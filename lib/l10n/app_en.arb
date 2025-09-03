@@ -1,0 +1,74 @@
+{
+  "appName": "Kelivo",
+  "@appName": {
+    "description": "The name of the application"
+  },
+  "settings": "Settings",
+  "@settings": {
+    "description": "Settings page title"
+  },
+  "language": "Language",
+  "@language": {
+    "description": "Language setting"
+  },
+  "theme": "Theme",
+  "@theme": {
+    "description": "Theme setting"
+  },
+  "about": "About",
+  "@about": {
+    "description": "About page title"
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Cancel button"
+  },
+  "confirm": "Confirm",
+  "@confirm": {
+    "description": "Confirm button"
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Save button"
+  },
+  "delete": "Delete",
+  "@delete": {
+    "description": "Delete button"
+  },
+  "edit": "Edit",
+  "@edit": {
+    "description": "Edit button"
+  },
+  "add": "Add",
+  "@add": {
+    "description": "Add button"
+  },
+  "close": "Close",
+  "@close": {
+    "description": "Close button"
+  },
+  "selectTranslationLanguage": "Select Translation Language",
+  "@selectTranslationLanguage": {
+    "description": "Title for language selection sheet"
+  },
+  "clearTranslation": "Clear Translation",
+  "@clearTranslation": {
+    "description": "Button to clear translation"
+  },
+  "dark": "Dark",
+  "@dark": {
+    "description": "Dark theme mode"
+  },
+  "light": "Light",
+  "@light": {
+    "description": "Light theme mode"
+  },
+  "system": "System",
+  "@system": {
+    "description": "System theme mode"
+  },
+  "back": "Back",
+  "@back": {
+    "description": "Back button tooltip"
+  }
+}

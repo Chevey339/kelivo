@@ -1,0 +1,20 @@
+{
+  "appName": "Kelivo",
+  "settings": "设置",
+  "language": "语言",
+  "theme": "主题",
+  "about": "关于",
+  "cancel": "取消",
+  "confirm": "确认",
+  "save": "保存",
+  "delete": "删除",
+  "edit": "编辑",
+  "add": "添加",
+  "close": "关闭",
+  "selectTranslationLanguage": "选择翻译语言",
+  "clearTranslation": "清空翻译",
+  "dark": "深色",
+  "light": "浅色",
+  "system": "跟随系统",
+  "back": "返回"
+}

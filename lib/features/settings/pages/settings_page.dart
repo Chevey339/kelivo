@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../model/pages/default_model_page.dart';
 import '../../provider/pages/providers_page.dart';
 import 'display_settings_page.dart';
@@ -22,22 +23,21 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
+    final l10n = AppLocalizations.of(context)!;
 
     String modeLabel(ThemeMode m) {
-      final zh = Localizations.localeOf(context).languageCode == 'zh';
       switch (m) {
         case ThemeMode.dark:
-          return zh ? '深色' : 'Dark';
+          return l10n.dark;
         case ThemeMode.light:
-          return zh ? '浅色' : 'Light';
+          return l10n.light;
         case ThemeMode.system:
         default:
-          return zh ? '跟随系统' : 'System';
+          return l10n.system;
       }
     }
 
     Future<void> pickThemeMode() async {
-      final zh = Localizations.localeOf(context).languageCode == 'zh';
       final selected = await showModalBottomSheet<ThemeMode>(
         context: context,
         backgroundColor: cs.surface,
@@ -89,9 +89,9 @@ class SettingsPage extends StatelessWidget {
         leading: IconButton(
           icon: Icon(Lucide.ArrowLeft, size: 22),
           onPressed: () => Navigator.of(context).maybePop(),
-          tooltip: Localizations.localeOf(context).languageCode == 'zh' ? '返回' : 'Back',
+          tooltip: l10n.back,
         ),
-        title: Text(Localizations.localeOf(context).languageCode == 'zh' ? '设置' : 'Settings'),
+        title: Text(l10n.settings),
       ),
       body: ListView(
         children: [

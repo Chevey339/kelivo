@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_localizations.dart';
 import 'features/home/pages/home_page.dart';
 import 'package:flutter/services.dart';
 // Theme is now managed in SettingsProvider
@@ -103,6 +104,7 @@ class MyApp extends StatelessWidget {
                   Locale('en', 'US'),
                 ],
                 localizationsDelegates: const [
+                  AppLocalizations.delegate, // Add this line
                   GlobalMaterialLocalizations.delegate,
                   GlobalWidgetsLocalizations.delegate,
                   GlobalCupertinoLocalizations.delegate,

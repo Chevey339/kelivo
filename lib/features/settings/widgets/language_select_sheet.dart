@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../icons/lucide_adapter.dart';
+import '../../../l10n/app_localizations.dart';
 
 class LanguageOption {
   final String code;
@@ -67,7 +68,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final zh = Localizations.localeOf(context).languageCode == 'zh';
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SafeArea(
@@ -101,7 +102,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   child: Text(
-                    zh ? '选择翻译语言' : 'Select Translation Language',
+                    l10n.selectTranslationLanguage,
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -121,10 +122,10 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
                           borderRadius: BorderRadius.circular(12),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(12),
-                            onTap: () => Navigator.of(context).pop(const LanguageOption(
+                            onTap: () => Navigator.of(context).pop(LanguageOption(
                               code: '__clear__',
-                              displayName: 'Clear Translation',
-                              displayNameZh: '清空翻译',
+                              displayName: l10n.clearTranslation,
+                              displayNameZh: l10n.clearTranslation,
                               flag: '',
                             )),
                             child: Padding(
@@ -138,7 +139,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
                                   ),
                                   const SizedBox(width: 12),
                                   Text(
-                                    zh ? '清空翻译' : 'Clear Translation',
+                                    l10n.clearTranslation,
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w500,
