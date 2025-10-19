@@ -6,6 +6,7 @@ import 'dart:convert';
 import '../services/search/search_service.dart';
 import '../models/api_keys.dart';
 import '../models/backup.dart';
+import '../services/icloud_sync_service.dart';
 
 class SettingsProvider extends ChangeNotifier {
   static const String _providersOrderKey = 'providers_order_v1';
@@ -44,6 +45,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _searchSelectedKey = 'search_selected_v1';
   static const String _searchEnabledKey = 'search_enabled_v1';
   static const String _webDavConfigKey = 'webdav_config_v1';
+  static const String _iCloudSyncEnabledKey = 'icloud_sync_enabled_v1';
 
   List<String> _providersOrder = const [];
   List<String> get providersOrder => _providersOrder;
@@ -93,11 +95,26 @@ class SettingsProvider extends ChangeNotifier {
   final Map<String, bool?> _searchConnection = <String, bool?>{};
   Map<String, bool?> get searchConnection => Map.unmodifiable(_searchConnection);
 
+  bool _icloudSyncEnabled = false;
+  bool get icloudSyncEnabled => _icloudSyncEnabled;
+  bool get supportsICloudSync => ICloudSyncService.instance.isSupported;
+
+  bool _loading = false;
+  bool _pendingReload = false;
+
   SettingsProvider() {
     _load();
+    if (supportsICloudSync) {
+      ICloudSyncService.instance.addListener(_handleICloudUpdate);
+    }
   }
 
   Future<void> _load() async {
+    if (_loading) {
+      _pendingReload = true;
+      return;
+    }
+    _loading = true;
     final prefs = await SharedPreferences.getInstance();
     _providersOrder = prefs.getStringList(_providersOrderKey) ?? [];
     final m = prefs.getString(_themeModeKey);
@@ -211,6 +228,8 @@ class SettingsProvider extends ChangeNotifier {
     if (webdavStr != null && webdavStr.isNotEmpty) {
       try { _webDavConfig = WebDavConfig.fromJson(jsonDecode(webdavStr) as Map<String, dynamic>); } catch (_) {}
     }
+    _icloudSyncEnabled = prefs.getBool(_iCloudSyncEnabledKey) ?? false;
+    await _applyICloudSyncSetting();
     if (_providerConfigs.isEmpty) {
       // Seed a couple of sensible defaults on first launch, but do not recreate
       // providers implicitly during later reads (e.g., when switching chats).
@@ -222,6 +241,27 @@ class SettingsProvider extends ChangeNotifier {
     _initSearchConnectivityTests();
 
     notifyListeners();
+    _loading = false;
+    if (_pendingReload) {
+      _pendingReload = false;
+      unawaited(_load());
+    }
+  }
+
+  Future<void> _applyICloudSyncSetting() async {
+    if (!supportsICloudSync) {
+      await ICloudSyncService.instance.disable();
+      return;
+    }
+    if (_icloudSyncEnabled) {
+      await ICloudSyncService.instance.enable();
+    } else {
+      await ICloudSyncService.instance.disable();
+    }
+  }
+
+  void _handleICloudUpdate() {
+    unawaited(_load());
   }
 
   // ===== App locale (UI language) =====
@@ -291,6 +331,16 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_webDavConfigKey, jsonEncode(cfg.toJson()));
+  }
+
+  Future<void> setICloudSyncEnabled(bool enabled) async {
+    if (!supportsICloudSync) return;
+    if (_icloudSyncEnabled == enabled) return;
+    _icloudSyncEnabled = enabled;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_iCloudSyncEnabledKey, enabled);
+    await _applyICloudSyncSetting();
   }
 
   Future<void> _initSearchConnectivityTests() async {
@@ -863,6 +913,14 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._enableDollarLatex = _enableDollarLatex;
     copy._enableMathRendering = _enableMathRendering;
     return copy;
+  }
+
+  @override
+  void dispose() {
+    if (supportsICloudSync) {
+      ICloudSyncService.instance.removeListener(_handleICloudUpdate);
+    }
+    super.dispose();
   }
 }
 

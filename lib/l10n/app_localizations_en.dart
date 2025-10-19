@@ -781,6 +781,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageBackupManagement => 'Backup Management';
 
   @override
+  String get backupPageICloudSection => 'iCloud Sync';
+
+  @override
+  String get backupPageICloudEnable => 'Enable iCloud sync';
+
+  @override
+  String get backupPageICloudDescription =>
+      'Sync preferences across signed-in Apple devices.';
+
+  @override
   String get backupPageWebDavBackup => 'WebDAV Backup';
 
   @override

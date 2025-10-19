@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
+import '../services/icloud_sync_service.dart';
 
 class UserProvider extends ChangeNotifier {
   static const String _prefsUserNameKey = 'user_name';
@@ -21,6 +23,9 @@ class UserProvider extends ChangeNotifier {
 
   UserProvider() {
     _load();
+    if (ICloudSyncService.instance.isSupported) {
+      ICloudSyncService.instance.addListener(_handleICloudUpdate);
+    }
   }
 
   Future<void> _load() async {
@@ -144,5 +149,39 @@ class UserProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_prefsAvatarTypeKey);
     await prefs.remove(_prefsAvatarValueKey);
+  }
+
+  Future<void> _reloadFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final n = prefs.getString(_prefsUserNameKey);
+    bool didChange = false;
+    if (n != null && n.isNotEmpty && n != _name) {
+      _name = n;
+      _hasSavedName = true;
+      didChange = true;
+    }
+    final newType = prefs.getString(_prefsAvatarTypeKey);
+    final rawAvatar = prefs.getString(_prefsAvatarValueKey);
+    final fixed = rawAvatar == null ? null : SandboxPathResolver.fix(rawAvatar);
+    if (newType != _avatarType || fixed != _avatarValue) {
+      _avatarType = newType;
+      _avatarValue = fixed;
+      didChange = true;
+    }
+    if (didChange) {
+      notifyListeners();
+    }
+  }
+
+  void _handleICloudUpdate() {
+    unawaited(_reloadFromPrefs());
+  }
+
+  @override
+  void dispose() {
+    if (ICloudSyncService.instance.isSupported) {
+      ICloudSyncService.instance.removeListener(_handleICloudUpdate);
+    }
+    super.dispose();
   }
 }

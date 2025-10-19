@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -7,6 +8,7 @@ import '../../utils/sandbox_path_resolver.dart';
 import '../models/assistant.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/avatar_cache.dart';
+import '../services/icloud_sync_service.dart';
 
 class AssistantProvider extends ChangeNotifier {
   static const String _assistantsKey = 'assistants_v1';
@@ -14,6 +16,8 @@ class AssistantProvider extends ChangeNotifier {
 
   final List<Assistant> _assistants = <Assistant>[];
   String? _currentAssistantId;
+  bool _loading = false;
+  bool _pendingReload = false;
 
   List<Assistant> get assistants => List.unmodifiable(_assistants);
   String? get currentAssistantId => _currentAssistantId;
@@ -26,9 +30,17 @@ class AssistantProvider extends ChangeNotifier {
 
   AssistantProvider() {
     _load();
+    if (ICloudSyncService.instance.isSupported) {
+      ICloudSyncService.instance.addListener(_handleICloudUpdate);
+    }
   }
 
   Future<void> _load() async {
+    if (_loading) {
+      _pendingReload = true;
+      return;
+    }
+    _loading = true;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_assistantsKey);
     if (raw != null && raw.isNotEmpty) {
@@ -46,6 +58,11 @@ class AssistantProvider extends ChangeNotifier {
       _currentAssistantId = null;
     }
     notifyListeners();
+    _loading = false;
+    if (_pendingReload) {
+      _pendingReload = false;
+      unawaited(_load());
+    }
   }
 
   Assistant _defaultAssistant(AppLocalizations l10n) => Assistant(
@@ -93,6 +110,10 @@ class AssistantProvider extends ChangeNotifier {
   Future<void> _persist() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString( _assistantsKey, Assistant.encodeList(_assistants));
+  }
+
+  void _handleICloudUpdate() {
+    unawaited(_load());
   }
 
   Future<void> setCurrentAssistant(String id) async {
@@ -267,5 +288,13 @@ class AssistantProvider extends ChangeNotifier {
     
     // Then persist the changes
     await _persist();
+  }
+
+  @override
+  void dispose() {
+    if (ICloudSyncService.instance.isSupported) {
+      ICloudSyncService.instance.removeListener(_handleICloudUpdate);
+    }
+    super.dispose();
   }
 }

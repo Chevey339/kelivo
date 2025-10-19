@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import '../services/icloud_sync_service.dart';
 
 /// Transport type supported on mobile: SSE and Streamable HTTP.
 enum McpTransportType { sse, http }
@@ -161,8 +162,14 @@ class McpProvider extends ChangeNotifier {
   // Heartbeat timers for live-connection health checks
   final Map<String, Timer> _heartbeats = <String, Timer>{};
 
+  bool _loading = false;
+  bool _pendingReload = false;
+
   McpProvider() {
     _load();
+    if (ICloudSyncService.instance.isSupported) {
+      ICloudSyncService.instance.addListener(_handleICloudUpdate);
+    }
   }
 
   List<McpServerConfig> get servers => List.unmodifiable(_servers);
@@ -174,6 +181,11 @@ class McpProvider extends ChangeNotifier {
       _servers.where((s) => statusFor(s.id) == McpStatus.connected).toList(growable: false);
 
   Future<void> _load() async {
+    if (_loading) {
+      _pendingReload = true;
+      return;
+    }
+    _loading = true;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_prefsKey);
     if (raw != null && raw.isNotEmpty) {
@@ -195,6 +207,11 @@ class McpProvider extends ChangeNotifier {
     for (final s in _servers.where((e) => e.enabled)) {
       // fire and forget
       unawaited(connect(s.id));
+    }
+    _loading = false;
+    if (_pendingReload) {
+      _pendingReload = false;
+      unawaited(_load());
     }
   }
 
@@ -879,13 +896,19 @@ class McpProvider extends ChangeNotifier {
     return tools;
   }
 
+  void _handleICloudUpdate() {
+    unawaited(_load());
+  }
+
   @override
   void dispose() {
-    // Clean up timers
     for (final t in _heartbeats.values) {
       t.cancel();
     }
     _heartbeats.clear();
+    if (ICloudSyncService.instance.isSupported) {
+      ICloudSyncService.instance.removeListener(_handleICloudUpdate);
+    }
     super.dispose();
   }
 }

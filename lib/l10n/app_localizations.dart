@@ -1571,6 +1571,24 @@ abstract class AppLocalizations {
   /// **'Backup Management'**
   String get backupPageBackupManagement;
 
+  /// No description provided for @backupPageICloudSection.
+  ///
+  /// In en, this message translates to:
+  /// **'iCloud Sync'**
+  String get backupPageICloudSection;
+
+  /// No description provided for @backupPageICloudEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable iCloud sync'**
+  String get backupPageICloudEnable;
+
+  /// No description provided for @backupPageICloudDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync preferences across signed-in Apple devices.'**
+  String get backupPageICloudDescription;
+
   /// No description provided for @backupPageWebDavBackup.
   ///
   /// In en, this message translates to:

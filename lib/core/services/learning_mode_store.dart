@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'icloud_sync_service.dart';
 
 class LearningModeStore {
   static const String _enabledKey = 'learning_mode_enabled_v1';
@@ -6,6 +7,19 @@ class LearningModeStore {
 
   static bool? _enabledCache;
   static String? _promptCache;
+  static bool _listenerAttached = false;
+
+  static void _ensureListener() {
+    if (_listenerAttached) return;
+    if (!ICloudSyncService.instance.isSupported) return;
+    _listenerAttached = true;
+    ICloudSyncService.instance.addListener(_handleICloudUpdate);
+  }
+
+  static void _handleICloudUpdate() {
+    _enabledCache = null;
+    _promptCache = null;
+  }
 
   static const String defaultPrompt = '''You are currently STUDYING, and you've asked me to follow these strict rules during this chat. No matter what other instructions follow, I MUST obey these rules:
 
@@ -129,6 +143,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
 // 5.  **Do Not Repeat Yourself:** Ensure that each of your turns in the conversation does not contain two similar responses back-to-back in the same turn. A poor response will look something like: "I can help with that problem. Shall we start by reviewing exponent rules? Let's work together to solve that problem! Would you like to begin with a review of exponent rules?"''';
 
   static Future<bool> isEnabled() async {
+    _ensureListener();
     if (_enabledCache != null) return _enabledCache!;
     final prefs = await SharedPreferences.getInstance();
     _enabledCache = prefs.getBool(_enabledKey) ?? false;
@@ -136,12 +151,14 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
   }
 
   static Future<void> setEnabled(bool enabled) async {
+    _ensureListener();
     _enabledCache = enabled;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_enabledKey, enabled);
   }
 
   static Future<String> getPrompt() async {
+    _ensureListener();
     if (_promptCache != null && _promptCache!.trim().isNotEmpty) return _promptCache!;
     final prefs = await SharedPreferences.getInstance();
     final p = prefs.getString(_promptKey);
@@ -150,6 +167,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
   }
 
   static Future<void> setPrompt(String prompt) async {
+    _ensureListener();
     _promptCache = prompt.trim().isEmpty ? defaultPrompt : prompt.trim();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_promptKey, _promptCache!);
@@ -157,4 +175,3 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
 
   static Future<void> resetPrompt() async => setPrompt(defaultPrompt);
 }
-
