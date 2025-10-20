@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/quick_phrase.dart';
 import '../services/quick_phrase_store.dart';
+import '../services/icloud_sync_service.dart';
 
 class QuickPhraseProvider with ChangeNotifier {
   List<QuickPhrase> _phrases = [];
@@ -13,6 +15,12 @@ class QuickPhraseProvider with ChangeNotifier {
   
   List<QuickPhrase> getForAssistant(String assistantId) =>
       _phrases.where((p) => !p.isGlobal && p.assistantId == assistantId).toList();
+
+  QuickPhraseProvider() {
+    if (ICloudSyncService.instance.isSupported) {
+      ICloudSyncService.instance.addListener(_handleICloudUpdate);
+    }
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -50,6 +58,10 @@ class QuickPhraseProvider with ChangeNotifier {
     await QuickPhraseStore.clear();
     _phrases = [];
     notifyListeners();
+  }
+
+  void _handleICloudUpdate() {
+    unawaited(loadAll());
   }
 
   void _reorderInMemory({
@@ -117,5 +129,13 @@ class QuickPhraseProvider with ChangeNotifier {
     _reorderInMemory(oldIndex: oldIndex, newIndex: newIndex, assistantId: assistantId);
     notifyListeners();
     await QuickPhraseStore.save(_phrases);
+  }
+
+  @override
+  void dispose() {
+    if (ICloudSyncService.instance.isSupported) {
+      ICloudSyncService.instance.removeListener(_handleICloudUpdate);
+    }
+    super.dispose();
   }
 }

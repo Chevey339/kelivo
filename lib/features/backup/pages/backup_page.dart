@@ -229,6 +229,29 @@ class _BackupPageState extends State<BackupPage> {
                 ),
               ]),
 
+              if (settings.supportsICloudSync) ...[
+                const SizedBox(height: 12),
+                header(l10n.backupPageICloudSection),
+                _iosSectionCard(children: [
+                  _iosSwitchRow(
+                    context,
+                    icon: Lucide.Cloud,
+                    label: l10n.backupPageICloudEnable,
+                    value: settings.icloudSyncEnabled,
+                    onChanged: (v) {
+                      context.read<SettingsProvider>().setICloudSyncEnabled(v);
+                    },
+                  ),
+                ]),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: Text(
+                    l10n.backupPageICloudDescription,
+                    style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.65)),
+                  ),
+                ),
+              ],
+
               // Section 2: WebDAV备份
               header(l10n.backupPageWebDavBackup),
               _iosSectionCard(children: [

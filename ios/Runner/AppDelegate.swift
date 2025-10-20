@@ -9,6 +9,7 @@ import UIKit
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
     if let controller = window?.rootViewController as? FlutterViewController {
+      ICloudSyncHandler.shared.register(with: controller)
       let channel = FlutterMethodChannel(name: "app.clipboard", binaryMessenger: controller.binaryMessenger)
       channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
         if call.method == "getClipboardImages" {

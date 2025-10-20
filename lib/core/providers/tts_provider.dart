@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:ui' as ui;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import '../services/icloud_sync_service.dart';
 
 /// System TTS provider using flutter_tts.
 /// Keeps minimal state and simple chunked speaking for long text.
@@ -43,6 +44,9 @@ class TtsProvider extends ChangeNotifier {
 
   TtsProvider() {
     _init();
+    if (ICloudSyncService.instance.isSupported) {
+      ICloudSyncService.instance.addListener(_handleICloudUpdate);
+    }
   }
 
   Future<void> _init() async {
@@ -94,6 +98,42 @@ class TtsProvider extends ChangeNotifier {
       _initialized = false;
       notifyListeners();
     }
+  }
+
+  Future<void> _reloadFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final double newRate = (prefs.getDouble(_rateKey) ?? 0.5).clamp(0.1, 1.0);
+    final double newPitch = (prefs.getDouble(_pitchKey) ?? 1.0).clamp(0.5, 2.0);
+    final String? newEngine = prefs.getString(_engineKey);
+    final String? newLang = prefs.getString(_langKey);
+
+    bool changed = false;
+    if (newRate != _speechRate) {
+      _speechRate = newRate;
+      changed = true;
+    }
+    if (newPitch != _pitch) {
+      _pitch = newPitch;
+      changed = true;
+    }
+    if (newEngine != _engineId) {
+      _engineId = newEngine;
+      changed = true;
+    }
+    if (newLang != _languageTag) {
+      _languageTag = newLang;
+      changed = true;
+    }
+    if (changed) {
+      if (_initialized) {
+        try { await _applyConfig(); } catch (_) {}
+      }
+      notifyListeners();
+    }
+  }
+
+  void _handleICloudUpdate() {
+    unawaited(_reloadFromPrefs());
   }
 
   Future<void> _applyConfig() async {
@@ -437,6 +477,9 @@ class TtsProvider extends ChangeNotifier {
   @override
   void dispose() {
     _tts.stop();
+    if (ICloudSyncService.instance.isSupported) {
+      ICloudSyncService.instance.removeListener(_handleICloudUpdate);
+    }
     super.dispose();
   }
 }

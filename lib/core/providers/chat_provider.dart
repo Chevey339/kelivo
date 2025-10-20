@@ -1,12 +1,17 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_item.dart';
+import '../services/icloud_sync_service.dart';
 
 class ChatProvider extends ChangeNotifier {
   ChatProvider({List<ChatItem>? seed}) {
     _chats = List.of(seed ?? const <ChatItem>[]);
     _init();
+    if (ICloudSyncService.instance.isSupported) {
+      ICloudSyncService.instance.addListener(_handleICloudUpdate);
+    }
   }
 
   static const String _prefsPinnedKey = 'pinned_chat_ids';
@@ -62,6 +67,19 @@ class ChatProvider extends ChangeNotifier {
     await prefs.setString(_prefsTitlesKey, jsonEncode(map));
   }
 
+  Future<void> _reloadFromPrefs() async {
+    await _loadPinned();
+    await _loadTitles();
+    if (_initialized == false) {
+      _initialized = true;
+    }
+    notifyListeners();
+  }
+
+  void _handleICloudUpdate() {
+    unawaited(_reloadFromPrefs());
+  }
+
   void setChats(List<ChatItem> items) {
     _chats = List.of(items);
     notifyListeners();
@@ -92,5 +110,12 @@ class ChatProvider extends ChangeNotifier {
     await _savePinned();
     await _saveTitles();
   }
-}
 
+  @override
+  void dispose() {
+    if (ICloudSyncService.instance.isSupported) {
+      ICloudSyncService.instance.removeListener(_handleICloudUpdate);
+    }
+    super.dispose();
+  }
+}

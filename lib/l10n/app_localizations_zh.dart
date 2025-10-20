@@ -763,6 +763,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageBackupManagement => '备份管理';
 
   @override
+  String get backupPageICloudSection => 'iCloud 同步';
+
+  @override
+  String get backupPageICloudEnable => '启用 iCloud 同步';
+
+  @override
+  String get backupPageICloudDescription => '在登录同一 Apple ID 的设备之间同步设置。';
+
+  @override
   String get backupPageWebDavBackup => 'WebDAV 备份';
 
   @override
@@ -3220,6 +3229,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageBackupManagement => '备份管理';
 
   @override
+  String get backupPageICloudSection => 'iCloud 同步';
+
+  @override
+  String get backupPageICloudEnable => '启用 iCloud 同步';
+
+  @override
+  String get backupPageICloudDescription => '在登录同一 Apple ID 的设备之间同步设置。';
+
+  @override
   String get backupPageWebDavBackup => 'WebDAV 备份';
 
   @override
@@ -5675,6 +5693,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageBackupManagement => '備份管理';
+
+  @override
+  String get backupPageICloudSection => 'iCloud 同步';
+
+  @override
+  String get backupPageICloudEnable => '啟用 iCloud 同步';
+
+  @override
+  String get backupPageICloudDescription => '在登入相同 Apple ID 的裝置間同步設定。';
 
   @override
   String get backupPageWebDavBackup => 'WebDAV 備份';
