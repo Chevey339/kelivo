@@ -61,7 +61,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'master'
+          channel: 'stable'
           
       - name: Get dependencies
         run: |
@@ -69,11 +69,13 @@ jobs:
           
       - name: Build APK (unsigned if no keystore)
         run: |
-          flutter build apk --release --split-per-abi
+          # Use verbose logs to surface kernel_snapshot errors
+          flutter build apk --release --split-per-abi -v
           
       - name: Build App Bundle
         run: |
-          flutter build appbundle --release
+          # Use verbose logs to surface kernel_snapshot errors
+          flutter build appbundle --release -v
           
       - name: Upload APKs
         uses: actions/upload-artifact@v4
@@ -105,7 +107,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'master'
+          channel: 'stable'
       - name: Get dependencies
         run: |
           flutter pub get
@@ -122,6 +124,19 @@ jobs:
           flutter build windows --release 2>&1 | Out-Null
 
           Write-Host "Applying flutter_tts workaround..."
+
+          # Robustly stub flutter_tts Windows CMake to a no-op target
+          $pluginCMake = "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts/windows/CMakeLists.txt"
+          if (Test-Path $pluginCMake) {
+            Write-Host "Stubbing $pluginCMake to avoid invalid CMake content"
+            @"
+cmake_minimum_required(VERSION 3.14)
+set(PLUGIN_NAME "flutter_tts_plugin")
+project(${PLUGIN_NAME} LANGUAGES CXX)
+# Define a no-op target so generated_plugins.cmake can link against it safely.
+add_library(${PLUGIN_NAME} INTERFACE)
+"@ | Set-Content $pluginCMake -Encoding UTF8
+          }
 
           # Remove from generated_plugins.cmake
           $genPlugins = "windows/flutter/generated_plugins.cmake"
@@ -144,12 +159,6 @@ jobs:
             (Get-Content $genHeader) | Where-Object {$_ -notmatch 'flutter_tts'} | Set-Content $genHeader -Encoding UTF8
           }
 
-          # Remove plugin symlink directory
-          if (Test-Path "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts") {
-            Write-Host "Removing plugin symlink"
-            Remove-Item -Recurse -Force "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts"
-          }
-
           Write-Host "Rebuilding with workaround applied..."
           flutter build windows --release
           
@@ -169,4 +178,3 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: kelivo-windows-x64.zip
-
