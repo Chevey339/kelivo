@@ -182,10 +182,35 @@ jobs:
           Write-Host "Rebuilding with workaround applied..."
           flutter build windows --release
           
-      - name: Create Windows Installer
+      - name: Package Windows Build
+        shell: pwsh
         run: |
-          # Create a simple ZIP archive as installer
-          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath kelivo-windows-x64.zip
+          Write-Host "Locating Windows build output folder..."
+          $candidates = @(
+            "build/windows/x64/runner/Release",
+            "build/windows/runner/Release",
+            "build/windows/x64/RelWithDebInfo",
+            "build/windows/runner/RelWithDebInfo"
+          )
+          $bundle = $null
+          foreach ($c in $candidates) {
+            if (Test-Path $c) {
+              if (Test-Path (Join-Path $c 'flutter_windows.dll') -or Test-Path (Join-Path $c 'data')) {
+                $bundle = $c; break
+              }
+            }
+          }
+          if (-not $bundle) {
+            $dll = Get-ChildItem -Recurse -ErrorAction SilentlyContinue -Filter 'flutter_windows.dll' | Select-Object -First 1
+            if ($dll) { $bundle = Split-Path $dll.FullName -Parent }
+          }
+          if (-not $bundle) { Get-ChildItem -Recurse build/windows | Select-Object -First 200 | % { $_.FullName }; throw "Failed to locate Windows bundle folder" }
+          Write-Host "Bundling from: $bundle"
+          if (-not (Test-Path (Join-Path $bundle 'data'))) { Write-Warning "'data' directory missing; the zip may be incomplete." }
+          if (-not (Test-Path (Join-Path $bundle 'flutter_windows.dll'))) { Write-Warning "'flutter_windows.dll' missing; the zip may be incomplete." }
+          Compress-Archive -Path (Join-Path $bundle '*') -DestinationPath kelivo-windows-x64.zip -Force
+          $size = (Get-Item kelivo-windows-x64.zip).Length / 1MB
+          Write-Host ("Created kelivo-windows-x64.zip ({0:N1} MB)" -f $size)
           
       - name: Upload Windows Build
         uses: actions/upload-artifact@v4
