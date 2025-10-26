@@ -14,12 +14,10 @@ jobs:
     steps:
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           body: |
             ## 🎉 Kelivo ${{ github.ref_name }} 发布
 
@@ -63,13 +61,12 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.1'
+          flutter-version: '3.24.5'
           channel: 'stable'
           
       - name: Get dependencies
         run: |
           flutter pub get
-          flutter pub upgrade --major-versions
           
       - name: Build APK
         run: |
@@ -109,13 +106,12 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.1'
+          flutter-version: '3.24.5'
           channel: 'stable'
           
       - name: Get dependencies
         run: |
           flutter pub get
-          flutter pub upgrade --major-versions
           
       - name: Build Windows
         run: |
@@ -153,13 +149,12 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.1'
+          flutter-version: '3.24.5'
           channel: 'stable'
           
       - name: Get dependencies
         run: |
           flutter pub get
-          flutter pub upgrade --major-versions
           
       - name: Build Linux
         run: |
