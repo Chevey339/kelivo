@@ -51,28 +51,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-          
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          
+
       - name: Get dependencies
         run: |
           flutter pub get
-          
-      - name: Build APK (unsigned if no keystore)
+
+      - name: Decode and setup keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "storeFile=app/upload-keystore.jks" >> android/key.properties
+
+      - name: Build APK (signed)
         run: |
           # Use verbose logs to surface kernel_snapshot errors
           flutter build apk --release --split-per-abi -v
-          
-      - name: Build App Bundle
+
+      - name: Build App Bundle (signed)
         run: |
           # Use verbose logs to surface kernel_snapshot errors
           flutter build appbundle --release -v
@@ -195,7 +203,7 @@ jobs:
           $bundle = $null
           foreach ($c in $candidates) {
             if (Test-Path $c) {
-              if (Test-Path (Join-Path $c 'flutter_windows.dll') -or Test-Path (Join-Path $c 'data')) {
+              if ((Test-Path (Join-Path $c 'flutter_windows.dll')) -or (Test-Path (Join-Path $c 'data'))) {
                 $bundle = $c; break
               }
             }
