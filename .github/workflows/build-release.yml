@@ -125,18 +125,29 @@ jobs:
 
           Write-Host "Applying flutter_tts workaround..."
 
-          # Robustly stub flutter_tts Windows CMake to a no-op target (avoid here-string to keep YAML valid)
+          # Robustly stub flutter_tts Windows CMake to a no-op SHARED target (so $<TARGET_FILE:..> works)
           $pluginCMake = "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts/windows/CMakeLists.txt"
+          $pluginDir = Split-Path $pluginCMake -Parent
           if (Test-Path $pluginCMake) {
-            Write-Host "Stubbing $pluginCMake to avoid invalid CMake content"
+            Write-Host "Stubbing $pluginCMake to a minimal SHARED library"
+            # Write minimal CMakeLists that builds an empty DLL
             $cmakeLines = @(
               'cmake_minimum_required(VERSION 3.14)',
               'set(PLUGIN_NAME "flutter_tts_plugin")',
               'project(${PLUGIN_NAME} LANGUAGES CXX)',
-              '# Define a no-op target so generated_plugins.cmake can link against it safely.',
-              'add_library(${PLUGIN_NAME} INTERFACE)'
+              'set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)',
+              'add_library(${PLUGIN_NAME} SHARED "noop.cpp")',
+              'target_compile_features(${PLUGIN_NAME} PUBLIC cxx_std_17)',
+              'set(flutter_tts_bundled_libraries "" PARENT_SCOPE)'
             )
             $cmakeLines | Set-Content $pluginCMake -Encoding UTF8
+            # Write minimal C++ source to ensure the DLL is produced
+            $noopCpp = Join-Path $pluginDir 'noop.cpp'
+            $cppLines = @(
+              '#include <windows.h>',
+              'extern "C" __declspec(dllexport) void kelivo_tts_noop() {}'
+            )
+            $cppLines | Set-Content $noopCpp -Encoding UTF8
           }
 
           # Remove from generated_plugins.cmake
