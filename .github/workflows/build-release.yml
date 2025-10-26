@@ -21,26 +21,28 @@ jobs:
           body: |
             ## 🎉 Kelivo ${{ github.ref_name }} 发布
 
-            ### ✨ 新功能
-            - **改进的加载动画效果**
-              - 支持多种动画风格（shimmer、pulse、typewriter、modern）
-              - 现代化的波浪加载效果
-              - 文字与动画同步显示
+            ### ✨ 新功能 (v1.1.0)
+            - **Token 使用详情显示**
+              - 显示输入（↓）和输出（↑）token 数量
+              - 支持显示思考 token（💭）和缓存 token（♻）
+              - 鼠标悬停显示详细的 token 使用信息
+              - 刷新页面后保持详细显示格式
 
-            ### 🔧 修复
-            - **修复思考内容的Markdown渲染**
-              - 现在可以正确显示粗体、斜体、代码块等格式
-            - **修复网页版侧边栏底部设置按钮不显示的问题**
-            - **Windows平台兼容性大幅改进**
-              - 修复触觉反馈在Windows上的调用错误
-              - 修复PDF读取、图片选择器等插件兼容性
-              - 所有平台特定功能现在都会优雅降级
+            ### 🔧 修复 (v1.1.0)
+            - **修复 Token 显示问题**
+              - 修复刷新页面后 token 显示变回总数的问题
+              - 修复鼠标悬停提示不显示的问题
+              - 使用 MouseRegion + OverlayEntry 实现更可靠的悬停提示
+            - **修复 Hive 数据持久化问题**
+              - 修复 tokenUsageJson 字段未正确保存到数据库的问题
+            - **修复代码语法错误**
+              - 修复 ios_switch.dart 中的十六进制颜色值格式错误
 
-            ### 🚀 技术改进
-            - 创建了AnimatedLoadingText和ModernLoadingIndicator组件
-            - 创建PlatformUtils工具类统一处理跨平台兼容性
-            - 升级了项目依赖包
-            - 添加了GitHub Actions自动构建配置
+            ### 🚀 技术改进 (v1.1.0)
+            - 配置 Android 应用签名
+            - 改进 GitHub Actions 构建流程
+            - 添加自定义悬停提示组件 _TokenUsageDisplay
+            - 优化 token 使用信息的存储和显示逻辑
 
             ### 📦 下载
             构建产物将在下方自动附加。

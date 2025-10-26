@@ -57,3 +57,9 @@ pubspec.lock
 internationalization.md
 /macos/Podfile.lock
 /desiredFileName.txt
+
+# Android signing keys - DO NOT COMMIT
+*.jks
+*.keystore
+key.properties
+*.jks.base64
