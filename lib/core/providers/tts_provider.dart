@@ -47,6 +47,13 @@ class TtsProvider extends ChangeNotifier {
 
   Future<void> _init() async {
     try {
+      // Windows 平台暂不实现 TTS，直接返回可用但提示未实现
+      if (defaultTargetPlatform == TargetPlatform.windows) {
+        _initialized = true;
+        _error = 'Windows 平台暂未实现 TTS 功能';
+        notifyListeners();
+        return;
+      }
       _tts = FlutterTts();
       // Load settings
       final prefs = await SharedPreferences.getInstance();

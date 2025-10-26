@@ -164,7 +164,7 @@ jobs:
               '#endif',
               'extern "C" {',
               'FLUTTER_PLUGIN_EXPORT void FlutterTtsPluginRegisterWithRegistrar(',
-              '    flutter::PluginRegistrar* registrar);',
+              '    FlutterDesktopPluginRegistrarRef registrar);',
               '}',
               '#endif  // FLUTTER_PLUGIN_FLUTTER_TTS_PLUGIN_H_'
             )
@@ -174,7 +174,7 @@ jobs:
             $implPath = Join-Path $pluginDir 'flutter_tts_plugin.cpp'
             $implLines = @(
               '#include "include/flutter_tts/flutter_tts_plugin.h"',
-              'void FlutterTtsPluginRegisterWithRegistrar(flutter::PluginRegistrar* registrar) {}'
+              'extern "C" void FlutterTtsPluginRegisterWithRegistrar(FlutterDesktopPluginRegistrarRef registrar) {}'
             )
             $implLines | Set-Content $implPath -Encoding UTF8
           }
