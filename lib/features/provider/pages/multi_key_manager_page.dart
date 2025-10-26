@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -9,6 +11,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../core/services/haptics.dart';
 
 class MultiKeyManagerPage extends StatefulWidget {
@@ -579,7 +582,8 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                for (final s in LoadBalanceStrategy.values)
+                // Only show Round Robin and Random for now
+                for (final s in <LoadBalanceStrategy>[LoadBalanceStrategy.roundRobin, LoadBalanceStrategy.random])
                   _TactileRow(
                     pressedScale: 1.00,
                     onTap: () => Navigator.of(ctx).pop(s),
@@ -628,7 +632,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
         return SafeArea(
@@ -642,72 +646,53 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.onSurface.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
+                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(999)))),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 36,
+                  child: Stack(
+                    children: [
+                      Align(
+                        alignment: Alignment.center,
+                        child: Text(l10n.multiKeyPageAdd, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: _TactileIconButton(
+                          icon: Lucide.X,
+                          color: cs.onSurface,
+                          onTap: () => Navigator.of(ctx).maybePop(),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                Text(l10n.multiKeyPageAdd, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 16),
                 TextField(
                   controller: inputCtrl,
                   minLines: 3,
                   maxLines: 6,
                   decoration: InputDecoration(
-                    labelText: l10n.multiKeyPageAddHint,
-                    alignLabelWithHint: true,
+                    hintText: l10n.multiKeyPageAddHint,
                     filled: true,
-                    fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
-                    ),
+                    fillColor: isDark ? Colors.white10 : Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary.withOpacity(0.5))),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.of(ctx).pop(),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
-                          side: BorderSide(color: cs.outlineVariant.withOpacity(0.35)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: Text(l10n.multiKeyPageCancel),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () => Navigator.of(ctx).pop(_splitKeys(inputCtrl.text)),
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
-                          backgroundColor: cs.primary,
-                          foregroundColor: cs.onPrimary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: Text(l10n.multiKeyPageAdd),
-                      ),
-                    ),
-                  ],
+                SizedBox(
+                  width: double.infinity,
+                  child: IosTileButton(
+                    label: l10n.multiKeyPageAdd,
+                    icon: Lucide.Plus,
+                    backgroundColor: cs.primary,
+                    onTap: () => Navigator.of(ctx).pop(_splitKeys(inputCtrl.text)),
+                  ),
                 ),
               ],
             ),
@@ -730,7 +715,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
         return SafeArea(
@@ -744,60 +729,53 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.onSurface.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
+                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(999)))),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 36,
+                  child: Stack(
+                    children: [
+                      Align(
+                        alignment: Alignment.center,
+                        child: Text(l10n.multiKeyPageEdit, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: _TactileIconButton(
+                          icon: Lucide.X,
+                          color: cs.onSurface,
+                          onTap: () => Navigator.of(ctx).maybePop(),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                Text(l10n.multiKeyPageEdit, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 16),
                 TextField(
                   controller: aliasCtrl,
                   decoration: InputDecoration(
-                    labelText: l10n.multiKeyPageAlias,
+                    hintText: l10n.multiKeyPageAlias,
                     filled: true,
-                    fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
-                    ),
+                    fillColor: isDark ? Colors.white10 : Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary.withOpacity(0.5))),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: keyCtrl,
                   decoration: InputDecoration(
-                    labelText: l10n.multiKeyPageKey,
+                    hintText: l10n.multiKeyPageKey,
                     filled: true,
-                    fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
-                    ),
+                    fillColor: isDark ? Colors.white10 : Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary.withOpacity(0.5))),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -805,61 +783,34 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                   controller: priCtrl,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    labelText: l10n.multiKeyPagePriority,
+                    hintText: l10n.multiKeyPagePriority,
                     filled: true,
-                    fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
-                    ),
+                    fillColor: isDark ? Colors.white10 : Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary.withOpacity(0.5))),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.of(ctx).pop(),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
-                          side: BorderSide(color: cs.outlineVariant.withOpacity(0.35)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                SizedBox(
+                  width: double.infinity,
+                  child: IosTileButton(
+                    label: l10n.multiKeyPageSave,
+                    icon: Lucide.Check,
+                    backgroundColor: cs.primary,
+                    onTap: () {
+                      final p = int.tryParse(priCtrl.text.trim()) ?? k.priority;
+                      final clamped = p.clamp(1, 10) as int;
+                      Navigator.of(ctx).pop(
+                        k.copyWith(
+                          name: aliasCtrl.text.trim().isEmpty ? null : aliasCtrl.text.trim(),
+                          key: keyCtrl.text.trim(),
+                          priority: clamped,
                         ),
-                        child: Text(l10n.multiKeyPageCancel),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () {
-                          final p = int.tryParse(priCtrl.text.trim()) ?? k.priority;
-                          final clamped = p.clamp(1, 10) as int;
-                          Navigator.of(ctx).pop(
-                            k.copyWith(
-                              name: aliasCtrl.text.trim().isEmpty ? null : aliasCtrl.text.trim(),
-                              key: keyCtrl.text.trim(),
-                              priority: clamped,
-                            ),
-                          );
-                        },
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
-                          backgroundColor: cs.primary,
-                          foregroundColor: cs.onPrimary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: Text(l10n.multiKeyPageSave),
-                      ),
-                    ),
-                  ],
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
@@ -956,7 +907,7 @@ class _TactileScaleState extends State<_TactileScale> {
       onTap: widget.onTap == null
           ? null
           : () {
-              Haptics.soft();
+              if (context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
               widget.onTap!.call();
             },
       child: AnimatedScale(

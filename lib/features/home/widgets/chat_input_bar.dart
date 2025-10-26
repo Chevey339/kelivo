@@ -21,6 +21,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../utils/brand_assets.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 
 class ChatInputBarController {
   _ChatInputBarState? _state;
@@ -670,43 +671,33 @@ class _ChatInputBarState extends State<ChatInputBar> {
                               final svc = SearchService.getService(options);
                               final asset = BrandAssets.assetForName(svc.name);
 
-                              Widget child;
-                              if (asset != null) {
-                                if (asset.endsWith('.svg')) {
-                                  child = SvgPicture.asset(
-                                    asset,
-                                    width: 20,
-                                    height: 20,
-                                    colorFilter: ColorFilter.mode(
-                                      theme.colorScheme.primary,
-                                      BlendMode.srcIn,
-                                    ),
-                                  );
-                                } else {
-                                  // Fallback for raster images: apply tint
-                                  child = Image.asset(
-                                    asset,
-                                    width: 20,
-                                    height: 20,
-                                    color: theme.colorScheme.primary,
-                                    colorBlendMode: BlendMode.srcIn,
-                                  );
-                                }
-                              } else {
-                                // Fallback to globe but themed
-                                child = Icon(
-                                  Lucide.Globe,
-                                  size: 20,
-                                  color: theme.colorScheme.primary,
-                                );
-                              }
-
                               return _CompactIconButton(
                                 tooltip: AppLocalizations.of(context)!.chatInputBarOnlineSearchTooltip,
                                 icon: Lucide.Globe,
                                 active: true,
                                 onTap: widget.onOpenSearch,
-                                child: child,
+                                childBuilder: (c) {
+                                  if (asset != null) {
+                                    if (asset.endsWith('.svg')) {
+                                      return SvgPicture.asset(
+                                        asset,
+                                        width: 20,
+                                        height: 20,
+                                        colorFilter: ColorFilter.mode(c, BlendMode.srcIn),
+                                      );
+                                    } else {
+                                      return Image.asset(
+                                        asset,
+                                        width: 20,
+                                        height: 20,
+                                        color: c,
+                                        colorBlendMode: BlendMode.srcIn,
+                                      );
+                                    }
+                                  } else {
+                                    return Icon(Lucide.Globe, size: 20, color: c);
+                                  }
+                                },
                               );
                             })(),
                             if (widget.supportsReasoning) ...[
@@ -716,16 +707,11 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                 icon: Lucide.Brain,
                                 active: widget.reasoningActive,
                                 onTap: widget.onConfigureReasoning,
-                                child: SvgPicture.asset(
+                                childBuilder: (c) => SvgPicture.asset(
                                   'assets/icons/deepthink.svg',
                                   width: 20,
                                   height: 20,
-                                  colorFilter: ColorFilter.mode(
-                                    widget.reasoningActive
-                                        ? theme.colorScheme.primary
-                                        : (isDark ? Colors.white70 : Colors.black54),
-                                    BlendMode.srcIn,
-                                  ),
+                                  colorFilter: ColorFilter.mode(c, BlendMode.srcIn),
                                 ),
                               ),
                             ],
@@ -820,7 +806,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                 icon: Lucide.Plus,
                                 active: widget.moreOpen,
                                 onTap: widget.onMore,
-                                child: AnimatedSwitcher(
+                                childBuilder: (c) => AnimatedSwitcher(
                                   duration: const Duration(milliseconds: 200),
                                   transitionBuilder: (child, anim) => RotationTransition(
                                     turns: Tween<double>(begin: 0.85, end: 1).animate(anim),
@@ -830,9 +816,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                     widget.moreOpen ? Lucide.X : Lucide.Plus,
                                     key: ValueKey(widget.moreOpen ? 'close' : 'add'),
                                     size: 20,
-                                    color: widget.moreOpen
-                                        ? theme.colorScheme.primary
-                                        : (isDark ? Colors.white70 : Colors.black54),
+                                    color: c,
                                   ),
                                 ),
                               ),
@@ -870,6 +854,7 @@ class _CompactIconButton extends StatelessWidget {
     this.tooltip,
     this.active = false,
     this.child,
+    this.childBuilder,
     this.modelIcon = false,
   });
 
@@ -879,6 +864,7 @@ class _CompactIconButton extends StatelessWidget {
   final String? tooltip;
   final bool active;
   final Widget? child;
+  final Widget Function(Color color)? childBuilder;
   final bool modelIcon;
 
   @override
@@ -894,24 +880,18 @@ class _CompactIconButton extends StatelessWidget {
     final double childSize = isModelChild ? 28.0 : iconSize; // enlarge circle a bit more
     final double padding = isModelChild ? 1.0 : 6.0; // keep total ~30px (2*1 + 28)
 
-    final button = Material(
-      color: Colors.transparent,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: Padding(
-          padding: EdgeInsets.all(padding),
-          child: child != null 
-              ? SizedBox(
-                  width: childSize,
-                  height: childSize,
-                  child: child,
-                )
-              : Icon(icon, size: 20, color: fgColor),
-        ),
-      ),
+    final button = IosIconButton(
+      size: isModelChild ? childSize : 20,
+      padding: EdgeInsets.all(padding),
+      onTap: onTap,
+      onLongPress: onLongPress,
+      color: fgColor,
+      builder: childBuilder != null
+          ? (c) => SizedBox(width: childSize, height: childSize, child: childBuilder!(c))
+          : (child != null
+              ? (_) => SizedBox(width: childSize, height: childSize, child: child)
+              : null),
+      icon: child == null && childBuilder == null ? icon : null,
     );
 
     return tooltip == null ? button : Semantics(tooltip: tooltip!, child: button);
@@ -986,7 +966,7 @@ class _CompactSendButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = (enabled || loading) ? color : (isDark ? Colors.white12 : Colors.grey.shade300);
+    final bg = (enabled || loading) ? color : (isDark ? Colors.white12 : Colors.grey.shade300.withOpacity(0.84));
     final fg = (enabled || loading) ? (isDark ? Colors.black : Colors.white) : (isDark ? Colors.white70 : Colors.grey.shade600);
 
     return Material(

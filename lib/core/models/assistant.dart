@@ -22,6 +22,9 @@ class Assistant {
   // Custom request overrides (per assistant)
   final List<Map<String, String>> customHeaders; // [{name:'X-Header', value:'v'}]
   final List<Map<String, String>> customBody; // [{key:'foo', value:'{"a":1}'}]
+  // Memory features
+  final bool enableMemory; // assistant memory feature switch
+  final bool enableRecentChatsReference; // include recent chat titles in prompt
 
   const Assistant({
     required this.id,
@@ -44,6 +47,8 @@ class Assistant {
     this.deletable = true,
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
+    this.enableMemory = false,
+    this.enableRecentChatsReference = false,
   });
 
   Assistant copyWith({
@@ -67,6 +72,8 @@ class Assistant {
     bool? deletable,
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
+    bool? enableMemory,
+    bool? enableRecentChatsReference,
     bool clearChatModel = false,
     bool clearAvatar = false,
     bool clearTemperature = false,
@@ -96,6 +103,9 @@ class Assistant {
       deletable: deletable ?? this.deletable,
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
+      enableMemory: enableMemory ?? this.enableMemory,
+      enableRecentChatsReference:
+          enableRecentChatsReference ?? this.enableRecentChatsReference,
     );
   }
 
@@ -120,6 +130,8 @@ class Assistant {
         'deletable': deletable,
         'customHeaders': customHeaders,
         'customBody': customBody,
+        'enableMemory': enableMemory,
+        'enableRecentChatsReference': enableRecentChatsReference,
     };
 
   static Assistant fromJson(Map<String, dynamic> json) => Assistant(
@@ -167,6 +179,9 @@ class Assistant {
           }
           return const <Map<String, String>>[];
         })(),
+        enableMemory: json['enableMemory'] as bool? ?? false,
+        enableRecentChatsReference:
+            json['enableRecentChatsReference'] as bool? ?? false,
       );
 
   static String encodeList(List<Assistant> list) => jsonEncode(list.map((e) => e.toJson()).toList());

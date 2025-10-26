@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import 'package:syncfusion_flutter_sliders/sliders.dart';
@@ -26,15 +28,17 @@ import 'package:flutter/services.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../utils/sandbox_path_resolver.dart';
-import 'dart:io' show File;
+import 'dart:io' show File, Platform;
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
+import '../../../core/providers/memory_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/haptics.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 
 class AssistantSettingsEditPage extends StatefulWidget {
   const AssistantSettingsEditPage({super.key, required this.assistantId});
@@ -52,7 +56,7 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 5, vsync: this); //mcp
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -110,16 +114,17 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(52),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _SegTabBar(
+            padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _SegTabBar(
                     controller: _tabController,
                     tabs: [
                       l10n.assistantEditPageBasicTab,
                       l10n.assistantEditPagePromptsTab,
-                      l10n.assistantEditPageMcpTab,
+                      l10n.assistantEditPageMemoryTab,
+                      // l10n.assistantEditPageMcpTab,
                       l10n.assistantEditPageQuickPhraseTab,
                       l10n.assistantEditPageCustomTab,
                     ],
@@ -135,11 +140,263 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
         children: [
           _BasicSettingsTab(assistantId: assistant.id),
           _PromptTab(assistantId: assistant.id),
-          _McpTab(assistantId: assistant.id),
+          _MemoryTab(assistantId: assistant.id),
+          // _McpTab(assistantId: assistant.id),
           _QuickPhraseTab(assistantId: assistant.id),
           _CustomRequestTab(assistantId: assistant.id),
         ],
       ),
+    );
+  }
+}
+
+class _MemoryTab extends StatelessWidget {
+  const _MemoryTab({required this.assistantId});
+  final String assistantId;
+
+  Future<void> _showAddEditSheet(
+    BuildContext context, {
+    int? id,
+    String initial = '',
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final controller = TextEditingController(text: initial);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final bottom = MediaQuery.of(ctx).viewInsets.bottom;
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, bottom + 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Lucide.Library, size: 18, color: cs.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.assistantEditMemoryDialogTitle,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  minLines: 1,
+                  maxLines: 8,
+                  decoration: InputDecoration(
+                    hintText: l10n.assistantEditMemoryDialogHint,
+                    filled: true,
+                    fillColor: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF7F7F9),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.2)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _IosButton(
+                        label: l10n.assistantEditEmojiDialogCancel,
+                        icon: Lucide.X,
+                        onTap: () => Navigator.of(ctx).pop(),
+                        filled: false,
+                        neutral: true,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _IosButton(
+                        label: l10n.assistantEditEmojiDialogSave,
+                        icon: Lucide.Check,
+                        onTap: () async {
+                          final text = controller.text.trim();
+                          if (text.isEmpty) return;
+                          final mp = context.read<MemoryProvider>();
+                          if (id == null) {
+                            await mp.add(assistantId: assistantId, content: text);
+                          } else {
+                            await mp.update(id: id, content: text);
+                          }
+                          if (context.mounted) Navigator.of(ctx).pop();
+                        },
+                        filled: true,
+                        neutral: false,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ap = context.watch<AssistantProvider>();
+    final a = ap.getById(assistantId)!;
+    final mp = context.watch<MemoryProvider>();
+    // Ensure provider loads persisted memories once
+    try { WidgetsBinding.instance.addPostFrameCallback((_) { mp.initialize(); }); } catch (_) {}
+    final memories = mp.getForAssistant(assistantId);
+
+    // Align the section card visuals with the basic settings page iOS-style list cards
+    Widget sectionCard({required Widget child, EdgeInsets padding = const EdgeInsets.symmetric(vertical: 6)}) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Container(
+            decoration: BoxDecoration(
+              // Match Settings page: Light uses translucent white; Dark uses subtle white10
+              color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+                width: 0.6,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Padding(padding: padding, child: child),
+          ),
+        );
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
+      children: [
+        // Feature switches
+        sectionCard(
+          child: Column(
+            children: [
+              _iosSwitchRow(
+                context,
+                icon: Lucide.bookHeart,
+                label: l10n.assistantEditMemorySwitchTitle,
+                value: a.enableMemory,
+                onChanged: (v) async {
+                  await context.read<AssistantProvider>().updateAssistant(a.copyWith(enableMemory: v));
+                },
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.History,
+                label: l10n.assistantEditRecentChatsSwitchTitle,
+                value: a.enableRecentChatsReference,
+                onChanged: (v) async {
+                  await context.read<AssistantProvider>().updateAssistant(a.copyWith(enableRecentChatsReference: v));
+                },
+              ),
+            ],
+          ),
+        ),
+
+        // Manage memories header with add button
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.assistantEditManageMemoryTitle,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+              ),
+              _TactileRow(
+                onTap: () => _showAddEditSheet(context),
+                pressedScale: 0.97,
+                builder: (pressed) {
+                  final color = pressed ? cs.primary.withOpacity(0.7) : cs.primary;
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Lucide.Plus, size: 16, color: color),
+                      const SizedBox(width: 4),
+                      Text(l10n.assistantEditAddMemoryButton, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+                    ],
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+
+        if (memories.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              l10n.assistantEditMemoryEmpty,
+              style: TextStyle(color: cs.onSurface.withOpacity(0.6), fontSize: 12),
+            ),
+          ),
+
+        // Memory list
+        ...memories.map((m) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06), width: 0.6),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        m.content,
+                        maxLines: 5,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    _TactileIconButton(
+                      icon: Lucide.Pencil,
+                      size: 18,
+                      color: cs.primary,
+                      onTap: () => _showAddEditSheet(context, id: m.id, initial: m.content),
+                    ),
+                    const SizedBox(width: 6),
+                    _TactileIconButton(
+                      icon: Lucide.Trash2,
+                      size: 18,
+                      color: cs.error,
+                      onTap: () async {
+                        await context.read<MemoryProvider>().delete(id: m.id);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+        const SizedBox(height: 32),
+      ],
     );
   }
 }
@@ -232,7 +489,7 @@ class _CustomRequestTab extends StatelessWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(0, 16, 0, 16), // Added top padding
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 16), // Reduced top padding
       children: [
         // Headers
         card(
@@ -728,7 +985,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         // Identity card (avatar + name) - iOS style
         Container(
@@ -1065,59 +1322,81 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
     final l10n = AppLocalizations.of(context)!;
     await showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        final maxH = MediaQuery.of(ctx).size.height * 0.8;
+        Widget row(String text, Future<void> Function() action) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: SizedBox(
+              height: 48,
+              child: IosCardPress(
+                borderRadius: BorderRadius.circular(14),
+                baseColor: cs.surface,
+                duration: const Duration(milliseconds: 260),
+                onTap: () async {
+                  Haptics.light();
+                  Navigator.of(ctx).pop();
+                  await Future<void>.delayed(const Duration(milliseconds: 10));
+                  await action();
+                },
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                ),
+              ),
+            ),
+          );
+        }
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: Text(l10n.assistantEditAvatarChooseImage),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  await _pickLocalImage(context, a);
-                },
+          top: false,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxH),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: cs.onSurface.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    row(l10n.assistantEditAvatarChooseImage, () async => _pickLocalImage(context, a)),
+                    row(l10n.assistantEditAvatarChooseEmoji, () async {
+                      final emoji = await _pickEmoji(context);
+                      if (emoji != null) {
+                        await context.read<AssistantProvider>().updateAssistant(
+                          a.copyWith(avatar: emoji),
+                        );
+                      }
+                    }),
+                    row(l10n.assistantEditAvatarEnterLink, () async => _inputAvatarUrl(context, a)),
+                    row(l10n.assistantEditAvatarImportQQ, () async => _inputQQAvatar(context, a)),
+                    row(l10n.assistantEditAvatarReset, () async {
+                      await context.read<AssistantProvider>().updateAssistant(
+                        a.copyWith(clearAvatar: true),
+                      );
+                    }),
+                    const SizedBox(height: 4),
+                  ],
+                ),
               ),
-              ListTile(
-                title: Text(l10n.assistantEditAvatarChooseEmoji),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  final emoji = await _pickEmoji(context);
-                  if (emoji != null) {
-                    await context.read<AssistantProvider>().updateAssistant(
-                      a.copyWith(avatar: emoji),
-                    );
-                  }
-                },
-              ),
-              ListTile(
-                title: Text(l10n.assistantEditAvatarEnterLink),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  await _inputAvatarUrl(context, a);
-                },
-              ),
-              ListTile(
-                title: Text(l10n.assistantEditAvatarImportQQ),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  await _inputQQAvatar(context, a);
-                },
-              ),
-              ListTile(
-                title: Text(l10n.assistantEditAvatarReset),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  await context.read<AssistantProvider>().updateAssistant(
-                    a.copyWith(clearAvatar: true),
-                  );
-                },
-              ),
-              const SizedBox(height: 4),
-            ],
+            ),
           ),
         );
       },
@@ -1619,6 +1898,7 @@ class _SliderTileNew extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    
     final active = cs.primary;
     final inactive = cs.onSurface.withOpacity(isDark ? 0.25 : 0.20);
     final double clamped = value.clamp(min, max);
@@ -2376,6 +2656,14 @@ class _PromptTabState extends State<_PromptTab> {
     );
   }
 
+  void _insertNewlineAtCursor() {
+    _insertAtCursor(_sysCtrl, '\n');
+    final ap = context.read<AssistantProvider>();
+    final a = ap.getById(widget.assistantId)!;
+    ap.updateAssistant(a.copyWith(systemPrompt: _sysCtrl.text));
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -2495,7 +2783,30 @@ class _PromptTabState extends State<_PromptTab> {
               onChanged: (v) => context
                   .read<AssistantProvider>()
                   .updateAssistant(a.copyWith(systemPrompt: v)),
+              // minLines: 1,
               maxLines: 8,
+              keyboardType: TextInputType.text,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => FocusScope.of(context).unfocus(),
+              onEditingComplete: () => FocusScope.of(context).unfocus(),
+              contextMenuBuilder: Platform.isIOS
+                  ? (BuildContext context, EditableTextState state) {
+                      return AdaptiveTextSelectionToolbar.buttonItems(
+                        anchors: state.contextMenuAnchors,
+                        buttonItems: <ContextMenuButtonItem>[
+                          ...state.contextMenuButtonItems,
+                          ContextMenuButtonItem(
+                            onPressed: () {
+                              // Insert a newline at current caret or replace selection
+                              _insertNewlineAtCursor();
+                              state.hideToolbar();
+                            },
+                            label: l10n.chatInputBarInsertNewline,
+                          ),
+                        ],
+                      );
+                    }
+                  : null,
               decoration: InputDecoration(
                 hintText: l10n.assistantEditSystemPromptHint,
                 border: OutlineInputBorder(
@@ -2568,6 +2879,30 @@ class _PromptTabState extends State<_PromptTab> {
               controller: _tmplCtrl,
               focusNode: _tmplFocus,
               maxLines: 4,
+              keyboardType: TextInputType.multiline,
+              textInputAction: Platform.isIOS ? TextInputAction.done : TextInputAction.newline,
+              onSubmitted: Platform.isIOS ? (_) => FocusScope.of(context).unfocus() : null,
+              contextMenuBuilder: Platform.isIOS
+                  ? (BuildContext context, EditableTextState state) {
+                      return AdaptiveTextSelectionToolbar.buttonItems(
+                        anchors: state.contextMenuAnchors,
+                        buttonItems: <ContextMenuButtonItem>[
+                          ...state.contextMenuButtonItems,
+                          ContextMenuButtonItem(
+                            onPressed: () {
+                              _insertAtCursor(_tmplCtrl, '\n');
+                              context.read<AssistantProvider>().updateAssistant(
+                                a.copyWith(messageTemplate: _tmplCtrl.text),
+                              );
+                              setState(() {});
+                              state.hideToolbar();
+                            },
+                            label: l10n.chatInputBarInsertNewline,
+                          ),
+                        ],
+                      );
+                    }
+                  : null,
               onChanged: (v) => context
                   .read<AssistantProvider>()
                   .updateAssistant(a.copyWith(messageTemplate: v)),
@@ -2657,7 +2992,7 @@ class _PromptTabState extends State<_PromptTab> {
     );
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
       children: [sysCard, const SizedBox(height: 12), tmplCard],
     );
   }
@@ -2747,7 +3082,7 @@ class _McpTab extends StatelessWidget {
     );
 
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
       itemCount: servers.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
@@ -2949,17 +3284,14 @@ class _QuickPhraseTab extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: () => _showAddEditSheet(context),
-                icon: Icon(Lucide.Plus, size: 20),
-                label: Text(l10n.assistantEditAddQuickPhraseButton),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(200, 44),
-                  backgroundColor: cs.primary,
-                  foregroundColor: cs.onPrimary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 200),
+                child: _IosButton(
+                  label: l10n.assistantEditAddQuickPhraseButton,
+                  icon: Lucide.Plus,
+                  filled: true,
+                  neutral: false,
+                  onTap: () => _showAddEditSheet(context),
                 ),
               ),
             ],
@@ -2971,7 +3303,7 @@ class _QuickPhraseTab extends StatelessWidget {
     return Stack(
       children: [
         ReorderableListView.builder(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
           itemCount: phrases.length,
           buildDefaultDragHandles: false,
           proxyDecorator: (child, index, animation) {
@@ -3019,7 +3351,7 @@ class _QuickPhraseTab extends StatelessWidget {
                               color: isDark
                                   ? cs.error.withOpacity(0.22)
                                   : cs.error.withOpacity(0.14),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
                               border: Border.all(color: cs.error.withOpacity(0.35)),
                             ),
                             padding: const EdgeInsets.symmetric(
@@ -3119,52 +3451,78 @@ class _QuickPhraseTab extends StatelessWidget {
             );
           },
         ),
-        // Capsule-style add button (iOS style with border)
+        // Glass circular add button (icon-only), matching providers multi-select style
         Positioned(
           left: 0,
           right: 0,
           bottom: 60,
           child: Center(
-            child: _TactileRow(
+            child: _GlassCircleButtonQP(
+              icon: Lucide.Plus,
+              color: cs.primary,
               onTap: () => _showAddEditSheet(context),
-              pressedScale: 0.97,
-              builder: (pressed) {
-                final bgColor = isDark
-                    ? const Color(0xFF1C1C1E)
-                    : const Color(0xFFF2F3F5);
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 110),
-                  curve: Curves.easeOutCubic,
-                  decoration: BoxDecoration(
-                    color: bgColor,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: cs.primary,
-                      width: 1.5,
-                    ),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Lucide.Plus, size: 20, color: cs.primary),
-                      const SizedBox(width: 8),
-                      Text(
-                        l10n.assistantEditAddQuickPhraseButton,
-                        style: TextStyle(
-                          color: cs.primary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+// Local glass circle button for Quick Phrase (icon-only, frosted background)
+class _GlassCircleButtonQP extends StatefulWidget {
+  const _GlassCircleButtonQP({required this.icon, required this.color, required this.onTap, this.size = 48});
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final double size; // diameter
+
+  @override
+  State<_GlassCircleButtonQP> createState() => _GlassCircleButtonQPState();
+}
+
+class _GlassCircleButtonQPState extends State<_GlassCircleButtonQP> {
+  bool _pressed = false;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final glassBase = isDark ? Colors.black.withOpacity(0.06) : Colors.white.withOpacity(0.06);
+    final overlay = isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05);
+    final tileColor = _pressed ? Color.alphaBlend(overlay, glassBase) : glassBase;
+    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.10 : 0.10);
+
+    final child = SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: Center(child: Icon(widget.icon, size: 18, color: widget.color)),
+    );
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: () { Haptics.light(); widget.onTap(); },
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOutCubic,
+        child: ClipOval(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 36, sigmaY: 36),
+            child: Container(
+              decoration: BoxDecoration(
+                color: tileColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: borderColor, width: 1.0),
+              ),
+              child: child,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -3232,11 +3590,13 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            Text(
-              widget.phrase == null
-                  ? l10n.quickPhraseAddTitle
-                  : l10n.quickPhraseEditTitle,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            Center(
+              child: Text(
+                widget.phrase == null
+                    ? l10n.quickPhraseAddTitle
+                    : l10n.quickPhraseEditTitle,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -3295,38 +3655,32 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(44),
-                      side: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.35),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    child: _IosButton(
+                      label: l10n.quickPhraseCancelButton,
+                      onTap: () => Navigator.of(context).pop(),
+                      filled: false,
+                      neutral: true,
                     ),
-                    child: Text(l10n.quickPhraseCancelButton),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: FilledButton(
-                    onPressed: () {
-                      Navigator.of(context).pop({
-                        'title': _titleController.text,
-                        'content': _contentController.text,
-                      });
-                    },
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(44),
-                      backgroundColor: cs.primary,
-                      foregroundColor: cs.onPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    child: _IosButton(
+                      label: l10n.quickPhraseSaveButton,
+                      onTap: () {
+                        Navigator.of(context).pop({
+                          'title': _titleController.text,
+                          'content': _contentController.text,
+                        });
+                      },
+                      icon: Lucide.Check,
+                      filled: true,
+                      neutral: false,
                     ),
-                    child: Text(l10n.quickPhraseSaveButton),
                   ),
                 ),
               ],
@@ -3345,45 +3699,116 @@ class _SegTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return SizedBox(
-      height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        itemCount: tabs.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final selected = controller.index == index;
-          return GestureDetector(
-            onTap: () => controller.animateTo(index),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: selected
-                    ? cs.primary.withOpacity(0.12)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: selected
-                      ? cs.primary
-                      : cs.outlineVariant.withOpacity(0.3),
-                ),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                tabs[index],
-                style: TextStyle(
-                  color: selected ? cs.primary : cs.onSurface.withOpacity(0.8),
-                  fontWeight: FontWeight.w600,
-                ),
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    const double outerHeight = 44;
+    const double innerPadding = 4; // gap between shell and selected block
+    const double gap = 6; // spacing between segments
+    const double minSegWidth = 88; // ensure readability; scroll if not enough
+    final double pillRadius = 18;
+    final double innerRadius =
+        ((pillRadius - innerPadding).clamp(0.0, pillRadius)).toDouble();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double availWidth = constraints.maxWidth;
+        final double innerAvailWidth = availWidth - innerPadding * 2;
+        final double segWidth = math.max(
+          minSegWidth,
+          (innerAvailWidth - gap * (tabs.length - 1)) / tabs.length,
+        );
+        final double rowWidth = segWidth * tabs.length + gap * (tabs.length - 1);
+
+        final Color shellBg = isDark
+            ? Colors.white.withOpacity(0.08)
+            : Colors.white; // 白底胶囊，无边框阴影
+
+        List<Widget> children = [];
+        for (int index = 0; index < tabs.length; index++) {
+          final bool selected = controller.index == index;
+          children.add(
+            SizedBox(
+              width: segWidth,
+              height: double.infinity,
+              child: _TactileRow(
+                onTap: () => controller.animateTo(index),
+                builder: (pressed) {
+                  // 背景不随按压变化：仅选中时有浅主题底色，未选中透明
+                  final Color baseBg = selected
+                      ? cs.primary.withOpacity(0.14)
+                      : Colors.transparent;
+                  final Color bg = baseBg; // 不叠加遮罩，不改变底色
+
+                  // 仅文字在按压时变浅并有渐变
+                  final Color baseTextColor = selected
+                      ? cs.primary // 选中文字：主题色
+                      : cs.onSurface.withOpacity(0.82); // 未选中：深灰
+                  final Color targetTextColor = pressed
+                      ? Color.lerp(baseTextColor, Colors.white, 0.22) ?? baseTextColor
+                      : baseTextColor;
+
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    decoration: BoxDecoration(
+                      color: bg,
+                      borderRadius: BorderRadius.circular(innerRadius), // 选中块圆角
+                    ),
+                    alignment: Alignment.center,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: TweenAnimationBuilder<Color?>(
+                        tween: ColorTween(end: targetTextColor),
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, color, _) {
+                          return Text(
+                            tabs[index],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: color ?? baseTextColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           );
-        },
-      ),
+          if (index != tabs.length - 1) {
+            children.add(const SizedBox(width: gap));
+          }
+        }
+
+        return Container(
+          height: outerHeight,
+          decoration: BoxDecoration(
+            color: shellBg,
+            borderRadius: BorderRadius.circular(pillRadius),
+          ),
+          clipBehavior: Clip.hardEdge,
+          child: Padding(
+            padding: const EdgeInsets.all(innerPadding),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: innerAvailWidth),
+                child: SizedBox(
+                  width: rowWidth,
+                  child: Row(children: children),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -3862,7 +4287,7 @@ class _TactileRowState extends State<_TactileRow> {
       onTap: widget.onTap == null
           ? null
           : () {
-              if (widget.haptics) Haptics.soft();
+              if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
               widget.onTap!.call();
             },
       child: child,

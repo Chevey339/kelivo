@@ -368,6 +368,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditClearButton => '清除';
 
   @override
+  String get desktopNavChatTooltip => '聊天';
+
+  @override
+  String get desktopNavTranslateTooltip => '翻译';
+
+  @override
+  String get desktopNavThemeToggleTooltip => '主题切换';
+
+  @override
+  String get desktopNavSettingsTooltip => '设置';
+
+  @override
+  String get desktopAvatarMenuUseEmoji => '使用表情符号';
+
+  @override
+  String get desktopAvatarMenuChangeFromImage => '从图片更换…';
+
+  @override
+  String get desktopAvatarMenuReset => '重置头像';
+
+  @override
   String get assistantEditAvatarChooseImage => '选择图片';
 
   @override
@@ -1079,6 +1100,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageEnableMathSubtitle => '渲染 LaTeX 数学公式（行内与块级）';
 
   @override
+  String get displaySettingsPageEnableUserMarkdownTitle => '用户消息 Markdown 渲染';
+
+  @override
+  String get displaySettingsPageEnableReasoningMarkdownTitle =>
+      '思维链 Markdown 渲染';
+
+  @override
   String get messageExportSheetFormatTitle => '导出格式';
 
   @override
@@ -1098,6 +1126,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get messageExportSheetBatchExportImageSubtitle => '将选中的消息渲染为 PNG 图片';
+
+  @override
+  String get messageExportSheetShowThinkingAndToolCards => '显示思考卡片和工具卡片';
+
+  @override
+  String get messageExportSheetShowThinkingContent => '显示思考内容';
 
   @override
   String get messageExportSheetDateTimeWithSecondsPattern =>
@@ -2120,6 +2154,12 @@ class AppLocalizationsZh extends AppLocalizations {
       '思考完成后自动折叠，保持界面简洁';
 
   @override
+  String get displaySettingsPageShowChatListDateTitle => '显示对话列表日期';
+
+  @override
+  String get displaySettingsPageShowChatListDateSubtitle => '在左侧对话列表中显示日期分组标签';
+
+  @override
   String get displaySettingsPageShowUpdatesTitle => '显示更新';
 
   @override
@@ -2136,6 +2176,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get displaySettingsPageHapticsOnSidebarSubtitle => '打开/关闭侧边栏时启用触觉反馈';
+
+  @override
+  String get displaySettingsPageHapticsGlobalTitle => '全局触觉反馈';
+
+  @override
+  String get displaySettingsPageHapticsIosSwitchTitle => '开关触觉反馈';
+
+  @override
+  String get displaySettingsPageHapticsOnListItemTapTitle => '列表项触觉反馈';
+
+  @override
+  String get displaySettingsPageHapticsOnCardTapTitle => '卡片触觉反馈';
 
   @override
   String get displaySettingsPageHapticsOnGenerateTitle => '消息生成触觉反馈';
@@ -2162,7 +2214,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageChatFontSampleText => '这是一个示例的聊天文本';
 
   @override
+  String get displaySettingsPageChatBackgroundMaskTitle => '背景图片遮罩透明度';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => '主题设置';
+
+  @override
+  String get displaySettingsPageThemeColorTitle => '主题颜色';
+
+  @override
+  String get desktopSettingsFontsTitle => '字体设置';
+
+  @override
+  String get displaySettingsPageOtherSettingsTitle => '其他设置';
 
   @override
   String get themeSettingsPageDynamicColorSection => '动态颜色';
@@ -2323,6 +2387,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServiceNameJina => 'Jina';
 
   @override
+  String get searchServiceNamePerplexity => 'Perplexity';
+
+  @override
+  String get searchProviderPerplexityDescription =>
+      'Perplexity 搜索 API。提供排序的网页结果，支持区域与域名过滤。';
+
+  @override
+  String get searchServiceNameBocha => '博查';
+
+  @override
+  String get searchProviderBochaDescription =>
+      '博查 AI 全网网页搜索，支持时间范围与摘要，更适合 AI 使用。';
+
+  @override
   String get generationInterrupted => '生成已中断';
 
   @override
@@ -2378,6 +2456,37 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get assistantEditManageQuickPhraseButton => '管理快捷短语';
+
+  @override
+  String get assistantEditPageMemoryTab => '记忆';
+
+  @override
+  String get assistantEditMemorySwitchTitle => '记忆';
+
+  @override
+  String get assistantEditMemorySwitchDescription => '允许助手主动存储并在对话间引用用户相关信息';
+
+  @override
+  String get assistantEditRecentChatsSwitchTitle => '参考历史聊天记录';
+
+  @override
+  String get assistantEditRecentChatsSwitchDescription =>
+      '在新对话中引用最近的对话标题以增强上下文';
+
+  @override
+  String get assistantEditManageMemoryTitle => '管理记忆';
+
+  @override
+  String get assistantEditAddMemoryButton => '添加记忆';
+
+  @override
+  String get assistantEditMemoryEmpty => '暂无记忆';
+
+  @override
+  String get assistantEditMemoryDialogTitle => '记忆';
+
+  @override
+  String get assistantEditMemoryDialogHint => '输入记忆内容';
 
   @override
   String get assistantEditAddQuickPhraseButton => '添加快捷短语';
@@ -2818,6 +2927,27 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditClearButton => '清除';
 
   @override
+  String get desktopNavChatTooltip => '聊天';
+
+  @override
+  String get desktopNavTranslateTooltip => '翻译';
+
+  @override
+  String get desktopNavThemeToggleTooltip => '主题切换';
+
+  @override
+  String get desktopNavSettingsTooltip => '设置';
+
+  @override
+  String get desktopAvatarMenuUseEmoji => '使用表情符号';
+
+  @override
+  String get desktopAvatarMenuChangeFromImage => '从图片更换…';
+
+  @override
+  String get desktopAvatarMenuReset => '重置头像';
+
+  @override
   String get assistantEditAvatarChooseImage => '选择图片';
 
   @override
@@ -3529,6 +3659,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageEnableMathSubtitle => '渲染 LaTeX 数学公式（行内与块级）';
 
   @override
+  String get displaySettingsPageEnableUserMarkdownTitle => '用户消息 Markdown 渲染';
+
+  @override
+  String get displaySettingsPageEnableReasoningMarkdownTitle =>
+      '思维链 Markdown 渲染';
+
+  @override
   String get messageExportSheetFormatTitle => '导出格式';
 
   @override
@@ -3548,6 +3685,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get messageExportSheetBatchExportImageSubtitle => '将选中的消息渲染为 PNG 图片';
+
+  @override
+  String get messageExportSheetShowThinkingAndToolCards => '显示思考卡片和工具卡片';
+
+  @override
+  String get messageExportSheetShowThinkingContent => '显示思考内容';
 
   @override
   String get messageExportSheetDateTimeWithSecondsPattern =>
@@ -4570,6 +4713,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '思考完成后自动折叠，保持界面简洁';
 
   @override
+  String get displaySettingsPageShowChatListDateTitle => '显示对话列表日期';
+
+  @override
+  String get displaySettingsPageShowChatListDateSubtitle => '在左侧对话列表中显示日期分组标签';
+
+  @override
   String get displaySettingsPageShowUpdatesTitle => '显示更新';
 
   @override
@@ -4586,6 +4735,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageHapticsOnSidebarSubtitle => '打开/关闭侧边栏时启用触觉反馈';
+
+  @override
+  String get displaySettingsPageHapticsGlobalTitle => '全局触觉反馈';
+
+  @override
+  String get displaySettingsPageHapticsIosSwitchTitle => '开关触觉反馈';
+
+  @override
+  String get displaySettingsPageHapticsOnListItemTapTitle => '列表项触觉反馈';
+
+  @override
+  String get displaySettingsPageHapticsOnCardTapTitle => '卡片触觉反馈';
 
   @override
   String get displaySettingsPageHapticsOnGenerateTitle => '消息生成触觉反馈';
@@ -4612,7 +4773,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageChatFontSampleText => '这是一个示例的聊天文本';
 
   @override
+  String get displaySettingsPageChatBackgroundMaskTitle => '背景图片遮罩透明度';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => '主题设置';
+
+  @override
+  String get displaySettingsPageThemeColorTitle => '主题颜色';
+
+  @override
+  String get desktopSettingsFontsTitle => '字体设置';
+
+  @override
+  String get displaySettingsPageOtherSettingsTitle => '其他设置';
 
   @override
   String get themeSettingsPageDynamicColorSection => '动态颜色';
@@ -4773,6 +4946,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServiceNameJina => 'Jina';
 
   @override
+  String get searchServiceNamePerplexity => 'Perplexity';
+
+  @override
+  String get searchProviderPerplexityDescription =>
+      'Perplexity 搜索 API。提供排序的网页结果，支持区域与域名过滤。';
+
+  @override
+  String get searchServiceNameBocha => '博查';
+
+  @override
+  String get searchProviderBochaDescription =>
+      '博查 AI 全网网页搜索，支持时间范围与摘要，更适合 AI 使用。';
+
+  @override
   String get generationInterrupted => '生成已中断';
 
   @override
@@ -4828,6 +5015,37 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditManageQuickPhraseButton => '管理快捷短语';
+
+  @override
+  String get assistantEditPageMemoryTab => '记忆';
+
+  @override
+  String get assistantEditMemorySwitchTitle => '记忆';
+
+  @override
+  String get assistantEditMemorySwitchDescription => '允许助手主动存储并在对话间引用用户相关信息';
+
+  @override
+  String get assistantEditRecentChatsSwitchTitle => '参考历史聊天记录';
+
+  @override
+  String get assistantEditRecentChatsSwitchDescription =>
+      '在新对话中引用最近的对话标题以增强上下文';
+
+  @override
+  String get assistantEditManageMemoryTitle => '管理记忆';
+
+  @override
+  String get assistantEditAddMemoryButton => '添加记忆';
+
+  @override
+  String get assistantEditMemoryEmpty => '暂无记忆';
+
+  @override
+  String get assistantEditMemoryDialogTitle => '记忆';
+
+  @override
+  String get assistantEditMemoryDialogHint => '输入记忆内容';
 
   @override
   String get assistantEditAddQuickPhraseButton => '添加快捷短语';
@@ -5266,6 +5484,27 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditClearButton => '清除';
+
+  @override
+  String get desktopNavChatTooltip => '聊天';
+
+  @override
+  String get desktopNavTranslateTooltip => '翻譯';
+
+  @override
+  String get desktopNavThemeToggleTooltip => '主題切換';
+
+  @override
+  String get desktopNavSettingsTooltip => '設定';
+
+  @override
+  String get desktopAvatarMenuUseEmoji => '使用表情符號';
+
+  @override
+  String get desktopAvatarMenuChangeFromImage => '從圖片更換…';
+
+  @override
+  String get desktopAvatarMenuReset => '重置頭像';
 
   @override
   String get assistantEditAvatarChooseImage => '選擇圖片';
@@ -5979,6 +6218,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageEnableMathSubtitle => '渲染 LaTeX 數學公式（行內與區塊）';
 
   @override
+  String get displaySettingsPageEnableUserMarkdownTitle => '使用者訊息 Markdown 渲染';
+
+  @override
+  String get displaySettingsPageEnableReasoningMarkdownTitle =>
+      '思维鏈 Markdown 渲染';
+
+  @override
   String get messageExportSheetFormatTitle => '匯出格式';
 
   @override
@@ -5998,6 +6244,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageExportSheetBatchExportImageSubtitle => '將選中的訊息渲染為 PNG 圖片';
+
+  @override
+  String get messageExportSheetShowThinkingAndToolCards => '顯示深度思考卡片與工具卡片';
+
+  @override
+  String get messageExportSheetShowThinkingContent => '顯示思考內容';
 
   @override
   String get messageExportSheetDateTimeWithSecondsPattern =>
@@ -7019,6 +7271,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '思考完成後自動折疊，保持介面簡潔';
 
   @override
+  String get displaySettingsPageShowChatListDateTitle => '顯示對話列表日期';
+
+  @override
+  String get displaySettingsPageShowChatListDateSubtitle => '在左側對話列表中顯示日期分組標籤';
+
+  @override
   String get displaySettingsPageShowUpdatesTitle => '顯示更新';
 
   @override
@@ -7035,6 +7293,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageHapticsOnSidebarSubtitle => '開啟/關閉側邊欄時啟用觸覺回饋';
+
+  @override
+  String get displaySettingsPageHapticsGlobalTitle => '全域觸覺回饋';
+
+  @override
+  String get displaySettingsPageHapticsIosSwitchTitle => '開關觸覺回饋';
+
+  @override
+  String get displaySettingsPageHapticsOnListItemTapTitle => '列表項點擊觸覺回饋';
+
+  @override
+  String get displaySettingsPageHapticsOnCardTapTitle => '卡片點擊觸覺回饋';
 
   @override
   String get displaySettingsPageHapticsOnGenerateTitle => '訊息生成觸覺回饋';
@@ -7061,7 +7331,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageChatFontSampleText => '這是一個範例的聊天文本';
 
   @override
+  String get displaySettingsPageChatBackgroundMaskTitle => '聊天背景遮罩透明度';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => '主題設定';
+
+  @override
+  String get displaySettingsPageThemeColorTitle => '主題顏色';
+
+  @override
+  String get desktopSettingsFontsTitle => '字體設定';
+
+  @override
+  String get displaySettingsPageOtherSettingsTitle => '其他設定';
 
   @override
   String get themeSettingsPageDynamicColorSection => '動態顏色';
@@ -7223,6 +7505,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServiceNameJina => 'Jina';
 
   @override
+  String get searchServiceNamePerplexity => 'Perplexity';
+
+  @override
+  String get searchProviderPerplexityDescription =>
+      'Perplexity 搜尋 API。提供排序的網頁結果，支援地區與網域過濾。';
+
+  @override
+  String get searchServiceNameBocha => '博查';
+
+  @override
+  String get searchProviderBochaDescription =>
+      '博查 AI 全網網頁搜尋，支援時間範圍與摘要，更適合 AI 使用。';
+
+  @override
   String get generationInterrupted => '生成已中斷';
 
   @override
@@ -7279,6 +7575,37 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditManageQuickPhraseButton => '管理快捷片語';
+
+  @override
+  String get assistantEditPageMemoryTab => '記憶';
+
+  @override
+  String get assistantEditMemorySwitchTitle => '記憶';
+
+  @override
+  String get assistantEditMemorySwitchDescription => '允許助理主動儲存並在對話間引用使用者相關資訊';
+
+  @override
+  String get assistantEditRecentChatsSwitchTitle => '參考歷史聊天記錄';
+
+  @override
+  String get assistantEditRecentChatsSwitchDescription =>
+      '在新對話中引用最近的對話標題以增強上下文';
+
+  @override
+  String get assistantEditManageMemoryTitle => '管理記憶';
+
+  @override
+  String get assistantEditAddMemoryButton => '新增記憶';
+
+  @override
+  String get assistantEditMemoryEmpty => '暫無記憶';
+
+  @override
+  String get assistantEditMemoryDialogTitle => '記憶';
+
+  @override
+  String get assistantEditMemoryDialogHint => '輸入記憶內容';
 
   @override
   String get assistantEditAddQuickPhraseButton => '新增快捷片語';

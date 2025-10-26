@@ -18,6 +18,7 @@ import '../../../main.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/memory_provider.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/api/chat_api_service.dart';
@@ -32,7 +33,8 @@ import '../../../core/models/conversation.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../settings/widgets/language_select_sheet.dart';
 import '../../chat/widgets/message_more_sheet.dart';
-import '../../chat/pages/message_edit_page.dart';
+// import '../../chat/pages/message_edit_page.dart';
+import '../../chat/widgets/message_edit_sheet.dart';
 import '../../chat/widgets/message_export_sheet.dart';
 import '../../assistant/widgets/mcp_assistant_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
@@ -45,6 +47,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../utils/brand_assets.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'dart:ui' as ui;
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -59,6 +62,7 @@ import '../../../shared/animations/widgets.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/models/quick_phrase.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../quick_phrase/widgets/quick_phrase_menu.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
@@ -180,6 +184,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   bool _learningModeEnabled = false;
   static const Duration _sidebarAnimDuration = Duration(milliseconds: 260);
   static const Curve _sidebarAnimCurve = Curves.easeOutCubic;
+  // Desktop: resizable embedded sidebar width
+  double _embeddedSidebarWidth = 300;
+  static const double _sidebarMinWidth = 200;
+  static const double _sidebarMaxWidth = 480;
+  bool _desktopUiInited = false;
 
   // Drawer haptics for swipe-open
   double _lastDrawerValue = 0.0;
@@ -769,12 +778,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     setState(() {
       _tabletSidebarOpen = !_tabletSidebarOpen;
     });
+    try { context.read<SettingsProvider>().setDesktopSidebarOpen(_tabletSidebarOpen); } catch (_) {}
   }
 
   Widget _buildTabletSidebar(BuildContext context) {
     final sidebar = SideDrawer(
       embedded: true,
-      embeddedWidth: 300,
+      embeddedWidth: _embeddedSidebarWidth,
       userName: context.watch<UserProvider>().name,
       assistantName: (() {
         final l10n = AppLocalizations.of(context)!;
@@ -796,14 +806,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return AnimatedContainer(
       duration: _sidebarAnimDuration,
       curve: _sidebarAnimCurve,
-      width: _tabletSidebarOpen ? 300 : 0,
+      width: _tabletSidebarOpen ? _embeddedSidebarWidth : 0,
       color: Colors.transparent,
       child: ClipRect(
         child: OverflowBox(
           alignment: Alignment.centerLeft,
           minWidth: 0,
-          maxWidth: 300,
-          child: SizedBox(width: 300, child: sidebar),
+          maxWidth: _embeddedSidebarWidth,
+          child: SizedBox(width: _embeddedSidebarWidth, child: sidebar),
         ),
       ),
     );
@@ -1177,6 +1187,80 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       apiMessages.insert(0, {'role': 'system', 'content': sys});
     }
 
+    // Inject Memories prompt and Recent Chats if enabled
+    try {
+      if (assistant?.enableMemory == true) {
+        final mp = context.read<MemoryProvider>();
+        final mems = mp.getForAssistant(assistant!.id);
+        final buf = StringBuffer();
+        buf.writeln('## Memories');
+        buf.writeln('These are memories that you can reference in the future conversations.');
+        buf.writeln('<memories>');
+        for (final m in mems) {
+          buf.writeln('<record>');
+          buf.writeln('<id>${m.id}</id>');
+          buf.writeln('<content>${m.content}</content>');
+          buf.writeln('</record>');
+        }
+        buf.writeln('</memories>');
+        // Tool usage guidance
+        buf.writeln('''
+## Memory Tool
+你是一个无状态的大模型，你无法存储记忆，因此为了记住信息，你需要使用**记忆工具**。
+你可以使用 `create_memory`, `edit_memory`, `delete_memory` 工具创建、更新或删除记忆。
+- 如果记忆中没有相关信息，请使用 create_memory 创建一条新的记录。
+- 如果已有相关记录，请使用 edit_memory 更新内容。
+- 若记忆过时或无用，请使用 delete_memory 删除。
+这些记忆会自动包含在未来的对话上下文中，在<memories>标签内。
+请勿在记忆中存储敏感信息，敏感信息包括：用户的民族、宗教信仰、性取向、政治观点及党派归属、性生活、犯罪记录等。
+在与用户聊天过程中，你可以像一个私人秘书一样**主动的**记录用户相关的信息到记忆里，包括但不限于：
+- 用户昵称/姓名
+- 年龄/性别/兴趣爱好
+- 计划事项等
+- 聊天风格偏好
+- 工作相关
+- 首次聊天时间
+- ...
+请主动调用工具记录，而不是需要用户要求。     
+记忆如果包含日期信息，请包含在内，请使用绝对时间格式，并且当前时间是 ${DateTime.now().toIso8601String()}。
+无需告知用户你已更改记忆记录，也不要在对话中直接显示记忆内容，除非用户主动要求。
+相似或相关的记忆应合并为一条记录，而不要重复记录，过时记录应删除。         
+你可以在和用户闲聊的时候暗示用户你能记住东西。
+''');
+        if (apiMessages.isNotEmpty && apiMessages.first['role'] == 'system') {
+          apiMessages[0]['content'] = ((apiMessages[0]['content'] ?? '') as String) + '\n\n' + buf.toString();
+        } else {
+          apiMessages.insert(0, {'role': 'system', 'content': buf.toString()});
+        }
+      }
+      if (assistant?.enableRecentChatsReference == true) {
+        final chats = context.read<ChatService>().getAllConversations();
+        final titles = chats
+            .where((c) => c.assistantId == assistant!.id)
+            .take(10)
+            .map((c) => c.title)
+            .where((t) => t.trim().isNotEmpty)
+            .toList();
+        if (titles.isNotEmpty) {
+          final sb = StringBuffer();
+          sb.writeln('## 最近的对话');
+          sb.writeln('这是用户最近的一些对话，你可以参考这些对话了解用户偏好:');
+          sb.writeln('<recent_chats>');
+          for (final t in titles) {
+            sb.writeln('<conversation>');
+            sb.writeln('  <title>$t</title>');
+            sb.writeln('</conversation>');
+          }
+          sb.writeln('</recent_chats>');
+          if (apiMessages.isNotEmpty && apiMessages.first['role'] == 'system') {
+            apiMessages[0]['content'] = ((apiMessages[0]['content'] ?? '') as String) + '\n\n' + sb.toString();
+          } else {
+            apiMessages.insert(0, {'role': 'system', 'content': sb.toString()});
+          }
+        }
+      }
+    } catch (_) {}
+
     // Determine tool support and built-in Gemini search status
     final supportsTools = _isToolModel(providerKey, modelId);
     bool _hasBuiltInGeminiSearch() {
@@ -1264,6 +1348,55 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         toolDefs.add(SearchToolService.getToolDefinition());
       }
 
+      // Memory tools
+      if (assistant?.enableMemory == true && supportsTools) {
+        toolDefs.addAll([
+          {
+            'type': 'function',
+            'function': {
+              'name': 'create_memory',
+              'description': 'create a memory record',
+              'parameters': {
+                'type': 'object',
+                'properties': {
+                  'content': {'type': 'string', 'description': 'The content of the memory record'}
+                },
+                'required': ['content']
+              }
+            }
+          },
+          {
+            'type': 'function',
+            'function': {
+              'name': 'edit_memory',
+              'description': 'update a memory record',
+              'parameters': {
+                'type': 'object',
+                'properties': {
+                  'id': {'type': 'integer', 'description': 'The id of the memory record'},
+                  'content': {'type': 'string', 'description': 'The content of the memory record'}
+                },
+                'required': ['id', 'content']
+              }
+            }
+          },
+          {
+            'type': 'function',
+            'function': {
+              'name': 'delete_memory',
+              'description': 'delete a memory record',
+              'parameters': {
+                'type': 'object',
+                'properties': {
+                  'id': {'type': 'integer', 'description': 'The id of the memory record'}
+                },
+                'required': ['id']
+              }
+            }
+          },
+        ]);
+      }
+
       // MCP tools
       final mcp = context.read<McpProvider>();
       final toolSvc = context.read<McpToolService>();
@@ -1298,6 +1431,29 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           if (name == SearchToolService.toolName && settings.searchEnabled) {
             final q = (args['query'] ?? '').toString();
             return await SearchToolService.executeSearch(q, settings);
+          }
+          // Memory tools
+          if (assistant?.enableMemory == true) {
+            try {
+              final mp = context.read<MemoryProvider>();
+              if (name == 'create_memory') {
+                final content = (args['content'] ?? '').toString();
+                if (content.isEmpty) return '';
+                final m = await mp.add(assistantId: assistant!.id, content: content);
+                return m.content;
+              } else if (name == 'edit_memory') {
+                final id = (args['id'] as num?)?.toInt() ?? -1;
+                final content = (args['content'] ?? '').toString();
+                if (id <= 0 || content.isEmpty) return '';
+                final m = await mp.update(id: id, content: content);
+                return m?.content ?? '';
+              } else if (name == 'delete_memory') {
+                final id = (args['id'] as num?)?.toInt() ?? -1;
+                if (id <= 0) return '';
+                final ok = await mp.delete(id: id);
+                return ok ? 'deleted' : '';
+              }
+            } catch (_) {}
           }
           // Fallback to MCP tools
           final text = await toolSvc.callToolTextForAssistant(
@@ -1574,7 +1730,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             if (mounted && _currentConversation?.id == _cidForStream) setState(() {
               _toolParts[assistantMessage.id] = _dedupeToolPartsList(parts);
             });
-            if (!_isUserScrolling) _scrollToBottomSoon();
+            if (!_isUserScrolling) {
+              _scrollToBottomSoon();
+            }
           }
 
           if (chunk.isDone) {
@@ -1690,9 +1848,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 totalTokens: totalTokens,
               );
 
-              // 滚动到底部显示新内容
+              // 滚动到底部显示新内容（仅在未处于用户滚动延迟阶段时）
               Future.delayed(const Duration(milliseconds: 50), () {
-                if (!_isUserScrolling) _scrollToBottom();
+                if (!_isUserScrolling) {
+                  _scrollToBottom();
+                }
               });
             }
           }
@@ -2010,6 +2170,78 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       final sys = PromptTransformer.replacePlaceholders(assistant.systemPrompt, vars);
       apiMessages.insert(0, {'role': 'system', 'content': sys});
     }
+    // Inject Memories + Recent Chats
+    try {
+      if (assistant?.enableMemory == true) {
+        final mp = context.read<MemoryProvider>();
+        final mems = mp.getForAssistant(assistant!.id);
+        final buf = StringBuffer();
+        buf.writeln('## Memories');
+        buf.writeln('These are memories that you can reference in the future conversations.');
+        buf.writeln('<memories>');
+        for (final m in mems) {
+          buf.writeln('<record>');
+          buf.writeln('<id>${m.id}</id>');
+          buf.writeln('<content>${m.content}</content>');
+          buf.writeln('</record>');
+        }
+        buf.writeln('</memories>');
+        buf.writeln('''
+## Memory Tool
+你是一个无状态的大模型，你无法存储记忆，因此为了记住信息，你需要使用**记忆工具**。
+你可以使用 `create_memory`, `edit_memory`, `delete_memory` 工具创建、更新或删除记忆。
+- 如果记忆中没有相关信息，请使用 create_memory 创建一条新的记录。
+- 如果已有相关记录，请使用 edit_memory 更新内容。
+- 若记忆过时或无用，请使用 delete_memory 删除。
+这些记忆会自动包含在未来的对话上下文中，在<memories>标签内。
+请勿在记忆中存储敏感信息，敏感信息包括：用户的民族、宗教信仰、性取向、政治观点及党派归属、性生活、犯罪记录等。
+在与用户聊天过程中，你可以像一个私人秘书一样**主动的**记录用户相关的信息到记忆里，包括但不限于：
+- 用户昵称/姓名
+- 年龄/性别/兴趣爱好
+- 计划事项等
+- 聊天风格偏好
+- 工作相关
+- 首次聊天时间
+- ...
+请主动调用工具记录，而不是需要用户要求。     
+记忆如果包含日期信息，请包含在内，请使用绝对时间格式，并且当前时间是 ${DateTime.now().toIso8601String()}。
+无需告知用户你已更改记忆记录，也不要在对话中直接显示记忆内容，除非用户主动要求。
+相似或相关的记忆应合并为一条记录，而不要重复记录，过时记录应删除。         
+你可以在和用户闲聊的时候暗示用户你能记住东西。
+''');
+        if (apiMessages.isNotEmpty && apiMessages.first['role'] == 'system') {
+          apiMessages[0]['content'] = ((apiMessages[0]['content'] ?? '') as String) + '\n\n' + buf.toString();
+        } else {
+          apiMessages.insert(0, {'role': 'system', 'content': buf.toString()});
+        }
+      }
+      if (assistant?.enableRecentChatsReference == true) {
+        final chats = context.read<ChatService>().getAllConversations();
+        final titles = chats
+            .where((c) => c.assistantId == assistant!.id)
+            .take(10)
+            .map((c) => c.title)
+            .where((t) => t.trim().isNotEmpty)
+            .toList();
+        if (titles.isNotEmpty) {
+          final sb = StringBuffer();
+          sb.writeln('## 最近的对话');
+          sb.writeln('这是用户最近的一些对话，你可以参考这些对话了解用户偏好:');
+          sb.writeln('<recent_chats>');
+          for (final t in titles) {
+            sb.writeln('<conversation>');
+            sb.writeln('  <title>$t</title>');
+            sb.writeln('</conversation>');
+          }
+          sb.writeln('</recent_chats>');
+          if (apiMessages.isNotEmpty && apiMessages.first['role'] == 'system') {
+            apiMessages[0]['content'] = ((apiMessages[0]['content'] ?? '') as String) + '\n\n' + sb.toString();
+          } else {
+            apiMessages.insert(0, {'role': 'system', 'content': sb.toString()});
+          }
+        }
+      }
+    } catch (_) {}
     // Inject search tool usage guide when enabled
     if (settings.searchEnabled) {
       final prompt = SearchToolService.getSystemPrompt();
@@ -2054,10 +2286,57 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       }
     }
 
-    // Prepare tools (Search + MCP)
+    // Prepare tools (Memory + Search + MCP)
     final List<Map<String, dynamic>> toolDefs = <Map<String, dynamic>>[];
     Future<String> Function(String, Map<String, dynamic>)? onToolCall;
     try {
+      if (assistant?.enableMemory == true && _isToolModel(providerKey, modelId)) {
+        toolDefs.addAll([
+          {
+            'type': 'function',
+            'function': {
+              'name': 'create_memory',
+              'description': 'create a memory record',
+              'parameters': {
+                'type': 'object',
+                'properties': {
+                  'content': {'type': 'string', 'description': 'The content of the memory record'}
+                },
+                'required': ['content']
+              }
+            }
+          },
+          {
+            'type': 'function',
+            'function': {
+              'name': 'edit_memory',
+              'description': 'update a memory record',
+              'parameters': {
+                'type': 'object',
+                'properties': {
+                  'id': {'type': 'integer', 'description': 'The id of the memory record'},
+                  'content': {'type': 'string', 'description': 'The content of the memory record'}
+                },
+                'required': ['id', 'content']
+              }
+            }
+          },
+          {
+            'type': 'function',
+            'function': {
+              'name': 'delete_memory',
+              'description': 'delete a memory record',
+              'parameters': {
+                'type': 'object',
+                'properties': {
+                  'id': {'type': 'integer', 'description': 'The id of the memory record'}
+                },
+                'required': ['id']
+              }
+            }
+          },
+        ]);
+      }
       if (settings.searchEnabled) {
         toolDefs.add(SearchToolService.getToolDefinition());
       }
@@ -2093,6 +2372,29 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           if (name == SearchToolService.toolName && settings.searchEnabled) {
             final q = (args['query'] ?? '').toString();
             return await SearchToolService.executeSearch(q, settings);
+          }
+          // Memory tools
+          if (assistant?.enableMemory == true) {
+            try {
+              final mp = context.read<MemoryProvider>();
+              if (name == 'create_memory') {
+                final content = (args['content'] ?? '').toString();
+                if (content.isEmpty) return '';
+                final m = await mp.add(assistantId: assistant!.id, content: content);
+                return m.content;
+              } else if (name == 'edit_memory') {
+                final id = (args['id'] as num?)?.toInt() ?? -1;
+                final content = (args['content'] ?? '').toString();
+                if (id <= 0 || content.isEmpty) return '';
+                final m = await mp.update(id: id, content: content);
+                return m?.content ?? '';
+              } else if (name == 'delete_memory') {
+                final id = (args['id'] as num?)?.toInt() ?? -1;
+                if (id <= 0) return '';
+                final ok = await mp.delete(id: id);
+                return ok ? 'deleted' : '';
+              }
+            } catch (_) {}
           }
           final text = await toolSvc.callToolTextForAssistant(
             mcp,
@@ -2270,7 +2572,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           try { await _chatService.upsertToolEvent(assistantMessage.id, id: r.id, name: r.name, arguments: r.arguments, content: r.content); } catch (_) {}
         }
         setState(() => _toolParts[assistantMessage.id] = _dedupeToolPartsList(parts));
-        if (!_isUserScrolling) _scrollToBottomSoon();
+        if (!_isUserScrolling) {
+          _scrollToBottomSoon();
+        }
       }
 
       if (chunk.content.isNotEmpty) {
@@ -2511,9 +2815,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   void _scrollToBottom() {
     try {
       if (!_scrollController.hasClients) return;
-      
-      // Don't auto-scroll if user is actively scrolling
-      if (_isUserScrolling) return;
       
       // Prevent using controller while it is still attached to old/new list simultaneously
       if (_scrollController.positions.length != 1) {
@@ -3012,22 +3313,24 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          onPressed: () {
-            // Always dismiss keyboard when toggling the sidebar
-            _dismissKeyboard();
-            _drawerController.toggle();
-          },
-          icon: SvgPicture.asset(
-            'assets/icons/list.svg',
-            width: 14,
-            height: 14,
-            colorFilter: ColorFilter.mode(
-              Theme.of(context).iconTheme.color ?? Theme.of(context).colorScheme.onSurface,
-              BlendMode.srcIn,
+        leading: Builder(builder: (context) {
+          return IosIconButton(
+            size: 20,
+            padding: const EdgeInsets.all(8),
+            minSize: 40,
+            builder: (color) => SvgPicture.asset(
+              'assets/icons/list.svg',
+              width: 14,
+              height: 14,
+              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
             ),
-          ),
-        ),
+            onTap: () {
+              // Always dismiss keyboard when toggling the sidebar
+              _dismissKeyboard();
+              _drawerController.toggle();
+            },
+          );
+        }),
         titleSpacing: 2,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3059,8 +3362,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),
         actions: [
           // Mini map button (to the left of new conversation)
-          IconButton(
-            onPressed: () async {
+          IosIconButton(
+            size: 20,
+            minSize: 44,
+            onTap: () async {
               final collapsed = _collapseVersions(_messages);
               final selectedId = await showMiniMapSheet(context, collapsed);
               if (!mounted) return;
@@ -3068,28 +3373,24 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 await _scrollToMessageId(selectedId);
               }
             },
-            icon: const Icon(Lucide.Map, size: 20),
-            tooltip: AppLocalizations.of(context)!.miniMapTooltip,
+            semanticLabel: AppLocalizations.of(context)!.miniMapTooltip,
+            icon: Lucide.Map,
           ),
-          // Temporarily hidden: More menu button
-          // IconButton(
-          //   onPressed: () {
-          //     Navigator.of(context).push(
-          //       MaterialPageRoute(builder: (_) => const MorePage()),
-          //     );
-          //   },
-          //   icon: const Icon(Lucide.Menu, size: 22),
-          // ),
-          IconButton(
-            onPressed: () async {
+          // const SizedBox(width: 4),
+          IosIconButton(
+            size: 22,
+            minSize: 44,
+            onTap: () async {
               await _createNewConversation();
               if (mounted) {
                 // Close drawer if open and scroll to bottom (fresh convo)
                 _forceScrollToBottomSoon();
               }
             },
-            icon: const Icon(Lucide.MessageCirclePlus, size: 22),
+            icon: Lucide.MessageCirclePlus,
           ),
+          const SizedBox(width: 4),
+          // Move the right spacer between mini map and new-topic per request
         ],
       ),
       body: Stack(
@@ -3098,6 +3399,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             Builder(
               builder: (context) {
               final bg = context.watch<AssistantProvider>().currentAssistant?.background;
+              final maskStrength = context.watch<SettingsProvider>().chatBackgroundMaskStrength;
             if (bg == null || bg.trim().isEmpty) return const SizedBox.shrink();
             ImageProvider provider;
             if (bg.startsWith('http')) {
@@ -3132,10 +3434,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [
-                              cs.background.withOpacity(0.20),
-                              cs.background.withOpacity(0.50),
-                            ],
+                            colors: () {
+                              final top = (0.20 * maskStrength).clamp(0.0, 1.0);
+                              final bottom = (0.50 * maskStrength).clamp(0.0, 1.0);
+                              return [
+                                cs.background.withOpacity(top),
+                                cs.background.withOpacity(bottom),
+                              ];
+                            }(),
                           ),
                         ),
                       ),
@@ -3328,9 +3634,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                         }
                                       : null,
                                   onEdit: message.role == 'user' ? () async {
-                                    final edited = await Navigator.of(context).push<String>(
-                                      MaterialPageRoute(builder: (_) => MessageEditPage(message: message)),
-                                    );
+                                    final edited = await showMessageEditSheet(context, message: message);
                                     if (edited != null) {
                                       final newMsg = await _chatService.appendMessageVersion(messageId: message.id, content: edited);
                                       if (!mounted) return;
@@ -3414,9 +3718,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                     await _chatService.deleteMessage(id);
                                   }
                                 } else if (action == MessageMoreAction.edit) {
-                                  final edited = await Navigator.of(context).push<String>(
-                                    MaterialPageRoute(builder: (_) => MessageEditPage(message: message)),
-                                  );
+                                  final edited = await showMessageEditSheet(context, message: message);
                                   if (edited != null) {
                                     final newMsg = await _chatService.appendMessageVersion(messageId: message.id, content: edited);
                                     if (!mounted) return;
@@ -3729,14 +4031,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
           // Inline tools sheet removed; replaced by modal bottom sheet
 
-          // Selection toolbar overlay (above input bar)
-          if (_selecting)
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 72),
+          // Selection toolbar overlay (above input bar) with iOS glass capsule + animations
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                // Move higher: 72 + 12 + 38
+                padding: const EdgeInsets.only(bottom: 122),
+                child: _AnimatedSelectionBar(
+                  visible: _selecting,
                   child: _SelectionToolbar(
                     onCancel: () {
                       setState(() {
@@ -3769,6 +4073,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ),
               ),
             ),
+          ),
 
           // Scroll-to-bottom button (bottom-right, above input bar)
           Builder(builder: (context) {
@@ -3918,6 +4223,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     required String? modelDisplay,
     required ColorScheme cs,
   }) {
+    final bool _isDesktop = defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.linux;
+    if (_isDesktop && !_desktopUiInited) {
+      _desktopUiInited = true;
+      try {
+        final sp = context.read<SettingsProvider>();
+        _embeddedSidebarWidth = sp.desktopSidebarWidth.clamp(_sidebarMinWidth, _sidebarMaxWidth);
+        _tabletSidebarOpen = sp.desktopSidebarOpen;
+      } catch (_) {}
+    }
     return Stack(
       children: [
         Positioned.fill(child: _buildAssistantBackground(context)),
@@ -3925,14 +4241,31 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       child: Row(
       children: [
         _buildTabletSidebar(context),
-        AnimatedContainer(
-          duration: _sidebarAnimDuration,
-          curve: _sidebarAnimCurve,
-          width: _tabletSidebarOpen ? 0.6 : 0,
-          child: _tabletSidebarOpen
-              ? const VerticalDivider(width: 0.6, thickness: 0.5)
-              : const SizedBox.shrink(),
-        ),
+        if (_isDesktop)
+          _SidebarResizeHandle(
+            visible: _tabletSidebarOpen,
+            onDrag: (dx) {
+              setState(() {
+                _embeddedSidebarWidth = (_embeddedSidebarWidth + dx).clamp(_sidebarMinWidth, _sidebarMaxWidth);
+              });
+            },
+            onDragEnd: () {
+              try { context.read<SettingsProvider>().setDesktopSidebarWidth(_embeddedSidebarWidth); } catch (_) {}
+            },
+          )
+        else
+          AnimatedContainer(
+            duration: _sidebarAnimDuration,
+            curve: _sidebarAnimCurve,
+            width: _tabletSidebarOpen ? 0.6 : 0,
+            child: _tabletSidebarOpen
+                ? VerticalDivider(
+                    width: 0.6,
+                    thickness: 0.5,
+                    color: cs.outlineVariant.withOpacity(0.20),
+                  )
+                : const SizedBox.shrink(),
+          ),
         Expanded(
           child: Scaffold(
             key: _scaffoldKey,
@@ -4170,9 +4503,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                                         : null,
                                                     onEdit: message.role == 'user'
                                                         ? () async {
-                                                            final edited = await Navigator.of(context).push<String>(
-                                                              MaterialPageRoute(builder: (_) => MessageEditPage(message: message)),
-                                                            );
+                                                            final edited = await showMessageEditSheet(context, message: message);
                                                             if (edited != null) {
                                                               final newMsg = await _chatService.appendMessageVersion(messageId: message.id, content: edited);
                                                               if (!mounted) return;
@@ -4247,9 +4578,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                                           await _chatService.deleteMessage(id);
                                                         }
                                                       } else if (action == MessageMoreAction.edit) {
-                                                        final edited = await Navigator.of(context).push<String>(
-                                                          MaterialPageRoute(builder: (_) => MessageEditPage(message: message)),
-                                                        );
+                                                        final edited = await showMessageEditSheet(context, message: message);
                                                         if (edited != null) {
                                                           final newMsg = await _chatService.appendMessageVersion(messageId: message.id, content: edited);
                                                           if (!mounted) return;
@@ -4556,14 +4885,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   ),
                 ),
 
-                // Selection toolbar overlay
-                if (_selecting)
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: SafeArea(
-                      top: false,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 72),
+                // Selection toolbar overlay (tablet) with iOS glass capsule + animations
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      // Move higher: 72 + 12 + 38
+                      padding: const EdgeInsets.only(bottom: 122),
+                      child: _AnimatedSelectionBar(
+                        visible: _selecting,
                         child: _SelectionToolbar(
                           onCancel: () {
                             setState(() {
@@ -4596,6 +4927,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       ),
                     ),
                   ),
+                ),
 
                 // Scroll-to-bottom button
                 Builder(builder: (context) {
@@ -4781,6 +5113,47 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     // Returning to this page: ensure keyboard stays closed unless user taps.
     WidgetsBinding.instance.addPostFrameCallback((_) => _dismissKeyboard());
   }
+
+}
+
+class _SidebarResizeHandle extends StatefulWidget {
+  const _SidebarResizeHandle({required this.visible, required this.onDrag, this.onDragEnd});
+  final bool visible;
+  final ValueChanged<double> onDrag;
+  final VoidCallback? onDragEnd;
+
+  @override
+  State<_SidebarResizeHandle> createState() => _SidebarResizeHandleState();
+}
+
+class _SidebarResizeHandleState extends State<_SidebarResizeHandle> {
+  bool _hovered = false;
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    if (!widget.visible) return const SizedBox.shrink();
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragUpdate: (details) => widget.onDrag(details.delta.dx),
+      onHorizontalDragEnd: (_) => widget.onDragEnd?.call(),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.resizeColumn,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Container(
+          width: 6,
+          height: double.infinity,
+          color: Colors.transparent,
+          alignment: Alignment.center,
+          child: Container(
+            width: 1,
+            height: double.infinity,
+            color: (_hovered ? cs.primary.withOpacity(0.28) : cs.outlineVariant.withOpacity(0.10)),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ReasoningData {
@@ -4872,44 +5245,191 @@ class _SelectionToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 6)),
-        ],
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.3)),
+    // Use compact icon-only glass buttons to avoid taking too much width
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _GlassCircleButtonSmall(
+          icon: Lucide.X,
+          color: cs.onSurface,
+          onTap: onCancel,
+          semanticLabel: AppLocalizations.of(context)!.homePageCancel,
+        ),
+        const SizedBox(width: 14),
+        _GlassCircleButtonSmall(
+          icon: Lucide.Check,
+          color: cs.primary,
+          onTap: onConfirm,
+          semanticLabel: AppLocalizations.of(context)!.homePageDone,
+        ),
+      ],
+    );
+  }
+}
+
+// Animated container that slides/fades in/out like provider multi-select bar
+class _AnimatedSelectionBar extends StatelessWidget {
+  const _AnimatedSelectionBar({required this.visible, required this.child});
+  final bool visible;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSlide(
+      offset: visible ? Offset.zero : const Offset(0, 1),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      child: AnimatedOpacity(
+        opacity: visible ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        child: IgnorePointer(ignoring: !visible, child: child),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          OutlinedButton.icon(
-            icon: const Icon(Lucide.X, size: 16),
-            onPressed: onCancel,
-            label: Text(l10n.homePageCancel),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    );
+  }
+}
+
+// iOS-style glass capsule button (no ripple), similar to providers multi-select style
+class _GlassCapsuleButton extends StatefulWidget {
+  const _GlassCapsuleButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  State<_GlassCapsuleButton> createState() => _GlassCapsuleButtonState();
+}
+
+class _GlassCapsuleButtonState extends State<_GlassCapsuleButton> {
+  bool _pressed = false;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    // Glass background, match providers' capsule taste
+    final glassBase = isDark ? Colors.black.withOpacity(0.06) : Colors.white.withOpacity(0.65);
+    final overlay = isDark ? Colors.black.withOpacity(0.06) : Colors.black.withOpacity(0.05);
+    final tileColor = _pressed ? Color.alphaBlend(overlay, glassBase) : glassBase;
+    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.35 : 0.40);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: () {
+        Haptics.light();
+        widget.onTap();
+      },
+      child: AnimatedScale(
+        scale: _pressed ? 0.96 : 1.0,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOutCubic,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: tileColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: borderColor, width: 1.0),
+              ),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(widget.icon, size: 16, color: widget.color),
+                  const SizedBox(width: 6),
+                  Text(
+                    widget.label,
+                    style: TextStyle(color: widget.color, fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 12),
-          ElevatedButton.icon(
-            icon: const Icon(Lucide.Check, size: 16),
-            onPressed: onConfirm,
-            label: Text(l10n.homePageDone),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: cs.primary,
-              foregroundColor: cs.onPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              elevation: 0,
+        ),
+      ),
+    );
+  }
+}
+
+// Compact icon-only glass button to minimize width (like providers multi-select icons)
+class _GlassCircleButtonSmall extends StatefulWidget {
+  const _GlassCircleButtonSmall({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    this.semanticLabel,
+    this.size = 40,
+  });
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final String? semanticLabel;
+  final double size; // diameter
+
+  @override
+  State<_GlassCircleButtonSmall> createState() => _GlassCircleButtonSmallState();
+}
+
+class _GlassCircleButtonSmallState extends State<_GlassCircleButtonSmall> {
+  bool _pressed = false;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final glassBase = isDark ? Colors.black.withOpacity(0.06) : Colors.white.withOpacity(0.06);
+    final overlay = isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05);
+    final tileColor = _pressed ? Color.alphaBlend(overlay, glassBase) : glassBase;
+    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.10 : 0.10);
+
+    final child = SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: Center(child: Icon(widget.icon, size: 18, color: widget.color)),
+    );
+
+    return Semantics(
+      button: true,
+      label: widget.semanticLabel,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: () {
+          Haptics.light();
+          widget.onTap();
+        },
+        child: AnimatedScale(
+          scale: _pressed ? 0.95 : 1.0,
+          duration: const Duration(milliseconds: 110),
+          curve: Curves.easeOutCubic,
+          child: ClipOval(
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: tileColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: borderColor, width: 1.0),
+                ),
+                child: child,
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

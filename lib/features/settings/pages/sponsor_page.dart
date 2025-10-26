@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -303,7 +305,10 @@ class _TactileRowState extends State<_TactileRow> {
       onTapDown: widget.onTap == null ? null : (_) => _setPressed(true),
       onTapUp: widget.onTap == null ? null : (_) => _setPressed(false),
       onTapCancel: widget.onTap == null ? null : () => _setPressed(false),
-      onTap: widget.onTap == null ? null : () { if (widget.haptics) Haptics.soft(); widget.onTap!.call(); },
+      onTap: widget.onTap == null ? null : () {
+        if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
+        widget.onTap!.call();
+      },
       child: widget.pressedScale == 1.0
           ? child
           : AnimatedScale(scale: _pressed ? widget.pressedScale : 1.0, duration: const Duration(milliseconds: 120), curve: Curves.easeOutCubic, child: child),

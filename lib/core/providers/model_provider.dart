@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'settings_provider.dart';
+import '../services/api_key_manager.dart';
+import 'package:Kelivo/secrets/fallback.dart';
 import '../services/api/google_service_account_auth.dart';
 
 enum ModelType { chat, embedding }
@@ -105,12 +107,13 @@ class _Http {
 class OpenAIProvider extends BaseProvider {
   @override
   Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
-    if (cfg.apiKey.isEmpty) return [];
+    final key = ProviderManager._effectiveApiKey(cfg);
+    if (key.isEmpty) return [];
     final client = _Http.clientFor(cfg);
     try {
       final uri = Uri.parse('${cfg.baseUrl}/models');
       final res = await client.get(uri, headers: {
-        'Authorization': 'Bearer ${cfg.apiKey}',
+        'Authorization': 'Bearer $key',
       });
       if (res.statusCode >= 200 && res.statusCode < 300) {
         final data = (jsonDecode(res.body)['data'] as List?) ?? [];
@@ -131,12 +134,13 @@ class ClaudeProvider extends BaseProvider {
   static const String anthropicVersion = '2023-06-01';
   @override
   Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
-    if (cfg.apiKey.isEmpty) return [];
+    final key = ProviderManager._effectiveApiKey(cfg);
+    if (key.isEmpty) return [];
     final client = _Http.clientFor(cfg);
     try {
       final uri = Uri.parse('${cfg.baseUrl}/models');
       final res = await client.get(uri, headers: {
-        'x-api-key': cfg.apiKey,
+        'x-api-key': key,
         'anthropic-version': anthropicVersion,
       });
       if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -166,8 +170,9 @@ class GoogleProvider extends BaseProvider {
       return 'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models';
     }
     final base = cfg.baseUrl.endsWith('/') ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1) : cfg.baseUrl;
-    if (cfg.apiKey.isNotEmpty) {
-      return '$base/models?key=${Uri.encodeQueryComponent(cfg.apiKey)}';
+    final key = ProviderManager._effectiveApiKey(cfg);
+    if (key.isNotEmpty) {
+      return '$base/models?key=${Uri.encodeQueryComponent(key)}';
     }
     return '$base/models';
   }
@@ -187,9 +192,12 @@ class GoogleProvider extends BaseProvider {
             final proj = (cfg.projectId ?? '').trim();
             if (proj.isNotEmpty) headers['X-Goog-User-Project'] = proj;
           } catch (_) {}
-        } else if (cfg.apiKey.isNotEmpty) {
-          // Fallback: treat apiKey as a bearer token if user pasted one
-          headers['Authorization'] = 'Bearer ${cfg.apiKey}';
+        } else {
+          final key = ProviderManager._effectiveApiKey(cfg);
+          if (key.isNotEmpty) {
+            // Fallback: treat apiKey as a bearer token if user pasted one
+            headers['Authorization'] = 'Bearer $key';
+          }
         }
       }
       final res = await client.get(Uri.parse(url), headers: headers);
@@ -221,6 +229,15 @@ class GoogleProvider extends BaseProvider {
 }
 
 class ProviderManager {
+  static String _effectiveApiKey(ProviderConfig cfg) {
+    try {
+      if (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) {
+        final sel = ApiKeyManager().selectForProvider(cfg);
+        if (sel.key != null) return sel.key!.key;
+      }
+    } catch (_) {}
+    return cfg.apiKey;
+  }
   // Per-model override helpers (duplicated logic from ChatApiService)
   static Map<String, dynamic> _modelOverride(ProviderConfig cfg, String modelId) {
     final ov = cfg.modelOverrides[modelId];
@@ -313,8 +330,21 @@ class ProviderManager {
         final extra = _customBody(cfg, modelId);
         if (extra.isNotEmpty) (body as Map<String, dynamic>).addAll(extra);
         // Merge custom headers overrides
+        // SiliconFlow fallback key for built-in free models when no API key provided
+        String apiKey = _effectiveApiKey(cfg);
+        try {
+          if ((cfg.id) == 'SiliconFlow') {
+            final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
+            if (host.contains('siliconflow') && apiKey.trim().isEmpty) {
+              final m = modelId.toLowerCase();
+              final allowed = m == 'thudm/glm-4-9b-0414' || m == 'qwen/qwen3-8b';
+              final fb = siliconflowFallbackKey.trim();
+              if (allowed && fb.isNotEmpty) apiKey = fb;
+            }
+          }
+        } catch (_) {}
         final headers = <String, String>{
-          'Authorization': 'Bearer ${cfg.apiKey}',
+          'Authorization': 'Bearer $apiKey',
           'Content-Type': 'application/json',
         };
         headers.addAll(_customHeaders(cfg, modelId));

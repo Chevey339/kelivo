@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +8,8 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/services/haptics.dart';
+import '../../../shared/widgets/ios_tile_button.dart';
 
 Future<String?> showAddProviderSheet(BuildContext context) async {
   final cs = Theme.of(context).colorScheme;
@@ -30,6 +33,23 @@ class _AddProviderSheet extends StatefulWidget {
 class _AddProviderSheetState extends State<_AddProviderSheet>
     with SingleTickerProviderStateMixin {
   late final TabController _tab = TabController(length: 3, vsync: this);
+
+  @override
+  void initState() {
+    super.initState();
+    _tab.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _tab.removeListener(_onTabChanged);
+    _tab.dispose();
+    super.dispose();
+  }
 
   // OpenAI
   bool _openaiEnabled = true;
@@ -70,10 +90,19 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.transparent)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.transparent)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary.withOpacity(0.4))),
+            fillColor: isDark ? Colors.white10 : Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+            ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           ),
         ),
@@ -99,11 +128,47 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     );
   }
 
+  Widget _switchRow({required String label, required bool value, required ValueChanged<bool> onChanged}) {
+    return Row(
+      children: [
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
+        IosSwitch(value: value, onChanged: onChanged),
+      ],
+    );
+  }
+
+  Widget _iosCard({required List<Widget> children}) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06), width: 0.6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Column(
+          children: [
+            for (int i = 0; i < children.length; i++) ...[
+              if (i > 0)
+                Divider(height: 10, thickness: 0.6, color: cs.outlineVariant.withOpacity(0.18)),
+              children[i],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _openaiForm(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _switchTile(label: l10n.addProviderSheetEnabledLabel, value: _openaiEnabled, onChanged: (v) => setState(() => _openaiEnabled = v)),
+        _iosCard(children: [
+          _switchRow(label: l10n.addProviderSheetEnabledLabel, value: _openaiEnabled, onChanged: (v) => setState(() => _openaiEnabled = v)),
+          _switchRow(label: 'Response API', value: _openaiUseResponse, onChanged: (v) => setState(() => _openaiUseResponse = v)),
+        ]),
         const SizedBox(height: 10),
         _inputRow(label: l10n.addProviderSheetNameLabel, controller: _openaiName),
         const SizedBox(height: 10),
@@ -111,15 +176,8 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
         const SizedBox(height: 10),
         _inputRow(label: 'API Base Url', controller: _openaiBase),
         const SizedBox(height: 10),
-        if (!_openaiUseResponse) ...[
+        if (!_openaiUseResponse)
           _inputRow(label: l10n.addProviderSheetApiPathLabel, controller: _openaiPath, hint: '/chat/completions'),
-          const SizedBox(height: 10),
-        ],
-        _switchTile(
-          label: 'Response API',
-          value: _openaiUseResponse,
-          onChanged: (v) => setState(() => _openaiUseResponse = v),
-        ),
       ],
     );
   }
@@ -128,7 +186,10 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _switchTile(label: l10n.addProviderSheetEnabledLabel, value: _googleEnabled, onChanged: (v) => setState(() => _googleEnabled = v)),
+        _iosCard(children: [
+          _switchRow(label: l10n.addProviderSheetEnabledLabel, value: _googleEnabled, onChanged: (v) => setState(() => _googleEnabled = v)),
+          _switchRow(label: 'Vertex AI', value: _googleVertex, onChanged: (v) => setState(() => _googleVertex = v)),
+        ]),
         const SizedBox(height: 10),
         _inputRow(label: l10n.addProviderSheetNameLabel, controller: _googleName),
         const SizedBox(height: 10),
@@ -138,12 +199,6 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
           _inputRow(label: 'API Base Url', controller: _googleBase),
           const SizedBox(height: 10),
         ],
-        _switchTile(
-          label: 'Vertex AI',
-          value: _googleVertex,
-          onChanged: (v) => setState(() => _googleVertex = v),
-        ),
-        const SizedBox(height: 10),
         if (_googleVertex) ...[
           _inputRow(label: l10n.addProviderSheetVertexAiLocationLabel, controller: _googleLocation, hint: 'us-central1'),
           const SizedBox(height: 10),
@@ -170,7 +225,9 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _switchTile(label: l10n.addProviderSheetEnabledLabel, value: _claudeEnabled, onChanged: (v) => setState(() => _claudeEnabled = v)),
+        _iosCard(children: [
+          _switchRow(label: l10n.addProviderSheetEnabledLabel, value: _claudeEnabled, onChanged: (v) => setState(() => _claudeEnabled = v)),
+        ]),
         const SizedBox(height: 10),
         _inputRow(label: l10n.addProviderSheetNameLabel, controller: _claudeName),
         const SizedBox(height: 10),
@@ -318,14 +375,27 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                 ),
               ),
               const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
+              SizedBox(
+                height: 36,
+                child: Stack(
                   children: [
-                    Expanded(
+                    Align(
+                      alignment: Alignment.center,
                       child: Text(
                         l10n.addProviderSheetTitle,
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: _TactileIconButton(
+                          icon: Lucide.X,
+                          color: cs.onSurface,
+                          size: 22,
+                          onTap: () => Navigator.of(context).maybePop(),
+                        ),
                       ),
                     ),
                   ],
@@ -333,28 +403,8 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
               ),
               const SizedBox(height: 8),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF7F7F9),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: TabBar(
-                    controller: _tab,
-                    indicatorColor: cs.primary,
-                    labelColor: cs.primary,
-                    unselectedLabelColor: cs.onSurface.withOpacity(0.7),
-                    dividerColor: Colors.transparent,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    tabs: const [
-                      Tab(text: 'OpenAI'),
-                      Tab(text: 'Google'),
-                      Tab(text: 'Claude'),
-                    ],
-                  ),
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _SegTabBar(controller: _tab, tabs: const ['OpenAI', 'Google', 'Claude']),
               ),
               const SizedBox(height: 12),
               Expanded(
@@ -383,33 +433,16 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.of(context).maybePop(),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: cs.primary.withOpacity(0.5)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: Text(l10n.addProviderSheetCancelButton, style: TextStyle(color: cs.primary)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Lucide.Plus, size: 18),
-                        onPressed: _onAdd,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: cs.primary,
-                          foregroundColor: cs.onPrimary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
-                        label: Text(l10n.addProviderSheetAddButton),
-                      ),
-                    ),
-                  ],
+                child: SizedBox(
+                  width: double.infinity,
+                  child: IosTileButton(
+                    icon: Lucide.Plus,
+                    label: l10n.addProviderSheetAddButton,
+                    backgroundColor: cs.primary,
+                    // No need to set foreground/border; component tints background lightly,
+                    // uses theme color for text, and draws a subtle same-hue border.
+                    onTap: _onAdd,
+                  ),
                 ),
               ),
             ],
@@ -439,7 +472,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+            fillColor: isDark ? Colors.white10 : Colors.white,
             border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide(color: Colors.transparent)),
             enabledBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide(color: Colors.transparent)),
             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary.withOpacity(0.4))),
@@ -472,5 +505,177 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
       } catch (_) {}
       if (mounted) setState(() {});
     } catch (_) {}
+  }
+
+}
+
+// Copy of assistant _SegTabBar to ensure consistency
+class _SegTabBar extends StatelessWidget {
+  const _SegTabBar({required this.controller, required this.tabs});
+  final TabController controller;
+  final List<String> tabs;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    const double outerHeight = 44;
+    const double innerPadding = 4;
+    const double gap = 6;
+    const double minSegWidth = 88;
+    final double pillRadius = 18;
+    final double innerRadius = ((pillRadius - innerPadding).clamp(0.0, pillRadius)).toDouble();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double availWidth = constraints.maxWidth;
+        final double innerAvailWidth = availWidth - innerPadding * 2;
+        final double segWidth = math.max(
+          minSegWidth,
+          (innerAvailWidth - gap * (tabs.length - 1)) / tabs.length,
+        );
+        final double rowWidth = segWidth * tabs.length + gap * (tabs.length - 1);
+
+        final Color shellBg = isDark ? Colors.white.withOpacity(0.08) : Colors.white;
+
+        List<Widget> children = [];
+        for (int index = 0; index < tabs.length; index++) {
+          final bool selected = controller.index == index;
+          children.add(
+            SizedBox(
+              width: segWidth,
+              height: double.infinity,
+              child: _TactileRow(
+                onTap: () => controller.animateTo(index),
+                builder: (pressed) {
+                  // Background does not change on press; only selected shows subtle tint
+                  final Color baseBg = selected ? cs.primary.withOpacity(0.14) : Colors.transparent;
+                  final Color bg = baseBg;
+
+                  // Text color lightens slightly on press
+                  final Color baseTextColor = selected ? cs.primary : cs.onSurface.withOpacity(0.82);
+                  final Color targetTextColor = pressed
+                      ? Color.lerp(baseTextColor, Colors.white, 0.22) ?? baseTextColor
+                      : baseTextColor;
+
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    decoration: BoxDecoration(
+                      color: bg,
+                      borderRadius: BorderRadius.circular(innerRadius),
+                    ),
+                    alignment: Alignment.center,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: TweenAnimationBuilder<Color?>(
+                        tween: ColorTween(end: targetTextColor),
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, color, _) {
+                          return Text(
+                            tabs[index],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: color ?? baseTextColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+          if (index != tabs.length - 1) children.add(const SizedBox(width: gap));
+        }
+
+        return Container(
+          height: outerHeight,
+          decoration: BoxDecoration(
+            color: shellBg,
+            borderRadius: BorderRadius.circular(pillRadius),
+          ),
+          clipBehavior: Clip.hardEdge,
+          child: Padding(
+            padding: const EdgeInsets.all(innerPadding),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: innerAvailWidth),
+                child: SizedBox(width: rowWidth, child: Row(children: children)),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TactileRow extends StatefulWidget {
+  const _TactileRow({required this.builder, this.onTap});
+  final Widget Function(bool pressed) builder;
+  final VoidCallback? onTap;
+  @override
+  State<_TactileRow> createState() => _TactileRowState();
+}
+
+class _TactileRowState extends State<_TactileRow> {
+  bool _pressed = false;
+  void _set(bool v) {
+    if (_pressed != v) setState(() => _pressed = v);
+  }
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: widget.onTap == null ? null : (_) => _set(true),
+      onTapUp: widget.onTap == null ? null : (_) => _set(false),
+      onTapCancel: widget.onTap == null ? null : () => _set(false),
+      onTap: widget.onTap,
+      child: widget.builder(_pressed),
+    );
+  }
+}
+
+// Local tactile icon button (no ripple), for close "X"
+class _TactileIconButton extends StatefulWidget {
+  const _TactileIconButton({required this.icon, required this.color, required this.onTap, this.size = 22});
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final double size;
+  @override
+  State<_TactileIconButton> createState() => _TactileIconButtonState();
+}
+
+class _TactileIconButtonState extends State<_TactileIconButton> {
+  bool _pressed = false;
+  @override
+  Widget build(BuildContext context) {
+    final base = widget.color;
+    final press = base.withOpacity(0.7);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: () { Haptics.light(); widget.onTap(); },
+      child: AnimatedScale(
+        scale: _pressed ? 0.95 : 1.0,
+        duration: const Duration(milliseconds: 110),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Icon(widget.icon, size: widget.size, color: _pressed ? press : base),
+        ),
+      ),
+    );
   }
 }

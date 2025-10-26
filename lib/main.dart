@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 // import 'dart:async';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
 import 'features/home/pages/home_page.dart';
+import 'desktop/desktop_home_page.dart';
 import 'package:flutter/services.dart';
+import 'package:window_manager/window_manager.dart';
+import 'desktop/desktop_window_controller.dart';
 // import 'package:logging/logging.dart' as logging;
 // Theme is now managed in SettingsProvider
 import 'theme/theme_factory.dart';
@@ -18,6 +22,7 @@ import 'core/providers/tts_provider.dart';
 import 'core/providers/assistant_provider.dart';
 import 'core/providers/update_provider.dart';
 import 'core/providers/quick_phrase_provider.dart';
+import 'core/providers/memory_provider.dart';
 import 'core/services/chat/chat_service.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'utils/sandbox_path_resolver.dart';
@@ -30,6 +35,8 @@ bool _didEnsureAssistants = false; // ensure defaults after l10n ready
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Desktop (Windows) window setup: hide native title bar for custom Flutter bar
+  await _initDesktopWindow();
   // Debug logging and global error handlers were enabled previously for diagnosis.
   // They are commented out now per request to reduce log noise.
   // FlutterError.onError = (FlutterErrorDetails details) { ... };
@@ -41,7 +48,21 @@ Future<void> main() async {
   // Enable edge-to-edge to allow content under system bars (Android)
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   // Start app (no extra guarded zone logging)
-  runApp(const MyApp());
+runApp(const MyApp());
+}
+
+Future<void> _initDesktopWindow() async {
+  if (kIsWeb) return;
+  try {
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      await windowManager.ensureInitialized();
+      await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
+    }
+    // Initialize and show desktop window with persisted size/position
+    await DesktopWindowController.instance.initializeAndShow(title: 'Kelivo');
+  } catch (_) {
+    // Ignore on unsupported platforms.
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -61,6 +82,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => TtsProvider()),
         ChangeNotifierProvider(create: (_) => UpdateProvider()),
         ChangeNotifierProvider(create: (_) => QuickPhraseProvider()),
+        ChangeNotifierProvider(create: (_) => MemoryProvider()),
       ],
       child: Builder(
         builder: (context) {
@@ -118,7 +140,7 @@ class MyApp extends StatelessWidget {
                 darkTheme: dark,
                 themeMode: settings.themeMode,
                 navigatorObservers: <NavigatorObserver>[routeObserver],
-                home: const HomePage(),
+                home: _selectHome(),
                 builder: (ctx, child) {
                   final bright = Theme.of(ctx).brightness;
                   final overlay = bright == Brightness.dark
@@ -164,5 +186,14 @@ class MyApp extends StatelessWidget {
       ),
     );
   }
+}
+
+Widget _selectHome() {
+  // Mobile remains the default platform. Desktop is an added platform.
+  if (kIsWeb) return const HomePage();
+  final isDesktop = defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.linux;
+  return isDesktop ? const DesktopHomePage() : const HomePage();
 }
  

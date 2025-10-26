@@ -88,7 +88,7 @@ class SettingsPage extends StatelessWidget {
 
     // iOS-style section header (neutral color, not theme color)
     Widget header(String text, {bool first = false}) => Padding(
-          padding: EdgeInsets.fromLTRB(12, first ? 2 : 18, 12, 6),
+          padding: EdgeInsets.fromLTRB(12, first ? 2 : 12, 12, 6),
           child: Text(
             text,
             style: TextStyle(
@@ -315,32 +315,32 @@ class SettingsPage extends StatelessWidget {
                 );
               },
             ),
-            _iosDivider(context),
-            _iosNavRow(
-              context,
-              icon: Lucide.Share2,
-              label: l10n.settingsPageShare,
-              onTap: () async {
-                // Provide anchor rect from overlay for iPad share sheet
-                Rect anchor;
-                try {
-                  final overlay = Overlay.of(context);
-                  final ro = overlay?.context.findRenderObject();
-                  if (ro is RenderBox && ro.hasSize) {
-                    final center = ro.size.center(Offset.zero);
-                    final global = ro.localToGlobal(center);
-                    anchor = Rect.fromCenter(center: global, width: 1, height: 1);
-                  } else {
-                    final size = MediaQuery.of(context).size;
-                    anchor = Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: 1, height: 1);
-                  }
-                } catch (_) {
-                  final size = MediaQuery.of(context).size;
-                  anchor = Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: 1, height: 1);
-                }
-                await Share.share(l10n.settingsShare, sharePositionOrigin: anchor);
-              },
-            ),
+            // _iosDivider(context),
+            // _iosNavRow(
+            //   context,
+            //   icon: Lucide.Share2,
+            //   label: l10n.settingsPageShare,
+            //   onTap: () async {
+            //     // Provide anchor rect from overlay for iPad share sheet
+            //     Rect anchor;
+            //     try {
+            //       final overlay = Overlay.of(context);
+            //       final ro = overlay?.context.findRenderObject();
+            //       if (ro is RenderBox && ro.hasSize) {
+            //         final center = ro.size.center(Offset.zero);
+            //         final global = ro.localToGlobal(center);
+            //         anchor = Rect.fromCenter(center: global, width: 1, height: 1);
+            //       } else {
+            //         final size = MediaQuery.of(context).size;
+            //         anchor = Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: 1, height: 1);
+            //       }
+            //     } catch (_) {
+            //       final size = MediaQuery.of(context).size;
+            //       anchor = Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: 1, height: 1);
+            //     }
+            //     await Share.share(l10n.settingsShare, sharePositionOrigin: anchor);
+            //   },
+            // ),
           ]),
 
           const SizedBox(height: 24),
@@ -485,7 +485,7 @@ class _TactileRowState extends State<_TactileRow> {
       onTap: widget.onTap == null
           ? null
           : () {
-              if (widget.haptics) {
+              if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) {
                 Haptics.soft();
               }
               widget.onTap!.call();

@@ -7,6 +7,8 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/ios_tile_button.dart';
 
 Future<bool?> showModelDetailSheet(BuildContext context, {required String providerKey, required String modelId}) {
   final cs = Theme.of(context).colorScheme;
@@ -15,7 +17,7 @@ Future<bool?> showModelDetailSheet(BuildContext context, {required String provid
     isScrollControlled: true,
     backgroundColor: cs.surface,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (ctx) => SafeArea(
       top: false,
@@ -36,7 +38,7 @@ Future<bool?> showCreateModelSheet(BuildContext context, {required String provid
     isScrollControlled: true,
     backgroundColor: cs.surface,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (ctx) => SafeArea(
       top: false,
@@ -184,43 +186,43 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
 
   Widget _buildHeader(BuildContext context, AppLocalizations l10n) {
     final cs = Theme.of(context).colorScheme;
-    return Container(
-      height: 48,
-      alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(child: Text(widget.isNew ? l10n.modelDetailSheetAddModel : l10n.modelDetailSheetEditModel, style: TextStyle(fontSize: 16, color: cs.onSurface, fontWeight: FontWeight.w600))),
-          // Close button intentionally removed for both Add and Edit dialogs per spec.
-        ],
+    return SizedBox(
+      height: 44,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            IosIconButton(
+              icon: Lucide.X,
+              size: 22,
+              color: cs.onSurface,
+              minSize: 36,
+              onTap: () => Navigator.of(context).maybePop(false),
+              semanticLabel: l10n.modelDetailSheetCancelButton,
+            ),
+            Expanded(
+              child: Center(
+                child: Text(
+                  widget.isNew ? l10n.modelDetailSheetAddModel : l10n.modelDetailSheetEditModel,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            // Right spacer to balance title centering
+            const SizedBox(width: 36),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildTabs(BuildContext context, AppLocalizations l10n) {
-    // Match the TabBar style used in add_provider_sheet.dart (OpenAI/Google/Claude)
-    final cs = Theme.of(context).colorScheme;
+    // iOS segmented tabs like provider add sheet
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF7F7F9),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: TabBar(
-          controller: _tabCtrl,
-          indicatorColor: cs.primary,
-          labelColor: cs.primary,
-          unselectedLabelColor: cs.onSurface.withOpacity(0.7),
-          dividerColor: Colors.transparent,
-          indicatorSize: TabBarIndicatorSize.tab,
-          tabs: [
-            Tab(text: l10n.modelDetailSheetBasicTab),
-            Tab(text: l10n.modelDetailSheetAdvancedTab),
-          ],
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: _SegTabBar(
+        controller: _tabCtrl,
+        tabs: [l10n.modelDetailSheetBasicTab, l10n.modelDetailSheetAdvancedTab],
       ),
     );
   }
@@ -260,11 +262,11 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
                   : null,
               decoration: InputDecoration(
                 filled: true,
-                fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+                fillColor: isDark ? Colors.white10 : Colors.white,
                 hintText: l10n.modelDetailSheetModelIdHint,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.4))),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5))),
               ),
             ),
             const SizedBox(height: 12),
@@ -277,10 +279,10 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
               },
               decoration: InputDecoration(
                 filled: true,
-                fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.4))),
+                fillColor: isDark ? Colors.white10 : Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5))),
               ),
             ),
             const SizedBox(height: 12),
@@ -455,19 +457,16 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
 
   Widget _buildFooter(BuildContext context, AppLocalizations l10n) {
     final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, 10, 12, 10 + MediaQuery.of(context).padding.bottom),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          TextButton(onPressed: () => Navigator.of(context).maybePop(false), child: Text(l10n.modelDetailSheetCancelButton)),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: _save,
-            style: TextButton.styleFrom(foregroundColor: cs.primary),
-            child: Text(widget.isNew ? l10n.modelDetailSheetAddButton : l10n.modelDetailSheetConfirmButton),
-          ),
-        ],
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 10 + MediaQuery.of(context).padding.bottom),
+      child: SizedBox(
+        width: double.infinity,
+        child: IosTileButton(
+          icon: widget.isNew ? Lucide.Plus : Lucide.Check,
+          label: widget.isNew ? l10n.modelDetailSheetAddButton : l10n.modelDetailSheetConfirmButton,
+          backgroundColor: cs.primary,
+          onTap: _save,
+        ),
       ),
     );
   }
@@ -778,14 +777,21 @@ class _HeaderRow extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: l10n.modelDetailSheetHeaderKeyHint,
                     filled: true,
-                    fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.transparent)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.transparent)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary.withOpacity(0.4))),
+                    fillColor: isDark ? Colors.white10 : Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary.withOpacity(0.5))),
                   ),
                 ),
               ),
-              IconButton(onPressed: onDelete, icon: const Icon(Lucide.Trash2))
+              IosIconButton(
+                icon: Lucide.Trash2,
+                size: 20,
+                color: cs.onSurface.withOpacity(0.8),
+                onTap: onDelete,
+                semanticLabel: 'Delete header',
+                minSize: 40,
+              )
             ],
           ),
           const SizedBox(height: 8),
@@ -794,10 +800,10 @@ class _HeaderRow extends StatelessWidget {
             decoration: InputDecoration(
               hintText: l10n.modelDetailSheetHeaderValueHint,
               filled: true,
-              fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.transparent)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.transparent)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.4))),
+              fillColor: isDark ? Colors.white10 : Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5))),
             ),
           ),
         ],
@@ -814,6 +820,7 @@ class _BodyRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Column(
@@ -826,14 +833,21 @@ class _BodyRow extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: l10n.modelDetailSheetBodyKeyHint,
                     filled: true,
-                    fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.4))),
+                    fillColor: isDark ? Colors.white10 : Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5))),
                   ),
                 ),
               ),
-              IconButton(onPressed: onDelete, icon: const Icon(Lucide.Trash2))
+              IosIconButton(
+                icon: Lucide.Trash2,
+                size: 20,
+                color: cs.onSurface.withOpacity(0.8),
+                onTap: onDelete,
+                semanticLabel: 'Delete entry',
+                minSize: 40,
+              )
             ],
           ),
           const SizedBox(height: 8),
@@ -844,10 +858,10 @@ class _BodyRow extends StatelessWidget {
             decoration: InputDecoration(
               hintText: l10n.modelDetailSheetBodyJsonHint,
               filled: true,
-              fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.4))),
+              fillColor: isDark ? Colors.white10 : Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5))),
             ),
           ),
         ],
@@ -897,14 +911,113 @@ class _OutlinedAddButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(Lucide.Plus, size: 18, color: cs.primary),
-      label: Text(label, style: TextStyle(color: cs.primary)),
-      style: OutlinedButton.styleFrom(
-        side: BorderSide(color: cs.primary.withOpacity(0.5)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    final border = BorderSide(color: cs.primary.withOpacity(0.5));
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.fromBorderSide(border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Lucide.Plus, size: 18, color: cs.primary),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(color: cs.primary)),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+// Segmented tab bar matching provider add sheet style
+class _SegTabBar extends StatelessWidget {
+  const _SegTabBar({required this.controller, required this.tabs});
+  final TabController controller;
+  final List<String> tabs;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    const double outerHeight = 44;
+    const double innerPadding = 4;
+    const double gap = 6;
+    const double minSegWidth = 88;
+    final double pillRadius = 18;
+    final double innerRadius = ((pillRadius - innerPadding).clamp(0.0, pillRadius)).toDouble();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double availWidth = constraints.maxWidth;
+        final double innerAvailWidth = availWidth - innerPadding * 2;
+        final double segWidth =
+            (innerAvailWidth - gap * (tabs.length - 1)) / tabs.length;
+        final double rowWidth = segWidth * tabs.length + gap * (tabs.length - 1);
+
+        final Color shellBg = isDark ? Colors.white.withOpacity(0.08) : Colors.white;
+
+        List<Widget> children = [];
+        for (int index = 0; index < tabs.length; index++) {
+          final bool selected = controller.index == index;
+          children.add(
+            SizedBox(
+              width: segWidth < minSegWidth ? minSegWidth : segWidth,
+              height: double.infinity,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => controller.index = index,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  curve: Curves.easeOutCubic,
+                  decoration: BoxDecoration(
+                    color: selected ? cs.primary.withOpacity(0.14) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(innerRadius),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    tabs[index],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected ? cs.primary : cs.onSurface.withOpacity(0.82),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          if (index != tabs.length - 1) children.add(const SizedBox(width: gap));
+        }
+
+        return Container(
+          height: outerHeight,
+          decoration: BoxDecoration(
+            color: shellBg,
+            borderRadius: BorderRadius.circular(pillRadius),
+          ),
+          clipBehavior: Clip.hardEdge,
+          child: Padding(
+            padding: const EdgeInsets.all(innerPadding),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: innerAvailWidth),
+                child: SizedBox(width: rowWidth, child: Row(children: children)),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

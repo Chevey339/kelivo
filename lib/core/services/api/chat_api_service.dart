@@ -9,8 +9,24 @@ import '../../models/token_usage.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import 'google_service_account_auth.dart';
 import '../../services/api_key_manager.dart';
+import 'package:Kelivo/secrets/fallback.dart';
 
 class ChatApiService {
+  static String _apiKeyForRequest(ProviderConfig cfg, String modelId) {
+    final orig = _effectiveApiKey(cfg).trim();
+    if (orig.isNotEmpty) return orig;
+    if ((cfg.id) == 'SiliconFlow') {
+      final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
+      if (!host.contains('siliconflow')) return orig;
+      final m = modelId.toLowerCase();
+      final allowed = m == 'thudm/glm-4-9b-0414' || m == 'qwen/qwen3-8b';
+      final fallback = siliconflowFallbackKey.trim();
+      if (allowed && fallback.isNotEmpty) {
+        return fallback;
+      }
+    }
+    return orig;
+  }
   static String _effectiveApiKey(ProviderConfig cfg) {
     try {
       if (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) {
@@ -339,7 +355,7 @@ class ChatApiService {
           };
         }
         final headers = <String, String>{
-          'Authorization': 'Bearer ${_effectiveApiKey(config)}',
+          'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
           'Content-Type': 'application/json',
         };
         headers.addAll(_customHeaders(config, modelId));
@@ -401,7 +417,7 @@ class ChatApiService {
           ],
         };
         final headers = <String, String>{
-          'x-api-key': _effectiveApiKey(config),
+          'x-api-key': _apiKeyForRequest(config, modelId),
           'anthropic-version': '2023-06-01',
           'Content-Type': 'application/json',
         };
@@ -436,7 +452,7 @@ class ChatApiService {
           final base = config.baseUrl.endsWith('/')
               ? config.baseUrl.substring(0, config.baseUrl.length - 1)
               : config.baseUrl;
-          url = '$base/models/$modelId:generateContent?key=${Uri.encodeComponent(_effectiveApiKey(config))}';
+          url = '$base/models/$modelId:generateContent?key=${Uri.encodeComponent(_apiKeyForRequest(config, modelId))}';
         }
         final body = {
           'contents': [
@@ -856,7 +872,7 @@ class ChatApiService {
 
     final request = http.Request('POST', url);
     final headers = <String, String>{
-      'Authorization': 'Bearer ${_effectiveApiKey(config)}',
+      'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
       'Content-Type': 'application/json',
       'Accept': 'text/event-stream',
     };
@@ -1073,7 +1089,7 @@ class ChatApiService {
 
               final req2 = http.Request('POST', url);
               final headers2 = <String, String>{
-                'Authorization': 'Bearer ${_effectiveApiKey(config)}',
+                'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
                 'Content-Type': 'application/json',
                 'Accept': 'text/event-stream',
               };
@@ -1396,8 +1412,57 @@ class ChatApiService {
               // if (finishReason != null) {
               //   print('[ChatApi] Received finishReason from choices: $finishReason');
               // }
+
+              // Some providers return non-streaming format (message.content) in SSE
+              final message = c0['message'];
               final delta = c0['delta'];
-              if (delta != null) {
+
+              if (message != null && message['content'] != null) {
+                // Non-streaming format: choices[0].message.content
+                final mc = message['content'];
+                if (mc is String) {
+                  content = mc;
+                } else if (mc is List) {
+                  final sb = StringBuffer();
+                  for (final it in mc) {
+                    if (it is Map) {
+                      final t = (it['text'] ?? '') as String? ?? '';
+                      if (t.isNotEmpty && (it['type'] == null || it['type'] == 'text')) sb.write(t);
+                    }
+                  }
+                  content = sb.toString();
+                } else {
+                  content = (mc ?? '').toString();
+                }
+                if (content.isNotEmpty) {
+                  approxCompletionChars += content.length;
+                }
+
+                // Parse possible image outputs in message content, gated by model output capability
+                if (wantsImageOutput && mc is List) {
+                  final List<dynamic> imageItems = <dynamic>[];
+                  for (final it in mc) {
+                    if (it is Map && (it['type'] == 'image_url' || it['type'] == 'image')) imageItems.add(it);
+                  }
+                  if (imageItems.isNotEmpty) {
+                    final buf = StringBuffer();
+                    for (final it in imageItems) {
+                      if (it is! Map) continue;
+                      dynamic iu = it['image_url'];
+                      String? url;
+                      if (iu is String) {
+                        url = iu;
+                      } else if (iu is Map) {
+                        final u2 = iu['url'];
+                        if (u2 is String) url = u2;
+                      }
+                      if (url != null && url.isNotEmpty) buf.write('\n\n![image](' + url + ')');
+                    }
+                    if (buf.isNotEmpty) content = content + buf.toString();
+                  }
+                }
+              } else if (delta != null) {
+                // Streaming format: choices[0].delta.content
                 // content may be string or list of parts
                 final dc = delta['content'];
                 if (dc is String) {
@@ -2188,17 +2253,15 @@ class ChatApiService {
                 }
               }
             } else if (host.contains('openrouter.ai')) {
-              // print('[ChatApi/OpenAI] suppress early finish due to OpenRouter host; wait for [DONE]');
             } else {
-              final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
-              yield ChatStreamChunk(
-                content: '',
-                reasoning: null,
-                isDone: true,
-                totalTokens: usage?.totalTokens ?? approxTotal,
-                usage: usage,
-              );
-              return;
+              // final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
+              // yield ChatStreamChunk(
+              //   content: '',
+              //   isDone: false,
+              //   totalTokens: usage?.totalTokens ?? approxTotal,
+              //   usage: usage,
+              // );
+              // return;
             }
           }
 
@@ -2272,7 +2335,7 @@ class ChatApiService {
 
             final request2 = http.Request('POST', url);
             request2.headers.addAll({
-              'Authorization': 'Bearer ${_effectiveApiKey(config)}',
+              'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
               'Content-Type': 'application/json',
               'Accept': 'text/event-stream',
             });
@@ -2319,6 +2382,10 @@ class ChatApiService {
         }
       }
     }
+
+    // Fallback: provider closed SSE without sending [DONE]
+    final approxTotal = usage?.totalTokens ?? (approxPromptTokens + _approxTokensFromChars(approxCompletionChars));
+    yield ChatStreamChunk(content: '', isDone: true, totalTokens: approxTotal, usage: usage);
   }
 
   static Stream<ChatStreamChunk> _sendClaudeStream(

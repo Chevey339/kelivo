@@ -9,6 +9,7 @@ import '../../../icons/lucide_adapter.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/ios_tile_button.dart';
 
 String encodeProviderConfig(ProviderConfig cfg) {
   String type;
@@ -52,7 +53,6 @@ Future<void> showShareProviderSheet(BuildContext context, String providerKey) as
     ),
     builder: (ctx) {
       final l10n = AppLocalizations.of(ctx)!;
-      final controller = TextEditingController(text: code);
       Rect shareAnchorRect(BuildContext bctx) {
         try {
           final ro = bctx.findRenderObject();
@@ -117,38 +117,28 @@ Future<void> showShareProviderSheet(BuildContext context, String providerKey) as
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Lucide.Copy, size: 18),
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: controller.text));
+                      child: IosTileButton(
+                        icon: Lucide.Copy,
+                        label: l10n.shareProviderSheetCopyButton,
+                        onTap: () {
+                          Clipboard.setData(ClipboardData(text: code));
                           showAppSnackBar(
                             context,
                             message: l10n.shareProviderSheetCopiedMessage,
                             type: NotificationType.success,
                           );
                         },
-                        label: Text(l10n.shareProviderSheetCopyButton),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: cs.primary.withOpacity(0.5)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Lucide.Share2, size: 18),
-                        onPressed: () async {
+                      child: IosTileButton(
+                        icon: Lucide.Share2,
+                        label: l10n.shareProviderSheetShareButton,
+                        onTap: () async {
                           final rect = shareAnchorRect(ctx);
                           await Share.share(code, subject: 'AI Provider', sharePositionOrigin: rect);
                         },
-                        label: Text(l10n.shareProviderSheetShareButton),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: cs.primary,
-                          foregroundColor: cs.onPrimary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
                       ),
                     ),
                   ],

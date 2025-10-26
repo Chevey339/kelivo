@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/providers/settings_provider.dart';
+import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../widgets/model_select_sheet.dart';
@@ -562,7 +564,10 @@ class _TactileRowState extends State<_TactileRow> {
               if (mounted) _setPressed(false);
             },
       onTapCancel: widget.onTap == null ? null : () => _setPressed(false),
-      onTap: widget.onTap == null ? null : () { if (widget.haptics) Haptics.soft(); widget.onTap!.call(); },
+      onTap: widget.onTap == null ? null : () {
+        if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
+        widget.onTap!.call();
+      },
       child: widget.builder(_pressed),
     );
   }

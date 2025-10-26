@@ -5,6 +5,8 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../core/services/haptics.dart';
 
 Future<void> showReasoningBudgetSheet(BuildContext context) async {
   await showModalBottomSheet(
@@ -12,7 +14,7 @@ Future<void> showReasoningBudgetSheet(BuildContext context) async {
     isScrollControlled: true,
     backgroundColor: Theme.of(context).colorScheme.surface,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (ctx) => const _ReasoningBudgetSheet(),
   );
@@ -78,48 +80,44 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
 
   Widget _tile(IconData icon, String title, int value, {String? subtitle, bool deepthink = false}) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final active = _bucket(_selected) == value;
-    final bg = active
-        ? (isDark ? cs.primary.withOpacity(0.12) : cs.primary.withOpacity(0.08))
-        : cs.surface;
     final Color iconColor = active ? cs.primary : cs.onSurface.withOpacity(0.7);
+    final Color onColor = active ? cs.primary : cs.onSurface;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Material(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => _select(value),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                deepthink
-                    ? SvgPicture.asset(
-                        'assets/icons/deepthink.svg',
-                        width: 18,
-                        height: 18,
-                        colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
-                      )
-                    : Icon(icon, color: iconColor),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 4),
-                        Text(subtitle, style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.7))),
-                      ]
-                    ],
-                  ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: SizedBox(
+        height: 48,
+        child: IosCardPress(
+          borderRadius: BorderRadius.circular(14),
+          baseColor: cs.surface,
+          duration: const Duration(milliseconds: 260),
+          onTap: () {
+            Haptics.light();
+            _select(value);
+            Navigator.of(context).maybePop();
+          },
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              deepthink
+                  ? SvgPicture.asset(
+                      'assets/icons/deepthink.svg',
+                      width: 18,
+                      height: 18,
+                      colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+                    )
+                  : Icon(icon, size: 20, color: iconColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: onColor),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                if (active) Icon(Lucide.Check, color: cs.primary),
-              ],
-            ),
+              ),
+              if (active) Icon(Lucide.Check, size: 18, color: cs.primary) else const SizedBox(width: 18),
+            ],
           ),
         ),
       ),
@@ -130,115 +128,39 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final maxHeight = MediaQuery.of(context).size.height * 0.8;
     return SafeArea(
       top: false,
       child: AnimatedPadding(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.6,
-          maxChildSize: 0.6,
-          minChildSize: 0.4,
-          builder: (c, controller) {
-            return Column(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // drag indicator
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(999))),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: ListView(
-                    controller: controller,
-                    padding: const EdgeInsets.only(bottom: 12),
+                const SizedBox(height: 6),
+                // No title per iOS style; keep content close to handle
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                        child: Text(
-                          l10n.reasoningBudgetSheetTitle,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Builder(builder: (context) {
-                          final cur = int.tryParse(_controller.text.trim());
-                          final eff = cur ?? _selected ?? -1;
-                          return Text(
-                            l10n.reasoningBudgetSheetCurrentLevel(_bucketName(context, eff)),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          );
-                        }),
-                      ),
-                      _tile(Lucide.X, l10n.reasoningBudgetSheetOff, 0, subtitle: l10n.reasoningBudgetSheetOffSubtitle),
-                      _tile(Lucide.Settings2, l10n.reasoningBudgetSheetAuto, -1, subtitle: l10n.reasoningBudgetSheetAutoSubtitle),
-                      _tile(Lucide.Brain, l10n.reasoningBudgetSheetLight, 1024, subtitle: l10n.reasoningBudgetSheetLightSubtitle, deepthink: true),
-                      _tile(Lucide.Brain, l10n.reasoningBudgetSheetMedium, 16000, subtitle: l10n.reasoningBudgetSheetMediumSubtitle, deepthink: true),
-                      _tile(Lucide.Brain, l10n.reasoningBudgetSheetHeavy, 32000, subtitle: l10n.reasoningBudgetSheetHeavySubtitle, deepthink: true),
-                      // const SizedBox(height: 8),
-                      // Padding(
-                      //   padding: const EdgeInsets.symmetric(horizontal: 16),
-                      //   child: Column(
-                      //     crossAxisAlignment: CrossAxisAlignment.start,
-                      //     children: [
-                      //       Text(l10n.reasoningBudgetSheetCustomLabel, style: Theme.of(context).textTheme.labelMedium),
-                      //       const SizedBox(height: 8),
-                      //       Builder(builder: (context) {
-                      //         final isDark = Theme.of(context).brightness == Brightness.dark;
-                      //         final cs2 = Theme.of(context).colorScheme;
-                      //         return TextField(
-                      //           controller: _controller,
-                      //           keyboardType: TextInputType.number,
-                      //           decoration: InputDecoration(
-                      //             hintText: l10n.reasoningBudgetSheetCustomHint,
-                      //             filled: true,
-                      //             fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-                      //             border: OutlineInputBorder(
-                      //               borderRadius: BorderRadius.circular(12),
-                      //               borderSide: const BorderSide(color: Colors.transparent),
-                      //             ),
-                      //             enabledBorder: OutlineInputBorder(
-                      //               borderRadius: BorderRadius.circular(12),
-                      //               borderSide: const BorderSide(color: Colors.transparent),
-                      //             ),
-                      //             focusedBorder: OutlineInputBorder(
-                      //               borderRadius: BorderRadius.circular(12),
-                      //               borderSide: BorderSide(color: cs2.primary.withOpacity(0.4)),
-                      //             ),
-                      //           ),
-                      //           onChanged: (v) {
-                      //             final n = int.tryParse(v.trim());
-                      //             if (n != null) {
-                      //               // Real-time save and update highlighting
-                      //               _select(n);
-                      //             } else {
-                      //               setState(() {}); // Only refresh "Current Level"
-                      //             }
-                      //           },
-                      //           onSubmitted: (v) {
-                      //             final n = int.tryParse(v.trim());
-                      //             if (n != null) {
-                      //               _select(n);
-                      //             }
-                      //             Navigator.of(context).maybePop();
-                      //           },
-                      //         );
-                      //       }),
-                      //     ],
-                      //   ),
-                      // ),
-                      const SizedBox(height: 12),
+                      _tile(Lucide.X, l10n.reasoningBudgetSheetOff, 0),
+                      _tile(Lucide.Settings2, l10n.reasoningBudgetSheetAuto, -1),
+                      _tile(Lucide.Brain, l10n.reasoningBudgetSheetLight, 1024, deepthink: true),
+                      _tile(Lucide.Brain, l10n.reasoningBudgetSheetMedium, 16000, deepthink: true),
+                      _tile(Lucide.Brain, l10n.reasoningBudgetSheetHeavy, 32000, deepthink: true),
                     ],
                   ),
                 ),
               ],
-            );
-          },
+            ),
+          ),
         ),
       ),
     );

@@ -14,7 +14,7 @@ Future<void> showConversationMcpSheet(BuildContext context, {required String con
     isScrollControlled: true,
     backgroundColor: cs.surface,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (_) => _ConversationMcpSheet(conversationId: conversationId),
   );

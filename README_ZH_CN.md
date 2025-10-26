@@ -27,6 +27,10 @@
 
 🔗 [TestFlight](https://testflight.apple.com/join/PZZyRMyY) 参与测试版体验。
 
+## 💖 赞助
+
+感谢 [siliconflow.cn](https://siliconflow.cn) 与我们合作提供可免费使用的模型。
+
 ## ✨ 功能特性
 
 - 🎨 **现代化设计** - Material You 设计语言，支持动态主题色(Android12+)
@@ -38,7 +42,7 @@
 - 📝 **Markdown 渲染** - 完整支持代码高亮、LaTeX 公式、表格等
 - 🎙️ **语音功能** - 内置 系统TTS 文本转语音功能
 - 🛠️ **MCP 支持** - Model Context Protocol 工具集成
-- 🔍 **网络搜索** - 集成多种搜索引擎（Exa、Tavily、知谱、LinkUp、Brave、Bing、Metaso、SearXNG、Ollama、Jina）
+- 🔍 **网络搜索** - 集成多种搜索引擎（Exa、Tavily、知谱、LinkUp、Brave、Bing、Metaso、SearXNG、Ollama、Jina, Perplexity, Bocha）
 - 🧩 **提示词变量** - 支持模型名称、时间等动态变量
 - 📤 **二维码分享** - 通过二维码导出和导入供应商配置
 - 💾 **数据备份** - 支持聊天记录备份和恢复
@@ -62,7 +66,7 @@
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 开启一个 Pull Request
 
-## 💖 致谢
+## ❤️ 致谢
 
 特别感谢 [RikkaHub](https://github.com/re-ovo/rikkahub) 项目提供的 UI 设计灵感。Kelivo 的界面设计深受 RikkaHub 优美且实用的设计启发。
 

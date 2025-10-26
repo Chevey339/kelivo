@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 
 Future<void> showImagePreviewSheet(BuildContext context, {required File file}) async {
   final cs = Theme.of(context).colorScheme;
@@ -207,46 +208,68 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                   child: Row(
                     children: [
-                      // Left small square share button
+                      // Left small square share button (no ripple)
                       Builder(
                         builder: (btnCtx) => SizedBox(
                           width: 48,
                           height: 48,
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: cs.outline.withOpacity(0.25)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              backgroundColor: cs.surface,
-                              padding: EdgeInsets.zero,
+                          child: IosCardPress(
+                            onTap: () => _onShare(btnCtx),
+                            borderRadius: BorderRadius.circular(12),
+                            baseColor: cs.surface,
+                            pressedBlendStrength: Theme.of(context).brightness == Brightness.dark ? 0.14 : 0.10,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: cs.outline.withOpacity(0.25)),
+                              ),
+                              child: Center(
+                                child: Icon(Lucide.MoreVertical, color: cs.onSurface.withOpacity(0.9)),
+                              ),
                             ),
-                            onPressed: () => _onShare(btnCtx),
-                            child: Icon(Lucide.MoreVertical, color: cs.onSurface.withOpacity(0.9)),
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // Right main save button
+                      // Right main save button (no ripple)
                       Expanded(
                         child: SizedBox(
                           height: 48,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: cs.primary,
-                              foregroundColor: cs.onPrimary,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              elevation: 0,
-                              shadowColor: Colors.transparent,
-                              surfaceTintColor: Colors.transparent,
+                          child: IosCardPress(
+                            onTap: _saving ? null : _onSave,
+                            borderRadius: BorderRadius.circular(12),
+                            baseColor: cs.primary,
+                            pressedBlendStrength: Theme.of(context).brightness == Brightness.dark ? 0.14 : 0.12,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 180),
+                                  child: _saving
+                                      ? const SizedBox(
+                                          key: ValueKey('saving'),
+                                          width: 18,
+                                          height: 18,
+                                          child: CupertinoActivityIndicator(radius: 9),
+                                        )
+                                      : Row(
+                                          key: const ValueKey('ready'),
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Lucide.Download, color: cs.onPrimary),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              l10n.imagePreviewSheetSaveImage,
+                                              style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.w600),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                              ),
                             ),
-                            onPressed: _saving ? null : _onSave,
-                            icon: _saving
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CupertinoActivityIndicator(radius: 9),
-                                  )
-                                : Icon(Lucide.Download, color: cs.onPrimary),
-                            label: Text(l10n.imagePreviewSheetSaveImage),
                           ),
                         ),
                       ),

@@ -8,6 +8,7 @@ import '../widgets/add_provider_sheet.dart';
 // grid reorder removed in favor of iOS-style list reordering
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
@@ -16,6 +17,9 @@ import '../../../core/providers/assistant_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
+import 'dart:ui' as ui show ImageFilter;
+import '../../../shared/widgets/ios_tile_button.dart';
+import '../../../shared/widgets/ios_checkbox.dart';
 
 class ProvidersPage extends StatefulWidget {
   const ProvidersPage({super.key});
@@ -173,8 +177,27 @@ class _ProvidersPageState extends State<ProvidersPage> {
             child: _SelectionBar(
               visible: _selectMode,
               count: _selected.length,
+              total: items.length,
               onExport: _onExportSelected,
               onDelete: _onDeleteSelected,
+              onSelectAll: () {
+                setState(() {
+                  // Select all deletable (non-built-in) providers
+                  final baseKeys = {for (final p in base) p.keyName};
+                  final deletable = [for (final p in items) if (!baseKeys.contains(p.keyName)) p.keyName];
+                  final allSelected = deletable.isNotEmpty && deletable.every(_selected.contains) && _selected.length == deletable.length;
+                  _selected.removeWhere((k) => !deletable.contains(k));
+                  if (allSelected) {
+                    // Unselect all deletable
+                    for (final k in deletable) { _selected.remove(k); }
+                  } else {
+                    // Select all deletable
+                    _selected
+                      ..removeWhere((k) => !deletable.contains(k))
+                      ..addAll(deletable);
+                  }
+                });
+              },
             ),
           ),
         ],
@@ -230,10 +253,19 @@ class _ProvidersPageState extends State<ProvidersPage> {
   Future<void> _onDeleteSelected() async {
     if (_selected.isEmpty) return;
     final l10n = AppLocalizations.of(context)!;
+    // Skip built-in providers (default ones)
+    final builtInKeys = {for (final p in _providers(l10n: l10n)) p.keyName};
+    final keysToDelete = _selected.where((k) => !builtInKeys.contains(k)).toList(growable: false);
+
+    if (keysToDelete.isEmpty) {
+      // Nothing deletable selected
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('${l10n.providerDetailPageDeleteProviderTitle} (${_selected.length})'),
+        title: Text('${l10n.providerDetailPageDeleteProviderTitle} (${keysToDelete.length})'),
         content: Text(l10n.providersPageDeleteSelectedConfirmContent),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.providerDetailPageCancelButton)),
@@ -247,13 +279,13 @@ class _ProvidersPageState extends State<ProvidersPage> {
       try {
         final ap = context.read<AssistantProvider>();
         for (final a in ap.assistants) {
-          if (_selected.contains(a.chatModelProvider)) {
+          if (keysToDelete.contains(a.chatModelProvider)) {
             await ap.updateAssistant(a.copyWith(clearChatModel: true));
           }
         }
       } catch (_) {}
       final sp = context.read<SettingsProvider>();
-      for (final k in _selected) {
+      for (final k in keysToDelete) {
         await sp.removeProviderConfig(k);
       }
       if (!mounted) return;
@@ -291,47 +323,71 @@ class _ProvidersList extends StatelessWidget {
     final bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
     final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06);
 
+    // Adapt height: wrap to content if short; flush to bottom if long
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(12),
-            topRight: Radius.circular(12),
-            bottomLeft: Radius.circular(0),
-            bottomRight: Radius.circular(0),
-          ),
-          border: Border.all(color: borderColor, width: 0.6),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: ReorderableListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          itemCount: items.length,
-          onReorder: onReorder,
-          buildDefaultDragHandles: false,
-          proxyDecorator: (child, index, animation) => Opacity(
-            opacity: 0.95,
-            child: Transform.scale(scale: 0.98, child: child),
-          ),
-          itemBuilder: (context, index) {
-            final p = items[index];
-            return KeyedSubtree(
-              key: ValueKey(p.keyName),
-              child: _SettleAnim(
-                active: settlingKeys.contains(p.keyName),
-                child: _ProviderRow(
-                  provider: p,
-                  index: index,
-                  total: items.length,
-                  selectMode: selectMode,
-                  selected: selectedKeys.contains(p.keyName),
-                  onToggleSelect: onToggleSelect,
-                ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final media = MediaQuery.of(context);
+          final safeBottom = media.padding.bottom;
+          final bottomGapIfFlush = safeBottom + 16.0; // leave room above system bar
+
+          final maxH = constraints.hasBoundedHeight ? constraints.maxHeight : double.infinity;
+          // Estimate row height: avatar(22) + vertical paddings(11*2) ~= 44
+          const double rowH = 44.0;
+          const double dividerH = 6.0; // _iosDivider height
+          const double listPadV = 8.0; // ReorderableListView vertical padding
+          final int n = items.length;
+          final double baseContentH = n == 0 ? 0.0 : (n * rowH + (n - 1) * dividerH + listPadV);
+          // Decide if we should treat it as reaching bottom (considering the bottom gap we will add)
+          final bool reachesBottom = maxH.isFinite &&
+              (baseContentH >= maxH - 0.5 || (baseContentH + bottomGapIfFlush) >= maxH - 0.5);
+          final double effectiveContentH = baseContentH + (reachesBottom ? bottomGapIfFlush : 0.0);
+          final double containerH = maxH.isFinite ? (effectiveContentH.clamp(0.0, maxH)).toDouble() : effectiveContentH;
+
+          return Container(
+            height: containerH.isFinite ? containerH : null,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(12),
+                topRight: const Radius.circular(12),
+                // If not reaching bottom, use rounded corners; if reaching bottom, flush
+                bottomLeft: Radius.circular(reachesBottom ? 0 : 12),
+                bottomRight: Radius.circular(reachesBottom ? 0 : 12),
               ),
-            );
-          },
-        ),
+              border: Border.all(color: borderColor, width: 0.6),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: ReorderableListView.builder(
+              padding: EdgeInsets.only(top: 4, bottom: reachesBottom ? bottomGapIfFlush : 4),
+              itemCount: items.length,
+              onReorder: onReorder,
+              buildDefaultDragHandles: false,
+              proxyDecorator: (child, index, animation) => Opacity(
+                opacity: 0.95,
+                child: Transform.scale(scale: 0.98, child: child),
+              ),
+              itemBuilder: (context, index) {
+                final p = items[index];
+                return KeyedSubtree(
+                  key: ValueKey(p.keyName),
+                  child: _SettleAnim(
+                    active: settlingKeys.contains(p.keyName),
+                    child: _ProviderRow(
+                      provider: p,
+                      index: index,
+                      total: items.length,
+                      selectMode: selectMode,
+                      selected: selectedKeys.contains(p.keyName),
+                      onToggleSelect: onToggleSelect,
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
       ),
     );
   }
@@ -406,7 +462,18 @@ class _ProviderRow extends StatelessWidget {
                     child: AnimatedOpacity(
                       duration: const Duration(milliseconds: 150),
                       opacity: selectMode ? 1.0 : 0.0,
-                      child: Align(alignment: Alignment.centerLeft, child: _SelectDot(selected: selected)),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: IosCheckbox(
+                          value: selected,
+                          size: 20,
+                          hitTestSize: 22,
+                          borderWidth: 1.6,
+                          activeColor: cs.primary,
+                          borderColor: cs.onSurface.withOpacity(0.35),
+                          onChanged: (_) => onToggleSelect(provider.keyName),
+                        ),
+                      ),
                     ),
                   ),
                   if (selectMode) const SizedBox(width: 4),
@@ -462,38 +529,21 @@ class _ProviderRow extends StatelessWidget {
   }
 }
 
-class _SelectDot extends StatelessWidget {
-  const _SelectDot({required this.selected});
-  final bool selected;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    if (selected) {
-      return Container(
-        width: 20,
-        height: 20,
-        decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
-        alignment: Alignment.center,
-        child: Icon(Lucide.Check, size: 13, color: cs.onPrimary),
-      );
-    }
-    return Container(
-      width: 20,
-      height: 20,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: cs.onSurface.withOpacity(0.35), width: 1.6),
-      ),
-    );
-  }
-}
-
 class _SelectionBar extends StatelessWidget {
-  const _SelectionBar({required this.visible, required this.count, required this.onExport, required this.onDelete});
+  const _SelectionBar({
+    required this.visible,
+    required this.count,
+    required this.total,
+    required this.onExport,
+    required this.onDelete,
+    required this.onSelectAll,
+  });
   final bool visible;
   final int count;
+  final int total;
   final VoidCallback onExport;
   final VoidCallback onDelete;
+  final VoidCallback onSelectAll;
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -511,25 +561,30 @@ class _SelectionBar extends StatelessWidget {
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 26),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 46),
               child: Center(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _CapsuleButton(
-                      label: l10n.providersPageDeleteAction,
+                    _GlassCircleButton(
                       icon: Lucide.Trash2,
                       color: const Color(0xFFFF3B30),
+                      semanticLabel: l10n.providersPageDeleteAction,
                       onTap: onDelete,
-                      outlined: true,
                     ),
-                    const SizedBox(width: 12),
-                    _CapsuleButton(
-                      label: l10n.providersPageExportAction,
-                      icon: Lucide.Export,
+                    const SizedBox(width: 14),
+                    _GlassCircleButton(
+                      icon: Lucide.checkCheck,
                       color: cs.primary,
+                      semanticLabel: null,
+                      onTap: onSelectAll,
+                    ),
+                    const SizedBox(width: 14),
+                    _GlassCircleButton(
+                      icon: Lucide.Share2,
+                      color: cs.primary,
+                      semanticLabel: l10n.providersPageExportAction,
                       onTap: onExport,
-                      outlined: true,
                     ),
                   ],
                 ),
@@ -557,9 +612,16 @@ class _CapsuleButtonState extends State<_CapsuleButton> {
   bool _pressed = false;
   @override
   Widget build(BuildContext context) {
-    final bg = widget.outlined ? widget.color.withOpacity(0.12) : widget.color;
-    final fg = widget.outlined ? widget.color : Colors.white;
-    final border = widget.outlined ? Border.all(color: widget.color, width: 1.2) : null;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    // iOS glass style: grey border + frosted background; keep icon/label tinted by provided color
+    final glassBase = isDark ? Colors.black.withOpacity(0.06) : Colors.white.withOpacity(0.65);
+    final overlay = isDark ? Colors.black.withOpacity(0.06) : Colors.black.withOpacity(0.05);
+    final tileColor = _pressed ? Color.alphaBlend(overlay, glassBase) : glassBase;
+    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.35 : 0.40); // subtle grey border
+    final fg = widget.color; // use provided color for content only
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => setState(() => _pressed = true),
@@ -573,22 +635,100 @@ class _CapsuleButtonState extends State<_CapsuleButton> {
         scale: _pressed ? 0.96 : 1.0,
         duration: const Duration(milliseconds: 110),
         curve: Curves.easeOutCubic,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(999),
-            border: border,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: tileColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: borderColor, width: 1.0),
+              ),
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(widget.icon, size: 16, color: fg),
+                  const SizedBox(width: 6),
+                  Text(widget.label, style: TextStyle(color: fg, fontSize: 14, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
           ),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(widget.icon, size: 16, color: fg),
-              const SizedBox(width: 6),
-              Text(widget.label, style: TextStyle(color: fg, fontSize: 14, fontWeight: FontWeight.w600)),
-            ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassCircleButton extends StatefulWidget {
+  const _GlassCircleButton({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    this.size = 46,
+    this.semanticLabel,
+  });
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final double size; // diameter
+  final String? semanticLabel;
+
+  @override
+  State<_GlassCircleButton> createState() => _GlassCircleButtonState();
+}
+
+
+class _GlassCircleButtonState extends State<_GlassCircleButton> {
+  bool _pressed = false;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final glassBase = isDark ? Colors.black.withOpacity(0.06) : Colors.white.withOpacity(0.06);
+    final overlay = isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05);
+    final tileColor = _pressed ? Color.alphaBlend(overlay, glassBase) : glassBase;
+    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.10 : 0.10);
+
+    final child = SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: Center(child: Icon(widget.icon, size: 18, color: widget.color)),
+    );
+
+    return Semantics(
+      button: true,
+      label: widget.semanticLabel,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: () {
+          Haptics.light();
+          widget.onTap();
+        },
+        child: AnimatedScale(
+          scale: _pressed ? 0.95 : 1.0,
+          duration: const Duration(milliseconds: 110),
+          curve: Curves.easeOutCubic,
+          child: ClipOval(
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 36, sigmaY: 36),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: tileColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: borderColor, width: 1.0),
+                ),
+                child: child,
+              ),
+            ),
           ),
         ),
       ),
@@ -616,6 +756,7 @@ Future<void> _showMultiExportSheet(BuildContext context, List<String> keys) asyn
     backgroundColor: cs.surface,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
     builder: (ctx) {
+      final bool showQr = keys.length <= 4;
       Rect shareAnchorRect(BuildContext bctx) {
         try {
           final ro = bctx.findRenderObject();
@@ -639,24 +780,26 @@ Future<void> _showMultiExportSheet(BuildContext context, List<String> keys) asyn
               const SizedBox(height: 12),
               Center(child: Text(l10n.providersPageExportSelectedTitle(keys.length), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600))),
               const SizedBox(height: 12),
-              // Single combined QR for all selected providers
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
-                  ),
-                  child: PrettyQr(
-                    data: text,
-                    size: 180,
-                    roundEdges: true,
-                    errorCorrectLevel: QrErrorCorrectLevel.M,
+              // Show QR only when selection is small to avoid overlong input
+              if (showQr) ...[
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
+                    ),
+                    child: PrettyQr(
+                      data: text,
+                      size: 180,
+                      roundEdges: true,
+                      errorCorrectLevel: QrErrorCorrectLevel.M,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
+              ],
               // Limited preview of codes (6-7 lines), full content still copied/shared
               SizedBox(
                 height: 128,
@@ -673,34 +816,24 @@ Future<void> _showMultiExportSheet(BuildContext context, List<String> keys) asyn
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Lucide.Copy, size: 18),
-                      onPressed: () {
+                    child: IosTileButton(
+                      icon: Lucide.Copy,
+                      label: l10n.providersPageExportCopyButton,
+                      onTap: () {
                         Clipboard.setData(ClipboardData(text: text));
                         showAppSnackBar(context, message: l10n.providersPageExportCopiedSnackbar, type: NotificationType.success);
                       },
-                      label: Text(l10n.providersPageExportCopyButton),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: cs.primary.withOpacity(0.5)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Lucide.Share2, size: 18),
-                      onPressed: () async {
+                    child: IosTileButton(
+                      icon: Lucide.Share2,
+                      label: l10n.providersPageExportShareButton,
+                      onTap: () async {
                         final rect = shareAnchorRect(ctx);
                         await Share.share(text, subject: 'AI Providers', sharePositionOrigin: rect);
                       },
-                      label: Text(l10n.providersPageExportShareButton),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: cs.primary,
-                        foregroundColor: cs.onPrimary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
                     ),
                   ),
                 ],
@@ -957,7 +1090,10 @@ class _TactileRowState extends State<_TactileRow> {
       onTapDown: widget.onTap == null ? null : (_) => _setPressed(true),
       onTapUp: widget.onTap == null ? null : (_) => _setPressed(false),
       onTapCancel: widget.onTap == null ? null : () => _setPressed(false),
-      onTap: widget.onTap == null ? null : () { if (widget.haptics) Haptics.soft(); widget.onTap!.call(); },
+      onTap: widget.onTap == null ? null : () {
+        if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
+        widget.onTap!.call();
+      },
       child: widget.builder(_pressed),
     );
   }

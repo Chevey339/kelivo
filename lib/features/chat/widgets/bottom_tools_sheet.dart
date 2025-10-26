@@ -4,6 +4,7 @@ import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/services/learning_mode_store.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 
 class BottomToolsSheet extends StatelessWidget {
   const BottomToolsSheet({super.key, this.onCamera, this.onPhotos, this.onUpload, this.onClear, this.clearLabel});
@@ -18,42 +19,30 @@ class BottomToolsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final bg = Theme.of(context).colorScheme.surface;
-    final primary = Theme.of(context).colorScheme.primary;
 
     Widget roundedAction({required IconData icon, required String label, VoidCallback? onTap}) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final cardColor = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
       return Expanded(
-        child: Container(
+        child: SizedBox(
           height: 72,
-          decoration: BoxDecoration(
+          child: IosCardPress(
+            baseColor: cardColor,
             borderRadius: BorderRadius.circular(14),
-            // Remove tile shadow per design
-          ),
-          child: Material(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white10
-                : const Color(0xFFF2F3F5),
-            borderRadius: BorderRadius.circular(14),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              overlayColor: MaterialStateProperty.resolveWith((states) {
-                final on = Theme.of(context).colorScheme.onSurface;
-                final base = states.contains(MaterialState.pressed) ? 0.08 : 0.05;
-                return on.withOpacity(base);
-              }),
-              splashColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
-              onTap: () {
-                Haptics.light();
-                onTap?.call();
-              },
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, size: 24, color: Theme.of(context).colorScheme.onSurface),
-                    const SizedBox(height: 6),
-                    Text(label, style: const TextStyle(fontSize: 13)),
-                  ],
-                ),
+            pressedScale: 0.98,
+            duration: const Duration(milliseconds: 260),
+            onTap: () {
+              Haptics.light();
+              onTap?.call();
+            },
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 24, color: Theme.of(context).colorScheme.onSurface),
+                  const SizedBox(height: 6),
+                  Text(label, style: const TextStyle(fontSize: 13)),
+                ],
               ),
             ),
           ),
@@ -150,30 +139,22 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
     final cs = Theme.of(context).colorScheme;
     final onColor = selected ? cs.primary : cs.onSurface;
     final radius = BorderRadius.circular(14);
-    return Material(
-      color: Colors.transparent,
-      borderRadius: radius,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
+    return SizedBox(
+      height: 48,
+      child: IosCardPress(
         borderRadius: radius,
-        overlayColor: MaterialStateProperty.resolveWith((states) {
-          final on = Theme.of(context).colorScheme.onSurface;
-          final base = states.contains(MaterialState.pressed) ? 0.08 : 0.05;
-          return on.withOpacity(base);
-        }),
+        baseColor: Theme.of(context).colorScheme.surface,
+        duration: const Duration(milliseconds: 260),
         onTap: onTap,
         onLongPress: onLongPress,
-        child: Container(
-          height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            children: [
-              Icon(icon, size: 20, color: onColor),
-              const SizedBox(width: 10),
-              Expanded(child: Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: onColor))),
-              if (selected) Icon(Lucide.Check, size: 18, color: cs.primary) else const SizedBox(width: 18),
-            ],
-          ),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: onColor),
+            const SizedBox(width: 10),
+            Expanded(child: Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: onColor))),
+            if (selected) Icon(Lucide.Check, size: 18, color: cs.primary) else const SizedBox(width: 18),
+          ],
         ),
       ),
     );
@@ -182,43 +163,35 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final bg = Theme.of(context).colorScheme.surface;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
-          child: _loading
-              ? const SizedBox(height: 48)
-              : _row(
-                  icon: Lucide.BookOpenText,
-                  label: l10n.bottomToolsSheetLearningMode,
-                  selected: _enabled,
-                  onTap: () async {
-                    Haptics.light();
-                    final next = !_enabled;
-                    await LearningModeStore.setEnabled(next);
-                    if (!mounted) return;
-                    setState(() => _enabled = next);
-                    // Close bottom sheet after toggling
-                    Navigator.of(context).maybePop();
-                  },
-                  onLongPress: () => _showLearningPromptSheet(context),
-                ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
-          child: _row(
-            icon: Lucide.Eraser,
-            label: widget.clearLabel ?? l10n.bottomToolsSheetClearContext,
-            onTap: () {
+        if (_loading)
+          const SizedBox(height: 48)
+        else
+          _row(
+            icon: Lucide.BookOpenText,
+            label: l10n.bottomToolsSheetLearningMode,
+            selected: _enabled,
+            onTap: () async {
               Haptics.light();
-              widget.onClear?.call();
+              final next = !_enabled;
+              await LearningModeStore.setEnabled(next);
+              if (!mounted) return;
+              setState(() => _enabled = next);
+              // Close bottom sheet after toggling
+              Navigator.of(context).maybePop();
             },
+            onLongPress: () => _showLearningPromptSheet(context),
           ),
+        const SizedBox(height: 8),
+        _row(
+          icon: Lucide.Eraser,
+          label: widget.clearLabel ?? l10n.bottomToolsSheetClearContext,
+          onTap: () {
+            Haptics.light();
+            widget.onClear?.call();
+          },
         ),
       ],
     );

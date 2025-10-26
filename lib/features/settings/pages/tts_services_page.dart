@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/providers/settings_provider.dart';
+import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../l10n/app_localizations.dart';
@@ -175,7 +177,10 @@ class _TactileRowState extends State<_TactileRow> {
       onTapDown: widget.onTap==null?null:(_)=>_set(true),
       onTapUp: widget.onTap==null?null:(_)=>_set(false),
       onTapCancel: widget.onTap==null?null:()=>_set(false),
-      onTap: widget.onTap==null?null:(){ if(widget.haptics) Haptics.soft(); widget.onTap!.call(); },
+      onTap: widget.onTap==null?null:(){
+        if(widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
+        widget.onTap!.call();
+      },
       child: AnimatedScale(
         scale: _pressed ? widget.pressedScale : 1.0,
         duration: const Duration(milliseconds: 110),

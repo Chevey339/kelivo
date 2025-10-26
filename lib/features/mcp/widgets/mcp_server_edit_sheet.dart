@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/providers/settings_provider.dart';
+import 'dart:math' as math;
+import 'package:provider/provider.dart';
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../shared/widgets/ios_tile_button.dart';
 
 class _HeaderEntry {
   final TextEditingController key;
@@ -23,6 +27,7 @@ Future<void> showMcpServerEditSheet(BuildContext context, {String? serverId}) as
     context: context,
     isScrollControlled: true,
     backgroundColor: cs.surface,
+    // Match provider sheet corner radius
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -53,6 +58,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet> with SingleTic
     super.initState();
     if (isEdit) {
       _tab = TabController(length: 2, vsync: this);
+      _tab!.addListener(_onTabChanged);
       final server = context.read<McpProvider>().getById(widget.serverId!)!;
       _enabled = server.enabled;
       _nameCtrl.text = server.name;
@@ -64,8 +70,13 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet> with SingleTic
     }
   }
 
+  void _onTabChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    _tab?.removeListener(_onTabChanged);
     _tab?.dispose();
     _nameCtrl.dispose();
     _urlCtrl.dispose();
@@ -75,20 +86,36 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet> with SingleTic
     super.dispose();
   }
 
-  Widget _switchTile({required String label, required bool value, required ValueChanged<bool> onChanged}) {
+  // Match provider sheet switch row style
+  Widget _switchRow({required String label, required bool value, required ValueChanged<bool> onChanged}) {
+    return Row(
+      children: [
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
+        IosSwitch(value: value, onChanged: onChanged),
+      ],
+    );
+  }
+
+  // Simple iOS-style card wrapper, same as provider sheet
+  Widget _iosCard({required List<Widget> children}) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF7F7F9),
+        color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
+        border: Border.all(color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06), width: 0.6),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        children: [
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
-          IosSwitch(value: value, onChanged: onChanged),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Column(
+          children: [
+            for (int i = 0; i < children.length; i++) ...[
+              if (i > 0) Divider(height: 10, thickness: 0.6, color: cs.outlineVariant.withOpacity(0.18)),
+              children[i],
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -106,10 +133,21 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet> with SingleTic
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.transparent)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.transparent)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary.withOpacity(0.4))),
+            // Match provider sheet input background
+            fillColor: isDark ? Colors.white10 : Colors.white,
+            // Match provider sheet border styles
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+            ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           ),
         ),
@@ -117,50 +155,14 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet> with SingleTic
     );
   }
 
+  // Segmented choice bar (like top tabs), used for transport type
   Widget _transportPicker() {
-    return Row(
-      children: [
-        _segButton(
-          label: 'Streamable HTTP',
-          selected: _transport == McpTransportType.http,
-          onTap: () => setState(() => _transport = McpTransportType.http),
-        ),
-        const SizedBox(width: 8),
-        _segButton(
-          label: 'SSE',
-          selected: _transport == McpTransportType.sse,
-          onTap: () => setState(() => _transport = McpTransportType.sse),
-        ),
-      ],
-    );
-  }
-
-  Widget _segButton({required String label, required bool selected, required VoidCallback onTap}) {
-    final cs = Theme.of(context).colorScheme;
-    return Expanded(
-      child: _TactileRow(
-        pressedScale: 0.98,
-        onTap: onTap,
-        builder: (pressed) {
-          final isDark = Theme.of(context).brightness == Brightness.dark;
-          final baseBg = selected ? cs.primary.withOpacity(0.12) : Colors.transparent;
-          // Use darker overlay in light mode to ensure visible press, lighter overlay in dark mode
-          final overlay = pressed ? (isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.07)) : Colors.transparent;
-          final textColor = selected ? cs.primary : cs.onSurface.withOpacity(0.8);
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: Color.alphaBlend(overlay, baseBg),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: selected ? cs.primary : cs.outlineVariant.withOpacity(0.3)),
-            ),
-            alignment: Alignment.center,
-            child: Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
-          );
-        },
-      ),
+    final labels = ['Streamable HTTP', 'SSE'];
+    final idx = _transport == McpTransportType.http ? 0 : 1;
+    return _SegChoiceBar(
+      labels: labels,
+      selectedIndex: idx,
+      onSelected: (i) => setState(() => _transport = i == 0 ? McpTransportType.http : McpTransportType.sse),
     );
   }
 
@@ -170,7 +172,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet> with SingleTic
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _switchTile(label: l10n.mcpServerEditSheetEnabledLabel, value: _enabled, onChanged: (v) => setState(() => _enabled = v)),
+        _iosCard(children: [
+          _switchRow(label: l10n.mcpServerEditSheetEnabledLabel, value: _enabled, onChanged: (v) => setState(() => _enabled = v)),
+        ]),
         const SizedBox(height: 10),
         _inputRow(label: l10n.mcpServerEditSheetNameLabel, controller: _nameCtrl, hint: 'My MCP'),
         const SizedBox(height: 10),
@@ -229,26 +233,12 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet> with SingleTic
         ],
         Align(
           alignment: Alignment.centerLeft,
-          child: _TactileRow(
-            pressedScale: 0.98,
+          child: IosTileButton(
+            icon: Lucide.Plus,
+            label: l10n.mcpServerEditSheetAddHeader,
+            backgroundColor: cs.primary,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             onTap: () => setState(() => _headers.add(_HeaderEntry(TextEditingController(), TextEditingController()))),
-            builder: (pressed) {
-              final isDark = Theme.of(context).brightness == Brightness.dark;
-              final bg = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
-              final border = cs.outlineVariant.withOpacity(0.3);
-              final overlay = pressed ? (isDark ? Colors.black.withOpacity(0.06) : Colors.white.withOpacity(0.05)) : Colors.transparent;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                curve: Curves.easeOutCubic,
-                decoration: BoxDecoration(color: Color.alphaBlend(overlay, bg), borderRadius: BorderRadius.circular(999), border: Border.all(color: border)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Lucide.Plus, size: 16, color: cs.primary),
-                  const SizedBox(width: 6),
-                  Text(l10n.mcpServerEditSheetAddHeader, style: TextStyle(fontSize: 13, color: cs.primary, fontWeight: FontWeight.w600)),
-                ]),
-              );
-            },
           ),
         ),
       ],
@@ -309,44 +299,55 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet> with SingleTic
                 ),
               ),
               const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
+              // Header: centered title with close on the left (match provider sheet)
+              SizedBox(
+                height: 36,
+                child: Stack(
                   children: [
-                    Expanded(child: Text(isEdit ? l10n.mcpServerEditSheetTitleEdit : l10n.mcpServerEditSheetTitleAdd, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600))),
+                    Align(
+                      alignment: Alignment.center,
+                      child: Text(
+                        isEdit ? l10n.mcpServerEditSheetTitleEdit : l10n.mcpServerEditSheetTitleAdd,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: _TactileIconButton(
+                          icon: Lucide.X,
+                          color: cs.onSurface,
+                          size: 22,
+                          semanticLabel: l10n.mcpPageCancel,
+                          onTap: () => Navigator.of(context).maybePop(),
+                        ),
+                      ),
+                    ),
                     if (isEdit)
-                      _TactileIconButton(
-                        icon: Lucide.RefreshCw,
-                        color: cs.primary,
-                        semanticLabel: l10n.mcpServerEditSheetSyncToolsTooltip,
-                        onTap: () => mcp.refreshTools(widget.serverId!),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: _TactileIconButton(
+                            icon: Lucide.RefreshCw,
+                            color: cs.primary,
+                            semanticLabel: l10n.mcpServerEditSheetSyncToolsTooltip,
+                            onTap: () => mcp.refreshTools(widget.serverId!),
+                          ),
+                        ),
                       ),
                   ],
                 ),
               ),
+              const SizedBox(height: 8),
               if (isEdit) ...[
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF7F7F9),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: TabBar(
-                      controller: _tab,
-                      indicatorColor: cs.primary,
-                      labelColor: cs.primary,
-                      unselectedLabelColor: cs.onSurface.withOpacity(0.7),
-                      dividerColor: Colors.transparent,
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      tabs: [
-                        Tab(text: l10n.mcpServerEditSheetTabBasic),
-                        Tab(text: l10n.mcpServerEditSheetTabTools),
-                      ],
-                    ),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _SegTabBar(controller: _tab!, tabs: [
+                    l10n.mcpServerEditSheetTabBasic,
+                    l10n.mcpServerEditSheetTabTools,
+                  ]),
                 ),
                 const SizedBox(height: 12),
               ],
@@ -445,23 +446,14 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet> with SingleTic
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _IosOutlineButton(
-                        label: l10n.mcpServerEditSheetCancel,
-                        onTap: () => Navigator.of(context).maybePop(),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _IosFilledButton(
-                        label: l10n.mcpServerEditSheetSave,
-                        icon: isEdit ? Lucide.Check : Lucide.Plus,
-                        onTap: _onSave,
-                      ),
-                    ),
-                  ],
+                child: SizedBox(
+                  width: double.infinity,
+                  child: IosTileButton(
+                    icon: isEdit ? Lucide.Check : Lucide.Plus,
+                    label: l10n.mcpServerEditSheetSave,
+                    backgroundColor: cs.primary,
+                    onTap: _onSave,
+                  ),
                 ),
               ),
             ],
@@ -518,7 +510,7 @@ class _TactileRowState extends State<_TactileRow> {
       onTapUp: widget.onTap==null?null:(_){ /* keep pressed a bit for better feel */ },
       onTapCancel: widget.onTap==null?null:()=>_set(false),
       onTap: widget.onTap==null?null:(){
-        Haptics.soft();
+        if (context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
         widget.onTap!.call();
         Future.delayed(const Duration(milliseconds: 120), () { if (mounted) _set(false); });
       },
@@ -583,6 +575,224 @@ class _IosFilledButton extends StatelessWidget {
               ],
               Text(label, style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.w600)),
             ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Generic segmented choice bar (visual style matches provider segmented tabs)
+class _SegChoiceBar extends StatelessWidget {
+  const _SegChoiceBar({required this.labels, required this.selectedIndex, required this.onSelected});
+  final List<String> labels;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    const double outerHeight = 44;
+    const double innerPadding = 4;
+    const double gap = 6;
+    const double minSegWidth = 88;
+    final double pillRadius = 18;
+    final double innerRadius = ((pillRadius - innerPadding).clamp(0.0, pillRadius)).toDouble();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double availWidth = constraints.maxWidth;
+        final double innerAvailWidth = availWidth - innerPadding * 2;
+        final double segWidth = math.max(
+          minSegWidth,
+          (innerAvailWidth - gap * (labels.length - 1)) / labels.length,
+        );
+        final double rowWidth = segWidth * labels.length + gap * (labels.length - 1);
+
+        final Color shellBg = isDark ? Colors.white.withOpacity(0.08) : Colors.white;
+
+        List<Widget> children = [];
+        for (int index = 0; index < labels.length; index++) {
+          final bool selected = selectedIndex == index;
+          children.add(
+            SizedBox(
+              width: segWidth,
+              height: double.infinity,
+              child: _TactileRow(
+                onTap: () => onSelected(index),
+                builder: (pressed) {
+                  final Color baseBg = selected ? cs.primary.withOpacity(0.14) : Colors.transparent;
+                  final Color bg = baseBg;
+                  final Color baseTextColor = selected ? cs.primary : cs.onSurface.withOpacity(0.82);
+                  final Color targetTextColor = pressed
+                      ? Color.lerp(baseTextColor, Colors.white, 0.22) ?? baseTextColor
+                      : baseTextColor;
+
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    decoration: BoxDecoration(
+                      color: bg,
+                      borderRadius: BorderRadius.circular(innerRadius),
+                    ),
+                    alignment: Alignment.center,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: TweenAnimationBuilder<Color?>(
+                        tween: ColorTween(end: targetTextColor),
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, color, _) {
+                          return Text(
+                            labels[index],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: color ?? baseTextColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+          if (index != labels.length - 1) children.add(const SizedBox(width: gap));
+        }
+
+        return Container(
+          height: outerHeight,
+          decoration: BoxDecoration(
+            color: shellBg,
+            borderRadius: BorderRadius.circular(pillRadius),
+          ),
+          clipBehavior: Clip.hardEdge,
+          child: Padding(
+            padding: const EdgeInsets.all(innerPadding),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: innerAvailWidth),
+                child: SizedBox(width: rowWidth, child: Row(children: children)),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Copy of provider segmented tab to match style
+class _SegTabBar extends StatelessWidget {
+  const _SegTabBar({required this.controller, required this.tabs});
+  final TabController controller;
+  final List<String> tabs;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    const double outerHeight = 44;
+    const double innerPadding = 4;
+    const double gap = 6;
+    const double minSegWidth = 88;
+    final double pillRadius = 18;
+    final double innerRadius = ((pillRadius - innerPadding).clamp(0.0, pillRadius)).toDouble();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double availWidth = constraints.maxWidth;
+        final double innerAvailWidth = availWidth - innerPadding * 2;
+        final double segWidth = math.max(
+          minSegWidth,
+          (innerAvailWidth - gap * (tabs.length - 1)) / tabs.length,
+        );
+        final double rowWidth = segWidth * tabs.length + gap * (tabs.length - 1);
+
+        final Color shellBg = isDark ? Colors.white.withOpacity(0.08) : Colors.white;
+
+        List<Widget> children = [];
+        for (int index = 0; index < tabs.length; index++) {
+          final bool selected = controller.index == index;
+          children.add(
+            SizedBox(
+              width: segWidth,
+              height: double.infinity,
+              child: _TactileRow(
+                onTap: () => controller.animateTo(index),
+                builder: (pressed) {
+                  // Background does not change on press; only selected shows subtle tint
+                  final Color baseBg = selected ? cs.primary.withOpacity(0.14) : Colors.transparent;
+                  final Color bg = baseBg;
+
+                  // Text color lightens slightly on press
+                  final Color baseTextColor = selected ? cs.primary : cs.onSurface.withOpacity(0.82);
+                  final Color targetTextColor = pressed
+                      ? Color.lerp(baseTextColor, Colors.white, 0.22) ?? baseTextColor
+                      : baseTextColor;
+
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    decoration: BoxDecoration(
+                      color: bg,
+                      borderRadius: BorderRadius.circular(innerRadius),
+                    ),
+                    alignment: Alignment.center,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: TweenAnimationBuilder<Color?>(
+                        tween: ColorTween(end: targetTextColor),
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, color, _) {
+                          return Text(
+                            tabs[index],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: color ?? baseTextColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+          if (index != tabs.length - 1) children.add(const SizedBox(width: gap));
+        }
+
+        return Container(
+          height: outerHeight,
+          decoration: BoxDecoration(
+            color: shellBg,
+            borderRadius: BorderRadius.circular(pillRadius),
+          ),
+          clipBehavior: Clip.hardEdge,
+          child: Padding(
+            padding: const EdgeInsets.all(innerPadding),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: innerAvailWidth),
+                child: SizedBox(width: rowWidth, child: Row(children: children)),
+              ),
+            ),
           ),
         );
       },

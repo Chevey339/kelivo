@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/providers/settings_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/services/search/search_service.dart';
@@ -437,6 +439,8 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     if (service is BraveOptions) return Lucide.Shield;
     if (service is MetasoOptions) return Lucide.Compass;
     if (service is JinaOptions) return Lucide.Sparkles;
+    if (service is PerplexityOptions) return Lucide.Search;
+    if (service is BochaOptions) return Lucide.Search;
     return Lucide.Search;
   }
 
@@ -452,6 +456,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     if (service is MetasoOptions) return service.apiKey.isNotEmpty ? l10n.searchServicesPageConfiguredStatus : l10n.searchServicesPageApiKeyRequiredStatus;
     if (service is OllamaOptions) return service.apiKey.isNotEmpty ? l10n.searchServicesPageConfiguredStatus : l10n.searchServicesPageApiKeyRequiredStatus;
     if (service is JinaOptions) return service.apiKey.isNotEmpty ? l10n.searchServicesPageConfiguredStatus : l10n.searchServicesPageApiKeyRequiredStatus;
+    if (service is BochaOptions) return service.apiKey.isNotEmpty ? l10n.searchServicesPageConfiguredStatus : l10n.searchServicesPageApiKeyRequiredStatus;
     return null;
   }
 
@@ -481,6 +486,8 @@ class _BrandBadge extends StatelessWidget {
     if (s is MetasoOptions) return 'metaso';
     if (s is OllamaOptions) return 'ollama';
     if (s is JinaOptions) return 'jina';
+    if (s is PerplexityOptions) return 'perplexity';
+    if (s is BochaOptions) return 'bocha';
     return 'search';
   }
 
@@ -630,6 +637,8 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
       {'type': 'metaso', 'name': l10n.searchServiceNameMetaso},
       {'type': 'jina', 'name': l10n.searchServiceNameJina},
       {'type': 'ollama', 'name': l10n.searchServiceNameOllama},
+      {'type': 'perplexity', 'name': l10n.searchServiceNamePerplexity},
+      {'type': 'bocha', 'name': l10n.searchServiceNameBocha},
     ];
     return ListView.builder(
       key: const ValueKey('service_list'),
@@ -668,6 +677,8 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
       case 'metaso': return l10n.searchServiceNameMetaso;
       case 'jina': return l10n.searchServiceNameJina;
       case 'ollama': return l10n.searchServiceNameOllama;
+      case 'perplexity': return l10n.searchServiceNamePerplexity;
+      case 'bocha': return l10n.searchServiceNameBocha;
       default: return '';
     }
   }
@@ -783,6 +794,8 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
       case 'metaso':
       case 'jina':
       case 'ollama':
+      case 'perplexity':
+      case 'bocha':
         return [
           _buildTextField(
             key: 'apiKey',
@@ -892,6 +905,16 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
           id: id,
           apiKey: _controllers['apiKey']!.text,
         );
+      case 'perplexity':
+        return PerplexityOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+        );
+      case 'bocha':
+        return BochaOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+        );
       default:
         return BingLocalOptions(id: id);
     }
@@ -945,6 +968,8 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
     } else if (service is OllamaOptions) {
       _controllers['apiKey'] = TextEditingController(text: service.apiKey);
     } else if (service is JinaOptions) {
+      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
+    } else if (service is BochaOptions) {
       _controllers['apiKey'] = TextEditingController(text: service.apiKey);
     }
   }
@@ -1071,7 +1096,8 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
         service is BraveOptions ||
         service is MetasoOptions ||
         service is OllamaOptions ||
-        service is JinaOptions) {
+        service is JinaOptions ||
+        service is BochaOptions) {
       return [
         _buildTextField(
           key: 'apiKey',
@@ -1177,6 +1203,23 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
         id: service.id,
         apiKey: _controllers['apiKey']!.text,
       );
+    } else if (service is PerplexityOptions) {
+      return PerplexityOptions(
+        id: service.id,
+        apiKey: _controllers['apiKey']!.text,
+        country: service.country,
+        searchDomainFilter: service.searchDomainFilter,
+        maxTokensPerPage: service.maxTokensPerPage,
+      );
+    } else if (service is BochaOptions) {
+      return BochaOptions(
+        id: service.id,
+        apiKey: _controllers['apiKey']!.text,
+        freshness: service.freshness,
+        summary: service.summary,
+        include: service.include,
+        exclude: service.exclude,
+      );
     }
     
     return service;
@@ -1275,6 +1318,8 @@ class _ServiceIcon extends StatelessWidget {
         return 'jina';
       case 'ollama':
         return 'ollama';
+      case 'bocha':
+        return 'bocha';
       default:
         return type;
     }
@@ -1347,7 +1392,10 @@ class _TactileRowState extends State<_TactileRow> {
       onTapDown: widget.onTap == null ? null : (_) => _setPressed(true),
       onTapUp: widget.onTap == null ? null : (_) => _setPressed(false),
       onTapCancel: widget.onTap == null ? null : () => _setPressed(false),
-      onTap: widget.onTap == null ? null : () { if (widget.haptics) Haptics.soft(); widget.onTap!.call(); },
+      onTap: widget.onTap == null ? null : () {
+        if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
+        widget.onTap!.call();
+      },
       child: widget.builder(_pressed),
     );
   }
@@ -1428,9 +1476,9 @@ Widget _sheetOption(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                SizedBox(
-                  width: 40,
-                  child: leading ?? Icon(icon ?? Lucide.ChevronRight, size: 20, color: c),
+                SizedBox.square(
+                  dimension: 36,
+                  child: Center(child: leading ?? Icon(icon ?? Lucide.ChevronRight, size: 20, color: c)),
                 ),
                 const SizedBox(width: 12),
                 Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: c))),

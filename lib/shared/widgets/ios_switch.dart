@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Theme; // for Material color scheme primary
 import '../../core/services/haptics.dart';
+import 'package:provider/provider.dart';
+import '../../core/providers/settings_provider.dart';
 
 /// A refined, iOS‑inspired switch with subtle animations
 /// tailored to the app's visual style.
@@ -156,7 +158,10 @@ class _IosSwitchState extends State<IosSwitch> {
   }
 
   void _handleTap() {
-    if (widget.enableHaptics) Haptics.soft();
+    // Only vibrate if both widget-level and settings-level toggles allow,
+    // global master switch is enforced within Haptics.* methods.
+    final sp = context.read<SettingsProvider>();
+    if (widget.enableHaptics && sp.hapticsIosSwitch) Haptics.soft();
     widget.onChanged?.call(!widget.value);
   }
 

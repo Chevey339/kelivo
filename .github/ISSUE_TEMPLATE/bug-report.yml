@@ -22,20 +22,7 @@ body:
       placeholder: What went wrong?
     validations:
       required: true
-  
-  - type: textarea
-    attributes:
-      label: Screenshots or Video
-      description: |
-        如果有，请添加截图或录屏来解释问题。
-        
-        If applicable, add screenshots or a screen recording to help explain your problem.
-      value: |
-        <details open>
-        <summary>Screenshots / Video demonstration</summary>
-        [Upload media here]
-        </details>
-  
+
   - type: textarea
     attributes:
       label: Environment
@@ -49,6 +36,19 @@ body:
         - App Version: [e.g. v1.0.8(5)]
     validations:
       required: true
+  
+  - type: textarea
+    attributes:
+      label: Screenshots or Video
+      description: |
+        如果有，请添加截图或录屏来解释问题。
+        
+        If applicable, add screenshots or a screen recording to help explain your problem.
+      value: |
+        <details open>
+        <summary>Screenshots / Video demonstration</summary>
+        [Upload media here]
+        </details>
   
   - type: textarea
     attributes:

@@ -186,7 +186,7 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
                                   color: isDark
                                       ? cs.error.withOpacity(0.22)
                                       : cs.error.withOpacity(0.14),
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
                                     color: cs.error.withOpacity(0.35),
                                   ),
@@ -230,7 +230,7 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
                             return Container(
                               decoration: BoxDecoration(
                                 color: Color.alphaBlend(overlay, baseBg),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(14),
                                 border: Border.all(color: cs.outlineVariant.withOpacity(isDark ? 0.1 : 0.08), width: 0.6),
                               ),
                               child: Padding(
@@ -348,11 +348,13 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            Text(
-              widget.phrase == null
-                  ? l10n.quickPhraseAddTitle
-                  : l10n.quickPhraseEditTitle,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            Center(
+              child: Text(
+                widget.phrase == null
+                    ? l10n.quickPhraseAddTitle
+                    : l10n.quickPhraseEditTitle,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -492,44 +494,70 @@ class _TactileCardState extends State<_TactileCard> {
   }
 }
 
-class _IosOutlineButton extends StatelessWidget {
+class _IosOutlineButton extends StatefulWidget {
   const _IosOutlineButton({required this.label, required this.onTap});
   final String label; final VoidCallback onTap;
   @override
+  State<_IosOutlineButton> createState() => _IosOutlineButtonState();
+}
+
+class _IosOutlineButtonState extends State<_IosOutlineButton> {
+  bool _pressed = false;
+  void _set(bool v){ if(_pressed!=v) setState(()=>_pressed=v);} 
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final overlayBase = isDark ? Colors.black : Colors.white;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () { Haptics.soft(); onTap(); },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: cs.primary.withOpacity(0.5)),
+      onTapDown: (_) => _set(true),
+      onTapUp: (_) => Future.delayed(const Duration(milliseconds: 80), ()=>_set(false)),
+      onTapCancel: () => _set(false),
+      onTap: () { Haptics.soft(); widget.onTap(); },
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 110), curve: Curves.easeOutCubic,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: cs.primary.withOpacity(0.5)),
+          ),
+          child: Text(widget.label, style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600)),
         ),
-        child: Text(label, style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600)),
       ),
     );
   }
 }
 
-class _IosFilledButton extends StatelessWidget {
+class _IosFilledButton extends StatefulWidget {
   const _IosFilledButton({required this.label, required this.onTap});
   final String label; final VoidCallback onTap;
+  @override
+  State<_IosFilledButton> createState() => _IosFilledButtonState();
+}
+
+class _IosFilledButtonState extends State<_IosFilledButton> {
+  bool _pressed = false;
+  void _set(bool v){ if(_pressed!=v) setState(()=>_pressed=v);} 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () { Haptics.soft(); onTap(); },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: cs.primary, borderRadius: BorderRadius.circular(12)),
-        child: Text(label, style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.w600)),
+      onTapDown: (_) => _set(true),
+      onTapUp: (_) => Future.delayed(const Duration(milliseconds: 80), ()=>_set(false)),
+      onTapCancel: () => _set(false),
+      onTap: () { Haptics.soft(); widget.onTap(); },
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 110), curve: Curves.easeOutCubic,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: cs.primary, borderRadius: BorderRadius.circular(12)),
+          child: Text(widget.label, style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.w600)),
+        ),
       ),
     );
   }

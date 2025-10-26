@@ -20,6 +20,7 @@ import '../../../core/providers/backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../core/services/backup/cherry_importer.dart';
 
 // File size formatter (B, KB, MB, GB)
 String _fmtBytes(int bytes) {
@@ -42,6 +43,93 @@ class BackupPage extends StatefulWidget {
 class _BackupPageState extends State<BackupPage> {
   List<BackupFileItem> _remote = const <BackupFileItem>[];
   bool _loadingRemote = false;
+
+  Future<bool?> _confirmCherryImport(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final locale = Localizations.localeOf(context);
+    final isZh = locale.languageCode.startsWith('zh');
+    final String body = isZh
+        ? '此功能目前仍处于实验阶段。\n目前仅能导入助手，对话内容，供应商和文件，\n一些供应商需要在baseurl后面添加/v1 or /v1beta。 \n为确保数据安全，建议在导入前先执行备份。\n是否已知晓并继续选择文件？'
+        : 'This feature is experimental.\nTo keep your data safe, it is recommended to back up before importing.\nProceed to choose a file?';
+
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final bottom = MediaQuery.of(ctx).viewInsets.bottom;
+        final onSurface60 = cs.onSurface.withOpacity(0.72);
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, bottom + 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: cs.onSurface.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: Text(
+                    l10n.backupPageImportFromCherryStudio,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Padding(
+                    //   padding: const EdgeInsets.only(top: 2),
+                    //   child: Icon(Lucide.BadgeInfo, size: 18, color: cs.primary),
+                    // ),
+                    // const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        body,
+                        style: TextStyle(fontSize: 14, height: 1.35, color: onSurface60),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _IosOutlineButton(
+                        label: l10n.backupPageCancel,
+                        onTap: () => Navigator.of(ctx).pop(false),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _IosFilledButton(
+                        label: l10n.backupPageOK,
+                        onTap: () => Navigator.of(ctx).pop(true),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Future<RestoreMode?> _chooseImportModeDialog(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -383,12 +471,62 @@ class _BackupPageState extends State<BackupPage> {
                   icon: Lucide.Box,
                   label: l10n.backupPageImportFromCherryStudio,
                   onTap: () async {
+                    // 1) Warn user that Cherry import is experimental
+                    final acknowledged = await _confirmCherryImport(context);
+                    if (acknowledged != true) return;
+
                     if (!mounted) return;
-                    showAppSnackBar(
-                      context,
-                      message: l10n.backupPageNotSupportedYet,
-                      type: NotificationType.warning,
-                    );
+                    // Pick Cherry Studio backup (.zip or .bak)
+                    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip', 'bak']);
+                    final path = result?.files.single.path;
+                    if (path == null) return;
+
+                    final mode = await _chooseImportModeDialog(context);
+                    if (mode == null) return;
+
+                    await _runWithImportingOverlay(context, () async {
+                      try {
+                        final settings = context.read<SettingsProvider>();
+                        final cs = context.read<ChatService>();
+                        final file = File(path);
+                        // Defer import to service
+                        final res = await CherryImporter.importFromCherryStudio(
+                          file: file,
+                          mode: mode,
+                          settings: settings,
+                          chatService: cs,
+                        );
+                        if (!mounted) return;
+                        await showDialog(
+                          context: context,
+                          builder: (dctx) => AlertDialog(
+                            title: Text(l10n.backupPageRestartRequired),
+                            content: Text(
+                              '${l10n.backupPageImportFromCherryStudio}:\n'
+                              ' • Providers: ${res.providers}\n'
+                              ' • Assistants: ${res.assistants}\n'
+                              ' • Conversations: ${res.conversations}\n'
+                              ' • Messages: ${res.messages}\n'
+                              ' • Files: ${res.files}\n\n'
+                              '${l10n.backupPageRestartContent}',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(dctx).pop(),
+                                child: Text(l10n.backupPageOK),
+                              ),
+                            ],
+                          ),
+                        );
+                      } catch (e) {
+                        if (!mounted) return;
+                        showAppSnackBar(
+                          context,
+                          message: e.toString(),
+                          type: NotificationType.error,
+                        );
+                      }
+                    });
                   },
                 ),
               ]),
@@ -629,7 +767,7 @@ class _TactileRowState extends State<_TactileRow> {
       onTap: widget.onTap == null
           ? null
           : () {
-              Haptics.soft();
+              if (context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
               widget.onTap!.call();
             },
       child: AnimatedScale(
@@ -766,6 +904,74 @@ Widget _iosNavRow(
       );
     },
   );
+}
+
+// --- Local iOS-style buttons for sheets ---
+class _IosOutlineButton extends StatefulWidget {
+  const _IosOutlineButton({required this.label, required this.onTap});
+  final String label; final VoidCallback onTap;
+  @override State<_IosOutlineButton> createState() => _IosOutlineButtonState();
+}
+
+class _IosOutlineButtonState extends State<_IosOutlineButton> {
+  bool _pressed = false;
+  void _set(bool v){ if(_pressed!=v) setState(()=>_pressed=v);} 
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _set(true),
+      onTapUp: (_) => Future.delayed(const Duration(milliseconds: 80), ()=>_set(false)),
+      onTapCancel: () => _set(false),
+      onTap: () { Haptics.soft(); widget.onTap(); },
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 110), curve: Curves.easeOutCubic,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: cs.primary.withOpacity(0.5)),
+          ),
+          child: Text(widget.label, style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600)),
+        ),
+      ),
+    );
+  }
+}
+
+class _IosFilledButton extends StatefulWidget {
+  const _IosFilledButton({required this.label, required this.onTap});
+  final String label; final VoidCallback onTap;
+  @override State<_IosFilledButton> createState() => _IosFilledButtonState();
+}
+
+class _IosFilledButtonState extends State<_IosFilledButton> {
+  bool _pressed = false;
+  void _set(bool v){ if(_pressed!=v) setState(()=>_pressed=v);} 
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _set(true),
+      onTapUp: (_) => Future.delayed(const Duration(milliseconds: 80), ()=>_set(false)),
+      onTapCancel: () => _set(false),
+      onTap: () { Haptics.soft(); widget.onTap(); },
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 110), curve: Curves.easeOutCubic,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: cs.primary, borderRadius: BorderRadius.circular(12)),
+          child: Text(widget.label, style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.w600)),
+        ),
+      ),
+    );
+  }
 }
 
 Widget _iosSwitchRow(BuildContext context, {IconData? icon, required String label, required bool value, required ValueChanged<bool> onChanged}) {

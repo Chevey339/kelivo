@@ -137,6 +137,17 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
               },
               onTap: () => _showAutoScrollIdleSheet(context),
             ),
+            _iosDivider(context),
+            _iosNavRow(
+              context,
+              icon: Lucide.Image,
+              label: l10n.displaySettingsPageChatBackgroundMaskTitle,
+              detailBuilder: (ctx) {
+                final v = ctx.watch<SettingsProvider>().chatBackgroundMaskStrength;
+                return Text('${(v * 100).round()}%', style: TextStyle(color: cs.onSurface.withOpacity(0.6), fontSize: 13));
+              },
+              onTap: () => _showChatBackgroundMaskSheet(context),
+            ),
           ]),
           // Inline cards replaced by sheet-triggering rows above.
         ],
@@ -363,6 +374,84 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
       },
     );
   }
+
+  Future<void> _showChatBackgroundMaskSheet(BuildContext context) async {
+    final cs = Theme.of(context).colorScheme;
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      isScrollControlled: false,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+            child: Builder(builder: (context) {
+              final theme = Theme.of(context);
+              final cs = theme.colorScheme;
+              final isDark = theme.brightness == Brightness.dark;
+              final strength = context.watch<SettingsProvider>().chatBackgroundMaskStrength;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Text('0%', style: TextStyle(color: cs.onSurface.withOpacity(0.7), fontSize: 12)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SfSliderTheme(
+                        data: SfSliderThemeData(
+                          activeTrackHeight: 8,
+                          inactiveTrackHeight: 8,
+                          overlayRadius: 14,
+                          activeTrackColor: cs.primary,
+                          inactiveTrackColor: cs.onSurface.withOpacity(isDark ? 0.25 : 0.20),
+                          tooltipBackgroundColor: cs.primary,
+                          tooltipTextStyle: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.w600),
+                          activeTickColor: cs.onSurface.withOpacity(isDark ? 0.45 : 0.35),
+                          inactiveTickColor: cs.onSurface.withOpacity(isDark ? 0.30 : 0.25),
+                          activeMinorTickColor: cs.onSurface.withOpacity(isDark ? 0.34 : 0.28),
+                          inactiveMinorTickColor: cs.onSurface.withOpacity(isDark ? 0.24 : 0.20),
+                        ),
+                        child: SfSlider(
+                          value: (strength * 100).roundToDouble(),
+                          min: 0.0,
+                          max: 200.0001,
+                          stepSize: 5.0,
+                          showTicks: true,
+                          showLabels: true,
+                          interval: 50,
+                          minorTicksPerInterval: 1,
+                          enableTooltip: true,
+                          shouldAlwaysShowTooltip: false,
+                          tooltipShape: const SfPaddleTooltipShape(),
+                          labelFormatterCallback: (value, text) => '${(value as double).round()}%',
+                          thumbIcon: Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: cs.primary,
+                              shape: BoxShape.circle,
+                              boxShadow: isDark ? [] : [
+                                BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: Offset(0, 2)),
+                              ],
+                            ),
+                          ),
+                          onChanged: (v) => context.read<SettingsProvider>().setChatBackgroundMaskStrength(((v as double) / 100.0).clamp(0.0, 2.0)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('${(strength * 100).round()}%', style: TextStyle(color: cs.onSurface, fontSize: 12)),
+                  ]),
+                ],
+              );
+            }),
+          ),
+        );
+      },
+    );
+  }
 }
 
 // --- iOS-style helpers ---
@@ -430,7 +519,10 @@ class _TactileRowState extends State<_TactileRow> {
       onTapDown: widget.onTap == null ? null : (_) => _setPressed(true),
       onTapUp: widget.onTap == null ? null : (_) => _setPressed(false),
       onTapCancel: widget.onTap == null ? null : () => _setPressed(false),
-      onTap: widget.onTap == null ? null : () { if (widget.haptics) Haptics.soft(); widget.onTap!.call(); },
+      onTap: widget.onTap == null ? null : () {
+        if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
+        widget.onTap!.call();
+      },
       child: widget.builder(_pressed),
     );
   }
@@ -609,6 +701,10 @@ class RenderingSettingsPage extends StatelessWidget {
           _iosSwitchRow(context, icon: Lucide.Hash, label: l10n.displaySettingsPageEnableDollarLatexTitle, value: sp.enableDollarLatex, onChanged: (v) => context.read<SettingsProvider>().setEnableDollarLatex(v)),
           _iosDivider(context),
           _iosSwitchRow(context, icon: Lucide.Code, label: l10n.displaySettingsPageEnableMathTitle, value: sp.enableMathRendering, onChanged: (v) => context.read<SettingsProvider>().setEnableMathRendering(v)),
+          _iosDivider(context),
+          _iosSwitchRow(context, icon: Lucide.TextSelect, label: l10n.displaySettingsPageEnableUserMarkdownTitle, value: sp.enableUserMarkdown, onChanged: (v) => context.read<SettingsProvider>().setEnableUserMarkdown(v)),
+          _iosDivider(context),
+          _iosSwitchRow(context, icon: Lucide.Brain, label: l10n.displaySettingsPageEnableReasoningMarkdownTitle, value: sp.enableReasoningMarkdown, onChanged: (v) => context.read<SettingsProvider>().setEnableReasoningMarkdown(v)),
         ]),
       ]),
     );
@@ -633,6 +729,8 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
           _iosDivider(context),
           _iosSwitchRow(context, icon: Lucide.ChevronRight, label: l10n.displaySettingsPageMessageNavButtonsTitle, value: sp.showMessageNavButtons, onChanged: (v) => context.read<SettingsProvider>().setShowMessageNavButtons(v)),
           _iosDivider(context),
+          _iosSwitchRow(context, icon: Lucide.Calendar, label: l10n.displaySettingsPageShowChatListDateTitle, value: sp.showChatListDate, onChanged: (v) => context.read<SettingsProvider>().setShowChatListDate(v)),
+          _iosDivider(context),
           _iosSwitchRow(context, icon: Lucide.MessageCirclePlus, label: l10n.displaySettingsPageNewChatOnLaunchTitle, value: sp.newChatOnLaunch, onChanged: (v) => context.read<SettingsProvider>().setNewChatOnLaunch(v)),
         ]),
       ]),
@@ -652,7 +750,39 @@ class HapticsSettingsPage extends StatelessWidget {
       ),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 16), children: [
         _iosSectionCard(children: [
+          _iosSwitchRow(
+            context,
+            icon: Lucide.Vibrate,
+            label: l10n.displaySettingsPageHapticsGlobalTitle,
+            value: sp.hapticsGlobalEnabled,
+            onChanged: (v) => context.read<SettingsProvider>().setHapticsGlobalEnabled(v),
+          ),
+          _iosDivider(context),
+          _iosSwitchRow(
+            context,
+            icon: Lucide.toggleRight,
+            label: l10n.displaySettingsPageHapticsIosSwitchTitle,
+            value: sp.hapticsIosSwitch,
+            onChanged: (v) => context.read<SettingsProvider>().setHapticsIosSwitch(v),
+          ),
+          _iosDivider(context),
           _iosSwitchRow(context, icon: Lucide.panelRight, label: l10n.displaySettingsPageHapticsOnSidebarTitle, value: sp.hapticsOnDrawer, onChanged: (v) => context.read<SettingsProvider>().setHapticsOnDrawer(v)),
+          _iosDivider(context),
+          _iosSwitchRow(
+            context,
+            icon: Lucide.ListOrdered,
+            label: l10n.displaySettingsPageHapticsOnListItemTapTitle,
+            value: sp.hapticsOnListItemTap,
+            onChanged: (v) => context.read<SettingsProvider>().setHapticsOnListItemTap(v),
+          ),
+          _iosDivider(context),
+          _iosSwitchRow(
+            context,
+            icon: Lucide.Square,
+            label: l10n.displaySettingsPageHapticsOnCardTapTitle,
+            value: sp.hapticsOnCardTap,
+            onChanged: (v) => context.read<SettingsProvider>().setHapticsOnCardTap(v),
+          ),
           _iosDivider(context),
           _iosSwitchRow(context, icon: Lucide.Vibrate, label: l10n.displaySettingsPageHapticsOnGenerateTitle, value: sp.hapticsOnGenerate, onChanged: (v) => context.read<SettingsProvider>().setHapticsOnGenerate(v)),
         ]),

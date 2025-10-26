@@ -791,6 +791,48 @@ abstract class AppLocalizations {
   /// **'Clear'**
   String get assistantEditClearButton;
 
+  /// No description provided for @desktopNavChatTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get desktopNavChatTooltip;
+
+  /// No description provided for @desktopNavTranslateTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Translate'**
+  String get desktopNavTranslateTooltip;
+
+  /// No description provided for @desktopNavThemeToggleTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get desktopNavThemeToggleTooltip;
+
+  /// No description provided for @desktopNavSettingsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get desktopNavSettingsTooltip;
+
+  /// No description provided for @desktopAvatarMenuUseEmoji.
+  ///
+  /// In en, this message translates to:
+  /// **'Use emoji'**
+  String get desktopAvatarMenuUseEmoji;
+
+  /// No description provided for @desktopAvatarMenuChangeFromImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Change from image…'**
+  String get desktopAvatarMenuChangeFromImage;
+
+  /// No description provided for @desktopAvatarMenuReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset avatar'**
+  String get desktopAvatarMenuReset;
+
   /// No description provided for @assistantEditAvatarChooseImage.
   ///
   /// In en, this message translates to:
@@ -2153,6 +2195,18 @@ abstract class AppLocalizations {
   /// **'Render LaTeX math (inline and block)'**
   String get displaySettingsPageEnableMathSubtitle;
 
+  /// No description provided for @displaySettingsPageEnableUserMarkdownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Render user messages with Markdown'**
+  String get displaySettingsPageEnableUserMarkdownTitle;
+
+  /// No description provided for @displaySettingsPageEnableReasoningMarkdownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Render reasoning (thinking) with Markdown'**
+  String get displaySettingsPageEnableReasoningMarkdownTitle;
+
   /// No description provided for @messageExportSheetFormatTitle.
   ///
   /// In en, this message translates to:
@@ -2194,6 +2248,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Render selected messages to a PNG image'**
   String get messageExportSheetBatchExportImageSubtitle;
+
+  /// No description provided for @messageExportSheetShowThinkingAndToolCards.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Deep Thinking and tool cards'**
+  String get messageExportSheetShowThinkingAndToolCards;
+
+  /// No description provided for @messageExportSheetShowThinkingContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Show thinking content'**
+  String get messageExportSheetShowThinkingContent;
 
   /// No description provided for @messageExportSheetDateTimeWithSecondsPattern.
   ///
@@ -4169,6 +4235,18 @@ abstract class AppLocalizations {
   /// **'Collapse reasoning after finish'**
   String get displaySettingsPageAutoCollapseThinkingSubtitle;
 
+  /// No description provided for @displaySettingsPageShowChatListDateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Chat List Dates'**
+  String get displaySettingsPageShowChatListDateTitle;
+
+  /// No description provided for @displaySettingsPageShowChatListDateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Display date group labels in the conversation list'**
+  String get displaySettingsPageShowChatListDateSubtitle;
+
   /// No description provided for @displaySettingsPageShowUpdatesTitle.
   ///
   /// In en, this message translates to:
@@ -4204,6 +4282,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enable haptic feedback when opening/closing sidebar'**
   String get displaySettingsPageHapticsOnSidebarSubtitle;
+
+  /// No description provided for @displaySettingsPageHapticsGlobalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Global Haptics'**
+  String get displaySettingsPageHapticsGlobalTitle;
+
+  /// No description provided for @displaySettingsPageHapticsIosSwitchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Haptics on Switch'**
+  String get displaySettingsPageHapticsIosSwitchTitle;
+
+  /// No description provided for @displaySettingsPageHapticsOnListItemTapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Haptics on List Items'**
+  String get displaySettingsPageHapticsOnListItemTapTitle;
+
+  /// No description provided for @displaySettingsPageHapticsOnCardTapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Haptics on Cards'**
+  String get displaySettingsPageHapticsOnCardTapTitle;
 
   /// No description provided for @displaySettingsPageHapticsOnGenerateTitle.
   ///
@@ -4253,11 +4355,35 @@ abstract class AppLocalizations {
   /// **'This is a sample chat text'**
   String get displaySettingsPageChatFontSampleText;
 
+  /// No description provided for @displaySettingsPageChatBackgroundMaskTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat Background Overlay Opacity'**
+  String get displaySettingsPageChatBackgroundMaskTitle;
+
   /// No description provided for @displaySettingsPageThemeSettingsTitle.
   ///
   /// In en, this message translates to:
   /// **'Theme Settings'**
   String get displaySettingsPageThemeSettingsTitle;
+
+  /// No description provided for @displaySettingsPageThemeColorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme Color'**
+  String get displaySettingsPageThemeColorTitle;
+
+  /// No description provided for @desktopSettingsFontsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fonts'**
+  String get desktopSettingsFontsTitle;
+
+  /// No description provided for @displaySettingsPageOtherSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get displaySettingsPageOtherSettingsTitle;
 
   /// No description provided for @themeSettingsPageDynamicColorSection.
   ///
@@ -4553,6 +4679,30 @@ abstract class AppLocalizations {
   /// **'Jina'**
   String get searchServiceNameJina;
 
+  /// No description provided for @searchServiceNamePerplexity.
+  ///
+  /// In en, this message translates to:
+  /// **'Perplexity'**
+  String get searchServiceNamePerplexity;
+
+  /// No description provided for @searchProviderPerplexityDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Perplexity Search API. Ranked web results with region and domain filters.'**
+  String get searchProviderPerplexityDescription;
+
+  /// No description provided for @searchServiceNameBocha.
+  ///
+  /// In en, this message translates to:
+  /// **'Bocha'**
+  String get searchServiceNameBocha;
+
+  /// No description provided for @searchProviderBochaDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Bocha web search API. Accurate web results with optional summaries.'**
+  String get searchProviderBochaDescription;
+
   /// No description provided for @generationInterrupted.
   ///
   /// In en, this message translates to:
@@ -4666,6 +4816,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manage Quick Phrases'**
   String get assistantEditManageQuickPhraseButton;
+
+  /// No description provided for @assistantEditPageMemoryTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory'**
+  String get assistantEditPageMemoryTab;
+
+  /// No description provided for @assistantEditMemorySwitchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory'**
+  String get assistantEditMemorySwitchTitle;
+
+  /// No description provided for @assistantEditMemorySwitchDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow the assistant to create and use memories across chats.'**
+  String get assistantEditMemorySwitchDescription;
+
+  /// No description provided for @assistantEditRecentChatsSwitchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent Chats Reference'**
+  String get assistantEditRecentChatsSwitchTitle;
+
+  /// No description provided for @assistantEditRecentChatsSwitchDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Include recent conversation titles to help with context.'**
+  String get assistantEditRecentChatsSwitchDescription;
+
+  /// No description provided for @assistantEditManageMemoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Memories'**
+  String get assistantEditManageMemoryTitle;
+
+  /// No description provided for @assistantEditAddMemoryButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Memory'**
+  String get assistantEditAddMemoryButton;
+
+  /// No description provided for @assistantEditMemoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No memories yet'**
+  String get assistantEditMemoryEmpty;
+
+  /// No description provided for @assistantEditMemoryDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory'**
+  String get assistantEditMemoryDialogTitle;
+
+  /// No description provided for @assistantEditMemoryDialogHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter memory content'**
+  String get assistantEditMemoryDialogHint;
 
   /// No description provided for @assistantEditAddQuickPhraseButton.
   ///

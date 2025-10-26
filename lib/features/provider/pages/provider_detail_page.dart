@@ -6,6 +6,7 @@ import '../../../utils/brand_assets.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -329,6 +330,47 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           ),
           const SizedBox(height: 12),
         ],
+        if (widget.keyName.toLowerCase() == 'siliconflow') ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: cs.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: cs.primary.withOpacity(0.35)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '已内置硅基流动的免费模型，无需 API Key。若需更强大的模型，请申请并在此配置你自己的 API Key。',
+                  style: TextStyle(color: cs.onSurface.withOpacity(0.8)),
+                ),
+                const SizedBox(height: 6),
+                Text.rich(
+                  TextSpan(
+                    text: '官网：',
+                    style: TextStyle(color: cs.onSurface.withOpacity(0.8)),
+                    children: [
+                      TextSpan(
+                        text: 'https://siliconflow.cn',
+                        style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700),
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () async {
+                            final uri = Uri.parse('https://siliconflow.cn');
+                            try {
+                              final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              if (!ok) { await launchUrl(uri); }
+                            } catch (_) { await launchUrl(uri); }
+                          },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         // 顶部管理分组标题（左侧缩进以对齐卡片内容）
         Padding(
           padding: const EdgeInsets.only(left: 12),
@@ -514,6 +556,18 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           ],
         ],
         const SizedBox(height: 12),
+        if (widget.keyName.toLowerCase() == 'siliconflow') ...[
+          const SizedBox(height: 6),
+          Center(
+            child: Image.asset(
+              Theme.of(context).brightness == Brightness.dark
+                  ? 'assets/icons/Powered-by-dark.png'
+                  : 'assets/icons/Powered-by-light.png',
+              height: 64,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -564,15 +618,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               return AnimatedBuilder(
                 animation: animation,
                 builder: (context, _) {
-                  final t = Curves.easeOutBack.transform(animation.value);
+                  final t = Curves.easeOut.transform(animation.value);
                   return Transform.scale(
                     scale: 0.98 + 0.02 * t,
-                    child: Material(
-                      elevation: 8 * t,
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      child: child,
-                    ),
+                    child: child,
                   );
                 },
                 child: child,
@@ -785,10 +834,20 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary.withOpacity(0.4))),
+            fillColor: isDark ? Colors.white10 : Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             suffixIcon: suffix,
           ),
         ),
@@ -1042,10 +1101,20 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             hintText: hint,
             filled: true,
             alignLabelWithHint: true,
-            fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary.withOpacity(0.4))),
+            fillColor: isDark ? Colors.white10 : Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           ),
         ),
       ],
@@ -1239,6 +1308,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final cs = Theme.of(context).colorScheme;
     final settings = context.read<SettingsProvider>();
     final cfg = settings.getProviderConfig(widget.keyName, defaultName: widget.displayName);
+    final bool _isDefaultSilicon = widget.keyName.toLowerCase() == 'siliconflow';
+    final bool _hasUserKey = (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) || cfg.apiKey.trim().isNotEmpty;
+    final bool _restrictToFree = _isDefaultSilicon && !_hasUserKey;
     final controller = TextEditingController();
     List<dynamic> items = const [];
     bool loading = true;
@@ -1258,11 +1330,22 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           final l10n = AppLocalizations.of(ctx)!;
           Future<void> _load() async {
             try {
-              final list = await ProviderManager.listModels(cfg);
-              setLocal(() {
-                items = list;
-                loading = false;
-              });
+              if (_restrictToFree) {
+                final list = <ModelInfo>[
+                  ModelRegistry.infer(ModelInfo(id: 'THUDM/GLM-4-9B-0414', displayName: 'THUDM/GLM-4-9B-0414')),
+                  ModelRegistry.infer(ModelInfo(id: 'Qwen/Qwen3-8B', displayName: 'Qwen/Qwen3-8B')),
+                ];
+                setLocal(() {
+                  items = list;
+                  loading = false;
+                });
+              } else {
+                final list = await ProviderManager.listModels(cfg);
+                setLocal(() {
+                  items = list;
+                  loading = false;
+                });
+              }
             } catch (e) {
               setLocal(() {
                 items = const [];
@@ -2136,7 +2219,7 @@ class _TactileRowState extends State<_TactileRow> {
       onTap: widget.onTap == null
           ? null
           : () {
-              if (widget.haptics) Haptics.soft();
+              if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
               widget.onTap!.call();
             },
       child: AnimatedScale(

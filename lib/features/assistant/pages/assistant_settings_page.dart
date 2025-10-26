@@ -3,6 +3,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../theme/design_tokens.dart';
 import 'package:provider/provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/models/assistant.dart';
 import 'dart:io' show File;
@@ -180,21 +181,45 @@ class _AssistantCard extends StatelessWidget {
     return Slidable(
       key: ValueKey('slidable-assistant-${item.id}'),
       endActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        extentRatio: 0.24,
+        motion: const StretchMotion(),
+        extentRatio: 0.35,
         children: [
-          SlidableAction(
+          CustomSlidableAction(
+            autoClose: true,
+            backgroundColor: Colors.transparent,
             onPressed: (_) async {
               final ok = await _confirmDelete(context, l10n);
               if (ok == true) {
                 await context.read<AssistantProvider>().deleteAssistant(item.id);
               }
             },
-            backgroundColor: cs.error,
-            foregroundColor: Colors.white,
-            icon: Lucide.Trash2,
-            label: l10n.assistantSettingsDeleteButton,
-            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: double.infinity,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? cs.error.withOpacity(0.22)
+                    : cs.error.withOpacity(0.14),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: cs.error.withOpacity(0.35)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              alignment: Alignment.center,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Lucide.Trash2, color: cs.error, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      l10n.assistantSettingsDeleteButton,
+                      style: TextStyle(color: cs.error, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -263,7 +288,10 @@ class _TactileCardState extends State<_TactileCard> {
       onTapDown: widget.onTap==null?null:(_)=>_set(true),
       onTapUp: widget.onTap==null?null:(_)=>_set(false),
       onTapCancel: widget.onTap==null?null:()=>_set(false),
-      onTap: widget.onTap==null?null:(){ if(widget.haptics) Haptics.soft(); widget.onTap!.call(); },
+      onTap: widget.onTap==null?null:(){
+        if(widget.haptics && context.read<SettingsProvider>().hapticsOnCardTap) Haptics.soft();
+        widget.onTap!.call();
+      },
       child: AnimatedScale(
         scale: _pressed ? widget.pressedScale : 1.0,
         duration: const Duration(milliseconds: 110),
@@ -291,63 +319,75 @@ Future<String?> _showAddAssistantSheet(BuildContext context) async {
     ),
     builder: (ctx) {
       final cs = Theme.of(ctx).colorScheme;
-      final viewInsets = MediaQuery.of(ctx).viewInsets;
+      final isDark = Theme.of(ctx).brightness == Brightness.dark;
+      final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
       return SafeArea(
         top: false,
         child: Padding(
-          padding: EdgeInsets.only(bottom: viewInsets.bottom),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(l10n.assistantSettingsAddSheetTitle, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: controller,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: l10n.assistantSettingsAddSheetHint,
-                    filled: true,
-                    fillColor: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.transparent),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.transparent),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: cs.primary.withOpacity(0.45)),
+          padding: EdgeInsets.only(left: 16, right: 16, top: 12, bottom: bottomInset + 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: Text(
+                  l10n.assistantSettingsAddSheetTitle,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: l10n.assistantSettingsAddSheetHint,
+                  filled: true,
+                  fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  ),
+                ),
+                onSubmitted: (_) => Navigator.of(ctx).pop(controller.text.trim()),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _IosOutlineButton(
+                      label: l10n.assistantSettingsAddSheetCancel,
+                      onTap: () => Navigator.of(ctx).pop(),
                     ),
                   ),
-                  onSubmitted: (_) => Navigator.of(ctx).pop(controller.text.trim()),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text(l10n.assistantSettingsAddSheetCancel),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _IosFilledButton(
+                      label: l10n.assistantSettingsAddSheetSave,
+                      onTap: () => Navigator.of(ctx).pop(controller.text.trim()),
                     ),
-                    const Spacer(),
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: cs.primary,
-                        foregroundColor: cs.onPrimary,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: Text(l10n.assistantSettingsAddSheetSave),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       );
@@ -467,6 +507,83 @@ class _AssistantAvatar extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: Text(emoji.characters.take(1).toString(), style: TextStyle(fontSize: size * 0.5)),
+    );
+  }
+}
+
+class _IosOutlineButton extends StatefulWidget {
+  const _IosOutlineButton({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+  @override
+  State<_IosOutlineButton> createState() => _IosOutlineButtonState();
+}
+
+class _IosOutlineButtonState extends State<_IosOutlineButton> {
+  bool _pressed = false;
+  void _set(bool v) {
+    if (_pressed != v) setState(() => _pressed = v);
+  }
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _set(true),
+      onTapUp: (_) => Future.delayed(const Duration(milliseconds: 80), () => _set(false)),
+      onTapCancel: () => _set(false),
+      onTap: () { Haptics.soft(); widget.onTap(); },
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOutCubic,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: cs.primary.withOpacity(0.5)),
+          ),
+          child: Text(widget.label, style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600)),
+        ),
+      ),
+    );
+  }
+}
+
+class _IosFilledButton extends StatefulWidget {
+  const _IosFilledButton({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+  @override
+  State<_IosFilledButton> createState() => _IosFilledButtonState();
+}
+
+class _IosFilledButtonState extends State<_IosFilledButton> {
+  bool _pressed = false;
+  void _set(bool v) {
+    if (_pressed != v) setState(() => _pressed = v);
+  }
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _set(true),
+      onTapUp: (_) => Future.delayed(const Duration(milliseconds: 80), () => _set(false)),
+      onTapCancel: () => _set(false),
+      onTap: () { Haptics.soft(); widget.onTap(); },
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOutCubic,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: cs.primary, borderRadius: BorderRadius.circular(12)),
+          child: Text(widget.label, style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.w600)),
+        ),
+      ),
     );
   }
 }

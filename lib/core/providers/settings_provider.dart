@@ -6,6 +6,7 @@ import 'dart:convert';
 import '../services/search/search_service.dart';
 import '../models/api_keys.dart';
 import '../models/backup.dart';
+import '../services/haptics.dart';
 
 class SettingsProvider extends ChangeNotifier {
   static const String _providersOrderKey = 'providers_order_v1';
@@ -28,12 +29,20 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowMessageNavKey = 'display_show_message_nav_v1';
   static const String _displayHapticsOnGenerateKey = 'display_haptics_on_generate_v1';
   static const String _displayHapticsOnDrawerKey = 'display_haptics_on_drawer_v1';
+  static const String _displayHapticsGlobalEnabledKey = 'display_haptics_global_enabled_v1';
+  static const String _displayHapticsIosSwitchKey = 'display_haptics_ios_switch_v1';
+  static const String _displayHapticsOnListItemTapKey = 'display_haptics_on_list_item_tap_v1';
+  static const String _displayHapticsOnCardTapKey = 'display_haptics_on_card_tap_v1';
   static const String _displayShowAppUpdatesKey = 'display_show_app_updates_v1';
   static const String _displayNewChatOnLaunchKey = 'display_new_chat_on_launch_v1';
   static const String _displayChatFontScaleKey = 'display_chat_font_scale_v1';
   static const String _displayAutoScrollIdleSecondsKey = 'display_auto_scroll_idle_seconds_v1';
+  static const String _displayChatBackgroundMaskStrengthKey = 'display_chat_background_mask_strength_v1';
   static const String _displayEnableDollarLatexKey = 'display_enable_dollar_latex_v1';
   static const String _displayEnableMathRenderingKey = 'display_enable_math_rendering_v1';
+  static const String _displayEnableUserMarkdownKey = 'display_enable_user_markdown_v1';
+  static const String _displayEnableReasoningMarkdownKey = 'display_enable_reasoning_markdown_v1';
+  static const String _displayShowChatListDateKey = 'display_show_chat_list_date_v1';
   static const String _appLocaleKey = 'app_locale_v1';
   static const String _translateModelKey = 'translate_model_v1';
   static const String _translatePromptKey = 'translate_prompt_v1';
@@ -44,6 +53,9 @@ class SettingsProvider extends ChangeNotifier {
   static const String _searchSelectedKey = 'search_selected_v1';
   static const String _searchEnabledKey = 'search_enabled_v1';
   static const String _webDavConfigKey = 'webdav_config_v1';
+  // Desktop UI
+  static const String _desktopSidebarWidthKey = 'desktop_sidebar_width_v1';
+  static const String _desktopSidebarOpenKey = 'desktop_sidebar_open_v1';
 
   List<String> _providersOrder = const [];
   List<String> get providersOrder => _providersOrder;
@@ -57,6 +69,12 @@ class SettingsProvider extends ChangeNotifier {
   bool get useDynamicColor => _useDynamicColor;
   bool _dynamicColorSupported = false; // runtime capability, not persisted
   bool get dynamicColorSupported => _dynamicColorSupported;
+
+  // Desktop UI persisted state
+  double _desktopSidebarWidth = 240;
+  bool _desktopSidebarOpen = true;
+  double get desktopSidebarWidth => _desktopSidebarWidth;
+  bool get desktopSidebarOpen => _desktopSidebarOpen;
 
   Map<String, ProviderConfig> _providerConfigs = {};
   Map<String, ProviderConfig> get providerConfigs => Map.unmodifiable(_providerConfigs);
@@ -176,13 +194,26 @@ class SettingsProvider extends ChangeNotifier {
     _showMessageNavButtons = prefs.getBool(_displayShowMessageNavKey) ?? true;
     _hapticsOnGenerate = prefs.getBool(_displayHapticsOnGenerateKey) ?? false;
     _hapticsOnDrawer = prefs.getBool(_displayHapticsOnDrawerKey) ?? true;
+    _hapticsGlobalEnabled = prefs.getBool(_displayHapticsGlobalEnabledKey) ?? true;
+    _hapticsIosSwitch = prefs.getBool(_displayHapticsIosSwitchKey) ?? true;
+    _hapticsOnListItemTap = prefs.getBool(_displayHapticsOnListItemTapKey) ?? true;
+    _hapticsOnCardTap = prefs.getBool(_displayHapticsOnCardTapKey) ?? true;
+    // Apply global haptics to service layer
+    Haptics.setEnabled(_hapticsGlobalEnabled);
     _showAppUpdates = prefs.getBool(_displayShowAppUpdatesKey) ?? true;
     _newChatOnLaunch = prefs.getBool(_displayNewChatOnLaunchKey) ?? true;
     _chatFontScale = prefs.getDouble(_displayChatFontScaleKey) ?? 1.0;
     _autoScrollIdleSeconds = prefs.getInt(_displayAutoScrollIdleSecondsKey) ?? 8;
+    _chatBackgroundMaskStrength = prefs.getDouble(_displayChatBackgroundMaskStrengthKey) ?? 1.0;
     // display: markdown/math rendering
     _enableDollarLatex = prefs.getBool(_displayEnableDollarLatexKey) ?? true;
     _enableMathRendering = prefs.getBool(_displayEnableMathRenderingKey) ?? true;
+    _enableUserMarkdown = prefs.getBool(_displayEnableUserMarkdownKey) ?? true;
+    _enableReasoningMarkdown = prefs.getBool(_displayEnableReasoningMarkdownKey) ?? true;
+    _showChatListDate = prefs.getBool(_displayShowChatListDateKey) ?? false;
+    // desktop UI
+    _desktopSidebarWidth = prefs.getDouble(_desktopSidebarWidthKey) ?? 300;
+    _desktopSidebarOpen = prefs.getBool(_desktopSidebarOpenKey) ?? true;
     // Load app locale; default to follow system on first launch
     _appLocaleTag = prefs.getString(_appLocaleKey);
     if (_appLocaleTag == null || _appLocaleTag!.isEmpty) {
@@ -216,12 +247,31 @@ class SettingsProvider extends ChangeNotifier {
       // providers implicitly during later reads (e.g., when switching chats).
       ensureProviderConfig('KelivoIN', defaultName: 'KelivoIN');
       ensureProviderConfig('Tensdaq', defaultName: 'Tensdaq');
+      ensureProviderConfig('SiliconFlow', defaultName: 'SiliconFlow');
     }
     
     // kick off a one-time connectivity test for services (exclude local Bing)
     _initSearchConnectivityTests();
 
     notifyListeners();
+  }
+
+  // ===== Desktop UI setters =====
+  Future<void> setDesktopSidebarWidth(double width) async {
+    final w = width.clamp(200.0, 640.0).toDouble();
+    if ((w - _desktopSidebarWidth).abs() < 0.5) return;
+    _desktopSidebarWidth = w;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_desktopSidebarWidthKey, _desktopSidebarWidth);
+  }
+
+  Future<void> setDesktopSidebarOpen(bool open) async {
+    if (_desktopSidebarOpen == open) return;
+    _desktopSidebarOpen = open;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_desktopSidebarOpenKey, _desktopSidebarOpen);
   }
 
   // ===== App locale (UI language) =====
@@ -717,6 +767,18 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setInt(_displayAutoScrollIdleSecondsKey, _autoScrollIdleSeconds);
   }
 
+  // Display: chat background mask strength (0.0 - 2.0, default 1.0)
+  double _chatBackgroundMaskStrength = 1.0;
+  double get chatBackgroundMaskStrength => _chatBackgroundMaskStrength;
+  Future<void> setChatBackgroundMaskStrength(double strength) async {
+    final s = strength.clamp(0.0, 2.0);
+    if (_chatBackgroundMaskStrength == s) return;
+    _chatBackgroundMaskStrength = s;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_displayChatBackgroundMaskStrengthKey, _chatBackgroundMaskStrength);
+  }
+
   // Display: inline $...$ LaTeX rendering
   bool _enableDollarLatex = true;
   bool get enableDollarLatex => _enableDollarLatex;
@@ -739,6 +801,39 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_displayEnableMathRenderingKey, v);
   }
 
+  // Display: render user messages with Markdown
+  bool _enableUserMarkdown = true;
+  bool get enableUserMarkdown => _enableUserMarkdown;
+  Future<void> setEnableUserMarkdown(bool v) async {
+    if (_enableUserMarkdown == v) return;
+    _enableUserMarkdown = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayEnableUserMarkdownKey, v);
+  }
+
+  // Display: render reasoning (thinking) content with Markdown
+  bool _enableReasoningMarkdown = true;
+  bool get enableReasoningMarkdown => _enableReasoningMarkdown;
+  Future<void> setEnableReasoningMarkdown(bool v) async {
+    if (_enableReasoningMarkdown == v) return;
+    _enableReasoningMarkdown = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayEnableReasoningMarkdownKey, v);
+  }
+
+  // Display: show chat list date
+  bool _showChatListDate = false;
+  bool get showChatListDate => _showChatListDate;
+  Future<void> setShowChatListDate(bool v) async {
+    if (_showChatListDate == v) return;
+    _showChatListDate = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayShowChatListDateKey, v);
+  }
+
   // Display: haptics on message generation
   bool _hapticsOnGenerate = false;
   bool get hapticsOnGenerate => _hapticsOnGenerate;
@@ -759,6 +854,52 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_displayHapticsOnDrawerKey, v);
+  }
+
+  // Display: global haptics master switch
+  bool _hapticsGlobalEnabled = true;
+  bool get hapticsGlobalEnabled => _hapticsGlobalEnabled;
+  Future<void> setHapticsGlobalEnabled(bool v) async {
+    if (_hapticsGlobalEnabled == v) return;
+    _hapticsGlobalEnabled = v;
+    // Apply immediately to service
+    Haptics.setEnabled(v);
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayHapticsGlobalEnabledKey, v);
+  }
+
+  // Display: iOS-style switch haptics only
+  bool _hapticsIosSwitch = true;
+  bool get hapticsIosSwitch => _hapticsIosSwitch;
+  Future<void> setHapticsIosSwitch(bool v) async {
+    if (_hapticsIosSwitch == v) return;
+    _hapticsIosSwitch = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayHapticsIosSwitchKey, v);
+  }
+
+  // Display: list item tap haptics (e.g., rows in settings pages)
+  bool _hapticsOnListItemTap = true;
+  bool get hapticsOnListItemTap => _hapticsOnListItemTap;
+  Future<void> setHapticsOnListItemTap(bool v) async {
+    if (_hapticsOnListItemTap == v) return;
+    _hapticsOnListItemTap = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayHapticsOnListItemTapKey, v);
+  }
+
+  // Display: card tap haptics (e.g., Assistant cards etc.)
+  bool _hapticsOnCardTap = true;
+  bool get hapticsOnCardTap => _hapticsOnCardTap;
+  Future<void> setHapticsOnCardTap(bool v) async {
+    if (_hapticsOnCardTap == v) return;
+    _hapticsOnCardTap = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayHapticsOnCardTapKey, v);
   }
 
   // Display: show app updates notification
@@ -856,12 +997,19 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._showMessageNavButtons = _showMessageNavButtons;
     copy._hapticsOnGenerate = _hapticsOnGenerate;
     copy._hapticsOnDrawer = _hapticsOnDrawer;
+    copy._hapticsGlobalEnabled = _hapticsGlobalEnabled;
+    copy._hapticsIosSwitch = _hapticsIosSwitch;
+    copy._hapticsOnListItemTap = _hapticsOnListItemTap;
+    copy._hapticsOnCardTap = _hapticsOnCardTap;
     copy._showAppUpdates = _showAppUpdates;
     copy._newChatOnLaunch = _newChatOnLaunch;
     copy._chatFontScale = _chatFontScale;
     copy._autoScrollIdleSeconds = _autoScrollIdleSeconds;
     copy._enableDollarLatex = _enableDollarLatex;
     copy._enableMathRendering = _enableMathRendering;
+    copy._enableUserMarkdown = _enableUserMarkdown;
+    copy._enableReasoningMarkdown = _enableReasoningMarkdown;
+    copy._showChatListDate = _showChatListDate;
     return copy;
   }
 }
@@ -1149,6 +1297,45 @@ class ProviderConfig {
                 'input': ['text'],
                 'output': ['text'],
                 'abilities': ['tool'],
+              },
+            },
+            proxyEnabled: false,
+            proxyHost: '',
+            proxyPort: '8080',
+            proxyUsername: '',
+            proxyPassword: '',
+            multiKeyEnabled: false,
+            apiKeys: const [],
+            keyManagement: const KeyManagementConfig(),
+          );
+        }
+        // Special-case SiliconFlow: prefill two partnered models
+        if (lowerKey.contains('silicon')) {
+          return ProviderConfig(
+            id: key,
+            enabled: _defaultEnabled(key),
+            name: displayName ?? key,
+            apiKey: '',
+            baseUrl: _defaultBase(key),
+            providerType: ProviderKind.openai,
+            chatPath: '/chat/completions',
+            useResponseApi: false,
+            models: const [
+              'THUDM/GLM-4-9B-0414',
+              'Qwen/Qwen3-8B',
+            ],
+            modelOverrides: const {
+              'THUDM/GLM-4-9B-0414': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool'],
+              },
+              'Qwen/Qwen3-8B': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
               },
             },
             proxyEnabled: false,

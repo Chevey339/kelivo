@@ -11,6 +11,7 @@ import 'model_detail_sheet.dart';
 import '../../provider/pages/provider_detail_page.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/brand_assets.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 
 class ModelSelection {
   final String providerKey;
@@ -174,7 +175,7 @@ Future<ModelSelection?> showModelSelector(BuildContext context, {String? limitPr
     isScrollControlled: true,
     backgroundColor: cs.surface,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (ctx) => _ModelSelectSheet(limitProviderKey: limitProviderKey),
   );
@@ -455,7 +456,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                 Container(
                   decoration: BoxDecoration(
                     color: cs.surface,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                   ),
                   child: Column(
                     children: [
@@ -465,32 +466,56 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                         Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(999))),
                         const SizedBox(height: 8),
                       ]),
-                      // Fixed search field
+                      // Fixed search field (iOS-like input style)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                         child: TextField(
                           controller: _search,
                           enabled: !_isLoading,
                           onChanged: (_) => setState(() {}),
+                          // Ensure high-contrast input text in both themes
+                          style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
+                          cursorColor: cs.primary,
                           decoration: InputDecoration(
                             hintText: l10n.modelSelectSheetSearchHint,
-                            prefixIcon: Icon(Lucide.Search, size: 18, color: cs.onSurface.withOpacity(_isLoading ? 0.3 : 0.6)),
+                            prefixIcon: Icon(Lucide.Search, size: 18, color: cs.onSurface.withOpacity(_isLoading ? 0.35 : 0.6)),
+                            // Use IconButton for reliable alignment at the far right
                             suffixIcon: (widget.limitProviderKey == null && context.watch<SettingsProvider>().pinnedModels.isNotEmpty)
                                 ? Tooltip(
                                     message: l10n.modelSelectSheetFavoritesSection,
                                     child: IconButton(
-                                      visualDensity: VisualDensity.compact,
+                                      icon: Icon(Lucide.Bookmark, size: 18, color: cs.onSurface.withOpacity(_isLoading ? 0.35 : 0.7)),
                                       onPressed: _jumpToFavorites,
-                                      icon: Icon(Lucide.Bookmark, size: 18, color: cs.onSurface.withOpacity(_isLoading ? 0.3 : 0.6)),
+                                      splashColor: Colors.transparent,
+                                      highlightColor: Colors.transparent,
+                                      hoverColor: Colors.transparent,
+                                      tooltip: l10n.modelSelectSheetFavoritesSection,
                                     ),
                                   )
                                 : null,
+                            suffixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                             filled: true,
-                            fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-                            disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary.withOpacity(0.4))),
+                            fillColor: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white.withOpacity(0.10)
+                                : Colors.white.withOpacity(0.64),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+                            ),
+                            disabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.25)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                            ),
                           ),
                         ),
                       ),
@@ -612,10 +637,17 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     // Bottom provider tabs (ordered per ProvidersPage order)
     final List<Widget> providerTabs = <Widget>[];
     if (widget.limitProviderKey == null && !_isLoading) {
+      String? selectedProviderKey;
+      // Find which provider currently holds the selected model
+      _groups.forEach((pk, group) {
+        if (selectedProviderKey == null && group.items.any((m) => m.selected)) {
+          selectedProviderKey = pk;
+        }
+      });
       for (final k in _orderedKeys) {
         final g = _groups[k];
         if (g != null) {
-          providerTabs.add(_providerTab(context, k, g.name));
+          providerTabs.add(_providerTab(context, k, g.name, selected: k == selectedProviderKey));
         }
       }
     }
@@ -651,103 +683,98 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: RepaintBoundary(
-        child: Material(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => Navigator.of(context).pop(ModelSelection(m.providerKey, m.id)),
-            onLongPress: () async {
-              // Edit model overrides in-place; refresh list after closing
-              await showModelDetailSheet(context, providerKey: m.providerKey, modelId: m.id);
-              if (mounted) {
-                // Recompute to reflect overrides changes
-                _isLoading = true;
-                setState(() {});
-                await _loadModelsAsync();
-              }
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                children: [
-                  _BrandAvatar(name: m.id, assetOverride: m.asset, size: 28),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (!showProviderLabel)
-                          Text(
-                            m.info.displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                          )
-                        else
-                          Text.rich(
+        child: IosCardPress(
+          baseColor: bg,
+          borderRadius: BorderRadius.circular(14),
+          pressedBlendStrength: 0.10,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          onTap: () => Navigator.of(context).pop(ModelSelection(m.providerKey, m.id)),
+          onLongPress: () async {
+            await showModelDetailSheet(context, providerKey: m.providerKey, modelId: m.id);
+            if (mounted) {
+              _isLoading = true;
+              setState(() {});
+              await _loadModelsAsync();
+            }
+          },
+          child: SizedBox(
+            width: double.infinity,
+            child: Row(
+            children: [
+              _BrandAvatar(name: m.id, assetOverride: m.asset, size: 28),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!showProviderLabel)
+                      Text(
+                        m.info.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      )
+                    else
+                      Text.rich(
+                        TextSpan(
+                          text: m.info.displayName,
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          children: [
                             TextSpan(
-                              text: m.info.displayName,
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                              children: [
-                                TextSpan(
-                                  text: ' | ${m.providerName}',
-                                  style: TextStyle(
-                                    color: cs.onSurface.withOpacity(0.6),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
+                              text: ' | ${m.providerName}',
+                              style: TextStyle(
+                                color: cs.onSurface.withOpacity(0.6),
+                                fontSize: 12,
+                              ),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        const SizedBox(height: 4),
-                        _modelTagWrap(context, effective),
-                      ],
-                    ),
-                  ),
-                  Builder(builder: (context) {
-                    final pinnedNow = context.select<SettingsProvider, bool>((s) => s.isModelPinned(m.providerKey, m.id));
-                    final icon = pinnedNow ? Icons.favorite : Icons.favorite_border;
-                    return IconButton(
-                      onPressed: () => settings.togglePinModel(m.providerKey, m.id),
-                      icon: Icon(icon, size: 20, color: cs.primary),
-                      tooltip: l10n.modelSelectSheetFavoriteTooltip,
-                    );
-                  }),
-                ],
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    const SizedBox(height: 4),
+                    _modelTagWrap(context, effective),
+                  ],
+                ),
               ),
-            ),
-          ),
+              Builder(builder: (context) {
+                final pinnedNow = context.select<SettingsProvider, bool>((s) => s.isModelPinned(m.providerKey, m.id));
+                final icon = pinnedNow ? Icons.favorite : Icons.favorite_border;
+                return Tooltip(
+                  message: l10n.modelSelectSheetFavoriteTooltip,
+                  child: IosIconButton(
+                    icon: icon,
+                    size: 20,
+                    color: cs.primary,
+                    onTap: () => settings.togglePinModel(m.providerKey, m.id),
+                    padding: const EdgeInsets.all(6),
+                    minSize: 36,
+                  ),
+                );
+              }),
+            ],
+          )),
         ),
       ),
     );
   }
 
-  Widget _providerTab(BuildContext context, String key, String name) {
+  Widget _providerTab(BuildContext context, String key, String name, {bool selected = false}) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: OutlinedButton.icon(
-        onPressed: () async { await _jumpToProvider(key); },
+      child: _ProviderChip(
+        avatar: _BrandAvatar(name: name, size: 18),
+        label: name,
+        selected: selected,
+        borderColor: cs.outlineVariant.withOpacity(0.25),
+        onTap: () async { await _jumpToProvider(key); },
         onLongPress: () async {
-          // Open provider detail page for quick edits
           await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ProviderDetailPage(keyName: key, displayName: name),
-            ),
+            MaterialPageRoute(builder: (_) => ProviderDetailPage(keyName: key, displayName: name)),
           );
           if (mounted) setState(() {});
         },
-        icon: _BrandAvatar(name: name, size: 16),
-        label: Text(name, style: const TextStyle(fontSize: 12)),
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-          backgroundColor: cs.surface,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-        ),
       ),
     );
   }
@@ -816,6 +843,64 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         );
       } catch (_) {}
     }
+  }
+}
+
+class _ProviderChip extends StatefulWidget {
+  const _ProviderChip({required this.avatar, required this.label, required this.onTap, this.onLongPress, this.borderColor, this.selected = false});
+  final Widget avatar;
+  final String label;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final Color? borderColor;
+  final bool selected;
+
+  @override
+  State<_ProviderChip> createState() => _ProviderChipState();
+}
+
+class _ProviderChipState extends State<_ProviderChip> {
+  bool _pressed = false;
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bool isSelected = widget.selected;
+    // Subtle background tint when selected (less conspicuous)
+    final Color baseBg = isSelected
+        ? (isDark ? cs.primary.withOpacity(0.08) : cs.primary.withOpacity(0.05))
+        : cs.surface;
+    final Color overlay = isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05);
+    final Color bg = _pressed ? Color.alphaBlend(overlay, baseBg) : baseBg;
+    // Slightly stronger border when selected; keep label color unchanged for subtlety
+    final Color borderColor = widget.borderColor ?? cs.outlineVariant.withOpacity(0.25);
+    final Color labelColor = cs.onSurface;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            widget.avatar,
+            const SizedBox(width: 6),
+            Text(widget.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: labelColor)),
+          ],
+        ),
+      ),
+    );
   }
 }
 

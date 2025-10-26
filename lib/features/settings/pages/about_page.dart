@@ -8,6 +8,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../icons/lucide_adapter.dart';
 import 'package:haptic_feedback/haptic_feedback.dart' as HF;
+import 'package:provider/provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -285,6 +287,7 @@ class _AboutPageState extends State<AboutPage> {
                                       label: e[0] as String,
                                       color: cs.primary,
                                       onTap: () async {
+                                        if (!context.read<SettingsProvider>().hapticsGlobalEnabled) return;
                                         try {
                                           final can = await HF.Haptics.canVibrate();
                                           if (can) {
@@ -297,6 +300,7 @@ class _AboutPageState extends State<AboutPage> {
                                 label: 'Play All',
                                 color: cs.secondary,
                                 onTap: () async {
+                                      if (!context.read<SettingsProvider>().hapticsGlobalEnabled) return;
                                       try {
                                         final can = await HF.Haptics.canVibrate();
                                         if (!can) return;
@@ -567,7 +571,7 @@ class _TactileRowState extends State<_TactileRow> {
       onTap: widget.onTap == null
           ? null
           : () {
-              if (widget.haptics) Haptics.soft();
+              if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
               widget.onTap!.call();
             },
       child: widget.pressedScale == 1.0

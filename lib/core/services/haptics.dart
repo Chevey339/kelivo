@@ -9,9 +9,14 @@ import 'package:haptic_feedback/haptic_feedback.dart' as HFP;
 /// are safe on platforms without plugin support (errors are swallowed).
 class Haptics {
   Haptics._();
+  // Global master switch controlled by settings. When false, all haptics are disabled.
+  static bool _enabled = true;
+  static bool get enabled => _enabled;
+  static void setEnabled(bool v) { _enabled = v; }
 
   /// Very light tap feedback (e.g., small UI taps or success tick).
   static void light() {
+    if (!enabled) return;
     if (_isIOS) {
       _safe(() => HFP.Haptics.vibrate(HFP.HapticsType.light));
     } else if (_isAndroid) {
@@ -21,6 +26,7 @@ class Haptics {
 
   /// Medium tap feedback (e.g., opening/closing drawer, toggles).
   static void medium() {
+    if (!enabled) return;
     if (_isIOS) {
       _safe(() => HFP.Haptics.vibrate(HFP.HapticsType.medium));
     } else if (_isAndroid) {
@@ -29,6 +35,7 @@ class Haptics {
   }
 
   static void soft() {
+    if (!enabled) return;
     if (_isIOS) {
       _safe(() => HFP.Haptics.vibrate(HFP.HapticsType.soft));
     } else if (_isAndroid) {
@@ -39,6 +46,7 @@ class Haptics {
 
   /// Drawer-specific pulse; tuned to feel present but not harsh.
   static void drawerPulse() {
+    if (!enabled) return;
     if (_isIOS) {
       _safe(() => HFP.Haptics.vibrate(HFP.HapticsType.soft));
     } else if (_isAndroid) {

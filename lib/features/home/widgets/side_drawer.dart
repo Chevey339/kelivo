@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:characters/characters.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
@@ -27,6 +28,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/avatar_cache.dart';
 import 'dart:ui' as ui;
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../core/services/haptics.dart';
+import '../../../desktop/desktop_context_menu.dart';
+import '../../../desktop/menu_anchor.dart';
 
 class SideDrawer extends StatefulWidget {
   const SideDrawer({
@@ -39,6 +44,7 @@ class SideDrawer extends StatefulWidget {
     this.loadingConversationIds = const <String>{},
     this.embedded = false,
     this.embeddedWidth,
+    this.showBottomBar = true,
   });
 
   final String userName;
@@ -49,17 +55,21 @@ class SideDrawer extends StatefulWidget {
   final Set<String> loadingConversationIds;
   final bool embedded; // when true, render as a fixed side panel instead of a Drawer
   final double? embeddedWidth; // optional explicit width for embedded mode
+  final bool showBottomBar; // desktop can hide this bottom area
 
   @override
   State<SideDrawer> createState() => _SideDrawerState();
 }
 
-class _SideDrawerState extends State<SideDrawer> {
+class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
+  bool get _isDesktop => defaultTargetPlatform == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.linux;
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   final GlobalKey _assistantTileKey = GlobalKey();
   OverlayEntry? _assistantPickerEntry;
   ValueNotifier<int>? _closeTicker;
+  bool _assistantsExpanded = false;
+  final ScrollController _listController = ScrollController();
 
   // Assistant avatar renderer shared across drawer views
   Widget _assistantAvatar(BuildContext context, Assistant? a, {double size = 28, VoidCallback? onTap}) {
@@ -192,68 +202,165 @@ class _SideDrawerState extends State<SideDrawer> {
     // Update check moved to app startup (main.dart)
   }
 
-  void _showChatMenu(BuildContext context, ChatItem chat) async {
+  void _showChatMenu(BuildContext context, ChatItem chat, {Offset? anchor}) async {
     final l10n = AppLocalizations.of(context)!;
     final chatService = context.read<ChatService>();
     final isPinned = chatService.getConversation(chat.id)?.isPinned ?? false;
+    final isDesktop = defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.linux;
+
+    if (isDesktop) {
+      // Desktop: glass anchored menu near cursor/button
+      Offset pos = anchor ?? DesktopMenuAnchor.positionOrCenter(context);
+      await showDesktopContextMenuAt(
+        context,
+        globalPosition: pos,
+        items: [
+          DesktopContextMenuItem(
+            icon: Lucide.Edit,
+            label: l10n.sideDrawerMenuRename,
+            onTap: () async { await _renameChat(context, chat); },
+          ),
+          DesktopContextMenuItem(
+            icon: Lucide.Pin,
+            label: isPinned ? l10n.sideDrawerMenuUnpin : l10n.sideDrawerMenuPin,
+            onTap: () async { await chatService.togglePinConversation(chat.id); },
+          ),
+          DesktopContextMenuItem(
+            icon: Lucide.RefreshCw,
+            label: l10n.sideDrawerMenuRegenerateTitle,
+            onTap: () async { await _regenerateTitle(context, chat.id); },
+          ),
+          DesktopContextMenuItem(
+            icon: Lucide.Trash2,
+            label: l10n.sideDrawerMenuDelete,
+            danger: true,
+            onTap: () async {
+              final deletingCurrent = chatService.currentConversationId == chat.id;
+              await chatService.deleteConversation(chat.id);
+              showAppSnackBar(
+                context,
+                message: l10n.sideDrawerDeleteSnackbar(chat.title),
+                type: NotificationType.success,
+                duration: const Duration(seconds: 3),
+              );
+              if (deletingCurrent || chatService.currentConversationId == null) {
+                widget.onNewConversation?.call();
+              }
+              Navigator.of(context).maybePop();
+            },
+          ),
+        ],
+      );
+      return;
+    }
+
     await showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        final maxH = MediaQuery.of(ctx).size.height * 0.8;
+        Widget row({required IconData icon, required String label, Color? color, required Future<void> Function() action}) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: SizedBox(
+              height: 48,
+              child: IosCardPress(
+                borderRadius: BorderRadius.circular(14),
+                baseColor: cs.surface,
+                duration: const Duration(milliseconds: 260),
+                onTap: () async {
+                  Haptics.light();
+                  Navigator.of(ctx).pop();
+                  await Future<void>.delayed(const Duration(milliseconds: 10));
+                  await action();
+                },
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 20, color: color ?? cs.onSurface),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: color ?? cs.onSurface),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(Lucide.Edit, size: 20),
-                title: Text(l10n.sideDrawerMenuRename),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  _renameChat(context, chat);
-                },
+          top: false,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxH),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: cs.onSurface.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    row(
+                      icon: Lucide.Edit,
+                      label: l10n.sideDrawerMenuRename,
+                      action: () async { _renameChat(context, chat); },
+                    ),
+                    row(
+                      icon: Lucide.Pin,
+                      label: isPinned ? l10n.sideDrawerMenuUnpin : l10n.sideDrawerMenuPin,
+                      action: () async { await chatService.togglePinConversation(chat.id); },
+                    ),
+                    row(
+                      icon: Lucide.RefreshCw,
+                      label: l10n.sideDrawerMenuRegenerateTitle,
+                      action: () async { await _regenerateTitle(context, chat.id); },
+                    ),
+                    row(
+                      icon: Lucide.Trash,
+                      label: l10n.sideDrawerMenuDelete,
+                      color: Colors.redAccent,
+                      action: () async {
+                        final deletingCurrent = chatService.currentConversationId == chat.id;
+                        await chatService.deleteConversation(chat.id);
+                        showAppSnackBar(
+                          context,
+                          message: l10n.sideDrawerDeleteSnackbar(chat.title),
+                          type: NotificationType.success,
+                          duration: const Duration(seconds: 3),
+                        );
+                        if (deletingCurrent || chatService.currentConversationId == null) {
+                          widget.onNewConversation?.call();
+                        }
+                        Navigator.of(context).maybePop();
+                      },
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                ),
               ),
-              ListTile(
-                leading: Icon(Lucide.Pin, size: 20),
-                title: Text(isPinned ? l10n.sideDrawerMenuUnpin : l10n.sideDrawerMenuPin),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  await chatService.togglePinConversation(chat.id);
-                },
-              ),
-              ListTile(
-                leading: Icon(Lucide.RefreshCw, size: 20),
-                title: Text(l10n.sideDrawerMenuRegenerateTitle),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  await _regenerateTitle(context, chat.id);
-                },
-              ),
-              ListTile(
-                leading: Icon(Lucide.Trash, size: 20, color: Colors.redAccent),
-                title: Text(l10n.sideDrawerMenuDelete, style: const TextStyle(color: Colors.redAccent)),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  final deletingCurrent = chatService.currentConversationId == chat.id;
-                  await chatService.deleteConversation(chat.id);
-                  // Show simple snackbar (no undo)
-                  showAppSnackBar(
-                    context,
-                    message: l10n.sideDrawerDeleteSnackbar(chat.title),
-                    type: NotificationType.success,
-                    duration: const Duration(seconds: 3),
-                  );
-                  // If the deleted one was the current selection, trigger host's new-topic (draft) flow
-                  if (deletingCurrent || chatService.currentConversationId == null) {
-                    widget.onNewConversation?.call();
-                  }
-                  // Close the drawer, return to main page
-                  Navigator.of(context).maybePop();
-                },
-              ),
-            ],
+            ),
           ),
         );
       },
@@ -324,6 +431,7 @@ class _SideDrawerState extends State<SideDrawer> {
     _assistantPickerEntry = null;
     _closeTicker?.removeListener(_handleCloseTick);
     _searchController.dispose();
+    _listController.dispose();
     super.dispose();
   }
 
@@ -553,11 +661,16 @@ class _SideDrawerState extends State<SideDrawer> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // 历史按钮（圆形，无文字）
-                      ClipOval(
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
+                      // 历史按钮（圆形，无水波纹）
+                      SizedBox(
+                        width: 45,
+                        height: 45,
+                        child: Center(
+                          child: IosIconButton(
+                            size: 22,
+                            color: textBase,
+                            icon: Lucide.History,
+                            padding: const EdgeInsets.all(10),
                             onTap: () async {
                               final selectedId = await Navigator.of(context).push<String>(
                                 MaterialPageRoute(builder: (_) => ChatHistoryPage(assistantId: currentAssistantId)),
@@ -566,13 +679,6 @@ class _SideDrawerState extends State<SideDrawer> {
                                 widget.onSelectConversation?.call(selectedId);
                               }
                             },
-                            child: SizedBox(
-                              width: 45,
-                              height: 45,
-                              child: Center(
-                                child: Icon(Lucide.History, size: 22, color: textBase),
-                              ),
-                            ),
                           ),
                         ),
                       ),
@@ -584,11 +690,10 @@ class _SideDrawerState extends State<SideDrawer> {
                   // 当前助手区域（固定）
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: Material(
+                    child: KeyedSubtree(
                       key: _assistantTileKey,
-                      color: widget.embedded ? Colors.transparent : cs.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      child: InkWell(
+                      child: IosCardPress(
+                        baseColor: widget.embedded ? Colors.transparent : cs.surface,
                         borderRadius: BorderRadius.circular(16),
                         onTap: _toggleAssistantPicker,
                         onLongPress: () {
@@ -600,49 +705,41 @@ class _SideDrawerState extends State<SideDrawer> {
                             );
                           }
                         },
-                        child: Padding(
-                            padding: const EdgeInsets.fromLTRB(4, 6, 12, 6),
-                            child: Row(
-                              children: [
-                              _assistantAvatar(
-                                context,
-                                ap.currentAssistant,
-                                size: 32,
-                                // onTap: () {
-                                //   final id = context.read<AssistantProvider>().currentAssistantId;
-                                //   if (id != null) {
-                                //     Navigator.of(context).push(
-                                //       MaterialPageRoute(builder: (_) => AssistantSettingsEditPage(assistantId: id)),
-                                //     );
-                                //   }
-                                // },
+                        padding: const EdgeInsets.fromLTRB(4, 6, 12, 6),
+                        child: Row(
+                          children: [
+                            _assistantAvatar(
+                              context,
+                              ap.currentAssistant,
+                              size: 32,
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                (ap.currentAssistant?.name ?? widget.assistantName),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: textBase),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Text(
-                                  (ap.currentAssistant?.name ?? widget.assistantName),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: textBase),
-                                ),
+                            ),
+                            const SizedBox(width: 8),
+                            AnimatedRotation(
+                              turns: _assistantsExpanded ? 0.5 : 0.0,
+                              duration: const Duration(milliseconds: 350),
+                              curve: Curves.easeOutCubic,
+                              child: Icon(
+                                Lucide.ChevronDown,
+                                size: 18,
+                                color: textBase.withOpacity(0.7),
                               ),
-                              const SizedBox(width: 8),
-                              AnimatedRotation(
-                                turns: _assistantPickerEntry != null ? 0.5 : 0.0,
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeOutCubic,
-                                child: Icon(
-                                  Lucide.ChevronDown,
-                                  size: 18,
-                                  color: textBase.withOpacity(0.7),
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
+
+                  // 注意：内联助手列表已移动至下方可滚动区域
                 ],
               ),
             ),
@@ -650,10 +747,83 @@ class _SideDrawerState extends State<SideDrawer> {
             // Scrollable conversation list below fixed header
             Expanded(
               child: ListView(
+                controller: _listController,
                 // Reduce side paddings to extend tile backgrounds while
                 // keeping text position unchanged (compensated in tile padding)
-                padding: const EdgeInsets.fromLTRB(10, 4, 10, 16),
+                padding: EdgeInsets.fromLTRB(
+                  10,
+                  (context.watch<SettingsProvider>().showChatListDate || _assistantsExpanded) ? 4 : 10,
+                  10,
+                  16,
+                ),
                 children: [
+                  // 助手列表（内联、与话题一体滚动）
+                  // 要求：助手列表仅淡入/淡出；下方话题区域需要被顺滑推开
+                  // 方案：外层 AnimatedSize 负责高度过渡（推开下方内容），内层 AnimatedSwitcher 仅做淡入淡出
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeInOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                      child: !_assistantsExpanded
+                          ? const SizedBox.shrink()
+                          : Builder(
+                              key: const ValueKey('assistants-inline'),
+                              builder: (context) {
+                                final ap2 = context.watch<AssistantProvider>();
+                                final assistants = ap2.assistants;
+                                final isDark2 = Theme.of(context).brightness == Brightness.dark;
+                                final textBase2 = isDark2 ? Colors.white : Colors.black;
+                                return Padding(
+                                  padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
+                                  child: ListView.builder(
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    itemCount: assistants.length,
+                                    itemBuilder: (ctx, i) {
+                                      final a = assistants[i];
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                        child: IosCardPress(
+                                          baseColor: widget.embedded ? Colors.transparent : Theme.of(context).colorScheme.surface,
+                                          borderRadius: BorderRadius.circular(16),
+                                          haptics: false,
+                                          onTap: () => _handleSelectAssistant(a),
+                                          padding: const EdgeInsets.fromLTRB(4, 6, 12, 6),
+                                          child: Row(
+                                            children: [
+                                              _assistantAvatar(context, a, size: 32),
+                                              const SizedBox(width: 16),
+                                              Expanded(
+                                                child: Text(
+                                                  a.name,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: textBase2),
+                                                ),
+                                              ),
+                                              IosIconButton(
+                                                size: 18,
+                                                color: textBase2.withOpacity(0.7),
+                                                icon: Lucide.Pencil,
+                                                padding: const EdgeInsets.all(8),
+                                                onTap: () => _openAssistantSettings(a.id),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ),
                   // Update banner under search box
                   Builder(builder: (context) {
                     final settings = context.watch<SettingsProvider>();
@@ -764,21 +934,23 @@ class _SideDrawerState extends State<SideDrawer> {
                                   loading: widget.loadingConversationIds.contains(chat.id),
                                   onTap: () => widget.onSelectConversation?.call(chat.id),
                                   onLongPress: () => _showChatMenu(context, chat),
+                                  onSecondaryTap: (pos) => _showChatMenu(context, chat, anchor: pos),
                                 ),
                             ],
                           ),
                           const SizedBox(height: 8),
                         ],
                         for (final group in groups) ...[
-                          Padding(
-                            // Keep label text aligned with tiles (8 outer + 16 inner = 24)
-                            padding: const EdgeInsets.fromLTRB(14, 6, 0, 6),
-                            child: Text(
-                              group.label,
-                              textAlign: TextAlign.left,
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.primary),
+                          if (context.watch<SettingsProvider>().showChatListDate)
+                            Padding(
+                              // Keep label text aligned with tiles (8 outer + 16 inner = 24)
+                              padding: const EdgeInsets.fromLTRB(14, 6, 0, 6),
+                              child: Text(
+                                group.label,
+                                textAlign: TextAlign.left,
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.primary),
+                              ),
                             ),
-                          ),
                           Column(
                             children: [
                               for (final chat in group.items)
@@ -789,10 +961,12 @@ class _SideDrawerState extends State<SideDrawer> {
                                   loading: widget.loadingConversationIds.contains(chat.id),
                                   onTap: () => widget.onSelectConversation?.call(chat.id),
                                   onLongPress: () => _showChatMenu(context, chat),
+                                  onSecondaryTap: (pos) => _showChatMenu(context, chat, anchor: pos),
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          if (context.watch<SettingsProvider>().showChatListDate)
+                            const SizedBox(height: 8),
                         ],
                       ],
                     ),
@@ -801,8 +975,7 @@ class _SideDrawerState extends State<SideDrawer> {
               ),
             ),
 
-            // 底部工具栏（固定）
-            Container(
+            if (widget.showBottomBar && (!widget.embedded || !_isDesktop)) Container(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
               decoration: BoxDecoration(
                 color: widget.embedded ? Colors.transparent : cs.surface,
@@ -813,9 +986,9 @@ class _SideDrawerState extends State<SideDrawer> {
                   Row(
                     children: [
                       const SizedBox(width: 6),
-                      // 用户头像（可点击更换）
-                      InkWell(
-                        customBorder: const CircleBorder(),
+                      // 用户头像（可点击更换）—移除水波纹
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
                         onTap: () => _editAvatar(context),
                         child: avatarWidget(
                           widget.userName,
@@ -826,41 +999,45 @@ class _SideDrawerState extends State<SideDrawer> {
                       const SizedBox(width: 20),
                       // 用户名称（可点击编辑，垂直居中）
                       Expanded(
-                        child: InkWell(
+                        child: IosCardPress(
                           borderRadius: BorderRadius.circular(6),
+                          baseColor: Colors.transparent,
                           onTap: () => _editUserName(context),
-                          child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 0),
+                          child: SizedBox(
                             height: 45,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              widget.userName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: textBase,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                widget.userName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: textBase,
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // 设置按钮（圆形，无文字）
-                      ClipOval(
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
+                      // 设置按钮（圆形，无水波纹）
+                      SizedBox(
+                        width: 45,
+                        height: 45,
+                        child: Center(
+                          child: IosIconButton(
+                            size: 22,
+                            color: textBase,
+                            icon: Lucide.Settings,
+                            padding: const EdgeInsets.all(10),
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(builder: (_) => const SettingsPage()),
                               );
                             },
-                            child: SizedBox(
-                              width: 45,
-                              height: 45,
-                              child: Center(child: Icon(Lucide.Settings, size: 22, color: textBase)),
-                            ),
                           ),
                         ),
                       ),
@@ -923,18 +1100,31 @@ class _SideDrawerState extends State<SideDrawer> {
   }
 
   void _toggleAssistantPicker() {
-    if (_assistantPickerEntry != null) {
-      _closeAssistantPicker();
-    } else {
-      _showAssistantPickerOverlay();
+    final goingToExpand = !_assistantsExpanded;
+    setState(() {
+      _assistantsExpanded = goingToExpand;
+    });
+    if (goingToExpand) {
+      // Smoothly reveal the assistant list at the top
+      if (_listController.hasClients) {
+        // Slight delay to ensure layout is ready before animating
+        Future<void>.delayed(const Duration(milliseconds: 10), () {
+          if (!_listController.hasClients) return;
+          _listController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 420),
+            curve: Curves.easeOutCubic,
+          );
+        });
+      }
     }
   }
 
   void _closeAssistantPicker() {
-    if (_assistantPickerEntry == null) return;
-    _assistantPickerEntry?.remove();
-    _assistantPickerEntry = null;
-    if (mounted) setState(() {});
+    if (!_assistantsExpanded) return;
+    setState(() {
+      _assistantsExpanded = false;
+    });
   }
 
   Future<void> _handleSelectAssistant(Assistant assistant) async {
@@ -953,219 +1143,6 @@ class _SideDrawerState extends State<SideDrawer> {
     );
   }
 
-  void _showAssistantPickerOverlay() {
-    final overlay = Overlay.of(context);
-    if (overlay == null) return;
-    final tileBox = _assistantTileKey.currentContext?.findRenderObject() as RenderBox?;
-    final overlayBox = overlay.context.findRenderObject() as RenderBox?;
-    if (tileBox == null || overlayBox == null) return;
-
-    final offset = tileBox.localToGlobal(Offset.zero, ancestor: overlayBox);
-    final size = tileBox.size;
-
-    final assistants = List<Assistant>.from(context.read<AssistantProvider>().assistants);
-    final currentId = context.read<AssistantProvider>().currentAssistantId;
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    final screenSize = MediaQuery.of(context).size;
-
-    const double headerHeight = 56;
-    const double rowExtent = 58;
-    const double listExtraPadding = 24;
-    final double maxHeight = screenSize.height * 0.6;
-    final double availableBody = math.max(0.0, maxHeight - headerHeight);
-    final double bodyHeight;
-    if (assistants.isEmpty) {
-      if (availableBody <= 0) {
-        bodyHeight = 0;
-      } else if (availableBody < 80.0) {
-        bodyHeight = availableBody;
-      } else {
-        bodyHeight = math.min(availableBody, 140.0);
-      }
-    } else {
-      bodyHeight = math.min(availableBody, assistants.length * rowExtent + listExtraPadding);
-    }
-    final double totalHeight = math.min(maxHeight, headerHeight + bodyHeight);
-
-    double top = offset.dy + size.height + 8;
-    if (top + totalHeight > screenSize.height - 16) {
-      top = math.max(16, screenSize.height - totalHeight - 16);
-    }
-    double left = offset.dx;
-    final double width = size.width;
-    if (left + width > screenSize.width - 16) {
-      left = math.max(16, screenSize.width - width - 16);
-    }
-
-    _assistantPickerEntry = OverlayEntry(
-      builder: (ctx) {
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: _closeAssistantPicker,
-              ),
-            ),
-            Positioned(
-              left: left,
-              top: top,
-              width: width,
-              child: Material(
-                color: Colors.transparent,
-                child: Animate(
-                  effects: [
-                    FadeEffect(duration: 180.ms, curve: Curves.easeOutCubic),
-                    SlideEffect(begin: const Offset(0, -0.04), end: Offset.zero, duration: 220.ms, curve: Curves.easeOutCubic),
-                  ],
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: cs.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.12),
-                          blurRadius: 18,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: SizedBox(
-                      height: totalHeight,
-                      child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 6, 12, 2),
-                          child: Row(
-                            children: [
-                              Icon(Lucide.Bot, size: 18, color: cs.primary),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  l10n.sideDrawerChooseAssistantTitle,
-                                  style: const TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              IconButton(
-                                tooltip: l10n.assistantProviderNewAssistantName,
-                                icon: Icon(Lucide.Plus, size: 18, color: cs.primary),
-                                onPressed: () async {
-                                  _closeAssistantPicker();
-                                  final id = await context.read<AssistantProvider>().addAssistant(context: context);
-                                  if (!mounted) return;
-                                  await Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => AssistantSettingsEditPage(assistantId: id)),
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        // const SizedBox(height: 1),
-                        if (assistants.isEmpty)
-                          Expanded(
-                            child: Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Text(
-                                  l10n.sideDrawerChooseAssistantTitle,
-                                  style: TextStyle(color: cs.onSurface.withOpacity(0.6)),
-                                ),
-                              ),
-                            ),
-                          )
-                        else
-                          Expanded(
-                            child: ListView.builder(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              itemCount: assistants.length,
-                              physics: const ClampingScrollPhysics(),
-                              itemBuilder: (ctx, index) {
-                                final assistant = assistants[index];
-                                final selected = assistant.id == currentId;
-                                final tile = Padding(
-                                  padding: EdgeInsets.fromLTRB(
-                                    8,
-                                    index == 0 ? 2.0 : 1.5,
-                                    8,
-                                    index == assistants.length - 1 ? 2.0 : 1.5,
-                                  ),
-                                  child: Material(
-                                    color: selected ? cs.primary.withOpacity(0.12) : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(12),
-                                      splashColor: cs.primary.withOpacity(0.16),
-                                      highlightColor: cs.primary.withOpacity(0.10),
-                                      onTap: () => _handleSelectAssistant(assistant),
-                                    child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
-                                        child: Row(
-                                          children: [
-                                            _assistantAvatar(
-                                              context,
-                                              assistant,
-                                              size: 28,
-                                              // onTap: () => _openAssistantSettings(assistant.id),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Text(
-                                                assistant.name,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w500,
-                                                  color: cs.onSurface,
-                                                ),
-                                              ),
-                                            ),
-                                            IconButton(
-                                              tooltip: l10n.assistantSettingsEditButton,
-                                              icon: Icon(
-                                                Lucide.Pencil,
-                                                size: 18,
-                                                color: cs.onSurface.withOpacity(0.6),
-                                              ),
-                                              splashRadius: 18,
-                                              onPressed: () => _openAssistantSettings(assistant.id),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ).animate(
-                                  delay: (index * 40).ms,
-                                ).fadeIn(
-                                  duration: 200.ms,
-                                  curve: Curves.easeOutCubic,
-                                ).slideY(
-                                  begin: 0.08,
-                                  end: 0,
-                                  duration: 240.ms,
-                                  curve: Curves.easeOutCubic,
-                                );
-                                return tile;
-                              },
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            )],
-        );
-      },
-    );
-
-    overlay.insert(_assistantPickerEntry!);
-    if (mounted) setState(() {});
-  }
 }
 
 extension on _SideDrawerState {
@@ -1173,55 +1150,75 @@ extension on _SideDrawerState {
     final l10n = AppLocalizations.of(context)!;
     await showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        final maxH = MediaQuery.of(ctx).size.height * 0.8;
+        Widget row(String text, VoidCallback onTap) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: SizedBox(
+              height: 48,
+              child: IosCardPress(
+                borderRadius: BorderRadius.circular(14),
+                baseColor: cs.surface,
+                duration: const Duration(milliseconds: 260),
+                onTap: () async {
+                  Haptics.light();
+                  Navigator.of(ctx).pop();
+                  await Future<void>.delayed(const Duration(milliseconds: 10));
+                  onTap();
+                },
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                ),
+              ),
+            ),
+          );
+        }
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: Text(l10n.sideDrawerChooseImage),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  await _pickLocalImage(context);
-                },
+          top: false,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxH),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: cs.onSurface.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    row(l10n.sideDrawerChooseImage, () async { await _pickLocalImage(context); }),
+                    row(l10n.sideDrawerChooseEmoji, () async {
+                      final emoji = await _pickEmoji(context);
+                      if (emoji != null) {
+                        await context.read<UserProvider>().setAvatarEmoji(emoji);
+                      }
+                    }),
+                    row(l10n.sideDrawerEnterLink, () async { await _inputAvatarUrl(context); }),
+                    row(l10n.sideDrawerImportFromQQ, () async { await _inputQQAvatar(context); }),
+                    row(l10n.sideDrawerReset, () async { await context.read<UserProvider>().resetAvatar(); }),
+                    const SizedBox(height: 4),
+                  ],
+                ),
               ),
-              ListTile(
-                title: Text(l10n.sideDrawerChooseEmoji),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  final emoji = await _pickEmoji(context);
-                  if (emoji != null) {
-                    await context.read<UserProvider>().setAvatarEmoji(emoji);
-                  }
-                },
-              ),
-              ListTile(
-                title: Text(l10n.sideDrawerEnterLink),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  await _inputAvatarUrl(context);
-                },
-              ),
-              ListTile(
-                title: Text(l10n.sideDrawerImportFromQQ),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  await _inputQQAvatar(context);
-                },
-              ),
-              ListTile(
-                title: Text(l10n.sideDrawerReset),
-                onTap: () async {
-                  Navigator.of(ctx).pop();
-                  await context.read<UserProvider>().resetAvatar();
-                },
-              ),
-              const SizedBox(height: 4),
-            ],
+            ),
           ),
         );
       },
@@ -1700,12 +1697,13 @@ class _ChatGroup {
   _ChatGroup({required this.label, required this.items});
 }
 
-class _ChatTile extends StatelessWidget {
+class _ChatTile extends StatefulWidget {
   const _ChatTile({
     required this.chat,
     required this.textColor,
     this.onTap,
     this.onLongPress,
+    this.onSecondaryTap,
     this.selected = false,
     this.loading = false,
   });
@@ -1714,8 +1712,17 @@ class _ChatTile extends StatelessWidget {
   final Color textColor;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final void Function(Offset globalPosition)? onSecondaryTap;
   final bool selected;
   final bool loading;
+
+  @override
+  State<_ChatTile> createState() => _ChatTileState();
+}
+
+class _ChatTileState extends State<_ChatTile> {
+  bool _hovered = false;
+  bool get _isDesktop => defaultTargetPlatform == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.linux;
 
   @override
   Widget build(BuildContext context) {
@@ -1724,37 +1731,51 @@ class _ChatTile extends StatelessWidget {
     final Color tileColor;
     if (embedded) {
       // In tablet embedded mode, keep selected highlight, others transparent
-      tileColor = selected ? cs.primary.withOpacity(0.16) : Colors.transparent;
+      tileColor = widget.selected ? cs.primary.withOpacity(0.16) : Colors.transparent;
     } else {
-      tileColor = selected ? cs.primary.withOpacity(0.12) : cs.surface;
+      tileColor = widget.selected ? cs.primary.withOpacity(0.12) : cs.surface;
     }
+    final base = _isDesktop && !widget.selected && _hovered
+        ? (embedded ? cs.primary.withOpacity(0.08) : cs.surface.withOpacity(0.9))
+        : tileColor;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: tileColor,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: GestureDetector(
+        onSecondaryTapDown: (details) {
+          if (_isDesktop) {
+            widget.onSecondaryTap?.call(details.globalPosition);
+          }
+        },
+        onLongPress: () {
+          if (_isDesktop) return;
+          widget.onLongPress?.call();
+        },
+        child: MouseRegion(
+          onEnter: (_) { if (_isDesktop) setState(() => _hovered = true); },
+          onExit: (_) { if (_isDesktop) setState(() => _hovered = false); },
+          cursor: _isDesktop ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        child: IosCardPress(
+          baseColor: base,
           borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          onLongPress: onLongPress,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-            child: Row(
+          haptics: false,
+          onTap: widget.onTap,
+          onLongPress: _isDesktop ? null : widget.onLongPress,
+          padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+          child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    chat.title,
+                    widget.chat.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 15,
-                      color: textColor,
+                      color: widget.textColor,
                       fontWeight: FontWeight.w400,
                     ),
                   ),
                 ),
-                if (loading) ...[
+                if (widget.loading) ...[
                   const SizedBox(width: 8),
                   _LoadingDot(),
                 ],

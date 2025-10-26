@@ -377,6 +377,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditClearButton => 'Clear';
 
   @override
+  String get desktopNavChatTooltip => 'Chat';
+
+  @override
+  String get desktopNavTranslateTooltip => 'Translate';
+
+  @override
+  String get desktopNavThemeToggleTooltip => 'Theme';
+
+  @override
+  String get desktopNavSettingsTooltip => 'Settings';
+
+  @override
+  String get desktopAvatarMenuUseEmoji => 'Use emoji';
+
+  @override
+  String get desktopAvatarMenuChangeFromImage => 'Change from image…';
+
+  @override
+  String get desktopAvatarMenuReset => 'Reset avatar';
+
+  @override
   String get assistantEditAvatarChooseImage => 'Choose Image';
 
   @override
@@ -1108,6 +1129,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Render LaTeX math (inline and block)';
 
   @override
+  String get displaySettingsPageEnableUserMarkdownTitle =>
+      'Render user messages with Markdown';
+
+  @override
+  String get displaySettingsPageEnableReasoningMarkdownTitle =>
+      'Render reasoning (thinking) with Markdown';
+
+  @override
   String get messageExportSheetFormatTitle => 'Export Format';
 
   @override
@@ -1131,6 +1160,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get messageExportSheetBatchExportImageSubtitle =>
       'Render selected messages to a PNG image';
+
+  @override
+  String get messageExportSheetShowThinkingAndToolCards =>
+      'Show Deep Thinking and tool cards';
+
+  @override
+  String get messageExportSheetShowThinkingContent => 'Show thinking content';
 
   @override
   String get messageExportSheetDateTimeWithSecondsPattern =>
@@ -2185,6 +2221,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Collapse reasoning after finish';
 
   @override
+  String get displaySettingsPageShowChatListDateTitle => 'Show Chat List Dates';
+
+  @override
+  String get displaySettingsPageShowChatListDateSubtitle =>
+      'Display date group labels in the conversation list';
+
+  @override
   String get displaySettingsPageShowUpdatesTitle => 'Show Updates';
 
   @override
@@ -2205,6 +2248,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageHapticsOnSidebarSubtitle =>
       'Enable haptic feedback when opening/closing sidebar';
+
+  @override
+  String get displaySettingsPageHapticsGlobalTitle => 'Global Haptics';
+
+  @override
+  String get displaySettingsPageHapticsIosSwitchTitle => 'Haptics on Switch';
+
+  @override
+  String get displaySettingsPageHapticsOnListItemTapTitle =>
+      'Haptics on List Items';
+
+  @override
+  String get displaySettingsPageHapticsOnCardTapTitle => 'Haptics on Cards';
 
   @override
   String get displaySettingsPageHapticsOnGenerateTitle => 'Haptics on Generate';
@@ -2235,7 +2291,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'This is a sample chat text';
 
   @override
+  String get displaySettingsPageChatBackgroundMaskTitle =>
+      'Chat Background Overlay Opacity';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => 'Theme Settings';
+
+  @override
+  String get displaySettingsPageThemeColorTitle => 'Theme Color';
+
+  @override
+  String get desktopSettingsFontsTitle => 'Fonts';
+
+  @override
+  String get displaySettingsPageOtherSettingsTitle => 'Other';
 
   @override
   String get themeSettingsPageDynamicColorSection => 'Dynamic Color';
@@ -2405,6 +2474,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchServiceNameJina => 'Jina';
 
   @override
+  String get searchServiceNamePerplexity => 'Perplexity';
+
+  @override
+  String get searchProviderPerplexityDescription =>
+      'Perplexity Search API. Ranked web results with region and domain filters.';
+
+  @override
+  String get searchServiceNameBocha => 'Bocha';
+
+  @override
+  String get searchProviderBochaDescription =>
+      'Bocha web search API. Accurate web results with optional summaries.';
+
+  @override
   String get generationInterrupted => 'Generation interrupted';
 
   @override
@@ -2461,6 +2544,38 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditManageQuickPhraseButton => 'Manage Quick Phrases';
+
+  @override
+  String get assistantEditPageMemoryTab => 'Memory';
+
+  @override
+  String get assistantEditMemorySwitchTitle => 'Memory';
+
+  @override
+  String get assistantEditMemorySwitchDescription =>
+      'Allow the assistant to create and use memories across chats.';
+
+  @override
+  String get assistantEditRecentChatsSwitchTitle => 'Recent Chats Reference';
+
+  @override
+  String get assistantEditRecentChatsSwitchDescription =>
+      'Include recent conversation titles to help with context.';
+
+  @override
+  String get assistantEditManageMemoryTitle => 'Manage Memories';
+
+  @override
+  String get assistantEditAddMemoryButton => 'Add Memory';
+
+  @override
+  String get assistantEditMemoryEmpty => 'No memories yet';
+
+  @override
+  String get assistantEditMemoryDialogTitle => 'Memory';
+
+  @override
+  String get assistantEditMemoryDialogHint => 'Enter memory content';
 
   @override
   String get assistantEditAddQuickPhraseButton => 'Add Quick Phrase';

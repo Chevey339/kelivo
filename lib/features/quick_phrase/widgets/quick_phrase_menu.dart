@@ -4,6 +4,8 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../core/models/quick_phrase.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../core/services/haptics.dart';
 
 class QuickPhraseMenu extends StatelessWidget {
   const QuickPhraseMenu({
@@ -92,67 +94,59 @@ class QuickPhraseMenu extends StatelessWidget {
                       //   color: cs.outlineVariant.withOpacity(0.2),
                       // ),
                       Flexible(
-                        child: ListView.separated(
+                        child: ListView.builder(
                           shrinkWrap: true,
                           padding: EdgeInsets.zero,
                           itemCount: phrases.length,
-                          separatorBuilder: (_, __) => Divider(
-                            height: 1,
-                            thickness: 1,
-                            indent: 16,
-                            endIndent: 16,
-                            color: cs.outlineVariant.withOpacity(0.15),
-                          ),
                           itemBuilder: (context, index) {
                             final phrase = phrases[index];
-                            return Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: () => onSelect(phrase),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            phrase.isGlobal
-                                                ? Lucide.Zap
-                                                : Lucide.botMessageSquare,
-                                            size: 14,
-                                            color: cs.primary.withOpacity(0.7),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Expanded(
-                                            child: Text(
-                                              phrase.title,
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        phrase.content,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: cs.onSurface.withOpacity(0.6),
+                            return IosCardPress(
+                              borderRadius: BorderRadius.zero,
+                              baseColor: Colors.transparent,
+                              onTap: () {
+                                try { Haptics.light(); } catch (_) {}
+                                onSelect(phrase);
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          phrase.isGlobal ? Lucide.Zap : Lucide.botMessageSquare,
+                                          size: 14,
+                                          color: cs.primary.withOpacity(0.7),
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            phrase.title,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      phrase.content,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurface.withOpacity(0.6),
                                       ),
-                                    ],
-                                  ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
                                 ),
                               ),
                             );

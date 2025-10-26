@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class IosCheckbox extends StatefulWidget {
@@ -45,6 +46,8 @@ class _IosCheckboxState extends State<IosCheckbox> {
   @override
   Widget build(BuildContext context) {
     final brightness = CupertinoTheme.brightnessOf(context);
+    final materialTheme = Theme.of(context);
+    final cs = materialTheme.colorScheme;
     final activeColor = widget.activeColor ?? CupertinoTheme.of(context).primaryColor;
     final borderColor = widget.borderColor ?? (brightness == Brightness.dark
         ? CupertinoColors.systemGrey3
@@ -53,6 +56,17 @@ class _IosCheckboxState extends State<IosCheckbox> {
     final bool enabled = widget.onChanged != null;
     final Color bgColor = widget.value ? activeColor : CupertinoColors.transparent;
     final Color effectiveBorderColor = widget.value ? activeColor : borderColor;
+    // Dynamically compute check color similar to providers multi-select:
+    // - If using theme primary, use `onPrimary` for best contrast.
+    // - If a custom activeColor is provided, compute contrast by brightness.
+    Color _contrastOn(Color bg) {
+      final b = ThemeData.estimateBrightnessForColor(bg);
+      return b == Brightness.dark ? CupertinoColors.white : CupertinoColors.black;
+    }
+    final bool usesThemePrimary = widget.activeColor == null;
+    final Color computedOnPrimary = cs.onPrimary;
+    final Color dynamicCheck = usesThemePrimary ? computedOnPrimary : _contrastOn(activeColor);
+    final Color effectiveCheckColor = dynamicCheck.withOpacity((widget.onChanged != null) ? 1.0 : 0.5);
 
     final double visualSize = widget.size;
     final double tapSize = math.max(widget.hitTestSize, visualSize);
@@ -92,20 +106,10 @@ class _IosCheckboxState extends State<IosCheckbox> {
                     color: enabled ? effectiveBorderColor : effectiveBorderColor.withOpacity(0.5),
                     width: widget.borderWidth,
                   ),
-                  boxShadow: widget.value
-                      ? [
-                          // Subtle glow when selected
-                          BoxShadow(
-                            color: activeColor.withOpacity(0.25),
-                            blurRadius: 8,
-                            spreadRadius: 0.5,
-                          ),
-                        ]
-                      : null,
                 ),
                 child: _AnimatedCheck(
                   show: widget.value,
-                  color: widget.checkmarkColor,
+                  color: effectiveCheckColor,
                   strokeWidth: math.max(2.0, widget.borderWidth + 0.5),
                 ),
               ),
@@ -197,4 +201,3 @@ class _CheckPainter extends CustomPainter {
         oldDelegate.strokeWidth != strokeWidth;
   }
 }
-
