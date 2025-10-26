@@ -68,6 +68,7 @@ import '../../quick_phrase/widgets/quick_phrase_menu.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/typing_indicator.dart';
+import '../../../shared/widgets/animated_loading_text.dart';
 
 
 class HomePage extends StatefulWidget {
@@ -794,6 +795,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       })(),
       closePickerTicker: _assistantPickerCloseTick,
       loadingConversationIds: _loadingConversationIds,
+      showBottomBar: true,
         onSelectConversation: (id) {
           _switchConversationAnimated(id);
         },
@@ -3495,20 +3497,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             final cs = Theme.of(context).colorScheme;
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  DotsTypingIndicator(color: cs.primary, dotSize: 8, gap: 4),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    AppLocalizations.of(context)!.chatMessageWidgetThinking,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: cs.onSurface.withOpacity(0.55),
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  )
-                                ],
+                              child: AnimatedLoadingText(
+                                text: AppLocalizations.of(context)!.chatMessageWidgetThinking,
+                                textStyle: TextStyle(
+                                  fontSize: 13,
+                                  color: cs.onSurface.withOpacity(0.6),
+                                  fontStyle: FontStyle.italic,
+                                ),
+                                dotSize: 8,
+                                dotGap: 4,
+                                style: LoadingTextStyle.modern, // 使用现代风格
                               ),
                             );
                           }

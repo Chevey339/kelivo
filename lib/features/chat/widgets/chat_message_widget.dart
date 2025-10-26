@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform, kIsWeb;
 import '../../../core/services/haptics.dart';
 import 'package:flutter/scheduler.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../desktop/desktop_context_menu.dart';
+import '../../../desktop/menu_anchor.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'dart:io' show File;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:open_filex/open_filex.dart';
 // import 'package:easy_image_viewer/easy_image_viewer.dart';
 import 'dart:convert';
@@ -21,6 +24,7 @@ import '../../../utils/avatar_cache.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
 import '../../../shared/widgets/typing_indicator.dart';
+import '../../../shared/widgets/animated_loading_text.dart';
 import '../../../shared/widgets/snackbar.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../l10n/app_localizations.dart';
@@ -1005,19 +1009,16 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           Container(
             width: double.infinity,
             child: widget.message.isStreaming && contentWithoutThink.isEmpty
-                ? Row(
-                    children: [
-                      DotsTypingIndicator(color: cs.primary, dotSize: 8, gap: 3),
-                      const SizedBox(width: 8),
-                      Text(
-                        l10n.chatMessageWidgetThinking,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: cs.onSurface.withOpacity(0.5),
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
+                ? AnimatedLoadingText(
+                    text: l10n.chatMessageWidgetThinking,
+                    textStyle: TextStyle(
+                      fontSize: 14,
+                      color: cs.onSurface.withOpacity(0.6),
+                      fontStyle: FontStyle.italic,
+                    ),
+                    dotSize: 8,
+                    dotGap: 3,
+                    style: LoadingTextStyle.modern, // 可以切换为 shimmer, pulse, typewriter, modern
                   )
                 : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2103,14 +2104,12 @@ class _ReasoningSectionState extends State<_ReasoningSection> with SingleTickerP
     final bool isLoading = loading;
     final display = _sanitize(widget.text);
 
-// 未加载：不要再指定 color: fg，让它继承和“加载中”相同的颜色
+// 未加载：不要再指定 color: fg，让它继承和"加载中"相同的颜色
     Widget body = Padding(
       padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
-      child: Text(
-        display.isNotEmpty ? display : '…',
-        style: baseStyle,                  // 统一
-        strutStyle: baseStrut,             // 统一
-        textHeightBehavior: baseTHB,       // 统一
+      child: MarkdownWithCodeHighlight(
+        text: display.isNotEmpty ? display : '…',
+        baseStyle: baseStyle,
       ),
     );
 
@@ -2148,11 +2147,9 @@ class _ReasoningSectionState extends State<_ReasoningSection> with SingleTickerP
               child: SingleChildScrollView(
                 controller: _scroll,
                 physics: const BouncingScrollPhysics(),
-                child: Text(
-                  display.isNotEmpty ? display : '…',
-                  style: baseStyle,            // 统一
-                  strutStyle: baseStrut,       // 统一
-                  textHeightBehavior: baseTHB, // 统一
+                child: MarkdownWithCodeHighlight(
+                  text: display.isNotEmpty ? display : '…',
+                  baseStyle: baseStyle,
                 ),
               ),
             ),
@@ -2160,11 +2157,9 @@ class _ReasoningSectionState extends State<_ReasoningSection> with SingleTickerP
               : SingleChildScrollView(
             controller: _scroll,
             physics: const NeverScrollableScrollPhysics(),
-            child: Text(
-              display.isNotEmpty ? display : '…',
-              style: baseStyle,            // 统一（原来是 12）
-              strutStyle: baseStrut,
-              textHeightBehavior: baseTHB,
+            child: MarkdownWithCodeHighlight(
+              text: display.isNotEmpty ? display : '…',
+              baseStyle: baseStyle,
             ),
           ),
         ),

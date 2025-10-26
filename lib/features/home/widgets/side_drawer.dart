@@ -975,7 +975,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               ),
             ),
 
-            if (widget.showBottomBar && (!widget.embedded || !_isDesktop)) Container(
+            if (widget.showBottomBar) Container(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
               decoration: BoxDecoration(
                 color: widget.embedded ? Colors.transparent : cs.surface,

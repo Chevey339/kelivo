@@ -1817,23 +1817,11 @@ class _ExportThinkingCard extends StatelessWidget {
           if (expanded)
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
-              child: Text(
-                cleanedText,
-                style: const TextStyle(
+              child: MarkdownWithCodeHighlight(
+                text: cleanedText,
+                baseStyle: const TextStyle(
                   fontSize: 12.5,
                   height: 1.32,
-                  leadingDistribution: TextLeadingDistribution.proportional,
-                ),
-                strutStyle: const StrutStyle(
-                  forceStrutHeight: true,
-                  fontSize: 12.5,
-                  height: 1.32,
-                  leading: 0,
-                ),
-                textHeightBehavior: const TextHeightBehavior(
-                  applyHeightToFirstAscent: false,
-                  applyHeightToLastDescent: false,
-                  leadingDistribution: TextLeadingDistribution.proportional,
                 ),
               ),
             ),
