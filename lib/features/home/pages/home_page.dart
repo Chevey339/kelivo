@@ -48,7 +48,8 @@ import 'package:flutter/rendering.dart';
 import 'dart:ui' as ui;
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import 'dart:io';
+import 'dart:io' show File, Directory;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
@@ -62,6 +63,7 @@ import '../../../core/providers/quick_phrase_provider.dart';
 import '../../quick_phrase/widgets/quick_phrase_menu.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
+import '../../../shared/widgets/typing_indicator.dart';
 
 
 class HomePage extends StatefulWidget {
@@ -192,14 +194,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     Widget? bg;
     if (bgRaw.isNotEmpty) {
       if (bgRaw.startsWith('http')) {
-        bg = Image.network(bgRaw, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink());
+            bg = Image.network(bgRaw, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink());
       } else {
         try {
           final fixed = SandboxPathResolver.fix(bgRaw);
-          final f = File(fixed);
-          if (f.existsSync()) {
-            bg = Image(image: FileImage(f), fit: BoxFit.cover);
-          }
+              if (!kIsWeb) {
+                final f = File(fixed);
+                if (f.existsSync()) {
+                  bg = Image(image: FileImage(f), fit: BoxFit.cover);
+                }
+              }
         } catch (_) {}
       }
     }
@@ -858,7 +862,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           _loadVersionSelections();
           _restoreMessageUiState();
         });
-        _scrollToBottomSoon();
+        // Only auto-scroll if用户未主动滚动
+        if (!_isUserScrolling) _scrollToBottomSoon();
       }
     }
   }
@@ -881,7 +886,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         });
         // Ensure list lays out, then jump to bottom while hidden
         try { await WidgetsBinding.instance.endOfFrame; } catch (_) {}
-        _scrollToBottom();
+        if (!_isUserScrolling) _scrollToBottom();
       }
     }
     if (mounted) {
@@ -936,7 +941,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       final paths = await _copyPickedFiles(files);
       if (paths.isNotEmpty) {
         _mediaController.addImages(paths);
-        _scrollToBottomSoon();
+        if (!_isUserScrolling) _scrollToBottomSoon();
       }
     } catch (_) {}
   }
@@ -949,7 +954,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       final paths = await _copyPickedFiles([file]);
       if (paths.isNotEmpty) {
         _mediaController.addImages(paths);
-        _scrollToBottomSoon();
+        if (!_isUserScrolling) _scrollToBottomSoon();
       }
     } catch (_) {}
   }
@@ -992,7 +997,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       }
       if (docs.isNotEmpty) {
         _mediaController.addFiles(docs);
-        _scrollToBottomSoon();
+        if (!_isUserScrolling) _scrollToBottomSoon();
       }
     } catch (_) {}
   }
@@ -1015,7 +1020,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       _toolParts.clear();
       _reasoningSegments.clear();
     });
-    _scrollToBottomSoon();
+    if (!_isUserScrolling) _scrollToBottomSoon();
   }
 
   Future<void> _sendMessage(ChatInputData input) async {
@@ -1057,7 +1062,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
     // 延迟滚动确保UI更新完成
     Future.delayed(const Duration(milliseconds: 100), () {
-      _scrollToBottom();
+      if (!_isUserScrolling) _scrollToBottom();
     });
 
     // Create assistant message placeholder
@@ -1098,7 +1103,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
     // 添加助手消息后也滚动到底部
     Future.delayed(const Duration(milliseconds: 100), () {
-      _scrollToBottom();
+      if (!_isUserScrolling) _scrollToBottom();
     });
 
     // Prepare messages for API
@@ -1569,7 +1574,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             if (mounted && _currentConversation?.id == _cidForStream) setState(() {
               _toolParts[assistantMessage.id] = _dedupeToolPartsList(parts);
             });
-            _scrollToBottomSoon();
+            if (!_isUserScrolling) _scrollToBottomSoon();
           }
 
           if (chunk.isDone) {
@@ -1687,7 +1692,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
               // 滚动到底部显示新内容
               Future.delayed(const Duration(milliseconds: 50), () {
-                _scrollToBottom();
+                if (!_isUserScrolling) _scrollToBottom();
               });
             }
           }
@@ -2265,7 +2270,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           try { await _chatService.upsertToolEvent(assistantMessage.id, id: r.id, name: r.name, arguments: r.arguments, content: r.content); } catch (_) {}
         }
         setState(() => _toolParts[assistantMessage.id] = _dedupeToolPartsList(parts));
-        _scrollToBottomSoon();
+        if (!_isUserScrolling) _scrollToBottomSoon();
       }
 
       if (chunk.content.isNotEmpty) {
@@ -3098,6 +3103,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             if (bg.startsWith('http')) {
               provider = NetworkImage(bg);
             } else {
+              if (kIsWeb) return const SizedBox.shrink();
               final localPath = SandboxPathResolver.fix(bg);
               final file = File(localPath);
               if (!file.existsSync()) return const SizedBox.shrink();
@@ -3171,12 +3177,35 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         }
                         truncCollapsed = count - 1;
                       }
+                      final bool listLoadingTail = _isCurrentConversationLoading;
                       final list = ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.only(bottom: 16, top: 8),
-                        itemCount: messages.length,
+                        itemCount: messages.length + (listLoadingTail ? 1 : 0),
                         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                         itemBuilder: (context, index) {
+                          // tail loading row
+                          if (listLoadingTail && index == messages.length) {
+                            final cs = Theme.of(context).colorScheme;
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  DotsTypingIndicator(color: cs.primary, dotSize: 8, gap: 4),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    AppLocalizations.of(context)!.chatMessageWidgetThinking,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: cs.onSurface.withOpacity(0.55),
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  )
+                                ],
+                              ),
+                            );
+                          }
                           if (index < 0 || index >= messages.length) {
                             return const SizedBox.shrink();
                           }

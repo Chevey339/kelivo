@@ -7,6 +7,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/rendering.dart';
@@ -1186,8 +1187,11 @@ class _AssistantAvatarSmall extends StatelessWidget {
           future: AvatarCache.getPath(av),
           builder: (ctx, snap) {
             final p = snap.data;
-            if (p != null && File(p).existsSync()) {
+            if (p != null && !kIsWeb && File(p).existsSync()) {
               return ClipOval(child: Image.file(File(p), width: size, height: size, fit: BoxFit.cover));
+            }
+            if (p != null && kIsWeb && p.startsWith('data:')) {
+              return ClipOval(child: Image.network(p, width: size, height: size, fit: BoxFit.cover));
             }
             return ClipOval(
               child: Image.network(av, width: size, height: size, fit: BoxFit.cover,
@@ -1196,7 +1200,7 @@ class _AssistantAvatarSmall extends StatelessWidget {
           },
         );
       }
-      if (av.startsWith('/') || av.contains(':')) {
+      if (!kIsWeb && (av.startsWith('/') || av.contains(':'))) {
         final fixed = SandboxPathResolver.fix(av);
         return ClipOval(child: Image.file(File(fixed), width: size, height: size, fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => _assistantInitial(cs, assistant?.name ?? '')));

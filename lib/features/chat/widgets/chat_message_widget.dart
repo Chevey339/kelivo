@@ -5,7 +5,8 @@ import '../../../core/services/haptics.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
-import 'dart:io';
+import 'dart:io' show File;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:open_filex/open_filex.dart';
 // import 'package:easy_image_viewer/easy_image_viewer.dart';
 import 'dart:convert';
@@ -19,6 +20,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
+import '../../../shared/widgets/typing_indicator.dart';
 import '../../../shared/widgets/snackbar.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../l10n/app_localizations.dart';
@@ -402,42 +404,68 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         future: AvatarCache.getPath(url),
         builder: (ctx, snap) {
           final p = snap.data;
-          if (p != null && File(p).existsSync()) {
-            return ClipOval(
-              child: Image.file(
-                File(p),
-                width: 32,
-                height: 32,
-                fit: BoxFit.cover,
+          if (p != null && !kIsWeb && File(p).existsSync()) {
+            return SizedBox(
+              width: 32,
+              height: 32,
+              child: ClipOval(
+                child: Image.file(
+                  File(p),
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.cover,
+                ),
               ),
             );
           }
-          return ClipOval(
-            child: Image.network(
-              url,
+          if (p != null && kIsWeb && p.startsWith('data:')) {
+            return SizedBox(
               width: 32,
               height: 32,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Icon(
-                Lucide.User,
-                size: 18,
-                color: cs.primary,
+              child: ClipOval(
+                child: Image.network(
+                  p,
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            );
+          }
+          return SizedBox(
+            width: 32,
+            height: 32,
+            child: ClipOval(
+              child: Image.network(
+                url,
+                width: 32,
+                height: 32,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Icon(
+                  Lucide.User,
+                  size: 18,
+                  color: cs.primary,
+                ),
               ),
             ),
           );
         },
       );
-    } else if (userProvider.avatarType == 'file' && userProvider.avatarValue != null) {
-      avatarContent = ClipOval(
-        child: Image.file(
-          File(SandboxPathResolver.fix(userProvider.avatarValue!)),
-          width: 32,
-          height: 32,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Icon(
-            Lucide.User,
-            size: 18,
-            color: cs.primary,
+    } else if (userProvider.avatarType == 'file' && userProvider.avatarValue != null && !kIsWeb) {
+      avatarContent = SizedBox(
+        width: 32,
+        height: 32,
+        child: ClipOval(
+          child: Image.file(
+            File(SandboxPathResolver.fix(userProvider.avatarValue!)),
+            width: 32,
+            height: 32,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Icon(
+              Lucide.User,
+              size: 18,
+              color: cs.primary,
+            ),
           ),
         ),
       );
@@ -609,18 +637,25 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               borderRadius: BorderRadius.circular(8),
                               child: Hero(
                                 tag: 'img:$p',
-                                child: Image.file(
-                                  File(SandboxPathResolver.fix(p)),
-                                  width: 96,
-                                  height: 96,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    width: 96,
-                                    height: 96,
-                                    color: Colors.black12,
-                                    child: const Icon(Icons.broken_image),
-                                  ),
-                                ),
+                                child: kIsWeb
+                                    ? Container(
+                                        width: 96,
+                                        height: 96,
+                                        color: Colors.black12,
+                                        child: const Icon(Icons.image_not_supported),
+                                      )
+                                    : Image.file(
+                                        File(SandboxPathResolver.fix(p)),
+                                        width: 96,
+                                        height: 96,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          width: 96,
+                                          height: 96,
+                                          color: Colors.black12,
+                                          child: const Icon(Icons.broken_image),
+                                        ),
+                                      ),
                               ),
                             ),
                           ),
@@ -971,28 +1006,31 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             width: double.infinity,
             child: widget.message.isStreaming && contentWithoutThink.isEmpty
                 ? Row(
-              children: [
-                _LoadingIndicator(),
-                const SizedBox(width: 8),
-                Text(
-                  l10n.chatMessageWidgetThinking,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: cs.onSurface.withOpacity(0.5),
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
-            )
+                    children: [
+                      DotsTypingIndicator(color: cs.primary, dotSize: 8, gap: 3),
+                      const SizedBox(width: 8),
+                      Text(
+                        l10n.chatMessageWidgetThinking,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: cs.onSurface.withOpacity(0.5),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  )
                 : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                 SelectionArea(
                   child: DefaultTextStyle.merge(
                     style: const TextStyle(fontSize: 15.7, height: 1.5),
-                    child: MarkdownWithCodeHighlight(
-                      text: contentWithoutThink,
-                      onCitationTap: (id) => _handleCitationTap(id),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: double.infinity),
+                      child: MarkdownWithCodeHighlight(
+                        text: contentWithoutThink,
+                        onCitationTap: (id) => _handleCitationTap(id),
+                      ),
                     ),
                   ),
                 ),
@@ -1000,7 +1038,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 if (widget.message.isStreaming)
                   Padding(
                     padding: const EdgeInsets.only(left: 4),
-                    child: _LoadingIndicator(),
+                    child: DotsTypingIndicator(color: cs.primary, dotSize: 7, gap: 3),
                   ),
                 // Translation section (collapsible)
                 if (widget.message.translation != null && widget.message.translation!.isNotEmpty) ...[
@@ -1097,72 +1135,74 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               onTap: () => _showCitationsSheet(_latestSearchItems()),
             ),
           ],
-          // Action buttons
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              IconButton(
-                icon: Icon(Lucide.Copy, size: 16),
-                onPressed: widget.onCopy ?? () {
-                  Clipboard.setData(ClipboardData(text: widget.message.content));
-                  showAppSnackBar(
-                    context,
-                    message: l10n.chatMessageWidgetCopiedToClipboard,
-                    type: NotificationType.success,
-                  );
-                },
-                visualDensity: VisualDensity.compact,
-                iconSize: 16,
-              ),
-              IconButton(
-                icon: Icon(Lucide.RefreshCw, size: 16),
-                onPressed: widget.onRegenerate,
-                tooltip: l10n.chatMessageWidgetRegenerateTooltip,
-                visualDensity: VisualDensity.compact,
-                iconSize: 16,
-              ),
-              Consumer<TtsProvider>(
-                builder: (context, tts, _) => IconButton(
-                  icon: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: FadeTransition(opacity: anim, child: child)),
-                    child: Icon(
-                      tts.isSpeaking ? Lucide.CircleStop : Lucide.Volume2,
-                      key: ValueKey(tts.isSpeaking ? 'stop' : 'speak'),
-                      size: 16,
-                    ),
-                  ),
-                  onPressed: widget.onSpeak,
-                  tooltip: tts.isSpeaking ? l10n.chatMessageWidgetStopTooltip : l10n.chatMessageWidgetSpeakTooltip,
+          // Action buttons（生成中隐藏，完成后显示）
+          if (!widget.message.isStreaming) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                IconButton(
+                  icon: Icon(Lucide.Copy, size: 16),
+                  onPressed: widget.onCopy ?? () {
+                    Clipboard.setData(ClipboardData(text: widget.message.content));
+                    showAppSnackBar(
+                      context,
+                      message: l10n.chatMessageWidgetCopiedToClipboard,
+                      type: NotificationType.success,
+                    );
+                  },
                   visualDensity: VisualDensity.compact,
                   iconSize: 16,
                 ),
-              ),
-              IconButton(
-                icon: Icon(Lucide.Languages, size: 16),
-                onPressed: widget.onTranslate,
-                tooltip: l10n.chatMessageWidgetTranslateTooltip,
-                visualDensity: VisualDensity.compact,
-                iconSize: 16,
-              ),
-              IconButton(
-                icon: Icon(Lucide.Ellipsis, size: 16),
-                onPressed: widget.onMore,
-                tooltip: l10n.chatMessageWidgetMoreTooltip,
-                visualDensity: VisualDensity.compact,
-                iconSize: 16,
-              ),
-              if ((widget.versionCount ?? 1) > 1) ...[
-                const SizedBox(width: 6),
-                _BranchSelector(
-                  index: widget.versionIndex ?? 0,
-                  total: widget.versionCount ?? 1,
-                  onPrev: widget.onPrevVersion,
-                  onNext: widget.onNextVersion,
+                IconButton(
+                  icon: Icon(Lucide.RefreshCw, size: 16),
+                  onPressed: widget.onRegenerate,
+                  tooltip: l10n.chatMessageWidgetRegenerateTooltip,
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 16,
                 ),
+                Consumer<TtsProvider>(
+                  builder: (context, tts, _) => IconButton(
+                    icon: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: FadeTransition(opacity: anim, child: child)),
+                      child: Icon(
+                        tts.isSpeaking ? Lucide.CircleStop : Lucide.Volume2,
+                        key: ValueKey(tts.isSpeaking ? 'stop' : 'speak'),
+                        size: 16,
+                      ),
+                    ),
+                    onPressed: widget.onSpeak,
+                    tooltip: tts.isSpeaking ? l10n.chatMessageWidgetStopTooltip : l10n.chatMessageWidgetSpeakTooltip,
+                    visualDensity: VisualDensity.compact,
+                    iconSize: 16,
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Lucide.Languages, size: 16),
+                  onPressed: widget.onTranslate,
+                  tooltip: l10n.chatMessageWidgetTranslateTooltip,
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 16,
+                ),
+                IconButton(
+                  icon: Icon(Lucide.Ellipsis, size: 16),
+                  onPressed: widget.onMore,
+                  tooltip: l10n.chatMessageWidgetMoreTooltip,
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 16,
+                ),
+                if ((widget.versionCount ?? 1) > 1) ...[
+                  const SizedBox(width: 6),
+                  _BranchSelector(
+                    index: widget.versionIndex ?? 0,
+                    total: widget.versionCount ?? 1,
+                    onPrev: widget.onPrevVersion,
+                    onNext: widget.onNextVersion,
+                  ),
+                ],
               ],
-            ],
-          ),
+            ),
+          ],
         ],
       ),
     );
@@ -1297,10 +1337,20 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           future: AvatarCache.getPath(av),
           builder: (ctx, snap) {
             final p = snap.data;
-            if (p != null && File(p).existsSync()) {
+            if (p != null && !kIsWeb && File(p).existsSync()) {
               return ClipOval(
                 child: Image.file(
                   File(p),
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.cover,
+                ),
+              );
+            }
+            if (p != null && kIsWeb && p.startsWith('data:')) {
+              return ClipOval(
+                child: Image.network(
+                  p,
                   width: 32,
                   height: 32,
                   fit: BoxFit.cover,
@@ -1319,7 +1369,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           },
         );
       }
-      if (av.startsWith('/') || av.contains(':')) {
+      if (!kIsWeb && (av.startsWith('/') || av.contains(':'))) {
         final fixed = SandboxPathResolver.fix(av);
         return ClipOval(
           child: Image.file(File(fixed), width: 32, height: 32, fit: BoxFit.cover,

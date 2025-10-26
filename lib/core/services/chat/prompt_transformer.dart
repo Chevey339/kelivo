@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../models/assistant.dart';
 import '../../providers/settings_provider.dart';
@@ -17,8 +18,8 @@ class PromptTransformer {
     final date = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final time = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     final dt = '$date $time';
-    final os = Platform.operatingSystem;
-    final osv = Platform.operatingSystemVersion;
+    final os = kIsWeb ? 'web' : Platform.operatingSystem;
+    final osv = kIsWeb ? 'unknown' : Platform.operatingSystemVersion;
     final device = os; // Simple fallback; can be extended with device_info plugins
     final battery = 'unknown';
 

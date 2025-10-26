@@ -654,10 +654,20 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
             future: AvatarCache.getPath(av),
             builder: (ctx, snap) {
               final p = snap.data;
-              if (p != null && File(p).existsSync()) {
+              if (p != null && !kIsWeb && File(p).existsSync()) {
                 return ClipOval(
                   child: Image.file(
                     File(p),
+                    width: size,
+                    height: size,
+                    fit: BoxFit.cover,
+                  ),
+                );
+              }
+              if (p != null && kIsWeb && p.startsWith('data:')) {
+                return ClipOval(
+                  child: Image.network(
+                    p,
                     width: size,
                     height: size,
                     fit: BoxFit.cover,
@@ -674,7 +684,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
               );
             },
           );
-        } else if (av.startsWith('/') || av.contains(':')) {
+        } else if (!kIsWeb && (av.startsWith('/') || av.contains(':'))) {
           final fixed = SandboxPathResolver.fix(av);
           inner = ClipOval(
             child: Image.file(
@@ -1558,10 +1568,12 @@ class _BackgroundPreviewState extends State<_BackgroundPreview> {
     final isNetwork = widget.path.startsWith('http');
     final imageWidget = isNetwork
         ? Image.network(widget.path, fit: BoxFit.contain)
-        : Image.file(
-            File(SandboxPathResolver.fix(widget.path)),
-            fit: BoxFit.contain,
-          );
+        : (kIsWeb
+            ? const SizedBox.shrink()
+            : Image.file(
+                File(SandboxPathResolver.fix(widget.path)),
+                fit: BoxFit.contain,
+              ));
     // When size known, maintain aspect ratio; otherwise cap the height to avoid overflow
     if (_size != null && _size!.width > 0 && _size!.height > 0) {
       final ratio = _size!.width / _size!.height;

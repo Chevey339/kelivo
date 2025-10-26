@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart';
@@ -169,10 +170,12 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                                     side: BorderSide(color: cs.outline.withOpacity(0.08)),
                                   ),
                                   clipBehavior: Clip.antiAlias,
-                                  child: Image.file(
-                                    widget.file,
-                                    fit: BoxFit.contain,
-                                  ),
+                                  child: kIsWeb
+                                      ? const SizedBox.shrink() // Web does not support Image.file
+                                      : Image.file(
+                                          widget.file,
+                                          fit: BoxFit.contain,
+                                        ),
                                 ),
                                 const SizedBox(height: 80), // leave space for action bar overlap, outside the card
                               ],

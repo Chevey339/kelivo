@@ -393,7 +393,7 @@ class _AssistantAvatar extends StatelessWidget {
           future: AvatarCache.getPath(av),
           builder: (ctx, snap) {
             final p = snap.data;
-            if (p != null && File(p).existsSync()) {
+              if (p != null && !kIsWeb && File(p).existsSync()) {
               return ClipOval(
                 child: Image(
                   image: FileImage(File(p)),
@@ -403,6 +403,11 @@ class _AssistantAvatar extends StatelessWidget {
                 ),
               );
             }
+              if (p != null && kIsWeb && p.startsWith('data:')) {
+                return ClipOval(
+                  child: Image.network(p, width: size, height: size, fit: BoxFit.cover),
+                );
+              }
             return ClipOval(
               child: Image.network(
                 av,
@@ -414,7 +419,7 @@ class _AssistantAvatar extends StatelessWidget {
             );
           },
         );
-      } else if (!kIsWeb && (av.startsWith('/') || av.contains(':'))) {
+        } else if (!kIsWeb && (av.startsWith('/') || av.contains(':'))) {
         final fixed = SandboxPathResolver.fix(av);
         return ClipOval(
           child: Image(

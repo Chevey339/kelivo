@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:vector_math/vector_math_64.dart' show Vector3;
@@ -109,6 +110,10 @@ class _ImageViewerPageState extends State<ImageViewerPage> with TickerProviderSt
           return MemoryImage(base64Decode(b64));
         }
       } catch (_) {}
+    }
+    if (kIsWeb) {
+      // On web, local file paths are not supported
+      return const AssetImage('assets/placeholder.png'); // or return null if you prefer
     }
     final fixed = SandboxPathResolver.fix(src);
     // Use a FileImage with a unique key per path so Hero tags remain stable

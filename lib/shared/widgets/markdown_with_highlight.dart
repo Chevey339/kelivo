@@ -9,6 +9,7 @@ import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
 import '../../icons/lucide_adapter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:convert';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../features/chat/pages/image_viewer_page.dart';
@@ -116,11 +117,18 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
           },
           child: LayoutBuilder(
             builder: (context, constraints) {
+              final media = MediaQuery.of(context);
+              final screenW = media.size.width;
+              final bounded = constraints.hasBoundedWidth && constraints.maxWidth.isFinite;
+              // Clamp to viewport width to satisfy Image size assertions
+              final double w = (bounded ? constraints.maxWidth : screenW).clamp(0.0, screenW);
               return ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image(
+                child: (provider == null)
+                    ? const SizedBox.shrink()
+                    : Image(
                   image: provider,
-                  width: constraints.maxWidth,
+                  width: w,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stack) => const Icon(Icons.broken_image),
                 ),
@@ -517,7 +525,7 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
         .toList();
   }
 
-  static ImageProvider _imageProviderFor(String src) {
+  static ImageProvider? _imageProviderFor(String src) {
     if (src.startsWith('http://') || src.startsWith('https://')) {
       return NetworkImage(src);
     }
@@ -530,6 +538,10 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
           return MemoryImage(base64Decode(b64));
         }
       } catch (_) {}
+    }
+    if (kIsWeb) {
+      // Web: avoid Image.file assertions
+      return null;
     }
     final fixed = SandboxPathResolver.fix(src);
     return FileImage(File(fixed));

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
@@ -68,5 +69,6 @@ class BackupProvider extends ChangeNotifier {
 
   Future<File> exportToFile() => _dataSync.exportToFile(_cfg);
   Future<void> restoreFromLocalFile(File file, {RestoreMode mode = RestoreMode.overwrite}) => _dataSync.restoreFromLocalFile(file, _cfg, mode: mode);
+  Future<void> restoreFromLocalBytes(Uint8List bytes, {RestoreMode mode = RestoreMode.overwrite}) => _dataSync.restoreFromLocalBytes(bytes, _cfg, mode: mode);
 }
 

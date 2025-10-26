@@ -3,7 +3,11 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:html' as html;
 import 'dart:js_util' as js_util;
-import 'dart:ui' as ui; // ignore: uri_does_not_exist
+// Flutter 3.22+ 使用 dart:ui_web 的 platformViewRegistry，旧版本为 dart:ui 的隐藏前缀。
+// 这里做兼容导入，优先使用 ui_web。
+// ignore: uri_does_not_exist
+// ignore: uri_does_not_exist
+import 'dart:ui_web' as ui_web;
 import 'package:flutter/widgets.dart';
 import 'mermaid_cache.dart';
 
@@ -43,8 +47,9 @@ MermaidViewHandle? createMermaidView(String code, bool dark, {Map<String, String
 
   final viewType = 'mermaid-view-${DateTime.now().microsecondsSinceEpoch}-${_viewSeq++}';
   container.id = viewType;
-  // ignore: undefined_prefixed_name
-  ui.platformViewRegistry.registerViewFactory(viewType, (int id) => container);
+  // 注册 HTML view：在新版 web SDK 使用 ui_web.platformViewRegistry。
+  // Web SDK: 使用 ui_web.platformViewRegistry 注册工厂
+  ui_web.platformViewRegistry.registerViewFactory(viewType, (int id) => container);
   _containers[viewType] = container;
 
   // Ensure Mermaid script is present, then initialize and render this node.

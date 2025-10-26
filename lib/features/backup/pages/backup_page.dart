@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -424,16 +426,36 @@ class _BackupPageState extends State<BackupPage> {
 
   Future<void> _doImportLocal(BuildContext context, BackupProvider vm) async {
     final l10n = AppLocalizations.of(context)!;
-    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip']);
-    final path = result?.files.single.path;
-    if (path == null) return;
+    // Prefer reading bytes to be web-safe; fallback to path on native.
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip'], withData: true);
+    final file = result?.files.single;
+    if (file == null) return;
     
     if (!mounted) return;
     final mode = await _chooseImportModeDialog(context);
     
     if (mode == null) return;
     
-    await _runWithImportingOverlay(context, () => vm.restoreFromLocalFile(File(path), mode: mode));
+    // Prefer bytes; if null, try readStream; only fall back to File(path) on non-web
+    Uint8List? pickedBytes = file.bytes;
+    if (pickedBytes == null && file.readStream != null) {
+      final chunks = <int>[];
+      await for (final chunk in file.readStream!) {
+        chunks.addAll(chunk);
+      }
+      pickedBytes = Uint8List.fromList(chunks);
+    }
+
+    if (pickedBytes != null && pickedBytes.isNotEmpty) {
+      await _runWithImportingOverlay(context, () => vm.restoreFromLocalBytes(pickedBytes!, mode: mode));
+    } else {
+      final path = file.path;
+      if (path == null || kIsWeb) {
+        showAppSnackBar(context, message: l10n.backupPageNotSupportedYet, type: NotificationType.error);
+        return;
+      }
+      await _runWithImportingOverlay(context, () => vm.restoreFromLocalFile(File(path), mode: mode));
+    }
     if (!mounted) return;
     await showDialog(
       context: context,

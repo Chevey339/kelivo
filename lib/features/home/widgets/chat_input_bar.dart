@@ -11,7 +11,10 @@ import 'package:path/path.dart' as p;
 import '../../../shared/responsive/breakpoints.dart';
 import 'dart:async';
 
-import 'dart:io';
+import 'dart:io' show File, Directory, Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../core/models/chat_input_data.dart';
 import '../../../utils/clipboard_images.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -208,7 +211,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
     // Enhance hardware keyboard behavior
     final w = MediaQuery.sizeOf(node.context!).width;
     final isTabletOrDesktop = w >= AppBreakpoints.tablet;
-    final isIosTablet = Platform.isIOS && isTabletOrDesktop;
+    final isIosTablet = (!kIsWeb) && Platform.isIOS && isTabletOrDesktop;
 
     final isDown = event is RawKeyDownEvent;
     final key = event.logicalKey;
@@ -468,17 +471,35 @@ class _ChatInputBarState extends State<ChatInputBar> {
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(10),
-                          child: Image.file(
-                            File(path),
+                          child: SizedBox(
                             width: 64,
                             height: 64,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              width: 64,
-                              height: 64,
-                              color: Colors.black12,
-                              child: const Icon(Icons.broken_image),
-                            ),
+                            child: kIsWeb && path.startsWith('data:')
+                                ? Image.memory(
+                                    base64Decode(path.substring(path.indexOf('base64,') + 7)),
+                                    width: 64,
+                                    height: 64,
+                                    fit: BoxFit.cover,
+                                  )
+                                : (kIsWeb
+                                    ? Container(
+                                        width: 64,
+                                        height: 64,
+                                        color: Colors.grey.shade300,
+                                        child: const Icon(Icons.image_not_supported),
+                                      )
+                                    : Image.file(
+                                        File(path),
+                                        width: 64,
+                                        height: 64,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          width: 64,
+                                          height: 64,
+                                          color: Colors.black12,
+                                          child: const Icon(Icons.broken_image),
+                                        ),
+                                      )),
                           ),
                         ),
                         Positioned(
@@ -538,9 +559,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
                       // On iOS, show "Send" on the return key and submit on tap.
                       // Still keep multiline so pasted text preserves line breaks.
                       keyboardType: TextInputType.multiline,
-                      textInputAction: Platform.isIOS ? TextInputAction.send : TextInputAction.newline,
-                      onSubmitted: Platform.isIOS ? (_) => _handleSend() : null,
-                      contextMenuBuilder: Platform.isIOS
+                      textInputAction: (!kIsWeb && Platform.isIOS) ? TextInputAction.send : TextInputAction.newline,
+                      onSubmitted: (!kIsWeb && Platform.isIOS) ? (_) => _handleSend() : null,
+                      contextMenuBuilder: (!kIsWeb && Platform.isIOS)
                           ? (BuildContext context, EditableTextState state) {
                               final l10n = AppLocalizations.of(context)!;
                               return AdaptiveTextSelectionToolbar.buttonItems(

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -35,7 +36,9 @@ class _AboutPageState extends State<AboutPage> {
   Future<void> _loadInfo() async {
     final pkg = await PackageInfo.fromPlatform();
     String sys;
-    if (Platform.isAndroid) {
+    if (kIsWeb) {
+      sys = 'Web';
+    } else if (Platform.isAndroid) {
       sys = 'Android';
     } else if (Platform.isIOS) {
       sys = 'iOS';

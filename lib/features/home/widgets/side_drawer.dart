@@ -75,10 +75,20 @@ class _SideDrawerState extends State<SideDrawer> {
             future: AvatarCache.getPath(av),
             builder: (ctx, snap) {
               final p = snap.data;
-              if (p != null && File(p).existsSync()) {
+              if (p != null && !kIsWeb && File(p).existsSync()) {
                 return ClipOval(
                   child: Image(
                     image: FileImage(File(p)),
+                    width: size,
+                    height: size,
+                    fit: BoxFit.cover,
+                  ),
+                );
+              }
+              if (p != null && kIsWeb && p.startsWith('data:')) {
+                return ClipOval(
+                  child: Image.network(
+                    p,
                     width: size,
                     height: size,
                     fit: BoxFit.cover,

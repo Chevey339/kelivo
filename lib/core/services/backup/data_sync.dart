@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:archive/archive_io.dart';
 import 'package:archive/archive.dart';
@@ -267,6 +269,10 @@ class DataSync {
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('Download failed: ${res.statusCode}');
     }
+    if (kIsWeb) {
+      await _restoreFromZipBytes(res.bodyBytes, cfg, mode: mode);
+      return;
+    }
     final tmpDir = await getTemporaryDirectory();
     final file = File(p.join(tmpDir.path, item.displayName));
     await file.writeAsBytes(res.bodyBytes);
@@ -288,6 +294,11 @@ class DataSync {
   Future<void> restoreFromLocalFile(File file, WebDavConfig cfg, {RestoreMode mode = RestoreMode.overwrite}) async {
     if (!await file.exists()) throw Exception('备份文件不存在');
     await _restoreFromBackupFile(file, cfg, mode: mode);
+  }
+
+  // For web: restore directly from bytes (selected via FilePicker for web)
+  Future<void> restoreFromLocalBytes(Uint8List bytes, WebDavConfig cfg, {RestoreMode mode = RestoreMode.overwrite}) async {
+    await _restoreFromZipBytes(bytes, cfg, mode: mode);
   }
 
   // ===== Internal helpers =====
@@ -709,6 +720,74 @@ class DataSync {
     }
 
     try { await extractDir.delete(recursive: true); } catch (_) {}
+  }
+
+  Future<void> _restoreFromZipBytes(Uint8List bytes, WebDavConfig cfg, {RestoreMode mode = RestoreMode.overwrite}) async {
+    // Decode archive and process JSON parts directly; skip file copies on web
+    final archive = ZipDecoder().decodeBytes(bytes);
+
+    String? readText(String name) {
+      try {
+        final f = archive.findFile(name);
+        if (f == null) return null;
+        return utf8.decode(f.content as List<int>);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    // Settings
+    final settingsTxt = readText('settings.json');
+    if (settingsTxt != null) {
+      try {
+        final map = jsonDecode(settingsTxt) as Map<String, dynamic>;
+        final prefs = await SharedPreferencesAsync.instance;
+        if (mode == RestoreMode.overwrite) {
+          await prefs.restore(map);
+        } else {
+          final existing = await prefs.snapshot();
+          for (final entry in map.entries) {
+            if (!existing.containsKey(entry.key)) {
+              await prefs.restoreSingle(entry.key, entry.value);
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Chats
+    final chatsTxt = readText('chats.json');
+    if (cfg.includeChats && chatsTxt != null) {
+      try {
+        final obj = jsonDecode(chatsTxt) as Map<String, dynamic>;
+        final convs = (obj['conversations'] as List?)?.map((e) => Conversation.fromJson((e as Map).cast<String, dynamic>())).toList() ?? const <Conversation>[];
+        final msgs = (obj['messages'] as List?)?.map((e) => ChatMessage.fromJson((e as Map).cast<String, dynamic>())).toList() ?? const <ChatMessage>[];
+        final toolEvents = ((obj['toolEvents'] as Map?) ?? const <String, dynamic>{}).map((k, v) => MapEntry(k.toString(), (v as List).cast<Map>().map((e) => e.cast<String, dynamic>()).toList()));
+
+        if (mode == RestoreMode.overwrite) {
+          await chatService.clearAllData();
+          final byConv = <String, List<ChatMessage>>{};
+          for (final m in msgs) { (byConv[m.conversationId] ??= <ChatMessage>[]).add(m); }
+          for (final c in convs) { await chatService.restoreConversation(c, byConv[c.id] ?? const <ChatMessage>[]); }
+          for (final entry in toolEvents.entries) { try { await chatService.setToolEvents(entry.key, entry.value); } catch (_) {} }
+        } else {
+          final existingConvs = chatService.getAllConversations();
+          final existingConvIds = existingConvs.map((c) => c.id).toSet();
+          final existingMsgIds = <String>{};
+          for (final conv in existingConvs) { existingMsgIds.addAll(chatService.getMessages(conv.id).map((m) => m.id)); }
+          final byConv = <String, List<ChatMessage>>{};
+          for (final m in msgs) { if (!existingMsgIds.contains(m.id)) { (byConv[m.conversationId] ??= <ChatMessage>[]).add(m); } }
+          for (final c in convs) {
+            if (!existingConvIds.contains(c.id)) {
+              await chatService.restoreConversation(c, byConv[c.id] ?? const <ChatMessage>[]);
+            } else if (byConv.containsKey(c.id)) {
+              for (final msg in byConv[c.id]!) { await chatService.addMessageDirectly(c.id, msg); }
+            }
+          }
+          for (final entry in toolEvents.entries) { final e = chatService.getToolEvents(entry.key); if (e.isEmpty) { try { await chatService.setToolEvents(entry.key, entry.value); } catch (_) {} } }
+        }
+      } catch (_) {}
+    }
   }
 }
 
