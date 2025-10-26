@@ -206,6 +206,21 @@ jobs:
           }
           if (-not $bundle) { Get-ChildItem -Recurse build/windows | Select-Object -First 200 | % { $_.FullName }; throw "Failed to locate Windows bundle folder" }
           Write-Host "Bundling from: $bundle"
+          # Ensure plugin DLLs are placed next to the exe so the loader can find them
+          $searchRoots = @('build/windows/x64', 'build/windows')
+          $pluginDlls = @()
+          foreach ($root in $searchRoots) {
+            if (Test-Path $root) {
+              $pluginDlls += Get-ChildItem -Recurse -ErrorAction SilentlyContinue -Path $root -Filter '*_plugin.dll'
+            }
+          }
+          foreach ($dll in $pluginDlls) {
+            $dest = Join-Path $bundle $dll.Name
+            if (-not (Test-Path $dest)) {
+              Write-Host ("Copy plugin: {0} -> {1}" -f $dll.FullName, $dest)
+              Copy-Item $dll.FullName $dest -Force
+            }
+          }
           if (-not (Test-Path (Join-Path $bundle 'data'))) { Write-Warning "'data' directory missing; the zip may be incomplete." }
           if (-not (Test-Path (Join-Path $bundle 'flutter_windows.dll'))) { Write-Warning "'flutter_windows.dll' missing; the zip may be incomplete." }
           Compress-Archive -Path (Join-Path $bundle '*') -DestinationPath kelivo-windows-x64.zip -Force
