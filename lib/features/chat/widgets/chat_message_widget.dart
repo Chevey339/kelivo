@@ -898,46 +898,37 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: 8));
                         // Build token display parts
                         final List<String> tokenParts = [];
-                        
+
                         // Always show input and output
                         tokenParts.add('${tokenUsage.promptTokens}↓');
                         tokenParts.add('${tokenUsage.completionTokens}↑');
-                        
+
                         // Only show thinking tokens if present
                         if (tokenUsage.thoughtTokens > 0) {
                           tokenParts.add('${tokenUsage.thoughtTokens}💭');
                         }
-                        
+
                         // Only show cached tokens if present
                         if (tokenUsage.cachedTokens > 0) {
                           tokenParts.add('${tokenUsage.cachedTokens}♻');
                         }
-                        
+
                         final String tokenText = tokenParts.join(' ');
-                        
-                        // Build detailed tooltip
-                        final String tooltipText = [
+
+                        // Build detailed tooltip lines
+                        final List<String> tooltipLines = [
                           '输入: ${tokenUsage.promptTokens}',
                           '输出: ${tokenUsage.completionTokens}',
                           if (tokenUsage.thoughtTokens > 0) '思考: ${tokenUsage.thoughtTokens}',
                           if (tokenUsage.cachedTokens > 0) '缓存: ${tokenUsage.cachedTokens}',
                           '总计: ${tokenUsage.totalTokens}',
-                        ].join('\n');
-                        
-                        rowChildren.add(Tooltip(
-                          message: tooltipText,
-                          preferBelow: false,
-                          waitDuration: const Duration(milliseconds: 500),
-                          child: Text(
-                            tokenText,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: tokenUsage.cachedTokens > 0 
-                                  ? cs.primary.withOpacity(0.7)
-                                  : cs.onSurface.withOpacity(0.5),
-                              fontFamily: 'monospace',
-                            ),
-                          ),
+                        ];
+
+                        rowChildren.add(_TokenUsageDisplay(
+                          tokenText: tokenText,
+                          tooltipLines: tooltipLines,
+                          hasCache: tokenUsage.cachedTokens > 0,
+                          colorScheme: cs,
                         ));
                       } else if (widget.message.totalTokens != null) {
                         // Fallback to old totalTokens display
@@ -2401,6 +2392,124 @@ class _MarqueeState extends State<_Marquee> with SingleTickerProviderStateMixin 
           },
         )
             : Align(alignment: Alignment.centerLeft, child: Text(widget.text, style: widget.style, maxLines: 1, softWrap: false)),
+      ),
+    );
+  }
+}
+
+// Token usage display with hover tooltip
+class _TokenUsageDisplay extends StatefulWidget {
+  final String tokenText;
+  final List<String> tooltipLines;
+  final bool hasCache;
+  final ColorScheme colorScheme;
+
+  const _TokenUsageDisplay({
+    required this.tokenText,
+    required this.tooltipLines,
+    required this.hasCache,
+    required this.colorScheme,
+  });
+
+  @override
+  State<_TokenUsageDisplay> createState() => _TokenUsageDisplayState();
+}
+
+class _TokenUsageDisplayState extends State<_TokenUsageDisplay> {
+  bool _isHovering = false;
+  OverlayEntry? _overlayEntry;
+
+  @override
+  void dispose() {
+    _removeOverlay();
+    super.dispose();
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  void _showOverlay(BuildContext context) {
+    _removeOverlay();
+
+    final overlay = Overlay.of(context);
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final offset = renderBox.localToGlobal(Offset.zero);
+    final size = renderBox.size;
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        left: offset.dx,
+        top: offset.dy + size.height + 4,
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(8),
+          color: widget.colorScheme.surface,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: widget.colorScheme.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: widget.colorScheme.outline.withOpacity(0.2),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: widget.tooltipLines.map((line) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text(
+                    line,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: widget.colorScheme.onSurface,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(_overlayEntry!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() => _isHovering = true);
+        _showOverlay(context);
+      },
+      onExit: (_) {
+        setState(() => _isHovering = false);
+        _removeOverlay();
+      },
+      cursor: SystemMouseCursors.help,
+      child: Text(
+        widget.tokenText,
+        style: TextStyle(
+          fontSize: 11,
+          color: widget.hasCache
+              ? widget.colorScheme.primary.withOpacity(0.7)
+              : widget.colorScheme.onSurface.withOpacity(0.5),
+          fontFamily: 'monospace',
+        ),
       ),
     );
   }
