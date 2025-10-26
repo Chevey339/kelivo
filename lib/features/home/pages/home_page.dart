@@ -2501,12 +2501,28 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
     Future<void> finish({bool generateTitle = false}) async {
       final processedContent = await MarkdownMediaSanitizer.replaceInlineBase64Images(fullContent);
-      await _chatService.updateMessage(assistantMessage.id, content: processedContent, totalTokens: totalTokens, isStreaming: false);
+      final tokenUsageJson = usage != null ? jsonEncode({
+        'promptTokens': usage!.promptTokens,
+        'completionTokens': usage!.completionTokens,
+        'cachedTokens': usage!.cachedTokens,
+        'totalTokens': usage!.totalTokens,
+      }) : null;
+      await _chatService.updateMessage(assistantMessage.id, 
+        content: processedContent, 
+        totalTokens: totalTokens, 
+        tokenUsageJson: tokenUsageJson,
+        isStreaming: false
+      );
       if (!mounted) return;
       setState(() {
         final index = _messages.indexWhere((m) => m.id == assistantMessage.id);
         if (index != -1) {
-          _messages[index] = _messages[index].copyWith(content: processedContent, totalTokens: totalTokens, isStreaming: false);
+          _messages[index] = _messages[index].copyWith(
+            content: processedContent, 
+            totalTokens: totalTokens, 
+            tokenUsageJson: tokenUsageJson,
+            isStreaming: false
+          );
         }
       });
       _setConversationLoading(assistantMessage.conversationId, false);

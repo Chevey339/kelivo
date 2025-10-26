@@ -106,15 +106,20 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'master'
-          
-      - name: Workaround flutter_tts Windows CMake issue
-        run: |
-          echo "Applying workaround for flutter_tts Windows CMake parse error"
-          # Remove Windows plugin symlink if exists to bypass plugin during CI
-          if (Test-Path "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts") { Remove-Item -Recurse -Force "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts" }
       - name: Get dependencies
         run: |
           flutter pub get
+      - name: Workaround flutter_tts Windows plugin
+        shell: pwsh
+        run: |
+          Write-Host "Patching generated_plugins.cmake to exclude flutter_tts"
+          $gen = "windows/flutter/generated_plugins.cmake"
+          if (Test-Path $gen) {
+            (Get-Content $gen) | Where-Object {$_ -notmatch 'flutter_tts'} | Set-Content $gen -Encoding UTF8
+          }
+          if (Test-Path "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts") {
+            Remove-Item -Recurse -Force "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts"
+          }
           
       - name: Build Windows
         run: |

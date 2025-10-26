@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
+import 'package:kelivo/core/models/token_usage.dart';
 
 part 'chat_message.g.dart';
 
@@ -25,6 +28,10 @@ class ChatMessage extends HiveObject {
 
   @HiveField(6)
   final int? totalTokens;
+  
+  // Detailed token usage information (stored as JSON string)
+  @HiveField(16)
+  final String? tokenUsageJson;
 
   @HiveField(7)
   final String conversationId;
@@ -66,6 +73,7 @@ class ChatMessage extends HiveObject {
     this.modelId,
     this.providerId,
     this.totalTokens,
+    this.tokenUsageJson,
     required this.conversationId,
     this.isStreaming = false,
     this.reasoningText,
@@ -88,6 +96,7 @@ class ChatMessage extends HiveObject {
     String? modelId,
     String? providerId,
     int? totalTokens,
+    String? tokenUsageJson,
     String? conversationId,
     bool? isStreaming,
     String? reasoningText,
@@ -106,6 +115,7 @@ class ChatMessage extends HiveObject {
       modelId: modelId ?? this.modelId,
       providerId: providerId ?? this.providerId,
       totalTokens: totalTokens ?? this.totalTokens,
+      tokenUsageJson: tokenUsageJson ?? this.tokenUsageJson,
       conversationId: conversationId ?? this.conversationId,
       isStreaming: isStreaming ?? this.isStreaming,
       reasoningText: reasoningText ?? this.reasoningText,
@@ -127,6 +137,7 @@ class ChatMessage extends HiveObject {
       'modelId': modelId,
       'providerId': providerId,
       'totalTokens': totalTokens,
+      'tokenUsageJson': tokenUsageJson,
       'conversationId': conversationId,
       'isStreaming': isStreaming,
       'reasoningText': reasoningText,
@@ -148,6 +159,7 @@ class ChatMessage extends HiveObject {
       modelId: json['modelId'] as String?,
       providerId: json['providerId'] as String?,
       totalTokens: json['totalTokens'] as int?,
+      tokenUsageJson: json['tokenUsageJson'] as String?,
       conversationId: json['conversationId'] as String,
       isStreaming: json['isStreaming'] as bool? ?? false,
       reasoningText: json['reasoningText'] as String?,
@@ -162,5 +174,21 @@ class ChatMessage extends HiveObject {
       groupId: json['groupId'] as String?,
       version: (json['version'] as int?) ?? 0,
     );
+  }
+  
+  // Helper method to get TokenUsage from tokenUsageJson
+  TokenUsage? get tokenUsage {
+    if (tokenUsageJson == null || tokenUsageJson!.isEmpty) return null;
+    try {
+      final json = jsonDecode(tokenUsageJson!) as Map<String, dynamic>;
+      return TokenUsage(
+        promptTokens: json['promptTokens'] as int? ?? 0,
+        completionTokens: json['completionTokens'] as int? ?? 0,
+        cachedTokens: json['cachedTokens'] as int? ?? 0,
+        totalTokens: json['totalTokens'] as int? ?? 0,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 }

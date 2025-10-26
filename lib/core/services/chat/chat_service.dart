@@ -405,6 +405,7 @@ class ChatService extends ChangeNotifier {
     String? modelId,
     String? providerId,
     int? totalTokens,
+    String? tokenUsageJson,
     bool isStreaming = false,
     String? reasoningText,
     DateTime? reasoningStartAt,
@@ -435,6 +436,7 @@ class ChatService extends ChangeNotifier {
       modelId: modelId,
       providerId: providerId,
       totalTokens: totalTokens,
+      tokenUsageJson: tokenUsageJson,
       isStreaming: isStreaming,
       reasoningText: reasoningText,
       reasoningStartAt: reasoningStartAt,
@@ -461,6 +463,7 @@ class ChatService extends ChangeNotifier {
   Future<void> updateMessage(String messageId, {
     String? content,
     int? totalTokens,
+    String? tokenUsageJson,
     bool? isStreaming,
     String? reasoningText,
     DateTime? reasoningStartAt,
@@ -476,6 +479,7 @@ class ChatService extends ChangeNotifier {
     final updatedMessage = message.copyWith(
       content: content ?? message.content,
       totalTokens: totalTokens ?? message.totalTokens,
+      tokenUsageJson: tokenUsageJson ?? message.tokenUsageJson,
       isStreaming: isStreaming ?? message.isStreaming,
       reasoningText: reasoningText ?? message.reasoningText,
       reasoningStartAt: reasoningStartAt ?? message.reasoningStartAt,
