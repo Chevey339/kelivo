@@ -61,8 +61,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5'
-          channel: 'stable'
+          channel: 'master'
           
       - name: Get dependencies
         run: |
@@ -106,8 +105,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5'
-          channel: 'stable'
+          channel: 'master'
           
       - name: Get dependencies
         run: |
@@ -135,45 +133,3 @@ jobs:
         with:
           files: kelivo-windows-x64.zip
 
-  build-linux:
-    needs: create-release
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Linux Dependencies
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ninja-build libgtk-3-dev libblkid-dev
-          
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.24.5'
-          channel: 'stable'
-          
-      - name: Get dependencies
-        run: |
-          flutter pub get
-          
-      - name: Build Linux
-        run: |
-          flutter config --enable-linux-desktop
-          flutter build linux --release
-          
-      - name: Create Linux Archive
-        run: |
-          cd build/linux/x64/release
-          tar czf ../../../../kelivo-linux-x64.tar.gz bundle/
-          
-      - name: Upload Linux Build
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-release
-          path: kelivo-linux-x64.tar.gz
-          
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: kelivo-linux-x64.tar.gz
