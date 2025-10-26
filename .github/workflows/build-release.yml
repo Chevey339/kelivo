@@ -125,17 +125,18 @@ jobs:
 
           Write-Host "Applying flutter_tts workaround..."
 
-          # Robustly stub flutter_tts Windows CMake to a no-op target
+          # Robustly stub flutter_tts Windows CMake to a no-op target (avoid here-string to keep YAML valid)
           $pluginCMake = "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts/windows/CMakeLists.txt"
           if (Test-Path $pluginCMake) {
             Write-Host "Stubbing $pluginCMake to avoid invalid CMake content"
-            @"
-cmake_minimum_required(VERSION 3.14)
-set(PLUGIN_NAME "flutter_tts_plugin")
-project(${PLUGIN_NAME} LANGUAGES CXX)
-# Define a no-op target so generated_plugins.cmake can link against it safely.
-add_library(${PLUGIN_NAME} INTERFACE)
-"@ | Set-Content $pluginCMake -Encoding UTF8
+            $cmakeLines = @(
+              'cmake_minimum_required(VERSION 3.14)',
+              'set(PLUGIN_NAME "flutter_tts_plugin")',
+              'project(${PLUGIN_NAME} LANGUAGES CXX)',
+              '# Define a no-op target so generated_plugins.cmake can link against it safely.',
+              'add_library(${PLUGIN_NAME} INTERFACE)'
+            )
+            $cmakeLines | Set-Content $pluginCMake -Encoding UTF8
           }
 
           # Remove from generated_plugins.cmake
