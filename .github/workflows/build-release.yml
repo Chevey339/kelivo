@@ -69,25 +69,51 @@ jobs:
         run: |
           flutter pub get
 
-      - name: Decode and setup keystore
+      - name: Setup keystore from base64
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          # Decode base64 directly from secret (remove any whitespace first)
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d ' \t\n\r' | base64 -d > android/app/upload-keystore.jks
+          # Method 1: Try direct base64 decode
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks 2>/dev/null || true
 
-          if [ ! -f android/app/upload-keystore.jks ] || [ ! -s android/app/upload-keystore.jks ]; then
-            echo "ERROR: Keystore file was not created or is empty"
-            echo "Trying to debug the base64 content..."
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | head -c 200
-            exit 1
+          # Check if it worked
+          if [ -s android/app/upload-keystore.jks ]; then
+            echo "✓ Keystore decoded successfully (method 1)"
+            ls -lh android/app/upload-keystore.jks
+          else
+            echo "Method 1 failed, trying method 2..."
+            # Method 2: Remove all whitespace then decode
+            echo "$KEYSTORE_BASE64" | tr -d '\n\r\t ' | base64 --decode > android/app/upload-keystore.jks 2>/dev/null || true
+
+            if [ -s android/app/upload-keystore.jks ]; then
+              echo "✓ Keystore decoded successfully (method 2)"
+              ls -lh android/app/upload-keystore.jks
+            else
+              echo "Method 2 failed, trying method 3..."
+              # Method 3: Use -i flag to ignore non-base64 characters
+              echo "$KEYSTORE_BASE64" | base64 -di > android/app/upload-keystore.jks 2>/dev/null || true
+
+              if [ -s android/app/upload-keystore.jks ]; then
+                echo "✓ Keystore decoded successfully (method 3)"
+                ls -lh android/app/upload-keystore.jks
+              else
+                echo "ERROR: All decode methods failed!"
+                echo "Base64 length: ${#KEYSTORE_BASE64}"
+                echo "First 100 chars: ${KEYSTORE_BASE64:0:100}"
+                exit 1
+              fi
+            fi
           fi
 
-          echo "Keystore file created successfully:"
-          ls -lh android/app/upload-keystore.jks
+          # Create key.properties
+          cat > android/key.properties << EOF
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=app/upload-keystore.jks
+          EOF
 
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
-          echo "storeFile=app/upload-keystore.jks" >> android/key.properties
+          echo "✓ key.properties created"
 
       - name: Build APK (signed)
         run: |
@@ -270,11 +296,22 @@ jobs:
 
           Write-Host "Creating zip archive from: $bundle"
           Write-Host "Files to be zipped:"
-          Get-ChildItem -Path $bundle -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
+          $allFiles = Get-ChildItem -Path $bundle -Recurse -File
+          $allFiles | ForEach-Object { Write-Host "  $($_.FullName) ($($_.Length) bytes)" }
+          Write-Host "Total files: $($allFiles.Count)"
 
-          # Use correct syntax: Get all items in the bundle directory
+          # Method 1: Try with wildcard
+          Write-Host "Attempting zip creation (method 1: wildcard)..."
           $bundlePath = Resolve-Path $bundle
-          Compress-Archive -Path "$bundlePath\*" -DestinationPath kelivo-windows-x64.zip -Force
+          $items = Get-ChildItem -Path $bundlePath -Recurse
+
+          if ($items.Count -eq 0) {
+            throw "ERROR: No files found in bundle directory!"
+          }
+
+          # Create zip using PowerShell's Compress-Archive with explicit file list
+          Write-Host "Creating archive with $($items.Count) items..."
+          Compress-Archive -Path $bundlePath\* -DestinationPath kelivo-windows-x64.zip -Force -CompressionLevel Optimal
 
           if (-not (Test-Path kelivo-windows-x64.zip)) {
             throw "ERROR: Failed to create zip file!"
@@ -283,8 +320,18 @@ jobs:
           $size = (Get-Item kelivo-windows-x64.zip).Length / 1MB
           Write-Host ("Created kelivo-windows-x64.zip ({0:N1} MB)" -f $size)
 
-          if ($size -lt 10) {
-            Write-Warning "WARNING: Zip file is suspiciously small (< 10 MB). Build may be incomplete."
+          if ($size -lt 1) {
+            Write-Host "ERROR: Zip is too small! Trying alternative method..."
+
+            # Alternative: Use 7zip if available
+            if (Get-Command 7z -ErrorAction SilentlyContinue) {
+              Write-Host "Using 7zip..."
+              7z a -tzip kelivo-windows-x64.zip "$bundlePath\*"
+              $size = (Get-Item kelivo-windows-x64.zip).Length / 1MB
+              Write-Host ("Created kelivo-windows-x64.zip with 7zip ({0:N1} MB)" -f $size)
+            } else {
+              throw "ERROR: Zip file is too small ($size MB) and 7zip not available!"
+            }
           }
           
       - name: Upload Windows Build
