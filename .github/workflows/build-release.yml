@@ -205,17 +205,33 @@ jobs:
           $bundle = $null
           foreach ($c in $candidates) {
             if (Test-Path $c) {
-              if ((Test-Path (Join-Path $c 'flutter_windows.dll')) -or (Test-Path (Join-Path $c 'data'))) {
-                $bundle = $c; break
+              $exeFile = Get-ChildItem -Path $c -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($exeFile) {
+                $bundle = $c
+                Write-Host "Found .exe file: $($exeFile.FullName)"
+                break
               }
             }
           }
           if (-not $bundle) {
-            $dll = Get-ChildItem -Recurse -ErrorAction SilentlyContinue -Filter 'flutter_windows.dll' | Select-Object -First 1
-            if ($dll) { $bundle = Split-Path $dll.FullName -Parent }
+            Write-Host "Searching for .exe file in build/windows..."
+            $exeFile = Get-ChildItem -Recurse -Path "build/windows" -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($exeFile) {
+              $bundle = Split-Path $exeFile.FullName -Parent
+              Write-Host "Found .exe file: $($exeFile.FullName)"
+            }
           }
-          if (-not $bundle) { Get-ChildItem -Recurse build/windows | Select-Object -First 200 | % { $_.FullName }; throw "Failed to locate Windows bundle folder" }
+          if (-not $bundle) {
+            Write-Host "Listing all files in build/windows:"
+            Get-ChildItem -Recurse build/windows | Select-Object -First 200 | ForEach-Object { Write-Host $_.FullName }
+            throw "Failed to locate Windows bundle folder with .exe file"
+          }
           Write-Host "Bundling from: $bundle"
+
+          # List all files in bundle directory
+          Write-Host "Files in bundle directory:"
+          Get-ChildItem -Path $bundle | ForEach-Object { Write-Host "  $($_.Name)" }
+
           # Ensure plugin DLLs are placed next to the exe so the loader can find them
           $searchRoots = @('build/windows/x64', 'build/windows')
           $pluginDlls = @()
@@ -231,11 +247,23 @@ jobs:
               Copy-Item $dll.FullName $dest -Force
             }
           }
+
+          # Verify critical files
+          $exeCheck = Get-ChildItem -Path $bundle -Filter "*.exe" | Select-Object -First 1
+          if (-not $exeCheck) { throw "ERROR: No .exe file found in bundle directory!" }
           if (-not (Test-Path (Join-Path $bundle 'data'))) { Write-Warning "'data' directory missing; the zip may be incomplete." }
           if (-not (Test-Path (Join-Path $bundle 'flutter_windows.dll'))) { Write-Warning "'flutter_windows.dll' missing; the zip may be incomplete." }
+
+          Write-Host "Creating zip archive..."
           Compress-Archive -Path (Join-Path $bundle '*') -DestinationPath kelivo-windows-x64.zip -Force
           $size = (Get-Item kelivo-windows-x64.zip).Length / 1MB
           Write-Host ("Created kelivo-windows-x64.zip ({0:N1} MB)" -f $size)
+
+          # Verify zip contents
+          Write-Host "Verifying zip contents..."
+          $zipContents = Get-ChildItem -Path $bundle
+          Write-Host "Files that should be in zip:"
+          $zipContents | ForEach-Object { Write-Host "  $($_.Name)" }
           
       - name: Upload Windows Build
         uses: actions/upload-artifact@v4
