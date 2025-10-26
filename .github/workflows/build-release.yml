@@ -71,11 +71,17 @@ jobs:
 
       - name: Decode and setup keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | grep -v "BEGIN" | grep -v "END" | tr -d '\n\r ' | base64 -d > android/app/upload-keystore.jks
+          # Save base64 to temp file and decode
+          echo "${{ secrets.KEYSTORE_BASE64 }}" > /tmp/keystore.b64
+          base64 -d /tmp/keystore.b64 > android/app/upload-keystore.jks
+
           if [ ! -f android/app/upload-keystore.jks ] || [ ! -s android/app/upload-keystore.jks ]; then
             echo "ERROR: Keystore file was not created or is empty"
+            echo "Base64 content (first 100 chars):"
+            head -c 100 /tmp/keystore.b64
             exit 1
           fi
+
           ls -lh android/app/upload-keystore.jks
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
