@@ -110,41 +110,47 @@ jobs:
         run: |
           flutter pub get
 
-      - name: Workaround flutter_tts Windows plugin CMake issue
+      - name: Configure Windows Desktop
+        run: |
+          flutter config --enable-windows-desktop
+
+      - name: Build Windows with flutter_tts workaround
         shell: pwsh
         run: |
-          Write-Host "Removing flutter_tts from Windows build to bypass CMake parse error"
+          # Start the build process, it will fail but generate the plugin files
+          Write-Host "Starting initial build to generate plugin files..."
+          flutter build windows --release 2>&1 | Out-Null
 
-          # 1. Remove from generated_plugins.cmake
+          Write-Host "Applying flutter_tts workaround..."
+
+          # Remove from generated_plugins.cmake
           $genPlugins = "windows/flutter/generated_plugins.cmake"
           if (Test-Path $genPlugins) {
             Write-Host "Patching $genPlugins"
             (Get-Content $genPlugins) | Where-Object {$_ -notmatch 'flutter_tts'} | Set-Content $genPlugins -Encoding UTF8
           }
 
-          # 2. Remove from generated_plugin_registrant.cc
+          # Remove from generated_plugin_registrant.cc
           $genRegistrant = "windows/flutter/generated_plugin_registrant.cc"
           if (Test-Path $genRegistrant) {
             Write-Host "Patching $genRegistrant"
             (Get-Content $genRegistrant) | Where-Object {$_ -notmatch 'flutter_tts'} | Set-Content $genRegistrant -Encoding UTF8
           }
 
-          # 3. Remove from generated_plugin_registrant.h
+          # Remove from generated_plugin_registrant.h
           $genHeader = "windows/flutter/generated_plugin_registrant.h"
           if (Test-Path $genHeader) {
             Write-Host "Patching $genHeader"
             (Get-Content $genHeader) | Where-Object {$_ -notmatch 'flutter_tts'} | Set-Content $genHeader -Encoding UTF8
           }
 
-          # 4. Remove plugin symlink directory
+          # Remove plugin symlink directory
           if (Test-Path "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts") {
             Write-Host "Removing plugin symlink"
             Remove-Item -Recurse -Force "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts"
           }
-          
-      - name: Build Windows
-        run: |
-          flutter config --enable-windows-desktop
+
+          Write-Host "Rebuilding with workaround applied..."
           flutter build windows --release
           
       - name: Create Windows Installer

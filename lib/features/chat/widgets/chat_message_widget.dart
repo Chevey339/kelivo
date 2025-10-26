@@ -697,7 +697,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               }
                               final res = await PlatformUtils.callPlatformMethod(
                                 () => OpenFilex.open(fixed, type: d.mime),
-                                fallback: ResultResponse(
+                                fallback: OpenResult(
                                   type: ResultType.error,
                                   message: 'File opening not supported on this platform',
                                 ),
@@ -896,18 +896,24 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       final tokenUsage = widget.message.tokenUsage;
                       if (tokenUsage != null) {
                         if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: 8));
-                        // Build concise token display with additional info
-                        final List<String> additionalInfo = [];
-                        if (tokenUsage.cachedTokens > 0) {
-                          additionalInfo.add('${tokenUsage.cachedTokens} 缓存');
-                        }
+                        // Build token display parts
+                        final List<String> tokenParts = [];
+                        
+                        // Always show input and output
+                        tokenParts.add('${tokenUsage.promptTokens}↓');
+                        tokenParts.add('${tokenUsage.completionTokens}↑');
+                        
+                        // Only show thinking tokens if present
                         if (tokenUsage.thoughtTokens > 0) {
-                          additionalInfo.add('${tokenUsage.thoughtTokens} 思考');
+                          tokenParts.add('${tokenUsage.thoughtTokens}💭');
                         }
                         
-                        final String tokenText = additionalInfo.isEmpty
-                            ? '${tokenUsage.totalTokens} tokens'
-                            : '${tokenUsage.totalTokens} tokens (${additionalInfo.join(', ')})';
+                        // Only show cached tokens if present
+                        if (tokenUsage.cachedTokens > 0) {
+                          tokenParts.add('${tokenUsage.cachedTokens}♻');
+                        }
+                        
+                        final String tokenText = tokenParts.join(' ');
                         
                         // Build detailed tooltip
                         final String tooltipText = [
@@ -929,6 +935,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               color: tokenUsage.cachedTokens > 0 
                                   ? cs.primary.withOpacity(0.7)
                                   : cs.onSurface.withOpacity(0.5),
+                              fontFamily: 'monospace',
                             ),
                           ),
                         ));
