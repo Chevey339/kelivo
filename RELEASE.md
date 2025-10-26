@@ -65,3 +65,7 @@ flutter build linux --release
 - 创建了AnimatedLoadingText和ModernLoadingIndicator组件
 - 升级了项目依赖包
 - 添加了GitHub Actions自动构建配置
+- **重要**: 修复了Windows平台的多项兼容性问题
+  - 创建PlatformUtils工具类统一处理跨平台兼容性
+  - 修复触觉反馈、PDF读取、图片选择器等插件在Windows上的调用错误
+  - 所有平台特定的功能现在都会优雅降级，确保Windows版本可以正常运行
