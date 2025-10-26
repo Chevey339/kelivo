@@ -2505,6 +2505,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         'promptTokens': usage!.promptTokens,
         'completionTokens': usage!.completionTokens,
         'cachedTokens': usage!.cachedTokens,
+        'thoughtTokens': usage!.thoughtTokens,
         'totalTokens': usage!.totalTokens,
       }) : null;
       await _chatService.updateMessage(assistantMessage.id, 

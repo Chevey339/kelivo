@@ -2972,9 +2972,12 @@ class ChatApiService {
             final obj = jsonDecode(data) as Map<String, dynamic>;
             final um = obj['usageMetadata'];
             if (um is Map<String, dynamic>) {
+              final thoughtTokens = (um['thoughtsTokenCount'] ?? 0) as int;
+              final candidateTokens = (um['candidatesTokenCount'] ?? 0) as int;
               usage = (usage ?? const TokenUsage()).merge(TokenUsage(
                 promptTokens: (um['promptTokenCount'] ?? 0) as int,
-                completionTokens: (um['candidatesTokenCount'] ?? 0) as int,
+                completionTokens: candidateTokens + thoughtTokens, // Include thought tokens in completion
+                thoughtTokens: thoughtTokens,
                 totalTokens: (um['totalTokenCount'] ?? 0) as int,
               ));
               totalTokens = usage!.totalTokens;

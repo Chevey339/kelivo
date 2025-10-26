@@ -53,11 +53,12 @@ android {
 
     buildTypes {
         getByName("release") {
+            // 禁用代码压缩和资源压缩以避免CI构建失败
+            isMinifyEnabled = false
+            isShrinkResources = false
+
             if (hasKeystore) {
                 signingConfig = signingConfigs.getByName("release")
-            } else {
-                // 未提供签名时构建未签名的release包，避免CI失败
-                isMinifyEnabled = false
             }
         }
     }

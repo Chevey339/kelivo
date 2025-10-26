@@ -185,6 +185,7 @@ class ChatMessage extends HiveObject {
         promptTokens: json['promptTokens'] as int? ?? 0,
         completionTokens: json['completionTokens'] as int? ?? 0,
         cachedTokens: json['cachedTokens'] as int? ?? 0,
+        thoughtTokens: json['thoughtTokens'] as int? ?? 0,
         totalTokens: json['totalTokens'] as int? ?? 0,
       );
     } catch (_) {

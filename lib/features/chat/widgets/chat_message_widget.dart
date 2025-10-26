@@ -892,15 +892,57 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         ),
                       ));
                     }
-                    if (widget.showTokenStats && widget.message.totalTokens != null) {
-                      if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: 8));
-                      rowChildren.add(Text(
-                        '${widget.message.totalTokens} tokens',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: cs.onSurface.withOpacity(0.5),
-                        ),
-                      ));
+                    if (widget.showTokenStats) {
+                      final tokenUsage = widget.message.tokenUsage;
+                      if (tokenUsage != null) {
+                        if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: 8));
+                        // Build concise token display with additional info
+                        final List<String> additionalInfo = [];
+                        if (tokenUsage.cachedTokens > 0) {
+                          additionalInfo.add('${tokenUsage.cachedTokens} 缓存');
+                        }
+                        if (tokenUsage.thoughtTokens > 0) {
+                          additionalInfo.add('${tokenUsage.thoughtTokens} 思考');
+                        }
+                        
+                        final String tokenText = additionalInfo.isEmpty
+                            ? '${tokenUsage.totalTokens} tokens'
+                            : '${tokenUsage.totalTokens} tokens (${additionalInfo.join(', ')})';
+                        
+                        // Build detailed tooltip
+                        final String tooltipText = [
+                          '输入: ${tokenUsage.promptTokens}',
+                          '输出: ${tokenUsage.completionTokens}',
+                          if (tokenUsage.thoughtTokens > 0) '思考: ${tokenUsage.thoughtTokens}',
+                          if (tokenUsage.cachedTokens > 0) '缓存: ${tokenUsage.cachedTokens}',
+                          '总计: ${tokenUsage.totalTokens}',
+                        ].join('\n');
+                        
+                        rowChildren.add(Tooltip(
+                          message: tooltipText,
+                          preferBelow: false,
+                          waitDuration: const Duration(milliseconds: 500),
+                          child: Text(
+                            tokenText,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: tokenUsage.cachedTokens > 0 
+                                  ? cs.primary.withOpacity(0.7)
+                                  : cs.onSurface.withOpacity(0.5),
+                            ),
+                          ),
+                        ));
+                      } else if (widget.message.totalTokens != null) {
+                        // Fallback to old totalTokens display
+                        if (rowChildren.isNotEmpty) rowChildren.add(const SizedBox(width: 8));
+                        rowChildren.add(Text(
+                          '${widget.message.totalTokens} tokens',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: cs.onSurface.withOpacity(0.5),
+                          ),
+                        ));
+                      }
                     }
                     return rowChildren.isNotEmpty
                         ? Row(children: rowChildren)
