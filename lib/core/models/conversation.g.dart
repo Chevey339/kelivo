@@ -25,8 +25,8 @@ class ConversationAdapter extends TypeAdapter<Conversation> {
       isPinned: fields[5] as bool,
       mcpServerIds: (fields[6] as List?)?.cast<String>(),
       assistantId: fields[7] as String?,
-      truncateIndex: (fields[8] as int?) ?? -1,
-      versionSelections: (fields[9] as Map?)?.map((k, v) => MapEntry(k.toString(), (v as num).toInt())) ?? <String, int>{},
+      truncateIndex: fields[8] as int?,
+      versionSelections: (fields[9] as Map?)?.cast<String, int>(),
     );
   }
 
