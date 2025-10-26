@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'window_size_manager.dart';
+import '../utils/platform_utils.dart';
 
 /// Handles desktop window initialization and persistence (size/position/maximized).
 class DesktopWindowController with WindowListener {
@@ -13,14 +14,14 @@ class DesktopWindowController with WindowListener {
   bool _attached = false;
 
   Future<void> initializeAndShow({String? title}) async {
-    if (kIsWeb) return;
-    if (!(defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.macOS ||
-        defaultTargetPlatform == TargetPlatform.linux)) {
+    if (kIsWeb || !PlatformUtils.isDesktop) return;
+
+    try {
+      await windowManager.ensureInitialized();
+    } catch (e) {
+      debugPrint('Window manager initialization failed: $e');
       return;
     }
-
-    await windowManager.ensureInitialized();
 
     // Windows custom title bar is handled in main (TitleBarStyle.hidden)
 

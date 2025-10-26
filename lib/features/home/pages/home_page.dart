@@ -54,6 +54,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io' show File, Directory;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
+import '../../../utils/platform_utils.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../core/services/learning_mode_store.dart';
@@ -928,47 +929,85 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Future<List<String>> _copyPickedFiles(List<XFile> files) async {
-    final docs = await getApplicationDocumentsDirectory();
-    final dir = Directory("${docs.path}/upload");
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
+    try {
+      final docs = await PlatformUtils.callPlatformMethod(
+        () => getApplicationDocumentsDirectory(),
+        fallback: null,
+      );
+      
+      if (docs == null) {
+        debugPrint('Cannot get documents directory');
+        return [];
+      }
+      
+      final dir = Directory("${docs.path}/upload");
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      final out = <String>[];
+      for (final f in files) {
+        try {
+          final name = f.name.isNotEmpty ? f.name : DateTime.now().millisecondsSinceEpoch.toString();
+          final dest = File("${dir.path}/$name");
+          await dest.writeAsBytes(await f.readAsBytes());
+          out.add(dest.path);
+        } catch (_) {}
+      }
+      return out;
+    } catch (e) {
+      debugPrint('Error copying files: $e');
+      return [];
     }
-    final out = <String>[];
-    for (final f in files) {
-      try {
-        final name = f.name.isNotEmpty ? f.name : DateTime.now().millisecondsSinceEpoch.toString();
-        final dest = File("${dir.path}/$name");
-        await dest.writeAsBytes(await f.readAsBytes());
-        out.add(dest.path);
-      } catch (_) {}
-    }
-    return out;
   }
 
   Future<void> _onPickPhotos() async {
+    if (PlatformUtils.isWindows) {
+      // Windows doesn't support image picker yet, fallback to file picker
+      await _onPickFiles();
+      return;
+    }
+    
     try {
       final picker = ImagePicker();
-      final files = await picker.pickMultiImage();
+      final files = await PlatformUtils.callPlatformMethod(
+        () => picker.pickMultiImage(),
+        fallback: <XFile>[],
+      );
+      
       if (files == null || files.isEmpty) return;
       final paths = await _copyPickedFiles(files);
       if (paths.isNotEmpty) {
         _mediaController.addImages(paths);
         if (!_isUserScrolling) _scrollToBottomSoon();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error picking photos: $e');
+    }
   }
 
   Future<void> _onPickCamera() async {
+    if (!PlatformUtils.supportsCamera) {
+      // Fallback to file picker on unsupported platforms
+      await _onPickFiles();
+      return;
+    }
+    
     try {
       final picker = ImagePicker();
-      final file = await picker.pickImage(source: ImageSource.camera);
+      final file = await PlatformUtils.callPlatformMethod(
+        () => picker.pickImage(source: ImageSource.camera),
+        fallback: null,
+      );
+      
       if (file == null) return;
       final paths = await _copyPickedFiles([file]);
       if (paths.isNotEmpty) {
         _mediaController.addImages(paths);
         if (!_isUserScrolling) _scrollToBottomSoon();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error picking from camera: $e');
+    }
   }
 
   String _inferMimeByExtension(String name) {
@@ -983,14 +1022,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Future<void> _onPickFiles() async {
     try {
-      final res = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        withData: false,
-        type: FileType.custom,
-        allowedExtensions: const [
-          'txt','md','json','js','pdf','docx'
-        ],
+      // Get supported extensions based on platform
+      final extensions = PlatformUtils.isWindows 
+        ? PlatformUtils.getSupportedFileExtensions()
+        : ['txt','md','json','js','pdf','docx'];
+      
+      final res = await PlatformUtils.callPlatformMethod<FilePickerResult?>(
+        () => FilePicker.platform.pickFiles(
+          allowMultiple: true,
+          withData: false,
+          type: FileType.custom,
+          allowedExtensions: extensions,
+        ),
       );
+      
       if (res == null || res.files.isEmpty) return;
       final docs = <DocumentAttachment>[];
       final toCopy = <XFile>[];
@@ -1011,7 +1056,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         _mediaController.addFiles(docs);
         if (!_isUserScrolling) _scrollToBottomSoon();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error picking files: $e');
+    }
   }
 
   Future<void> _createNewConversation() async {

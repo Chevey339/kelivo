@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatf
 import 'package:characters/characters.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import '../../../utils/platform_utils.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'package:provider/provider.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -1560,23 +1561,28 @@ extension on _SideDrawerState {
   }
 
   Future<void> _pickLocalImage(BuildContext context) async {
-    if (kIsWeb) {
+    if (kIsWeb || PlatformUtils.isWindows) {
+      // Windows desktop doesn't support image picker yet
       await _inputAvatarUrl(context);
       return;
     }
+    
     try {
       final picker = ImagePicker();
-      final XFile? file = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1024,
-        imageQuality: 90,
+      final result = await PlatformUtils.callPlatformMethod<XFile?>(
+        () => picker.pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 1024,
+          imageQuality: 90,
+        ),
       );
+      
       if (!mounted) return;
-      if (file != null) {
-        await context.read<UserProvider>().setAvatarFilePath(file.path);
+      if (result != null) {
+        await context.read<UserProvider>().setAvatarFilePath(result.path);
         return;
       }
-    } on PlatformException catch (e) {
+    } catch (e) {
       // Gracefully degrade when plugin channel isn't available or permission denied.
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;

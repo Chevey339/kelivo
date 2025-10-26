@@ -13,6 +13,7 @@ import 'dart:io' show File;
 import 'package:open_filex/open_filex.dart';
 // import 'package:easy_image_viewer/easy_image_viewer.dart';
 import 'dart:convert';
+import '../../../utils/platform_utils.dart';
 import '../pages/image_viewer_page.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -694,8 +695,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                 );
                                 return;
                               }
-                              final res = await OpenFilex.open(fixed, type: d.mime);
-                              if (res.type != ResultType.done) {
+                              final res = await PlatformUtils.callPlatformMethod(
+                                () => OpenFilex.open(fixed, type: d.mime),
+                                fallback: ResultResponse(
+                                  type: ResultType.error,
+                                  message: 'File opening not supported on this platform',
+                                ),
+                              );
+                              
+                              if (res != null && res.type != ResultType.done) {
                                 showAppSnackBar(
                                   context,
                                   message: l10n.chatMessageWidgetCannotOpenFile(res.message ?? res.type.toString()),

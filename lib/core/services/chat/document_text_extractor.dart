@@ -6,6 +6,7 @@ import 'package:xml/xml.dart';
 import 'package:flutter/services.dart';
 import 'package:read_pdf_text/read_pdf_text.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../utils/platform_utils.dart';
 
 class DocumentTextExtractor {
   static Future<String> extract({required String path, required String mime}) async {
@@ -13,9 +14,17 @@ class DocumentTextExtractor {
       // Remap old iOS sandbox path if needed
       final fixedPath = SandboxPathResolver.fix(path);
       if (mime == 'application/pdf') {
+        // Check if platform supports PDF reading
+        if (PlatformUtils.isWindows) {
+          return '[[PDF text extraction is not yet supported on Windows]]';
+        }
+        
         try {
-          final text = await ReadPdfText.getPDFtext(fixedPath);
-          if (text.trim().isNotEmpty) return text;
+          final text = await PlatformUtils.callPlatformMethod(
+            () => ReadPdfText.getPDFtext(fixedPath),
+            fallback: '',
+          );
+          if (text != null && text.trim().isNotEmpty) return text;
         } on PlatformException catch (e) {
           return '[[Failed to read PDF: ${e.message ?? e.code}]]';
         } on MissingPluginException catch (_) {

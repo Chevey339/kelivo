@@ -8,6 +8,7 @@ import 'desktop/desktop_home_page.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import 'desktop/desktop_window_controller.dart';
+import 'utils/platform_utils.dart';
 // import 'package:logging/logging.dart' as logging;
 // Theme is now managed in SettingsProvider
 import 'theme/theme_factory.dart';
@@ -52,16 +53,20 @@ runApp(const MyApp());
 }
 
 Future<void> _initDesktopWindow() async {
-  if (kIsWeb) return;
+  if (kIsWeb || !PlatformUtils.isDesktop) return;
+  
   try {
-    if (defaultTargetPlatform == TargetPlatform.windows) {
-      await windowManager.ensureInitialized();
-      await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
+    if (PlatformUtils.isWindows) {
+      // Windows-specific initialization
+      await PlatformUtils.callPlatformMethod(() async {
+        await windowManager.ensureInitialized();
+        await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
+      });
     }
     // Initialize and show desktop window with persisted size/position
     await DesktopWindowController.instance.initializeAndShow(title: 'Kelivo');
-  } catch (_) {
-    // Ignore on unsupported platforms.
+  } catch (e) {
+    debugPrint('Desktop window initialization failed: $e');
   }
 }
 

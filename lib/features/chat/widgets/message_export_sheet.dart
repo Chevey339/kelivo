@@ -14,6 +14,7 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../utils/platform_utils.dart';
 import 'image_preview_sheet.dart';
 
 import '../../../icons/lucide_adapter.dart';
@@ -319,7 +320,16 @@ Future<File?> _renderWidgetDirectly(
     if (data == null) return null;
     
     // Save to file
-    final dir = await getTemporaryDirectory();
+    final dir = await PlatformUtils.callPlatformMethod(
+      () => getTemporaryDirectory(),
+      fallback: null,
+    );
+    
+    if (dir == null) {
+      debugPrint('Cannot get temporary directory');
+      return null;
+    }
+    
     final file = File('${dir.path}/chat-export-${DateTime.now().millisecondsSinceEpoch}.png');
     await file.writeAsBytes(data.buffer.asUint8List());
     
@@ -455,7 +465,16 @@ Future<File?> _renderAndSavePagedOld(
     final data = await img.toByteData(format: ui.ImageByteFormat.png);
     if (data == null) return null;
     
-    final dir = await getTemporaryDirectory();
+    final dir = await PlatformUtils.callPlatformMethod(
+      () => getTemporaryDirectory(),
+      fallback: null,
+    );
+    
+    if (dir == null) {
+      debugPrint('Cannot get temporary directory');
+      return null;
+    }
+    
     final file = File('${dir.path}/chat-export-${DateTime.now().millisecondsSinceEpoch}.png');
     await file.writeAsBytes(data.buffer.asUint8List());
     return file;
@@ -597,7 +616,16 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
         buf.writeln('\n---\n');
       }
 
-      final tmp = await getTemporaryDirectory();
+      final tmp = await PlatformUtils.callPlatformMethod(
+        () => getTemporaryDirectory(),
+        fallback: null,
+      );
+      
+      if (tmp == null) {
+        debugPrint('Cannot get temporary directory');
+        return;
+      }
+      
       final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.md';
       final file = File('${tmp.path}/$filename');
       await file.writeAsString(buf.toString());
@@ -828,7 +856,16 @@ class _ExportSheetState extends State<_ExportSheet> {
         buf.writeln('- ${d.fileName}  `(${d.mime})`');
       }
 
-      final tmp = await getTemporaryDirectory();
+      final tmp = await PlatformUtils.callPlatformMethod(
+        () => getTemporaryDirectory(),
+        fallback: null,
+      );
+      
+      if (tmp == null) {
+        debugPrint('Cannot get temporary directory');
+        return;
+      }
+      
       final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.md';
       final file = File('${tmp.path}/$filename');
       await file.writeAsString(buf.toString());
