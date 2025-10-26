@@ -17,8 +17,8 @@ import 'snackbar.dart';
 import 'mermaid_bridge.dart';
 import 'export_capture_scope.dart';
 import 'mermaid_image_cache.dart';
-import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/theme/theme_factory.dart' show kDefaultFontFamilyFallback;
+import 'package:kelivo/l10n/app_localizations.dart';
+import 'package:kelivo/theme/theme_factory.dart' show kDefaultFontFamilyFallback;
 import 'package:provider/provider.dart';
 import '../../core/providers/settings_provider.dart';
 

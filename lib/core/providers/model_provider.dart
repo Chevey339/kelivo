@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'settings_provider.dart';
 import '../services/api_key_manager.dart';
-import 'package:Kelivo/secrets/fallback.dart';
+import 'package:kelivo/secrets/fallback.dart';
 import '../services/api/google_service_account_auth.dart';
 
 enum ModelType { chat, embedding }
