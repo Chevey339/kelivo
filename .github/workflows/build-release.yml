@@ -157,11 +157,13 @@ jobs:
             (Get-Content $genPlugins) | Where-Object {$_ -notmatch 'flutter_tts'} | Set-Content $genPlugins -Encoding UTF8
           }
 
-          # Remove from generated_plugin_registrant.cc
+          # Remove from generated_plugin_registrant.cc (both header include and registrar call)
           $genRegistrant = "windows/flutter/generated_plugin_registrant.cc"
           if (Test-Path $genRegistrant) {
             Write-Host "Patching $genRegistrant"
-            (Get-Content $genRegistrant) | Where-Object {$_ -notmatch 'flutter_tts'} | Set-Content $genRegistrant -Encoding UTF8
+            (Get-Content $genRegistrant) |
+              Where-Object {$_ -notmatch '(flutter_tts|FlutterTts)'} |
+              Set-Content $genRegistrant -Encoding UTF8
           }
 
           # Remove from generated_plugin_registrant.h
@@ -171,8 +173,8 @@ jobs:
             (Get-Content $genHeader) | Where-Object {$_ -notmatch 'flutter_tts'} | Set-Content $genHeader -Encoding UTF8
           }
 
-          Write-Host "Rebuilding with workaround applied..."
-          flutter build windows --release
+          Write-Host "Rebuilding with workaround applied (cmake build to avoid regenerating registrant)..."
+          cmake --build build/windows --config Release
           
       - name: Create Windows Installer
         run: |
