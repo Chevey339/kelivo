@@ -125,56 +125,62 @@ jobs:
 
           Write-Host "Applying flutter_tts workaround..."
 
-          # Robustly stub flutter_tts Windows CMake to a no-op SHARED target (so $<TARGET_FILE:..> works)
+          # Robustly stub flutter_tts Windows plugin into a minimal valid plugin that compiles and links
           $pluginCMake = "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts/windows/CMakeLists.txt"
           $pluginDir = Split-Path $pluginCMake -Parent
           if (Test-Path $pluginCMake) {
-            Write-Host "Stubbing $pluginCMake to a minimal SHARED library"
-            # Write minimal CMakeLists that builds an empty DLL
+            Write-Host "Stubbing $pluginCMake to a minimal valid plugin"
+            # Write minimal CMakeLists that builds a DLL and exports the registrar symbol
             $cmakeLines = @(
               'cmake_minimum_required(VERSION 3.14)',
               'set(PLUGIN_NAME "flutter_tts_plugin")',
               'project(${PLUGIN_NAME} LANGUAGES CXX)',
-              'set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)',
-              'add_library(${PLUGIN_NAME} SHARED "noop.cpp")',
+              'add_library(${PLUGIN_NAME} SHARED',
+              '  "flutter_tts_plugin.cpp"',
+              ')',
+              'apply_standard_settings(${PLUGIN_NAME})',
               'target_compile_features(${PLUGIN_NAME} PUBLIC cxx_std_17)',
+              'target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)',
+              'target_include_directories(${PLUGIN_NAME} INTERFACE',
+              '  "${CMAKE_CURRENT_SOURCE_DIR}/include"',
+              ')',
+              'target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)',
               'set(flutter_tts_bundled_libraries "" PARENT_SCOPE)'
             )
             $cmakeLines | Set-Content $pluginCMake -Encoding UTF8
-            # Write minimal C++ source to ensure the DLL is produced
-            $noopCpp = Join-Path $pluginDir 'noop.cpp'
-            $cppLines = @(
-              '#include <windows.h>',
-              'extern "C" __declspec(dllexport) void kelivo_tts_noop() {}'
+
+            # Ensure include directory exists and write header
+            $includeDir = Join-Path $pluginDir 'include/flutter_tts'
+            New-Item -ItemType Directory -Force $includeDir | Out-Null
+            $headerPath = Join-Path $includeDir 'flutter_tts_plugin.h'
+            $headerLines = @(
+              '#ifndef FLUTTER_PLUGIN_FLUTTER_TTS_PLUGIN_H_',
+              '#define FLUTTER_PLUGIN_FLUTTER_TTS_PLUGIN_H_',
+              '#include <flutter/plugin_registrar_windows.h>',
+              '#if defined(FLUTTER_PLUGIN_IMPL)',
+              '#define FLUTTER_PLUGIN_EXPORT __declspec(dllexport)',
+              '#else',
+              '#define FLUTTER_PLUGIN_EXPORT __declspec(dllimport)',
+              '#endif',
+              'extern "C" {',
+              'FLUTTER_PLUGIN_EXPORT void FlutterTtsPluginRegisterWithRegistrar(',
+              '    flutter::PluginRegistrar* registrar);',
+              '}',
+              '#endif  // FLUTTER_PLUGIN_FLUTTER_TTS_PLUGIN_H_'
             )
-            $cppLines | Set-Content $noopCpp -Encoding UTF8
+            $headerLines | Set-Content $headerPath -Encoding UTF8
+
+            # Write minimal implementation
+            $implPath = Join-Path $pluginDir 'flutter_tts_plugin.cpp'
+            $implLines = @(
+              '#include "include/flutter_tts/flutter_tts_plugin.h"',
+              'void FlutterTtsPluginRegisterWithRegistrar(flutter::PluginRegistrar* registrar) {}'
+            )
+            $implLines | Set-Content $implPath -Encoding UTF8
           }
 
-          # Remove from generated_plugins.cmake
-          $genPlugins = "windows/flutter/generated_plugins.cmake"
-          if (Test-Path $genPlugins) {
-            Write-Host "Patching $genPlugins"
-            (Get-Content $genPlugins) | Where-Object {$_ -notmatch 'flutter_tts'} | Set-Content $genPlugins -Encoding UTF8
-          }
-
-          # Remove from generated_plugin_registrant.cc (both header include and registrar call)
-          $genRegistrant = "windows/flutter/generated_plugin_registrant.cc"
-          if (Test-Path $genRegistrant) {
-            Write-Host "Patching $genRegistrant"
-            (Get-Content $genRegistrant) |
-              Where-Object {$_ -notmatch '(flutter_tts|FlutterTts)'} |
-              Set-Content $genRegistrant -Encoding UTF8
-          }
-
-          # Remove from generated_plugin_registrant.h
-          $genHeader = "windows/flutter/generated_plugin_registrant.h"
-          if (Test-Path $genHeader) {
-            Write-Host "Patching $genHeader"
-            (Get-Content $genHeader) | Where-Object {$_ -notmatch 'flutter_tts'} | Set-Content $genHeader -Encoding UTF8
-          }
-
-          Write-Host "Rebuilding with workaround applied (cmake build to avoid regenerating registrant)..."
-          cmake --build build/windows --config Release
+          Write-Host "Rebuilding with workaround applied..."
+          flutter build windows --release
           
       - name: Create Windows Installer
         run: |
