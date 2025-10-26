@@ -71,7 +71,12 @@ jobs:
 
       - name: Decode and setup keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | grep -v "BEGIN\|END" | base64 -d > android/app/upload-keystore.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | grep -v "BEGIN" | grep -v "END" | tr -d '\n\r ' | base64 -d > android/app/upload-keystore.jks
+          if [ ! -f android/app/upload-keystore.jks ] || [ ! -s android/app/upload-keystore.jks ]; then
+            echo "ERROR: Keystore file was not created or is empty"
+            exit 1
+          fi
+          ls -lh android/app/upload-keystore.jks
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
@@ -251,19 +256,29 @@ jobs:
           # Verify critical files
           $exeCheck = Get-ChildItem -Path $bundle -Filter "*.exe" | Select-Object -First 1
           if (-not $exeCheck) { throw "ERROR: No .exe file found in bundle directory!" }
+          Write-Host "Found .exe: $($exeCheck.Name)"
+
           if (-not (Test-Path (Join-Path $bundle 'data'))) { Write-Warning "'data' directory missing; the zip may be incomplete." }
           if (-not (Test-Path (Join-Path $bundle 'flutter_windows.dll'))) { Write-Warning "'flutter_windows.dll' missing; the zip may be incomplete." }
 
-          Write-Host "Creating zip archive..."
-          Compress-Archive -Path (Join-Path $bundle '*') -DestinationPath kelivo-windows-x64.zip -Force
+          Write-Host "Creating zip archive from: $bundle"
+          Write-Host "Files to be zipped:"
+          Get-ChildItem -Path $bundle -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
+
+          # Use correct syntax: Get all items in the bundle directory
+          $bundlePath = Resolve-Path $bundle
+          Compress-Archive -Path "$bundlePath\*" -DestinationPath kelivo-windows-x64.zip -Force
+
+          if (-not (Test-Path kelivo-windows-x64.zip)) {
+            throw "ERROR: Failed to create zip file!"
+          }
+
           $size = (Get-Item kelivo-windows-x64.zip).Length / 1MB
           Write-Host ("Created kelivo-windows-x64.zip ({0:N1} MB)" -f $size)
 
-          # Verify zip contents
-          Write-Host "Verifying zip contents..."
-          $zipContents = Get-ChildItem -Path $bundle
-          Write-Host "Files that should be in zip:"
-          $zipContents | ForEach-Object { Write-Host "  $($_.Name)" }
+          if ($size -lt 10) {
+            Write-Warning "WARNING: Zip file is suspiciously small (< 10 MB). Build may be incomplete."
+          }
           
       - name: Upload Windows Build
         uses: actions/upload-artifact@v4
