@@ -67,7 +67,7 @@ jobs:
         run: |
           flutter pub get
           
-      - name: Build APK
+      - name: Build APK (unsigned if no keystore)
         run: |
           flutter build apk --release --split-per-abi
           
@@ -107,6 +107,11 @@ jobs:
         with:
           channel: 'master'
           
+      - name: Workaround flutter_tts Windows CMake issue
+        run: |
+          echo "Applying workaround for flutter_tts Windows CMake parse error"
+          # Remove Windows plugin symlink if exists to bypass plugin during CI
+          if (Test-Path "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts") { Remove-Item -Recurse -Force "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts" }
       - name: Get dependencies
         run: |
           flutter pub get

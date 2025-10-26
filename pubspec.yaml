@@ -98,6 +98,12 @@ dev_dependencies:
   flutter_lints: ^5.0.0
 
 dependency_overrides:
+  # 临时禁用 flutter_tts 的 Windows 插件以绕过 CI 上的 CMake 解析错误
+  flutter_tts:
+    git:
+      url: https://github.com/dlutton/flutter_tts.git
+      ref: 4.2.3
+      path: .
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

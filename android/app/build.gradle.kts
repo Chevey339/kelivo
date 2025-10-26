@@ -33,22 +33,32 @@ android {
     }
 
     val keystorePropertiesFile = rootProject.file("key.properties")
+    val hasKeystore = keystorePropertiesFile.exists()
     val keystoreProperties = Properties().apply {
-        load(keystorePropertiesFile.inputStream())
+        if (hasKeystore) {
+            load(keystorePropertiesFile.inputStream())
+        }
     }
 
     signingConfigs {
-        create("release") {
-            storeFile = file(keystoreProperties["storeFile"] as String)
-            storePassword = keystoreProperties["storePassword"] as String
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
+        if (hasKeystore) {
+            create("release") {
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
         }
     }
 
     buildTypes {
         getByName("release") {
-            signingConfig = signingConfigs.getByName("release")
+            if (hasKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                // 未提供签名时构建未签名的release包，避免CI失败
+                isMinifyEnabled = false
+            }
         }
     }
 }
