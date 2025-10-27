@@ -62,18 +62,18 @@ jobs:
           fi
 
           echo "Setting up keystore..."
-          echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+          echo "$KEYSTORE_BASE64" | base64 -d > android/upload-keystore.jks
 
           echo "Creating key.properties..."
           cat > android/key.properties << EOF
           storePassword=$KEYSTORE_PASSWORD
           keyPassword=$KEY_PASSWORD
           keyAlias=$KEY_ALIAS
-          storeFile=app/upload-keystore.jks
+          storeFile=upload-keystore.jks
           EOF
 
           echo "Keystore setup complete!"
-          ls -lh android/app/upload-keystore.jks
+          ls -lh android/upload-keystore.jks
 
       - name: Build APK
         run: |
@@ -150,14 +150,27 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Checking for problematic plugins..."
-          $pubspec = Get-Content pubspec.yaml -Raw
-          
+          $pubspecContent = Get-Content pubspec.yaml
+
           # Check if flutter_tts exists and comment it out
-          if ($pubspec -match 'flutter_tts:') {
-            Write-Host "Disabling flutter_tts for Windows build..."
-            $pubspec = $pubspec -replace '(\s+flutter_tts:[^\n]*)', '  # $1  # Disabled for Windows'
-            Set-Content pubspec.yaml $pubspec
-            
+          $modified = $false
+          $newContent = @()
+
+          foreach ($line in $pubspecContent) {
+            if ($line -match '^\s+flutter_tts:') {
+              Write-Host "Disabling flutter_tts for Windows build..."
+              $newContent += "  # $line  # Disabled for Windows"
+              $modified = $true
+            } else {
+              $newContent += $line
+            }
+          }
+
+          if ($modified) {
+            $newContent | Set-Content pubspec.yaml
+            Write-Host "Modified pubspec.yaml:"
+            Get-Content pubspec.yaml | Select-String -Pattern "flutter_tts" -Context 1,1
+
             Write-Host "Re-running flutter pub get..."
             flutter pub get
           } else {
