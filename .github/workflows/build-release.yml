@@ -98,6 +98,18 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Remove problematic Windows plugins
+        shell: pwsh
+        run: |
+          Write-Host "Removing flutter_tts from pubspec.yaml for Windows build..."
+          $content = Get-Content pubspec.yaml -Raw
+          # Comment out flutter_tts line
+          $content = $content -replace '(\s+flutter_tts:.*)', '  # $1  # Disabled for Windows build'
+          Set-Content pubspec.yaml $content
+          
+          Write-Host "Running flutter pub get again..."
+          flutter pub get
+
       - name: Build Windows app
         run: flutter build windows --release
 
