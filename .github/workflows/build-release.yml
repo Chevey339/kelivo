@@ -48,24 +48,62 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build APK (unsigned)
-        run: flutter build apk --release --split-per-abi
+      - name: Setup Android signing
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "Setting up keystore..."
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
+          
+          echo "Creating key.properties..."
+          cat > android/key.properties << EOF
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=app/upload-keystore.jks
+          EOF
+          
+          echo "Keystore setup complete!"
+          ls -lh android/app/upload-keystore.jks
 
-      - name: Build App Bundle (unsigned)
-        run: flutter build appbundle --release
+      - name: Build APK
+        run: |
+          if [ -f "android/key.properties" ]; then
+            echo "Building SIGNED APK..."
+            flutter build apk --release --split-per-abi
+          else
+            echo "Building UNSIGNED APK (no keystore found)..."
+            flutter build apk --release --split-per-abi
+          fi
+
+      - name: Build App Bundle
+        run: |
+          if [ -f "android/key.properties" ]; then
+            echo "Building SIGNED App Bundle..."
+            flutter build appbundle --release
+          else
+            echo "Building UNSIGNED App Bundle (no keystore found)..."
+            flutter build appbundle --release
+          fi
 
       - name: Rename APK files
         run: |
           cd build/app/outputs/flutter-apk
-          mv app-armeabi-v7a-release.apk kelivo-armeabi-v7a-release.apk || true
-          mv app-arm64-v8a-release.apk kelivo-arm64-v8a-release.apk || true
-          mv app-x86_64-release.apk kelivo-x86_64-release.apk || true
+          for file in app-*-release.apk; do
+            if [ -f "$file" ]; then
+              newname=$(echo "$file" | sed 's/app-/kelivo-/')
+              mv "$file" "$newname"
+              echo "Renamed: $file -> $newname"
+            fi
+          done
           ls -lh
 
       - name: Rename AAB file
         run: |
           cd build/app/outputs/bundle/release
-          mv app-release.aab kelivo-release.aab || true
+          if [ -f "app-release.aab" ]; then
+            mv app-release.aab kelivo-release.aab
+            echo "Renamed: app-release.aab -> kelivo-release.aab"
+          fi
           ls -lh
 
       - name: Upload APKs to Release
@@ -98,17 +136,23 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Remove problematic Windows plugins
+      - name: Disable problematic plugins for Windows
         shell: pwsh
         run: |
-          Write-Host "Removing flutter_tts from pubspec.yaml for Windows build..."
-          $content = Get-Content pubspec.yaml -Raw
-          # Comment out flutter_tts line
-          $content = $content -replace '(\s+flutter_tts:.*)', '  # $1  # Disabled for Windows build'
-          Set-Content pubspec.yaml $content
+          Write-Host "Checking for problematic plugins..."
+          $pubspec = Get-Content pubspec.yaml -Raw
           
-          Write-Host "Running flutter pub get again..."
-          flutter pub get
+          # Check if flutter_tts exists and comment it out
+          if ($pubspec -match 'flutter_tts:') {
+            Write-Host "Disabling flutter_tts for Windows build..."
+            $pubspec = $pubspec -replace '(\s+flutter_tts:[^\n]*)', '  # $1  # Disabled for Windows'
+            Set-Content pubspec.yaml $pubspec
+            
+            Write-Host "Re-running flutter pub get..."
+            flutter pub get
+          } else {
+            Write-Host "No problematic plugins found."
+          }
 
       - name: Build Windows app
         run: flutter build windows --release
@@ -122,18 +166,24 @@ jobs:
           $buildPath = "build\windows\x64\runner\Release"
           
           if (-not (Test-Path $buildPath)) {
-            Write-Host "Build path not found: $buildPath"
-            Write-Host "Searching for build output..."
-            Get-ChildItem -Path "build\windows" -Recurse -Filter "*.exe" | ForEach-Object {
-              Write-Host "Found: $($_.FullName)"
+            Write-Host "ERROR: Build path not found: $buildPath"
+            Write-Host "Searching for .exe files..."
+            $exeFiles = Get-ChildItem -Path "build\windows" -Recurse -Filter "*.exe" -ErrorAction SilentlyContinue
+            if ($exeFiles) {
+              foreach ($exe in $exeFiles) {
+                Write-Host "Found: $($exe.FullName)"
+                $buildPath = Split-Path $exe.FullName -Parent
+                break
+              }
+            } else {
+              throw "No executable files found!"
             }
-            throw "Build output not found!"
           }
           
-          Write-Host "Build path found: $buildPath"
+          Write-Host "Build path: $buildPath"
           Write-Host "Contents:"
           Get-ChildItem -Path $buildPath | ForEach-Object {
-            Write-Host "  $($_.Name)"
+            Write-Host "  $($_.Name) ($($_.Length) bytes)"
           }
           
           # Create output directory
@@ -141,26 +191,26 @@ jobs:
           New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
           
           # Copy all files
-          Write-Host "Copying files to $outputDir..."
+          Write-Host "`nCopying files to $outputDir..."
           Copy-Item -Path "$buildPath\*" -Destination $outputDir -Recurse -Force
           
           # Verify exe exists
           $exeFile = Get-ChildItem -Path $outputDir -Filter "*.exe" | Select-Object -First 1
           if (-not $exeFile) {
-            throw "No executable file found in output directory!"
+            throw "ERROR: No executable file found in output directory!"
           }
           Write-Host "Executable found: $($exeFile.Name)"
           
           # Create zip archive
-          Write-Host "Creating zip archive..."
+          Write-Host "`nCreating zip archive..."
           Compress-Archive -Path $outputDir -DestinationPath "kelivo-windows-x64.zip" -Force
           
-          $zipSize = (Get-Item "kelivo-windows-x64.zip").Length / 1MB
-          Write-Host "Created kelivo-windows-x64.zip (${zipSize:N2} MB)"
-          
-          if ($zipSize -lt 5) {
-            Write-Warning "Warning: Zip file seems small (${zipSize:N2} MB)"
+          if (-not (Test-Path "kelivo-windows-x64.zip")) {
+            throw "ERROR: Failed to create zip file!"
           }
+          
+          $zipSize = (Get-Item "kelivo-windows-x64.zip").Length / 1MB
+          Write-Host "✓ Created kelivo-windows-x64.zip (${zipSize:N2} MB)"
 
       - name: Upload Windows build to Release
         uses: softprops/action-gh-release@v2
