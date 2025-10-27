@@ -1,4 +1,4 @@
-name: Build Release
+name: Build and Release
 
 on:
   push:
@@ -8,340 +8,149 @@ on:
 
 jobs:
   create-release:
+    name: Create Release
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: Create Release
         id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          body: |
-            ## 🎉 Kelivo ${{ github.ref_name }} 发布
-
-            ### ✨ 新功能 (v1.1.0)
-            - **Token 使用详情显示**
-              - 显示输入（↓）和输出（↑）token 数量
-              - 支持显示思考 token（💭）和缓存 token（♻）
-              - 鼠标悬停显示详细的 token 使用信息
-              - 刷新页面后保持详细显示格式
-
-            ### 🔧 修复 (v1.1.0)
-            - **修复 Token 显示问题**
-              - 修复刷新页面后 token 显示变回总数的问题
-              - 修复鼠标悬停提示不显示的问题
-              - 使用 MouseRegion + OverlayEntry 实现更可靠的悬停提示
-            - **修复 Hive 数据持久化问题**
-              - 修复 tokenUsageJson 字段未正确保存到数据库的问题
-            - **修复代码语法错误**
-              - 修复 ios_switch.dart 中的十六进制颜色值格式错误
-
-            ### 🚀 技术改进 (v1.1.0)
-            - 配置 Android 应用签名
-            - 改进 GitHub Actions 构建流程
-            - 添加自定义悬停提示组件 _TokenUsageDisplay
-            - 优化 token 使用信息的存储和显示逻辑
-
-            ### 📦 下载
-            构建产物将在下方自动附加。
           draft: false
           prerelease: false
+          generate_release_notes: true
+
   build-android:
+    name: Build Android
     needs: create-release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: 'zulu'
           java-version: '17'
+          cache: 'gradle'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          cache: true
 
-      - name: Get dependencies
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK (unsigned)
+        run: flutter build apk --release --split-per-abi
+
+      - name: Build App Bundle (unsigned)
+        run: flutter build appbundle --release
+
+      - name: Rename APK files
         run: |
-          flutter pub get
+          cd build/app/outputs/flutter-apk
+          mv app-armeabi-v7a-release.apk kelivo-armeabi-v7a-release.apk || true
+          mv app-arm64-v8a-release.apk kelivo-arm64-v8a-release.apk || true
+          mv app-x86_64-release.apk kelivo-x86_64-release.apk || true
+          ls -lh
 
-      - name: Setup keystore from base64
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      - name: Rename AAB file
         run: |
-          # Method 1: Try direct base64 decode
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks 2>/dev/null || true
+          cd build/app/outputs/bundle/release
+          mv app-release.aab kelivo-release.aab || true
+          ls -lh
 
-          # Check if it worked
-          if [ -s android/app/upload-keystore.jks ]; then
-            echo "✓ Keystore decoded successfully (method 1)"
-            ls -lh android/app/upload-keystore.jks
-          else
-            echo "Method 1 failed, trying method 2..."
-            # Method 2: Remove all whitespace then decode
-            echo "$KEYSTORE_BASE64" | tr -d '\n\r\t ' | base64 --decode > android/app/upload-keystore.jks 2>/dev/null || true
-
-            if [ -s android/app/upload-keystore.jks ]; then
-              echo "✓ Keystore decoded successfully (method 2)"
-              ls -lh android/app/upload-keystore.jks
-            else
-              echo "Method 2 failed, trying method 3..."
-              # Method 3: Use -i flag to ignore non-base64 characters
-              echo "$KEYSTORE_BASE64" | base64 -di > android/app/upload-keystore.jks 2>/dev/null || true
-
-              if [ -s android/app/upload-keystore.jks ]; then
-                echo "✓ Keystore decoded successfully (method 3)"
-                ls -lh android/app/upload-keystore.jks
-              else
-                echo "ERROR: All decode methods failed!"
-                echo "Base64 length: ${#KEYSTORE_BASE64}"
-                echo "First 100 chars: ${KEYSTORE_BASE64:0:100}"
-                exit 1
-              fi
-            fi
-          fi
-
-          # Create key.properties
-          cat > android/key.properties << EOF
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=app/upload-keystore.jks
-          EOF
-
-          echo "✓ key.properties created"
-
-      - name: Build APK (signed)
-        run: |
-          # Use verbose logs to surface kernel_snapshot errors
-          flutter build apk --release --split-per-abi -v
-
-      - name: Build App Bundle (signed)
-        run: |
-          # Use verbose logs to surface kernel_snapshot errors
-          flutter build appbundle --release -v
-          
-      - name: Upload APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release-apks
-          path: |
-            build/app/outputs/flutter-apk/*.apk
-            
-      - name: Upload App Bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release-bundle
-          path: build/app/outputs/bundle/release/*.aab
-          
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Upload APKs to Release
+        uses: softprops/action-gh-release@v2
         with:
           files: |
-            build/app/outputs/flutter-apk/*.apk
-            build/app/outputs/bundle/release/*.aab
+            build/app/outputs/flutter-apk/kelivo-*.apk
+            build/app/outputs/bundle/release/kelivo-release.aab
 
   build-windows:
+    name: Build Windows
     needs: create-release
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-      - name: Get dependencies
-        run: |
-          flutter pub get
+          cache: true
 
-      - name: Configure Windows Desktop
-        run: |
-          flutter config --enable-windows-desktop
+      - name: Flutter doctor
+        run: flutter doctor -v
 
-      - name: Build Windows with flutter_tts workaround
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows app
+        run: flutter build windows --release
+
+      - name: Create portable package
         shell: pwsh
         run: |
-          # Start the build process, it will fail but generate the plugin files
-          Write-Host "Starting initial build to generate plugin files..."
-          flutter build windows --release 2>&1 | Out-Null
-
-          Write-Host "Applying flutter_tts workaround..."
-
-          # Robustly stub flutter_tts Windows plugin into a minimal valid plugin that compiles and links
-          $pluginCMake = "windows/flutter/ephemeral/.plugin_symlinks/flutter_tts/windows/CMakeLists.txt"
-          $pluginDir = Split-Path $pluginCMake -Parent
-          if (Test-Path $pluginCMake) {
-            Write-Host "Stubbing $pluginCMake to a minimal valid plugin"
-            # Write minimal CMakeLists that builds a DLL and exports the registrar symbol
-            $cmakeLines = @(
-              'cmake_minimum_required(VERSION 3.14)',
-              'set(PLUGIN_NAME "flutter_tts_plugin")',
-              'project(${PLUGIN_NAME} LANGUAGES CXX)',
-              'add_library(${PLUGIN_NAME} SHARED',
-              '  "flutter_tts_plugin.cpp"',
-              ')',
-              'apply_standard_settings(${PLUGIN_NAME})',
-              'target_compile_features(${PLUGIN_NAME} PUBLIC cxx_std_17)',
-              'target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)',
-              'target_include_directories(${PLUGIN_NAME} INTERFACE',
-              '  "${CMAKE_CURRENT_SOURCE_DIR}/include"',
-              ')',
-              'target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)',
-              'set(flutter_tts_bundled_libraries "" PARENT_SCOPE)'
-            )
-            $cmakeLines | Set-Content $pluginCMake -Encoding UTF8
-
-            # Ensure include directory exists and write header
-            $includeDir = Join-Path $pluginDir 'include/flutter_tts'
-            New-Item -ItemType Directory -Force $includeDir | Out-Null
-            $headerPath = Join-Path $includeDir 'flutter_tts_plugin.h'
-            $headerLines = @(
-              '#ifndef FLUTTER_PLUGIN_FLUTTER_TTS_PLUGIN_H_',
-              '#define FLUTTER_PLUGIN_FLUTTER_TTS_PLUGIN_H_',
-              '#include <flutter/plugin_registrar_windows.h>',
-              '#if defined(FLUTTER_PLUGIN_IMPL)',
-              '#define FLUTTER_PLUGIN_EXPORT __declspec(dllexport)',
-              '#else',
-              '#define FLUTTER_PLUGIN_EXPORT __declspec(dllimport)',
-              '#endif',
-              'extern "C" {',
-              'FLUTTER_PLUGIN_EXPORT void FlutterTtsPluginRegisterWithRegistrar(',
-              '    FlutterDesktopPluginRegistrarRef registrar);',
-              '}',
-              '#endif  // FLUTTER_PLUGIN_FLUTTER_TTS_PLUGIN_H_'
-            )
-            $headerLines | Set-Content $headerPath -Encoding UTF8
-
-            # Write minimal implementation
-            $implPath = Join-Path $pluginDir 'flutter_tts_plugin.cpp'
-            $implLines = @(
-              '#include "include/flutter_tts/flutter_tts_plugin.h"',
-              'extern "C" void FlutterTtsPluginRegisterWithRegistrar(FlutterDesktopPluginRegistrarRef registrar) {}'
-            )
-            $implLines | Set-Content $implPath -Encoding UTF8
-          }
-
-          Write-Host "Rebuilding with workaround applied..."
-          flutter build windows --release
+          Write-Host "Creating Windows portable package..."
           
-      - name: Package Windows Build
-        shell: pwsh
-        run: |
-          Write-Host "Locating Windows build output folder..."
-          $candidates = @(
-            "build/windows/x64/runner/Release",
-            "build/windows/runner/Release",
-            "build/windows/x64/RelWithDebInfo",
-            "build/windows/runner/RelWithDebInfo"
-          )
-          $bundle = $null
-          foreach ($c in $candidates) {
-            if (Test-Path $c) {
-              $exeFile = Get-ChildItem -Path $c -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-              if ($exeFile) {
-                $bundle = $c
-                Write-Host "Found .exe file: $($exeFile.FullName)"
-                break
-              }
+          # Find the build output directory
+          $buildPath = "build\windows\x64\runner\Release"
+          
+          if (-not (Test-Path $buildPath)) {
+            Write-Host "Build path not found: $buildPath"
+            Write-Host "Searching for build output..."
+            Get-ChildItem -Path "build\windows" -Recurse -Filter "*.exe" | ForEach-Object {
+              Write-Host "Found: $($_.FullName)"
             }
-          }
-          if (-not $bundle) {
-            Write-Host "Searching for .exe file in build/windows..."
-            $exeFile = Get-ChildItem -Recurse -Path "build/windows" -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($exeFile) {
-              $bundle = Split-Path $exeFile.FullName -Parent
-              Write-Host "Found .exe file: $($exeFile.FullName)"
-            }
-          }
-          if (-not $bundle) {
-            Write-Host "Listing all files in build/windows:"
-            Get-ChildItem -Recurse build/windows | Select-Object -First 200 | ForEach-Object { Write-Host $_.FullName }
-            throw "Failed to locate Windows bundle folder with .exe file"
-          }
-          Write-Host "Bundling from: $bundle"
-
-          # List all files in bundle directory
-          Write-Host "Files in bundle directory:"
-          Get-ChildItem -Path $bundle | ForEach-Object { Write-Host "  $($_.Name)" }
-
-          # Ensure plugin DLLs are placed next to the exe so the loader can find them
-          $searchRoots = @('build/windows/x64', 'build/windows')
-          $pluginDlls = @()
-          foreach ($root in $searchRoots) {
-            if (Test-Path $root) {
-              $pluginDlls += Get-ChildItem -Recurse -ErrorAction SilentlyContinue -Path $root -Filter '*_plugin.dll'
-            }
-          }
-          foreach ($dll in $pluginDlls) {
-            $dest = Join-Path $bundle $dll.Name
-            if (-not (Test-Path $dest)) {
-              Write-Host ("Copy plugin: {0} -> {1}" -f $dll.FullName, $dest)
-              Copy-Item $dll.FullName $dest -Force
-            }
-          }
-
-          # Verify critical files
-          $exeCheck = Get-ChildItem -Path $bundle -Filter "*.exe" | Select-Object -First 1
-          if (-not $exeCheck) { throw "ERROR: No .exe file found in bundle directory!" }
-          Write-Host "Found .exe: $($exeCheck.Name)"
-
-          if (-not (Test-Path (Join-Path $bundle 'data'))) { Write-Warning "'data' directory missing; the zip may be incomplete." }
-          if (-not (Test-Path (Join-Path $bundle 'flutter_windows.dll'))) { Write-Warning "'flutter_windows.dll' missing; the zip may be incomplete." }
-
-          Write-Host "Creating zip archive from: $bundle"
-          Write-Host "Files to be zipped:"
-          $allFiles = Get-ChildItem -Path $bundle -Recurse -File
-          $allFiles | ForEach-Object { Write-Host "  $($_.FullName) ($($_.Length) bytes)" }
-          Write-Host "Total files: $($allFiles.Count)"
-
-          # Method 1: Try with wildcard
-          Write-Host "Attempting zip creation (method 1: wildcard)..."
-          $bundlePath = Resolve-Path $bundle
-          $items = Get-ChildItem -Path $bundlePath -Recurse
-
-          if ($items.Count -eq 0) {
-            throw "ERROR: No files found in bundle directory!"
-          }
-
-          # Create zip using PowerShell's Compress-Archive with explicit file list
-          Write-Host "Creating archive with $($items.Count) items..."
-          Compress-Archive -Path $bundlePath\* -DestinationPath kelivo-windows-x64.zip -Force -CompressionLevel Optimal
-
-          if (-not (Test-Path kelivo-windows-x64.zip)) {
-            throw "ERROR: Failed to create zip file!"
-          }
-
-          $size = (Get-Item kelivo-windows-x64.zip).Length / 1MB
-          Write-Host ("Created kelivo-windows-x64.zip ({0:N1} MB)" -f $size)
-
-          if ($size -lt 1) {
-            Write-Host "ERROR: Zip is too small! Trying alternative method..."
-
-            # Alternative: Use 7zip if available
-            if (Get-Command 7z -ErrorAction SilentlyContinue) {
-              Write-Host "Using 7zip..."
-              7z a -tzip kelivo-windows-x64.zip "$bundlePath\*"
-              $size = (Get-Item kelivo-windows-x64.zip).Length / 1MB
-              Write-Host ("Created kelivo-windows-x64.zip with 7zip ({0:N1} MB)" -f $size)
-            } else {
-              throw "ERROR: Zip file is too small ($size MB) and 7zip not available!"
-            }
+            throw "Build output not found!"
           }
           
-      - name: Upload Windows Build
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-release
-          path: kelivo-windows-x64.zip
+          Write-Host "Build path found: $buildPath"
+          Write-Host "Contents:"
+          Get-ChildItem -Path $buildPath | ForEach-Object {
+            Write-Host "  $($_.Name)"
+          }
           
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+          # Create output directory
+          $outputDir = "kelivo-windows-x64"
+          New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+          
+          # Copy all files
+          Write-Host "Copying files to $outputDir..."
+          Copy-Item -Path "$buildPath\*" -Destination $outputDir -Recurse -Force
+          
+          # Verify exe exists
+          $exeFile = Get-ChildItem -Path $outputDir -Filter "*.exe" | Select-Object -First 1
+          if (-not $exeFile) {
+            throw "No executable file found in output directory!"
+          }
+          Write-Host "Executable found: $($exeFile.Name)"
+          
+          # Create zip archive
+          Write-Host "Creating zip archive..."
+          Compress-Archive -Path $outputDir -DestinationPath "kelivo-windows-x64.zip" -Force
+          
+          $zipSize = (Get-Item "kelivo-windows-x64.zip").Length / 1MB
+          Write-Host "Created kelivo-windows-x64.zip (${zipSize:N2} MB)"
+          
+          if ($zipSize -lt 5) {
+            Write-Warning "Warning: Zip file seems small (${zipSize:N2} MB)"
+          }
+
+      - name: Upload Windows build to Release
+        uses: softprops/action-gh-release@v2
         with:
           files: kelivo-windows-x64.zip
