@@ -49,13 +49,18 @@ jobs:
         run: flutter pub get
 
       - name: Setup Android signing
-        if: ${{ secrets.KEYSTORE_BASE64 }}
+        continue-on-error: true
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "No keystore configured, will build unsigned APK"
+            exit 0
+          fi
+
           echo "Setting up keystore..."
           echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
 
