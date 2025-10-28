@@ -48,6 +48,15 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Clean old signing files
+        run: |
+          echo "Cleaning old signing files..."
+          rm -f android/key.properties
+          rm -f android/upload-keystore.jks
+          rm -f android/app/upload-keystore.jks
+          rm -f android/app/key.properties
+          echo "Cleanup complete"
+
       - name: Setup Android signing
         continue-on-error: true
         env:
@@ -73,7 +82,14 @@ jobs:
           EOF
 
           echo "Keystore setup complete!"
+          echo "Keystore file location:"
           ls -lh android/upload-keystore.jks
+          echo ""
+          echo "key.properties content:"
+          cat android/key.properties
+          echo ""
+          echo "Current directory structure:"
+          ls -la android/ | head -20
 
       - name: Build APK
         run: |

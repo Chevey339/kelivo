@@ -13,7 +13,14 @@
 
 ### 1. KEYSTORE_BASE64
 **名称**: `KEYSTORE_BASE64`
-**值**: 复制 `android/app/upload-keystore.jks.base64` 文件的全部内容（包括 BEGIN 和 END 行）
+**值**: 你的 keystore 文件的 base64 编码内容
+
+如何生成：
+```bash
+# 如果你有 upload-keystore.jks 文件
+base64 -i upload-keystore.jks -o upload-keystore.jks.base64
+# 然后复制 upload-keystore.jks.base64 文件的全部内容
+```
 
 ### 2. KEYSTORE_PASSWORD
 **名称**: `KEYSTORE_PASSWORD`
