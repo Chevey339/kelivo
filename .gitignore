@@ -33,6 +33,10 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/dist/
+/flutter/
+/.tools/
+nul
 
 # Symbolication related
 app.*.symbols
