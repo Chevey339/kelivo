@@ -52,3 +52,16 @@ git push origin v1.1.0
 - 密钥文件和密码要妥善保管
 - 如果需要更改密码，记得同时更新 GitHub Secrets 和本地的 `key.properties` 文件
 
+## 故障排查
+
+### 如果构建失败，提示找不到 keystore 文件
+
+1. 检查 GitHub Secrets 中的 `KEYSTORE_BASE64` 是否正确设置
+2. 确保 base64 编码的内容完整（没有多余的空格或换行）
+3. 查看构建日志中的调试输出，确认 `key.properties` 的内容
+4. 确保 `KEY_ALIAS`、`KEYSTORE_PASSWORD`、`KEY_PASSWORD` 都已正确设置
+
+### 如果路径错误（例如 android/app/app/xxx）
+
+这通常是因为旧的配置文件缓存。工作流已经添加了清理步骤，应该会自动解决。
+
