@@ -1,6 +1,7 @@
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../utils/platform_utils.dart';
 
 // CJK/Latin fallback to stabilize fontWeight (w100–w600) on iOS for Chinese
 const List<String> kDefaultFontFamilyFallback = <String>[
@@ -8,6 +9,17 @@ const List<String> kDefaultFontFamilyFallback = <String>[
   'Heiti SC',
   'Hiragino Sans GB',
   'Roboto',
+];
+
+// Better CJK fallback for Windows to avoid serif/sim-sun look and ensure glyph coverage.
+const List<String> kWindowsFontFamilyFallback = <String>[
+  'Microsoft YaHei UI',
+  'Microsoft YaHei',
+  'Segoe UI Variable',
+  'Segoe UI',
+  'Noto Sans CJK SC',
+  'Roboto',
+  'Arial Unicode MS',
 ];
 
 TextTheme _withFontFallback(TextTheme base, List<String> fallback) {
@@ -131,6 +143,7 @@ ThemeData buildLightTheme(ColorScheme? dynamicScheme) {
   );
   // _logColorScheme('Light ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
 
+  final fallback = PlatformUtils.isWindows ? kWindowsFontFamilyFallback : kDefaultFontFamilyFallback;
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
@@ -160,7 +173,7 @@ ThemeData buildLightTheme(ColorScheme? dynamicScheme) {
         color: Colors.black,
         fontSize: 18,
         fontWeight: FontWeight.w600,
-      ).copyWith(fontFamilyFallback: kDefaultFontFamilyFallback),
+      ).copyWith(fontFamilyFallback: fallback),
       iconTheme: const IconThemeData(color: Colors.black),
       actionsIconTheme: const IconThemeData(color: Colors.black),
       systemOverlayStyle: const SystemUiOverlayStyle(
@@ -173,8 +186,8 @@ ThemeData buildLightTheme(ColorScheme? dynamicScheme) {
     ),
   );
   return theme.copyWith(
-    textTheme: _withFontFallback(theme.textTheme, kDefaultFontFamilyFallback),
-    primaryTextTheme: _withFontFallback(theme.primaryTextTheme, kDefaultFontFamilyFallback),
+    textTheme: _withFontFallback(theme.textTheme, fallback),
+    primaryTextTheme: _withFontFallback(theme.primaryTextTheme, fallback),
   );
 }
 
@@ -183,6 +196,7 @@ ThemeData buildLightThemeForScheme(ColorScheme staticScheme, {ColorScheme? dynam
   final scheme = (dynamicScheme?.harmonized()) ?? staticScheme;
   // Align logging behavior with buildLightTheme so diagnostics are consistent.
   // _logColorScheme('Light ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
+  final fallback = PlatformUtils.isWindows ? kWindowsFontFamilyFallback : kDefaultFontFamilyFallback;
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
@@ -212,7 +226,7 @@ ThemeData buildLightThemeForScheme(ColorScheme staticScheme, {ColorScheme? dynam
         color: Colors.black,
         fontSize: 18,
         fontWeight: FontWeight.w600,
-      ).copyWith(fontFamilyFallback: kDefaultFontFamilyFallback),
+      ).copyWith(fontFamilyFallback: fallback),
       iconTheme: const IconThemeData(color: Colors.black),
       actionsIconTheme: const IconThemeData(color: Colors.black),
       systemOverlayStyle: SystemUiOverlayStyle(
@@ -223,8 +237,8 @@ ThemeData buildLightThemeForScheme(ColorScheme staticScheme, {ColorScheme? dynam
     ),
   );
   return theme.copyWith(
-    textTheme: _withFontFallback(theme.textTheme, kDefaultFontFamilyFallback),
-    primaryTextTheme: _withFontFallback(theme.primaryTextTheme, kDefaultFontFamilyFallback),
+    textTheme: _withFontFallback(theme.textTheme, fallback),
+    primaryTextTheme: _withFontFallback(theme.primaryTextTheme, fallback),
   );
 }
 
@@ -264,6 +278,7 @@ ThemeData buildDarkTheme(ColorScheme? dynamicScheme) {
   );
   // _logColorScheme('Dark ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
 
+  final fallback = PlatformUtils.isWindows ? kWindowsFontFamilyFallback : kDefaultFontFamilyFallback;
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
@@ -293,7 +308,7 @@ ThemeData buildDarkTheme(ColorScheme? dynamicScheme) {
         color: Colors.white,
         fontSize: 18,
         fontWeight: FontWeight.w600,
-      ).copyWith(fontFamilyFallback: kDefaultFontFamilyFallback),
+      ).copyWith(fontFamilyFallback: fallback),
       iconTheme: const IconThemeData(color: Colors.white),
       actionsIconTheme: const IconThemeData(color: Colors.white),
       systemOverlayStyle: const SystemUiOverlayStyle(
@@ -306,8 +321,8 @@ ThemeData buildDarkTheme(ColorScheme? dynamicScheme) {
     ),
   );
   return theme.copyWith(
-    textTheme: _withFontFallback(theme.textTheme, kDefaultFontFamilyFallback),
-    primaryTextTheme: _withFontFallback(theme.primaryTextTheme, kDefaultFontFamilyFallback),
+    textTheme: _withFontFallback(theme.textTheme, fallback),
+    primaryTextTheme: _withFontFallback(theme.primaryTextTheme, fallback),
   );
 }
 
@@ -315,6 +330,7 @@ ThemeData buildDarkThemeForScheme(ColorScheme staticScheme, {ColorScheme? dynami
   final scheme = (dynamicScheme?.harmonized()) ?? staticScheme;
   // Align logging behavior with buildDarkTheme so diagnostics are consistent.
   // _logColorScheme('Dark ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
+  final fallback = PlatformUtils.isWindows ? kWindowsFontFamilyFallback : kDefaultFontFamilyFallback;
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
@@ -344,7 +360,7 @@ ThemeData buildDarkThemeForScheme(ColorScheme staticScheme, {ColorScheme? dynami
         color: Colors.white,
         fontSize: 18,
         fontWeight: FontWeight.w600,
-      ).copyWith(fontFamilyFallback: kDefaultFontFamilyFallback),
+      ).copyWith(fontFamilyFallback: fallback),
       iconTheme: const IconThemeData(color: Colors.white),
       actionsIconTheme: const IconThemeData(color: Colors.white),
       systemOverlayStyle: SystemUiOverlayStyle(
@@ -355,7 +371,7 @@ ThemeData buildDarkThemeForScheme(ColorScheme staticScheme, {ColorScheme? dynami
     ),
   );
   return theme.copyWith(
-    textTheme: _withFontFallback(theme.textTheme, kDefaultFontFamilyFallback),
-    primaryTextTheme: _withFontFallback(theme.primaryTextTheme, kDefaultFontFamilyFallback),
+    textTheme: _withFontFallback(theme.textTheme, fallback),
+    primaryTextTheme: _withFontFallback(theme.primaryTextTheme, fallback),
   );
 }

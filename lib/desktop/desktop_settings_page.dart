@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
-import 'dart:math' as math;
 
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
 import '../theme/palettes.dart';
 import '../core/providers/settings_provider.dart';
+import '../core/providers/assistant_provider.dart';
 import '../shared/widgets/ios_switch.dart';
+import '../features/assistant/pages/assistant_settings_page.dart';
+import '../features/provider/pages/providers_page.dart';
+import '../features/model/pages/default_model_page.dart';
+import '../features/search/pages/search_services_page.dart';
+import '../features/mcp/pages/mcp_page.dart';
+import '../features/quick_phrase/pages/quick_phrases_page.dart';
+import '../features/settings/pages/tts_services_page.dart';
+import '../features/backup/pages/backup_page.dart';
+import '../features/settings/pages/about_page.dart';
 
 /// Desktop settings layout: left menu + vertical divider + right content.
-/// For now, only the left menu and the Display Settings content are implemented.
+/// All settings pages are now implemented.
 class DesktopSettingsPage extends StatefulWidget {
   const DesktopSettingsPage({super.key});
 
@@ -33,6 +42,31 @@ enum _SettingsMenuItem {
 
 class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   _SettingsMenuItem _selected = _SettingsMenuItem.display;
+
+  Widget _buildBody(_SettingsMenuItem item) {
+    switch (item) {
+      case _SettingsMenuItem.display:
+        return const _DisplaySettingsBody(key: ValueKey('display'));
+      case _SettingsMenuItem.assistant:
+        return const _AssistantSettingsBody(key: ValueKey('assistant'));
+      case _SettingsMenuItem.providers:
+        return const _ProvidersSettingsBody(key: ValueKey('providers'));
+      case _SettingsMenuItem.defaultModel:
+        return const _DefaultModelSettingsBody(key: ValueKey('defaultModel'));
+      case _SettingsMenuItem.search:
+        return const _SearchSettingsBody(key: ValueKey('search'));
+      case _SettingsMenuItem.mcp:
+        return const _McpSettingsBody(key: ValueKey('mcp'));
+      case _SettingsMenuItem.quickPhrases:
+        return const _QuickPhrasesSettingsBody(key: ValueKey('quickPhrases'));
+      case _SettingsMenuItem.tts:
+        return const _TtsSettingsBody(key: ValueKey('tts'));
+      case _SettingsMenuItem.backup:
+        return const _BackupSettingsBody(key: ValueKey('backup'));
+      case _SettingsMenuItem.about:
+        return const _AboutSettingsBody(key: ValueKey('about'));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,9 +143,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
                     switchInCurve: Curves.easeOutCubic,
-                    child: _selected == _SettingsMenuItem.display
-                        ? const _DisplaySettingsBody(key: ValueKey('display'))
-                        : _ComingSoonBody(selected: _selected),
+                    child: _buildBody(_selected),
                   ),
                 ),
               ],
@@ -1526,6 +1558,439 @@ class _BackgroundMaskRowState extends State<_BackgroundMaskRow> {
           const SizedBox(width: 8),
           Text('%', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 14, decoration: TextDecoration.none)),
         ],
+      ),
+    );
+  }
+}
+
+// ===== Assistant Settings Body =====
+
+class _AssistantSettingsBody extends StatelessWidget {
+  const _AssistantSettingsBody({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final assistantProvider = context.watch<AssistantProvider>();
+
+    return Container(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsCard(
+                title: l10n.settingsPageAssistant,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const AssistantSettingsPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(lucide.Lucide.Settings, size: 18),
+                        label: Text(l10n.settingsPageAssistant),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ===== Providers Settings Body =====
+
+class _ProvidersSettingsBody extends StatelessWidget {
+  const _ProvidersSettingsBody({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Container(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsCard(
+                title: l10n.settingsPageProviders,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const ProvidersPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(lucide.Lucide.Settings, size: 18),
+                        label: Text(l10n.settingsPageProviders),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ===== Default Model Settings Body =====
+
+class _DefaultModelSettingsBody extends StatelessWidget {
+  const _DefaultModelSettingsBody({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Container(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsCard(
+                title: l10n.settingsPageDefaultModel,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const DefaultModelPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(lucide.Lucide.Settings, size: 18),
+                        label: Text(l10n.settingsPageDefaultModel),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ===== Search Settings Body =====
+
+class _SearchSettingsBody extends StatelessWidget {
+  const _SearchSettingsBody({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Container(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsCard(
+                title: l10n.settingsPageSearch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const SearchServicesPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(lucide.Lucide.Settings, size: 18),
+                        label: Text(l10n.settingsPageSearch),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ===== MCP Settings Body =====
+
+class _McpSettingsBody extends StatelessWidget {
+  const _McpSettingsBody({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Container(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsCard(
+                title: l10n.settingsPageMcp,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const McpPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(lucide.Lucide.Settings, size: 18),
+                        label: Text(l10n.settingsPageMcp),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ===== Quick Phrases Settings Body =====
+
+class _QuickPhrasesSettingsBody extends StatelessWidget {
+  const _QuickPhrasesSettingsBody({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Container(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsCard(
+                title: l10n.settingsPageQuickPhrase,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const QuickPhrasesPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(lucide.Lucide.Settings, size: 18),
+                        label: Text(l10n.settingsPageQuickPhrase),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ===== TTS Settings Body =====
+
+class _TtsSettingsBody extends StatelessWidget {
+  const _TtsSettingsBody({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Container(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsCard(
+                title: l10n.settingsPageTts,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const TtsServicesPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(lucide.Lucide.Settings, size: 18),
+                        label: Text(l10n.settingsPageTts),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ===== Backup Settings Body =====
+
+class _BackupSettingsBody extends StatelessWidget {
+  const _BackupSettingsBody({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Container(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsCard(
+                title: l10n.settingsPageBackup,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const BackupPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(lucide.Lucide.Settings, size: 18),
+                        label: Text(l10n.settingsPageBackup),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ===== About Settings Body =====
+
+class _AboutSettingsBody extends StatelessWidget {
+  const _AboutSettingsBody({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Container(
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsCard(
+                title: l10n.settingsPageAbout,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const AboutPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(lucide.Lucide.info, size: 18),
+                        label: Text(l10n.settingsPageAbout),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

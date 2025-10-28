@@ -30,6 +30,7 @@ import 'utils/sandbox_path_resolver.dart';
 import 'shared/widgets/snackbar.dart';
 
 final RouteObserver<ModalRoute<dynamic>> routeObserver = RouteObserver<ModalRoute<dynamic>>();
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 bool _didCheckUpdates = false; // one-time update check flag
 bool _didEnsureAssistants = false; // ensure defaults after l10n ready
 
@@ -68,6 +69,10 @@ Future<void> _initDesktopWindow() async {
   } catch (e) {
     debugPrint('Desktop window initialization failed: $e');
   }
+}
+
+class BackIntent extends Intent {
+  const BackIntent();
 }
 
 class MyApp extends StatelessWidget {
@@ -137,6 +142,7 @@ class MyApp extends StatelessWidget {
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
                 title: 'Kelivo',
+                navigatorKey: appNavigatorKey,
                 // App UI language; null = follow system (respects iOS per-app language)
                 locale: settings.appLocaleForMaterialApp,
                 supportedLocales: AppLocalizations.supportedLocales,
@@ -177,10 +183,32 @@ class MyApp extends StatelessWidget {
                 });
               }
 
-                  return AnnotatedRegion<SystemUiOverlayStyle>(
-                    value: overlay,
-                    child: AppSnackBarOverlay(
-                      child: child ?? const SizedBox.shrink(),
+                  return Shortcuts(
+                    shortcuts: <LogicalKeySet, Intent>{
+                      // ESC: close dialog/sheet or pop route
+                      LogicalKeySet(LogicalKeyboardKey.escape): const BackIntent(),
+                      // Ctrl+W: common desktop close-tab/back gesture
+                      LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyW): const BackIntent(),
+                    },
+                    child: Actions(
+                      actions: <Type, Action<Intent>>{
+                        BackIntent: CallbackAction<BackIntent>(
+                          onInvoke: (intent) {
+                            final nav = appNavigatorKey.currentState;
+                            nav?.maybePop();
+                            return null;
+                          },
+                        ),
+                      },
+                      child: Focus(
+                        autofocus: true,
+                        child: AnnotatedRegion<SystemUiOverlayStyle>(
+                          value: overlay,
+                          child: AppSnackBarOverlay(
+                            child: child ?? const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
                     ),
                   );
                 },

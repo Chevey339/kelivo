@@ -1,4 +1,4 @@
-name: kelivo
+﻿name: kelivo
 description: "An LLM chat client."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -68,6 +68,7 @@ dependencies:
   mcp_client: ^1.0.2
   flutter_highlight: ^0.7.0
   syncfusion_flutter_sliders: ^30.2.6
+  # TTS 功能: Windows 平台通过条件导入使用 stub 实现,不会实际调用 flutter_tts
   flutter_tts: ^4.2.3
   html: ^0.15.6
   animations: ^2.0.11
@@ -97,8 +98,12 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
 
-# dependency_overrides 已移除，直接使用 pub.dev 上的 flutter_tts
-# Windows 平台的兼容性问题通过 GitHub Actions workflow 中的 workaround 处理
+# Windows 平台 TTS 兼容性说�?
+# flutter_tts �?Windows 上可能存在编译问�?但通过条件导入 (conditional imports)
+# �?lib/core/services/tts/ 中实现了平台特定的适配:
+# - Windows 使用 stub 实现 (tts_stub.dart),不会实际调用 flutter_tts
+# - 移动平台使用真实实现 (tts_impl.dart),调用 flutter_tts
+# 因此无需在构建时手动禁用 flutter_tts 依赖
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

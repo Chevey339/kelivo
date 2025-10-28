@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'dart:ui' as ui;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_tts/flutter_tts.dart';
+import '../services/tts/tts_factory.dart';
 
-/// System TTS provider using flutter_tts.
+/// System TTS provider using platform-specific TTS implementation.
 /// Keeps minimal state and simple chunked speaking for long text.
 class TtsProvider extends ChangeNotifier {
   static const String _rateKey = 'tts_speech_rate_v1';
@@ -12,7 +12,7 @@ class TtsProvider extends ChangeNotifier {
   static const String _engineKey = 'tts_engine_v1';
   static const String _langKey = 'tts_language_v1';
 
-  late FlutterTts _tts;
+  late TtsInterface _tts;
 
   bool _initialized = false;
   bool _engineReady = false;
@@ -47,14 +47,15 @@ class TtsProvider extends ChangeNotifier {
 
   Future<void> _init() async {
     try {
-      // Windows 平台暂不实现 TTS，直接返回可用但提示未实现
+      // Windows 平台使用 stub 实现，不会报错
       if (defaultTargetPlatform == TargetPlatform.windows) {
+        _tts = createTts();
         _initialized = true;
         _error = 'Windows 平台暂未实现 TTS 功能';
         notifyListeners();
         return;
       }
-      _tts = FlutterTts();
+      _tts = createTts();
       // Load settings
       final prefs = await SharedPreferences.getInstance();
       _speechRate = (prefs.getDouble(_rateKey) ?? 0.5).clamp(0.1, 1.0);
@@ -140,7 +141,7 @@ class TtsProvider extends ChangeNotifier {
   Future<void> _recreateEngine() async {
     try { await _tts.stop(); } catch (_) {}
     _engineReady = false;
-    _tts = FlutterTts();
+    _tts = createTts();
     // Rebind event handlers
     _tts.setStartHandler(() {
       _isSpeaking = true;
@@ -173,8 +174,8 @@ class TtsProvider extends ChangeNotifier {
 
   Future<void> _kickEngine() async {
     // Querying languages/engines tends to trigger binding on Android.
-    try { await _tts.getLanguages; } catch (_) {}
-    try { await _tts.getEngines; } catch (_) {}
+    try { await _tts.getLanguages(); } catch (_) {}
+    try { await _tts.getEngines(); } catch (_) {}
   }
 
   Future<void> _ensureBound({Duration timeout = const Duration(seconds: 3)}) async {
@@ -182,7 +183,7 @@ class TtsProvider extends ChangeNotifier {
     final deadline = DateTime.now().add(timeout);
     while (DateTime.now().isBefore(deadline)) {
       try {
-        final langs = await _tts.getLanguages;
+        final langs = await _tts.getLanguages();
         if (langs != null) {
           _engineReady = true;
           notifyListeners();
@@ -198,7 +199,7 @@ class TtsProvider extends ChangeNotifier {
   Future<void> _selectEngine() async {
     // Android only: choose Google engine if present, otherwise first available
     try {
-      final engines = await _tts.getEngines;
+      final engines = await _tts.getEngines();
       if (engines is List && engines.isNotEmpty) {
         String? chosen;
         for (final e in engines) {
@@ -237,7 +238,7 @@ class TtsProvider extends ChangeNotifier {
 
   Future<List<String>> listEngines() async {
     try {
-      final res = await _tts.getEngines;
+      final res = await _tts.getEngines();
       if (res is List) return res.map((e) => e.toString()).toList();
     } catch (_) {}
     return const <String>[];
@@ -245,7 +246,7 @@ class TtsProvider extends ChangeNotifier {
 
   Future<List<String>> listLanguages() async {
     try {
-      final res = await _tts.getLanguages;
+      final res = await _tts.getLanguages();
       if (res is List) return res.map((e) => e.toString()).toList();
     } catch (_) {}
     return const <String>[];
