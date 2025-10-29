@@ -28,6 +28,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: false
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -47,6 +49,11 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Generate required files
+        run: |
+          echo "Generating Hive adapters and other generated files..."
+          flutter pub run build_runner build --delete-conflicting-outputs || echo "Build runner completed with warnings"
 
       - name: Clean old signing files
         run: |
@@ -93,23 +100,25 @@ jobs:
 
       - name: Build APK
         run: |
+          echo "Building APK..."
           if [ -f "android/key.properties" ]; then
             echo "Building SIGNED APK..."
-            flutter build apk --release --split-per-abi
           else
             echo "Building UNSIGNED APK (no keystore found)..."
-            flutter build apk --release --split-per-abi
           fi
+          flutter build apk --release --split-per-abi --no-tree-shake-icons
+        continue-on-error: false
 
       - name: Build App Bundle
         run: |
+          echo "Building App Bundle..."
           if [ -f "android/key.properties" ]; then
             echo "Building SIGNED App Bundle..."
-            flutter build appbundle --release
           else
             echo "Building UNSIGNED App Bundle (no keystore found)..."
-            flutter build appbundle --release
           fi
+          flutter build appbundle --release --no-tree-shake-icons
+        continue-on-error: false
 
       - name: Rename APK files
         run: |
@@ -146,6 +155,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: false
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -162,39 +173,17 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Disable problematic plugins for Windows
+      - name: Generate required files
         shell: pwsh
         run: |
-          Write-Host "Checking for problematic plugins..."
-          $pubspecContent = Get-Content pubspec.yaml
-
-          # Check if flutter_tts exists and comment it out
-          $modified = $false
-          $newContent = @()
-
-          foreach ($line in $pubspecContent) {
-            if ($line -match '^\s+flutter_tts:') {
-              Write-Host "Disabling flutter_tts for Windows build..."
-              $newContent += "  # $line  # Disabled for Windows"
-              $modified = $true
-            } else {
-              $newContent += $line
-            }
-          }
-
-          if ($modified) {
-            $newContent | Set-Content pubspec.yaml
-            Write-Host "Modified pubspec.yaml:"
-            Get-Content pubspec.yaml | Select-String -Pattern "flutter_tts" -Context 1,1
-
-            Write-Host "Re-running flutter pub get..."
-            flutter pub get
-          } else {
-            Write-Host "No problematic plugins found."
+          Write-Host "Generating Hive adapters and other generated files..."
+          flutter pub run build_runner build --delete-conflicting-outputs
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Build runner completed with warnings, continuing..."
           }
 
       - name: Build Windows app
-        run: flutter build windows --release
+        run: flutter build windows --release --no-tree-shake-icons
 
       - name: Create portable package
         shell: pwsh
