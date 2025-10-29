@@ -602,6 +602,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           ReorderableListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             itemCount: models.length,
+            buildDefaultDragHandles: false, // 禁用默认拖动手柄，使用自定义的
             onReorder: (oldIndex, newIndex) async {
               if (newIndex > oldIndex) newIndex -= 1;
               final id = models[oldIndex];
@@ -632,40 +633,38 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               final cs = Theme.of(context).colorScheme;
               return KeyedSubtree(
                 key: ValueKey('reorder-model-$id'),
-                child: ReorderableDelayedDragStartListener(
-                  index: i,
-                  child: Slidable(
-                    key: ValueKey('model-$id'),
-                    endActionPane: ActionPane(
-                      motion: const StretchMotion(),
-                      extentRatio: 0.42,
-                      children: [
-                        CustomSlidableAction(
-                          autoClose: true,
-                          backgroundColor: Colors.transparent,
-                          child: Container(
-                            width: double.infinity,
-                            height: double.infinity,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).brightness == Brightness.dark ? cs.error.withOpacity(0.22) : cs.error.withOpacity(0.14),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: cs.error.withOpacity(0.35)),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            alignment: Alignment.center,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Lucide.Trash2, color: cs.error, size: 18),
-                                  const SizedBox(width: 6),
-                                  Text(l10n.providerDetailPageDeleteModelButton, style: TextStyle(color: cs.error, fontWeight: FontWeight.w700)),
-                                ],
-                              ),
+                child: Slidable(
+                  key: ValueKey('model-$id'),
+                  endActionPane: ActionPane(
+                    motion: const StretchMotion(),
+                    extentRatio: 0.42,
+                    children: [
+                      CustomSlidableAction(
+                        autoClose: true,
+                        backgroundColor: Colors.transparent,
+                        child: Container(
+                          width: double.infinity,
+                          height: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).brightness == Brightness.dark ? cs.error.withOpacity(0.22) : cs.error.withOpacity(0.14),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: cs.error.withOpacity(0.35)),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          alignment: Alignment.center,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Lucide.Trash2, color: cs.error, size: 18),
+                                const SizedBox(width: 6),
+                                Text(l10n.providerDetailPageDeleteModelButton, style: TextStyle(color: cs.error, fontWeight: FontWeight.w700)),
+                              ],
                             ),
                           ),
-                          onPressed: (_) async {
+                        ),
+                        onPressed: (_) async {
                             final ok = await showDialog<bool>(
                               context: context,
                               builder: (dctx) => AlertDialog(
@@ -716,8 +715,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                         ),
                       ],
                     ),
-                    child: _ModelCard(providerKey: widget.keyName, modelId: id),
-                  ),
+                  child: _ModelCard(providerKey: widget.keyName, modelId: id, reorderIndex: i),
                 ),
               );
             },
@@ -1648,9 +1646,10 @@ Widget _buildDismissBg(BuildContext context, {required bool alignStart}) {
 }
 
 class _ModelCard extends StatelessWidget {
-  const _ModelCard({required this.providerKey, required this.modelId});
+  const _ModelCard({required this.providerKey, required this.modelId, required this.reorderIndex});
   final String providerKey;
   final String modelId;
+  final int reorderIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -1659,9 +1658,10 @@ class _ModelCard extends StatelessWidget {
     return _TactileRow(
       pressedScale: 0.98,
       haptics: false,
-      onTap: () {},
+      onTap: null,
       builder: (pressed) {
         return Container(
+          clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
             color: cs.surface,
             borderRadius: BorderRadius.circular(12),
@@ -1670,27 +1670,75 @@ class _ModelCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
-                _BrandAvatar(name: modelId, size: 28),
-                const SizedBox(width: 10),
+                // 左侧内容区域：头像和名称（不包含拖动监听器，避免重复）
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(_displayName(context), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      _modelTagWrap(context, _effective(context)),
+                      _BrandAvatar(name: modelId, size: 28),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_displayName(context), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            _modelTagWrap(context, _effective(context)),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                _TactileIconButton(
-                  icon: Lucide.Settings2,
-                  color: cs.onSurface.withOpacity(0.7),
-                  size: 18,
-                  semanticLabel: l10n.providerDetailPageEditTooltip,
-                  haptics: false,
-                  onTap: () async {
-                    await showModelDetailSheet(context, providerKey: providerKey, modelId: modelId);
-                  },
+                // 右侧按钮区域 - 增加间距和更明确的布局
+                const SizedBox(width: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 设置按钮 - 使用 Ink 而不是 Container 避免背景色与 InkWell 叠加
+                    Material(
+                      color: Colors.transparent,
+                      child: Ink(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: cs.primary.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () async {
+                            await showModelDetailSheet(context, providerKey: providerKey, modelId: modelId);
+                          },
+                          child: Center(
+                            child: Icon(
+                              Lucide.Settings2,
+                              size: 18,
+                              color: cs.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // 拖动手柄按钮 - 移除背景色避免与 DragStartListener 的交互层叠加
+                    ReorderableDragStartListener(
+                      index: reorderIndex,
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.grab,
+                        child: SizedBox(
+                          width: 34,
+                          height: 34,
+                          child: Center(
+                            child: Icon(
+                              Lucide.GripHorizontal,
+                              size: 18,
+                              color: cs.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -2170,33 +2218,26 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   Widget build(BuildContext context) {
     final base = widget.color;
     final pressColor = base.withOpacity(0.7);
-    final icon = Icon(widget.icon, size: widget.size, color: _pressed ? pressColor : base, semanticLabel: widget.semanticLabel);
 
-    return Semantics(
-      button: true,
-      label: widget.semanticLabel,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
-        onTap: () {
-          // if (widget.haptics) Haptics.light();
-          widget.onTap();
-        },
-        onLongPress: widget.onLongPress == null
-            ? null
-            : () {
-                if (widget.haptics) Haptics.light();
-                widget.onLongPress!.call();
-              },
-        child: AnimatedScale(
-          scale: _pressed ? 0.95 : 1.0,
-          duration: const Duration(milliseconds: 100),
-          curve: Curves.easeOut,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-            child: icon,
+        onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
+        child: Container(
+          // 固定尺寸，防止布局问题
+          width: 32,
+          height: 32,
+          alignment: Alignment.center,
+          child: Icon(
+            widget.icon,
+            size: widget.size,
+            color: _pressed ? pressColor : base,
+            semanticLabel: widget.semanticLabel,
           ),
         ),
       ),
@@ -2211,17 +2252,20 @@ class _TactileRowState extends State<_TactileRow> {
   }
   @override
   Widget build(BuildContext context) {
+    // If no onTap, don't use GestureDetector to avoid blocking child interactions
+    if (widget.onTap == null) {
+      return widget.builder(_pressed);
+    }
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: widget.onTap == null ? null : (_) => _setPressed(true),
-      onTapUp: widget.onTap == null ? null : (_) => _setPressed(false),
-      onTapCancel: widget.onTap == null ? null : () => _setPressed(false),
-      onTap: widget.onTap == null
-          ? null
-          : () {
-              if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
-              widget.onTap!.call();
-            },
+      onTapDown: (_) => _setPressed(true),
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      onTap: () {
+        if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
+        widget.onTap!.call();
+      },
       child: AnimatedScale(
         scale: _pressed ? widget.pressedScale : 1.0,
         duration: const Duration(milliseconds: 110),
