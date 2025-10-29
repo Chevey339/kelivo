@@ -10,7 +10,9 @@ class DesktopChatPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Reuse existing chat experience (tablet branch) without modifying mobile implementation.
-    return const HomePage();
+    // Set isEmbeddedInDesktopNav to true to hide the sidebar bottom bar (user avatar and settings)
+    // since DesktopNavRail already provides these controls.
+    return const HomePage(isEmbeddedInDesktopNav: true);
   }
 }
 

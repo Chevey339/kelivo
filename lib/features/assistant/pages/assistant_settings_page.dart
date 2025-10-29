@@ -16,7 +16,10 @@ import '../../../core/services/haptics.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
 class AssistantSettingsPage extends StatelessWidget {
-  const AssistantSettingsPage({super.key});
+  const AssistantSettingsPage({super.key, this.embedded = false});
+
+  /// Whether this page is embedded in a desktop settings layout (no Scaffold/AppBar)
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +28,54 @@ class AssistantSettingsPage extends StatelessWidget {
 
     final assistants = context.watch<AssistantProvider>().assistants;
 
+    final bodyContent = ReorderableListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
+      itemCount: assistants.length,
+      onReorder: (oldIndex, newIndex) async {
+        if (newIndex > oldIndex) newIndex -= 1;
+        // Immediately update UI for smooth experience
+        final assistantProvider = context.read<AssistantProvider>();
+        await assistantProvider.reorderAssistants(oldIndex, newIndex);
+      },
+      proxyDecorator: (child, index, animation) {
+        return AnimatedBuilder(
+          animation: animation,
+          builder: (context, _) {
+            final t = Curves.easeOutBack.transform(animation.value);
+            return Transform.scale(
+              scale: 0.98 + 0.02 * t,
+              child: Material(
+                elevation: 0, // remove drag shadow
+                shadowColor: Colors.transparent,
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(14),
+                child: child,
+              ),
+            );
+          },
+        );
+      },
+      itemBuilder: (context, index) {
+        final item = assistants[index];
+        return KeyedSubtree(
+          key: ValueKey('reorder-assistant-${item.id}'),
+          child: ReorderableDelayedDragStartListener(
+            index: index,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _AssistantCard(item: item),
+            ),
+          ),
+        );
+      },
+    );
+
+    // If embedded, return body content directly without Scaffold
+    if (embedded) {
+      return bodyContent;
+    }
+
+    // Otherwise, return full page with Scaffold and AppBar
     return Scaffold(
       appBar: AppBar(
         leading: Tooltip(
@@ -58,47 +109,7 @@ class AssistantSettingsPage extends StatelessWidget {
           const SizedBox(width: 8),
         ],
       ),
-      body: ReorderableListView.builder(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
-        itemCount: assistants.length,
-        onReorder: (oldIndex, newIndex) async {
-          if (newIndex > oldIndex) newIndex -= 1;
-          // Immediately update UI for smooth experience
-          final assistantProvider = context.read<AssistantProvider>();
-          await assistantProvider.reorderAssistants(oldIndex, newIndex);
-        },
-        proxyDecorator: (child, index, animation) {
-          return AnimatedBuilder(
-            animation: animation,
-            builder: (context, _) {
-              final t = Curves.easeOutBack.transform(animation.value);
-              return Transform.scale(
-                scale: 0.98 + 0.02 * t,
-                child: Material(
-                  elevation: 0, // remove drag shadow
-                  shadowColor: Colors.transparent,
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                  child: child,
-                ),
-              );
-            },
-          );
-        },
-        itemBuilder: (context, index) {
-          final item = assistants[index];
-          return KeyedSubtree(
-            key: ValueKey('reorder-assistant-${item.id}'),
-            child: ReorderableDelayedDragStartListener(
-              index: index,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _AssistantCard(item: item),
-              ),
-            ),
-          );
-        },
-      ),
+      body: bodyContent,
     );
   }
 }

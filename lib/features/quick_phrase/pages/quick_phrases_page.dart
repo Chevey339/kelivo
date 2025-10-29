@@ -10,10 +10,13 @@ import 'package:uuid/uuid.dart';
 import '../../../core/services/haptics.dart';
 
 class QuickPhrasesPage extends StatefulWidget {
-  const QuickPhrasesPage({super.key, this.assistantId});
+  const QuickPhrasesPage({super.key, this.assistantId, this.embedded = false});
 
   final String?
   assistantId; // null = global phrases, non-null = assistant-specific
+
+  /// Whether this page is embedded in a desktop settings layout (no Scaffold/AppBar)
+  final bool embedded;
 
   @override
   State<QuickPhrasesPage> createState() => _QuickPhrasesPageState();
@@ -86,37 +89,8 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
         ? quickPhraseProvider.globalPhrases
         : quickPhraseProvider.getForAssistant(widget.assistantId!);
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: Tooltip(
-          message: l10n.quickPhraseBackTooltip,
-          child: _TactileIconButton(
-            icon: Lucide.ArrowLeft,
-            color: Theme.of(context).colorScheme.onSurface,
-            size: 22,
-            onTap: () => Navigator.of(context).maybePop(),
-          ),
-        ),
-        title: Text(
-          widget.assistantId == null
-              ? l10n.quickPhraseGlobalTitle
-              : l10n.quickPhraseAssistantTitle,
-        ),
-        actions: [
-          Tooltip(
-            message: l10n.quickPhraseAddTooltip,
-            child: _TactileIconButton(
-              icon: Lucide.Plus,
-              color: Theme.of(context).colorScheme.onSurface,
-              size: 22,
-              onTap: () => _showAddEditSheet(),
-            ),
-          ),
-          const SizedBox(width: 12),
-        ],
-      ),
-      body: phrases.isEmpty
-          ? Center(
+    final bodyContent = phrases.isEmpty
+        ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -280,7 +254,44 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
                   ),
                 );
               },
+            );
+
+    // If embedded, return body content directly without Scaffold
+    if (widget.embedded) {
+      return bodyContent;
+    }
+
+    // Otherwise, return full page with Scaffold and AppBar
+    return Scaffold(
+      appBar: AppBar(
+        leading: Tooltip(
+          message: l10n.quickPhraseBackTooltip,
+          child: _TactileIconButton(
+            icon: Lucide.ArrowLeft,
+            color: Theme.of(context).colorScheme.onSurface,
+            size: 22,
+            onTap: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        title: Text(
+          widget.assistantId == null
+              ? l10n.quickPhraseGlobalTitle
+              : l10n.quickPhraseAssistantTitle,
+        ),
+        actions: [
+          Tooltip(
+            message: l10n.quickPhraseAddTooltip,
+            child: _TactileIconButton(
+              icon: Lucide.Plus,
+              color: Theme.of(context).colorScheme.onSurface,
+              size: 22,
+              onTap: () => _showAddEditSheet(),
             ),
+          ),
+          const SizedBox(width: 12),
+        ],
+      ),
+      body: bodyContent,
     );
   }
 }

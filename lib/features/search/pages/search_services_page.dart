@@ -13,7 +13,10 @@ import '../../../utils/brand_assets.dart';
 import '../../../core/services/haptics.dart';
 
 class SearchServicesPage extends StatefulWidget {
-  const SearchServicesPage({super.key});
+  const SearchServicesPage({super.key, this.embedded = false});
+
+  /// Whether this page is embedded in a desktop settings layout (no Scaffold/AppBar)
+  final bool embedded;
 
   @override
   State<SearchServicesPage> createState() => _SearchServicesPageState();
@@ -148,6 +151,28 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     final cs = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
+    final bodyContent = ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        _sectionHeader(l10n.searchServicesPageSearchProviders, cs, first: true),
+        _iosSectionCard(children: [
+          for (int i = 0; i < _services.length; i++) ...[
+            _iosProviderRow(context, index: i),
+            if (i != _services.length - 1) _iosDivider(context),
+          ],
+        ]),
+        const SizedBox(height: 16),
+        _sectionHeader(l10n.searchServicesPageGeneralOptions, cs),
+        _buildCommonOptionsSection(context),
+      ],
+    );
+
+    // If embedded, return body content directly without Scaffold
+    if (widget.embedded) {
+      return bodyContent;
+    }
+
+    // Otherwise, return full page with Scaffold and AppBar
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
@@ -174,21 +199,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
           const SizedBox(width: 12),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
-          _sectionHeader(l10n.searchServicesPageSearchProviders, cs, first: true),
-          _iosSectionCard(children: [
-            for (int i = 0; i < _services.length; i++) ...[
-              _iosProviderRow(context, index: i),
-              if (i != _services.length - 1) _iosDivider(context),
-            ],
-          ]),
-          const SizedBox(height: 16),
-          _sectionHeader(l10n.searchServicesPageGeneralOptions, cs),
-          _buildCommonOptionsSection(context),
-        ],
-      ),
+      body: bodyContent,
     );
   }
 

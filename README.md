@@ -47,7 +47,7 @@
 | Android | ✅ 已支持 | Android 5.0+ |
 | iOS | ✅ 已支持 | iOS 12.0+ |
 | Harmony | ✅ 已支持 | [kelivo-ohos](https://github.com/Chevey339/kelivo-ohos) |
-| Windows | 🚧 计划中 | - |
+| Windows | ✅ 已支持 | 查看 [Windows 构建指南](BUILD_WINDOWS.md) |
 | macOS | 🚧 计划中 | - |
 | Web | 🚧 实验性 | - |
 

@@ -16,7 +16,10 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 
 class AboutPage extends StatefulWidget {
-  const AboutPage({super.key});
+  const AboutPage({super.key, this.embedded = false});
+
+  /// Whether this page is embedded in a desktop settings layout (no Scaffold/AppBar)
+  final bool embedded;
 
   @override
   State<AboutPage> createState() => _AboutPageState();
@@ -380,21 +383,7 @@ class _AboutPageState extends State<AboutPage> {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: Tooltip(
-          message: l10n.settingsPageBackButton,
-          child: _TactileIconButton(
-            icon: Lucide.ArrowLeft,
-            color: cs.onSurface,
-            size: 22,
-            onTap: () => Navigator.of(context).maybePop(),
-          ),
-        ),
-        title: Text(l10n.settingsPageAbout),
-        actions: const [SizedBox(width: 12)],
-      ),
-      body: ListView(
+    final bodyContent = ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
         children: [
           // Header card: left icon + right title/description
@@ -494,7 +483,29 @@ class _AboutPageState extends State<AboutPage> {
 
           const SizedBox(height: 24),
         ],
+      );
+
+    // If embedded, return body content directly without Scaffold
+    if (widget.embedded) {
+      return bodyContent;
+    }
+
+    // Otherwise, return full page with Scaffold and AppBar
+    return Scaffold(
+      appBar: AppBar(
+        leading: Tooltip(
+          message: l10n.settingsPageBackButton,
+          child: _TactileIconButton(
+            icon: Lucide.ArrowLeft,
+            color: cs.onSurface,
+            size: 22,
+            onTap: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        title: Text(l10n.settingsPageAbout),
+        actions: const [SizedBox(width: 12)],
       ),
+      body: bodyContent,
     );
   }
 }

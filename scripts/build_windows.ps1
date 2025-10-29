@@ -1,6 +1,41 @@
+<#
+.SYNOPSIS
+  Build Kelivo for Windows platform
+
+.DESCRIPTION
+  This script builds the Kelivo Flutter application for Windows.
+  It automatically handles Flutter SDK detection, dependency management,
+  and creates a portable distribution package.
+
+.PARAMETER Clean
+  Perform a clean build (removes build artifacts before building)
+
+.PARAMETER DisableTts
+  Disable flutter_tts plugin (default: $true)
+  The flutter_tts plugin requires NUGET.EXE on Windows which may not be available.
+  TTS functionality is handled by a stub implementation on Windows.
+
+.EXAMPLE
+  .\build_windows.ps1
+  Build with default settings (TTS disabled)
+
+.EXAMPLE
+  .\build_windows.ps1 -Clean
+  Clean build with TTS disabled
+
+.EXAMPLE
+  .\build_windows.ps1 -DisableTts:$false
+  Build with TTS enabled (requires NUGET.EXE)
+
+.OUTPUTS
+  - build/windows/x64/runner/Release/kelivo.exe
+  - dist/kelivo-windows-x64/ (portable folder)
+  - dist/kelivo-windows-x64.zip (distribution package)
+#>
+
 Param(
   [switch]$Clean,
-  [switch]$DisableTts
+  [switch]$DisableTts = $true  # Default to true for Windows compatibility
 )
 
 Set-StrictMode -Version Latest
@@ -63,6 +98,7 @@ try {
 
   if ($DisableTts) {
     Write-Section 'Temporarily disabling flutter_tts for Windows'
+    Write-Info 'flutter_tts is disabled by default for Windows builds to avoid NUGET.EXE dependency'
     $modified = $false
     $lines = $pubspecRaw -split "`n"
     $new = foreach ($l in $lines) {

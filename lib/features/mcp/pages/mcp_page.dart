@@ -12,7 +12,10 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 
 class McpPage extends StatelessWidget {
-  const McpPage({super.key});
+  const McpPage({super.key, this.embedded = false});
+
+  /// Whether this page is embedded in a desktop settings layout (no Scaffold/AppBar)
+  final bool embedded;
 
   Color _statusColor(BuildContext context, McpStatus s) {
     final cs = Theme.of(context).colorScheme;
@@ -122,39 +125,14 @@ class McpPage extends StatelessWidget {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: Tooltip(
-          message: l10n.mcpPageBackTooltip,
-          child: _TactileIconButton(
-            icon: Lucide.ArrowLeft,
-            color: cs.onSurface,
-            size: 22,
-            onTap: () => Navigator.of(context).maybePop(),
-          ),
-        ),
-        title: const Text('MCP'),
-        actions: [
-          Tooltip(
-            message: l10n.mcpPageAddMcpTooltip,
-            child: _TactileIconButton(
-              icon: Lucide.Plus,
-              color: cs.onSurface,
-              size: 22,
-              onTap: () async { await showMcpServerEditSheet(context); },
+    final bodyContent = servers.isEmpty
+        ? Center(
+            child: Text(
+              l10n.mcpPageNoServers,
+              style: TextStyle(color: cs.onSurface.withOpacity(0.6)),
             ),
-          ),
-          const SizedBox(width: 12),
-        ],
-      ),
-      body: servers.isEmpty
-          ? Center(
-              child: Text(
-                l10n.mcpPageNoServers,
-                style: TextStyle(color: cs.onSurface.withOpacity(0.6)),
-              ),
-            )
-          : ListView.builder(
+          )
+        : ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               itemCount: servers.length,
               itemBuilder: (context, index) {
@@ -379,7 +357,40 @@ class McpPage extends StatelessWidget {
                   ),
                 );
               },
+            );
+
+    // If embedded, return body content directly without Scaffold
+    if (embedded) {
+      return bodyContent;
+    }
+
+    // Otherwise, return full page with Scaffold and AppBar
+    return Scaffold(
+      appBar: AppBar(
+        leading: Tooltip(
+          message: l10n.mcpPageBackTooltip,
+          child: _TactileIconButton(
+            icon: Lucide.ArrowLeft,
+            color: cs.onSurface,
+            size: 22,
+            onTap: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        title: const Text('MCP'),
+        actions: [
+          Tooltip(
+            message: l10n.mcpPageAddMcpTooltip,
+            child: _TactileIconButton(
+              icon: Lucide.Plus,
+              color: cs.onSurface,
+              size: 22,
+              onTap: () async { await showMcpServerEditSheet(context); },
             ),
+          ),
+          const SizedBox(width: 12),
+        ],
+      ),
+      body: bodyContent,
     );
   }
 }

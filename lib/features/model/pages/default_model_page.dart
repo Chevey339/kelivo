@@ -12,7 +12,10 @@ import '../../../utils/brand_assets.dart';
 import '../../../core/services/haptics.dart';
 
 class DefaultModelPage extends StatelessWidget {
-  const DefaultModelPage({super.key});
+  const DefaultModelPage({super.key, this.embedded = false});
+
+  /// Whether this page is embedded in a desktop settings layout (no Scaffold/AppBar)
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +37,65 @@ class DefaultModelPage extends StatelessWidget {
       }
     }
 
+    final bodyContent = ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        _ModelCard(
+          icon: Lucide.MessageCircle,
+          title: l10n.defaultModelPageChatModelTitle,
+          subtitle: l10n.defaultModelPageChatModelSubtitle,
+          modelProvider: settings.currentModelProvider,
+          modelId: settings.currentModelId,
+          onPick: () async {
+            final sel = await showModelSelector(context);
+            if (sel != null) {
+              await context.read<SettingsProvider>().setCurrentModel(sel.providerKey, sel.modelId);
+            }
+          },
+        ),
+        const SizedBox(height: 16),
+        _ModelCard(
+          icon: Lucide.NotebookTabs,
+          title: l10n.defaultModelPageTitleModelTitle,
+          subtitle: l10n.defaultModelPageTitleModelSubtitle,
+          modelProvider: settings.titleModelProvider,
+          modelId: settings.titleModelId,
+          fallbackProvider: settings.currentModelProvider,
+          fallbackModelId: settings.currentModelId,
+          onPick: () async {
+            final sel = await showModelSelector(context);
+            if (sel != null) {
+              await context.read<SettingsProvider>().setTitleModel(sel.providerKey, sel.modelId);
+            }
+          },
+          configAction: () => _showTitlePromptSheet(context),
+        ),
+        const SizedBox(height: 16),
+        _ModelCard(
+          icon: Lucide.Languages,
+          title: l10n.defaultModelPageTranslateModelTitle,
+          subtitle: l10n.defaultModelPageTranslateModelSubtitle,
+          modelProvider: settings.translateModelProvider,
+          modelId: settings.translateModelId,
+          fallbackProvider: settings.currentModelProvider,
+          fallbackModelId: settings.currentModelId,
+          onPick: () async {
+            final sel = await showModelSelector(context);
+            if (sel != null) {
+              await context.read<SettingsProvider>().setTranslateModel(sel.providerKey, sel.modelId);
+            }
+          },
+          configAction: () => _showTranslatePromptSheet(context),
+        ),
+      ],
+    );
+
+    // If embedded, return body content directly without Scaffold
+    if (embedded) {
+      return bodyContent;
+    }
+
+    // Otherwise, return full page with Scaffold and AppBar
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
@@ -49,58 +111,7 @@ class DefaultModelPage extends StatelessWidget {
         title: Text(l10n.defaultModelPageTitle),
         actions: const [SizedBox(width: 12)],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        children: [
-          _ModelCard(
-            icon: Lucide.MessageCircle,
-            title: l10n.defaultModelPageChatModelTitle,
-            subtitle: l10n.defaultModelPageChatModelSubtitle,
-            modelProvider: settings.currentModelProvider,
-            modelId: settings.currentModelId,
-            onPick: () async {
-              final sel = await showModelSelector(context);
-              if (sel != null) {
-                await context.read<SettingsProvider>().setCurrentModel(sel.providerKey, sel.modelId);
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-          _ModelCard(
-            icon: Lucide.NotebookTabs,
-            title: l10n.defaultModelPageTitleModelTitle,
-            subtitle: l10n.defaultModelPageTitleModelSubtitle,
-            modelProvider: settings.titleModelProvider,
-            modelId: settings.titleModelId,
-            fallbackProvider: settings.currentModelProvider,
-            fallbackModelId: settings.currentModelId,
-            onPick: () async {
-              final sel = await showModelSelector(context);
-              if (sel != null) {
-                await context.read<SettingsProvider>().setTitleModel(sel.providerKey, sel.modelId);
-              }
-            },
-            configAction: () => _showTitlePromptSheet(context),
-          ),
-          const SizedBox(height: 16),
-          _ModelCard(
-            icon: Lucide.Languages,
-            title: l10n.defaultModelPageTranslateModelTitle,
-            subtitle: l10n.defaultModelPageTranslateModelSubtitle,
-            modelProvider: settings.translateModelProvider,
-            modelId: settings.translateModelId,
-            fallbackProvider: settings.currentModelProvider,
-            fallbackModelId: settings.currentModelId,
-            onPick: () async {
-              final sel = await showModelSelector(context);
-              if (sel != null) {
-                await context.read<SettingsProvider>().setTranslateModel(sel.providerKey, sel.modelId);
-              }
-            },
-            configAction: () => _showTranslatePromptSheet(context),
-          ),
-        ],
-      ),
+      body: bodyContent,
     );
   }
 

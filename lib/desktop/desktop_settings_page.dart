@@ -1570,45 +1570,8 @@ class _AssistantSettingsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final assistantProvider = context.watch<AssistantProvider>();
-
-    return Container(
-      alignment: Alignment.topCenter,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SettingsCard(
-                title: l10n.settingsPageAssistant,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const AssistantSettingsPage(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(lucide.Lucide.Settings, size: 18),
-                        label: Text(l10n.settingsPageAssistant),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    // Embed AssistantSettingsPage content directly without navigation
+    return const AssistantSettingsPage(embedded: true);
   }
 }
 
@@ -1619,44 +1582,8 @@ class _ProvidersSettingsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return Container(
-      alignment: Alignment.topCenter,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SettingsCard(
-                title: l10n.settingsPageProviders,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const ProvidersPage(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(lucide.Lucide.Settings, size: 18),
-                        label: Text(l10n.settingsPageProviders),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    // Embed ProvidersPage content directly without navigation
+    return const ProvidersPage(embedded: true);
   }
 }
 
@@ -1667,44 +1594,8 @@ class _DefaultModelSettingsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return Container(
-      alignment: Alignment.topCenter,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SettingsCard(
-                title: l10n.settingsPageDefaultModel,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const DefaultModelPage(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(lucide.Lucide.Settings, size: 18),
-                        label: Text(l10n.settingsPageDefaultModel),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    // Embed DefaultModelPage content directly without navigation
+    return const DefaultModelPage(embedded: true);
   }
 }
 
@@ -1715,44 +1606,8 @@ class _SearchSettingsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return Container(
-      alignment: Alignment.topCenter,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SettingsCard(
-                title: l10n.settingsPageSearch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const SearchServicesPage(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(lucide.Lucide.Settings, size: 18),
-                        label: Text(l10n.settingsPageSearch),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    // Embed SearchServicesPage content directly without navigation
+    return const SearchServicesPage(embedded: true);
   }
 }
 
@@ -1763,44 +1618,8 @@ class _McpSettingsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return Container(
-      alignment: Alignment.topCenter,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SettingsCard(
-                title: l10n.settingsPageMcp,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const McpPage(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(lucide.Lucide.Settings, size: 18),
-                        label: Text(l10n.settingsPageMcp),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    // Embed McpPage content directly without navigation
+    return const McpPage(embedded: true);
   }
 }
 
@@ -1811,44 +1630,8 @@ class _QuickPhrasesSettingsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return Container(
-      alignment: Alignment.topCenter,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SettingsCard(
-                title: l10n.settingsPageQuickPhrase,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const QuickPhrasesPage(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(lucide.Lucide.Settings, size: 18),
-                        label: Text(l10n.settingsPageQuickPhrase),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    // Embed QuickPhrasesPage content directly without navigation
+    return const QuickPhrasesPage(embedded: true);
   }
 }
 
@@ -1859,44 +1642,8 @@ class _TtsSettingsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return Container(
-      alignment: Alignment.topCenter,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SettingsCard(
-                title: l10n.settingsPageTts,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const TtsServicesPage(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(lucide.Lucide.Settings, size: 18),
-                        label: Text(l10n.settingsPageTts),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    // Embed TtsServicesPage content directly without navigation
+    return const TtsServicesPage(embedded: true);
   }
 }
 
@@ -1907,44 +1654,8 @@ class _BackupSettingsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return Container(
-      alignment: Alignment.topCenter,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SettingsCard(
-                title: l10n.settingsPageBackup,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const BackupPage(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(lucide.Lucide.Settings, size: 18),
-                        label: Text(l10n.settingsPageBackup),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    // Embed BackupPage content directly without navigation
+    return const BackupPage(embedded: true);
   }
 }
 
@@ -1955,43 +1666,7 @@ class _AboutSettingsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return Container(
-      alignment: Alignment.topCenter,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SettingsCard(
-                title: l10n.settingsPageAbout,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const AboutPage(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(lucide.Lucide.info, size: 18),
-                        label: Text(l10n.settingsPageAbout),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    // Embed AboutPage content directly without navigation
+    return const AboutPage(embedded: true);
   }
 }

@@ -612,7 +612,23 @@ class ChatApiService {
       final List<Map<String, dynamic>> toolList = [];
       if (tools != null && tools.isNotEmpty) {
         for (final t in tools) {
-          if (t is Map<String, dynamic>) toolList.add(Map<String, dynamic>.from(t));
+          if (t is Map<String, dynamic>) {
+            // Convert Chat Completions format to Response API format
+            // Chat Completions: {"type": "function", "function": {"name": "...", "description": "...", "parameters": {...}}}
+            // Response API: {"type": "function", "name": "...", "description": "...", "parameters": {...}}
+            if (t['type'] == 'function' && t['function'] is Map) {
+              final func = t['function'] as Map<String, dynamic>;
+              toolList.add({
+                'type': 'function',
+                'name': func['name'],
+                if (func['description'] != null) 'description': func['description'],
+                if (func['parameters'] != null) 'parameters': func['parameters'],
+              });
+            } else {
+              // Already in Response API format or other format
+              toolList.add(Map<String, dynamic>.from(t));
+            }
+          }
         }
       }
 

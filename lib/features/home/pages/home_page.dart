@@ -73,7 +73,11 @@ import '../../../shared/widgets/animated_loading_text.dart';
 
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.isEmbeddedInDesktopNav = false});
+
+  /// Whether this page is embedded in DesktopHomePage with DesktopNavRail
+  /// If true, the sidebar bottom bar (with user avatar and settings) will be hidden
+  final bool isEmbeddedInDesktopNav;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -796,7 +800,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       })(),
       closePickerTicker: _assistantPickerCloseTick,
       loadingConversationIds: _loadingConversationIds,
-      showBottomBar: true,
+      // Hide bottom bar when embedded in DesktopHomePage (which has DesktopNavRail)
+      showBottomBar: !widget.isEmbeddedInDesktopNav,
         onSelectConversation: (id) {
           _switchConversationAnimated(id);
         },

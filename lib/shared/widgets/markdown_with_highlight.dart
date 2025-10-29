@@ -1313,9 +1313,10 @@ class AtxHeadingMd extends BlockMd {
     final innerCfg = config.copyWith(style: const TextStyle());
     final inner = TextSpan(children: MarkdownComponent.generate(context, raw, innerCfg, true));
     final style = _headingTextStyle(context, config, level);
-    // Slightly tighter spacing between headings and body
-    final top = switch (level) { 1 => 2.0, 2 => 2.0, _ => 2.0 };
-    final bottom = switch (level) { 1 => 2.0, 2 => 2.0, 3 => 2.0, _ => 2.0 };
+    // Increase top spacing to ensure headings are visually separated from preceding content
+    // This prevents headings from appearing inline with regular text (especially in reasoning blocks)
+    final top = switch (level) { 1 => 12.0, 2 => 10.0, 3 => 8.0, _ => 6.0 };
+    final bottom = switch (level) { 1 => 6.0, 2 => 5.0, 3 => 4.0, _ => 3.0 };
 
     return Padding(
       padding: EdgeInsets.only(top: top, bottom: bottom),
@@ -1382,9 +1383,9 @@ class SetextHeadingMd extends BlockMd {
     final innerCfg = config.copyWith(style: const TextStyle());
     final inner = TextSpan(children: MarkdownComponent.generate(context, title, innerCfg, true));
     final style = AtxHeadingMd()._headingTextStyle(context, config, level);
-    // Match the tighter spacing used in ATX headings
-    final top = level == 1 ? 10.0 : 9.0;
-    final bottom = 6.0;
+    // Match the spacing used in ATX headings for consistency
+    final top = level == 1 ? 12.0 : 10.0;
+    final bottom = level == 1 ? 6.0 : 5.0;
 
     return Padding(
       padding: EdgeInsets.only(top: top, bottom: bottom),

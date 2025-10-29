@@ -9,13 +9,96 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 
 class TtsServicesPage extends StatelessWidget {
-  const TtsServicesPage({super.key});
+  const TtsServicesPage({super.key, this.embedded = false});
+
+  /// Whether this page is embedded in a desktop settings layout (no Scaffold/AppBar)
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
+    final bodyContent = ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      children: [
+        _header(context, l10n.ttsServicesPageTitle, first: true),
+        Consumer<TtsProvider>(builder: (context, tts, _) {
+          final available = tts.isAvailable && (tts.error == null);
+          final titleText = l10n.ttsServicesPageSystemTtsTitle;
+          final subText = available
+              ? l10n.ttsServicesPageSystemTtsAvailableSubtitle
+              : l10n.ttsServicesPageSystemTtsUnavailableSubtitle(tts.error ?? l10n.ttsServicesPageSystemTtsUnavailableNotInitialized);
+          final letter = (titleText.trim().isEmpty ? '?' : titleText.trim().substring(0, 1)).toUpperCase();
+          return _iosSectionCard(children: [
+            _TactileRow(
+              pressedScale: 0.98,
+              haptics: false,
+              onTap: available ? () => _showSystemTtsConfig(context) : null,
+              builder: (pressed) {
+                final cs = Theme.of(context).colorScheme;
+                final base = cs.onSurface.withOpacity(0.9);
+                return _AnimatedPressColor(
+                  pressed: pressed,
+                  base: base,
+                  builder: (c) {
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+                    // Light mode: white overlay; Dark mode: black overlay (per request)
+                    final overlay = pressed
+                        ? (isDark ? Colors.black.withOpacity(0.06) : Colors.white.withOpacity(0.05))
+                        : Colors.transparent;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                      child: Row(
+                        children: [
+                          _AvatarBadge(letter: letter, overlay: overlay),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(titleText, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, color: c, fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 3),
+                                Text(subText, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: c.withOpacity(0.7))),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _SmallTactileIcon(
+                            icon: tts.isSpeaking ? Lucide.CircleStop : Lucide.Volume2,
+                            baseColor: c,
+                            onTap: available
+                                ? () async {
+                                    if (!tts.isSpeaking) {
+                                      final demo = l10n.ttsServicesPageTestSpeechText;
+                                      await tts.speak(demo);
+                                    } else {
+                                      await tts.stop();
+                                    }
+                                  }
+                                : () {},
+                            enabled: available,
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(Lucide.ChevronRight, size: 16, color: c),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ]);
+        }),
+      ],
+    );
+
+    // If embedded, return body content directly without Scaffold
+    if (embedded) {
+      return bodyContent;
+    }
+
+    // Otherwise, return full page with Scaffold and AppBar
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
@@ -48,79 +131,7 @@ class TtsServicesPage extends StatelessWidget {
           const SizedBox(width: 12),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
-          _header(context, l10n.ttsServicesPageTitle, first: true),
-          Consumer<TtsProvider>(builder: (context, tts, _) {
-            final available = tts.isAvailable && (tts.error == null);
-            final titleText = l10n.ttsServicesPageSystemTtsTitle;
-            final subText = available
-                ? l10n.ttsServicesPageSystemTtsAvailableSubtitle
-                : l10n.ttsServicesPageSystemTtsUnavailableSubtitle(tts.error ?? l10n.ttsServicesPageSystemTtsUnavailableNotInitialized);
-            final letter = (titleText.trim().isEmpty ? '?' : titleText.trim().substring(0, 1)).toUpperCase();
-            return _iosSectionCard(children: [
-              _TactileRow(
-                pressedScale: 0.98,
-                haptics: false,
-                onTap: available ? () => _showSystemTtsConfig(context) : null,
-                builder: (pressed) {
-                  final cs = Theme.of(context).colorScheme;
-                  final base = cs.onSurface.withOpacity(0.9);
-                  return _AnimatedPressColor(
-                    pressed: pressed,
-                    base: base,
-                    builder: (c) {
-                      final isDark = Theme.of(context).brightness == Brightness.dark;
-                      // Light mode: white overlay; Dark mode: black overlay (per request)
-                      final overlay = pressed
-                          ? (isDark ? Colors.black.withOpacity(0.06) : Colors.white.withOpacity(0.05))
-                          : Colors.transparent;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                        child: Row(
-                          children: [
-                            _AvatarBadge(letter: letter, overlay: overlay),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(titleText, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, color: c, fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 3),
-                                  Text(subText, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: c.withOpacity(0.7))),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _SmallTactileIcon(
-                              icon: tts.isSpeaking ? Lucide.CircleStop : Lucide.Volume2,
-                              baseColor: c,
-                              onTap: available
-                                  ? () async {
-                                      if (!tts.isSpeaking) {
-                                        final demo = l10n.ttsServicesPageTestSpeechText;
-                                        await tts.speak(demo);
-                                      } else {
-                                        await tts.stop();
-                                      }
-                                    }
-                                  : () {},
-                              enabled: available,
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(Lucide.ChevronRight, size: 16, color: c),
-                          ],
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ]);
-          }),
-        ],
-      ),
+      body: bodyContent,
     );
   }
 }

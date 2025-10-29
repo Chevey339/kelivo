@@ -22,7 +22,10 @@ import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 
 class ProvidersPage extends StatefulWidget {
-  const ProvidersPage({super.key});
+  const ProvidersPage({super.key, this.embedded = false});
+
+  /// Whether this page is embedded in a desktop settings layout (no Scaffold/AppBar)
+  final bool embedded;
 
   @override
   State<ProvidersPage> createState() => _ProvidersPageState();
@@ -71,6 +74,78 @@ class _ProvidersPageState extends State<ProvidersPage> {
     tmp.addAll(map.values);
     final items = tmp;
 
+    final bodyContent = Stack(
+      children: [
+        _ProvidersList(
+          items: items,
+          selectMode: _selectMode,
+          selectedKeys: _selected,
+          onToggleSelect: (key) {
+            setState(() {
+              if (_selected.contains(key)) {
+                _selected.remove(key);
+              } else {
+                _selected.add(key);
+              }
+            });
+          },
+          onReorder: (oldIndex, newIndex) async {
+            // Normalize newIndex because Flutter passes the index after removal
+            if (newIndex > oldIndex) newIndex -= 1;
+            final moved = items[oldIndex];
+            final mut = List<_Provider>.of(items);
+            final item = mut.removeAt(oldIndex);
+            mut.insert(newIndex, item);
+            setState(() => _settleKeys.add(moved.keyName));
+            await context.read<SettingsProvider>().setProvidersOrder([
+              for (final p in mut) p.keyName
+            ]);
+            Future.delayed(const Duration(milliseconds: 220), () {
+              if (!mounted) return;
+              setState(() => _settleKeys.remove(moved.keyName));
+            });
+          },
+          settlingKeys: _settleKeys,
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: _SelectionBar(
+            visible: _selectMode,
+            count: _selected.length,
+            total: items.length,
+            onExport: _onExportSelected,
+            onDelete: _onDeleteSelected,
+            onSelectAll: () {
+              setState(() {
+                // Select all deletable (non-built-in) providers
+                final baseKeys = {for (final p in base) p.keyName};
+                final deletable = [for (final p in items) if (!baseKeys.contains(p.keyName)) p.keyName];
+                final allSelected = deletable.isNotEmpty && deletable.every(_selected.contains) && _selected.length == deletable.length;
+                _selected.removeWhere((k) => !deletable.contains(k));
+                if (allSelected) {
+                  // Unselect all deletable
+                  for (final k in deletable) { _selected.remove(k); }
+                } else {
+                  // Select all deletable
+                  _selected
+                    ..removeWhere((k) => !deletable.contains(k))
+                    ..addAll(deletable);
+                }
+              });
+            },
+          ),
+        ),
+      ],
+    );
+
+    // If embedded, return body content directly without Scaffold
+    if (widget.embedded) {
+      return bodyContent;
+    }
+
+    // Otherwise, return full page with Scaffold and AppBar
     return Scaffold(
       appBar: AppBar(
         leading: Tooltip(
@@ -137,71 +212,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
           const SizedBox(width: 12),
         ],
       ),
-      body: Stack(
-        children: [
-          _ProvidersList(
-            items: items,
-            selectMode: _selectMode,
-            selectedKeys: _selected,
-            onToggleSelect: (key) {
-              setState(() {
-                if (_selected.contains(key)) {
-                  _selected.remove(key);
-                } else {
-                  _selected.add(key);
-                }
-              });
-            },
-            onReorder: (oldIndex, newIndex) async {
-              // Normalize newIndex because Flutter passes the index after removal
-              if (newIndex > oldIndex) newIndex -= 1;
-              final moved = items[oldIndex];
-              final mut = List<_Provider>.of(items);
-              final item = mut.removeAt(oldIndex);
-              mut.insert(newIndex, item);
-              setState(() => _settleKeys.add(moved.keyName));
-              await context.read<SettingsProvider>().setProvidersOrder([
-                for (final p in mut) p.keyName
-              ]);
-              Future.delayed(const Duration(milliseconds: 220), () {
-                if (!mounted) return;
-                setState(() => _settleKeys.remove(moved.keyName));
-              });
-            },
-            settlingKeys: _settleKeys,
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _SelectionBar(
-              visible: _selectMode,
-              count: _selected.length,
-              total: items.length,
-              onExport: _onExportSelected,
-              onDelete: _onDeleteSelected,
-              onSelectAll: () {
-                setState(() {
-                  // Select all deletable (non-built-in) providers
-                  final baseKeys = {for (final p in base) p.keyName};
-                  final deletable = [for (final p in items) if (!baseKeys.contains(p.keyName)) p.keyName];
-                  final allSelected = deletable.isNotEmpty && deletable.every(_selected.contains) && _selected.length == deletable.length;
-                  _selected.removeWhere((k) => !deletable.contains(k));
-                  if (allSelected) {
-                    // Unselect all deletable
-                    for (final k in deletable) { _selected.remove(k); }
-                  } else {
-                    // Select all deletable
-                    _selected
-                      ..removeWhere((k) => !deletable.contains(k))
-                      ..addAll(deletable);
-                  }
-                });
-              },
-            ),
-          ),
-        ],
-      ),
+      body: bodyContent,
     );
   }
 

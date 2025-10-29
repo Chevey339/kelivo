@@ -34,7 +34,10 @@ String _fmtBytes(int bytes) {
 }
 
 class BackupPage extends StatefulWidget {
-  const BackupPage({super.key});
+  const BackupPage({super.key, this.embedded = false});
+
+  /// Whether this page is embedded in a desktop settings layout (no Scaffold/AppBar)
+  final bool embedded;
 
   @override
   State<BackupPage> createState() => _BackupPageState();
@@ -274,21 +277,7 @@ class _BackupPageState extends State<BackupPage> {
           ),
         );
 
-        return Scaffold(
-          appBar: AppBar(
-            leading: Tooltip(
-              message: l10n.settingsPageBackButton,
-              child: _TactileIconButton(
-                icon: Lucide.ArrowLeft,
-                color: cs.onSurface,
-                size: 22,
-                onTap: () => Navigator.of(context).maybePop(),
-              ),
-            ),
-            title: Text(l10n.backupPageTitle),
-            actions: const [SizedBox(width: 12)],
-          ),
-          body: ListView(
+        final bodyContent = ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               // Section 1: 备份管理
@@ -531,7 +520,29 @@ class _BackupPageState extends State<BackupPage> {
                 ),
               ]),
             ],
+          );
+
+        // If embedded, return body content directly without Scaffold
+        if (widget.embedded) {
+          return bodyContent;
+        }
+
+        // Otherwise, return full page with Scaffold and AppBar
+        return Scaffold(
+          appBar: AppBar(
+            leading: Tooltip(
+              message: l10n.settingsPageBackButton,
+              child: _TactileIconButton(
+                icon: Lucide.ArrowLeft,
+                color: cs.onSurface,
+                size: 22,
+                onTap: () => Navigator.of(context).maybePop(),
+              ),
+            ),
+            title: Text(l10n.backupPageTitle),
+            actions: const [SizedBox(width: 12)],
           ),
+          body: bodyContent,
         );
       }),
     );
