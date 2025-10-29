@@ -182,6 +182,22 @@ jobs:
             Write-Host "Build runner completed with warnings, continuing..."
           }
 
+      - name: Disable flutter_tts for Windows
+        shell: pwsh
+        run: |
+          Write-Host "Disabling flutter_tts plugin for Windows build..."
+          $pubspecPath = "pubspec.yaml"
+          $content = Get-Content $pubspecPath -Raw
+
+          # Comment out flutter_tts dependency
+          $content = $content -replace '(\s+flutter_tts:\s+\^[\d\.]+)', '  # $1  # Disabled for Windows build'
+
+          Set-Content $pubspecPath $content
+          Write-Host "Updated pubspec.yaml"
+
+          # Run pub get again
+          flutter pub get
+
       - name: Build Windows app
         run: flutter build windows --release --no-tree-shake-icons
 
