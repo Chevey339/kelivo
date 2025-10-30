@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 
 /// 现代化的加载指示器，支持多种风格
 enum LoadingStyle {
@@ -344,6 +345,7 @@ class CompactModernLoader extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final effectiveColor = color ?? cs.primary;
+    final isAndroid = defaultTargetPlatform == TargetPlatform.android;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -358,19 +360,29 @@ class CompactModernLoader extends StatelessWidget {
         ),
         if (text.isNotEmpty) ...[
           const SizedBox(width: 8),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 14,
-              color: cs.onSurface.withOpacity(0.6),
-              fontStyle: FontStyle.italic,
-            ),
-          )
-          .animate(onPlay: (controller) => controller.repeat())
-          .shimmer(
-            duration: 2000.ms,
-            color: effectiveColor.withOpacity(0.1),
-          ),
+          // Android 上禁用 shimmer 效果以避免双重渲染问题
+          isAndroid
+            ? Text(
+                text,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: cs.onSurface.withOpacity(0.6),
+                  fontStyle: FontStyle.italic,
+                ),
+              )
+            : Text(
+                text,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: cs.onSurface.withOpacity(0.6),
+                  fontStyle: FontStyle.italic,
+                ),
+              )
+              .animate(onPlay: (controller) => controller.repeat())
+              .shimmer(
+                duration: 2000.ms,
+                color: effectiveColor.withOpacity(0.1),
+              ),
         ],
       ],
     );

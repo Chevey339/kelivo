@@ -1,0 +1,46 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "🪟 Kelivo (Windows)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "windows",
+      "args": [
+        "--observatory-port=9100"
+      ]
+    },
+    {
+      "name": "🌐 Kelivo (Chrome)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "chrome",
+      "args": [
+        "--web-port=8080"
+      ]
+    },
+    {
+      "name": "📱 Kelivo (Android)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--observatory-port=9100"
+      ]
+    },
+    {
+      "name": "⚡ Kelivo (Profile Mode)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "profile",
+      "deviceId": "windows"
+    },
+    {
+      "name": "🚀 Kelivo (Release Mode)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "release",
+      "deviceId": "windows"
+    }
+  ]
+}
+

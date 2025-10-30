@@ -122,6 +122,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   final GlobalKey _userBubbleKey = GlobalKey();
   OverlayEntry? _userMenuOverlay;
   bool _userMenuActive = false; // for bubble highlight/scale
+  // More button keys for desktop menu anchoring
+  final GlobalKey _userMoreButtonKey = GlobalKey();
+  final GlobalKey _assistantMoreButtonKey = GlobalKey();
   late final Ticker _ticker = Ticker((_) {
     if (mounted && _tickActive) setState(() {});
   });
@@ -236,6 +239,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     _ticker.dispose();
     _reasoningScroll.dispose();
     super.dispose();
+  }
+
+  /// Set the global position for desktop menu anchoring based on button key
+  void _setMoreButtonPosition(GlobalKey buttonKey) {
+    final rb = buttonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (rb == null) return;
+    final buttonTopLeft = rb.localToGlobal(Offset.zero);
+    final buttonSize = rb.size;
+    // Position menu at bottom-center of button
+    final anchorPosition = buttonTopLeft + Offset(buttonSize.width / 2, buttonSize.height);
+    DesktopMenuAnchor.setPosition(anchorPosition);
   }
 
   void _removeUserMenuOverlay() {
@@ -774,8 +788,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     iconSize: 16,
                   ),
                   IconButton(
+                    key: _userMoreButtonKey,
                     icon: Icon(Lucide.Ellipsis, size: 16),
-                    onPressed: widget.onMore,
+                    onPressed: widget.onMore == null ? null : () {
+                      _setMoreButtonPosition(_userMoreButtonKey);
+                      widget.onMore!();
+                    },
                     tooltip: l10n.chatMessageWidgetMoreTooltip,
                     visualDensity: VisualDensity.compact,
                     iconSize: 16,
@@ -1234,8 +1252,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   iconSize: 16,
                 ),
                 IconButton(
+                  key: _assistantMoreButtonKey,
                   icon: Icon(Lucide.Ellipsis, size: 16),
-                  onPressed: widget.onMore,
+                  onPressed: widget.onMore == null ? null : () {
+                    _setMoreButtonPosition(_assistantMoreButtonKey);
+                    widget.onMore!();
+                  },
                   tooltip: l10n.chatMessageWidgetMoreTooltip,
                   visualDensity: VisualDensity.compact,
                   iconSize: 16,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 // Replaced flutter_zoom_drawer with a custom InteractiveDrawer
 import '../../../shared/widgets/interactive_drawer.dart';
 import '../../../shared/responsive/breakpoints.dart';
@@ -676,12 +677,19 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final settings = context.read<SettingsProvider>();
     final cfg = settings.getProviderConfig(providerKey);
     final ov = cfg.modelOverrides[modelId] as Map?;
+    debugPrint('[Tool Check] $modelId: modelOverrides=$ov');
     if (ov != null) {
       final abilities = (ov['abilities'] as List?)?.map((e) => e.toString()).toList() ?? const [];
-      if (abilities.map((e) => e.toLowerCase()).contains('tool')) return true;
+      debugPrint('[Tool Check] $modelId: abilities from override=$abilities');
+      if (abilities.map((e) => e.toLowerCase()).contains('tool')) {
+        debugPrint('[Tool Check] $modelId: tool=true (from modelOverrides)');
+        return true;
+      }
     }
     final inferred = ModelRegistry.infer(ModelInfo(id: modelId, displayName: modelId));
-    return inferred.abilities.contains(ModelAbility.tool);
+    final hasTool = inferred.abilities.contains(ModelAbility.tool);
+    debugPrint('[Tool Check] $modelId: tool=$hasTool (from infer), abilities=${inferred.abilities}');
+    return hasTool;
   }
 
   // More page entry is temporarily removed.
@@ -1178,11 +1186,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         : List.of(_messages);
     final List<ChatMessage> source = _collapseVersions(sourceAll);
     final apiMessages = source
-        .where((m) => m.content.isNotEmpty)
-        .map((m) => {
-              'role': m.role == 'assistant' ? 'assistant' : 'user',
-              'content': m.content,
+        .map((m) {
+              var content = m.content;
+
+              // Clean assistant messages that may contain tool call markers
+              if (m.role == 'assistant') {
+                content = _cleanToolCallMarkers(content);
+              }
+
+              return {
+                'role': m.role == 'assistant' ? 'assistant' : 'user',
+                'content': content,
+              };
             })
+        .where((m) => m['content']!.toString().isNotEmpty) // Filter after cleaning
         .toList();
 
     // Build document prompts and clean markers in last user message
@@ -1398,8 +1415,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       Future<String> Function(String, Map<String, dynamic>)? onToolCall;
 
       // Search tool (skip when Gemini built-in search is active)
+      final logFile = File('c:/mycode/kelivo/debug_tools.log');
+      logFile.writeAsStringSync('[Tools] searchEnabled=${settings.searchEnabled}, hasBuiltInSearch=$hasBuiltInSearch, supportsTools=$supportsTools\n', mode: FileMode.append);
+      debugPrint('[Tools] searchEnabled=${settings.searchEnabled}, hasBuiltInSearch=$hasBuiltInSearch, supportsTools=$supportsTools');
       if (settings.searchEnabled && !hasBuiltInSearch && supportsTools) {
         toolDefs.add(SearchToolService.getToolDefinition());
+        logFile.writeAsStringSync('[Tools] Added search tool\n', mode: FileMode.append);
+        debugPrint('[Tools] Added search tool');
       }
 
       // Memory tools
@@ -1480,7 +1502,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         }));
       }
 
+      final logFile2 = File('c:/mycode/kelivo/debug_tools.log');
+      logFile2.writeAsStringSync('[Tools] Total toolDefs count: ${toolDefs.length}\n', mode: FileMode.append);
+      debugPrint('[Tools] Total toolDefs count: ${toolDefs.length}');
       if (toolDefs.isNotEmpty) {
+        final toolNames = toolDefs.map((t) => t['function']?['name'] ?? t['name'] ?? 'unknown').toList();
+        logFile2.writeAsStringSync('[Tools] Tool names: $toolNames\n', mode: FileMode.append);
+        logFile2.writeAsStringSync('[Tools] Full toolDefs: ${jsonEncode(toolDefs)}\n', mode: FileMode.append);
+        debugPrint('[Tools] Tool names: $toolNames');
         onToolCall = (name, args) async {
           if (name == SearchToolService.toolName && settings.searchEnabled) {
             final q = (args['query'] ?? '').toString();
@@ -1569,7 +1598,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           _titleQueued = true;
         }
         // Replace extremely long inline base64 images with local files to avoid jank
-        final processedContent = await MarkdownMediaSanitizer.replaceInlineBase64Images(fullContent);
+        // Also clean tool call markers that some providers incorrectly include in content
+        var processedContent = await MarkdownMediaSanitizer.replaceInlineBase64Images(fullContent);
+        processedContent = _cleanToolCallMarkers(processedContent);
         await _chatService.updateMessage(
           assistantMessage.id,
           content: processedContent,
@@ -1882,13 +1913,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             }
 
             if (streamOutput) {
+              // Clean tool call markers before displaying/saving
+              final cleanedContent = _cleanToolCallMarkers(fullContent);
+
               // Update UI with streaming content
               if (mounted && _currentConversation?.id == _cidForStream) {
                 setState(() {
                   final index = _messages.indexWhere((m) => m.id == assistantMessage.id);
                   if (index != -1) {
                     _messages[index] = _messages[index].copyWith(
-                      content: fullContent,
+                      content: cleanedContent,
                       totalTokens: totalTokens,
                     );
                   }
@@ -1898,7 +1932,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               // Persist partial content so it's saved even if interrupted
               await _chatService.updateMessage(
                 assistantMessage.id,
-                content: fullContent,
+                content: cleanedContent,
                 totalTokens: totalTokens,
               );
 
@@ -1914,7 +1948,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         onError: (e) async {
           // Preserve partial content; if empty, write error message into bubble
           final errText = '${AppLocalizations.of(context)!.generationInterrupted}: $e';
-          final displayContent = fullContent.isNotEmpty ? fullContent : errText;
+          var displayContent = fullContent.isNotEmpty ? fullContent : errText;
+          displayContent = _cleanToolCallMarkers(displayContent);
+
           await _chatService.updateMessage(
             assistantMessage.id,
             content: displayContent,
@@ -1991,7 +2027,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     } catch (e) {
       // Preserve partial content on outer error as well; if empty, show error text in bubble
       final errText = '${AppLocalizations.of(context)!.generationInterrupted}: $e';
-      final displayContent = fullContent.isNotEmpty ? fullContent : errText;
+      var displayContent = fullContent.isNotEmpty ? fullContent : errText;
+      displayContent = _cleanToolCallMarkers(displayContent);
+
       await _chatService.updateMessage(
         assistantMessage.id,
         content: displayContent,
@@ -2505,7 +2543,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     DateTime? _reasoningStartAt2;
 
     Future<void> finish({bool generateTitle = false}) async {
-      final processedContent = await MarkdownMediaSanitizer.replaceInlineBase64Images(fullContent);
+      // Clean tool call markers before saving
+      var processedContent = await MarkdownMediaSanitizer.replaceInlineBase64Images(fullContent);
+      processedContent = _cleanToolCallMarkers(processedContent);
+
       final tokenUsageJson = usage != null ? jsonEncode({
         'promptTokens': usage!.promptTokens,
         'completionTokens': usage!.completionTokens,
@@ -2513,9 +2554,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         'thoughtTokens': usage!.thoughtTokens,
         'totalTokens': usage!.totalTokens,
       }) : null;
-      await _chatService.updateMessage(assistantMessage.id, 
-        content: processedContent, 
-        totalTokens: totalTokens, 
+      await _chatService.updateMessage(assistantMessage.id,
+        content: processedContent,
+        totalTokens: totalTokens,
         tokenUsageJson: tokenUsageJson,
         isStreaming: false
       );
@@ -2524,8 +2565,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         final index = _messages.indexWhere((m) => m.id == assistantMessage.id);
         if (index != -1) {
           _messages[index] = _messages[index].copyWith(
-            content: processedContent, 
-            totalTokens: totalTokens, 
+            content: processedContent,
+            totalTokens: totalTokens,
             tokenUsageJson: tokenUsageJson,
             isStreaming: false
           );
@@ -2683,9 +2724,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         }
 
         if (streamOutput) {
+          final cleanedContent = _cleanToolCallMarkers(fullContent);
           setState(() {
             final i = _messages.indexWhere((m) => m.id == assistantMessage.id);
-            if (i != -1) _messages[i] = _messages[i].copyWith(content: fullContent);
+            if (i != -1) _messages[i] = _messages[i].copyWith(content: cleanedContent);
           });
         }
       }
@@ -2722,7 +2764,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     onError: (e) async {
       // When regenerate fails, persist error text into this assistant bubble
       final errText = '${AppLocalizations.of(context)!.generationInterrupted}: $e';
-      final displayContent = fullContent.isNotEmpty ? fullContent : errText;
+      var displayContent = fullContent.isNotEmpty ? fullContent : errText;
+      displayContent = _cleanToolCallMarkers(displayContent);
+
       await _chatService.updateMessage(
         assistantMessage.id,
         content: displayContent,
@@ -2791,6 +2835,34 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     cancelOnError: true,
     );
     _conversationStreams[_cid] = _sub2;
+  }
+
+  /// Clean tool call markers and JSON from assistant message content.
+  /// Some providers incorrectly return tool call information as text content.
+  String _cleanToolCallMarkers(String content) {
+    if (content.isEmpty) return content;
+
+    // Remove tool call markers like <|FunctionCallEnd|>
+    var cleaned = content
+        .replaceAll(RegExp(r'<\|FunctionCall(?:Begin|End)\|>'), '')
+        .replaceAll(RegExp(r'<\|tool_call\|>'), '')
+        .replaceAll(RegExp(r'<\|tool_(?:start|end)\|>'), '');
+
+    // Remove standalone tool call JSON
+    final trimmed = cleaned.trim();
+    if (trimmed.startsWith('{') && trimmed.contains('"name"') && trimmed.contains('"parameters"')) {
+      try {
+        final decoded = jsonDecode(trimmed);
+        if (decoded is Map && decoded.containsKey('name') && decoded.containsKey('parameters')) {
+          // This is a tool call JSON, remove it completely
+          return '';
+        }
+      } catch (_) {
+        // Not valid JSON, keep as-is
+      }
+    }
+
+    return cleaned;
   }
 
   ChatInputData _parseInputFromRaw(String raw) {

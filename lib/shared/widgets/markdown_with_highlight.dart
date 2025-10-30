@@ -1315,15 +1315,22 @@ class AtxHeadingMd extends BlockMd {
     final style = _headingTextStyle(context, config, level);
     // Increase top spacing to ensure headings are visually separated from preceding content
     // This prevents headings from appearing inline with regular text (especially in reasoning blocks)
-    final top = switch (level) { 1 => 12.0, 2 => 10.0, 3 => 8.0, _ => 6.0 };
-    final bottom = switch (level) { 1 => 6.0, 2 => 5.0, 3 => 4.0, _ => 3.0 };
+    final top = switch (level) { 1 => 16.0, 2 => 14.0, 3 => 12.0, _ => 10.0 };
+    final bottom = switch (level) { 1 => 8.0, 2 => 6.0, 3 => 5.0, _ => 4.0 };
 
+    // Use Column to ensure block-level rendering (prevents inline display with preceding text)
     return Padding(
       padding: EdgeInsets.only(top: top, bottom: bottom),
-      child: RichText(
-        text: TextSpan(style: style, children: [inner]),
-        textScaler: MediaQuery.of(context).textScaler,
-        textAlign: TextAlign.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RichText(
+            text: TextSpan(style: style, children: [inner]),
+            textScaler: MediaQuery.of(context).textScaler,
+            textAlign: TextAlign.start,
+          ),
+        ],
       ),
     );
   }
@@ -1384,15 +1391,22 @@ class SetextHeadingMd extends BlockMd {
     final inner = TextSpan(children: MarkdownComponent.generate(context, title, innerCfg, true));
     final style = AtxHeadingMd()._headingTextStyle(context, config, level);
     // Match the spacing used in ATX headings for consistency
-    final top = level == 1 ? 12.0 : 10.0;
-    final bottom = level == 1 ? 6.0 : 5.0;
+    final top = level == 1 ? 16.0 : 14.0;
+    final bottom = level == 1 ? 8.0 : 6.0;
 
+    // Use Column to ensure block-level rendering (prevents inline display with preceding text)
     return Padding(
       padding: EdgeInsets.only(top: top, bottom: bottom),
-      child: RichText(
-        text: TextSpan(style: style, children: [inner]),
-        textScaler: MediaQuery.of(context).textScaler,
-        textAlign: TextAlign.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RichText(
+            text: TextSpan(style: style, children: [inner]),
+            textScaler: MediaQuery.of(context).textScaler,
+            textAlign: TextAlign.start,
+          ),
+        ],
       ),
     );
   }

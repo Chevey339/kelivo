@@ -15,6 +15,7 @@ Future<bool?> showModelDetailSheet(BuildContext context, {required String provid
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
+    useRootNavigator: true,
     backgroundColor: cs.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -36,6 +37,7 @@ Future<bool?> showCreateModelSheet(BuildContext context, {required String provid
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
+    useRootNavigator: true,
     backgroundColor: cs.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -197,7 +199,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
               size: 22,
               color: cs.onSurface,
               minSize: 36,
-              onTap: () => Navigator.of(context).maybePop(false),
+              onTap: () => Navigator.of(context, rootNavigator: true).pop(false),
               semanticLabel: l10n.modelDetailSheetCancelButton,
             ),
             Expanded(
@@ -517,12 +519,15 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
         if (b.keyCtrl.text.trim().isNotEmpty)
           {'key': b.keyCtrl.text.trim(), 'value': b.valueCtrl.text}
     ];
+    final abilitiesList = _abilities.map((e) => e == ModelAbility.reasoning ? 'reasoning' : 'tool').toList();
+    debugPrint('[Model Save] id=$id, abilities=$abilitiesList, _abilities=$_abilities');
+
     ov[id] = {
       'name': _nameCtrl.text.trim(),
       'type': _type == ModelType.chat ? 'chat' : 'embedding',
       'input': _input.map((e) => e == Modality.image ? 'image' : 'text').toList(),
       'output': _output.map((e) => e == Modality.image ? 'image' : 'text').toList(),
-      'abilities': _abilities.map((e) => e == ModelAbility.reasoning ? 'reasoning' : 'tool').toList(),
+      'abilities': abilitiesList,
       'headers': headers,
       'body': bodies,
       'tools': {
@@ -575,7 +580,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
       await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov));
     }
     if (!mounted) return;
-    Navigator.of(context).pop(true);
+      Navigator.of(context, rootNavigator: true).pop(true);
   }
 }
 

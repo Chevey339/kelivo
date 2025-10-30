@@ -59,36 +59,43 @@ class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
         border: Border(
           bottom: BorderSide(
             color: cs.outlineVariant.withOpacity(0.25),
-            width: 0.5,
+            width: 1.0,
           ),
         ),
       ),
-      child: DragToMoveArea(
-        child: Row(
-          children: [
-            const SizedBox(width: 6),
-            ...widget.leftChildren,
-            const Spacer(),
-            WindowCaptionButton.minimize(
-              brightness: brightness,
-              onPressed: () => windowManager.minimize(),
-            ),
-            if (_isMaximized)
-              WindowCaptionButton.unmaximize(
-                brightness: brightness,
-                onPressed: () => windowManager.unmaximize(),
-              )
-            else
-              WindowCaptionButton.maximize(
-                brightness: brightness,
-                onPressed: () => windowManager.maximize(),
+      child: Row(
+        children: [
+          // Draggable area on the left side
+          Expanded(
+            child: DragToMoveArea(
+              child: Row(
+                children: [
+                  const SizedBox(width: 6),
+                  ...widget.leftChildren,
+                ],
               ),
-            WindowCaptionButton.close(
-              brightness: brightness,
-              onPressed: () => windowManager.close(),
             ),
-          ],
-        ),
+          ),
+          // Window control buttons (not draggable)
+          WindowCaptionButton.minimize(
+            brightness: brightness,
+            onPressed: () => windowManager.minimize(),
+          ),
+          if (_isMaximized)
+            WindowCaptionButton.unmaximize(
+              brightness: brightness,
+              onPressed: () => windowManager.unmaximize(),
+            )
+          else
+            WindowCaptionButton.maximize(
+              brightness: brightness,
+              onPressed: () => windowManager.maximize(),
+            ),
+          WindowCaptionButton.close(
+            brightness: brightness,
+            onPressed: () => windowManager.close(),
+          ),
+        ],
       ),
     );
   }

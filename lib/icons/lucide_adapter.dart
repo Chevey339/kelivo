@@ -42,6 +42,7 @@ class Lucide {
   static const IconData ChevronDown = lucide.LucideIcons.chevronDown;
   static const IconData Import = lucide.LucideIcons.import;
   static const IconData GripHorizontal = lucide.LucideIcons.gripHorizontal;
+  static const IconData Move = lucide.LucideIcons.move;
   static const IconData Settings2 = lucide.LucideIcons.settings2;
   static const IconData Network = lucide.LucideIcons.network;
   static const IconData Cable = lucide.LucideIcons.cable;

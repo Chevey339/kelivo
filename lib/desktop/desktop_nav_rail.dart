@@ -110,6 +110,7 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () {
           // Open centered profile dialog
           showUserProfileDialog(context);
@@ -153,6 +154,7 @@ class _CircleAction extends StatelessWidget {
       message: tooltip,
       waitDuration: const Duration(milliseconds: 300),
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: _HoverCircle(
           size: size,
@@ -218,6 +220,7 @@ class _ThemeCycleButtonState extends State<_ThemeCycleButton> {
       message: l10n.desktopNavThemeToggleTooltip,
       waitDuration: const Duration(milliseconds: 300),
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () => _cycleTheme(context),
         child: _HoverCircle(
           size: 40,

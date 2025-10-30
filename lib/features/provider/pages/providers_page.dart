@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -427,6 +428,9 @@ class _ProviderRow extends StatelessWidget {
     final cfg = settings.getProviderConfig(provider.keyName, defaultName: provider.name);
     final enabled = cfg.enabled;
     final l10n = AppLocalizations.of(context)!;
+    final isDesktop = defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.linux;
 
     final statusBg = enabled ? Colors.green.withOpacity(0.12) : Colors.orange.withOpacity(0.15);
     final statusFg = enabled ? Colors.green : Colors.orange;
@@ -488,6 +492,23 @@ class _ProviderRow extends StatelessWidget {
                     ),
                   ),
                   if (selectMode) const SizedBox(width: 4),
+                  // Desktop: explicit drag handle on the left
+                  if (isDesktop && !selectMode) ...[
+                    ReorderableDragStartListener(
+                      index: index,
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.grab,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Icon(
+                            Lucide.GripHorizontal,
+                            size: 18,
+                            color: cs.onSurface.withOpacity(0.4),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   SizedBox(width: 36, child: Center(child: _BrandAvatar(name: (cfg.name.isNotEmpty ? cfg.name : provider.keyName), size: 22))),
                   const SizedBox(width: 12),
                   Expanded(
@@ -525,7 +546,9 @@ class _ProviderRow extends StatelessWidget {
               ));
 
             Widget line = KeyedSubtree(key: ValueKey('row-$index'), child: rowContent);
-            if (!selectMode) {
+            // Mobile: wrap entire row with delayed drag listener
+            // Desktop: explicit drag handle already added above
+            if (!selectMode && !isDesktop) {
               line = ReorderableDelayedDragStartListener(index: index, child: line);
             }
             return Column(children: [line, if (!isLast) _iosDivider(context)]);
@@ -1130,5 +1153,5 @@ class _AnimatedPressColor extends StatelessWidget {
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
-  return Divider(height: 6, thickness: 0.6, indent: 54, endIndent: 12, color: cs.outlineVariant.withOpacity(0.18));
+  return Divider(height: 6, thickness: 1.0, indent: 54, endIndent: 12, color: cs.outlineVariant.withOpacity(0.18));
 }

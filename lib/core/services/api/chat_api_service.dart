@@ -886,6 +886,27 @@ class ChatApiService {
       }
     }
 
+    try {
+      final logFile = File('c:/mycode/kelivo/debug_tools.log');
+      logFile.writeAsStringSync('[API Request] URL: $url\n', mode: FileMode.append);
+      logFile.writeAsStringSync('[API Request] tools param: ${tools?.length ?? 0} tools\n', mode: FileMode.append);
+      logFile.writeAsStringSync('[API Request] body.tools: ${body['tools']?.length ?? 0} tools\n', mode: FileMode.append);
+      if (body['tools'] != null) {
+        logFile.writeAsStringSync('[API Request] body.tools content: ${jsonEncode(body['tools'])}\n', mode: FileMode.append);
+      }
+      logFile.writeAsStringSync('[API Request] Full body: ${jsonEncode(body)}\n', mode: FileMode.append);
+      logFile.writeAsStringSync('[API Request] useResponseApi: ${config.useResponseApi}\n', mode: FileMode.append);
+    } catch (e) {
+      print('[API Request] Failed to write log: $e');
+    }
+
+    print('[API Request] URL: $url');
+    print('[API Request] tools param: ${tools?.length ?? 0} tools');
+    print('[API Request] body.tools: ${body['tools']?.length ?? 0} tools');
+    if (body['tools'] != null) {
+      print('[API Request] body.tools content: ${jsonEncode(body['tools'])}');
+    }
+
     final request = http.Request('POST', url);
     final headers = <String, String>{
       'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
@@ -1298,6 +1319,13 @@ class ChatApiService {
           if (config.useResponseApi == true) {
             // OpenAI /responses SSE types
             final type = json['type'];
+
+            // Log all event types
+            try {
+              final logFile = File('c:/mycode/kelivo/debug_tools.log');
+              logFile.writeAsStringSync('[Response Event] type: $type, json: ${jsonEncode(json)}\n', mode: FileMode.append);
+            } catch (_) {}
+
             if (type == 'response.output_text.delta') {
               final delta = json['delta'];
               if (delta is String) {
@@ -1307,16 +1335,38 @@ class ChatApiService {
             } else if (type == 'response.reasoning_summary_text.delta') {
               final delta = json['delta'];
               if (delta is String) reasoning = delta;
-            } else if (type is String && type.contains('function_call')) {
-              // Accumulate function call args for Responses API
-              final id = (json['id'] ?? json['call_id'] ?? '').toString();
-              final name = (json['name'] ?? json['function']?['name'] ?? '').toString();
-              final argsDelta = (json['arguments'] ?? json['arguments_delta'] ?? json['delta'] ?? '').toString();
-              if (id.isNotEmpty || name.isNotEmpty) {
-                final key = id.isNotEmpty ? id : name;
-                final entry = toolAccResp.putIfAbsent(key, () => {'name': name, 'args': ''});
-                if (name.isNotEmpty) entry['name'] = name;
-                if (argsDelta.isNotEmpty) entry['args'] = (entry['args'] ?? '') + argsDelta;
+            } else if (type == 'response.output_item.added') {
+              // New output item added (could be function_call, message, etc.)
+              final item = json['item'];
+              if (item is Map && item['type'] == 'function_call') {
+                final id = (item['call_id'] ?? item['id'] ?? '').toString();
+                final name = (item['name'] ?? '').toString();
+                if (id.isNotEmpty || name.isNotEmpty) {
+                  final key = id.isNotEmpty ? id : name;
+                  toolAccResp.putIfAbsent(key, () => {'id': id, 'name': name, 'args': ''});
+                }
+              }
+            } else if (type == 'response.function_call_arguments.delta') {
+              // Accumulate function call arguments
+              final itemId = (json['item_id'] ?? '').toString();
+              final delta = (json['delta'] ?? '').toString();
+              if (itemId.isNotEmpty && delta.isNotEmpty) {
+                // Find entry by item_id
+                for (final entry in toolAccResp.values) {
+                  // Match by item_id or use first entry (simple case)
+                  entry['args'] = (entry['args'] ?? '') + delta;
+                  break; // For now, assume single tool call
+                }
+              }
+            } else if (type == 'response.function_call_arguments.done') {
+              // Function call arguments complete
+              final itemId = (json['item_id'] ?? '').toString();
+              final args = (json['arguments'] ?? '').toString();
+              if (itemId.isNotEmpty && args.isNotEmpty) {
+                for (final entry in toolAccResp.values) {
+                  entry['args'] = args; // Use final complete args
+                  break;
+                }
               }
             } else if (type == 'response.completed') {
               final u = json['response']?['usage'];
@@ -1368,15 +1418,20 @@ class ChatApiService {
               } catch (_) {}
               // Responses: emit any collected tool calls from previous deltas
               if (onToolCall != null && toolAccResp.isNotEmpty) {
+                try {
+                  final logFile = File('c:/mycode/kelivo/debug_tools.log');
+                  logFile.writeAsStringSync('[Tool Execution] toolAccResp: ${jsonEncode(toolAccResp)}\n', mode: FileMode.append);
+                } catch (_) {}
+
                 final callInfos = <ToolCallInfo>[];
                 final msgs = <Map<String, dynamic>>[];
                 int idx = 0;
                 toolAccResp.forEach((key, m) {
                   Map<String, dynamic> args;
                   try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
-                  final id2 = key.isNotEmpty ? key : 'call_$idx';
+                  final id2 = (m['id'] ?? key).isNotEmpty ? (m['id'] ?? key) : 'call_$idx';
                   callInfos.add(ToolCallInfo(id: id2, name: (m['name'] ?? ''), arguments: args));
-                  msgs.add({'__id': id2, '__name': (m['name'] ?? ''), '__args': args});
+                  msgs.add({'__id': id2, '__name': (m['name'] ?? ''), '__args': args, '__callId': m['id'] ?? key});
                   idx += 1;
                 });
                 if (callInfos.isNotEmpty) {
@@ -1384,16 +1439,289 @@ class ChatApiService {
                   yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? approxTotal, usage: usage, toolCalls: callInfos);
                 }
                 final resultsInfo = <ToolResultInfo>[];
+                final toolOutputs = <Map<String, dynamic>>[];
                 for (final m in msgs) {
                   final nm = m['__name'] as String;
                   final id2 = m['__id'] as String;
+                  final callId = m['__callId'] as String;
                   final args = (m['__args'] as Map<String, dynamic>);
                   final res = await onToolCall(nm, args) ?? '';
                   resultsInfo.add(ToolResultInfo(id: id2, name: nm, arguments: args, content: res));
+                  toolOutputs.add({
+                    'type': 'function_call_output',
+                    'call_id': callId,
+                    'output': res,
+                  });
+
+                  try {
+                    final logFile = File('c:/mycode/kelivo/debug_tools.log');
+                    logFile.writeAsStringSync('[Tool Execution] Executed $nm with args $args, result length: ${res.length}\n', mode: FileMode.append);
+                  } catch (_) {}
                 }
                 if (resultsInfo.isNotEmpty) {
                   yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolResults: resultsInfo);
                 }
+
+                // === Tool Calling Loop (like rikkahub) ===
+                // Initialize current messages and system instructions
+                var currentMessages = <Map<String, dynamic>>[];
+                String systemInstructions = '';
+
+                // Extract system messages and build initial message list
+                for (final m in messages) {
+                  final roleRaw = (m['role'] ?? 'user').toString();
+                  if (roleRaw == 'system') {
+                    final content = (m['content'] ?? '').toString();
+                    if (content.isNotEmpty) {
+                      systemInstructions = systemInstructions.isEmpty ? content : (systemInstructions + '\n\n' + content);
+                    }
+                  } else {
+                    currentMessages.add(Map<String, dynamic>.from(m));
+                  }
+                }
+
+                // Tool calling loop (max 256 iterations)
+                for (int stepIndex = 0; stepIndex < 256; stepIndex++) {
+                  try {
+                    final logFile = File('c:/mycode/kelivo/debug_tools.log');
+                    logFile.writeAsStringSync('[Tool Loop] === Step #$stepIndex ===\n', mode: FileMode.append);
+                    logFile.writeAsStringSync('[Tool Loop] toolAccResp: ${jsonEncode(toolAccResp)}\n', mode: FileMode.append);
+                  } catch (_) {}
+
+                  // Check if we have tool calls to process
+                  if (toolAccResp.isEmpty) {
+                    try {
+                      final logFile = File('c:/mycode/kelivo/debug_tools.log');
+                      logFile.writeAsStringSync('[Tool Loop] No tool calls, exiting loop\n', mode: FileMode.append);
+                    } catch (_) {}
+                    break;
+                  }
+
+                  // Execute all tool calls
+                  final callInfos = <ToolCallInfo>[];
+                  final toolCallMsgs = <Map<String, dynamic>>[];
+                  final toolOutputs = <Map<String, dynamic>>[];
+                  int idx = 0;
+
+                  toolAccResp.forEach((key, m) {
+                    Map<String, dynamic> args;
+                    try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+                    final id2 = (m['id'] ?? key).isNotEmpty ? (m['id'] ?? key) : 'call_$idx';
+                    callInfos.add(ToolCallInfo(id: id2, name: (m['name'] ?? ''), arguments: args));
+                    toolCallMsgs.add({
+                      '__id': id2,
+                      '__name': (m['name'] ?? ''),
+                      '__args': args,
+                      '__callId': m['id'] ?? key,
+                    });
+                    idx += 1;
+                  });
+
+                  if (callInfos.isNotEmpty) {
+                    final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
+                    yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? approxTotal, usage: usage, toolCalls: callInfos);
+                  }
+
+                  // Execute tools
+                  final resultsInfo = <ToolResultInfo>[];
+                  for (final m in toolCallMsgs) {
+                    final nm = m['__name'] as String;
+                    final id2 = m['__id'] as String;
+                    final callId = m['__callId'] as String;
+                    final args = (m['__args'] as Map<String, dynamic>);
+                    final res = await onToolCall(nm, args) ?? '';
+                    resultsInfo.add(ToolResultInfo(id: id2, name: nm, arguments: args, content: res));
+                    toolOutputs.add({
+                      'type': 'function_call_output',
+                      'call_id': callId,
+                      'output': res,
+                    });
+
+                    try {
+                      final logFile = File('c:/mycode/kelivo/debug_tools.log');
+                      logFile.writeAsStringSync('[Tool Loop] Executed $nm, result length: ${res.length}\n', mode: FileMode.append);
+                    } catch (_) {}
+                  }
+
+                  if (resultsInfo.isNotEmpty) {
+                    yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolResults: resultsInfo);
+                  }
+
+                  // Build conversation (like rikkahub's buildMessages)
+                  final conversation = <Map<String, dynamic>>[];
+
+                  // Add all current messages
+                  for (final m in currentMessages) {
+                    final roleRaw = (m['role'] ?? 'user').toString();
+                    if (roleRaw == 'system') continue;
+
+                    final content = (m['content'] ?? '').toString();
+                    conversation.add({'role': roleRaw, 'content': content});
+
+                    // If message has tool calls, add them
+                    final toolCalls = m['__toolCalls'] as List?;
+                    if (toolCalls != null && toolCalls.isNotEmpty) {
+                      for (final tc in toolCalls) {
+                        conversation.add({
+                          'type': 'function_call',
+                          'call_id': tc['call_id'],
+                          'name': tc['name'],
+                          'arguments': tc['arguments'],
+                        });
+                      }
+                    }
+
+                    // If message has tool results, add them
+                    final toolResults = m['__toolResults'] as List?;
+                    if (toolResults != null && toolResults.isNotEmpty) {
+                      conversation.addAll(toolResults.cast<Map<String, dynamic>>());
+                    }
+                  }
+
+                  // Add current tool calls
+                  for (final m in toolCallMsgs) {
+                    conversation.add({
+                      'type': 'function_call',
+                      'call_id': m['__callId'],
+                      'name': m['__name'],
+                      'arguments': jsonEncode(m['__args']),
+                    });
+                  }
+
+                  // Add tool outputs
+                  conversation.addAll(toolOutputs);
+
+                  try {
+                    final logFile = File('c:/mycode/kelivo/debug_tools.log');
+                    logFile.writeAsStringSync('[Tool Loop] Conversation: ${jsonEncode(conversation)}\n', mode: FileMode.append);
+                  } catch (_) {}
+
+                  // Send follow-up request
+                  final followUpBody = {
+                    'model': modelId,
+                    'input': conversation,
+                    'stream': true,
+                    if (systemInstructions.isNotEmpty) 'instructions': systemInstructions,
+                    'reasoning': {'effort': 'high', 'summary': 'detailed'},
+                    if (temperature != null) 'temperature': temperature,
+                    if (topP != null) 'top_p': topP,
+                    if (maxTokens != null) 'max_output_tokens': maxTokens,
+                  };
+
+                  final followUpReq = http.Request('POST', url);
+                  followUpReq.headers.addAll(headers);
+                  followUpReq.body = jsonEncode(followUpBody);
+
+                  final followUpStream = await client.send(followUpReq);
+
+                  try {
+                    final logFile = File('c:/mycode/kelivo/debug_tools.log');
+                    logFile.writeAsStringSync('[Tool Loop] Response status: ${followUpStream.statusCode}\n', mode: FileMode.append);
+                  } catch (_) {}
+
+                  // Process follow-up response
+                  final followUpChunks = followUpStream.stream.transform(utf8.decoder);
+                  String followUpBuffer = '';
+
+                  // Clear tool accumulator for next response
+                  toolAccResp.clear();
+
+                  await for (final chunk in followUpChunks) {
+                    followUpBuffer += chunk;
+                    final lines = followUpBuffer.split('\n');
+                    followUpBuffer = lines.last;
+
+                    for (int i = 0; i < lines.length - 1; i++) {
+                      final line = lines[i].trim();
+                      if (line.isEmpty || !line.startsWith('data:')) continue;
+                      final data = line.substring(5).trimLeft();
+                      if (data == '[DONE]') continue;
+
+                      try {
+                        final followUpJson = jsonDecode(data);
+                        final followUpType = followUpJson['type'];
+
+                        // Handle all event types
+                        if (followUpType == 'response.reasoning_summary_text.delta') {
+                          final delta = followUpJson['delta'];
+                          if (delta is String && delta.isNotEmpty) {
+                            yield ChatStreamChunk(content: '', reasoning: delta, isDone: false, totalTokens: totalTokens, usage: usage);
+                          }
+                        } else if (followUpType == 'response.output_text.delta') {
+                          final delta = followUpJson['delta'];
+                          if (delta is String && delta.isNotEmpty) {
+                            yield ChatStreamChunk(content: delta, isDone: false, totalTokens: totalTokens, usage: usage);
+                          }
+                        } else if (followUpType == 'response.output_item.added') {
+                          final item = followUpJson['item'];
+                          if (item is Map && item['type'] == 'function_call') {
+                            final id = (item['call_id'] ?? item['id'] ?? '').toString();
+                            final name = (item['name'] ?? '').toString();
+                            if (id.isNotEmpty || name.isNotEmpty) {
+                              final key = id.isNotEmpty ? id : name;
+                              toolAccResp.putIfAbsent(key, () => {'id': id, 'name': name, 'args': ''});
+                            }
+                          }
+                        } else if (followUpType == 'response.function_call_arguments.delta') {
+                          final itemId = (followUpJson['item_id'] ?? '').toString();
+                          final delta = (followUpJson['delta'] ?? '').toString();
+                          if (itemId.isNotEmpty && delta.isNotEmpty) {
+                            for (final entry in toolAccResp.values) {
+                              entry['args'] = (entry['args'] ?? '') + delta;
+                              break;
+                            }
+                          }
+                        } else if (followUpType == 'response.function_call_arguments.done') {
+                          final itemId = (followUpJson['item_id'] ?? '').toString();
+                          final args = (followUpJson['arguments'] ?? '').toString();
+                          if (itemId.isNotEmpty && args.isNotEmpty) {
+                            for (final entry in toolAccResp.values) {
+                              entry['args'] = args;
+                              break;
+                            }
+                          }
+                        } else if (followUpType == 'response.completed') {
+                          final u = followUpJson['response']?['usage'];
+                          if (u != null) {
+                            final inTok = (u['input_tokens'] ?? 0) as int;
+                            final outTok = (u['output_tokens'] ?? 0) as int;
+                            usage = (usage ?? const TokenUsage()).merge(TokenUsage(promptTokens: inTok, completionTokens: outTok));
+                            totalTokens = usage!.totalTokens;
+                          }
+                        }
+                      } catch (e) {
+                        try {
+                          final logFile = File('c:/mycode/kelivo/debug_tools.log');
+                          logFile.writeAsStringSync('[Tool Loop] Parse error: $e\n', mode: FileMode.append);
+                        } catch (_) {}
+                      }
+                    }
+                  }
+
+                  // Update current messages
+                  currentMessages.add({
+                    'role': 'assistant',
+                    'content': '',
+                    '__toolCalls': toolCallMsgs.map((m) => {
+                      'call_id': m['__callId'],
+                      'name': m['__name'],
+                      'arguments': jsonEncode(m['__args']),
+                    }).toList(),
+                    '__toolResults': toolOutputs,
+                  });
+
+                  try {
+                    final logFile = File('c:/mycode/kelivo/debug_tools.log');
+                    logFile.writeAsStringSync('[Tool Loop] After response, toolAccResp: ${jsonEncode(toolAccResp)}\n', mode: FileMode.append);
+                  } catch (_) {}
+
+                  // Continue loop if there are more tool calls
+                }
+
+                try {
+                  final logFile = File('c:/mycode/kelivo/debug_tools.log');
+                  logFile.writeAsStringSync('[Tool Loop] Exited loop, finishing\n', mode: FileMode.append);
+                } catch (_) {}
               }
               final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
               yield ChatStreamChunk(

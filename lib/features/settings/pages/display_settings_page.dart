@@ -479,7 +479,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
-  return Divider(height: 6, thickness: 0.6, indent: 54, endIndent: 12, color: cs.outlineVariant.withOpacity(0.18));
+  return Divider(height: 6, thickness: 1.0, indent: 54, endIndent: 12, color: cs.outlineVariant.withOpacity(0.18));
 }
 
 class _AnimatedPressColor extends StatelessWidget {
@@ -643,7 +643,7 @@ Widget _sheetOption(BuildContext context, {IconData? icon, required String label
 }
 
 Widget _sheetDivider(BuildContext context) {
-  final cs = Theme.of(context).colorScheme; return Divider(height: 1, thickness: 0.6, indent: 52, endIndent: 16, color: cs.outlineVariant.withOpacity(0.18));
+  final cs = Theme.of(context).colorScheme; return Divider(height: 1, thickness: 1.0, indent: 52, endIndent: 16, color: cs.outlineVariant.withOpacity(0.18));
 }
 
 Widget _sheetDividerNoIcon(BuildContext context) {

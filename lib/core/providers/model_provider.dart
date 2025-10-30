@@ -49,7 +49,7 @@ class ModelRegistry {
       r'(gpt-4o|gpt-4-1|o\d|gemini|claude|doubao-1\.6|grok-4|step-3|intern-s1)',
       caseSensitive: false);
   static final RegExp tool = RegExp(
-      r'(gpt-4o|gpt-4-1|gpt-oss|o\d|gemini|claude|qwen-3|doubao-1\.6|grok-4|kimi-k2|step-3|intern-s1|glm-4\.5|deepseek-r1|deepseek-v3)'
+      r'(gpt-4o|gpt-4-1|gpt-oss|gpt-5|o\d|gemini|claude|qwen-3|doubao-1\.6|grok-4|kimi-k2|step-3|intern-s1|glm-4\.5|deepseek-r1|deepseek-v3)'
           .replaceAll(' ', ''),
       caseSensitive: false);
   static final RegExp reasoning = RegExp(

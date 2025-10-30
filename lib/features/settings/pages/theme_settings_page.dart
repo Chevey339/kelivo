@@ -95,7 +95,7 @@ Widget _iosSectionCard({required List<Widget> children}) {
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
-  return Divider(height: 6, thickness: 0.6, indent: 54, endIndent: 12, color: cs.outlineVariant.withOpacity(0.18));
+  return Divider(height: 6, thickness: 1.0, indent: 54, endIndent: 12, color: cs.outlineVariant.withOpacity(0.18));
 }
 
 class _AnimatedPressColor extends StatelessWidget {
