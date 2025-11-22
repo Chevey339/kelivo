@@ -1071,5 +1071,10 @@
   "messageWebViewConsoleLogs": "控制台日誌",
   "messageWebViewNoConsoleMessages": "暫無控制台訊息",
   "messageWebViewRefreshTooltip": "重新整理",
-  "messageWebViewForwardTooltip": "前進"
+  "messageWebViewForwardTooltip": "前進",
+  "providerDetailPageBatchDetectButton": "檢測",
+  "providerDetailPageBatchDetecting": "檢測中...",
+  "providerDetailPageBatchDetectStart": "開始檢測",
+  "providerDetailPageDetectSuccess": "檢測成功",
+  "providerDetailPageDetectFailed": "檢測失敗"
 }

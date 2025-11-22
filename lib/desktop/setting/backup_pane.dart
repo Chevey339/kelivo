@@ -438,7 +438,7 @@ class _RemoteItemCardState extends State<_RemoteItemCard> {
               ),
             ),
             const SizedBox(width: 8),
-            Tooltip(message: l10n.backupPageRestoreTooltip, child: _SmallIconBtn(icon: lucide.Lucide.RotateCw, onTap: widget.onRestore)),
+            Tooltip(message: l10n.backupPageRestoreTooltip, child: _SmallIconBtn(icon: lucide.Lucide.Import, onTap: widget.onRestore)),
             const SizedBox(width: 6),
             Tooltip(message: l10n.backupPageDeleteTooltip, child: _SmallIconBtn(icon: lucide.Lucide.Trash2, onTap: widget.onDelete)),
           ],

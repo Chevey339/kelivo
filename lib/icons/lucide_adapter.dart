@@ -140,4 +140,6 @@ class Lucide {
   static const IconData RefreshCcwDot = lucide.LucideIcons.refreshCcwDot;
   static const IconData Layers = lucide.LucideIcons.layers2;
   static const IconData Shapes = lucide.LucideIcons.shapes;
+  static const IconData CheckCircle = lucide.LucideIcons.circleCheck;
+  static const IconData XCircle = lucide.LucideIcons.circleX;
 }

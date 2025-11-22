@@ -12,6 +12,7 @@ import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
 import 'model_fetch_dialog.dart' show showModelFetchDialog;
 import '../shared/widgets/ios_switch.dart';
+import '../shared/widgets/ios_checkbox.dart';
 // Desktop assistants panel dependencies
 import '../features/assistant/pages/assistant_settings_edit_page.dart' show showAssistantDesktopDialog; // dialog opener only
 import '../core/providers/assistant_provider.dart';
@@ -1140,6 +1141,15 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
   bool _showApiKey = false;
   bool _eyeHover = false;
   
+  // 批量选择模式相关
+  bool _isSelectionMode = false;
+  final Set<String> _selectedModels = {};
+  bool _isDetecting = false;
+  final Map<String, bool> _detectionResults = {};
+  final Map<String, String> _detectionErrorMessages = {};
+  String? _currentDetectingModel;
+  final Set<String> _pendingModels = {};
+  
   // Connection test state for inline dialog
   // Keep local to this file to avoid cross-file coupling
   
@@ -1710,31 +1720,64 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Tooltip(
-                    message: l10n.searchServicesPageTestConnectionTooltip,
-                    child: _IconBtn(icon: lucide.Lucide.HeartPulse, onTap: () => _showTestConnectionDialog(context)),
-                  ),
-                  const SizedBox(width: 6),
-                  Tooltip(
-                    message: l10n.providerDetailPageAddNewModelButton,
-                    child: _IconBtn(icon: lucide.Lucide.Plus, onTap: () => _createModel(context)),
-                  ),
-                  const SizedBox(width: 6),
-                  Tooltip(
-                    message: l10n.providerDetailPageFetchModelsButton,
-                    child: _IconTextBtn(
-                      icon: lucide.Lucide.RefreshCcwDot,
-                      label: l10n.providerDetailPageFetchModelsButton,
-                      onTap: () async {
-                        final providerName = widget.displayName;
-                        await showModelFetchDialog(
-                          context,
-                          providerKey: widget.providerKey,
-                          providerDisplayName: providerName,
-                        );
-                      },
+                  if (_isSelectionMode) ...[
+                    Tooltip(
+                      message: l10n.homePageCancel,
+                      child: _IconBtn(icon: lucide.Lucide.X, onTap: _exitSelectionMode),
                     ),
-                  ),
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: l10n.mcpAssistantSheetSelectAll,
+                      child: _IconBtn(icon: lucide.Lucide.CheckSquare, onTap: () {
+                        setState(() {
+                          _selectedModels.clear();
+                          _selectedModels.addAll(models);
+                        });
+                      }),
+                    ),
+                    const SizedBox(width: 6),
+                    if (_selectedModels.isNotEmpty)
+                      Tooltip(
+                        message: _isDetecting ? l10n.providerDetailPageBatchDetecting : l10n.providerDetailPageBatchDetectStart,
+                        child: _IconTextBtn(
+                          icon: _isDetecting ? lucide.Lucide.Loader : lucide.Lucide.HeartPulse,
+                          label: _isDetecting ? l10n.providerDetailPageBatchDetecting : l10n.providerDetailPageBatchDetectButton,
+                          onTap: () => _startDetection(),
+                        ),
+                      ),
+                  ] else ...[
+                    if (!_isDetecting)
+                      Tooltip(
+                        message: l10n.searchServicesPageTestConnectionTooltip,
+                        child: _IconBtn(icon: lucide.Lucide.HeartPulse, onTap: _enterSelectionMode),
+                      )
+                    else
+                      Tooltip(
+                        message: l10n.providerDetailPageBatchDetecting,
+                        child: _IconBtn(icon: lucide.Lucide.Loader, onTap: () {}),
+                      ),
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: l10n.providerDetailPageAddNewModelButton,
+                      child: _IconBtn(icon: lucide.Lucide.Plus, onTap: () => _createModel(context)),
+                    ),
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: l10n.providerDetailPageFetchModelsButton,
+                      child: _IconTextBtn(
+                        icon: lucide.Lucide.RefreshCcwDot,
+                        label: l10n.providerDetailPageFetchModelsButton,
+                        onTap: () async {
+                          final providerName = widget.displayName;
+                          await showModelFetchDialog(
+                            context,
+                            providerKey: widget.providerKey,
+                            providerDisplayName: providerName,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ],
               ),
 
@@ -1747,6 +1790,18 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                     group: entry.key,
                     modelIds: entry.value,
                     providerKey: widget.providerKey,
+                    isSelectionMode: _isSelectionMode,
+                    selectedModels: _selectedModels,
+                    onSelectionChanged: (newSelection) {
+                      setState(() {
+                        _selectedModels.clear();
+                        _selectedModels.addAll(newSelection);
+                      });
+                    },
+                    detectionResults: _detectionResults,
+                    detectionErrorMessages: _detectionErrorMessages,
+                    currentDetectingModel: _currentDetectingModel,
+                    pendingModels: _pendingModels,
                   ),
                 ),
 
@@ -2794,6 +2849,79 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
       },
     );
   }
+
+  void _enterSelectionMode() {
+    setState(() {
+      _isSelectionMode = true;
+      _selectedModels.clear();
+      _detectionResults.clear();
+      _detectionErrorMessages.clear();
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedModels.clear();
+      _detectionResults.clear();
+      _detectionErrorMessages.clear();
+    });
+  }
+
+  Future<void> _startDetection() async {
+    if (_selectedModels.isEmpty || _isDetecting) return;
+    
+    final modelsToTest = Set<String>.from(_selectedModels);
+    
+    setState(() {
+      _isDetecting = true;
+      _detectionResults.clear();
+      _detectionErrorMessages.clear();
+      _isSelectionMode = false;
+      _selectedModels.clear();
+      _pendingModels.clear();
+      _pendingModels.addAll(modelsToTest);
+      _currentDetectingModel = null;
+    });
+
+    final sp = context.read<SettingsProvider>();
+    final cfg = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
+    
+    for (final modelId in modelsToTest) {
+      if (mounted) {
+        setState(() {
+          _currentDetectingModel = modelId;
+          _pendingModels.remove(modelId);
+        });
+      }
+      
+      try {
+        await ProviderManager.testConnection(cfg, modelId);
+        if (mounted) {
+          setState(() {
+            _detectionResults[modelId] = true;
+            _detectionErrorMessages.remove(modelId);
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _detectionResults[modelId] = false;
+            _detectionErrorMessages[modelId] = e.toString();
+          });
+        }
+      }
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (mounted) {
+      setState(() {
+        _isDetecting = false;
+        _currentDetectingModel = null;
+        _pendingModels.clear();
+      });
+    }
+  }
 }
 
 enum _TestState { idle, loading, success, error }
@@ -3399,10 +3527,28 @@ class _DesktopKeyRow extends StatelessWidget {
 }
 
 class _ModelGroupAccordion extends StatefulWidget {
-  const _ModelGroupAccordion({required this.group, required this.modelIds, required this.providerKey});
+  const _ModelGroupAccordion({
+    required this.group,
+    required this.modelIds,
+    required this.providerKey,
+    this.isSelectionMode = false,
+    this.selectedModels = const {},
+    this.onSelectionChanged,
+    this.detectionResults = const {},
+    this.detectionErrorMessages = const {},
+    this.currentDetectingModel,
+    this.pendingModels = const {},
+  });
   final String group;
   final List<String> modelIds;
   final String providerKey;
+  final bool isSelectionMode;
+  final Set<String> selectedModels;
+  final Map<String, String> detectionErrorMessages;
+  final ValueChanged<Set<String>>? onSelectionChanged;
+  final Map<String, bool> detectionResults;
+  final String? currentDetectingModel;
+  final Set<String> pendingModels;
   @override
   State<_ModelGroupAccordion> createState() => _ModelGroupAccordionState();
 }
@@ -3456,7 +3602,28 @@ class _ModelGroupAccordionState extends State<_ModelGroupAccordion> {
             ),
             AnimatedCrossFade(
               firstChild: const SizedBox.shrink(),
-              secondChild: Column(children: [for (final id in widget.modelIds) _ModelRow(modelId: id, providerKey: widget.providerKey)]),
+              secondChild: Column(children: [
+                for (final id in widget.modelIds)
+                  _ModelRow(
+                    modelId: id,
+                    providerKey: widget.providerKey,
+                    isSelectionMode: widget.isSelectionMode,
+                    isSelected: widget.selectedModels.contains(id),
+                    onSelectionChanged: (selected) {
+                      final newSelection = Set<String>.from(widget.selectedModels);
+                      if (selected) {
+                        newSelection.add(id);
+                      } else {
+                        newSelection.remove(id);
+                      }
+                      widget.onSelectionChanged?.call(newSelection);
+                    },
+                    detectionErrorMessage: widget.detectionErrorMessages[id],
+                    detectionResult: widget.detectionResults[id],
+                    isDetecting: widget.currentDetectingModel == id,
+                    isPending: widget.pendingModels.contains(id),
+                  ),
+              ]),
               crossFadeState: _open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
               duration: const Duration(milliseconds: 180),
               sizeCurve: Curves.easeOutCubic,
@@ -3469,12 +3636,30 @@ class _ModelGroupAccordionState extends State<_ModelGroupAccordion> {
 }
 
 class _ModelRow extends StatelessWidget {
-  const _ModelRow({required this.modelId, required this.providerKey});
+  const _ModelRow({
+    required this.modelId,
+    required this.providerKey,
+    this.isSelectionMode = false,
+    this.isSelected = false,
+    this.detectionErrorMessage,
+    this.onSelectionChanged,
+    this.detectionResult,
+    this.isDetecting = false,
+    this.isPending = false,
+  });
   final String modelId;
   final String providerKey;
+  final bool isSelectionMode;
+  final bool isSelected;
+  final String? detectionErrorMessage;
+  final ValueChanged<bool>? onSelectionChanged;
+  final bool? detectionResult;
+  final bool isDetecting;
+  final bool isPending;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
     final cfg = sp.getProviderConfig(providerKey);
     ModelInfo _infer(String id) => ModelRegistry.infer(ModelInfo(id: id, displayName: id));
@@ -3575,26 +3760,69 @@ class _ModelRow extends StatelessWidget {
       }
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        children: [
-          _BrandCircle(name: displayName, size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(displayName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5)),
-          ),
-          const SizedBox(width: 8),
-          Row(children: caps.map((w) => Padding(padding: const EdgeInsets.only(left: 4), child: w)).toList()),
-          const SizedBox(width: 8),
-          _IconBtn(icon: lucide.Lucide.Settings2, onTap: () async { await showDesktopModelEditDialog(context, providerKey: providerKey, modelId: modelId); }),
-          const SizedBox(width: 4),
-          _IconBtn(icon: lucide.Lucide.Minus, onTap: () async {
-            final old = context.read<SettingsProvider>().getProviderConfig(providerKey);
-            final list = List<String>.from(old.models)..removeWhere((e) => e == modelId);
-            await context.read<SettingsProvider>().setProviderConfig(providerKey, old.copyWith(models: list));
-          }),
-        ],
+    return GestureDetector(
+      onTap: isSelectionMode ? () => onSelectionChanged?.call(!isSelected) : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            if (isSelectionMode) ...[
+              IosCheckbox(
+                value: isSelected,
+                onChanged: (value) => onSelectionChanged?.call(value),
+              ),
+              const SizedBox(width: 10),
+            ],
+            _BrandCircle(name: displayName, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(displayName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5)),
+            ),
+            const SizedBox(width: 8),
+            if (isDetecting) ...[
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+              ),
+              const SizedBox(width: 8),
+            ] else if (isPending) ...[
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: cs.onSurface.withOpacity(0.3), width: 2),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ] else if (detectionResult != null) ...[
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Tooltip(
+                  message: detectionResult! ? l10n.providerDetailPageDetectSuccess : (detectionErrorMessage ?? l10n.providerDetailPageDetectFailed),
+                  child: Icon(
+                    detectionResult! ? lucide.Lucide.CheckCircle : lucide.Lucide.XCircle,
+                    size: 16,
+                    color: detectionResult! ? Colors.green : cs.error,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (!isSelectionMode) ...[
+              Row(children: caps.map((w) => Padding(padding: const EdgeInsets.only(left: 4), child: w)).toList()),
+              const SizedBox(width: 8),
+              _IconBtn(icon: lucide.Lucide.Settings2, onTap: () async { await showDesktopModelEditDialog(context, providerKey: providerKey, modelId: modelId); }),
+              const SizedBox(width: 4),
+              _IconBtn(icon: lucide.Lucide.Minus, onTap: () async {
+                final old = context.read<SettingsProvider>().getProviderConfig(providerKey);
+                final list = List<String>.from(old.models)..removeWhere((e) => e == modelId);
+                await context.read<SettingsProvider>().setProviderConfig(providerKey, old.copyWith(models: list));
+              }),
+            ],
+          ],
+        ),
       ),
     );
   }

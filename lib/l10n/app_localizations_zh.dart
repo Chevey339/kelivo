@@ -3148,6 +3148,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatInputBarOcrTooltip => 'OCR 文字识别';
+
+  @override
+  String get providerDetailPageBatchDetectButton => '检测';
+
+  @override
+  String get providerDetailPageBatchDetecting => '检测中...';
+
+  @override
+  String get providerDetailPageBatchDetectStart => '开始检测';
+
+  @override
+  String get providerDetailPageDetectSuccess => '检测成功';
+
+  @override
+  String get providerDetailPageDetectFailed => '检测失败';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -6294,6 +6309,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatInputBarOcrTooltip => 'OCR 文字识别';
+
+  @override
+  String get providerDetailPageBatchDetectButton => '检测';
+
+  @override
+  String get providerDetailPageBatchDetecting => '检测中...';
+
+  @override
+  String get providerDetailPageBatchDetectStart => '开始检测';
+
+  @override
+  String get providerDetailPageDetectSuccess => '检测成功';
+
+  @override
+  String get providerDetailPageDetectFailed => '检测失败';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -9441,4 +9471,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatInputBarOcrTooltip => 'OCR 文字辨識';
+
+  @override
+  String get providerDetailPageBatchDetectButton => '檢測';
+
+  @override
+  String get providerDetailPageBatchDetecting => '檢測中...';
+
+  @override
+  String get providerDetailPageBatchDetectStart => '開始檢測';
+
+  @override
+  String get providerDetailPageDetectSuccess => '檢測成功';
+
+  @override
+  String get providerDetailPageDetectFailed => '檢測失敗';
 }

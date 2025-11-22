@@ -6178,6 +6178,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Image OCR'**
   String get chatInputBarOcrTooltip;
+
+  /// No description provided for @providerDetailPageBatchDetectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Detect'**
+  String get providerDetailPageBatchDetectButton;
+
+  /// No description provided for @providerDetailPageBatchDetecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Detecting...'**
+  String get providerDetailPageBatchDetecting;
+
+  /// No description provided for @providerDetailPageBatchDetectStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Detection'**
+  String get providerDetailPageBatchDetectStart;
+
+  /// No description provided for @providerDetailPageDetectSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Detection successful'**
+  String get providerDetailPageDetectSuccess;
+
+  /// No description provided for @providerDetailPageDetectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Detection failed'**
+  String get providerDetailPageDetectFailed;
 }
 
 class _AppLocalizationsDelegate

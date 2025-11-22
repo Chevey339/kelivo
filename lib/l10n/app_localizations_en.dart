@@ -3263,4 +3263,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatInputBarOcrTooltip => 'Image OCR';
+
+  @override
+  String get providerDetailPageBatchDetectButton => 'Detect';
+
+  @override
+  String get providerDetailPageBatchDetecting => 'Detecting...';
+
+  @override
+  String get providerDetailPageBatchDetectStart => 'Start Detection';
+
+  @override
+  String get providerDetailPageDetectSuccess => 'Detection successful';
+
+  @override
+  String get providerDetailPageDetectFailed => 'Detection failed';
 }

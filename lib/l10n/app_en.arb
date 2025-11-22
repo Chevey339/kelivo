@@ -1298,5 +1298,10 @@
   "messageWebViewNoConsoleMessages": "No console messages",
   "messageWebViewRefreshTooltip": "Refresh",
   "messageWebViewForwardTooltip": "Forward",
-  "chatInputBarOcrTooltip": "Image OCR"
+  "chatInputBarOcrTooltip": "Image OCR",
+  "providerDetailPageBatchDetectButton": "Detect",
+  "providerDetailPageBatchDetecting": "Detecting...",
+  "providerDetailPageBatchDetectStart": "Start Detection",
+  "providerDetailPageDetectSuccess": "Detection successful",
+  "providerDetailPageDetectFailed": "Detection failed"
 }
