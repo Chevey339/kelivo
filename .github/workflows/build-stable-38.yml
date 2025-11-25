@@ -1,0 +1,670 @@
+name: Flutter Multi-Platform Build Stable 3.38
+
+env:
+  FLUTTER_VERSION: '3.38.3'  # 修改为你需要的 Flutter 版本
+
+on:
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      # 选择构建的平台
+      build_android:
+        description: '构建 Android'
+        required: false
+        default: true
+        type: boolean
+
+      build_ios:
+        description: '构建 iOS'
+        required: false
+        default: true
+        type: boolean
+
+      build_mac:
+        description: '构建 macOS'
+        required: false
+        default: true
+        type: boolean
+
+      build_windows:
+        description: '构建 Windows'
+        required: false
+        default: true
+        type: boolean
+
+      build_linux:
+        description: '构建 Linux'
+        required: false
+        default: true
+        type: boolean
+
+      # 是否发布到 Release（默认不发布）
+      publish_release:
+        description: '发布到 Release'
+        required: false
+        default: false
+        type: boolean
+
+      # Release 标签（只有选择发布时才需要填写）
+      release_tag:
+        description: 'Release 标签（如 v1.0.0）'
+        required: false
+        default: ''
+        type: string
+
+      # 是否为预发布版本
+      prerelease:
+        description: '是否为预发布版本 (Pre-release)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  # Android 构建
+  android:
+    if: ${{ github.event.inputs.build_android == 'true' }}
+    name: 构建 Android
+    runs-on: ubuntu-latest
+    permissions: write-all
+
+    steps:
+      - name: 📦 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ☕ 配置 Java 环境
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: 🐦 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 📝 Inject fallback
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          cat > lib/secrets/fallback.dart <<'EOF'
+          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
+          EOF
+      - name: 📝 获取版本号
+        id: version
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          if [ "${{ github.event.inputs.publish_release }}" != "true" ]; then
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            VERSION="${VERSION}_${SHORT_SHA}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "版本号: $VERSION"
+      # 如果有签名密钥，写入密钥文件
+      - name: 🔑 写入签名密钥
+        if: ${{ env.SIGN_KEYSTORE_BASE64 != '' }}
+        env:
+          SIGN_KEYSTORE_BASE64: ${{ secrets.SIGN_KEYSTORE_BASE64 }}
+        run: |
+          echo "$SIGN_KEYSTORE_BASE64" | base64 --decode > android/app/key.jks
+          echo "storeFile=key.jks" >> android/key.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          echo "✅ 签名配置已写入"
+      - name: 🏗️ 构建 APK
+        run: flutter build apk --release --split-per-abi
+
+      - name: 📦 重命名 APK
+        run: |
+          cd build/app/outputs/flutter-apk
+          for file in app-*-release.apk; do
+            abi=$(echo "$file" | sed -E 's/app-(.*)-release\.apk/\1/')
+            mv "$file" "Kelivo_android_${VERSION}_${abi}.apk"
+          done
+      - name: 🚀 发布到 Release
+        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: build/app/outputs/flutter-apk/Kelivo_android_*.apk
+
+      - name: 📤 上传构建产物 (arm64-v8a)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-arm64-v8a
+          path: build/app/outputs/flutter-apk/Kelivo_android_*_arm64-v8a.apk
+
+      - name: 📤 上传构建产物 (armeabi-v7a)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-armeabi-v7a
+          path: build/app/outputs/flutter-apk/Kelivo_android_*_armeabi-v7a.apk
+
+      - name: 📤 上传构建产物 (x86_64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-x86_64
+          path: build/app/outputs/flutter-apk/Kelivo_android_*_x86_64.apk
+
+  # iOS 构建
+  ios:
+    if: ${{ github.event.inputs.build_ios == 'true' }}
+    name: 构建 iOS
+    runs-on: macos-latest
+    permissions: write-all
+
+    steps:
+      - name: 📦 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐦 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 📝 Inject fallback
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          cat > lib/secrets/fallback.dart <<'EOF'
+          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
+          EOF
+      - name: 📝 获取版本号
+        id: version
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          if [ "${{ github.event.inputs.publish_release }}" != "true" ]; then
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            VERSION="${VERSION}_${SHORT_SHA}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "版本号: $VERSION"
+      - name: 🏗️ 构建 iOS (无签名)
+        run: |
+          flutter build ios --release --no-codesign
+          cd build/ios/iphoneos
+          mkdir Payload
+          cp -r Runner.app Payload/
+          zip -r ../../../Kelivo_ios_${VERSION}.ipa Payload
+      - name: 🚀 发布到 Release
+        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: Kelivo_ios_*.ipa
+
+      - name: 📤 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: iOS-IPA
+          path: Kelivo_ios_*.ipa
+
+  # macOS 构建
+  macos:
+    if: ${{ github.event.inputs.build_mac == 'true' }}
+    name: 构建 macOS
+    runs-on: macos-latest
+    permissions: write-all
+
+    steps:
+      - name: 📦 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐦 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 📝 Inject fallback
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          cat > lib/secrets/fallback.dart <<'EOF'
+          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
+          EOF
+      - name: 📝 获取版本号
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          if [ "${{ github.event.inputs.publish_release }}" != "true" ]; then
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            VERSION="${VERSION}_${SHORT_SHA}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - name: 🏗️ 构建 macOS
+        run: flutter build macos --release
+
+      - name: 📦 创建 DMG
+        run: |
+          brew install create-dmg
+          create-dmg \
+            --volname "Kelivo" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --app-drop-link 600 185 \
+            "Kelivo_macos_${VERSION}.dmg" \
+            "build/macos/Build/Products/Release/kelivo.app" || true
+          # 如果 create-dmg 失败，使用简单方式
+          if [ ! -f "Kelivo_macos_${VERSION}.dmg" ]; then
+            hdiutil create -volname Kelivo -srcfolder build/macos/Build/Products/Release/kelivo.app -ov -format UDZO Kelivo_macos_${VERSION}.dmg
+          fi
+      - name: 🚀 发布到 Release
+        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: Kelivo_macos_*.dmg
+
+      - name: 📤 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-DMG
+          path: Kelivo_macos_*.dmg
+
+  # Windows 构建
+  windows:
+    if: ${{ github.event.inputs.build_windows == 'true' }}
+    name: 构建 Windows
+    runs-on: windows-latest
+    permissions: write-all
+
+    steps:
+      - name: 📦 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔧 安装最新 CMake
+        uses: lukka/get-cmake@latest
+
+      - name: 🐦 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 📝 Inject fallback
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          cat > lib/secrets/fallback.dart <<'EOF'
+          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
+          EOF
+      - name: 🔧 获取依赖
+        run: flutter pub get
+
+      - name: 🔍 验证 CMake 版本
+        shell: pwsh
+        run: |
+          Write-Host "检查 CMake 版本..."
+          cmake --version
+          $cmakeVersion = (cmake --version | Select-String "cmake version" | ForEach-Object { $_.ToString() })
+          Write-Host "当前 CMake: $cmakeVersion"
+      - name: 📝 获取版本号
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path pubspec.yaml -Pattern "version:" | ForEach-Object { $_.Line.Split(":")[1].Trim() })
+          if ("${{ github.event.inputs.publish_release }}" -ne "true") {
+            $shortSha = git rev-parse --short HEAD
+            $version = "$version`_$shortSha"
+          }
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+          Write-Host "版本号: $version"
+      - name: 🏗️ 构建 Windows
+        run: flutter build windows --release
+
+      - name: 📦 打包 ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "Kelivo_windows_$env:VERSION.zip"
+      - name: 🔧 安装 Inno Setup
+        run: choco install innosetup -y
+
+      - name: 📦 创建安装程序
+        shell: pwsh
+        run: |
+          # 语言文件检测（中文语言包在部分 Runner 缺失，避免编译失败）
+          $zhLangCompiler = "C:\\Program Files (x86)\\Inno Setup 6\\Languages\\ChineseSimplified.isl"
+          $zhLangLocalDir = Join-Path (Get-Location) "Languages"
+          $zhLangLocal = Join-Path $zhLangLocalDir "ChineseSimplified.isl"
+          $languagesBlock = $null
+          if (Test-Path $zhLangCompiler) {
+            Write-Host "✅ 检测到中文语言文件: $zhLangCompiler"
+            $languagesBlock = @"
+          [Languages]
+          Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+          Name: "english"; MessagesFile: "compiler:Default.isl"
+          "@
+          } else {
+            Write-Host "⚠️ 未在 Inno Setup 安装目录找到中文语言文件，尝试下载到本地项目..."
+            try {
+              New-Item -ItemType Directory -Force -Path $zhLangLocalDir | Out-Null
+              $uri = 'https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/ChineseSimplified.isl'
+              Invoke-WebRequest -Uri $uri -OutFile $zhLangLocal -UseBasicParsing -TimeoutSec 60
+              if (Test-Path $zhLangLocal) {
+                Write-Host "✅ 已下载中文语言文件: $zhLangLocal"
+                $languagesBlock = @"
+          [Languages]
+          Name: "chinesesimplified"; MessagesFile: "$zhLangLocal"
+          Name: "english"; MessagesFile: "compiler:Default.isl"
+          "@
+              }
+            } catch {
+              Write-Host "⚠️ 下载中文语言文件失败: $($_.Exception.Message)"
+            }
+            if (-not $languagesBlock) {
+              Write-Host "ℹ️ 将仅包含英文安装向导"
+              $languagesBlock = @"
+          [Languages]
+          Name: "english"; MessagesFile: "compiler:Default.isl"
+          "@
+            }
+          }
+          # 创建 Inno Setup 脚本
+          $issContent = @"
+          #define MyAppName "Kelivo"
+          #define MyAppVersion "$env:VERSION"
+          #define MyAppPublisher "Psyche"
+          #define MyAppExeName "kelivo.exe"
+          [Setup]
+          AppId={{A7B8C9D0-E1F2-4A5B-8C9D-0E1F2A3B4C5D}}
+          AppName={#MyAppName}
+          AppVersion={#MyAppVersion}
+          AppPublisher={#MyAppPublisher}
+          DefaultDirName={autopf}\{#MyAppName}
+          DefaultGroupName={#MyAppName}
+          OutputDir=.
+          OutputBaseFilename=Kelivo_windows_{#MyAppVersion}_setup
+          Compression=lzma2
+          SolidCompression=yes
+          WizardStyle=modern
+          ArchitecturesInstallIn64BitMode=x64
+          ArchitecturesAllowed=x64
+          UninstallDisplayIcon={app}\{#MyAppExeName}
+          $languagesBlock
+          [Tasks]
+          Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加图标:"
+          [Files]
+          Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          [Icons]
+          Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+          Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
+          Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+          [Run]
+          Filename: "{app}\{#MyAppExeName}"; Description: "启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent
+          "@
+          
+          # 使用 UTF-8 BOM 以确保中文字符在 Inno Setup 中正确解析
+          $issContent | Out-File -FilePath "installer.iss" -Encoding utf8BOM
+          
+          # 编译安装程序
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer.iss"
+      - name: 🚀 发布到 Release
+        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: |
+            Kelivo_windows_*.zip
+            Kelivo_windows_*_setup.exe
+      - name: 📤 上传构建产物 (ZIP)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-ZIP
+          path: Kelivo_windows_*.zip
+
+      - name: 📤 上传构建产物 (Installer)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-Installer
+          path: Kelivo_windows_*_setup.exe
+
+  # Linux 构建
+  linux:
+    if: ${{ github.event.inputs.build_linux == 'true' }}
+    name: 构建 Linux
+    runs-on: ubuntu-latest
+    permissions: write-all
+
+    steps:
+      - name: 📦 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔧 安装依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config libgtk-3-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+            rpm patchelf libfuse2 file \
+            libkeybinder-3.0-dev libayatana-appindicator3-dev
+      - name: 🐦 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 📝 Inject fallback
+        shell: bash
+        run: |
+          mkdir -p lib/secrets
+          cat > lib/secrets/fallback.dart <<'EOF'
+          const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
+          EOF
+      - name: 📝 获取版本号
+        run: |
+          RAW_VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          VERSION=$RAW_VERSION
+          if [ "${{ github.event.inputs.publish_release }}" != "true" ]; then
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            VERSION="${VERSION}_${SHORT_SHA}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION_NUMBER=$(echo $RAW_VERSION | cut -d'+' -f1)" >> $GITHUB_ENV
+      - name: 🏗️ 构建 Linux
+        run: flutter build linux --release
+
+      - name: 📦 打包 tar.gz
+        run: |
+          cd build/linux/x64/release/bundle
+          tar -czf ../../../../../Kelivo_linux_${VERSION}.tar.gz .
+      - name: 📦 创建 AppImage
+        run: |
+          # 下载 appimagetool
+          wget -O appimagetool "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool
+          
+          # 创建 AppDir 结构
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/lib
+          cp -r build/linux/x64/release/bundle/* AppDir/usr/bin/
+          
+          # 创建 AppRun 脚本
+          cat > AppDir/AppRun << 'EOF'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="${HERE}/usr/bin:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+          exec "${HERE}/usr/bin/kelivo" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+          
+          # 创建 desktop 文件
+          cat > AppDir/kelivo.desktop << EOF
+          [Desktop Entry]
+          Name=Kelivo
+          Exec=kelivo
+          Icon=kelivo
+          Type=Application
+          Categories=Utility;
+          EOF
+          
+          # 复制图标（如果存在）
+          if [ -f "linux/kelivo.png" ]; then
+            cp linux/kelivo.png AppDir/kelivo.png
+          else
+            # 创建一个简单的占位图标
+            touch AppDir/kelivo.png
+          fi
+          
+          # 构建 AppImage
+          ARCH=x86_64 ./appimagetool AppDir Kelivo_linux_${VERSION}.AppImage
+      - name: 📦 创建 DEB 包
+        run: |
+          # 创建 DEB 目录结构
+          mkdir -p deb/DEBIAN
+          mkdir -p deb/opt/kelivo
+          mkdir -p deb/usr/share/applications
+          mkdir -p deb/usr/share/icons/hicolor/256x256/apps
+          
+          # 复制文件
+          cp -r build/linux/x64/release/bundle/* deb/opt/kelivo/
+          
+          # 创建 control 文件
+          cat > deb/DEBIAN/control << EOF
+          Package: kelivo
+          Version: ${VERSION_NUMBER}
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Psyche <your@email.com>
+          Depends: libgtk-3-0, libstdc++6, libglu1-mesa, libgstreamer1.0-0, libgstreamer-plugins-base1.0-0, libglib2.0-0, libc6
+          Description: Kelivo Application
+           A Flutter application for Linux
+          EOF
+          
+          # 创建 desktop 文件
+          cat > deb/usr/share/applications/kelivo.desktop << EOF
+          [Desktop Entry]
+          Name=Kelivo
+          Exec=/opt/kelivo/kelivo
+          Icon=kelivo
+          Type=Application
+          Categories=Utility;
+          EOF
+          
+          # 创建启动脚本
+          cat > deb/opt/kelivo/kelivo.sh << 'EOF'
+          #!/bin/bash
+          cd "$(dirname "$0")"
+          ./kelivo "$@"
+          EOF
+          chmod +x deb/opt/kelivo/kelivo.sh
+          
+          # 构建 DEB 包
+          dpkg-deb --build deb Kelivo_linux_${VERSION}_amd64.deb
+      - name: 📦 创建 RPM 包
+        run: |
+          # 创建 RPM 构建目录
+          mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          
+          # 创建源码目录
+          mkdir -p kelivo-${VERSION_NUMBER}
+          cp -r build/linux/x64/release/bundle/* kelivo-${VERSION_NUMBER}/
+          tar -czf ~/rpmbuild/SOURCES/kelivo-${VERSION_NUMBER}.tar.gz kelivo-${VERSION_NUMBER}
+          
+          # 创建 spec 文件
+          cat > ~/rpmbuild/SPECS/kelivo.spec << EOF
+          Name:           kelivo
+          Version:        ${VERSION_NUMBER}
+          Release:        1%{?dist}
+          Summary:        Kelivo Application
+          License:        MIT
+          Source0:        %{name}-%{version}.tar.gz
+          BuildArch:      x86_64
+          Requires:       gtk3, libstdc++(>=6), mesa-libGLU, gstreamer1, gstreamer1-plugins-base, glib2, glibc
+          
+          %description
+          A Flutter application for Linux
+          
+          %prep
+          %setup -q
+          
+          %install
+          mkdir -p %{buildroot}/opt/kelivo
+          cp -r * %{buildroot}/opt/kelivo/
+          
+          mkdir -p %{buildroot}/usr/share/applications
+          cat > %{buildroot}/usr/share/applications/kelivo.desktop << 'DESKTOPEOF'
+          [Desktop Entry]
+          Name=Kelivo
+          Exec=/opt/kelivo/kelivo
+          Icon=kelivo
+          Type=Application
+          Categories=Utility;
+          DESKTOPEOF
+          
+          %files
+          /opt/kelivo/*
+          /usr/share/applications/kelivo.desktop
+          
+          %changelog
+          * $(date "+%a %b %d %Y") Psyche <your@email.com> - ${VERSION_NUMBER}-1
+          - Initial RPM release
+          EOF
+          
+          # 构建 RPM
+          rpmbuild -bb ~/rpmbuild/SPECS/kelivo.spec
+          cp ~/rpmbuild/RPMS/x86_64/kelivo-${VERSION_NUMBER}-1.*.rpm Kelivo_linux_${VERSION}.rpm
+      - name: 🚀 发布到 Release
+        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: |
+            Kelivo_linux_*.tar.gz
+            Kelivo_linux_*.AppImage
+            Kelivo_linux_*_amd64.deb
+            Kelivo_linux_*.rpm
+      - name: 📤 上传构建产物 (tar.gz)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux-tar.gz
+          path: Kelivo_linux_*.tar.gz
+
+      - name: 📤 上传构建产物 (AppImage)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux-AppImage
+          path: Kelivo_linux_*.AppImage
+
+      - name: 📤 上传构建产物 (DEB)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux-DEB
+          path: Kelivo_linux_*_amd64.deb
+
+      - name: 📤 上传构建产物 (RPM)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux-RPM
+          path: Kelivo_linux_*.rpm

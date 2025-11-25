@@ -125,6 +125,7 @@ class ChatInputBar extends StatefulWidget {
 class _ChatInputBarState extends State<ChatInputBar> {
   late TextEditingController _controller;
   bool _searchEnabled = false;
+  bool _isExpanded = false; // Track expand/collapse state for input field
   final List<String> _images = <String>[]; // local file paths
   final List<DocumentAttachment> _docs = <DocumentAttachment>[]; // files to upload
   final Map<LogicalKeyboardKey, Timer?> _repeatTimers = {};
@@ -189,6 +190,16 @@ class _ChatInputBarState extends State<ChatInputBar> {
     final l10n = AppLocalizations.of(context)!;
     return l10n.chatInputBarHint;
   }
+
+  /// Returns the number of lines in the input text (minimum 1).
+  int get _lineCount {
+    final text = _controller.text;
+    if (text.isEmpty) return 1;
+    return text.split('\n').length;
+  }
+
+  /// Whether to show the expand/collapse button (when text has 3+ lines).
+  bool get _showExpandButton => _lineCount >= 3;
 
   void _handleSend() {
     final text = _controller.text.trim();
@@ -1127,13 +1138,15 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   ),
                   child: Column(
                     children: [
-                  // Input field
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xxs, AppSpacing.md, AppSpacing.xs),
-                    child: Focus(
-                      onKey: (node, event) => _handleKeyEvent(node, event),
-                      child: Builder(
-                        builder: (ctx) {
+                  // Input field with expand/collapse button
+                  Stack(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xxs, AppSpacing.md, AppSpacing.xs),
+                        child: Focus(
+                          onKey: (node, event) => _handleKeyEvent(node, event),
+                          child: Builder(
+                            builder: (ctx) {
                           // Desktop: show a right-click context menu with paste/cut/copy/select all
                           // Future<void> _showDesktopContextMenu(Offset globalPos) async {
                           //   bool isDesktop = false;
@@ -1210,7 +1223,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                               focusNode: widget.focusNode,
                               onChanged: (_) => setState(() {}),
                               minLines: 1,
-                              maxLines: 5,
+                              maxLines: _isExpanded ? 25 : 5,
                               // On iOS, show "Send" on the return key and submit on tap.
                               // Still keep multiline so pasted text preserves line breaks.
                               keyboardType: TextInputType.multiline,
@@ -1339,10 +1352,25 @@ class _ChatInputBarState extends State<ChatInputBar> {
                               cursorColor: theme.colorScheme.primary,
                             ),
                           );
-                        },
+                            },
+                          ),
+                        ),
                       ),
-                    ),
-                  
+                      // Expand/Collapse icon button (only shown when 3+ lines)
+                      if (_showExpandButton)
+                        Positioned(
+                          top: 10,
+                          right: 12,
+                          child: GestureDetector(
+                            onTap: () => setState(() => _isExpanded = !_isExpanded),
+                            child: Icon(
+                              _isExpanded ? Lucide.ChevronsDownUp : Lucide.ChevronsUpDown,
+                              size: 16,
+                              color: theme.colorScheme.onSurface.withOpacity(0.45),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   // Bottom buttons row (no divider)
                   Padding(

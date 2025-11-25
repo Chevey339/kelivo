@@ -3191,6 +3191,18 @@ abstract class AppLocalizations {
   /// **'Newline'**
   String get chatInputBarInsertNewline;
 
+  /// No description provided for @chatInputBarExpand.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand'**
+  String get chatInputBarExpand;
+
+  /// No description provided for @chatInputBarCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse'**
+  String get chatInputBarCollapse;
+
   /// No description provided for @mcpPageBackTooltip.
   ///
   /// In en, this message translates to:

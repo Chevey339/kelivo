@@ -521,6 +521,8 @@
   "chatInputBarMcpServersTooltip": "MCP伺服器",
   "chatInputBarMoreTooltip": "更多",
   "chatInputBarInsertNewline": "換行",
+  "chatInputBarExpand": "展開",
+  "chatInputBarCollapse": "收起",
   "mcpPageBackTooltip": "返回",
   "mcpPageAddMcpTooltip": "新增 MCP",
   "mcpPageNoServers": "暫無 MCP 伺服器",

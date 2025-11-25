@@ -533,6 +533,8 @@
   "chatInputBarMcpServersTooltip": "MCP服务器",
   "chatInputBarMoreTooltip": "更多",
   "chatInputBarInsertNewline": "换行",
+  "chatInputBarExpand": "展开",
+  "chatInputBarCollapse": "收起",
   "mcpPageBackTooltip": "返回",
   "mcpPageAddMcpTooltip": "添加 MCP",
   "mcpPageNoServers": "暂无 MCP 服务器",

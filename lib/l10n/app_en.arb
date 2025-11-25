@@ -694,6 +694,8 @@
   "chatInputBarMcpServersTooltip": "MCP Servers",
   "chatInputBarMoreTooltip": "Add",
   "chatInputBarInsertNewline": "Newline",
+  "chatInputBarExpand": "Expand",
+  "chatInputBarCollapse": "Collapse",
   "mcpPageBackTooltip": "Back",
   "mcpPageAddMcpTooltip": "Add MCP",
   "mcpPageNoServers": "No MCP servers",
