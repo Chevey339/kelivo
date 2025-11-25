@@ -20,8 +20,9 @@ import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../shared/pages/webview_page.dart';
 import '../../../desktop/html_preview_dialog.dart';
 import 'dart:convert';
+import '../../../core/providers/favorite_provider.dart';
 
-enum MessageMoreAction { edit, fork, delete, share }
+enum MessageMoreAction { edit, fork, delete, share, favorite }
 
 Future<MessageMoreAction?> showMessageMoreSheet(BuildContext context, ChatMessage message) async {
   final isDesktop = defaultTargetPlatform == TargetPlatform.macOS ||
@@ -42,11 +43,19 @@ Future<MessageMoreAction?> showMessageMoreSheet(BuildContext context, ChatMessag
 
   // Desktop: show anchored glass menu near the clicked button
   final l10n = AppLocalizations.of(context)!;
+  final favoriteProvider = Provider.of<FavoriteProvider>(context, listen: false);
+  final isFavorited = favoriteProvider.isFavorited(message.id);
+  
   MessageMoreAction? selected;
   await showDesktopContextMenuAt(
     context,
     globalPosition: DesktopMenuAnchor.positionOrCenter(context),
     items: [
+      DesktopContextMenuItem(
+        icon: isFavorited ? Lucide.StarOff : Lucide.Star,
+        label: isFavorited ? '取消收藏' : '收藏', // TODO: 添加到本地化
+        onTap: () { selected = MessageMoreAction.favorite; },
+      ),
       DesktopContextMenuItem(
         icon: Lucide.TextSelect,
         label: l10n.messageMoreSheetSelectCopy,
@@ -198,6 +207,8 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final favoriteProvider = context.watch<FavoriteProvider>();
+    final isFavorited = favoriteProvider.isFavorited(widget.message.id);
 
     // Footer metadata (time/model) removed per iOS-style spec
 
@@ -229,6 +240,14 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    _actionItem(
+                      icon: isFavorited ? Lucide.StarOff : Lucide.Star,
+                      label: isFavorited ? '取消收藏' : '收藏', // TODO: 添加到本地化
+                      iconColor: isFavorited ? null : Colors.amber,
+                      onTap: () {
+                        Navigator.of(context).pop(MessageMoreAction.favorite);
+                      },
+                    ),
                     _actionItem(
                       icon: Lucide.TextSelect,
                       label: l10n.messageMoreSheetSelectCopy,

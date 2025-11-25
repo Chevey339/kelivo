@@ -28,6 +28,7 @@ import '../../../core/models/token_usage.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/tts_provider.dart';
+import '../../../core/providers/favorite_provider.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../model/widgets/model_select_sheet.dart';
@@ -4969,6 +4970,96 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                       if (enabled0) _selectedItems.add(m.id);
                                     }
                                   });
+                                } else if (action == MessageMoreAction.favorite) {
+                                  // 处理收藏操作
+                                  final favoriteProvider = context.read<FavoriteProvider>();
+                                  final isFavorited = favoriteProvider.isFavorited(message.id);
+                                  
+                                  if (isFavorited) {
+                                    // 取消收藏
+                                    final favorite = favoriteProvider.getFavoriteByMessageId(message.id);
+                                    if (favorite != null) {
+                                      await favoriteProvider.deleteFavorite(favorite.id);
+                                      if (mounted) {
+                                        showAppSnackBar(context, message: '已取消收藏', type: NotificationType.success);
+                                      }
+                                    }
+                                  } else {
+                                    // 添加收藏 - 需要找到对应的问题
+                                    String question = '';
+                                    String answer = message.content;
+                                    
+                                    // 如果是助手消息，找到前一条用户消息作为问题
+                                    if (message.role == 'assistant') {
+                                      for (int i = index - 1; i >= 0; i--) {
+                                        if (messages[i].role == 'user') {
+                                          question = messages[i].content;
+                                          break;
+                                        }
+                                      }
+                                    } else {
+                                      // 如果是用户消息，找到后一条助手消息作为回答
+                                      question = message.content;
+                                      for (int i = index + 1; i < messages.length; i++) {
+                                        if (messages[i].role == 'assistant') {
+                                          answer = messages[i].content;
+                                          break;
+                                        }
+                                      }
+                                    }
+                                    
+                                    if (question.isNotEmpty && answer.isNotEmpty) {
+                                      // 使用当前对话标题作为收藏标题
+                                      final title = _currentConversation?.title ?? '未命名对话';
+                                      
+                                      // 获取供应商和模型信息（从助手消息中）
+                                      String? providerId;
+                                      String? modelId;
+                                      if (message.role == 'assistant') {
+                                        providerId = message.providerId;
+                                        modelId = message.modelId;
+                                      } else {
+                                        // 如果是用户消息，查找后面的助手回复
+                                        for (int i = index + 1; i < messages.length; i++) {
+                                          if (messages[i].role == 'assistant') {
+                                            providerId = messages[i].providerId;
+                                            modelId = messages[i].modelId;
+                                            break;
+                                          }
+                                        }
+                                      }
+                                      
+                                      // 获取助手信息
+                                      String? assistantId;
+                                      String? assistantName;
+                                      String? assistantAvatar;
+                                      final assistantProvider = context.read<AssistantProvider>();
+                                      final assistant = _currentConversation?.assistantId != null
+                                          ? assistantProvider.getById(_currentConversation!.assistantId!)
+                                          : assistantProvider.currentAssistant;
+                                      if (assistant != null) {
+                                        assistantId = assistant.id;
+                                        assistantName = assistant.name;
+                                        assistantAvatar = assistant.avatar;
+                                      }
+                                      
+                                      await favoriteProvider.addFavorite(
+                                        title: title,
+                                        question: question,
+                                        answer: answer,
+                                        conversationId: _currentConversation?.id,
+                                        messageId: message.id,
+                                        providerId: providerId,
+                                        modelId: modelId,
+                                        assistantId: assistantId,
+                                        assistantName: assistantName,
+                                        assistantAvatar: assistantAvatar,
+                                      );
+                                      if (mounted) {
+                                        showAppSnackBar(context, message: '已添加到收藏', type: NotificationType.success);
+                                      }
+                                    }
+                                  }
                                 }
                               },
                                   toolParts: message.role == 'assistant' ? _toolParts[message.id] : null,
@@ -6061,6 +6152,97 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                                             if (enabled0) _selectedItems.add(m.id);
                                                           }
                                                         });
+                                                      } else if (action == MessageMoreAction.favorite) {
+                                                        // 处理收藏操作
+                                                        final favoriteProvider = context.read<FavoriteProvider>();
+                                                        final isFavorited = favoriteProvider.isFavorited(message.id);
+                                                        
+                                                        if (isFavorited) {
+                                                          // 取消收藏
+                                                          final favorite = favoriteProvider.getFavoriteByMessageId(message.id);
+                                                          if (favorite != null) {
+                                                            await favoriteProvider.deleteFavorite(favorite.id);
+                                                            if (mounted) {
+                                                              showAppSnackBar(context, message: '已取消收藏', type: NotificationType.success);
+                                                            }
+                                                          }
+                                                        } else {
+                                                          // 添加收藏 - 需要找到对应的问题
+                                                          String question = '';
+                                                          String answer = message.content;
+                                                          final idx = messages.indexWhere((m) => m.id == message.id);
+                                                          
+                                                          // 如果是助手消息，找到前一条用户消息作为问题
+                                                          if (message.role == 'assistant') {
+                                                            for (int i = idx - 1; i >= 0; i--) {
+                                                              if (messages[i].role == 'user') {
+                                                                question = messages[i].content;
+                                                                break;
+                                                              }
+                                                            }
+                                                          } else {
+                                                            // 如果是用户消息，找到后一条助手消息作为回答
+                                                            question = message.content;
+                                                            for (int i = idx + 1; i < messages.length; i++) {
+                                                              if (messages[i].role == 'assistant') {
+                                                                answer = messages[i].content;
+                                                                break;
+                                                              }
+                                                            }
+                                                          }
+                                                          
+                                                          if (question.isNotEmpty && answer.isNotEmpty) {
+                                                            // 使用当前对话标题作为收藏标题
+                                                            final title = _currentConversation?.title ?? '未命名对话';
+                                                            
+                                                            // 获取供应商和模型信息（从助手消息中）
+                                                            String? providerId;
+                                                            String? modelId;
+                                                            if (message.role == 'assistant') {
+                                                              providerId = message.providerId;
+                                                              modelId = message.modelId;
+                                                            } else {
+                                                              // 如果是用户消息，查找后面的助手回复
+                                                              for (int i = idx + 1; i < messages.length; i++) {
+                                                                if (messages[i].role == 'assistant') {
+                                                                  providerId = messages[i].providerId;
+                                                                  modelId = messages[i].modelId;
+                                                                  break;
+                                                                }
+                                                              }
+                                                            }
+                                                            
+                                                            // 获取助手信息
+                                                            String? assistantId;
+                                                            String? assistantName;
+                                                            String? assistantAvatar;
+                                                            final assistantProvider = context.read<AssistantProvider>();
+                                                            final assistant = _currentConversation?.assistantId != null
+                                                                ? assistantProvider.getById(_currentConversation!.assistantId!)
+                                                                : assistantProvider.currentAssistant;
+                                                            if (assistant != null) {
+                                                              assistantId = assistant.id;
+                                                              assistantName = assistant.name;
+                                                              assistantAvatar = assistant.avatar;
+                                                            }
+                                                            
+                                                            await favoriteProvider.addFavorite(
+                                                              title: title,
+                                                              question: question,
+                                                              answer: answer,
+                                                              conversationId: _currentConversation?.id,
+                                                              messageId: message.id,
+                                                              providerId: providerId,
+                                                              modelId: modelId,
+                                                              assistantId: assistantId,
+                                                              assistantName: assistantName,
+                                                              assistantAvatar: assistantAvatar,
+                                                            );
+                                                            if (mounted) {
+                                                              showAppSnackBar(context, message: '已添加到收藏', type: NotificationType.success);
+                                                            }
+                                                          }
+                                                        }
                                                       } else if (action == null) {
                                                         // do nothing
                                                       } else {

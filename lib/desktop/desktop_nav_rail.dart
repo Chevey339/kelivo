@@ -17,12 +17,14 @@ class DesktopNavRail extends StatelessWidget {
     required this.activeIndex,
     required this.onTapChat,
     required this.onTapTranslate,
+    required this.onTapFavorite,
     required this.onTapSettings,
   });
 
-  final int activeIndex; // 0=Chat, 1=Translate
+  final int activeIndex; // 0=Chat, 1=Translate, 2=Favorite
   final VoidCallback onTapChat;
   final VoidCallback onTapTranslate;
+  final VoidCallback onTapFavorite;
   final VoidCallback onTapSettings;
 
   static const double width = 64.0;
@@ -35,6 +37,7 @@ class DesktopNavRail extends StatelessWidget {
     final double topGap = isMac ? 36.0 : 8.0;
     final isChatActive = activeIndex == 0;
     final isTranslateActive = activeIndex == 1;
+    final isFavoriteActive = activeIndex == 2;
 
     return Container(
       width: width,
@@ -60,6 +63,15 @@ class DesktopNavRail extends StatelessWidget {
             size: 40,
             iconSize: 18,
             iconColor: isTranslateActive ? cs.primary : null,
+          ),
+          const SizedBox(height: 8),
+          _CircleAction(
+            tooltip: '收藏', // TODO: 添加到本地化
+            icon: lucide.Lucide.Star,
+            onTap: onTapFavorite,
+            size: 40,
+            iconSize: 18,
+            iconColor: isFavoriteActive ? cs.primary : null,
           ),
           const Spacer(),
           _ThemeCycleButton(),

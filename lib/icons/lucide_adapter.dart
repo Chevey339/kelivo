@@ -142,4 +142,6 @@ class Lucide {
   static const IconData Shapes = lucide.LucideIcons.shapes;
   static const IconData CheckCircle = lucide.LucideIcons.circleCheck;
   static const IconData XCircle = lucide.LucideIcons.circleX;
+  static const IconData Star = lucide.LucideIcons.star;
+  static const IconData StarOff = lucide.LucideIcons.starOff;
 }
