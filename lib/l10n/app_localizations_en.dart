@@ -3350,4 +3350,54 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerDetailPageDetectFailed => 'Detection failed';
+
+  @override
+  String get favoritePageTitle => 'Favorites';
+
+  @override
+  String get favoritePageEmpty => 'No favorites yet';
+
+  @override
+  String get favoritePageEmptyHint =>
+      'Tap the favorite button in chat to add favorites';
+
+  @override
+  String get favoritePageSelectHint => 'Select a favorite to view details';
+
+  @override
+  String get favoritePageDeleteTitle => 'Delete Favorite';
+
+  @override
+  String get favoritePageDeleteMessage =>
+      'Are you sure you want to delete this favorite? This action cannot be undone.';
+
+  @override
+  String get favoritePageDeleteButton => 'Delete';
+
+  @override
+  String get favoritePageCancelButton => 'Cancel';
+
+  @override
+  String get favoriteDetailBackTooltip => 'Back';
+
+  @override
+  String get favoriteDetailCopyAllTooltip => 'Copy All';
+
+  @override
+  String get favoriteDetailCopiedAll => 'All content copied';
+
+  @override
+  String get favoriteActionAdd => 'Favorite';
+
+  @override
+  String get favoriteActionRemove => 'Unfavorite';
+
+  @override
+  String get favoriteActionAdded => 'Added to favorites';
+
+  @override
+  String get favoriteActionRemoved => 'Removed from favorites';
+
+  @override
+  String get favoriteDefaultTitle => 'Untitled Conversation';
 }

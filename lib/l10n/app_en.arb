@@ -1326,5 +1326,21 @@
   "providerDetailPageBatchDetecting": "Detecting...",
   "providerDetailPageBatchDetectStart": "Start Detection",
   "providerDetailPageDetectSuccess": "Detection successful",
-  "providerDetailPageDetectFailed": "Detection failed"
+  "providerDetailPageDetectFailed": "Detection failed",
+  "favoritePageTitle": "Favorites",
+  "favoritePageEmpty": "No favorites yet",
+  "favoritePageEmptyHint": "Tap the favorite button in chat to add favorites",
+  "favoritePageSelectHint": "Select a favorite to view details",
+  "favoritePageDeleteTitle": "Delete Favorite",
+  "favoritePageDeleteMessage": "Are you sure you want to delete this favorite? This action cannot be undone.",
+  "favoritePageDeleteButton": "Delete",
+  "favoritePageCancelButton": "Cancel",
+  "favoriteDetailBackTooltip": "Back",
+  "favoriteDetailCopyAllTooltip": "Copy All",
+  "favoriteDetailCopiedAll": "All content copied",
+  "favoriteActionAdd": "Favorite",
+  "favoriteActionRemove": "Unfavorite",
+  "favoriteActionAdded": "Added to favorites",
+  "favoriteActionRemoved": "Removed from favorites",
+  "favoriteDefaultTitle": "Untitled Conversation"
 }

@@ -6346,6 +6346,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Detection failed'**
   String get providerDetailPageDetectFailed;
+
+  /// No description provided for @favoritePageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get favoritePageTitle;
+
+  /// No description provided for @favoritePageEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No favorites yet'**
+  String get favoritePageEmpty;
+
+  /// No description provided for @favoritePageEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the favorite button in chat to add favorites'**
+  String get favoritePageEmptyHint;
+
+  /// No description provided for @favoritePageSelectHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a favorite to view details'**
+  String get favoritePageSelectHint;
+
+  /// No description provided for @favoritePageDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Favorite'**
+  String get favoritePageDeleteTitle;
+
+  /// No description provided for @favoritePageDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this favorite? This action cannot be undone.'**
+  String get favoritePageDeleteMessage;
+
+  /// No description provided for @favoritePageDeleteButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get favoritePageDeleteButton;
+
+  /// No description provided for @favoritePageCancelButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get favoritePageCancelButton;
+
+  /// No description provided for @favoriteDetailBackTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get favoriteDetailBackTooltip;
+
+  /// No description provided for @favoriteDetailCopyAllTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy All'**
+  String get favoriteDetailCopyAllTooltip;
+
+  /// No description provided for @favoriteDetailCopiedAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All content copied'**
+  String get favoriteDetailCopiedAll;
+
+  /// No description provided for @favoriteActionAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite'**
+  String get favoriteActionAdd;
+
+  /// No description provided for @favoriteActionRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Unfavorite'**
+  String get favoriteActionRemove;
+
+  /// No description provided for @favoriteActionAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to favorites'**
+  String get favoriteActionAdded;
+
+  /// No description provided for @favoriteActionRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed from favorites'**
+  String get favoriteActionRemoved;
+
+  /// No description provided for @favoriteDefaultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled Conversation'**
+  String get favoriteDefaultTitle;
 }
 
 class _AppLocalizationsDelegate

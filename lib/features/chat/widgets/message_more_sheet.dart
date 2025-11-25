@@ -53,7 +53,9 @@ Future<MessageMoreAction?> showMessageMoreSheet(BuildContext context, ChatMessag
     items: [
       DesktopContextMenuItem(
         icon: isFavorited ? Lucide.StarOff : Lucide.Star,
-        label: isFavorited ? '取消收藏' : '收藏', // TODO: 添加到本地化
+        label: isFavorited 
+          ? AppLocalizations.of(context)!.favoriteActionRemove 
+          : AppLocalizations.of(context)!.favoriteActionAdd,
         onTap: () { selected = MessageMoreAction.favorite; },
       ),
       DesktopContextMenuItem(
@@ -242,7 +244,9 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                   children: [
                     _actionItem(
                       icon: isFavorited ? Lucide.StarOff : Lucide.Star,
-                      label: isFavorited ? '取消收藏' : '收藏', // TODO: 添加到本地化
+                      label: isFavorited 
+                        ? AppLocalizations.of(context)!.favoriteActionRemove 
+                        : AppLocalizations.of(context)!.favoriteActionAdd,
                       iconColor: isFavorited ? null : Colors.amber,
                       onTap: () {
                         Navigator.of(context).pop(MessageMoreAction.favorite);

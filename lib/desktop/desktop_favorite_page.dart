@@ -75,7 +75,7 @@ class _DesktopFavoritePageState extends State<DesktopFavoritePage> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    '收藏', // TODO: 添加到本地化
+                    AppLocalizations.of(context)!.favoritePageTitle,
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -110,7 +110,7 @@ class _DesktopFavoritePageState extends State<DesktopFavoritePage> {
                 ? FavoriteDetailPage(item: selectedItem, embedded: true)
                 : Center(
                     child: Text(
-                      '选择一个收藏查看详情',
+                      AppLocalizations.of(context)!.favoritePageSelectHint,
                       style: TextStyle(
                         fontSize: 14,
                         color: cs.onSurface.withOpacity(0.5),
@@ -395,7 +395,7 @@ class _FavoriteTileState extends State<_FavoriteTile> {
       items: [
         DesktopContextMenuItem(
           icon: lucide.Lucide.Trash2,
-          label: '删除',
+          label: AppLocalizations.of(context)!.favoritePageDeleteButton,
           danger: true,
           onTap: widget.onDelete,
         ),
@@ -406,7 +406,7 @@ class _FavoriteTileState extends State<_FavoriteTile> {
   // 获取显示文本（在分组下显示问题的简略内容）
   String _getDisplayText() {
     final question = widget.item.question.trim();
-    if (question.isEmpty) return '空内容';
+    if (question.isEmpty) return AppLocalizations.of(context)!.favoritePageEmpty;
     
     // 移除换行符，只显示第一行
     final firstLine = question.split('\n').first.trim();
@@ -439,7 +439,7 @@ class _EmptyState extends StatelessWidget {
               color: cs.onSurface.withOpacity(0.5),
               decoration: TextDecoration.none,
             ),
-            child: const Text('暂无收藏'),
+            child: Text(AppLocalizations.of(context)!.favoritePageEmpty),
           ),
           const SizedBox(height: 8),
           DefaultTextStyle(
@@ -448,7 +448,7 @@ class _EmptyState extends StatelessWidget {
               color: cs.onSurface.withOpacity(0.4),
               decoration: TextDecoration.none,
             ),
-            child: const Text('在聊天中点击收藏按钮添加收藏'),
+            child: Text(AppLocalizations.of(context)!.favoritePageEmptyHint),
           ),
         ],
       ),
@@ -480,7 +480,7 @@ class _DeleteConfirmDialog extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        '删除收藏',
+                        AppLocalizations.of(context)!.favoritePageDeleteTitle,
                         style: TextStyle(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w700,
@@ -506,7 +506,7 @@ class _DeleteConfirmDialog extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    '确定要删除这条收藏吗？此操作无法撤销。',
+                    AppLocalizations.of(context)!.favoritePageDeleteMessage,
                     style: TextStyle(
                       color: cs.onSurface.withOpacity(0.9),
                       fontSize: 13.5,
@@ -518,13 +518,13 @@ class _DeleteConfirmDialog extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       _DialogButton(
-                        label: '取消',
+                        label: AppLocalizations.of(context)!.favoritePageCancelButton,
                         filled: false,
                         onTap: () => Navigator.of(context).pop(false),
                       ),
                       const SizedBox(width: 8),
                       _DialogButton(
-                        label: '删除',
+                        label: AppLocalizations.of(context)!.favoritePageDeleteButton,
                         filled: true,
                         danger: true,
                         onTap: () => Navigator.of(context).pop(true),

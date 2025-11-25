@@ -12,6 +12,7 @@ import '../core/providers/settings_provider.dart';
 import '../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:characters/characters.dart';
+import '../l10n/app_localizations.dart';
 
 /// 收藏详情页面
 class FavoriteDetailPage extends StatelessWidget {
@@ -58,7 +59,7 @@ class FavoriteDetailPage extends StatelessWidget {
                 _IconButton(
                   icon: lucide.Lucide.ArrowLeft,
                   onTap: () => Navigator.of(context).pop(),
-                  tooltip: '返回',
+                  tooltip: AppLocalizations.of(context)!.favoriteDetailBackTooltip,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -76,7 +77,7 @@ class FavoriteDetailPage extends StatelessWidget {
                 _IconButton(
                   icon: lucide.Lucide.Copy,
                   onTap: () => _copyAll(context),
-                  tooltip: '复制全部',
+                  tooltip: AppLocalizations.of(context)!.favoriteDetailCopyAllTooltip,
                 ),
               ],
             ),
@@ -170,7 +171,11 @@ class FavoriteDetailPage extends StatelessWidget {
   void _copyAll(BuildContext context) {
     final text = '问题：\n${item.question}\n\n回答：\n${item.answer}';
     Clipboard.setData(ClipboardData(text: text));
-    showAppSnackBar(context, message: '已复制全部内容', type: NotificationType.success);
+    showAppSnackBar(
+      context, 
+      message: AppLocalizations.of(context)!.favoriteDetailCopiedAll, 
+      type: NotificationType.success,
+    );
   }
 }
 

@@ -4981,7 +4981,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                     if (favorite != null) {
                                       await favoriteProvider.deleteFavorite(favorite.id);
                                       if (mounted) {
-                                        showAppSnackBar(context, message: '已取消收藏', type: NotificationType.success);
+                                        showAppSnackBar(
+                                          context, 
+                                          message: AppLocalizations.of(context)!.favoriteActionRemoved, 
+                                          type: NotificationType.success,
+                                        );
                                       }
                                     }
                                   } else {
@@ -5010,7 +5014,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                     
                                     if (question.isNotEmpty && answer.isNotEmpty) {
                                       // 使用当前对话标题作为收藏标题
-                                      final title = _currentConversation?.title ?? '未命名对话';
+                                      final title = _currentConversation?.title ?? AppLocalizations.of(context)!.favoriteDefaultTitle;
                                       
                                       // 获取供应商和模型信息（从助手消息中）
                                       String? providerId;
@@ -5056,7 +5060,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                         assistantAvatar: assistantAvatar,
                                       );
                                       if (mounted) {
-                                        showAppSnackBar(context, message: '已添加到收藏', type: NotificationType.success);
+                                        showAppSnackBar(
+                                          context, 
+                                          message: AppLocalizations.of(context)!.favoriteActionAdded, 
+                                          type: NotificationType.success,
+                                        );
                                       }
                                     }
                                   }
@@ -6163,7 +6171,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                                           if (favorite != null) {
                                                             await favoriteProvider.deleteFavorite(favorite.id);
                                                             if (mounted) {
-                                                              showAppSnackBar(context, message: '已取消收藏', type: NotificationType.success);
+                                                              showAppSnackBar(
+                                                                context, 
+                                                                message: AppLocalizations.of(context)!.favoriteActionRemoved, 
+                                                                type: NotificationType.success,
+                                                              );
                                                             }
                                                           }
                                                         } else {
@@ -6193,7 +6205,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                                           
                                                           if (question.isNotEmpty && answer.isNotEmpty) {
                                                             // 使用当前对话标题作为收藏标题
-                                                            final title = _currentConversation?.title ?? '未命名对话';
+                                                            final title = _currentConversation?.title ?? AppLocalizations.of(context)!.favoriteDefaultTitle;
                                                             
                                                             // 获取供应商和模型信息（从助手消息中）
                                                             String? providerId;
@@ -6239,7 +6251,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                                               assistantAvatar: assistantAvatar,
                                                             );
                                                             if (mounted) {
-                                                              showAppSnackBar(context, message: '已添加到收藏', type: NotificationType.success);
+                                                              showAppSnackBar(
+                                                                context, 
+                                                                message: AppLocalizations.of(context)!.favoriteActionAdded, 
+                                                                type: NotificationType.success,
+                                                              );
                                                             }
                                                           }
                                                         }
