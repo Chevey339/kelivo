@@ -1103,5 +1103,21 @@
   "providerDetailPageBatchDetecting": "检测中...",
   "providerDetailPageBatchDetectStart": "开始检测",
   "providerDetailPageDetectSuccess": "检测成功",
-  "providerDetailPageDetectFailed": "检测失败"
+  "providerDetailPageDetectFailed": "检测失败",
+  "favoritePageTitle": "收藏",
+  "favoritePageEmpty": "暂无收藏",
+  "favoritePageEmptyHint": "在聊天中点击收藏按钮添加收藏",
+  "favoritePageSelectHint": "选择一个收藏查看详情",
+  "favoritePageDeleteTitle": "删除收藏",
+  "favoritePageDeleteMessage": "确定要删除这条收藏吗？此操作无法撤销。",
+  "favoritePageDeleteButton": "删除",
+  "favoritePageCancelButton": "取消",
+  "favoriteDetailBackTooltip": "返回",
+  "favoriteDetailCopyAllTooltip": "复制全部",
+  "favoriteDetailCopiedAll": "已复制全部内容",
+  "favoriteActionAdd": "收藏",
+  "favoriteActionRemove": "取消收藏",
+  "favoriteActionAdded": "已添加到收藏",
+  "favoriteActionRemoved": "已取消收藏",
+  "favoriteDefaultTitle": "未命名对话"
 }

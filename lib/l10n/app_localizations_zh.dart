@@ -6510,6 +6510,54 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageDetectFailed => '检测失败';
+
+  @override
+  String get favoritePageTitle => '收藏';
+
+  @override
+  String get favoritePageEmpty => '暂无收藏';
+
+  @override
+  String get favoritePageEmptyHint => '在聊天中点击收藏按钮添加收藏';
+
+  @override
+  String get favoritePageSelectHint => '选择一个收藏查看详情';
+
+  @override
+  String get favoritePageDeleteTitle => '删除收藏';
+
+  @override
+  String get favoritePageDeleteMessage => '确定要删除这条收藏吗？此操作无法撤销。';
+
+  @override
+  String get favoritePageDeleteButton => '删除';
+
+  @override
+  String get favoritePageCancelButton => '取消';
+
+  @override
+  String get favoriteDetailBackTooltip => '返回';
+
+  @override
+  String get favoriteDetailCopyAllTooltip => '复制全部';
+
+  @override
+  String get favoriteDetailCopiedAll => '已复制全部内容';
+
+  @override
+  String get favoriteActionAdd => '收藏';
+
+  @override
+  String get favoriteActionRemove => '取消收藏';
+
+  @override
+  String get favoriteActionAdded => '已添加到收藏';
+
+  @override
+  String get favoriteActionRemoved => '已取消收藏';
+
+  @override
+  String get favoriteDefaultTitle => '未命名对话';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -9741,4 +9789,52 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageDetectFailed => '檢測失敗';
+
+  @override
+  String get favoritePageTitle => '收藏';
+
+  @override
+  String get favoritePageEmpty => '暫無收藏';
+
+  @override
+  String get favoritePageEmptyHint => '在聊天中點擊收藏按鈕添加收藏';
+
+  @override
+  String get favoritePageSelectHint => '選擇一個收藏查看詳情';
+
+  @override
+  String get favoritePageDeleteTitle => '刪除收藏';
+
+  @override
+  String get favoritePageDeleteMessage => '確定要刪除這條收藏嗎？此操作無法撤銷。';
+
+  @override
+  String get favoritePageDeleteButton => '刪除';
+
+  @override
+  String get favoritePageCancelButton => '取消';
+
+  @override
+  String get favoriteDetailBackTooltip => '返回';
+
+  @override
+  String get favoriteDetailCopyAllTooltip => '複製全部';
+
+  @override
+  String get favoriteDetailCopiedAll => '已複製全部內容';
+
+  @override
+  String get favoriteActionAdd => '收藏';
+
+  @override
+  String get favoriteActionRemove => '取消收藏';
+
+  @override
+  String get favoriteActionAdded => '已添加到收藏';
+
+  @override
+  String get favoriteActionRemoved => '已取消收藏';
+
+  @override
+  String get favoriteDefaultTitle => '未命名對話';
 }
