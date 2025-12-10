@@ -121,11 +121,15 @@ class _Http {
       if (user.isNotEmpty) {
         io.addProxyCredentials(host, port, '', HttpClientBasicCredentials(user, pass));
       }
+      // Allow self-signed certificates for proxy connections
+      io.badCertificateCallback = (cert, host, port) => true;
       return IOClient(io);
     }
     // 非代理情况也需要设置 idleTimeout
     final io = HttpClient();
     io.idleTimeout = const Duration(minutes: 5);
+    // Allow self-signed certificates for third-party proxies
+    io.badCertificateCallback = (cert, host, port) => true;
     return IOClient(io);
   }
 }
@@ -165,13 +169,37 @@ class ClaudeProvider extends BaseProvider {
     final client = _Http.clientFor(cfg);
     try {
       final uri = Uri.parse('${cfg.baseUrl}/models');
-      final res = await client.get(uri, headers: {
+
+      // Try Anthropic native format first
+      var res = await client.get(uri, headers: {
         'x-api-key': key,
         'anthropic-version': anthropicVersion,
       });
+
+      // If failed, try OpenAI-compatible format (for third-party proxies)
+      if (res.statusCode >= 400) {
+        res = await client.get(uri, headers: {
+          'Authorization': 'Bearer $key',
+        });
+      }
+
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        final obj = jsonDecode(res.body) as Map<String, dynamic>;
-        final data = (obj['data'] as List?) ?? [];
+        final decoded = jsonDecode(res.body);
+        // Support both Anthropic native format {"data": [...]} and third-party proxy formats
+        List<dynamic> data = [];
+        if (decoded is Map) {
+          final obj = decoded as Map<String, dynamic>;
+          if (obj['data'] is List) {
+            // Anthropic native format or OpenAI format
+            data = obj['data'] as List;
+          } else if (obj['models'] is List) {
+            // Alternative format used by some proxies
+            data = obj['models'] as List;
+          }
+        } else if (decoded is List) {
+          // Direct array response
+          data = decoded;
+        }
         return [
           for (final e in data)
             if (e is Map && e['id'] is String)
@@ -404,9 +432,19 @@ class ProviderManager {
         };
         final extra = _customBody(cfg, modelId);
         if (extra.isNotEmpty) (body as Map<String, dynamic>).addAll(extra);
+
+        // Auto-detect authentication format: Anthropic native vs OpenAI-compatible proxy
+        final bool isOfficialAnthropic = cfg.baseUrl.contains('anthropic.com') ||
+                                          cfg.baseUrl.contains('claude.ai');
+        final apiKey = _effectiveApiKey(cfg);
+
         final headers = <String, String>{
-          'x-api-key': cfg.apiKey,
-          'anthropic-version': ClaudeProvider.anthropicVersion,
+          if (isOfficialAnthropic) ...{
+            'x-api-key': apiKey,
+            'anthropic-version': ClaudeProvider.anthropicVersion,
+          } else ...{
+            'Authorization': 'Bearer $apiKey',
+          },
           'Content-Type': 'application/json',
         };
         headers.addAll(_customHeaders(cfg, modelId));

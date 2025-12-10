@@ -458,11 +458,15 @@ class ChatApiService {
       if (user.isNotEmpty) {
         io.addProxyCredentials(host, port, '', HttpClientBasicCredentials(user, pass));
       }
+      // Allow self-signed certificates for proxy connections
+      io.badCertificateCallback = (cert, host, port) => true;
       return IOClient(io);
     }
     // 非代理情况也需要设置 idleTimeout
     final io = HttpClient();
     io.idleTimeout = const Duration(minutes: 5);
+    // Allow self-signed certificates for third-party proxies
+    io.badCertificateCallback = (cert, host, port) => true;
     return IOClient(io);
   }
 
@@ -703,9 +707,19 @@ class ChatApiService {
             {'role': 'user', 'content': prompt}
           ],
         };
+
+        // Auto-detect authentication format: Anthropic native vs OpenAI-compatible proxy
+        final bool isOfficialAnthropic = config.baseUrl.contains('anthropic.com') ||
+                                          config.baseUrl.contains('claude.ai');
+        final apiKey = _apiKeyForRequest(config, modelId);
+
         final headers = <String, String>{
-          'x-api-key': _apiKeyForRequest(config, modelId),
-          'anthropic-version': '2023-06-01',
+          if (isOfficialAnthropic) ...{
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          } else ...{
+            'Authorization': 'Bearer $apiKey',
+          },
           'Content-Type': 'application/json',
         };
         headers.addAll(_customHeaders(config, modelId));
@@ -3504,9 +3518,18 @@ class ChatApiService {
     }
 
     // Headers (constant across rounds)
+    // Auto-detect authentication format: Anthropic native vs OpenAI-compatible proxy
+    final bool isOfficialAnthropic = config.baseUrl.contains('anthropic.com') ||
+                                      config.baseUrl.contains('claude.ai');
+    final apiKey = _effectiveApiKey(config);
+
     final baseHeaders = <String, String>{
-      'x-api-key': _effectiveApiKey(config),
-      'anthropic-version': '2023-06-01',
+      if (isOfficialAnthropic) ...{
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      } else ...{
+        'Authorization': 'Bearer $apiKey',
+      },
       'Content-Type': 'application/json',
       'Accept': stream ? 'text/event-stream' : 'application/json',
     };
@@ -3519,21 +3542,41 @@ class ChatApiService {
 
     while (true) {
       // Prepare request body per round
+      // When thinking is enabled, temperature must be 1
+      final useThinking = isReasoning && thinkingBudget != 0;
+      final effectiveTemperature = useThinking ? 1.0 : temperature;
+
+      // Calculate effective thinking budget and max_tokens
+      // Rule: max_tokens must be greater than budget_tokens
+      final requestMaxTokens = maxTokens ?? 4096;
+      final effectiveBudgetTokens = useThinking
+          ? ((thinkingBudget != null && thinkingBudget > 0)
+              ? thinkingBudget
+              : 5000) // Lower default to avoid conflicts
+          : 0;
+
+      // Ensure max_tokens > budget_tokens (add at least 1000 tokens for the response)
+      final finalMaxTokens = useThinking
+          ? (requestMaxTokens > effectiveBudgetTokens + 1000
+              ? requestMaxTokens
+              : effectiveBudgetTokens + 1000)
+          : requestMaxTokens;
+
       final body = <String, dynamic>{
         'model': upstreamModelId,
-        'max_tokens': maxTokens ?? 4096,
+        'max_tokens': finalMaxTokens,
         'messages': convo,
         'stream': stream,
         if (systemPrompt.isNotEmpty) 'system': systemPrompt,
-        if (temperature != null) 'temperature': temperature,
+        if (effectiveTemperature != null) 'temperature': effectiveTemperature,
         if (topP != null) 'top_p': topP,
         if (allTools.isNotEmpty) 'tools': allTools,
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
-        if (isReasoning)
+        // Add thinking parameter for reasoning models
+        if (useThinking)
           'thinking': {
-            'type': (thinkingBudget == 0) ? 'disabled' : 'enabled',
-            if (thinkingBudget != null && thinkingBudget > 0)
-              'budget_tokens': thinkingBudget,
+            'type': 'enabled',
+            'budget_tokens': effectiveBudgetTokens,
           },
       };
       final extraClaude = _customBody(config, modelId);
@@ -3558,34 +3601,87 @@ class ChatApiService {
       if (!stream) {
         final txt = await response.stream.bytesToString();
         final obj = jsonDecode(txt) as Map;
-        // Usage
+
+        // Detect response format: Anthropic native vs OpenAI-compatible proxy
+        final bool isAnthropicFormat = obj.containsKey('content');
+        final bool isOpenAIFormat = obj.containsKey('choices');
+
+        // Usage parsing (support both formats)
         try {
-          final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
-          if (u != null) {
-            final inTok = (u['input_tokens'] ?? 0) as int? ?? 0;
-            final outTok = (u['output_tokens'] ?? 0) as int? ?? 0;
-            final round = TokenUsage(promptTokens: inTok, completionTokens: outTok, cachedTokens: 0, totalTokens: inTok + outTok);
-            totalUsage = (totalUsage ?? const TokenUsage()).merge(round);
+          if (isAnthropicFormat) {
+            final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
+            if (u != null) {
+              final inTok = (u['input_tokens'] ?? 0) as int? ?? 0;
+              final outTok = (u['output_tokens'] ?? 0) as int? ?? 0;
+              final round = TokenUsage(promptTokens: inTok, completionTokens: outTok, cachedTokens: 0, totalTokens: inTok + outTok);
+              totalUsage = (totalUsage ?? const TokenUsage()).merge(round);
+            }
+          } else if (isOpenAIFormat) {
+            final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
+            if (u != null) {
+              final inTok = (u['prompt_tokens'] ?? 0) as int? ?? 0;
+              final outTok = (u['completion_tokens'] ?? 0) as int? ?? 0;
+              final round = TokenUsage(promptTokens: inTok, completionTokens: outTok, cachedTokens: 0, totalTokens: inTok + outTok);
+              totalUsage = (totalUsage ?? const TokenUsage()).merge(round);
+            }
           }
         } catch (_) {}
-        final content = (obj['content'] as List?) ?? const <dynamic>[];
+
         final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
         final Map<String, Map<String, dynamic>> toolUses = <String, Map<String, dynamic>>{}; // id -> {name,args}
         final buf = StringBuffer();
-        for (final it in content) {
-          if (it is! Map) continue;
-          final type = (it['type'] ?? '').toString();
-          if (type == 'text') {
-            final t = (it['text'] ?? '').toString();
-            if (t.isNotEmpty) { assistantBlocks.add({'type': 'text', 'text': t}); buf.write(t); }
-          } else if (type == 'thinking') {
-          } else if (type == 'tool_use') {
-            final id = (it['id'] ?? '').toString();
-            final name = (it['name'] ?? '').toString();
-            final args = (it['input'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
-            if (id.isNotEmpty) {
-              toolUses[id] = {'name': name, 'args': args};
-              assistantBlocks.add({'type': 'tool_use', 'id': id, 'name': name, 'input': args});
+
+        if (isOpenAIFormat) {
+          // Parse OpenAI-compatible proxy format
+          final choices = (obj['choices'] as List?) ?? const <dynamic>[];
+          if (choices.isNotEmpty) {
+            final msg = choices.first['message'];
+            if (msg is Map) {
+              final content = (msg['content'] ?? '').toString();
+              if (content.isNotEmpty) {
+                assistantBlocks.add({'type': 'text', 'text': content});
+                buf.write(content);
+              }
+              // Handle tool calls in OpenAI format
+              final toolCalls = (msg['tool_calls'] as List?) ?? const <dynamic>[];
+              for (final tc in toolCalls) {
+                if (tc is Map) {
+                  final id = (tc['id'] ?? '').toString();
+                  final fn = tc['function'];
+                  if (fn is Map) {
+                    final name = (fn['name'] ?? '').toString();
+                    Map<String, dynamic> args = const <String, dynamic>{};
+                    final argsStr = (fn['arguments'] ?? '').toString();
+                    if (argsStr.isNotEmpty) {
+                      try { args = (jsonDecode(argsStr) as Map).cast<String, dynamic>(); } catch (_) {}
+                    }
+                    if (id.isNotEmpty) {
+                      toolUses[id] = {'name': name, 'args': args};
+                      assistantBlocks.add({'type': 'tool_use', 'id': id, 'name': name, 'input': args});
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          // Parse Anthropic native format
+          final content = (obj['content'] as List?) ?? const <dynamic>[];
+          for (final it in content) {
+            if (it is! Map) continue;
+            final type = (it['type'] ?? '').toString();
+            if (type == 'text') {
+              final t = (it['text'] ?? '').toString();
+              if (t.isNotEmpty) { assistantBlocks.add({'type': 'text', 'text': t}); buf.write(t); }
+            } else if (type == 'thinking') {
+            } else if (type == 'tool_use') {
+              final id = (it['id'] ?? '').toString();
+              final name = (it['name'] ?? '').toString();
+              final args = (it['input'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+              if (id.isNotEmpty) {
+                toolUses[id] = {'name': name, 'args': args};
+                assistantBlocks.add({'type': 'tool_use', 'id': id, 'name': name, 'input': args});
+              }
             }
           }
         }
@@ -3637,6 +3733,7 @@ class ChatApiService {
       final Map<String, Map<String, dynamic>> _srvArgs = <String, Map<String, dynamic>>{};
 
       bool messageStopped = false;
+      bool? isAnthropicFormat; // Auto-detect format from first chunk
 
       await for (final chunk in sse) {
         buffer += chunk;
@@ -3648,8 +3745,101 @@ class ChatApiService {
           if (line.isEmpty || !line.startsWith('data:')) continue;
 
           final data = line.substring(5).trimLeft();
+          if (data == '[DONE]') {
+            messageStopped = true;
+            break;
+          }
+
           try {
             final obj = jsonDecode(data);
+
+            // Auto-detect format on first valid chunk
+            if (isAnthropicFormat == null) {
+              isAnthropicFormat = obj.containsKey('type');
+              // If not Anthropic format, assume OpenAI-compatible
+              if (!isAnthropicFormat!) {
+                isAnthropicFormat = !obj.containsKey('choices');
+              }
+            }
+
+            if (isAnthropicFormat == false) {
+              // Parse OpenAI-compatible proxy format
+              final choices = (obj['choices'] as List?) ?? const <dynamic>[];
+              if (choices.isEmpty) continue;
+
+              final choice = choices.first;
+              if (choice is! Map) continue;
+
+              // Handle delta content
+              final delta = choice['delta'];
+              if (delta is Map) {
+                final content = (delta['content'] ?? '').toString();
+                if (content.isNotEmpty) {
+                  textBuf.write(content);
+                  yield ChatStreamChunk(content: content, isDone: false, totalTokens: roundTokens);
+                }
+
+                // Handle tool calls in OpenAI format
+                final toolCalls = (delta['tool_calls'] as List?) ?? const <dynamic>[];
+                for (final tc in toolCalls) {
+                  if (tc is! Map) continue;
+                  final idx = (tc['index'] ?? 0) as int;
+                  final id = (tc['id'] ?? '').toString();
+                  final fn = tc['function'];
+
+                  if (fn is Map) {
+                    final name = (fn['name'] ?? '').toString();
+                    final argsDelta = (fn['arguments'] ?? '').toString();
+
+                    if (id.isNotEmpty && name.isNotEmpty) {
+                      _anthToolUse.putIfAbsent(id, () => {'name': name, 'args': ''});
+                      if (!_cliIndexToId.containsKey(idx)) {
+                        _cliIndexToId[idx] = id;
+                        assistantBlocks.add({'type': 'tool_use', 'id': id, 'name': name, 'input': {}});
+                        yield ChatStreamChunk(
+                          content: '',
+                          isDone: false,
+                          totalTokens: roundTokens,
+                          usage: usage,
+                          toolCalls: [ToolCallInfo(id: id, name: name, arguments: const <String, dynamic>{})],
+                        );
+                      }
+                    }
+
+                    if (id.isNotEmpty && argsDelta.isNotEmpty) {
+                      final entry = _anthToolUse[id];
+                      if (entry != null) {
+                        entry['args'] = (entry['args'] ?? '') + argsDelta;
+                      }
+                    }
+                  }
+                }
+              }
+
+              // Handle finish reason
+              final finishReason = (choice['finish_reason'] ?? '').toString();
+              if (finishReason.isNotEmpty && finishReason != 'null') {
+                _lastStopReason = finishReason;
+                if (finishReason == 'stop' || finishReason == 'end_turn') {
+                  messageStopped = true;
+                }
+              }
+
+              // Handle usage in OpenAI format
+              if (obj.containsKey('usage')) {
+                final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
+                if (u != null) {
+                  final inTok = (u['prompt_tokens'] ?? 0) as int;
+                  final outTok = (u['completion_tokens'] ?? 0) as int;
+                  usage = (usage ?? const TokenUsage()).merge(TokenUsage(promptTokens: inTok, completionTokens: outTok));
+                  roundTokens = usage!.totalTokens;
+                }
+              }
+
+              continue; // Skip Anthropic-specific parsing
+            }
+
+            // Original Anthropic native format parsing
             final type = obj['type'];
 
             if (type == 'content_block_start') {
@@ -3830,6 +4020,48 @@ class ChatApiService {
 
       // Merge usage across rounds for final token count
       if (usage != null) totalUsage = (totalUsage ?? const TokenUsage()).merge(usage!);
+
+      // For OpenAI format: finalize tool calls and execute them
+      if (isAnthropicFormat == false && _anthToolUse.isNotEmpty) {
+        // Flush any remaining text
+        final t = textBuf.toString();
+        if (t.isNotEmpty) assistantBlocks.add({'type': 'text', 'text': t});
+
+        // Parse accumulated tool arguments and execute tool calls
+        for (final entry in _anthToolUse.entries) {
+          final id = entry.key;
+          final name = (entry.value['name'] ?? '').toString();
+          Map<String, dynamic> args = <String, dynamic>{};
+          final argsStr = (entry.value['args'] ?? '').toString();
+          if (argsStr.isNotEmpty) {
+            try {
+              args = (jsonDecode(argsStr) as Map).cast<String, dynamic>();
+            } catch (_) {}
+          }
+
+          // Update assistant blocks with final parsed arguments
+          for (int k = assistantBlocks.length - 1; k >= 0; k--) {
+            final b = assistantBlocks[k];
+            if (b['type'] == 'tool_use' && (b['id']?.toString() ?? '') == id) {
+              assistantBlocks[k] = {'type': 'tool_use', 'id': id, 'name': name, 'input': args};
+              break;
+            }
+          }
+
+          // Execute tool call if handler is provided
+          if (onToolCall != null) {
+            final res = await onToolCall(name, args) ?? '';
+            _toolResultsContent[id] = res;
+            yield ChatStreamChunk(
+              content: '',
+              isDone: false,
+              totalTokens: roundTokens,
+              toolResults: [ToolResultInfo(id: id, name: name, arguments: args, content: res)],
+              usage: usage,
+            );
+          }
+        }
+      }
 
       // If no client tool calls, decide whether to continue (pause_turn/server tool) or finalize
       if (_anthToolUse.isEmpty) {

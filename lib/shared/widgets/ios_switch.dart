@@ -68,7 +68,7 @@ class _IosSwitchState extends State<IosSwitch> {
     final Color offTrack = widget.inactiveColor ??
         (isDark
             ? CupertinoDynamicColor.resolve(CupertinoColors.systemGrey6, context)
-            : const Color(0x14_000000)); // subtle black overlay on light
+            : const Color(0x14000000)); // subtle black overlay on light
 
     final bool enabled = widget.onChanged != null;
     final double radius = widget.height / 2;
