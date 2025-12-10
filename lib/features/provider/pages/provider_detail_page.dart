@@ -120,7 +120,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final l10n = AppLocalizations.of(context)!;
     bool _isUserAdded(String key) {
       const fixed = {
-        'KelivoIN', 'OpenAI', 'Gemini', 'SiliconFlow', 'OpenRouter',
+        'KelivoIN', 'OpenAI', 'Gemini', 'MemoryLake', 'SiliconFlow', 'OpenRouter',
         'DeepSeek', 'Tensdaq', 'Aliyun', 'Zhipu AI', 'Claude', 'Grok', 'ByteDance',
       };
       return !fixed.contains(key);

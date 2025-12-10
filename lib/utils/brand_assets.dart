@@ -25,6 +25,7 @@ class BrandAssets {
 
   // Keep order-specific matching using a list of entries.
   static final List<MapEntry<RegExp, String>> _mapping = <MapEntry<RegExp, String>>[
+    MapEntry(RegExp(r'memorylake'), 'memorylake.svg'),
     MapEntry(RegExp(r'openai|gpt|o\d'), 'openai.svg'),
     MapEntry(RegExp(r'gemini'), 'gemini-color.svg'),
     MapEntry(RegExp(r'google'), 'google-color.svg'),

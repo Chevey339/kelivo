@@ -471,6 +471,7 @@ class SettingsProvider extends ChangeNotifier {
       // providers implicitly during later reads (e.g., when switching chats).
       ensureProviderConfig('KelivoIN', defaultName: 'KelivoIN');
       ensureProviderConfig('Tensdaq', defaultName: 'Tensdaq');
+      ensureProviderConfig('MemoryLake', defaultName: 'MemoryLake');
       ensureProviderConfig('SiliconFlow', defaultName: 'SiliconFlow');
     }
     
@@ -2134,6 +2135,7 @@ class ProviderConfig {
 
   static String _defaultBase(String key) {
     final k = key.toLowerCase();
+    if (k.contains('memorylake')) return 'https://memorylake.data.cloud/v1';
     if (k.contains('tensdaq')) return 'https://tensdaq-api.x-aio.com/v1';
     if (k.contains('kelivoin')) return 'https://text.pollinations.ai/openai';
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
@@ -2151,6 +2153,7 @@ class ProviderConfig {
   static ProviderConfig defaultsFor(String key, {String? displayName}) {
     bool _defaultEnabled(String k) {
       final s = k.toLowerCase();
+      if (s.contains('memorylake')) return true;
       if (s.contains('tensdaq')) return true;
       if (s.contains('openai')) return true;
       if (s.contains('gemini') || s.contains('google')) return true;
@@ -2240,6 +2243,129 @@ class ProviderConfig {
                 'input': ['text'],
                 'output': ['text'],
                 'abilities': ['tool'],
+              },
+            },
+            proxyEnabled: false,
+            proxyHost: '',
+            proxyPort: '8080',
+            proxyUsername: '',
+            proxyPassword: '',
+            multiKeyEnabled: false,
+            apiKeys: const [],
+            keyManagement: const KeyManagementConfig(),
+          );
+        }
+        // Special-case MemoryLake: prefill models with capabilities
+        if (lowerKey.contains('memorylake')) {
+          return ProviderConfig(
+            id: key,
+            enabled: _defaultEnabled(key),
+            name: displayName ?? key,
+            apiKey: '',
+            baseUrl: _defaultBase(key),
+            providerType: ProviderKind.openai,
+            chatPath: '/chat/completions',
+            useResponseApi: false,
+            models: const [
+              'gpt-5',
+              'gpt-5-mini',
+              'claude-haiku-4-5-20251001',
+              'claude-sonnet-4-5-20250929',
+              'gemini-2.5-pro',
+              'gemini-3-pro-preview',
+              'gemini-2.5-flash',
+              'glm-4.5',
+              'glm-4.5-air',
+              'grok-4-fast-non-reasoning',
+              'grok-4',
+              'qwen-flash',
+              'qwen-max',
+              'qwen-plus',
+            ],
+            modelOverrides: const {
+              'gpt-5': {
+                'type': 'chat',
+                'input': ['text', 'image'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
+              },
+              'gpt-5-mini': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
+              },
+              'claude-haiku-4-5-20251001': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
+              },
+              'claude-sonnet-4-5-20250929': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
+              },
+              'gemini-2.5-pro': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
+              },
+              'gemini-3-pro-preview': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
+              },
+              'gemini-2.5-flash': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
+              },
+              'glm-4.5': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
+              },
+              'glm-4.5-air': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
+              },
+              'grok-4-fast-non-reasoning': {
+                'type': 'chat',
+                'input': ['text', 'image'],
+                'output': ['text'],
+                'abilities': ['tool'],
+              },
+              'grok-4': {
+                'type': 'chat',
+                'input': ['text', 'image'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
+              },
+              'qwen-flash': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
+              },
+              'qwen-max': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
+              },
+              'qwen-plus': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
               },
             },
             proxyEnabled: false,
