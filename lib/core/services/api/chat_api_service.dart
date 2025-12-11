@@ -14,6 +14,8 @@ import 'package:Kelivo/secrets/fallback.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 
 class ChatApiService {
+  static const String _aihubmixAppCode = 'ZKRT3588';
+
   /// Resolve the upstream/vendor model id for a given logical model key.
   /// When per-instance overrides specify `apiModelId`, that value is used for
   /// outbound HTTP requests and vendor-specific heuristics. Otherwise the
@@ -78,6 +80,10 @@ class ChatApiService {
     final ov = _modelOverride(cfg, modelId);
     final list = (ov['headers'] as List?) ?? const <dynamic>[];
     final out = <String, String>{};
+    // AIhubmix promo header (opt-in per-provider)
+    if (_isAihubmix(cfg) && cfg.aihubmixAppCodeEnabled == true) {
+      out.putIfAbsent('APP-Code', () => _aihubmixAppCode);
+    }
     for (final e in list) {
       if (e is Map) {
         final name = (e['name'] ?? e['key'] ?? '').toString().trim();
@@ -118,6 +124,11 @@ class ChatApiService {
       }
     }
     return out;
+  }
+
+  static bool _isAihubmix(ProviderConfig cfg) {
+    final base = cfg.baseUrl.toLowerCase();
+    return base.contains('aihubmix.com');
   }
 
   // Resolve effective model info by respecting per-model overrides; fallback to inference

@@ -6,6 +6,7 @@ enum HotkeyAction {
   closeWindow,
   openSettings,
   newTopic,
+  switchModel,
   toggleLeftPanelAssistants,
   toggleLeftPanelTopics,
 }

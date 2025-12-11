@@ -810,14 +810,17 @@ class ChatActions {
       dynamic e, stream_ctrl.StreamingState state) async {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
+    final errorText = e.toString();
 
     // Mark streaming as ended to allow UI rebuilds again
     streamController.markStreamingEnded(messageId);
 
     streamController.cleanupTimers(messageId);
-    final processed = _transformAssistantContent(state);
+    final rawContent =
+        state.fullContentRaw.isNotEmpty ? state.fullContentRaw : errorText;
+    final processed = _transformAssistantContent(state, rawContent);
     // Let UI provide the localized error message
-    final displayContent = processed.isNotEmpty ? processed : '';
+    final displayContent = processed.isNotEmpty ? processed : errorText;
     await chatService.updateMessage(
       messageId,
       content: displayContent,
@@ -855,7 +858,8 @@ class ChatActions {
     );
 
     await _conversationStreams.remove(conversationId)?.cancel();
-    onStreamError?.call(e.toString());
+    onStreamError?.call(errorText);
+    onStreamFinished?.call();
   }
 
   /// Handle stream done callback.

@@ -916,6 +916,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hotkeyNewTopic => '新建话题';
 
   @override
+  String get hotkeySwitchModel => '切换模型';
+
+  @override
   String get hotkeyToggleAssistantPanel => '切换助手显示';
 
   @override
@@ -2053,6 +2056,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providerDetailPageResponseApiTitle => 'Response API (/responses)';
+
+  @override
+  String get providerDetailPageAihubmixAppCodeLabel => '应用 Code（享 10% 优惠）';
+
+  @override
+  String get providerDetailPageAihubmixAppCodeHelp =>
+      '为请求附加 APP-Code，可享 10% 优惠，仅对 AIhubmix 生效。';
 
   @override
   String get providerDetailPageVertexAiTitle => 'Vertex AI';
@@ -4224,6 +4234,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get hotkeyNewTopic => '新建话题';
 
   @override
+  String get hotkeySwitchModel => '切换模型';
+
+  @override
   String get hotkeyToggleAssistantPanel => '切换助手显示';
 
   @override
@@ -5361,6 +5374,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageResponseApiTitle => 'Response API (/responses)';
+
+  @override
+  String get providerDetailPageAihubmixAppCodeLabel => '应用 Code（享 10% 优惠）';
+
+  @override
+  String get providerDetailPageAihubmixAppCodeHelp =>
+      '为请求附加 APP-Code，可享 10% 优惠，仅对 AIhubmix 生效。';
 
   @override
   String get providerDetailPageVertexAiTitle => 'Vertex AI';
@@ -7532,6 +7552,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get hotkeyNewTopic => '新建話題';
 
   @override
+  String get hotkeySwitchModel => '切換模型';
+
+  @override
   String get hotkeyToggleAssistantPanel => '切換助理顯示';
 
   @override
@@ -8668,6 +8691,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageResponseApiTitle => 'Response API (/responses)';
+
+  @override
+  String get providerDetailPageAihubmixAppCodeLabel => '應用 Code（享 10% 優惠）';
+
+  @override
+  String get providerDetailPageAihubmixAppCodeHelp =>
+      '為請求附加 APP-Code，可享 10% 優惠，僅對 AIhubmix 生效。';
 
   @override
   String get providerDetailPageVertexAiTitle => 'Vertex AI';

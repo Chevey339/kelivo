@@ -807,6 +807,15 @@ class DataSync {
 class SharedPreferencesAsync {
   SharedPreferencesAsync._();
   static SharedPreferencesAsync? _inst;
+  // Local window state keys stay on device and are excluded from backups
+  static const _localOnlyKeys = {
+    'window_width_v1',
+    'window_height_v1',
+    'window_pos_x_v1',
+    'window_pos_y_v1',
+    'window_maximized_v1',
+  };
+
   static Future<SharedPreferencesAsync> get instance async {
     _inst ??= SharedPreferencesAsync._();
     return _inst!;
@@ -817,6 +826,7 @@ class SharedPreferencesAsync {
     final keys = prefs.getKeys();
     final map = <String, dynamic>{};
     for (final k in keys) {
+      if (_localOnlyKeys.contains(k)) continue;
       map[k] = prefs.get(k);
     }
     return map;
@@ -827,6 +837,7 @@ class SharedPreferencesAsync {
     for (final entry in data.entries) {
       final k = entry.key;
       final v = entry.value;
+      if (_localOnlyKeys.contains(k)) continue;
       if (v is bool) await prefs.setBool(k, v);
       else if (v is int) await prefs.setInt(k, v);
       else if (v is double) await prefs.setDouble(k, v);
@@ -838,6 +849,7 @@ class SharedPreferencesAsync {
   }
   
   Future<void> restoreSingle(String key, dynamic value) async {
+    if (_localOnlyKeys.contains(key)) return;
     final prefs = await SharedPreferences.getInstance();
     if (value is bool) await prefs.setBool(key, value);
     else if (value is int) await prefs.setInt(key, value);

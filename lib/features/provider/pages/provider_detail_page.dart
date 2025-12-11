@@ -71,6 +71,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   final Map<String, String> _detectionErrorMessages = {};
   String? _currentDetectingModel;
   final Set<String> _pendingModels = {};
+  bool _aihubmixAppCodeEnabled = false;
 
   @override
   void initState() {
@@ -95,6 +96,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     _proxyUserCtrl.text = _cfg.proxyUsername ?? '';
     _proxyPassCtrl.text = _cfg.proxyPassword ?? '';
     _multiKeyEnabled = _cfg.multiKeyEnabled ?? false;
+    _aihubmixAppCodeEnabled = _cfg.aihubmixAppCodeEnabled ?? false;
   }
 
   @override
@@ -608,6 +610,13 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               context,
               label: l10n.providerDetailPageVertexAiTitle,
               trailing: IosSwitch(value: _vertexAI, onChanged: (v) { setState(() => _vertexAI = v); _save(); }),
+            ),
+          if (_isAihubmix)
+            _iosRowWithHelp(
+              context,
+              label: l10n.providerDetailPageAihubmixAppCodeLabel,
+              helpText: l10n.providerDetailPageAihubmixAppCodeHelp,
+              trailing: IosSwitch(value: _aihubmixAppCodeEnabled, onChanged: (v) { setState(() => _aihubmixAppCodeEnabled = v); _save(); }),
             ),
           _TactileRow(
             onTap: () async {
@@ -1254,7 +1263,58 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     );
   }
 
-  
+  Widget _iosRowWithHelp(
+    BuildContext context, {
+    required String label,
+    required String helpText,
+    Widget? trailing,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return _TactileRow(
+      onTap: null,
+      builder: (pressed) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final base = cs.onSurface;
+        final target = pressed ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base) : base;
+        return TweenAnimationBuilder<Color?>(
+          tween: ColorTween(end: target),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          builder: (context, color, _) {
+            final c = color ?? base;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: c))),
+                        Tooltip(
+                          message: helpText,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Icon(Icons.help_outline, size: 18, color: cs.onSurface.withOpacity(0.6)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (trailing != null) trailing,
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  bool get _isAihubmix {
+    final keyLower = widget.keyName.toLowerCase();
+    final baseLower = _baseCtrl.text.toLowerCase();
+    return keyLower.contains('aihubmix') || baseLower.contains('aihubmix.com');
+  }
 
   Widget _providerKindRow(BuildContext context) {
     String labelFor(ProviderKind k) {
@@ -1389,6 +1449,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       projectId: _kind == ProviderKind.google ? projectId : old.projectId,
       serviceAccountJson: _kind == ProviderKind.google ? _saJsonCtrl.text.trim() : old.serviceAccountJson,
       multiKeyEnabled: _multiKeyEnabled,
+      aihubmixAppCodeEnabled: _aihubmixAppCodeEnabled,
       // preserve models and modelOverrides and proxy fields implicitly via copyWith
     );
     await settings.setProviderConfig(widget.keyName, updated);

@@ -942,6 +942,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hotkeyNewTopic => 'New Topic';
 
   @override
+  String get hotkeySwitchModel => 'Switch Model';
+
+  @override
   String get hotkeyToggleAssistantPanel => 'Toggle Assistants';
 
   @override
@@ -2122,6 +2125,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerDetailPageResponseApiTitle => 'Response API (/responses)';
+
+  @override
+  String get providerDetailPageAihubmixAppCodeLabel => 'APP-Code (10% off)';
+
+  @override
+  String get providerDetailPageAihubmixAppCodeHelp =>
+      'Adds header APP-Code requests to get a 10% discount. Only affects AIhubmix.';
 
   @override
   String get providerDetailPageVertexAiTitle => 'Vertex AI';

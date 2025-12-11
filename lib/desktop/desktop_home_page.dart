@@ -84,6 +84,9 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
         case HotkeyAction.newTopic:
           if (_tabIndex == 0) ChatActionBus.instance.fire(ChatAction.newTopic);
           break;
+        case HotkeyAction.switchModel:
+          if (_tabIndex == 0) ChatActionBus.instance.fire(ChatAction.switchModel);
+          break;
         case HotkeyAction.toggleLeftPanelAssistants:
           if (_tabIndex == 0)
             ChatActionBus.instance.fire(ChatAction.toggleLeftPanelAssistants);

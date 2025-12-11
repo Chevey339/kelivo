@@ -273,12 +273,14 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
       final rawName = _openaiName.text.trim();
       final display = rawName.isEmpty ? 'OpenAI' : rawName;
       final keyName = uniqueKey('OpenAI', display);
+      final base = _openaiBase.text.trim().isEmpty ? 'https://api.openai.com/v1' : _openaiBase.text.trim();
+      final promo = base.toLowerCase().contains('aihubmix.com');
       final cfg = ProviderConfig(
         id: keyName,
         enabled: _openaiEnabled,
         name: display,
         apiKey: _openaiKey.text.trim(),
-        baseUrl: _openaiBase.text.trim().isEmpty ? 'https://api.openai.com/v1' : _openaiBase.text.trim(),
+        baseUrl: base,
         providerType: ProviderKind.openai,  // Explicitly set as OpenAI type
         chatPath: _openaiUseResponse ? null : (_openaiPath.text.trim().isEmpty ? '/chat/completions' : _openaiPath.text.trim()),
         useResponseApi: _openaiUseResponse,
@@ -289,6 +291,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
         proxyPort: '8080',
         proxyUsername: '',
         proxyPassword: '',
+        aihubmixAppCodeEnabled: promo,
       );
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;
@@ -296,12 +299,14 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
       final rawName = _googleName.text.trim();
       final display = rawName.isEmpty ? 'Google' : rawName;
       final keyName = uniqueKey('Google', display);
+      final base = _googleVertex ? 'https://aiplatform.googleapis.com' : (_googleBase.text.trim().isEmpty ? 'https://generativelanguage.googleapis.com/v1beta' : _googleBase.text.trim());
+      final promo = base.toLowerCase().contains('aihubmix.com');
       final cfg = ProviderConfig(
         id: keyName,
         enabled: _googleEnabled,
         name: display,
         apiKey: _googleVertex ? '' : _googleKey.text.trim(),
-        baseUrl: _googleVertex ? 'https://aiplatform.googleapis.com' : (_googleBase.text.trim().isEmpty ? 'https://generativelanguage.googleapis.com/v1beta' : _googleBase.text.trim()),
+        baseUrl: base,
         providerType: ProviderKind.google,  // Explicitly set as Google type
         vertexAI: _googleVertex,
         location: _googleVertex ? (_googleLocation.text.trim().isEmpty ? 'us-central1' : _googleLocation.text.trim()) : '',
@@ -314,6 +319,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
         proxyPort: '8080',
         proxyUsername: '',
         proxyPassword: '',
+        aihubmixAppCodeEnabled: promo,
       );
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;
@@ -321,12 +327,14 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
       final rawName = _claudeName.text.trim();
       final display = rawName.isEmpty ? 'Claude' : rawName;
       final keyName = uniqueKey('Claude', display);
+      final base = _claudeBase.text.trim().isEmpty ? 'https://api.anthropic.com/v1' : _claudeBase.text.trim();
+      final promo = base.toLowerCase().contains('aihubmix.com');
       final cfg = ProviderConfig(
         id: keyName,
         enabled: _claudeEnabled,
         name: display,
         apiKey: _claudeKey.text.trim(),
-        baseUrl: _claudeBase.text.trim().isEmpty ? 'https://api.anthropic.com/v1' : _claudeBase.text.trim(),
+        baseUrl: base,
         providerType: ProviderKind.claude,  // Explicitly set as Claude type
         models: const [],
         modelOverrides: const {},
@@ -335,6 +343,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
         proxyPort: '8080',
         proxyUsername: '',
         proxyPassword: '',
+        aihubmixAppCodeEnabled: promo,
       );
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;

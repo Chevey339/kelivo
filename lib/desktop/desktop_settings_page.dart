@@ -1045,6 +1045,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
           (name: 'KelivoIN', key: 'KelivoIN'),
           (name: 'Tensdaq', key: 'Tensdaq'),
           (name: 'DeepSeek', key: 'DeepSeek'),
+          (name: 'AIhubmix', key: 'AIhubmix'),
           (name: l10n.providersPageAliyunName, key: 'Aliyun'),
           (name: l10n.providersPageZhipuName, key: 'Zhipu AI'),
           (name: 'Claude', key: 'Claude'),
@@ -2062,6 +2063,7 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
               final respNow = cfgNow.useResponseApi ?? false;
               final vertexNow = cfgNow.vertexAI ?? false;
               final proxyEnabledNow = cfgNow.proxyEnabled ?? false;
+              final aihubmixAppCodeEnabled = cfgNow.aihubmixAppCodeEnabled ?? false;
               Widget row(String label, Widget trailing) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(children: [
@@ -2220,10 +2222,32 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                                 await spWatch.setProviderConfig(widget.providerKey, old.copyWith(vertexAI: v));
                               }))),
                             );
-                          }
+                        }
                           return const SizedBox.shrink(key: ValueKey('none'));
                         }(),
                       ),
+                      const SizedBox(height: 4),
+                      if (_isAihubmix(cfgNow))
+                        row(
+                          l10n.providerDetailPageAihubmixAppCodeLabel,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Tooltip(
+                                message: l10n.providerDetailPageAihubmixAppCodeHelp,
+                                child: Icon(Icons.help_outline, size: 16, color: cs.onSurface.withOpacity(0.6)),
+                              ),
+                              const SizedBox(width: 8),
+                              IosSwitch(
+                                value: aihubmixAppCodeEnabled,
+                                onChanged: (v) async {
+                                  final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
+                                  await spWatch.setProviderConfig(widget.providerKey, old.copyWith(aihubmixAppCodeEnabled: v));
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
                       const SizedBox(height: 4),
                       // 5) Network proxy inline
                       row(l10n.providerDetailPageNetworkTab, Align(alignment: Alignment.centerRight, child: IosSwitch(value: proxyEnabledNow, onChanged: (v) async {
@@ -2367,6 +2391,12 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
         await context.read<SettingsProvider>().setProviderAvatarUrl(providerKey, url);
       }
     }
+  }
+
+  bool _isAihubmix(ProviderConfig cfg) {
+    final base = cfg.baseUrl.toLowerCase();
+    final key = cfg.id.toLowerCase();
+    return key.contains('aihubmix') || base.contains('aihubmix.com');
   }
 
   Future<void> _showNetworkDialog(BuildContext context) async {

@@ -148,12 +148,14 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody> with Sin
       final rawName = _openaiName.text.trim();
       final display = rawName.isEmpty ? 'OpenAI' : rawName;
       final keyName = uniqueKey('OpenAI', display);
+      final base = _openaiBase.text.trim().isNotEmpty ? _openaiBase.text.trim() : 'https://api.openai.com/v1';
+      final promo = base.toLowerCase().contains('aihubmix.com');
       final cfg = ProviderConfig(
         id: keyName,
         enabled: _openaiEnabled,
         name: display,
         apiKey: _openaiKey.text.trim(),
-        baseUrl: _openaiBase.text.trim().isNotEmpty ? _openaiBase.text.trim() : 'https://api.openai.com/v1',
+        baseUrl: base,
         providerType: ProviderKind.openai,
         chatPath: _openaiUseResponse ? null : (_openaiPath.text.trim().isNotEmpty ? _openaiPath.text.trim() : '/chat/completions'),
         useResponseApi: _openaiUseResponse,
@@ -164,6 +166,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody> with Sin
         proxyPort: '8080',
         proxyUsername: '',
         proxyPassword: '',
+        aihubmixAppCodeEnabled: promo,
       );
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;
@@ -171,12 +174,16 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody> with Sin
       final rawName = _googleName.text.trim();
       final display = rawName.isEmpty ? 'Google' : rawName;
       final keyName = uniqueKey('Google', display);
+      final base = _googleVertex
+          ? 'https://aiplatform.googleapis.com'
+          : (_googleBase.text.trim().isNotEmpty ? _googleBase.text.trim() : 'https://generativelanguage.googleapis.com/v1beta');
+      final promo = base.toLowerCase().contains('aihubmix.com');
       final cfg = ProviderConfig(
         id: keyName,
         enabled: _googleEnabled,
         name: display,
         apiKey: _googleVertex ? '' : _googleKey.text.trim(),
-        baseUrl: _googleVertex ? 'https://aiplatform.googleapis.com' : (_googleBase.text.trim().isNotEmpty ? _googleBase.text.trim() : 'https://generativelanguage.googleapis.com/v1beta'),
+        baseUrl: base,
         providerType: ProviderKind.google,
         vertexAI: _googleVertex,
         location: _googleVertex ? (_googleLocation.text.trim().isNotEmpty ? _googleLocation.text.trim() : 'us-central1') : '',
@@ -189,6 +196,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody> with Sin
         proxyPort: '8080',
         proxyUsername: '',
         proxyPassword: '',
+        aihubmixAppCodeEnabled: promo,
       );
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;
@@ -196,12 +204,14 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody> with Sin
       final rawName = _claudeName.text.trim();
       final display = rawName.isEmpty ? 'Claude' : rawName;
       final keyName = uniqueKey('Claude', display);
+      final base = _claudeBase.text.trim().isNotEmpty ? _claudeBase.text.trim() : 'https://api.anthropic.com/v1';
+      final promo = base.toLowerCase().contains('aihubmix.com');
       final cfg = ProviderConfig(
         id: keyName,
         enabled: _claudeEnabled,
         name: display,
         apiKey: _claudeKey.text.trim(),
-        baseUrl: _claudeBase.text.trim().isNotEmpty ? _claudeBase.text.trim() : 'https://api.anthropic.com/v1',
+        baseUrl: base,
         providerType: ProviderKind.claude,
         models: const [],
         modelOverrides: const {},
@@ -210,6 +220,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody> with Sin
         proxyPort: '8080',
         proxyUsername: '',
         proxyPassword: '',
+        aihubmixAppCodeEnabled: promo,
       );
       await settings.setProviderConfig(keyName, cfg);
       createdKey = keyName;

@@ -38,6 +38,7 @@ import '../services/ocr_service.dart';
 import '../services/translation_service.dart';
 import '../services/file_upload_service.dart';
 import '../widgets/chat_input_bar.dart';
+import '../../model/widgets/model_select_sheet.dart';
 
 /// Translation data for UI state (expanded/collapsed).
 class TranslationData {
@@ -393,6 +394,9 @@ class HomePageController extends ChangeNotifier {
               _inputFocus.requestFocus();
             });
           }
+          break;
+        case ChatAction.switchModel:
+          await showModelSelectSheet(_context);
           break;
       }
     });

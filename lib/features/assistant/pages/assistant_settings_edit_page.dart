@@ -3021,6 +3021,69 @@ class _PromptTabState extends State<_PromptTab> {
     }
   }
 
+  Future<void> _applySystemPromptChange(String value) async {
+    final ap = context.read<AssistantProvider>();
+    final a = ap.getById(widget.assistantId);
+    if (a == null) return;
+    _sysCtrl.text = value;
+    _sysCtrl.selection = TextSelection.collapsed(offset: _sysCtrl.text.length);
+    await ap.updateAssistant(a.copyWith(systemPrompt: value));
+    if (mounted) setState(() {});
+  }
+
+  Future<String?> _showSystemPromptMobileSheet(String initial) {
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) => _SystemPromptMobileSheet(initial: initial),
+    );
+  }
+
+  Future<String?> _showSystemPromptDesktopDialog(String initial) {
+    return showGeneralDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'system-prompt-editor',
+      barrierColor: Colors.black.withOpacity(0.12),
+      pageBuilder: (ctx, _, __) {
+        return _SystemPromptDesktopDialog(initial: initial);
+      },
+      transitionBuilder: (ctx, anim, _, child) {
+        final curved = CurvedAnimation(
+          parent: anim,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.98, end: 1.0).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openSystemPromptEditor() async {
+    final platform = Theme.of(context).platform;
+    final bool isDesktop = kIsWeb ||
+        platform == TargetPlatform.macOS ||
+        platform == TargetPlatform.linux ||
+        platform == TargetPlatform.windows;
+    final initial = _sysCtrl.text;
+    final String? next = isDesktop
+        ? await _showSystemPromptDesktopDialog(initial)
+        : await _showSystemPromptMobileSheet(initial);
+    if (!mounted || next == null || next == _sysCtrl.text) return;
+    await _applySystemPromptChange(next);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -3137,6 +3200,16 @@ class _PromptTabState extends State<_PromptTab> {
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                 ),
+                IosIconButton(
+                  icon: Lucide.Maximize2,
+                  size: 20,
+                  padding: const EdgeInsets.all(8),
+                  minSize: 38,
+                  color: cs.primary,
+                  onTap: _openSystemPromptEditor,
+                  semanticLabel: l10n.assistantEditSystemPromptTitle,
+                ),
+                const SizedBox(width: 4),
                 _IosButton(
                   label: l10n.assistantEditSystemPromptImportButton,
                   icon: Icons.file_open,
@@ -3621,6 +3694,286 @@ class _HoverIconButtonState extends State<_HoverIconButton> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(widget.icon, size: 16, color: _hover ? cs.primary : cs.onSurface.withOpacity(0.9)),
+        ),
+      ),
+    );
+  }
+}
+
+class _HoverTextButton extends StatefulWidget {
+  const _HoverTextButton({
+    required this.label,
+    required this.onTap,
+    this.color,
+    this.dense = false,
+    this.enableHover = true,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final Color? color;
+  final bool dense;
+  final bool enableHover;
+
+  @override
+  State<_HoverTextButton> createState() => _HoverTextButtonState();
+}
+
+class _HoverTextButtonState extends State<_HoverTextButton> {
+  bool _hover = false;
+  bool _press = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color textColor =
+        _press ? (widget.color ?? cs.primary).withOpacity(0.8) : (widget.color ?? cs.primary);
+    final EdgeInsets padding =
+        widget.dense ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8) : const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
+    final Color bg = (_hover || _press)
+        ? (isDark ? Colors.white.withOpacity(_press ? 0.12 : 0.08) : Colors.black.withOpacity(_press ? 0.08 : 0.06))
+        : Colors.transparent;
+
+    return MouseRegion(
+      onEnter: widget.enableHover ? (_) => setState(() => _hover = true) : null,
+      onExit: widget.enableHover ? (_) => setState(() => _hover = false) : null,
+      cursor: widget.enableHover ? SystemMouseCursors.click : MouseCursor.defer,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _press = true),
+        onTapUp: (_) => setState(() => _press = false),
+        onTapCancel: () => setState(() => _press = false),
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOutCubic,
+          padding: padding,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 13.5,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SystemPromptMobileSheet extends StatefulWidget {
+  const _SystemPromptMobileSheet({required this.initial});
+  final String initial;
+
+  @override
+  State<_SystemPromptMobileSheet> createState() =>
+      _SystemPromptMobileSheetState();
+}
+
+class _SystemPromptMobileSheetState extends State<_SystemPromptMobileSheet> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.96,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 10, 16, bottom + 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                _HoverTextButton(
+                  label: MaterialLocalizations.of(context).closeButtonLabel,
+                  color: cs.onSurface,
+                  onTap: () => Navigator.of(context).maybePop(),
+                  dense: true,
+                  enableHover: false,
+                ),
+                const Spacer(),
+                _HoverTextButton(
+                  label: l10n.assistantEditEmojiDialogSave,
+                  color: cs.primary,
+                  onTap: () => Navigator.of(context).pop(_controller.text),
+                  dense: true,
+                  enableHover: false,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: cs.outlineVariant.withOpacity(0.2),
+                  ),
+                ),
+                child: TextField(
+                  controller: _controller,
+                  autofocus: true,
+                  expands: true,
+                  maxLines: null,
+                  minLines: null,
+                  keyboardType: TextInputType.multiline,
+                  textAlignVertical: TextAlignVertical.top,
+                  decoration: InputDecoration(
+                    hintText: l10n.assistantEditSystemPromptHint,
+                    border: InputBorder.none,
+                    contentPadding:
+                        const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SystemPromptDesktopDialog extends StatefulWidget {
+  const _SystemPromptDesktopDialog({required this.initial});
+  final String initial;
+
+  @override
+  State<_SystemPromptDesktopDialog> createState() =>
+      _SystemPromptDesktopDialogState();
+}
+
+class _SystemPromptDesktopDialogState
+    extends State<_SystemPromptDesktopDialog> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Center(
+      child: Material(
+        type: MaterialType.transparency,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 860, maxHeight: 660),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 12, 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.assistantEditSystemPromptTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        _HoverTextButton(
+                          label: MaterialLocalizations.of(context)
+                              .closeButtonLabel,
+                          color: cs.onSurface,
+                          onTap: () => Navigator.of(context).maybePop(),
+                          dense: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(
+                    height: 1,
+                    thickness: 0.6,
+                    color: cs.outlineVariant.withOpacity(0.14),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.white10
+                              : const Color(0xFFF7F7F9),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: cs.outlineVariant.withOpacity(0.2),
+                          ),
+                        ),
+                        child: TextField(
+                          controller: _controller,
+                          autofocus: true,
+                          expands: true,
+                          maxLines: null,
+                          minLines: null,
+                          keyboardType: TextInputType.multiline,
+                          textAlignVertical: TextAlignVertical.top,
+                          decoration: InputDecoration(
+                            hintText: l10n.assistantEditSystemPromptHint,
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.fromLTRB(
+                                14, 14, 14, 14),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: _HoverTextButton(
+                        label: l10n.assistantEditEmojiDialogSave,
+                        color: cs.primary,
+                        onTap: () =>
+                            Navigator.of(context).pop(_controller.text),
+                        dense: true,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

@@ -215,6 +215,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
         _p('KelivoIN', 'KelivoIN', enabled: true, models: 0),
         _p('Tensdaq', 'Tensdaq', enabled: false, models: 0),
         _p('DeepSeek', 'DeepSeek', enabled: false, models: 0),
+        _p('AIhubmix', 'AIhubmix', enabled: false, models: 0),
         _p(l10n.providersPageAliyunName, 'Aliyun', enabled: false, models: 0),
         _p(l10n.providersPageZhipuName, 'Zhipu AI', enabled: false, models: 0),
         _p('Claude', 'Claude', enabled: false, models: 0),

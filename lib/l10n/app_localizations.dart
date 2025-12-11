@@ -1877,6 +1877,12 @@ abstract class AppLocalizations {
   /// **'New Topic'**
   String get hotkeyNewTopic;
 
+  /// No description provided for @hotkeySwitchModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch Model'**
+  String get hotkeySwitchModel;
+
   /// No description provided for @hotkeyToggleAssistantPanel.
   ///
   /// In en, this message translates to:
@@ -4054,6 +4060,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Response API (/responses)'**
   String get providerDetailPageResponseApiTitle;
+
+  /// No description provided for @providerDetailPageAihubmixAppCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'APP-Code (10% off)'**
+  String get providerDetailPageAihubmixAppCodeLabel;
+
+  /// No description provided for @providerDetailPageAihubmixAppCodeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Adds header APP-Code requests to get a 10% discount. Only affects AIhubmix.'**
+  String get providerDetailPageAihubmixAppCodeHelp;
 
   /// No description provided for @providerDetailPageVertexAiTitle.
   ///

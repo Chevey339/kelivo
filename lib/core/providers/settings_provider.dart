@@ -473,6 +473,7 @@ class SettingsProvider extends ChangeNotifier {
       ensureProviderConfig('Tensdaq', defaultName: 'Tensdaq');
       ensureProviderConfig('MemoryLake', defaultName: 'MemoryLake');
       ensureProviderConfig('SiliconFlow', defaultName: 'SiliconFlow');
+      ensureProviderConfig('AIhubmix', defaultName: 'AIhubmix');
     }
     
     // kick off a one-time connectivity test for services (exclude local Bing)
@@ -1975,6 +1976,8 @@ class ProviderConfig {
   final bool? multiKeyEnabled; // default false
   final List<ApiKeyConfig>? apiKeys; // when enabled
   final KeyManagementConfig? keyManagement;
+  // AIhubmix promo header opt-in
+  final bool? aihubmixAppCodeEnabled;
 
   ProviderConfig({
     required this.id,
@@ -2001,6 +2004,7 @@ class ProviderConfig {
     this.multiKeyEnabled,
     this.apiKeys,
     this.keyManagement,
+    this.aihubmixAppCodeEnabled,
   });
 
   // Sentinel for copyWith nullability control (allow explicit null set)
@@ -2031,6 +2035,7 @@ class ProviderConfig {
     bool? multiKeyEnabled,
     List<ApiKeyConfig>? apiKeys,
     KeyManagementConfig? keyManagement,
+    bool? aihubmixAppCodeEnabled,
   }) => ProviderConfig(
         id: id ?? this.id,
         enabled: enabled ?? this.enabled,
@@ -2056,6 +2061,7 @@ class ProviderConfig {
         multiKeyEnabled: multiKeyEnabled ?? this.multiKeyEnabled,
         apiKeys: apiKeys ?? this.apiKeys,
         keyManagement: keyManagement ?? this.keyManagement,
+        aihubmixAppCodeEnabled: aihubmixAppCodeEnabled ?? this.aihubmixAppCodeEnabled,
       );
 
   Map<String, dynamic> toJson() => {
@@ -2083,6 +2089,7 @@ class ProviderConfig {
         'multiKeyEnabled': multiKeyEnabled,
         'apiKeys': apiKeys?.map((e) => e.toJson()).toList(),
         'keyManagement': keyManagement?.toJson(),
+        'aihubmixAppCodeEnabled': aihubmixAppCodeEnabled,
       };
 
   factory ProviderConfig.fromJson(Map<String, dynamic> json) => ProviderConfig(
@@ -2120,6 +2127,7 @@ class ProviderConfig {
         keyManagement: KeyManagementConfig.fromJson(
           (json['keyManagement'] as Map?)?.cast<String, dynamic>(),
         ),
+        aihubmixAppCodeEnabled: json['aihubmixAppCodeEnabled'] as bool?,
       );
 
   static ProviderKind classify(String key, {ProviderKind? explicitType}) {
@@ -2139,6 +2147,7 @@ class ProviderConfig {
     if (k.contains('tensdaq')) return 'https://tensdaq-api.x-aio.com/v1';
     if (k.contains('kelivoin')) return 'https://text.pollinations.ai/openai';
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
+    if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';
     if (RegExp(r'qwen|aliyun|dashscope').hasMatch(k)) return 'https://dashscope.aliyuncs.com/compatible-mode/v1';
     if (RegExp(r'bytedance|doubao|volces|ark').hasMatch(k)) return 'https://ark.cn-beijing.volces.com/api/v3';
     if (k.contains('silicon')) return 'https://api.siliconflow.cn/v1';
@@ -2187,6 +2196,7 @@ class ProviderConfig {
           multiKeyEnabled: false,
           apiKeys: const [],
           keyManagement: const KeyManagementConfig(),
+          aihubmixAppCodeEnabled: false,
         );
       case ProviderKind.claude:
         return ProviderConfig(
@@ -2206,6 +2216,7 @@ class ProviderConfig {
           multiKeyEnabled: false,
           apiKeys: const [],
           keyManagement: const KeyManagementConfig(),
+          aihubmixAppCodeEnabled: false,
         );
       case ProviderKind.openai:
       default:
@@ -2253,6 +2264,7 @@ class ProviderConfig {
             multiKeyEnabled: false,
             apiKeys: const [],
             keyManagement: const KeyManagementConfig(),
+            aihubmixAppCodeEnabled: false,
           );
         }
         // Special-case MemoryLake: prefill models with capabilities
@@ -2414,7 +2426,8 @@ class ProviderConfig {
             proxyPassword: '',
             multiKeyEnabled: false,
             apiKeys: const [],
-          keyManagement: const KeyManagementConfig(),
+            keyManagement: const KeyManagementConfig(),
+            aihubmixAppCodeEnabled: false,
           );
         }
         return ProviderConfig(
@@ -2436,6 +2449,7 @@ class ProviderConfig {
           multiKeyEnabled: false,
           apiKeys: const [],
           keyManagement: const KeyManagementConfig(),
+          aihubmixAppCodeEnabled: lowerKey.contains('aihubmix'),
         );
     }
   }

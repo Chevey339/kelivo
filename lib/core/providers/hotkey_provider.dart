@@ -66,6 +66,14 @@ class HotkeyProvider extends ChangeNotifier {
       defaultMac: 'cmd+n',
       enabledByDefault: true,
     ),
+    // Switch model (chat; no default)
+    'switch_model': AppHotkey(
+      id: 'switch_model',
+      l10nLabelKey: 'hotkeySwitchModel',
+      defaultWinLinux: '',
+      defaultMac: '',
+      enabledByDefault: true,
+    ),
     // Toggle assistants panel (left topics layout only)
     'toggle_assistants': AppHotkey(
       id: 'toggle_assistants',
@@ -223,6 +231,9 @@ class HotkeyProvider extends ChangeNotifier {
         break;
       case 'new_topic':
         HotkeyEventBus.instance.fire(HotkeyAction.newTopic);
+        break;
+      case 'switch_model':
+        HotkeyEventBus.instance.fire(HotkeyAction.switchModel);
         break;
       case 'toggle_assistants':
         HotkeyEventBus.instance.fire(HotkeyAction.toggleLeftPanelAssistants);
