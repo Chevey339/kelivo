@@ -1038,6 +1038,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
     // Base providers (same as mobile list)
     List<({String name, String key})> base() => [
           (name: 'OpenAI', key: 'OpenAI'),
+          (name: 'MemoryLake', key: 'MemoryLake'),
           (name: l10n.providersPageSiliconFlowName, key: 'SiliconFlow'),
           (name: 'Gemini', key: 'Gemini'),
           (name: 'OpenRouter', key: 'OpenRouter'),
