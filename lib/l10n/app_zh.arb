@@ -361,6 +361,7 @@
   "backupPageBackupNow": "立即备份",
   "backupPageLocalBackup": "本地备份",
   "backupPageImportFromCherryStudio": "从 Cherry Studio 导入",
+  "backupPageImportFromChatbox": "从 Chatbox 导入",
   "homePageClearContext": "清空上下文",
   "homePageClearContextWithCount": "清空上下文 ({actual}/{configured})",
   "homePageDefaultAssistant": "默认助手",

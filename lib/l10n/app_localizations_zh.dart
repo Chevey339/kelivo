@@ -1099,6 +1099,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
 
   @override
+  String get backupPageImportFromChatbox => '从 Chatbox 导入';
+
+  @override
   String get chatHistoryPageTitle => '聊天历史';
 
   @override
@@ -4415,6 +4418,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
+
+  @override
+  String get backupPageImportFromChatbox => '从 Chatbox 导入';
 
   @override
   String get chatHistoryPageTitle => '聊天历史';

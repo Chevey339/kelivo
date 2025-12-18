@@ -2243,6 +2243,12 @@ abstract class AppLocalizations {
   /// **'Import from Cherry Studio'**
   String get backupPageImportFromCherryStudio;
 
+  /// No description provided for @backupPageImportFromChatbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Chatbox'**
+  String get backupPageImportFromChatbox;
+
   /// No description provided for @chatHistoryPageTitle.
   ///
   /// In en, this message translates to:
