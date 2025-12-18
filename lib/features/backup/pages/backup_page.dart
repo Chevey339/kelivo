@@ -535,7 +535,7 @@ class _BackupPageState extends State<BackupPage> {
                   label: l10n.backupPageImportFromChatbox,
                   onTap: () async {
                     if (!mounted) return;
-                    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['json']);
+                    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['json'], allowMultiple: false);
                     final path = result?.files.single.path;
                     if (path == null) return;
 

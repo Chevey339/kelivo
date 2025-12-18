@@ -32,19 +32,24 @@ class ChatboxImporter {
       await chatService.clearAllData();
     }
 
-    // Build map of existing ids for merge
+    // Existing conversations
     final existingConvs = chatService.getAllConversations();
     final existingConvIds = existingConvs.map((c) => c.id).toSet();
-    final existingMsgIds = <String>{};
+
+    // Build per-conversation message id sets for merge, and global taken ids to avoid Hive key collision.
+    final existingMsgIdsByConv = <String, Set<String>>{};
+    final takenMsgIds = <String>{};
     if (mode == RestoreMode.merge) {
       for (final c in existingConvs) {
         final msgs = chatService.getMessages(c.id);
+        final set = <String>{};
         for (final m in msgs) {
-          existingMsgIds.add(m.id);
+          set.add(m.id);
+          takenMsgIds.add(m.id);
         }
+        existingMsgIdsByConv[c.id] = set;
       }
     }
-    final takenMsgIds = <String>{...existingMsgIds};
 
     final sessions = _extractSessions(root);
     int convCount = 0;
@@ -56,6 +61,9 @@ class ChatboxImporter {
       final name = (s['name'] ?? 'Imported').toString();
       final starred = s['starred'] as bool? ?? false;
 
+      final mergingIntoExisting = mode == RestoreMode.merge && existingConvIds.contains(sid);
+      final existingInThisConv = mergingIntoExisting ? (existingMsgIdsByConv[sid] ?? const <String>{}) : const <String>{};
+
       final rawMessages = (s['messages'] as List?) ?? const <dynamic>[];
       final messages = <ChatMessage>[];
 
@@ -65,7 +73,9 @@ class ChatboxImporter {
         final mm = m.map((k, v) => MapEntry(k.toString(), v));
         final rawId = (mm['id'] ?? '').toString();
         if (rawId.isEmpty) continue;
-        if (mode == RestoreMode.merge && existingMsgIds.contains(rawId)) {
+        // Only skip duplicates within the conversation being merged into.
+        if (mergingIntoExisting && existingInThisConv.contains(rawId)) {
+          takenMsgIds.add(rawId);
           continue;
         }
         final mid = _uniqueMessageId(rawId, sid: sid, index: localIndex, taken: takenMsgIds);
@@ -94,6 +104,10 @@ class ChatboxImporter {
         final times = messages.map((m) => m.timestamp).toList()..sort();
         createdAt = times.first;
         updatedAt = times.last;
+      }
+
+      if (messages.isEmpty) {
+        continue;
       }
 
       if (mode == RestoreMode.merge && existingConvIds.contains(sid)) {
