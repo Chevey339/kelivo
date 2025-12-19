@@ -9,11 +9,13 @@ import '../../l10n/app_localizations.dart';
 import '../../core/models/backup.dart';
 import '../../core/providers/backup_provider.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../core/providers/assistant_provider.dart';
 import '../../core/services/chat/chat_service.dart';
 import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/snackbar.dart';
+import '../../features/assistant/widgets/assistant_select_sheet.dart';
 
 class DesktopBackupPane extends StatefulWidget {
   const DesktopBackupPane({super.key});
@@ -33,6 +35,54 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
   late TextEditingController _path;
   bool _includeChats = true;
   bool _includeFiles = true;
+
+  Future<String> _ensureChatBoxAssistantId() async {
+    final ap = context.read<AssistantProvider>();
+    await ap.ensureDefaults(context);
+    for (final a in ap.assistants) {
+      if (a.name.trim().toLowerCase() == 'chatbox') return a.id;
+    }
+    return await ap.addAssistant(name: 'ChatBox', context: context);
+  }
+
+  Future<String?> _chooseChatboxImportTargetAssistantId() async {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(l10n.sideDrawerChooseAssistantTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop('__chatbox__'),
+              child: const Align(alignment: Alignment.centerLeft, child: Text('ChatBox')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop('__other__'),
+              child: Align(alignment: Alignment.centerLeft, child: Text('${l10n.sideDrawerChooseAssistantTitle}…')),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(l10n.backupPageCancel)),
+        ],
+      ),
+    );
+    if (choice == null) return null;
+    if (choice == '__chatbox__') {
+      return await _ensureChatBoxAssistantId();
+    }
+    if (choice == '__other__') {
+      await context.read<AssistantProvider>().ensureDefaults(context);
+      return await showAssistantMoveSelector(context);
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -381,11 +431,14 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       final chat = context.read<ChatService>();
                       try {
                         final l10n = AppLocalizations.of(context)!;
+                        final targetAssistantId = await _chooseChatboxImportTargetAssistantId();
+                        if (targetAssistantId == null) return;
                         final res = await ChatboxImporter.importFromChatbox(
                           file: f,
                           mode: mode,
                           chatService: chat,
                           defaultConversationTitle: l10n.chatboxImportDefaultConversationTitle,
+                          targetAssistantId: targetAssistantId,
                         );
                         await showDialog(context: context, builder: (_) => AlertDialog(
                           backgroundColor: cs.surface,

@@ -34,6 +34,7 @@ class ChatboxImporter {
     required RestoreMode mode,
     required ChatService chatService,
     required String defaultConversationTitle,
+    required String targetAssistantId,
   }) async {
     final root = await _readChatboxBackupJson(file);
 
@@ -47,6 +48,9 @@ class ChatboxImporter {
     // Existing conversations
     final existingConvs = chatService.getAllConversations();
     final existingConvIds = existingConvs.map((c) => c.id).toSet();
+    final existingConvById = <String, Conversation>{
+      for (final c in existingConvs) c.id: c,
+    };
 
     // Build per-conversation message id sets for merge, and global taken ids to avoid Hive key collision.
     final existingMsgIdsByConv = <String, Set<String>>{};
@@ -76,39 +80,49 @@ class ChatboxImporter {
 
       final mergingIntoExisting = mode == RestoreMode.merge && existingConvIds.contains(sid);
       final existingInThisConv = mergingIntoExisting ? (existingMsgIdsByConv[sid] ?? const <String>{}) : const <String>{};
+      final existed = mergingIntoExisting ? existingConvById[sid] : null;
+
+      // Bind an unowned existing conversation to the target assistant WITHOUT touching updatedAt.
+      if (existed != null && existed.assistantId == null) {
+        existed.assistantId = targetAssistantId;
+        await existed.save();
+      }
 
       final rawMessages = (s['messages'] as List?) ?? const <dynamic>[];
       final messages = <ChatMessage>[];
 
       int localIndex = 0;
       for (final m in rawMessages) {
-        if (m is! Map) continue;
-        final mm = m.map((k, v) => MapEntry(k.toString(), v));
-        final rawId = (mm['id'] ?? '').toString();
-        if (rawId.isEmpty) continue;
-        // Only skip duplicates within the conversation being merged into.
-        if (mergingIntoExisting && existingInThisConv.contains(rawId)) {
-          takenMsgIds.add(rawId);
-          continue;
+        try {
+          if (m is! Map) continue;
+          final mm = m.map((k, v) => MapEntry(k.toString(), v));
+          final rawId = (mm['id'] ?? '').toString();
+          if (rawId.isEmpty) continue;
+          // Only skip duplicates within the conversation being merged into.
+          if (mergingIntoExisting && existingInThisConv.contains(rawId)) {
+            takenMsgIds.add(rawId);
+            continue;
+          }
+          final mid = _uniqueMessageId(rawId, sid: sid, index: localIndex, taken: takenMsgIds);
+          takenMsgIds.add(mid);
+
+          final role = _mapRole((mm['role'] ?? 'user').toString());
+          final content = _extractContent(mm);
+          final ts = _extractTimestamp(mm['timestamp']);
+
+          messages.add(ChatMessage(
+            id: mid,
+            role: role,
+            content: content,
+            timestamp: ts,
+            conversationId: sid,
+            modelId: _extractModelId(mm),
+            providerId: _extractProviderId(mm),
+            totalTokens: _extractTotalTokens(mm),
+          ));
+        } finally {
+          localIndex += 1;
         }
-        final mid = _uniqueMessageId(rawId, sid: sid, index: localIndex, taken: takenMsgIds);
-        takenMsgIds.add(mid);
-
-        final role = _mapRole((mm['role'] ?? 'user').toString());
-        final content = _extractContent(mm);
-        final ts = _extractTimestamp(mm['timestamp']);
-
-        messages.add(ChatMessage(
-          id: mid,
-          role: role,
-          content: content,
-          timestamp: ts,
-          conversationId: sid,
-          modelId: _extractModelId(mm),
-          providerId: _extractProviderId(mm),
-          totalTokens: _extractTotalTokens(mm),
-        ));
-        localIndex += 1;
       }
 
       DateTime createdAt = DateTime.now();
@@ -135,6 +149,7 @@ class ChatboxImporter {
           createdAt: createdAt,
           updatedAt: updatedAt,
           isPinned: starred,
+          assistantId: targetAssistantId,
         );
         await chatService.restoreConversation(conv, messages);
         convCount += 1;
