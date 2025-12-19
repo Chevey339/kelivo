@@ -365,7 +365,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         await showDialog(context: context, builder: (_) => AlertDialog(
                           backgroundColor: cs.surface,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          title: Text('Error'),
+                          title: Text(l10n.multiKeyPageError),
                           content: Text(e.toString()),
                           actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.backupPageOK))],
                         ));
@@ -380,20 +380,30 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       if (mode == null) return;
                       final chat = context.read<ChatService>();
                       try {
-                        final res = await ChatboxImporter.importFromChatbox(file: f, mode: mode, chatService: chat);
+                        final l10n = AppLocalizations.of(context)!;
+                        final res = await ChatboxImporter.importFromChatbox(
+                          file: f,
+                          mode: mode,
+                          chatService: chat,
+                          defaultConversationTitle: l10n.chatboxImportDefaultConversationTitle,
+                        );
                         await showDialog(context: context, builder: (_) => AlertDialog(
                           backgroundColor: cs.surface,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           title: Text(l10n.backupPageImportFromChatbox),
-                          content: Text(' • Conversations: ${res.conversations}\n • Messages: ${res.messages}'),
+                          content: Text(' • ${l10n.backupPageConversations}: ${res.conversations}\n • ${l10n.backupPageMessages}: ${res.messages}'),
                           actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.backupPageOK))],
                         ));
                       } catch (e) {
+                        final l10n = AppLocalizations.of(context)!;
+                        final msg = (e is ChatboxImportException && e.error == ChatboxImportError.invalidBackupJson)
+                            ? l10n.chatboxImportInvalidBackupJson
+                            : e.toString();
                         await showDialog(context: context, builder: (_) => AlertDialog(
                           backgroundColor: cs.surface,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          title: Text('Error'),
-                          content: Text(e.toString()),
+                          title: Text(l10n.multiKeyPageError),
+                          content: Text(msg),
                           actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.backupPageOK))],
                         ));
                       }

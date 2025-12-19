@@ -1102,6 +1102,38 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageImportFromChatbox => '从 Chatbox 导入';
 
   @override
+  String get backupPageConversations => '对话';
+
+  @override
+  String get backupPageMessages => '消息';
+
+  @override
+  String get chatboxImportDefaultConversationTitle => '导入的会话';
+
+  @override
+  String get chatboxImportInvalidBackupJson => '无效的 ChatBox 备份 JSON';
+
+  @override
+  String get importProviderSheetErrorInvalidPrefix => '前缀无效';
+
+  @override
+  String get importProviderSheetErrorInvalidJson => '无效的 JSON';
+
+  @override
+  String get importProviderSheetErrorUnsupportedFormat => '不支持的格式';
+
+  @override
+  String get importProviderSheetErrorUnsupportedContent => '不支持的内容';
+
+  @override
+  String get importProviderSheetErrorQrNotDetected => '未识别到二维码';
+
+  @override
+  String importProviderSheetErrorUnknownProviderType(Object type) {
+    return '未知的供应商类型: $type';
+  }
+
+  @override
   String get chatHistoryPageTitle => '聊天历史';
 
   @override
@@ -4423,6 +4455,38 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageImportFromChatbox => '从 Chatbox 导入';
 
   @override
+  String get backupPageConversations => '对话';
+
+  @override
+  String get backupPageMessages => '消息';
+
+  @override
+  String get chatboxImportDefaultConversationTitle => '导入的会话';
+
+  @override
+  String get chatboxImportInvalidBackupJson => '无效的 ChatBox 备份 JSON';
+
+  @override
+  String get importProviderSheetErrorInvalidPrefix => '前缀无效';
+
+  @override
+  String get importProviderSheetErrorInvalidJson => '无效的 JSON';
+
+  @override
+  String get importProviderSheetErrorUnsupportedFormat => '不支持的格式';
+
+  @override
+  String get importProviderSheetErrorUnsupportedContent => '不支持的内容';
+
+  @override
+  String get importProviderSheetErrorQrNotDetected => '未识别到二维码';
+
+  @override
+  String importProviderSheetErrorUnknownProviderType(Object type) {
+    return '未知的供应商类型: $type';
+  }
+
+  @override
   String get chatHistoryPageTitle => '聊天历史';
 
   @override
@@ -7739,6 +7803,41 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromCherryStudio => '從 Cherry Studio 匯入';
+
+  @override
+  String get backupPageImportFromChatbox => '從 Chatbox 匯入';
+
+  @override
+  String get backupPageConversations => '對話';
+
+  @override
+  String get backupPageMessages => '訊息';
+
+  @override
+  String get chatboxImportDefaultConversationTitle => '匯入的對話';
+
+  @override
+  String get chatboxImportInvalidBackupJson => '無效的 ChatBox 備份 JSON';
+
+  @override
+  String get importProviderSheetErrorInvalidPrefix => '前綴無效';
+
+  @override
+  String get importProviderSheetErrorInvalidJson => '無效的 JSON';
+
+  @override
+  String get importProviderSheetErrorUnsupportedFormat => '不支援的格式';
+
+  @override
+  String get importProviderSheetErrorUnsupportedContent => '不支援的內容';
+
+  @override
+  String get importProviderSheetErrorQrNotDetected => '未識別到二維碼';
+
+  @override
+  String importProviderSheetErrorUnknownProviderType(Object type) {
+    return '未知的供應商類型: $type';
+  }
 
   @override
   String get chatHistoryPageTitle => '聊天歷史';

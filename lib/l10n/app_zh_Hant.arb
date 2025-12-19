@@ -363,6 +363,22 @@
   "backupPageBackupNow": "立即備份",
   "backupPageLocalBackup": "本機備份",
   "backupPageImportFromCherryStudio": "從 Cherry Studio 匯入",
+  "backupPageImportFromChatbox": "從 Chatbox 匯入",
+  "backupPageConversations": "對話",
+  "backupPageMessages": "訊息",
+  "chatboxImportDefaultConversationTitle": "匯入的對話",
+  "chatboxImportInvalidBackupJson": "無效的 ChatBox 備份 JSON",
+  "importProviderSheetErrorInvalidPrefix": "前綴無效",
+  "importProviderSheetErrorInvalidJson": "無效的 JSON",
+  "importProviderSheetErrorUnsupportedFormat": "不支援的格式",
+  "importProviderSheetErrorUnsupportedContent": "不支援的內容",
+  "importProviderSheetErrorQrNotDetected": "未識別到二維碼",
+  "importProviderSheetErrorUnknownProviderType": "未知的供應商類型: {type}",
+  "@importProviderSheetErrorUnknownProviderType": {
+    "placeholders": {
+      "type": {}
+    }
+  },
   "homePageClearContext": "清空上下文",
   "homePageClearContextWithCount": "清空上下文 ({actual}/{configured})",
   "homePageDefaultAssistant": "預設助理",

@@ -402,6 +402,21 @@
   "backupPageLocalBackup": "本地备份",
   "backupPageImportFromCherryStudio": "从 Cherry Studio 导入",
   "backupPageImportFromChatbox": "从 Chatbox 导入",
+  "backupPageConversations": "对话",
+  "backupPageMessages": "消息",
+  "chatboxImportDefaultConversationTitle": "导入的会话",
+  "chatboxImportInvalidBackupJson": "无效的 ChatBox 备份 JSON",
+  "importProviderSheetErrorInvalidPrefix": "前缀无效",
+  "importProviderSheetErrorInvalidJson": "无效的 JSON",
+  "importProviderSheetErrorUnsupportedFormat": "不支持的格式",
+  "importProviderSheetErrorUnsupportedContent": "不支持的内容",
+  "importProviderSheetErrorQrNotDetected": "未识别到二维码",
+  "importProviderSheetErrorUnknownProviderType": "未知的供应商类型: {type}",
+  "@importProviderSheetErrorUnknownProviderType": {
+    "placeholders": {
+      "type": {}
+    }
+  },
   "homePageClearContext": "清空上下文",
   "homePageClearContextWithCount": "清空上下文 ({actual}/{configured})",
   "homePageDefaultAssistant": "默认助手",

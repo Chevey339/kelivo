@@ -422,6 +422,21 @@
   "backupPageLocalBackup": "Local Backup",
   "backupPageImportFromCherryStudio": "Import from Cherry Studio",
   "backupPageImportFromChatbox": "Import from Chatbox",
+  "backupPageConversations": "Conversations",
+  "backupPageMessages": "Messages",
+  "chatboxImportDefaultConversationTitle": "Imported",
+  "chatboxImportInvalidBackupJson": "Invalid ChatBox backup JSON",
+  "importProviderSheetErrorInvalidPrefix": "Invalid prefix",
+  "importProviderSheetErrorInvalidJson": "Invalid JSON",
+  "importProviderSheetErrorUnsupportedFormat": "Unsupported format",
+  "importProviderSheetErrorUnsupportedContent": "Unsupported content",
+  "importProviderSheetErrorQrNotDetected": "QR not detected",
+  "importProviderSheetErrorUnknownProviderType": "Unknown provider type: {type}",
+  "@importProviderSheetErrorUnknownProviderType": {
+    "placeholders": {
+      "type": {}
+    }
+  },
   "chatHistoryPageTitle": "Chat History",
   "chatHistoryPageSearchTooltip": "Search",
   "chatHistoryPageDeleteAllTooltip": "Delete Unpinned",

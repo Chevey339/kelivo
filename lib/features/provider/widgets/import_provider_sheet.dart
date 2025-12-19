@@ -17,9 +17,71 @@ class _ImportResult {
   _ImportResult(this.key, this.cfg);
 }
 
+enum _ImportProviderError {
+  invalidPrefix,
+  invalidJson,
+  unsupportedFormat,
+  unsupportedContent,
+  qrNotDetected,
+  unknownProviderType,
+}
+
+class _ImportProviderException implements Exception {
+  final _ImportProviderError error;
+  final String? detail;
+  const _ImportProviderException(this.error, {this.detail});
+  @override
+  String toString() => 'ImportProviderException($error${detail == null ? '' : ': $detail'})';
+}
+
+String _localizeImportProviderError(AppLocalizations l10n, Object e) {
+  if (e is _ImportProviderException) {
+    switch (e.error) {
+      case _ImportProviderError.invalidPrefix:
+        return l10n.importProviderSheetErrorInvalidPrefix;
+      case _ImportProviderError.invalidJson:
+        return l10n.importProviderSheetErrorInvalidJson;
+      case _ImportProviderError.unsupportedFormat:
+        return l10n.importProviderSheetErrorUnsupportedFormat;
+      case _ImportProviderError.unsupportedContent:
+        return l10n.importProviderSheetErrorUnsupportedContent;
+      case _ImportProviderError.qrNotDetected:
+        return l10n.importProviderSheetErrorQrNotDetected;
+      case _ImportProviderError.unknownProviderType:
+        return l10n.importProviderSheetErrorUnknownProviderType(e.detail ?? '');
+    }
+  }
+
+  if (e is FormatException) {
+    final m = e.message;
+    if (m == 'Invalid prefix') return l10n.importProviderSheetErrorInvalidPrefix;
+    if (m == 'Unsupported format') return l10n.importProviderSheetErrorUnsupportedFormat;
+    if (m == 'No valid lines') return l10n.importProviderSheetErrorUnsupportedContent;
+    if (m.startsWith('Unknown provider type: ')) {
+      final type = m.substring('Unknown provider type: '.length);
+      return l10n.importProviderSheetErrorUnknownProviderType(type);
+    }
+    // Default: hide raw parse errors, etc.
+    return l10n.importProviderSheetErrorInvalidJson;
+  }
+
+  final s = e.toString();
+  if (s == 'QR not detected') return l10n.importProviderSheetErrorQrNotDetected;
+  if (s == 'Unsupported content') return l10n.importProviderSheetErrorUnsupportedContent;
+  if (s == 'Unsupported format') return l10n.importProviderSheetErrorUnsupportedFormat;
+  if (s == 'Invalid prefix') return l10n.importProviderSheetErrorInvalidPrefix;
+
+  return s;
+}
+
 List<_ImportResult> _decodeChatBoxJson(BuildContext context, String s) {
   final settings = context.read<SettingsProvider>();
-  final Map<String, dynamic> obj = jsonDecode(s) as Map<String, dynamic>;
+  Map<String, dynamic> obj;
+  try {
+    obj = jsonDecode(s) as Map<String, dynamic>;
+  } catch (_) {
+    throw const _ImportProviderException(_ImportProviderError.invalidJson);
+  }
   final providers = (obj['providers'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ?? {};
   final out = <_ImportResult>[];
   String uniqueKey(String prefix, String display) {
@@ -135,11 +197,21 @@ List<_ImportResult> _decodeChatBoxJson(BuildContext context, String s) {
 
 _ImportResult _decodeSingle(BuildContext context, String s) {
   if (!s.trim().startsWith('ai-provider:v1:')) {
-    throw FormatException('Invalid prefix');
+    throw const _ImportProviderException(_ImportProviderError.invalidPrefix);
   }
   final base64Str = s.trim().substring('ai-provider:v1:'.length);
-  final jsonStr = utf8.decode(base64Decode(base64Str));
-  final obj = jsonDecode(jsonStr) as Map<String, dynamic>;
+  String jsonStr;
+  try {
+    jsonStr = utf8.decode(base64Decode(base64Str));
+  } catch (_) {
+    throw const _ImportProviderException(_ImportProviderError.invalidJson);
+  }
+  Map<String, dynamic> obj;
+  try {
+    obj = jsonDecode(jsonStr) as Map<String, dynamic>;
+  } catch (_) {
+    throw const _ImportProviderException(_ImportProviderError.invalidJson);
+  }
   final type = (obj['type'] ?? '').toString();
   final name = (obj['name'] ?? '').toString();
   final apiKey = (obj['apiKey'] ?? '').toString();
@@ -228,7 +300,7 @@ _ImportResult _decodeSingle(BuildContext context, String s) {
     );
     return _ImportResult(key, cfg);
   } else {
-    throw FormatException('Unknown provider type: $type');
+    throw _ImportProviderException(_ImportProviderError.unknownProviderType, detail: type);
   }
 }
 
@@ -308,7 +380,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                   } catch (_) {}
                                 }
                                 if (results.isEmpty) {
-                                  throw const FormatException('Unsupported format');
+                                  throw const _ImportProviderException(_ImportProviderError.unsupportedFormat);
                                 }
                               } else {
                                 final p = parts.first;
@@ -317,7 +389,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                 } else if (p.startsWith('{')) {
                                   results.addAll(_decodeChatBoxJson(ctx, p));
                                 } else {
-                                  throw const FormatException('Unsupported format');
+                                  throw const _ImportProviderException(_ImportProviderError.unsupportedFormat);
                                 }
                               }
                               for (final r in results) {
@@ -334,9 +406,10 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                 type: NotificationType.success,
                               );
                             } catch (e) {
+                              final err = _localizeImportProviderError(l10n, e);
                               showAppSnackBar(
                                 ctx,
-                                message: l10n.importProviderSheetImportFailedMessage(e.toString()),
+                                message: l10n.importProviderSheetImportFailedMessage(err),
                                 type: NotificationType.error,
                               );
                             }
@@ -371,10 +444,12 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                   }
                                 } catch (_) {}
                               }
-                              if (code == null || code!.isEmpty) throw 'QR not detected';
+                              if (code == null || code.isEmpty) {
+                                throw const _ImportProviderException(_ImportProviderError.qrNotDetected);
+                              }
                               final settings = ctx.read<SettingsProvider>();
                               final results = <_ImportResult>[];
-                              final parts = code!.split(RegExp(r'\r?\n+')).map((e)=>e.trim()).where((e)=>e.isNotEmpty).toList();
+                              final parts = code.split(RegExp(r'\r?\n+')).map((e)=>e.trim()).where((e)=>e.isNotEmpty).toList();
                               if (parts.length > 1) {
                                 for (final p in parts) {
                                   try {
@@ -385,7 +460,9 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                     }
                                   } catch (_) {}
                                 }
-                                if (results.isEmpty) throw 'Unsupported content';
+                                if (results.isEmpty) {
+                                  throw const _ImportProviderException(_ImportProviderError.unsupportedContent);
+                                }
                               } else {
                                 final p = parts.first;
                                 if (p.startsWith('ai-provider:v1:')) {
@@ -393,7 +470,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                 } else if (p.startsWith('{')) {
                                   results.addAll(_decodeChatBoxJson(ctx, p));
                                 } else {
-                                  throw 'Unsupported content';
+                                  throw const _ImportProviderException(_ImportProviderError.unsupportedContent);
                                 }
                               }
                               for (final r in results) {
@@ -410,9 +487,10 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                 type: NotificationType.success,
                               );
                             } catch (e) {
+                              final err = _localizeImportProviderError(l10n, e);
                               showAppSnackBar(
                                 ctx,
-                                message: l10n.importProviderSheetImportFailedMessage(e.toString()),
+                                message: l10n.importProviderSheetImportFailedMessage(err),
                                 type: NotificationType.error,
                               );
                             }
@@ -500,7 +578,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                 }
                               }
                               if (results.isEmpty) {
-                                throw const FormatException('No valid lines');
+                                throw const _ImportProviderException(_ImportProviderError.unsupportedContent);
                               }
                             } else {
                               final text = lines.first;
@@ -509,7 +587,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                               } else if (text.startsWith('{')) {
                                 results.addAll(_decodeChatBoxJson(ctx, text));
                               } else {
-                                throw const FormatException('Unsupported format');
+                                throw const _ImportProviderException(_ImportProviderError.unsupportedFormat);
                               }
                             }
                             for (final r in results) {
@@ -527,9 +605,10 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                               type: NotificationType.success,
                             );
                           } catch (e) {
+                            final err = _localizeImportProviderError(l10n, e);
                             showAppSnackBar(
                               ctx,
-                              message: l10n.importProviderSheetImportFailedMessage(e.toString()),
+                              message: l10n.importProviderSheetImportFailedMessage(err),
                               type: NotificationType.error,
                             );
                           }

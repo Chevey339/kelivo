@@ -550,6 +550,7 @@ class _BackupPageState extends State<BackupPage> {
                           file: file,
                           mode: mode,
                           chatService: cs,
+                          defaultConversationTitle: l10n.chatboxImportDefaultConversationTitle,
                         );
                         if (!mounted) return;
                         await showDialog(
@@ -558,8 +559,8 @@ class _BackupPageState extends State<BackupPage> {
                             title: Text(l10n.backupPageImportFromChatbox),
                             content: Text(
                               '${l10n.backupPageImportFromChatbox}:\n'
-                              ' • Conversations: ${res.conversations}\n'
-                              ' • Messages: ${res.messages}\n',
+                              ' • ${l10n.backupPageConversations}: ${res.conversations}\n'
+                              ' • ${l10n.backupPageMessages}: ${res.messages}\n',
                             ),
                             actions: [
                               TextButton(
@@ -571,9 +572,12 @@ class _BackupPageState extends State<BackupPage> {
                         );
                       } catch (e) {
                         if (!mounted) return;
+                        final msg = (e is ChatboxImportException && e.error == ChatboxImportError.invalidBackupJson)
+                            ? l10n.chatboxImportInvalidBackupJson
+                            : e.toString();
                         showAppSnackBar(
                           context,
-                          message: e.toString(),
+                          message: msg,
                           type: NotificationType.error,
                         );
                       }

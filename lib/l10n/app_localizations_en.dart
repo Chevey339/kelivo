@@ -1134,6 +1134,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageImportFromChatbox => 'Import from Chatbox';
 
   @override
+  String get backupPageConversations => 'Conversations';
+
+  @override
+  String get backupPageMessages => 'Messages';
+
+  @override
+  String get chatboxImportDefaultConversationTitle => 'Imported';
+
+  @override
+  String get chatboxImportInvalidBackupJson => 'Invalid ChatBox backup JSON';
+
+  @override
+  String get importProviderSheetErrorInvalidPrefix => 'Invalid prefix';
+
+  @override
+  String get importProviderSheetErrorInvalidJson => 'Invalid JSON';
+
+  @override
+  String get importProviderSheetErrorUnsupportedFormat => 'Unsupported format';
+
+  @override
+  String get importProviderSheetErrorUnsupportedContent =>
+      'Unsupported content';
+
+  @override
+  String get importProviderSheetErrorQrNotDetected => 'QR not detected';
+
+  @override
+  String importProviderSheetErrorUnknownProviderType(Object type) {
+    return 'Unknown provider type: $type';
+  }
+
+  @override
   String get chatHistoryPageTitle => 'Chat History';
 
   @override

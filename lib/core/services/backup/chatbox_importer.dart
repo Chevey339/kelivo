@@ -6,6 +6,17 @@ import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 import '../chat/chat_service.dart';
 
+enum ChatboxImportError {
+  invalidBackupJson,
+}
+
+class ChatboxImportException implements Exception {
+  final ChatboxImportError error;
+  const ChatboxImportException(this.error);
+  @override
+  String toString() => 'ChatboxImportException($error)';
+}
+
 class ChatboxImportResult {
   final int conversations;
   final int messages;
@@ -22,6 +33,7 @@ class ChatboxImporter {
     required File file,
     required RestoreMode mode,
     required ChatService chatService,
+    required String defaultConversationTitle,
   }) async {
     final root = await _readChatboxBackupJson(file);
 
@@ -58,7 +70,8 @@ class ChatboxImporter {
     for (final s in sessions) {
       final sid = (s['id'] ?? '').toString();
       if (sid.isEmpty) continue;
-      final name = (s['name'] ?? 'Imported').toString();
+      final rawName = (s['name'] ?? '').toString().trim();
+      final name = rawName.isNotEmpty ? rawName : defaultConversationTitle;
       final starred = s['starred'] as bool? ?? false;
 
       final mergingIntoExisting = mode == RestoreMode.merge && existingConvIds.contains(sid);
@@ -134,11 +147,15 @@ class ChatboxImporter {
 
   static Future<Map<String, dynamic>> _readChatboxBackupJson(File file) async {
     final text = await file.readAsString();
-    final obj = jsonDecode(text);
-    if (obj is Map) {
-      return obj.map((k, v) => MapEntry(k.toString(), v));
+    try {
+      final obj = jsonDecode(text);
+      if (obj is Map) {
+        return obj.map((k, v) => MapEntry(k.toString(), v));
+      }
+    } catch (_) {
+      // fall through
     }
-    throw Exception('Invalid Chatbox backup JSON');
+    throw const ChatboxImportException(ChatboxImportError.invalidBackupJson);
   }
 
   static List<Map<String, dynamic>> _extractSessions(Map<String, dynamic> root) {
