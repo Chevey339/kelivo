@@ -76,13 +76,24 @@ class ChatboxImporter {
       if (sid.isEmpty) continue;
       final rawName = (s['name'] ?? '').toString().trim();
       final name = rawName.isNotEmpty ? rawName : defaultConversationTitle;
-      final starred = s['starred'] as bool? ?? false;
+      final starred = (() {
+        final v = s['starred'];
+        if (v is bool) return v;
+        if (v is num) return v != 0;
+        if (v is String) {
+          final t = v.trim().toLowerCase();
+          if (t == 'true' || t == '1' || t == 'yes' || t == 'y') return true;
+          if (t == 'false' || t == '0' || t == 'no' || t == 'n') return false;
+        }
+        return false;
+      })();
 
       final mergingIntoExisting = mode == RestoreMode.merge && existingConvIds.contains(sid);
       final existingInThisConv = mergingIntoExisting ? (existingMsgIdsByConv[sid] ?? const <String>{}) : const <String>{};
       final existed = mergingIntoExisting ? existingConvById[sid] : null;
 
-      // Bind an unowned existing conversation to the target assistant WITHOUT touching updatedAt.
+      // Bind an unowned existing conversation to the target assistant.
+      // Note: HiveObject.save() does not automatically update updatedAt, so it remains unchanged.
       if (existed != null && existed.assistantId == null) {
         existed.assistantId = targetAssistantId;
         await existed.save();
@@ -91,38 +102,34 @@ class ChatboxImporter {
       final rawMessages = (s['messages'] as List?) ?? const <dynamic>[];
       final messages = <ChatMessage>[];
 
-      int localIndex = 0;
-      for (final m in rawMessages) {
-        try {
-          if (m is! Map) continue;
-          final mm = m.map((k, v) => MapEntry(k.toString(), v));
-          final rawId = (mm['id'] ?? '').toString();
-          if (rawId.isEmpty) continue;
-          // Only skip duplicates within the conversation being merged into.
-          if (mergingIntoExisting && existingInThisConv.contains(rawId)) {
-            takenMsgIds.add(rawId);
-            continue;
-          }
-          final mid = _uniqueMessageId(rawId, sid: sid, index: localIndex, taken: takenMsgIds);
-          takenMsgIds.add(mid);
-
-          final role = _mapRole((mm['role'] ?? 'user').toString());
-          final content = _extractContent(mm);
-          final ts = _extractTimestamp(mm['timestamp']);
-
-          messages.add(ChatMessage(
-            id: mid,
-            role: role,
-            content: content,
-            timestamp: ts,
-            conversationId: sid,
-            modelId: _extractModelId(mm),
-            providerId: _extractProviderId(mm),
-            totalTokens: _extractTotalTokens(mm),
-          ));
-        } finally {
-          localIndex += 1;
+      for (int localIndex = 0; localIndex < rawMessages.length; localIndex++) {
+        final m = rawMessages[localIndex];
+        if (m is! Map) continue;
+        final mm = m.map((k, v) => MapEntry(k.toString(), v));
+        final rawId = (mm['id'] ?? '').toString();
+        if (rawId.isEmpty) continue;
+        // Only skip duplicates within the conversation being merged into.
+        if (mergingIntoExisting && existingInThisConv.contains(rawId)) {
+          takenMsgIds.add(rawId);
+          continue;
         }
+        final mid = _uniqueMessageId(rawId, sid: sid, index: localIndex, taken: takenMsgIds);
+        takenMsgIds.add(mid);
+
+        final role = _mapRole((mm['role'] ?? 'user').toString());
+        final content = _extractContent(mm);
+        final ts = _extractTimestamp(mm['timestamp']);
+
+        messages.add(ChatMessage(
+          id: mid,
+          role: role,
+          content: content,
+          timestamp: ts,
+          conversationId: sid,
+          modelId: _extractModelId(mm),
+          providerId: _extractProviderId(mm),
+          totalTokens: _extractTotalTokens(mm),
+        ));
       }
 
       DateTime createdAt = DateTime.now();
@@ -137,10 +144,20 @@ class ChatboxImporter {
         continue;
       }
 
-      if (mode == RestoreMode.merge && existingConvIds.contains(sid)) {
+      if (mergingIntoExisting) {
         for (final m in messages) {
           await chatService.addMessageDirectly(sid, m);
           msgCount += 1;
+        }
+        if (existed != null && messages.isNotEmpty) {
+          DateTime latest = existed.updatedAt;
+          for (final m in messages) {
+            if (m.timestamp.isAfter(latest)) latest = m.timestamp;
+          }
+          if (latest.isAfter(existed.updatedAt)) {
+            existed.updatedAt = latest;
+            await existed.save();
+          }
         }
       } else {
         final conv = Conversation(
@@ -183,10 +200,10 @@ class ChatboxImporter {
       if (id.isEmpty) return;
       // If no messages, try to resolve from session:{id}
       if (m['messages'] is! List) {
-        final k = 'session:$id';
-        final full = root[k];
+        final sessionKey = 'session:$id';
+        final full = root[sessionKey];
         if (full is Map) {
-          out.add(full.map((k, v) => MapEntry(k.toString(), v)));
+          out.add(full.map((kk, vv) => MapEntry(kk.toString(), vv)));
           return;
         }
       }
@@ -207,10 +224,10 @@ class ChatboxImporter {
         final mm = meta.map((k, v) => MapEntry(k.toString(), v));
         final id = (mm['id'] ?? '').toString();
         if (id.isEmpty) continue;
-        final k = 'session:$id';
-        final full = root[k];
+        final sessionKey = 'session:$id';
+        final full = root[sessionKey];
         if (full is Map) {
-          out.add(full.map((k, v) => MapEntry(k.toString(), v)));
+          out.add(full.map((kk, vv) => MapEntry(kk.toString(), vv)));
         } else {
           // best-effort: keep meta (may include messages in older exports)
           out.add(mm);
@@ -245,11 +262,28 @@ class ChatboxImporter {
     try {
       if (ts is num) {
         final v = ts.toInt();
-        if (v >= 1000000000000) {
-          return DateTime.fromMillisecondsSinceEpoch(v);
-        }
-        if (v >= 1000000000) {
-          return DateTime.fromMillisecondsSinceEpoch(v * 1000);
+        if (v <= 0) return DateTime.now();
+        if (v >= 1000000000000) return DateTime.fromMillisecondsSinceEpoch(v);
+
+        DateTime? asMs;
+        DateTime? asSec;
+        try {
+          asMs = DateTime.fromMillisecondsSinceEpoch(v);
+        } catch (_) {}
+        try {
+          asSec = DateTime.fromMillisecondsSinceEpoch(v * 1000);
+        } catch (_) {}
+
+        bool ok(DateTime? d) => d != null && d.year >= 1990 && d.year <= 2100;
+        final okMs = ok(asMs);
+        final okSec = ok(asSec);
+        if (okMs && !okSec) return asMs!;
+        if (okSec && !okMs) return asSec!;
+        if (okMs && okSec) {
+          final now = DateTime.now();
+          final dm = (now.millisecondsSinceEpoch - asMs!.millisecondsSinceEpoch).abs();
+          final ds = (now.millisecondsSinceEpoch - asSec!.millisecondsSinceEpoch).abs();
+          return dm <= ds ? asMs : asSec;
         }
       }
     } catch (_) {}

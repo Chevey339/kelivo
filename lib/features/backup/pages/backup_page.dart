@@ -21,7 +21,6 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
-import '../../assistant/widgets/assistant_select_sheet.dart';
 
 // File size formatter (B, KB, MB, GB)
 String _fmtBytes(int bytes) {
@@ -44,92 +43,6 @@ class BackupPage extends StatefulWidget {
 class _BackupPageState extends State<BackupPage> {
   List<BackupFileItem> _remote = const <BackupFileItem>[];
   bool _loadingRemote = false;
-
-  Future<String> _ensureChatBoxAssistantId(BuildContext context) async {
-    final ap = context.read<AssistantProvider>();
-    await ap.ensureDefaults(context);
-    for (final a in ap.assistants) {
-      if (a.name.trim().toLowerCase() == 'chatbox') return a.id;
-    }
-    return await ap.addAssistant(name: 'ChatBox', context: context);
-  }
-
-  Future<String?> _chooseChatboxImportTargetAssistantId(BuildContext context) async {
-    final cs = Theme.of(context).colorScheme;
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: cs.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        final l10n = AppLocalizations.of(ctx)!;
-        final bottom = MediaQuery.of(ctx).viewInsets.bottom;
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, bottom + 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.onSurface.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  l10n.sideDrawerChooseAssistantTitle,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 10),
-                // Default option: ChatBox
-                ListTile(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  tileColor: cs.primary.withOpacity(0.08),
-                  title: const Text('ChatBox', style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(l10n.backupPageImportFromChatbox),
-                  onTap: () => Navigator.of(ctx).pop('__chatbox__'),
-                ),
-                const SizedBox(height: 6),
-                ListTile(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  tileColor: cs.surface,
-                  title: Text('${l10n.sideDrawerChooseAssistantTitle}…'),
-                  onTap: () => Navigator.of(ctx).pop('__other__'),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: Text(l10n.backupPageCancel),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-    if (choice == null) return null;
-    if (choice == '__chatbox__') {
-      return await _ensureChatBoxAssistantId(context);
-    }
-    if (choice == '__other__') {
-      await context.read<AssistantProvider>().ensureDefaults(context);
-      return await showAssistantMoveSelector(context);
-    }
-    return null;
-  }
 
   Future<bool?> _confirmCherryImport(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
@@ -630,11 +543,11 @@ class _BackupPageState extends State<BackupPage> {
                     final mode = await _chooseImportModeDialog(context);
                     if (mode == null) return;
 
-                    final targetAssistantId = await _chooseChatboxImportTargetAssistantId(context);
-                    if (targetAssistantId == null) return;
-
                     await _runWithImportingOverlay(context, () async {
                       try {
+                        final ap = context.read<AssistantProvider>();
+                        await ap.ensureDefaults(context);
+                        final targetAssistantId = ap.assistants.isNotEmpty ? ap.assistants.first.id : await ap.addAssistant(context: context);
                         final cs = context.read<ChatService>();
                         final file = File(path);
                         final res = await ChatboxImporter.importFromChatbox(
