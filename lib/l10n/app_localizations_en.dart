@@ -524,6 +524,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditPageMcpTab => 'MCP';
 
   @override
+  String get assistantEditPageToolsTab => 'Tools';
+
+  @override
   String get assistantEditPageQuickPhraseTab => 'Quick Phrase';
 
   @override
@@ -2228,7 +2231,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint =>
-      'Requires OpenAI Responses API (enable "Responses API" in provider settings).';
+      'Requires OpenAI Responses API.';
 
   @override
   String get modelDetailSheetOpenaiCodeInterpreterTool => 'Code Interpreter';

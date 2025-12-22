@@ -1049,6 +1049,12 @@ abstract class AppLocalizations {
   /// **'MCP'**
   String get assistantEditPageMcpTab;
 
+  /// No description provided for @assistantEditPageToolsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools'**
+  String get assistantEditPageToolsTab;
+
   /// No description provided for @assistantEditPageQuickPhraseTab.
   ///
   /// In en, this message translates to:
@@ -4208,7 +4214,7 @@ abstract class AppLocalizations {
   /// No description provided for @modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint.
   ///
   /// In en, this message translates to:
-  /// **'Requires OpenAI Responses API (enable "Responses API" in provider settings).'**
+  /// **'Requires OpenAI Responses API.'**
   String get modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint;
 
   /// No description provided for @modelDetailSheetOpenaiCodeInterpreterTool.

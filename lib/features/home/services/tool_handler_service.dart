@@ -136,7 +136,9 @@ class ToolHandlerService {
     final supportsTools = isToolModel(providerKey, modelId);
 
     // Search tool (skip when Gemini built-in search is active)
-    if (settings.searchEnabled && !hasBuiltInSearch && supportsTools) {
+    // Check both global setting and assistant-specific setting
+    final searchEnabled = settings.searchEnabled && (assistant?.enableWebSearch ?? true);
+    if (searchEnabled && !hasBuiltInSearch && supportsTools) {
       toolDefs.add(SearchToolService.getToolDefinition());
     }
 
@@ -283,7 +285,9 @@ class ToolHandlerService {
 
     return (name, args) async {
       // Search tool
-      if (name == SearchToolService.toolName && settings.searchEnabled) {
+      // Check both global setting and assistant-specific setting
+      final searchEnabled = settings.searchEnabled && (assistant?.enableWebSearch ?? true);
+      if (name == SearchToolService.toolName && searchEnabled) {
         final q = (args['query'] ?? '').toString();
         return await SearchToolService.executeSearch(q, settings);
       }

@@ -27,6 +27,8 @@ class Assistant {
   // Memory features
   final bool enableMemory; // assistant memory feature switch
   final bool enableRecentChatsReference; // include recent chat titles in prompt
+  // Web search feature
+  final bool enableWebSearch; // assistant web search feature switch
   // Preset conversation messages (ordered)
   final List<PresetMessage> presetMessages;
   // Regex replacement rules
@@ -55,6 +57,7 @@ class Assistant {
     this.customBody = const <Map<String, String>>[],
     this.enableMemory = false,
     this.enableRecentChatsReference = false,
+    this.enableWebSearch = true,
     this.presetMessages = const <PresetMessage>[],
     this.regexRules = const <AssistantRegex>[],
   });
@@ -82,6 +85,7 @@ class Assistant {
     List<Map<String, String>>? customBody,
     bool? enableMemory,
     bool? enableRecentChatsReference,
+    bool? enableWebSearch,
     List<PresetMessage>? presetMessages,
     List<AssistantRegex>? regexRules,
     bool clearChatModel = false,
@@ -116,6 +120,7 @@ class Assistant {
       enableMemory: enableMemory ?? this.enableMemory,
       enableRecentChatsReference:
           enableRecentChatsReference ?? this.enableRecentChatsReference,
+      enableWebSearch: enableWebSearch ?? this.enableWebSearch,
       presetMessages: presetMessages ?? this.presetMessages,
       regexRules: regexRules ?? this.regexRules,
     );
@@ -144,6 +149,7 @@ class Assistant {
         'customBody': customBody,
         'enableMemory': enableMemory,
         'enableRecentChatsReference': enableRecentChatsReference,
+        'enableWebSearch': enableWebSearch,
         'presetMessages': PresetMessage.encodeList(presetMessages),
         'regexRules': regexRules.map((e) => e.toJson()).toList(),
     };
@@ -196,6 +202,7 @@ class Assistant {
         enableMemory: json['enableMemory'] as bool? ?? false,
         enableRecentChatsReference:
             json['enableRecentChatsReference'] as bool? ?? false,
+        enableWebSearch: json['enableWebSearch'] as bool? ?? true,
         presetMessages: (() {
           try {
             return PresetMessage.decodeList(json['presetMessages']);

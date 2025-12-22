@@ -275,6 +275,7 @@
   "assistantEditPageBasicTab": "Basic",
   "assistantEditPagePromptsTab": "Prompts",
   "assistantEditPageMcpTab": "MCP",
+  "assistantEditPageToolsTab": "Tools",
   "assistantEditPageQuickPhraseTab": "Quick Phrase",
   "assistantEditPageCustomTab": "Custom",
   "assistantEditPageRegexTab": "Regex Replace",
