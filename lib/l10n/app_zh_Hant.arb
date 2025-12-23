@@ -367,6 +367,7 @@
   "backupPageConversations": "對話",
   "backupPageMessages": "訊息",
   "chatboxImportDefaultConversationTitle": "匯入的對話",
+  "cherryImportDefaultConversationTitle": "匯入的對話",
   "chatboxImportInvalidBackupJson": "無效的 ChatBox 備份 JSON",
   "importProviderSheetErrorInvalidPrefix": "前綴無效",
   "importProviderSheetErrorInvalidJson": "無效的 JSON",

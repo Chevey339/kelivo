@@ -425,6 +425,7 @@
   "backupPageConversations": "Conversations",
   "backupPageMessages": "Messages",
   "chatboxImportDefaultConversationTitle": "Imported",
+  "cherryImportDefaultConversationTitle": "Imported",
   "chatboxImportInvalidBackupJson": "Invalid ChatBox backup JSON",
   "importProviderSheetErrorInvalidPrefix": "Invalid prefix",
   "importProviderSheetErrorInvalidJson": "Invalid JSON",

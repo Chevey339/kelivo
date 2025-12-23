@@ -2267,6 +2267,12 @@ abstract class AppLocalizations {
   /// **'Imported'**
   String get chatboxImportDefaultConversationTitle;
 
+  /// No description provided for @cherryImportDefaultConversationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported'**
+  String get cherryImportDefaultConversationTitle;
+
   /// No description provided for @chatboxImportInvalidBackupJson.
   ///
   /// In en, this message translates to:

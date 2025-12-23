@@ -38,6 +38,7 @@ class CherryImporter {
     required RestoreMode mode,
     required SettingsProvider settings,
     required ChatService chatService,
+    required String defaultConversationTitle,
   }) async {
     // 1) Load JSON from ZIP/BAK (best-effort)
     final Map<String, dynamic> root = await _readCherryBackupFile(file);
@@ -49,7 +50,11 @@ class CherryImporter {
     }
 
     // 3) Parse localStorage persist:cherry-studio (Redux persist)
-    final localStorage = (root['localStorage'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ?? const <String, dynamic>{};
+    final localStorage =
+        (root['localStorage'] as Map?)?.map(
+          (k, v) => MapEntry(k.toString(), v),
+        ) ??
+        const <String, dynamic>{};
     final persistStr = (localStorage['persist:cherry-studio'] ?? '') as String;
     if (persistStr.isEmpty) {
       throw Exception('Missing localStorage["persist:cherry-studio"]');
@@ -77,18 +82,26 @@ class CherryImporter {
       }
     } catch (_) {}
 
-    final List<dynamic> cherryProviders = (llmSlice['providers'] as List?) ?? const <dynamic>[];
+    final List<dynamic> cherryProviders =
+        (llmSlice['providers'] as List?) ?? const <dynamic>[];
     final Map<String, dynamic> assistantsRoot = assistantsSlice;
-    final List<dynamic> cherryAssistants = (assistantsRoot['assistants'] as List?) ?? const <dynamic>[];
+    final List<dynamic> cherryAssistants =
+        (assistantsRoot['assistants'] as List?) ?? const <dynamic>[];
 
     // 4) IndexedDB
-    final indexedDB = (root['indexedDB'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ?? const <String, dynamic>{};
-    final List<dynamic> cherryFiles = (indexedDB['files'] as List?) ?? const <dynamic>[];
-    final List<dynamic> cherryTopicsWithMessages = (indexedDB['topics'] as List?) ?? const <dynamic>[];
-    final List<dynamic> cherryMessageBlocks = (indexedDB['message_blocks'] as List?) ?? const <dynamic>[];
+    final indexedDB =
+        (root['indexedDB'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ??
+        const <String, dynamic>{};
+    final List<dynamic> cherryFiles =
+        (indexedDB['files'] as List?) ?? const <dynamic>[];
+    final List<dynamic> cherryTopicsWithMessages =
+        (indexedDB['topics'] as List?) ?? const <dynamic>[];
+    final List<dynamic> cherryMessageBlocks =
+        (indexedDB['message_blocks'] as List?) ?? const <dynamic>[];
 
     // Build a map of topic metadata from assistants[].topics[]
-    final Map<String, Map<String, dynamic>> topicMeta = <String, Map<String, dynamic>>{};
+    final Map<String, Map<String, dynamic>> topicMeta =
+        <String, Map<String, dynamic>>{};
     for (final a in cherryAssistants) {
       if (a is! Map) continue;
       final topics = (a['topics'] as List?) ?? const <dynamic>[];
@@ -105,15 +118,43 @@ class CherryImporter {
     }
 
     // Build a map of topicId -> messages
-    final Map<String, List<Map<String, dynamic>>> topicMessages = <String, List<Map<String, dynamic>>>{};
+    // Also keep a best-effort topic meta map from IndexedDB topics (some exports
+    // don't include assistants[].topics[] or omit assistantId/name there).
+    final Map<String, Map<String, dynamic>> topicMetaFromIndexedDb =
+        <String, Map<String, dynamic>>{};
+    final Map<String, List<Map<String, dynamic>>> topicMessages =
+        <String, List<Map<String, dynamic>>>{};
     for (final e in cherryTopicsWithMessages) {
       if (e is! Map) continue;
-      final id = (e['id'] ?? '').toString();
+      final mm = e.map((k, v) => MapEntry(k.toString(), v));
+      final id = (mm['id'] ?? '').toString();
       if (id.isEmpty) continue;
-      final msgs = (e['messages'] as List?) ?? const <dynamic>[];
+      // Meta fallback (strip messages to avoid large maps)
+      final meta = <String, dynamic>{}..addAll(mm);
+      meta.remove('messages');
+      // Some exports may use 'title' for topic name
+      if ((meta['name'] == null || meta['name'].toString().trim().isEmpty) &&
+          meta['title'] != null &&
+          meta['title'].toString().trim().isNotEmpty) {
+        meta['name'] = meta['title'].toString();
+      }
+      // Normalize assistantId variants
+      dynamic candAid = meta['assistantId'] ?? meta['assistant_id'];
+      if (candAid is Map) {
+        final m = candAid.map((k, v) => MapEntry(k.toString(), v));
+        candAid = m['id'] ?? m['assistantId'] ?? m['assistant_id'];
+      }
+      if (candAid != null && candAid.toString().trim().isNotEmpty) {
+        meta['assistantId'] = candAid.toString();
+      }
+      topicMetaFromIndexedDb[id] = meta.map(
+        (k, v) => MapEntry(k.toString(), v),
+      );
+
+      final msgs = (mm['messages'] as List?) ?? const <dynamic>[];
       topicMessages[id] = [
         for (final m in msgs)
-          if (m is Map) m.map((k, v) => MapEntry(k.toString(), v))
+          if (m is Map) m.map((k, v) => MapEntry(k.toString(), v)),
       ];
     }
 
@@ -129,22 +170,29 @@ class CherryImporter {
         final content = (b['content'] ?? '').toString();
         if (content.isNotEmpty) {
           final prev = blockTextByMessageId[messageId];
-          blockTextByMessageId[messageId] = prev == null || prev.isEmpty ? content : '$prev\n$content';
+          blockTextByMessageId[messageId] = prev == null || prev.isEmpty
+              ? content
+              : '$prev\n$content';
         }
       } else if (type == 'code') {
         final code = (b['content'] ?? '').toString();
         final lang = (b['language'] ?? '').toString();
         if (code.isNotEmpty) {
-          final fenced = '```' + (lang.isNotEmpty ? lang : '') + "\n" + code + "\n```";
+          final fenced =
+              '```' + (lang.isNotEmpty ? lang : '') + "\n" + code + "\n```";
           final prev = blockTextByMessageId[messageId];
-          blockTextByMessageId[messageId] = prev == null || prev.isEmpty ? fenced : '$prev\n$fenced';
+          blockTextByMessageId[messageId] = prev == null || prev.isEmpty
+              ? fenced
+              : '$prev\n$fenced';
         }
       } else if (type == 'error') {
         final err = (b['content'] ?? '').toString();
         if (err.isNotEmpty) {
           final tagged = '> Error\n> ' + err.replaceAll('\n', '\n> ');
           final prev = blockTextByMessageId[messageId];
-          blockTextByMessageId[messageId] = prev == null || prev.isEmpty ? tagged : '$prev\n$tagged';
+          blockTextByMessageId[messageId] = prev == null || prev.isEmpty
+              ? tagged
+              : '$prev\n$tagged';
         }
       } else if (type == 'thinking') {
         // Optional: include as a collapsible-like section in plain text
@@ -152,16 +200,57 @@ class CherryImporter {
         if (think.isNotEmpty) {
           final wrapped = '<think>\n' + think + '\n</think>';
           final prev = blockTextByMessageId[messageId];
-          blockTextByMessageId[messageId] = prev == null || prev.isEmpty ? wrapped : '$prev\n$wrapped';
+          blockTextByMessageId[messageId] = prev == null || prev.isEmpty
+              ? wrapped
+              : '$prev\n$wrapped';
         }
       }
     }
 
     // 5) Import providers into Settings (SharedPreferences)
-    final importedProviders = await _importProviders(cherryProviders, settings, mode);
+    final importedProviders = await _importProviders(
+      cherryProviders,
+      settings,
+      mode,
+    );
 
     // 6) Import assistants (persist to SharedPreferences, restart recommended)
     final importedAssistants = await _importAssistants(cherryAssistants, mode);
+
+    // Determine a stable fallback assistant id to avoid creating assistantId==null
+    // conversations (which would be treated as "global" and shown under any assistant).
+    String? fallbackAssistantId;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_assistantsKey);
+      if (raw != null && raw.isNotEmpty) {
+        final obj = jsonDecode(raw);
+        if (obj is List) {
+          for (final e in obj) {
+            if (e is Map && e['id'] != null) {
+              final id = e['id'].toString().trim();
+              if (id.isNotEmpty) {
+                fallbackAssistantId = id;
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // best-effort
+    }
+    if ((fallbackAssistantId ?? '').trim().isEmpty) {
+      // Fallback to the first assistant id from the backup itself.
+      for (final a in cherryAssistants) {
+        if (a is! Map) continue;
+        final id = (a['id'] ?? '').toString().trim();
+        if (id.isNotEmpty) {
+          fallbackAssistantId = id;
+          break;
+        }
+      }
+    }
 
     // If overwrite, clear chats/files BEFORE writing any uploads to avoid deletion later
     if (!chatService.initialized) {
@@ -174,7 +263,8 @@ class CherryImporter {
     // 7) Prepare files (only if referenced by messages)
     final filesById = <String, Map<String, dynamic>>{
       for (final f in cherryFiles)
-        if (f is Map && f['id'] != null) f['id'].toString(): f.map((k, v) => MapEntry(k.toString(), v))
+        if (f is Map && f['id'] != null)
+          f['id'].toString(): f.map((k, v) => MapEntry(k.toString(), v)),
     };
 
     // Precompute used file ids
@@ -183,7 +273,8 @@ class CherryImporter {
       for (final m in entry.value) {
         final files = (m['files'] as List?) ?? const <dynamic>[];
         for (final rf in files) {
-          if (rf is Map && rf['id'] != null) usedFileIds.add(rf['id'].toString());
+          if (rf is Map && rf['id'] != null)
+            usedFileIds.add(rf['id'].toString());
         }
       }
     }
@@ -191,27 +282,47 @@ class CherryImporter {
     // Also include files referenced by message_blocks when a 'file' object is present
     for (final b in cherryMessageBlocks) {
       if (b is! Map) continue;
-      final fileObj = (b['file'] as Map?)?.map((k, v) => MapEntry(k.toString(), v));
+      final fileObj = (b['file'] as Map?)?.map(
+        (k, v) => MapEntry(k.toString(), v),
+      );
       final fid = (fileObj?['id'] ?? '').toString();
       if (fid.isNotEmpty) usedFileIds.add(fid);
     }
 
     // Write referenced files into Documents/upload and build path map
-    final pathsByFileId = await _materializeFiles(filesById, usedFileIds, backupArchive: file);
+    final pathsByFileId = await _materializeFiles(
+      filesById,
+      usedFileIds,
+      backupArchive: file,
+    );
 
     // Build mapping of extra attachments (images/files) in message_blocks (not represented in message.files)
-    final Map<String, List<_PendingAttachmentRef>> pendingAttachmentsByMessage = <String, List<_PendingAttachmentRef>>{};
+    final Map<String, List<_PendingAttachmentRef>> pendingAttachmentsByMessage =
+        <String, List<_PendingAttachmentRef>>{};
     for (final b in cherryMessageBlocks) {
       if (b is! Map) continue;
       final type = (b['type'] ?? '').toString();
       final messageId = (b['messageId'] ?? '').toString();
       if (messageId.isEmpty) continue;
-      final fileObj = (b['file'] as Map?)?.map((k, v) => MapEntry(k.toString(), v));
+      final fileObj = (b['file'] as Map?)?.map(
+        (k, v) => MapEntry(k.toString(), v),
+      );
       final url = (b['url'] ?? '').toString();
-      final isImageType = type.toLowerCase().contains('image') || (fileObj?['type']?.toString().toLowerCase().startsWith('image') ?? false);
+      final isImageType =
+          type.toLowerCase().contains('image') ||
+          (fileObj?['type']?.toString().toLowerCase().startsWith('image') ??
+              false);
       if (fileObj != null && (fileObj['id'] ?? '').toString().isNotEmpty) {
         (pendingAttachmentsByMessage[messageId] ??= <_PendingAttachmentRef>[])
-            .add(_PendingAttachmentRef(fileId: (fileObj['id'] ?? '').toString(), name: (fileObj['origin_name'] ?? fileObj['name'] ?? '').toString(), mime: (fileObj['type'] ?? '').toString(), isImage: isImageType));
+            .add(
+              _PendingAttachmentRef(
+                fileId: (fileObj['id'] ?? '').toString(),
+                name: (fileObj['origin_name'] ?? fileObj['name'] ?? '')
+                    .toString(),
+                mime: (fileObj['type'] ?? '').toString(),
+                isImage: isImageType,
+              ),
+            );
       } else if (url.isNotEmpty) {
         if (url.startsWith('data:image')) {
           (pendingAttachmentsByMessage[messageId] ??= <_PendingAttachmentRef>[])
@@ -226,12 +337,15 @@ class CherryImporter {
     // 8) Import topics & messages into ChatService
     final convCountAndMsgCount = await _importConversations(
       topicMeta: topicMeta,
+      topicMetaFromIndexedDb: topicMetaFromIndexedDb,
       topicMessages: topicMessages,
       filePaths: pathsByFileId,
       chatService: chatService,
       mode: mode,
       blockTexts: blockTextByMessageId,
       pendingAttachmentsByMessage: pendingAttachmentsByMessage,
+      fallbackAssistantId: fallbackAssistantId,
+      defaultConversationTitle: defaultConversationTitle,
     );
 
     return CherryImportResult(
@@ -247,8 +361,6 @@ class CherryImporter {
 
   static Future<Map<String, dynamic>> _readCherryBackupFile(File file) async {
     final bytes = await file.readAsBytes();
-
-    Map<String, dynamic>? parsed;
 
     // Helper to verify structure looks like Cherry backup
     Map<String, dynamic>? _tryParseBackupJson(String text) {
@@ -274,7 +386,10 @@ class CherryImporter {
       for (final entry in archive) {
         if (!entry.isFile) continue;
         try {
-          final content = utf8.decode(entry.content as List<int>, allowMalformed: true);
+          final content = utf8.decode(
+            entry.content as List<int>,
+            allowMalformed: true,
+          );
           final obj = _tryParseBackupJson(content);
           if (obj != null) return obj;
         } catch (_) {
@@ -294,7 +409,11 @@ class CherryImporter {
     throw Exception('Unable to read Cherry backup file');
   }
 
-  static Future<int> _importProviders(List<dynamic> cherryProviders, SettingsProvider settings, RestoreMode mode) async {
+  static Future<int> _importProviders(
+    List<dynamic> cherryProviders,
+    SettingsProvider settings,
+    RestoreMode mode,
+  ) async {
     // Build imported map id -> ProviderConfig JSON-like
     final imported = <String, Map<String, dynamic>>{};
 
@@ -343,7 +462,9 @@ class CherryImporter {
         } else {
           // If it's OpenAI/Claude/Google and no trailing slash, append default version unless a suffix already exists.
           final lower = base.toLowerCase();
-          final hasVersionSuffix = RegExp(r'/v\d([a-z0-9._-]+)?$').hasMatch(lower);
+          final hasVersionSuffix = RegExp(
+            r'/v\d([a-z0-9._-]+)?$',
+          ).hasMatch(lower);
           if (!hasVersionSuffix) {
             if (kind == 'google') {
               base = '$base/v1beta';
@@ -362,12 +483,16 @@ class CherryImporter {
         'apiKey': apiKey,
         'baseUrl': base.isNotEmpty
             ? base
-            : (kind == 'google' ? 'https://generativelanguage.googleapis.com/v1beta' : (kind == 'claude' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1')),
+            : (kind == 'google'
+                  ? 'https://generativelanguage.googleapis.com/v1beta'
+                  : (kind == 'claude'
+                        ? 'https://api.anthropic.com/v1'
+                        : 'https://api.openai.com/v1')),
         'providerType': kind == 'openai'
             ? 'openai'
             : kind == 'google'
-                ? 'google'
-                : 'claude',
+            ? 'google'
+            : 'claude',
         'chatPath': kind == 'openai' ? '/chat/completions' : null,
         'useResponseApi': kind == 'openai' ? false : null,
         'vertexAI': kind == 'google' ? false : null,
@@ -411,7 +536,9 @@ class CherryImporter {
         merged[entry.key] = entry.value;
       } else {
         // Update with non-empty fields from imported
-        final cur = (merged[entry.key] as Map).map((k, v) => MapEntry(k.toString(), v));
+        final cur = (merged[entry.key] as Map).map(
+          (k, v) => MapEntry(k.toString(), v),
+        );
         final inc = entry.value;
         final next = Map<String, dynamic>.from(cur);
         void putIfNotEmpty(String k) {
@@ -420,6 +547,7 @@ class CherryImporter {
           if (v is String && v.trim().isEmpty) return;
           next[k] = v;
         }
+
         for (final k in inc.keys) {
           putIfNotEmpty(k);
         }
@@ -430,7 +558,8 @@ class CherryImporter {
     await prefs.setString(_providersKey, jsonEncode(merged));
 
     // Merge providers order: append new ids at end, keep existing order
-    final existedOrder = prefs.getStringList(_providersOrderKey) ?? const <String>[];
+    final existedOrder =
+        prefs.getStringList(_providersOrderKey) ?? const <String>[];
     final orderSet = existedOrder.toList();
     for (final id in imported.keys) {
       if (!orderSet.contains(id)) orderSet.add(id);
@@ -440,7 +569,10 @@ class CherryImporter {
     return imported.length;
   }
 
-  static Future<int> _importAssistants(List<dynamic> cherryAssistants, RestoreMode mode) async {
+  static Future<int> _importAssistants(
+    List<dynamic> cherryAssistants,
+    RestoreMode mode,
+  ) async {
     // Map to our Assistant JSON list (as stored by Assistant.encodeList)
     final out = <Map<String, dynamic>>[];
     for (final a in cherryAssistants) {
@@ -449,15 +581,21 @@ class CherryImporter {
       if (id.isEmpty) continue;
       final name = (a['name'] ?? id).toString();
       final prompt = (a['prompt'] ?? '').toString();
-      final settings = (a['settings'] as Map?)?.map((k, v) => MapEntry(k.toString(), v));
-      final model = (a['model'] as Map?)?.map((k, v) => MapEntry(k.toString(), v));
+      final settings = (a['settings'] as Map?)?.map(
+        (k, v) => MapEntry(k.toString(), v),
+      );
+      final model = (a['model'] as Map?)?.map(
+        (k, v) => MapEntry(k.toString(), v),
+      );
 
       final temperature = (settings?['temperature'] as num?)?.toDouble();
       final topP = (settings?['topP'] as num?)?.toDouble();
       final ctxCount = (settings?['contextCount'] as num?)?.toInt();
       final streamOutput = settings?['streamOutput'] as bool?;
       final enableMaxTokens = settings?['enableMaxTokens'] as bool? ?? false;
-      final maxTokens = enableMaxTokens ? (settings?['maxTokens'] as num?)?.toInt() : null;
+      final maxTokens = enableMaxTokens
+          ? (settings?['maxTokens'] as num?)?.toInt()
+          : null;
 
       final json = <String, dynamic>{
         'id': id,
@@ -496,11 +634,13 @@ class CherryImporter {
     List<dynamic> existing = const <dynamic>[];
     try {
       final raw = prefs.getString(_assistantsKey);
-      if (raw != null && raw.isNotEmpty) existing = jsonDecode(raw) as List<dynamic>;
+      if (raw != null && raw.isNotEmpty)
+        existing = jsonDecode(raw) as List<dynamic>;
     } catch (_) {}
     final byId = <String, Map<String, dynamic>>{
       for (final e in existing)
-        if (e is Map && e['id'] != null) e['id'].toString(): e.map((k, v) => MapEntry(k.toString(), v))
+        if (e is Map && e['id'] != null)
+          e['id'].toString(): e.map((k, v) => MapEntry(k.toString(), v)),
     };
     for (final a in out) {
       final id = a['id'] as String;
@@ -512,7 +652,8 @@ class CherryImporter {
         final incPrompt = (a['systemPrompt'] as String?)?.trim() ?? '';
         if (incPrompt.isNotEmpty) local['systemPrompt'] = incPrompt;
         // Update model fields if provided
-        if (a['chatModelProvider'] != null) local['chatModelProvider'] = a['chatModelProvider'];
+        if (a['chatModelProvider'] != null)
+          local['chatModelProvider'] = a['chatModelProvider'];
         if (a['chatModelId'] != null) local['chatModelId'] = a['chatModelId'];
       }
     }
@@ -531,18 +672,22 @@ class CherryImporter {
 
     // If a ZIP is provided, index entries under common folders for quick lookup
     Map<String, ArchiveFile>? filesIndexByBase;
-    Map<String, ArchiveFile>? filesIndexByRel;  // normalized rel path like files/x.pdf or data/files/uuid.png
-    Map<String, ArchiveFile>? filesIndexById;   // id (without ext) -> entry
-    Map<String, String>? diskFilesIndexByBase;  // basename -> absolute path (if importing from extracted folder)
-    Map<String, String>? diskFilesIndexByRel;   // normalized rel path -> absolute path
-    Map<String, String>? diskFilesIndexById;    // id (without ext) -> absolute path
+    Map<String, ArchiveFile>?
+    filesIndexByRel; // normalized rel path like files/x.pdf or data/files/uuid.png
+    Map<String, ArchiveFile>? filesIndexById; // id (without ext) -> entry
+    Map<String, String>?
+    diskFilesIndexByBase; // basename -> absolute path (if importing from extracted folder)
+    Map<String, String>?
+    diskFilesIndexByRel; // normalized rel path -> absolute path
+    Map<String, String>?
+    diskFilesIndexById; // id (without ext) -> absolute path
     if (backupArchive != null) {
       try {
         final bytes = await backupArchive.readAsBytes();
         final archive = ZipDecoder().decodeBytes(bytes, verify: false);
         final byBase = <String, ArchiveFile>{};
-        final byRel  = <String, ArchiveFile>{};
-        final byId   = <String, ArchiveFile>{};
+        final byRel = <String, ArchiveFile>{};
+        final byId = <String, ArchiveFile>{};
         final uuidLike = RegExp(r'^[0-9a-fA-F-]{10,}$');
         for (final e in archive) {
           if (!e.isFile) continue;
@@ -563,14 +708,16 @@ class CherryImporter {
             byRel[rel] = e;
           }
           // by id without ext
-          final noExt = base.contains('.') ? base.substring(0, base.lastIndexOf('.')) : base;
+          final noExt = base.contains('.')
+              ? base.substring(0, base.lastIndexOf('.'))
+              : base;
           if (uuidLike.hasMatch(noExt)) {
             byId[noExt] = e;
           }
         }
         if (byBase.isNotEmpty) filesIndexByBase = byBase;
-        if (byRel.isNotEmpty)  filesIndexByRel  = byRel;
-        if (byId.isNotEmpty)   filesIndexById   = byId;
+        if (byRel.isNotEmpty) filesIndexByRel = byRel;
+        if (byId.isNotEmpty) filesIndexById = byId;
       } catch (_) {
         // not a zip, ignore
       }
@@ -583,8 +730,8 @@ class CherryImporter {
           Directory(p.join(parent.path, 'files')),
         ];
         final byBase = <String, String>{};
-        final byRel  = <String, String>{};
-        final byId   = <String, String>{};
+        final byRel = <String, String>{};
+        final byId = <String, String>{};
         final uuidLike = RegExp(r'^[0-9a-fA-F-]{10,}$');
         for (final dir in candidates) {
           if (!await dir.exists()) continue;
@@ -604,15 +751,17 @@ class CherryImporter {
               final rel = l.substring(idx + 1);
               byRel[rel] = abs;
             }
-            final noExt = base.contains('.') ? base.substring(0, base.lastIndexOf('.')) : base;
+            final noExt = base.contains('.')
+                ? base.substring(0, base.lastIndexOf('.'))
+                : base;
             if (uuidLike.hasMatch(noExt)) {
               byId[noExt] = abs;
             }
           }
         }
         if (byBase.isNotEmpty) diskFilesIndexByBase = byBase;
-        if (byRel.isNotEmpty)  diskFilesIndexByRel  = byRel;
-        if (byId.isNotEmpty)   diskFilesIndexById   = byId;
+        if (byRel.isNotEmpty) diskFilesIndexByRel = byRel;
+        if (byId.isNotEmpty) diskFilesIndexById = byId;
       } catch (_) {}
     }
 
@@ -622,9 +771,10 @@ class CherryImporter {
       if (meta == null) continue;
       final name = (meta['origin_name'] ?? meta['name'] ?? 'file').toString();
       final ext = (meta['ext'] ?? '').toString();
-      final mime = (meta['type'] ?? '').toString();
       final safeName = name.replaceAll(RegExp(r'[/\\\0]'), '_');
-      final fn = safeName.isNotEmpty ? safeName : (ext.isNotEmpty ? 'file.$ext' : 'file');
+      final fn = safeName.isNotEmpty
+          ? safeName
+          : (ext.isNotEmpty ? 'file.$ext' : 'file');
       final fileName = 'cherry_${id}_$fn';
       final outPath = p.join(uploadDir.path, fileName);
 
@@ -670,21 +820,29 @@ class CherryImporter {
           final relKeys = <String>{
             lowerRel,
             lowerRel.startsWith('files/') ? lowerRel : 'files/$lowerRel',
-            lowerRel.startsWith('data/files/') ? lowerRel : 'data/files/$lowerRel',
+            lowerRel.startsWith('data/files/')
+                ? lowerRel
+                : 'data/files/$lowerRel',
           };
           bool done = false;
           for (final key in relKeys) {
-            if (!done && filesIndexByRel != null && filesIndexByRel.containsKey(key)) {
+            if (!done &&
+                filesIndexByRel != null &&
+                filesIndexByRel.containsKey(key)) {
               final entry = filesIndexByRel[key]!;
               final bytes = entry.content as List<int>;
               await File(outPath).writeAsBytes(bytes);
-              result[id] = outPath; done = true;
+              result[id] = outPath;
+              done = true;
             }
-            if (!done && diskFilesIndexByRel != null && diskFilesIndexByRel.containsKey(key)) {
+            if (!done &&
+                diskFilesIndexByRel != null &&
+                diskFilesIndexByRel.containsKey(key)) {
               final src = diskFilesIndexByRel[key]!;
               final bytes = await File(src).readAsBytes();
               await File(outPath).writeAsBytes(bytes);
-              result[id] = outPath; done = true;
+              result[id] = outPath;
+              done = true;
             }
             if (done) break;
           }
@@ -695,23 +853,32 @@ class CherryImporter {
       // 2) by filename candidates: name, origin_name, basename(path)
       try {
         final candidates = <String>{};
-        void add(String? s) { if (s != null && s.trim().isNotEmpty) candidates.add(p.basename(s)); }
+        void add(String? s) {
+          if (s != null && s.trim().isNotEmpty) candidates.add(p.basename(s));
+        }
+
         add(meta['name']?.toString());
         add(meta['origin_name']?.toString());
         add(meta['path']?.toString());
         bool done = false;
         for (final base in candidates) {
-          if (!done && filesIndexByBase != null && filesIndexByBase.containsKey(base)) {
+          if (!done &&
+              filesIndexByBase != null &&
+              filesIndexByBase.containsKey(base)) {
             final entry = filesIndexByBase[base]!;
             final bytes = entry.content as List<int>;
             await File(outPath).writeAsBytes(bytes);
-            result[id] = outPath; done = true;
+            result[id] = outPath;
+            done = true;
           }
-          if (!done && diskFilesIndexByBase != null && diskFilesIndexByBase.containsKey(base)) {
+          if (!done &&
+              diskFilesIndexByBase != null &&
+              diskFilesIndexByBase.containsKey(base)) {
             final src = diskFilesIndexByBase[base]!;
             final bytes = await File(src).readAsBytes();
             await File(outPath).writeAsBytes(bytes);
-            result[id] = outPath; done = true;
+            result[id] = outPath;
+            done = true;
           }
           if (done) break;
         }
@@ -732,25 +899,30 @@ class CherryImporter {
           final entry = filesIndexById[id]!;
           final bytes = entry.content as List<int>;
           await File(outPath).writeAsBytes(bytes);
-          result[id] = outPath; continue;
+          result[id] = outPath;
+          continue;
         }
         if (filesIndexByBase != null && filesIndexByBase.containsKey(idPlus)) {
           final entry = filesIndexByBase[idPlus]!;
           final bytes = entry.content as List<int>;
           await File(outPath).writeAsBytes(bytes);
-          result[id] = outPath; continue;
+          result[id] = outPath;
+          continue;
         }
         if (diskFilesIndexById != null && diskFilesIndexById.containsKey(id)) {
           final src = diskFilesIndexById[id]!;
           final bytes = await File(src).readAsBytes();
           await File(outPath).writeAsBytes(bytes);
-          result[id] = outPath; continue;
+          result[id] = outPath;
+          continue;
         }
-        if (diskFilesIndexByBase != null && diskFilesIndexByBase.containsKey(idPlus)) {
+        if (diskFilesIndexByBase != null &&
+            diskFilesIndexByBase.containsKey(idPlus)) {
           final src = diskFilesIndexByBase[idPlus]!;
           final bytes = await File(src).readAsBytes();
           await File(outPath).writeAsBytes(bytes);
-          result[id] = outPath; continue;
+          result[id] = outPath;
+          continue;
         }
       } catch (_) {}
 
@@ -762,12 +934,16 @@ class CherryImporter {
   // Returns (conversations, messages, extraFilesSaved)
   static Future<(int, int, int)> _importConversations({
     required Map<String, Map<String, dynamic>> topicMeta,
+    required Map<String, Map<String, dynamic>> topicMetaFromIndexedDb,
     required Map<String, List<Map<String, dynamic>>> topicMessages,
     required Map<String, String> filePaths,
     required ChatService chatService,
     required RestoreMode mode,
     required Map<String, String> blockTexts,
-    required Map<String, List<_PendingAttachmentRef>> pendingAttachmentsByMessage,
+    required Map<String, List<_PendingAttachmentRef>>
+    pendingAttachmentsByMessage,
+    required String? fallbackAssistantId,
+    required String defaultConversationTitle,
   }) async {
     if (!chatService.initialized) await chatService.init();
 
@@ -786,20 +962,53 @@ class CherryImporter {
     int msgCount = 0;
     int extraSaved = 0; // number of files saved from base64/data urls
 
+    bool _parseBool(dynamic v) {
+      if (v is bool) return v;
+      if (v is num) return v != 0;
+      if (v is String) {
+        final t = v.trim().toLowerCase();
+        if (t == 'true' || t == '1' || t == 'yes' || t == 'y') return true;
+        if (t == 'false' || t == '0' || t == 'no' || t == 'n') return false;
+      }
+      return false;
+    }
+
+    String _resolveAssistantId(Map<String, dynamic> meta) {
+      dynamic cand = meta['assistantId'] ?? meta['assistant_id'];
+      if (cand is Map) {
+        final m = cand.map((k, v) => MapEntry(k.toString(), v));
+        cand = m['id'] ?? m['assistantId'] ?? m['assistant_id'];
+      }
+      final s = (cand ?? '').toString().trim();
+      if (s.isNotEmpty) return s;
+      final fb = (fallbackAssistantId ?? '').trim();
+      if (fb.isNotEmpty) return fb;
+      // Last resort: avoid null (null would be treated as global and shown everywhere).
+      return 'orphan-imported';
+    }
+
     for (final entry in topicMessages.entries) {
       final topicId = entry.key;
       final msgsRaw = entry.value;
-      final meta = topicMeta[topicId] ?? const <String, dynamic>{};
-      final title = (meta['name'] ?? 'Imported').toString();
-      final pinned = meta['pinned'] as bool? ?? false;
-      final assistantId = (meta['assistantId'] ?? '').toString().trim().isEmpty ? null : meta['assistantId'].toString();
+      final meta =
+          topicMeta[topicId] ??
+          topicMetaFromIndexedDb[topicId] ??
+          const <String, dynamic>{};
+      final rawTitle = (meta['name'] ?? meta['title'] ?? '').toString().trim();
+      final title = rawTitle.isNotEmpty ? rawTitle : defaultConversationTitle;
+      final pinned = _parseBool(meta['pinned'] ?? meta['isPinned']);
+      final assistantId = _resolveAssistantId(meta);
       // created/updated fallback from messages
       DateTime createdAt;
       DateTime updatedAt;
-      try { createdAt = DateTime.parse((meta['createdAt'] ?? '').toString()); } catch (_) {
+      try {
+        createdAt = DateTime.parse((meta['createdAt'] ?? '').toString());
+      } catch (_) {
         createdAt = DateTime.now();
       }
-      try { updatedAt = DateTime.parse((meta['updatedAt'] ?? '').toString()); } catch (_) {
+      try {
+        updatedAt = DateTime.parse((meta['updatedAt'] ?? '').toString());
+      } catch (_) {
         updatedAt = createdAt;
       }
 
@@ -808,9 +1017,12 @@ class CherryImporter {
       for (final m in msgsRaw) {
         final msgId = (m['id'] ?? '').toString();
         if (msgId.isEmpty) continue;
-        if (mode == RestoreMode.merge && existingMsgIds.contains(msgId)) continue;
+        if (mode == RestoreMode.merge && existingMsgIds.contains(msgId))
+          continue;
         final roleRaw = (m['role'] ?? 'user').toString();
-        final role = (roleRaw == 'system') ? 'assistant' : roleRaw; // our schema only supports 'user'|'assistant'
+        final role = (roleRaw == 'system')
+            ? 'assistant'
+            : roleRaw; // our schema only supports 'user'|'assistant'
         // Prefer message.content; if empty, fallback to reconstructed blocks
         String content = '';
         final rawContent = m['content'];
@@ -823,11 +1035,24 @@ class CherryImporter {
           content = (blockTexts[msgId] ?? '').toString();
         }
         DateTime ts;
-        try { ts = DateTime.parse((m['createdAt'] ?? '').toString()); } catch (_) { ts = DateTime.now(); }
+        try {
+          ts = DateTime.parse((m['createdAt'] ?? '').toString());
+        } catch (_) {
+          ts = DateTime.now();
+        }
 
-        final modelId = (m['modelId'] ?? (m['model'] is Map ? (m['model']['id'] ?? '').toString() : null)) as String?;
-        final providerId = (m['model'] is Map ? (m['model']['provider'] ?? '').toString() : null);
-        final usage = (m['usage'] as Map?)?.map((k, v) => MapEntry(k.toString(), v));
+        final modelId =
+            (m['modelId'] ??
+                    (m['model'] is Map
+                        ? (m['model']['id'] ?? '').toString()
+                        : null))
+                as String?;
+        final providerId = (m['model'] is Map
+            ? (m['model']['provider'] ?? '').toString()
+            : null);
+        final usage = (m['usage'] as Map?)?.map(
+          (k, v) => MapEntry(k.toString(), v),
+        );
         final totalTokens = (usage?['total_tokens'] as num?)?.toInt();
 
         // Attachments -> appended as user-style markers or assistant markdown
@@ -841,40 +1066,84 @@ class CherryImporter {
           final mime = (f['type'] ?? '').toString();
           final savedPath = filePaths[fid];
           if (savedPath != null && savedPath.isNotEmpty) {
-            final isImage = mime.toLowerCase().startsWith('image') || (name.toLowerCase().contains('.') && RegExp(r"\.(png|jpg|jpeg|gif|webp)").hasMatch(name.toLowerCase()));
-            attachmentLines.add(_formatAttachmentLine(role, isImage, savedPath, name, mime));
+            final isImage =
+                mime.toLowerCase().startsWith('image') ||
+                (name.toLowerCase().contains('.') &&
+                    RegExp(
+                      r"\.(png|jpg|jpeg|gif|webp)",
+                    ).hasMatch(name.toLowerCase()));
+            attachmentLines.add(
+              _formatAttachmentLine(role, isImage, savedPath, name, mime),
+            );
           } else {
             // Fallback to URL if present (no download)
             final url = (f['url'] ?? '').toString();
             if (url.isNotEmpty) {
-              final isImage = url.toLowerCase().contains(RegExp(r"\.(png|jpg|jpeg|gif|webp)$"));
-              attachmentLines.add(_formatAttachmentLine(role, isImage, url, name, mime));
+              final isImage = url.toLowerCase().contains(
+                RegExp(r"\.(png|jpg|jpeg|gif|webp)$"),
+              );
+              attachmentLines.add(
+                _formatAttachmentLine(role, isImage, url, name, mime),
+              );
             }
           }
         }
 
         // Add images referenced by message blocks (image) and message.metadata.generateImageResponse
-        final extraAtt = pendingAttachmentsByMessage[msgId] ?? const <_PendingAttachmentRef>[];
+        final extraAtt =
+            pendingAttachmentsByMessage[msgId] ??
+            const <_PendingAttachmentRef>[];
         for (final ref in extraAtt) {
           if (ref.fileId != null) {
             final savedPath = filePaths[ref.fileId!];
             if (savedPath != null) {
-              attachmentLines.add(_formatAttachmentLine(role, ref.isImage, savedPath, ref.name ?? (ref.isImage ? 'image' : 'file'), ref.mime ?? (ref.isImage ? 'image/png' : 'application/octet-stream')));
+              attachmentLines.add(
+                _formatAttachmentLine(
+                  role,
+                  ref.isImage,
+                  savedPath,
+                  ref.name ?? (ref.isImage ? 'image' : 'file'),
+                  ref.mime ??
+                      (ref.isImage ? 'image/png' : 'application/octet-stream'),
+                ),
+              );
             }
           } else if (ref.dataUrl != null) {
             final savedPath = await _saveDataUrlToUpload(ref.dataUrl!);
             if (savedPath != null) {
               extraSaved += 1;
-              attachmentLines.add(_formatAttachmentLine(role, ref.isImage, savedPath, ref.name ?? (ref.isImage ? 'image' : 'file'), ref.mime ?? (ref.isImage ? 'image/png' : 'application/octet-stream')));
+              attachmentLines.add(
+                _formatAttachmentLine(
+                  role,
+                  ref.isImage,
+                  savedPath,
+                  ref.name ?? (ref.isImage ? 'image' : 'file'),
+                  ref.mime ??
+                      (ref.isImage ? 'image/png' : 'application/octet-stream'),
+                ),
+              );
             }
           } else if (ref.url != null && ref.url!.isNotEmpty) {
-            attachmentLines.add(_formatAttachmentLine(role, ref.isImage, ref.url!, ref.name ?? (ref.isImage ? 'image' : 'file'), ref.mime ?? (ref.isImage ? 'image/png' : 'application/octet-stream')));
+            attachmentLines.add(
+              _formatAttachmentLine(
+                role,
+                ref.isImage,
+                ref.url!,
+                ref.name ?? (ref.isImage ? 'image' : 'file'),
+                ref.mime ??
+                    (ref.isImage ? 'image/png' : 'application/octet-stream'),
+              ),
+            );
           }
         }
 
         // generateImageResponse in metadata
-        final metadata = (m['metadata'] as Map?)?.map((k, v) => MapEntry(k.toString(), v));
-        final gen = (metadata?['generateImageResponse'] as Map?)?.map((k, v) => MapEntry(k.toString(), v));
+        final metadata = (m['metadata'] as Map?)?.map(
+          (k, v) => MapEntry(k.toString(), v),
+        );
+        final gen = (metadata?['generateImageResponse'] as Map?)?.map(
+          (k, v) => MapEntry(k.toString(), v),
+        );
         if (gen != null) {
           final imgs = (gen['images'] as List?) ?? const <dynamic>[];
           for (final item in imgs) {
@@ -882,13 +1151,39 @@ class CherryImporter {
             if (s.isEmpty) continue;
             if (s.startsWith('data:image')) {
               final saved = await _saveDataUrlToUpload(s);
-              if (saved != null) { extraSaved += 1; attachmentLines.add(_formatAttachmentLine(role, true, saved, 'image', 'image/png')); }
+              if (saved != null) {
+                extraSaved += 1;
+                attachmentLines.add(
+                  _formatAttachmentLine(
+                    role,
+                    true,
+                    saved,
+                    'image',
+                    'image/png',
+                  ),
+                );
+              }
             } else if (s.startsWith('http://') || s.startsWith('https://')) {
-              attachmentLines.add(_formatAttachmentLine(role, true, s, 'image', 'image/png'));
+              attachmentLines.add(
+                _formatAttachmentLine(role, true, s, 'image', 'image/png'),
+              );
             } else {
               // raw base64 without prefix
-              final saved = await _saveDataUrlToUpload('data:image/png;base64,$s');
-              if (saved != null) { extraSaved += 1; attachmentLines.add(_formatAttachmentLine(role, true, saved, 'image', 'image/png')); }
+              final saved = await _saveDataUrlToUpload(
+                'data:image/png;base64,$s',
+              );
+              if (saved != null) {
+                extraSaved += 1;
+                attachmentLines.add(
+                  _formatAttachmentLine(
+                    role,
+                    true,
+                    saved,
+                    'image',
+                    'image/png',
+                  ),
+                );
+              }
             }
           }
         }
@@ -901,25 +1196,39 @@ class CherryImporter {
               final saved = await _saveDataUrlToUpload(du);
               if (saved != null) {
                 extraSaved += 1;
-                attachmentLines.add(_formatAttachmentLine(role, true, saved, 'image', 'image/png'));
+                attachmentLines.add(
+                  _formatAttachmentLine(
+                    role,
+                    true,
+                    saved,
+                    'image',
+                    'image/png',
+                  ),
+                );
               }
             }
             // Optionally strip the base64 blobs from content to avoid giant text blobs
             content = _stripDataImageUrls(content);
           }
         }
-        final mergedContent = attachmentLines.isEmpty ? content : (content.isEmpty ? attachmentLines.join('\n') : '$content\n${attachmentLines.join('\n')}' );
+        final mergedContent = attachmentLines.isEmpty
+            ? content
+            : (content.isEmpty
+                  ? attachmentLines.join('\n')
+                  : '$content\n${attachmentLines.join('\n')}');
 
-        messages.add(ChatMessage(
-          id: msgId,
-          role: role,
-          content: mergedContent,
-          timestamp: ts,
-          modelId: modelId,
-          providerId: providerId,
-          totalTokens: totalTokens,
-          conversationId: topicId,
-        ));
+        messages.add(
+          ChatMessage(
+            id: msgId,
+            role: role,
+            content: mergedContent,
+            timestamp: ts,
+            modelId: modelId,
+            providerId: providerId,
+            totalTokens: totalTokens,
+            conversationId: topicId,
+          ),
+        );
       }
 
       // Derive timestamps if missing
@@ -929,12 +1238,35 @@ class CherryImporter {
         updatedAt = times.last;
       }
 
+      // Skip importing empty conversations to match Chatbox import behavior.
+      // Still bind an existing unowned conversation (assistantId == null/empty) in merge mode
+      // to avoid it being treated as a "global" chat shown under any assistant.
+      if (mode == RestoreMode.merge && existingConvIds.contains(topicId)) {
+        final existed = chatService.getConversation(topicId);
+        if (existed != null) {
+          final rawAid = (existed.assistantId ?? '').trim();
+          if (rawAid.isEmpty) {
+            existed.assistantId = assistantId;
+            await existed.save();
+          }
+        }
+      }
+      if (messages.isEmpty) {
+        continue;
+      }
+
       // Persist
       if (mode == RestoreMode.merge && existingConvIds.contains(topicId)) {
         // Only add new messages
         for (final m in messages) {
           await chatService.addMessageDirectly(topicId, m);
           msgCount += 1;
+        }
+        // Keep conversation recency in sync with imported messages.
+        final existed = chatService.getConversation(topicId);
+        if (existed != null && updatedAt.isAfter(existed.updatedAt)) {
+          existed.updatedAt = updatedAt;
+          await existed.save();
         }
       } else {
         final conv = Conversation(
@@ -954,7 +1286,13 @@ class CherryImporter {
     return (convCount, msgCount, extraSaved);
   }
 
-  static String _formatAttachmentLine(String role, bool isImage, String target, String name, String mime) {
+  static String _formatAttachmentLine(
+    String role,
+    bool isImage,
+    String target,
+    String name,
+    String mime,
+  ) {
     if (role == 'assistant') {
       if (isImage) {
         return '![]($target)';
@@ -974,12 +1312,16 @@ class CherryImporter {
   }
 
   static List<String> _extractDataImageUrls(String text) {
-    final re = RegExp(r'data:image\/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+\/\=\r\n]+');
+    final re = RegExp(
+      r'data:image\/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+\/\=\r\n]+',
+    );
     return re.allMatches(text).map((m) => m.group(0)!).toList();
   }
 
   static String _stripDataImageUrls(String text) {
-    final re = RegExp(r'data:image\/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+\/\=\r\n]+');
+    final re = RegExp(
+      r'data:image\/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+\/\=\r\n]+',
+    );
     return text.replaceAll(re, '');
   }
 
@@ -1015,7 +1357,8 @@ class CherryImporter {
         default:
           ext = 'png';
       }
-      final fname = 'cherry_img_${DateTime.now().millisecondsSinceEpoch}_${bytes.length}.$ext';
+      final fname =
+          'cherry_img_${DateTime.now().millisecondsSinceEpoch}_${bytes.length}.$ext';
       final out = File(p.join(upload.path, fname));
       await out.writeAsBytes(bytes);
       return out.path;
@@ -1032,5 +1375,12 @@ class _PendingAttachmentRef {
   final String? name;
   final String? mime;
   final bool isImage;
-  const _PendingAttachmentRef({this.fileId, this.dataUrl, this.url, this.name, this.mime, this.isImage = true});
+  const _PendingAttachmentRef({
+    this.fileId,
+    this.dataUrl,
+    this.url,
+    this.name,
+    this.mime,
+    this.isImage = true,
+  });
 }

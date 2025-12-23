@@ -1111,6 +1111,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatboxImportDefaultConversationTitle => '导入的会话';
 
   @override
+  String get cherryImportDefaultConversationTitle => '导入的会话';
+
+  @override
   String get chatboxImportInvalidBackupJson => '无效的 ChatBox 备份 JSON';
 
   @override
@@ -4464,6 +4467,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatboxImportDefaultConversationTitle => '导入的会话';
 
   @override
+  String get cherryImportDefaultConversationTitle => '导入的会话';
+
+  @override
   String get chatboxImportInvalidBackupJson => '无效的 ChatBox 备份 JSON';
 
   @override
@@ -7815,6 +7821,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatboxImportDefaultConversationTitle => '匯入的對話';
+
+  @override
+  String get cherryImportDefaultConversationTitle => '匯入的對話';
 
   @override
   String get chatboxImportInvalidBackupJson => '無效的 ChatBox 備份 JSON';

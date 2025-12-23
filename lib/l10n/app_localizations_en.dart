@@ -1143,6 +1143,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatboxImportDefaultConversationTitle => 'Imported';
 
   @override
+  String get cherryImportDefaultConversationTitle => 'Imported';
+
+  @override
   String get chatboxImportInvalidBackupJson => 'Invalid ChatBox backup JSON';
 
   @override
