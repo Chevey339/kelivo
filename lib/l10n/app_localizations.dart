@@ -2309,6 +2309,12 @@ abstract class AppLocalizations {
   /// **'QR not detected'**
   String get importProviderSheetErrorQrNotDetected;
 
+  /// No description provided for @importProviderSheetErrorUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown error'**
+  String get importProviderSheetErrorUnknown;
+
   /// No description provided for @importProviderSheetErrorUnknownProviderType.
   ///
   /// In en, this message translates to:

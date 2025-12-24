@@ -35,7 +35,11 @@ class _ImportProviderException implements Exception {
       'ImportProviderException($error${detail == null ? '' : ': $detail'})';
 }
 
-String _localizeImportProviderError(AppLocalizations l10n, Object e) {
+String _localizeImportProviderError(
+  AppLocalizations l10n,
+  Object e, [
+  StackTrace? st,
+]) {
   if (e is _ImportProviderException) {
     switch (e.error) {
       case _ImportProviderError.invalidPrefix:
@@ -77,7 +81,16 @@ String _localizeImportProviderError(AppLocalizations l10n, Object e) {
     return l10n.importProviderSheetErrorUnsupportedFormat;
   if (s == 'Invalid prefix') return l10n.importProviderSheetErrorInvalidPrefix;
 
-  return s;
+  // Unknown error: do not expose raw exception strings to the user.
+  FlutterError.reportError(
+    FlutterErrorDetails(
+      exception: e,
+      stack: st,
+      library: 'import_provider_sheet',
+      context: ErrorDescription('Import provider failed (unknown error)'),
+    ),
+  );
+  return l10n.importProviderSheetErrorUnknown;
 }
 
 List<_ImportResult> _decodeChatboxJson(BuildContext context, String s) {
@@ -357,7 +370,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: cs.onSurface.withOpacity(0.2),
+                        color: cs.onSurface.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -384,6 +397,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                             icon: Lucide.Camera,
                             color: cs.onSurface,
                             size: 22,
+                            haptics: true,
                             semanticLabel:
                                 l10n.importProviderSheetScanQrTooltip,
                             onTap: () async {
@@ -452,10 +466,11 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                       ),
                                   type: NotificationType.success,
                                 );
-                              } catch (e) {
+                              } catch (e, st) {
                                 final err = _localizeImportProviderError(
                                   l10n,
                                   e,
+                                  st,
                                 );
                                 showAppSnackBar(
                                   ctx,
@@ -475,6 +490,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                             icon: Lucide.Image,
                             color: cs.onSurface,
                             size: 22,
+                            haptics: true,
                             semanticLabel:
                                 l10n.importProviderSheetFromGalleryTooltip,
                             onTap: () async {
@@ -486,26 +502,21 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                 );
                                 if (img == null) return;
                                 final scanner = MobileScannerController();
-                                final result = await scanner.analyzeImage(
-                                  img.path,
-                                );
                                 String? code;
-                                if (result != null) {
-                                  try {
-                                    // dynamic access to barcodes for compatibility
-                                    final bars =
-                                        (result as dynamic).barcodes as List?;
-                                    if (bars != null) {
-                                      for (final b in bars) {
-                                        final v =
-                                            (b as dynamic).rawValue as String?;
-                                        if (v != null && v.isNotEmpty) {
-                                          code = v;
-                                          break;
-                                        }
-                                      }
+                                try {
+                                  final BarcodeCapture? capture = await scanner
+                                      .analyzeImage(img.path);
+                                  for (final barcode
+                                      in (capture?.barcodes ??
+                                          const <Barcode>[])) {
+                                    final v = barcode.rawValue;
+                                    if (v != null && v.isNotEmpty) {
+                                      code = v;
+                                      break;
                                     }
-                                  } catch (_) {}
+                                  }
+                                } finally {
+                                  scanner.dispose();
                                 }
                                 if (code == null || code.isEmpty) {
                                   throw const _ImportProviderException(
@@ -569,10 +580,11 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                       ),
                                   type: NotificationType.success,
                                 );
-                              } catch (e) {
+                              } catch (e, st) {
                                 final err = _localizeImportProviderError(
                                   l10n,
                                   e,
+                                  st,
                                 );
                                 showAppSnackBar(
                                   ctx,
@@ -610,19 +622,19 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: cs.outlineVariant.withOpacity(0.4),
+                                color: cs.outlineVariant.withValues(alpha: 0.4),
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: cs.outlineVariant.withOpacity(0.4),
+                                color: cs.outlineVariant.withValues(alpha: 0.4),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: cs.primary.withOpacity(0.5),
+                                color: cs.primary.withValues(alpha: 0.5),
                               ),
                             ),
                           ),
@@ -714,8 +726,12 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                     ),
                                 type: NotificationType.success,
                               );
-                            } catch (e) {
-                              final err = _localizeImportProviderError(l10n, e);
+                            } catch (e, st) {
+                              final err = _localizeImportProviderError(
+                                l10n,
+                                e,
+                                st,
+                              );
                               showAppSnackBar(
                                 ctx,
                                 message: l10n
@@ -767,7 +783,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
       size: widget.size,

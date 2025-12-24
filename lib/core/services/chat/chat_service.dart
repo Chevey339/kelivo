@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../models/chat_message.dart';
@@ -12,6 +11,7 @@ class ChatService extends ChangeNotifier {
   static const String _conversationsBoxName = 'conversations';
   static const String _messagesBoxName = 'messages';
   static const String _toolEventsBoxName = 'tool_events_v1';
+  static const String _legacyOrphanImportedAssistantId = 'orphan-imported';
 
   late Box<Conversation> _conversationsBox;
   late Box<ChatMessage> _messagesBox;
@@ -55,6 +55,8 @@ class ChatService extends ChangeNotifier {
 
     // Migrate any persisted message content that references old iOS sandbox paths
     await _migrateSandboxPaths();
+    // Fix legacy imported conversations that used a non-existent sentinel assistant id.
+    await _migrateLegacyOrphanImportedAssistantIds();
 
     _initialized = true;
     notifyListeners();
@@ -246,6 +248,21 @@ class ChatService extends ChangeNotifier {
         if (changed && updated != content) {
           final newMsg = msg.copyWith(content: updated);
           await _messagesBox.put(msg.id, newMsg);
+        }
+      }
+    } catch (_) {
+      // best-effort migration; ignore errors
+    }
+  }
+
+  Future<void> _migrateLegacyOrphanImportedAssistantIds() async {
+    try {
+      if (_conversationsBox.isEmpty) return;
+      for (final c in _conversationsBox.values) {
+        final aid = (c.assistantId ?? '').trim();
+        if (aid == _legacyOrphanImportedAssistantId) {
+          c.assistantId = null;
+          await c.save();
         }
       }
     } catch (_) {

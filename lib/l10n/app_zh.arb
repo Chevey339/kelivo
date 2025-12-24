@@ -372,6 +372,7 @@
   "importProviderSheetErrorUnsupportedFormat": "不支持的格式",
   "importProviderSheetErrorUnsupportedContent": "不支持的内容",
   "importProviderSheetErrorQrNotDetected": "未识别到二维码",
+  "importProviderSheetErrorUnknown": "未知错误",
   "importProviderSheetErrorUnknownProviderType": "未知的供应商类型: {type}",
   "@importProviderSheetErrorUnknownProviderType": {
     "placeholders": {

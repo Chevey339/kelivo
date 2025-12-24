@@ -973,7 +973,7 @@ class CherryImporter {
       return false;
     }
 
-    String _resolveAssistantId(Map<String, dynamic> meta) {
+    String? _resolveAssistantId(Map<String, dynamic> meta) {
       dynamic cand = meta['assistantId'] ?? meta['assistant_id'];
       if (cand is Map) {
         final m = cand.map((k, v) => MapEntry(k.toString(), v));
@@ -983,8 +983,9 @@ class CherryImporter {
       if (s.isNotEmpty) return s;
       final fb = (fallbackAssistantId ?? '').trim();
       if (fb.isNotEmpty) return fb;
-      // Last resort: avoid null (null would be treated as global and shown everywhere).
-      return 'orphan-imported';
+      // Last resort: return null so imported conversations remain visible under the
+      // current assistant (UI shows assistantId==current OR assistantId==null).
+      return null;
     }
 
     for (final entry in topicMessages.entries) {

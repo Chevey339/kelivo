@@ -1165,6 +1165,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importProviderSheetErrorQrNotDetected => 'QR not detected';
 
   @override
+  String get importProviderSheetErrorUnknown => 'Unknown error';
+
+  @override
   String importProviderSheetErrorUnknownProviderType(String type) {
     return 'Unknown provider type: $type';
   }

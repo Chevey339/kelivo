@@ -432,6 +432,7 @@
   "importProviderSheetErrorUnsupportedFormat": "Unsupported format",
   "importProviderSheetErrorUnsupportedContent": "Unsupported content",
   "importProviderSheetErrorQrNotDetected": "QR not detected",
+  "importProviderSheetErrorUnknown": "Unknown error",
   "importProviderSheetErrorUnknownProviderType": "Unknown provider type: {type}",
   "@importProviderSheetErrorUnknownProviderType": {
     "placeholders": {
