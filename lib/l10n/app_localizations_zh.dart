@@ -1114,7 +1114,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cherryImportDefaultConversationTitle => '导入的会话';
 
   @override
-  String get chatboxImportInvalidBackupJson => '无效的 ChatBox 备份 JSON';
+  String get chatboxImportInvalidBackupJson => '无效的 Chatbox 备份 JSON';
 
   @override
   String get importProviderSheetErrorInvalidPrefix => '前缀无效';
@@ -2298,7 +2298,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get importProviderSheetDescription =>
-      '粘贴分享字符串（可多行，每行一个）或 ChatBox JSON';
+      '粘贴分享字符串（可多行，每行一个）或 Chatbox JSON';
 
   @override
   String get importProviderSheetInputHint => 'ai-provider:v1:...';
@@ -4470,7 +4470,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get cherryImportDefaultConversationTitle => '导入的会话';
 
   @override
-  String get chatboxImportInvalidBackupJson => '无效的 ChatBox 备份 JSON';
+  String get chatboxImportInvalidBackupJson => '无效的 Chatbox 备份 JSON';
 
   @override
   String get importProviderSheetErrorInvalidPrefix => '前缀无效';
@@ -5654,7 +5654,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get importProviderSheetDescription =>
-      '粘贴分享字符串（可多行，每行一个）或 ChatBox JSON';
+      '粘贴分享字符串（可多行，每行一个）或 Chatbox JSON';
 
   @override
   String get importProviderSheetInputHint => 'ai-provider:v1:...';
@@ -7826,7 +7826,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get cherryImportDefaultConversationTitle => '匯入的對話';
 
   @override
-  String get chatboxImportInvalidBackupJson => '無效的 ChatBox 備份 JSON';
+  String get chatboxImportInvalidBackupJson => '無效的 Chatbox 備份 JSON';
 
   @override
   String get importProviderSheetErrorInvalidPrefix => '前綴無效';
@@ -9008,7 +9008,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get importProviderSheetDescription => '貼上分享字串（可多行，每行一個）或 ChatBox JSON';
+  String get importProviderSheetDescription => '貼上分享字串（可多行，每行一個）或 Chatbox JSON';
 
   @override
   String get importProviderSheetInputHint => 'ai-provider:v1:...';

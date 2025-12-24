@@ -1146,7 +1146,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cherryImportDefaultConversationTitle => 'Imported';
 
   @override
-  String get chatboxImportInvalidBackupJson => 'Invalid ChatBox backup JSON';
+  String get chatboxImportInvalidBackupJson => 'Invalid Chatbox backup JSON';
 
   @override
   String get importProviderSheetErrorInvalidPrefix => 'Invalid prefix';
@@ -2371,7 +2371,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importProviderSheetDescription =>
-      'Paste share strings (multi-line supported) or ChatBox JSON';
+      'Paste share strings (multi-line supported) or Chatbox JSON';
 
   @override
   String get importProviderSheetInputHint => 'ai-provider:v1:... or JSON';

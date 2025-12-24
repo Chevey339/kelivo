@@ -2276,7 +2276,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatboxImportInvalidBackupJson.
   ///
   /// In en, this message translates to:
-  /// **'Invalid ChatBox backup JSON'**
+  /// **'Invalid Chatbox backup JSON'**
   String get chatboxImportInvalidBackupJson;
 
   /// No description provided for @importProviderSheetErrorInvalidPrefix.
@@ -4526,7 +4526,7 @@ abstract class AppLocalizations {
   /// No description provided for @importProviderSheetDescription.
   ///
   /// In en, this message translates to:
-  /// **'Paste share strings (multi-line supported) or ChatBox JSON'**
+  /// **'Paste share strings (multi-line supported) or Chatbox JSON'**
   String get importProviderSheetDescription;
 
   /// No description provided for @importProviderSheetInputHint.

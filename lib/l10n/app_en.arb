@@ -426,7 +426,7 @@
   "backupPageMessages": "Messages",
   "chatboxImportDefaultConversationTitle": "Imported",
   "cherryImportDefaultConversationTitle": "Imported",
-  "chatboxImportInvalidBackupJson": "Invalid ChatBox backup JSON",
+  "chatboxImportInvalidBackupJson": "Invalid Chatbox backup JSON",
   "importProviderSheetErrorInvalidPrefix": "Invalid prefix",
   "importProviderSheetErrorInvalidJson": "Invalid JSON",
   "importProviderSheetErrorUnsupportedFormat": "Unsupported format",
@@ -984,7 +984,7 @@
       }
     }
   },
-  "importProviderSheetDescription": "Paste share strings (multi-line supported) or ChatBox JSON",
+  "importProviderSheetDescription": "Paste share strings (multi-line supported) or Chatbox JSON",
   "importProviderSheetInputHint": "ai-provider:v1:... or JSON",
   "importProviderSheetCancelButton": "Cancel",
   "importProviderSheetImportButton": "Import",
