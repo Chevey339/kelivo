@@ -2313,7 +2313,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Unknown provider type: {type}'**
-  String importProviderSheetErrorUnknownProviderType(Object type);
+  String importProviderSheetErrorUnknownProviderType(String type);
 
   /// No description provided for @chatHistoryPageTitle.
   ///

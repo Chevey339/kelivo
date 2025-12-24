@@ -95,13 +95,13 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     bool? includeChats,
     bool? includeFiles,
   }) async {
+    var normalizedPath = (path != null ? path.trim() : _path.text.trim());
+    if (normalizedPath.isEmpty) normalizedPath = 'kelivo_backups';
     final cfg = WebDavConfig(
       url: url ?? _url.text.trim(),
       username: username ?? _username.text.trim(),
       password: password ?? _password.text,
-      path:
-          path ??
-          (_path.text.trim().isEmpty ? 'kelivo_backups' : _path.text.trim()),
+      path: normalizedPath,
       includeChats: includeChats ?? _includeChats,
       includeFiles: includeFiles ?? _includeFiles,
     );

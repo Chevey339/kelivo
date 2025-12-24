@@ -1132,7 +1132,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importProviderSheetErrorQrNotDetected => '未识别到二维码';
 
   @override
-  String importProviderSheetErrorUnknownProviderType(Object type) {
+  String importProviderSheetErrorUnknownProviderType(String type) {
     return '未知的供应商类型: $type';
   }
 
@@ -4488,7 +4488,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get importProviderSheetErrorQrNotDetected => '未识别到二维码';
 
   @override
-  String importProviderSheetErrorUnknownProviderType(Object type) {
+  String importProviderSheetErrorUnknownProviderType(String type) {
     return '未知的供应商类型: $type';
   }
 
@@ -7844,7 +7844,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get importProviderSheetErrorQrNotDetected => '未識別到二維碼';
 
   @override
-  String importProviderSheetErrorUnknownProviderType(Object type) {
+  String importProviderSheetErrorUnknownProviderType(String type) {
     return '未知的供應商類型: $type';
   }
 

@@ -316,13 +316,13 @@ class ChatboxImporter {
         if (type == 'text') {
           final t = pm['text'];
           if (t != null) {
-            if (sb.isNotEmpty) sb.write('\n');
+            if (sb.length > 0) sb.write('\n');
             sb.write(t.toString());
           }
         } else if (type == 'info') {
           final t = pm['text'];
           if (t != null) {
-            if (sb.isNotEmpty) sb.write('\n');
+            if (sb.length > 0) sb.write('\n');
             sb.write(t.toString());
           }
         } else if (type == 'reasoning') {

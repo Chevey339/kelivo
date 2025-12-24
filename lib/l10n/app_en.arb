@@ -435,7 +435,9 @@
   "importProviderSheetErrorUnknownProviderType": "Unknown provider type: {type}",
   "@importProviderSheetErrorUnknownProviderType": {
     "placeholders": {
-      "type": {}
+      "type": {
+        "type": "String"
+      }
     }
   },
   "chatHistoryPageTitle": "Chat History",

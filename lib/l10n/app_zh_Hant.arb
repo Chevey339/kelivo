@@ -377,7 +377,9 @@
   "importProviderSheetErrorUnknownProviderType": "未知的供應商類型: {type}",
   "@importProviderSheetErrorUnknownProviderType": {
     "placeholders": {
-      "type": {}
+      "type": {
+        "type": "String"
+      }
     }
   },
   "homePageClearContext": "清空上下文",
