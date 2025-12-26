@@ -1259,6 +1259,47 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
 
   @override
+  String get backupPageImportFromChatbox => '从 Chatbox 导入';
+
+  @override
+  String get backupPageConversations => '对话';
+
+  @override
+  String get backupPageMessages => '消息';
+
+  @override
+  String get chatboxImportDefaultConversationTitle => '导入的会话';
+
+  @override
+  String get cherryImportDefaultConversationTitle => '导入的会话';
+
+  @override
+  String get chatboxImportInvalidBackupJson => '无效的 Chatbox 备份 JSON';
+
+  @override
+  String get importProviderSheetErrorInvalidPrefix => '前缀无效';
+
+  @override
+  String get importProviderSheetErrorInvalidJson => '无效的 JSON';
+
+  @override
+  String get importProviderSheetErrorUnsupportedFormat => '不支持的格式';
+
+  @override
+  String get importProviderSheetErrorUnsupportedContent => '不支持的内容';
+
+  @override
+  String get importProviderSheetErrorQrNotDetected => '未识别到二维码';
+
+  @override
+  String get importProviderSheetErrorUnknown => '未知错误';
+
+  @override
+  String importProviderSheetErrorUnknownProviderType(String type) {
+    return '未知的供应商类型: $type';
+  }
+
+  @override
   String get chatHistoryPageTitle => '聊天历史';
 
   @override
@@ -2485,7 +2526,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get importProviderSheetDescription =>
-      '粘贴分享字符串（可多行，每行一个）或 ChatBox JSON';
+      '粘贴分享字符串（可多行，每行一个）或 Chatbox JSON';
 
   @override
   String get importProviderSheetInputHint => 'ai-provider:v1:...';
@@ -4857,6 +4898,47 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
 
   @override
+  String get backupPageImportFromChatbox => '从 Chatbox 导入';
+
+  @override
+  String get backupPageConversations => '对话';
+
+  @override
+  String get backupPageMessages => '消息';
+
+  @override
+  String get chatboxImportDefaultConversationTitle => '导入的会话';
+
+  @override
+  String get cherryImportDefaultConversationTitle => '导入的会话';
+
+  @override
+  String get chatboxImportInvalidBackupJson => '无效的 Chatbox 备份 JSON';
+
+  @override
+  String get importProviderSheetErrorInvalidPrefix => '前缀无效';
+
+  @override
+  String get importProviderSheetErrorInvalidJson => '无效的 JSON';
+
+  @override
+  String get importProviderSheetErrorUnsupportedFormat => '不支持的格式';
+
+  @override
+  String get importProviderSheetErrorUnsupportedContent => '不支持的内容';
+
+  @override
+  String get importProviderSheetErrorQrNotDetected => '未识别到二维码';
+
+  @override
+  String get importProviderSheetErrorUnknown => '未知错误';
+
+  @override
+  String importProviderSheetErrorUnknownProviderType(String type) {
+    return '未知的供应商类型: $type';
+  }
+
+  @override
   String get chatHistoryPageTitle => '聊天历史';
 
   @override
@@ -6066,7 +6148,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get importProviderSheetDescription =>
-      '粘贴分享字符串（可多行，每行一个）或 ChatBox JSON';
+      '粘贴分享字符串（可多行，每行一个）或 Chatbox JSON';
 
   @override
   String get importProviderSheetInputHint => 'ai-provider:v1:...';
@@ -8420,6 +8502,47 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageImportFromCherryStudio => '從 Cherry Studio 匯入';
 
   @override
+  String get backupPageImportFromChatbox => '從 Chatbox 匯入';
+
+  @override
+  String get backupPageConversations => '對話';
+
+  @override
+  String get backupPageMessages => '訊息';
+
+  @override
+  String get chatboxImportDefaultConversationTitle => '匯入的對話';
+
+  @override
+  String get cherryImportDefaultConversationTitle => '匯入的對話';
+
+  @override
+  String get chatboxImportInvalidBackupJson => '無效的 Chatbox 備份 JSON';
+
+  @override
+  String get importProviderSheetErrorInvalidPrefix => '前綴無效';
+
+  @override
+  String get importProviderSheetErrorInvalidJson => '無效的 JSON';
+
+  @override
+  String get importProviderSheetErrorUnsupportedFormat => '不支援的格式';
+
+  @override
+  String get importProviderSheetErrorUnsupportedContent => '不支援的內容';
+
+  @override
+  String get importProviderSheetErrorQrNotDetected => '未識別到二維碼';
+
+  @override
+  String get importProviderSheetErrorUnknown => '未知錯誤';
+
+  @override
+  String importProviderSheetErrorUnknownProviderType(String type) {
+    return '未知的供應商類型: $type';
+  }
+
+  @override
   String get chatHistoryPageTitle => '聊天歷史';
 
   @override
@@ -9644,7 +9767,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get importProviderSheetDescription => '貼上分享字串（可多行，每行一個）或 ChatBox JSON';
+  String get importProviderSheetDescription => '貼上分享字串（可多行，每行一個）或 Chatbox JSON';
 
   @override
   String get importProviderSheetInputHint => 'ai-provider:v1:...';

@@ -544,6 +544,26 @@
   "backupPageBackupNow": "Backup Now",
   "backupPageLocalBackup": "Local Backup",
   "backupPageImportFromCherryStudio": "Import from Cherry Studio",
+  "backupPageImportFromChatbox": "Import from Chatbox",
+  "backupPageConversations": "Conversations",
+  "backupPageMessages": "Messages",
+  "chatboxImportDefaultConversationTitle": "Imported",
+  "cherryImportDefaultConversationTitle": "Imported",
+  "chatboxImportInvalidBackupJson": "Invalid Chatbox backup JSON",
+  "importProviderSheetErrorInvalidPrefix": "Invalid prefix",
+  "importProviderSheetErrorInvalidJson": "Invalid JSON",
+  "importProviderSheetErrorUnsupportedFormat": "Unsupported format",
+  "importProviderSheetErrorUnsupportedContent": "Unsupported content",
+  "importProviderSheetErrorQrNotDetected": "QR not detected",
+  "importProviderSheetErrorUnknown": "Unknown error",
+  "importProviderSheetErrorUnknownProviderType": "Unknown provider type: {type}",
+  "@importProviderSheetErrorUnknownProviderType": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
   "chatHistoryPageTitle": "Chat History",
   "chatHistoryPageSearchTooltip": "Search",
   "chatHistoryPageDeleteAllTooltip": "Delete Unpinned",
@@ -1117,7 +1137,7 @@
       }
     }
   },
-  "importProviderSheetDescription": "Paste share strings (multi-line supported) or ChatBox JSON",
+  "importProviderSheetDescription": "Paste share strings (multi-line supported) or Chatbox JSON",
   "importProviderSheetInputHint": "ai-provider:v1:... or JSON",
   "importProviderSheetCancelButton": "Cancel",
   "importProviderSheetImportButton": "Import",

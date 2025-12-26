@@ -17,10 +17,93 @@ class _ImportResult {
   _ImportResult(this.key, this.cfg);
 }
 
-List<_ImportResult> _decodeChatBoxJson(BuildContext context, String s) {
+enum _ImportProviderError {
+  invalidPrefix,
+  invalidJson,
+  unsupportedFormat,
+  unsupportedContent,
+  qrNotDetected,
+  unknownProviderType,
+}
+
+class _ImportProviderException implements Exception {
+  final _ImportProviderError error;
+  final String? detail;
+  const _ImportProviderException(this.error, {this.detail});
+  @override
+  String toString() =>
+      'ImportProviderException($error${detail == null ? '' : ': $detail'})';
+}
+
+String _localizeImportProviderError(
+  AppLocalizations l10n,
+  Object e, [
+  StackTrace? st,
+]) {
+  if (e is _ImportProviderException) {
+    switch (e.error) {
+      case _ImportProviderError.invalidPrefix:
+        return l10n.importProviderSheetErrorInvalidPrefix;
+      case _ImportProviderError.invalidJson:
+        return l10n.importProviderSheetErrorInvalidJson;
+      case _ImportProviderError.unsupportedFormat:
+        return l10n.importProviderSheetErrorUnsupportedFormat;
+      case _ImportProviderError.unsupportedContent:
+        return l10n.importProviderSheetErrorUnsupportedContent;
+      case _ImportProviderError.qrNotDetected:
+        return l10n.importProviderSheetErrorQrNotDetected;
+      case _ImportProviderError.unknownProviderType:
+        return l10n.importProviderSheetErrorUnknownProviderType(e.detail ?? '');
+    }
+  }
+
+  if (e is FormatException) {
+    final m = e.message;
+    if (m == 'Invalid prefix')
+      return l10n.importProviderSheetErrorInvalidPrefix;
+    if (m == 'Unsupported format')
+      return l10n.importProviderSheetErrorUnsupportedFormat;
+    if (m == 'No valid lines')
+      return l10n.importProviderSheetErrorUnsupportedContent;
+    if (m.startsWith('Unknown provider type: ')) {
+      final type = m.substring('Unknown provider type: '.length);
+      return l10n.importProviderSheetErrorUnknownProviderType(type);
+    }
+    // Default: hide raw parse errors, etc.
+    return l10n.importProviderSheetErrorInvalidJson;
+  }
+
+  final s = e.toString();
+  if (s == 'QR not detected') return l10n.importProviderSheetErrorQrNotDetected;
+  if (s == 'Unsupported content')
+    return l10n.importProviderSheetErrorUnsupportedContent;
+  if (s == 'Unsupported format')
+    return l10n.importProviderSheetErrorUnsupportedFormat;
+  if (s == 'Invalid prefix') return l10n.importProviderSheetErrorInvalidPrefix;
+
+  // Unknown error: do not expose raw exception strings to the user.
+  FlutterError.reportError(
+    FlutterErrorDetails(
+      exception: e,
+      stack: st,
+      library: 'import_provider_sheet',
+      context: ErrorDescription('Import provider failed (unknown error)'),
+    ),
+  );
+  return l10n.importProviderSheetErrorUnknown;
+}
+
+List<_ImportResult> _decodeChatboxJson(BuildContext context, String s) {
   final settings = context.read<SettingsProvider>();
-  final Map<String, dynamic> obj = jsonDecode(s) as Map<String, dynamic>;
-  final providers = (obj['providers'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ?? {};
+  Map<String, dynamic> obj;
+  try {
+    obj = jsonDecode(s) as Map<String, dynamic>;
+  } catch (_) {
+    throw const _ImportProviderException(_ImportProviderError.invalidJson);
+  }
+  final providers =
+      (obj['providers'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ??
+      {};
   final out = <_ImportResult>[];
   String uniqueKey(String prefix, String display) {
     final existing = settings.providerConfigs.keys.toSet();
@@ -45,6 +128,7 @@ List<_ImportResult> _decodeChatBoxJson(BuildContext context, String s) {
     }
     return candidate;
   }
+
   // OpenAI
   final openai = providers['openai'] as Map?;
   if (openai != null) {
@@ -135,11 +219,21 @@ List<_ImportResult> _decodeChatBoxJson(BuildContext context, String s) {
 
 _ImportResult _decodeSingle(BuildContext context, String s) {
   if (!s.trim().startsWith('ai-provider:v1:')) {
-    throw FormatException('Invalid prefix');
+    throw const _ImportProviderException(_ImportProviderError.invalidPrefix);
   }
   final base64Str = s.trim().substring('ai-provider:v1:'.length);
-  final jsonStr = utf8.decode(base64Decode(base64Str));
-  final obj = jsonDecode(jsonStr) as Map<String, dynamic>;
+  String jsonStr;
+  try {
+    jsonStr = utf8.decode(base64Decode(base64Str));
+  } catch (_) {
+    throw const _ImportProviderException(_ImportProviderError.invalidJson);
+  }
+  Map<String, dynamic> obj;
+  try {
+    obj = jsonDecode(jsonStr) as Map<String, dynamic>;
+  } catch (_) {
+    throw const _ImportProviderException(_ImportProviderError.invalidJson);
+  }
   final type = (obj['type'] ?? '').toString();
   final name = (obj['name'] ?? '').toString();
   final apiKey = (obj['apiKey'] ?? '').toString();
@@ -228,7 +322,10 @@ _ImportResult _decodeSingle(BuildContext context, String s) {
     );
     return _ImportResult(key, cfg);
   } else {
-    throw FormatException('Unknown provider type: $type');
+    throw _ImportProviderException(
+      _ImportProviderError.unknownProviderType,
+      detail: type,
+    );
   }
 }
 
@@ -259,70 +356,363 @@ Future<void> showImportProviderSheet(BuildContext context) async {
             );
           }(),
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.8,
+            ),
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(999)))),
-                const SizedBox(height: 12),
-                // iOS-style header: centered title with left/right actions
-                SizedBox(
-                  height: 36,
-                  child: Stack(
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: cs.onSurface.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // iOS-style header: centered title with left/right actions
+                  SizedBox(
+                    height: 36,
+                    child: Stack(
+                      children: [
+                        Align(
+                          alignment: Alignment.center,
+                          child: Text(
+                            l10n.importProviderSheetTitle,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _TactileIconButton(
+                            icon: Lucide.Camera,
+                            color: cs.onSurface,
+                            size: 22,
+                            haptics: true,
+                            semanticLabel:
+                                l10n.importProviderSheetScanQrTooltip,
+                            onTap: () async {
+                              final code = await Navigator.of(ctx).push<String>(
+                                MaterialPageRoute(
+                                  builder: (_) => const QrScanPage(),
+                                ),
+                              );
+                              if (code == null || code.isEmpty) return;
+                              try {
+                                final settings = ctx.read<SettingsProvider>();
+                                final results = <_ImportResult>[];
+                                // Support combined multi-provider QR content: newline-separated share strings or JSON
+                                final parts = code
+                                    .split(RegExp(r'\r?\n+'))
+                                    .map((e) => e.trim())
+                                    .where((e) => e.isNotEmpty)
+                                    .toList();
+                                if (parts.length > 1) {
+                                  for (final p in parts) {
+                                    try {
+                                      if (p.startsWith('ai-provider:v1:')) {
+                                        results.add(_decodeSingle(ctx, p));
+                                      } else if (p.startsWith('{')) {
+                                        results.addAll(
+                                          _decodeChatboxJson(ctx, p),
+                                        );
+                                      }
+                                    } catch (_) {}
+                                  }
+                                  if (results.isEmpty) {
+                                    throw const _ImportProviderException(
+                                      _ImportProviderError.unsupportedFormat,
+                                    );
+                                  }
+                                } else {
+                                  final p = parts.first;
+                                  if (p.startsWith('ai-provider:v1:')) {
+                                    results.add(_decodeSingle(ctx, p));
+                                  } else if (p.startsWith('{')) {
+                                    results.addAll(_decodeChatboxJson(ctx, p));
+                                  } else {
+                                    throw const _ImportProviderException(
+                                      _ImportProviderError.unsupportedFormat,
+                                    );
+                                  }
+                                }
+                                for (final r in results) {
+                                  await settings.setProviderConfig(
+                                    r.key,
+                                    r.cfg,
+                                  );
+                                  final order = List<String>.of(
+                                    settings.providersOrder,
+                                  );
+                                  order.remove(r.key);
+                                  order.insert(0, r.key);
+                                  await settings.setProvidersOrder(order);
+                                }
+                                Navigator.of(ctx).pop();
+                                showAppSnackBar(
+                                  context,
+                                  message: l10n
+                                      .importProviderSheetImportSuccessMessage(
+                                        results.length,
+                                      ),
+                                  type: NotificationType.success,
+                                );
+                              } catch (e, st) {
+                                final err = _localizeImportProviderError(
+                                  l10n,
+                                  e,
+                                  st,
+                                );
+                                showAppSnackBar(
+                                  ctx,
+                                  message: l10n
+                                      .importProviderSheetImportFailedMessage(
+                                        err,
+                                      ),
+                                  type: NotificationType.error,
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: _TactileIconButton(
+                            icon: Lucide.Image,
+                            color: cs.onSurface,
+                            size: 22,
+                            haptics: true,
+                            semanticLabel:
+                                l10n.importProviderSheetFromGalleryTooltip,
+                            onTap: () async {
+                              try {
+                                // pick from gallery and analyze
+                                final picker = ImagePicker();
+                                final img = await picker.pickImage(
+                                  source: ImageSource.gallery,
+                                );
+                                if (img == null) return;
+                                final scanner = MobileScannerController();
+                                String? code;
+                                try {
+                                  final BarcodeCapture? capture = await scanner
+                                      .analyzeImage(img.path);
+                                  for (final barcode
+                                      in (capture?.barcodes ??
+                                          const <Barcode>[])) {
+                                    final v = barcode.rawValue;
+                                    if (v != null && v.isNotEmpty) {
+                                      code = v;
+                                      break;
+                                    }
+                                  }
+                                } finally {
+                                  scanner.dispose();
+                                }
+                                if (code == null || code.isEmpty) {
+                                  throw const _ImportProviderException(
+                                    _ImportProviderError.qrNotDetected,
+                                  );
+                                }
+                                final settings = ctx.read<SettingsProvider>();
+                                final results = <_ImportResult>[];
+                                final parts = code
+                                    .split(RegExp(r'\r?\n+'))
+                                    .map((e) => e.trim())
+                                    .where((e) => e.isNotEmpty)
+                                    .toList();
+                                if (parts.length > 1) {
+                                  for (final p in parts) {
+                                    try {
+                                      if (p.startsWith('ai-provider:v1:')) {
+                                        results.add(_decodeSingle(ctx, p));
+                                      } else if (p.startsWith('{')) {
+                                        results.addAll(
+                                          _decodeChatboxJson(ctx, p),
+                                        );
+                                      }
+                                    } catch (_) {}
+                                  }
+                                  if (results.isEmpty) {
+                                    throw const _ImportProviderException(
+                                      _ImportProviderError.unsupportedContent,
+                                    );
+                                  }
+                                } else {
+                                  final p = parts.first;
+                                  if (p.startsWith('ai-provider:v1:')) {
+                                    results.add(_decodeSingle(ctx, p));
+                                  } else if (p.startsWith('{')) {
+                                    results.addAll(_decodeChatboxJson(ctx, p));
+                                  } else {
+                                    throw const _ImportProviderException(
+                                      _ImportProviderError.unsupportedContent,
+                                    );
+                                  }
+                                }
+                                for (final r in results) {
+                                  await settings.setProviderConfig(
+                                    r.key,
+                                    r.cfg,
+                                  );
+                                  final order = List<String>.of(
+                                    settings.providersOrder,
+                                  );
+                                  order.remove(r.key);
+                                  order.insert(0, r.key);
+                                  await settings.setProvidersOrder(order);
+                                }
+                                Navigator.of(ctx).pop();
+                                showAppSnackBar(
+                                  context,
+                                  message: l10n
+                                      .importProviderSheetImportSuccessMessage(
+                                        results.length,
+                                      ),
+                                  type: NotificationType.success,
+                                );
+                              } catch (e, st) {
+                                final err = _localizeImportProviderError(
+                                  l10n,
+                                  e,
+                                  st,
+                                );
+                                showAppSnackBar(
+                                  ctx,
+                                  message: l10n
+                                      .importProviderSheetImportFailedMessage(
+                                        err,
+                                      ),
+                                  type: NotificationType.error,
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: ListView(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 8),
+                      children: [
+                        TextField(
+                          controller: controller,
+                          maxLines: 10,
+                          decoration: InputDecoration(
+                            hintText: l10n.importProviderSheetDescription,
+                            filled: true,
+                            fillColor:
+                                Theme.of(ctx).brightness == Brightness.dark
+                                ? Colors.white10
+                                : Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: cs.outlineVariant.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: cs.outlineVariant.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: cs.primary.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
                     children: [
-                      Align(
-                        alignment: Alignment.center,
-                        child: Text(
-                          l10n.importProviderSheetTitle,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      Expanded(
+                        child: IosTileButton(
+                          icon: Lucide.X,
+                          label: l10n.importProviderSheetCancelButton,
+                          onTap: () {
+                            Haptics.light();
+                            FocusScope.of(ctx).unfocus();
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (Navigator.of(ctx).canPop()) {
+                                Navigator.of(ctx).maybePop();
+                              }
+                            });
+                          },
                         ),
                       ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: _TactileIconButton(
-                          icon: Lucide.Camera,
-                          color: cs.onSurface,
-                          size: 22,
-                          semanticLabel: l10n.importProviderSheetScanQrTooltip,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: IosTileButton(
+                          icon: Lucide.Import,
+                          label: l10n.importProviderSheetImportButton,
                           onTap: () async {
-                            final code = await Navigator.of(ctx).push<String>(
-                              MaterialPageRoute(builder: (_) => const QrScanPage()),
-                            );
-                            if (code == null || code.isEmpty) return;
+                            final raw = controller.text.trim();
+                            if (raw.isEmpty) return;
                             try {
                               final settings = ctx.read<SettingsProvider>();
                               final results = <_ImportResult>[];
-                              // Support combined multi-provider QR content: newline-separated share strings or JSON
-                              final parts = code.split(RegExp(r'\r?\n+')).map((e)=>e.trim()).where((e)=>e.isNotEmpty).toList();
-                              if (parts.length > 1) {
-                                for (final p in parts) {
+                              // Support multi-line input where each non-empty line is a share string or JSON
+                              final lines = raw
+                                  .split(RegExp(r'\r?\n'))
+                                  .map((e) => e.trim())
+                                  .where((e) => e.isNotEmpty)
+                                  .toList();
+                              if (lines.length > 1) {
+                                for (final line in lines) {
                                   try {
-                                    if (p.startsWith('ai-provider:v1:')) {
-                                      results.add(_decodeSingle(ctx, p));
-                                    } else if (p.startsWith('{')) {
-                                      results.addAll(_decodeChatBoxJson(ctx, p));
+                                    if (line.startsWith('ai-provider:v1:')) {
+                                      results.add(_decodeSingle(ctx, line));
+                                    } else if (line.startsWith('{')) {
+                                      results.addAll(
+                                        _decodeChatboxJson(ctx, line),
+                                      );
                                     }
-                                  } catch (_) {}
+                                  } catch (_) {
+                                    // skip invalid line
+                                  }
                                 }
                                 if (results.isEmpty) {
-                                  throw const FormatException('Unsupported format');
+                                  throw const _ImportProviderException(
+                                    _ImportProviderError.unsupportedContent,
+                                  );
                                 }
                               } else {
-                                final p = parts.first;
-                                if (p.startsWith('ai-provider:v1:')) {
-                                  results.add(_decodeSingle(ctx, p));
-                                } else if (p.startsWith('{')) {
-                                  results.addAll(_decodeChatBoxJson(ctx, p));
+                                final text = lines.first;
+                                if (text.startsWith('ai-provider:v1:')) {
+                                  results.add(_decodeSingle(ctx, text));
+                                } else if (text.startsWith('{')) {
+                                  results.addAll(_decodeChatboxJson(ctx, text));
                                 } else {
-                                  throw const FormatException('Unsupported format');
+                                  throw const _ImportProviderException(
+                                    _ImportProviderError.unsupportedFormat,
+                                  );
                                 }
                               }
                               for (final r in results) {
                                 await settings.setProviderConfig(r.key, r.cfg);
-                                final order = List<String>.of(settings.providersOrder);
+                                // Put to front
+                                final order = List<String>.of(
+                                  settings.providersOrder,
+                                );
                                 order.remove(r.key);
                                 order.insert(0, r.key);
                                 await settings.setProvidersOrder(order);
@@ -330,89 +720,24 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                               Navigator.of(ctx).pop();
                               showAppSnackBar(
                                 context,
-                                message: l10n.importProviderSheetImportSuccessMessage(results.length),
+                                message: l10n
+                                    .importProviderSheetImportSuccessMessage(
+                                      results.length,
+                                    ),
                                 type: NotificationType.success,
                               );
-                            } catch (e) {
+                            } catch (e, st) {
+                              final err = _localizeImportProviderError(
+                                l10n,
+                                e,
+                                st,
+                              );
                               showAppSnackBar(
                                 ctx,
-                                message: l10n.importProviderSheetImportFailedMessage(e.toString()),
-                                type: NotificationType.error,
-                              );
-                            }
-                          },
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: _TactileIconButton(
-                          icon: Lucide.Image,
-                          color: cs.onSurface,
-                          size: 22,
-                          semanticLabel: l10n.importProviderSheetFromGalleryTooltip,
-                          onTap: () async {
-                            try {
-                              // pick from gallery and analyze
-                              final picker = ImagePicker();
-                              final img = await picker.pickImage(source: ImageSource.gallery);
-                              if (img == null) return;
-                              final scanner = MobileScannerController();
-                              final result = await scanner.analyzeImage(img.path);
-                              String? code;
-                              if (result != null) {
-                                try {
-                                  // dynamic access to barcodes for compatibility
-                                  final bars = (result as dynamic).barcodes as List?;
-                                  if (bars != null) {
-                                    for (final b in bars) {
-                                      final v = (b as dynamic).rawValue as String?;
-                                      if (v != null && v.isNotEmpty) { code = v; break; }
-                                    }
-                                  }
-                                } catch (_) {}
-                              }
-                              if (code == null || code!.isEmpty) throw 'QR not detected';
-                              final settings = ctx.read<SettingsProvider>();
-                              final results = <_ImportResult>[];
-                              final parts = code!.split(RegExp(r'\r?\n+')).map((e)=>e.trim()).where((e)=>e.isNotEmpty).toList();
-                              if (parts.length > 1) {
-                                for (final p in parts) {
-                                  try {
-                                    if (p.startsWith('ai-provider:v1:')) {
-                                      results.add(_decodeSingle(ctx, p));
-                                    } else if (p.startsWith('{')) {
-                                      results.addAll(_decodeChatBoxJson(ctx, p));
-                                    }
-                                  } catch (_) {}
-                                }
-                                if (results.isEmpty) throw 'Unsupported content';
-                              } else {
-                                final p = parts.first;
-                                if (p.startsWith('ai-provider:v1:')) {
-                                  results.add(_decodeSingle(ctx, p));
-                                } else if (p.startsWith('{')) {
-                                  results.addAll(_decodeChatBoxJson(ctx, p));
-                                } else {
-                                  throw 'Unsupported content';
-                                }
-                              }
-                              for (final r in results) {
-                                await settings.setProviderConfig(r.key, r.cfg);
-                                final order = List<String>.of(settings.providersOrder);
-                                order.remove(r.key);
-                                order.insert(0, r.key);
-                                await settings.setProvidersOrder(order);
-                              }
-                              Navigator.of(ctx).pop();
-                              showAppSnackBar(
-                                context,
-                                message: l10n.importProviderSheetImportSuccessMessage(results.length),
-                                type: NotificationType.success,
-                              );
-                            } catch (e) {
-                              showAppSnackBar(
-                                ctx,
-                                message: l10n.importProviderSheetImportFailedMessage(e.toString()),
+                                message: l10n
+                                    .importProviderSheetImportFailedMessage(
+                                      err,
+                                    ),
                                 type: NotificationType.error,
                               );
                             }
@@ -421,123 +746,6 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 8),
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: ListView(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(bottom: 8),
-                    children: [
-                      TextField(
-                        controller: controller,
-                        maxLines: 10,
-                        decoration: InputDecoration(
-                          hintText: l10n.importProviderSheetDescription,
-                          filled: true,
-                          fillColor: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: IosTileButton(
-                        icon: Lucide.X,
-                        label: l10n.importProviderSheetCancelButton,
-                        onTap: () {
-                          Haptics.light();
-                          FocusScope.of(ctx).unfocus();
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (Navigator.of(ctx).canPop()) {
-                              Navigator.of(ctx).maybePop();
-                            }
-                          });
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: IosTileButton(
-                        icon: Lucide.Import,
-                        label: l10n.importProviderSheetImportButton,
-                        onTap: () async {
-                          final raw = controller.text.trim();
-                          if (raw.isEmpty) return;
-                          try {
-                            final settings = ctx.read<SettingsProvider>();
-                            final results = <_ImportResult>[];
-                            // Support multi-line input where each non-empty line is a share string or JSON
-                            final lines = raw.split(RegExp(r'\r?\n'))
-                                .map((e) => e.trim())
-                                .where((e) => e.isNotEmpty)
-                                .toList();
-                            if (lines.length > 1) {
-                              for (final line in lines) {
-                                try {
-                                  if (line.startsWith('ai-provider:v1:')) {
-                                    results.add(_decodeSingle(ctx, line));
-                                  } else if (line.startsWith('{')) {
-                                    results.addAll(_decodeChatBoxJson(ctx, line));
-                                  }
-                                } catch (_) {
-                                  // skip invalid line
-                                }
-                              }
-                              if (results.isEmpty) {
-                                throw const FormatException('No valid lines');
-                              }
-                            } else {
-                              final text = lines.first;
-                              if (text.startsWith('ai-provider:v1:')) {
-                                results.add(_decodeSingle(ctx, text));
-                              } else if (text.startsWith('{')) {
-                                results.addAll(_decodeChatBoxJson(ctx, text));
-                              } else {
-                                throw const FormatException('Unsupported format');
-                              }
-                            }
-                            for (final r in results) {
-                              await settings.setProviderConfig(r.key, r.cfg);
-                              // Put to front
-                              final order = List<String>.of(settings.providersOrder);
-                              order.remove(r.key);
-                              order.insert(0, r.key);
-                              await settings.setProvidersOrder(order);
-                            }
-                            Navigator.of(ctx).pop();
-                            showAppSnackBar(
-                              context,
-                              message: l10n.importProviderSheetImportSuccessMessage(results.length),
-                              type: NotificationType.success,
-                            );
-                          } catch (e) {
-                            showAppSnackBar(
-                              ctx,
-                              message: l10n.importProviderSheetImportFailedMessage(e.toString()),
-                              type: NotificationType.error,
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
                 ],
               ),
             ),
@@ -575,7 +783,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
       size: widget.size,
@@ -591,7 +799,10 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
-        onTap: () { if (widget.haptics) Haptics.light(); widget.onTap(); },
+        onTap: () {
+          if (widget.haptics) Haptics.light();
+          widget.onTap();
+        },
         child: AnimatedScale(
           scale: _pressed ? 0.95 : 1.0,
           duration: const Duration(milliseconds: 100),

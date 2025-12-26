@@ -1293,6 +1293,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageImportFromCherryStudio => 'Import from Cherry Studio';
 
   @override
+  String get backupPageImportFromChatbox => 'Import from Chatbox';
+
+  @override
+  String get backupPageConversations => 'Conversations';
+
+  @override
+  String get backupPageMessages => 'Messages';
+
+  @override
+  String get chatboxImportDefaultConversationTitle => 'Imported';
+
+  @override
+  String get cherryImportDefaultConversationTitle => 'Imported';
+
+  @override
+  String get chatboxImportInvalidBackupJson => 'Invalid Chatbox backup JSON';
+
+  @override
+  String get importProviderSheetErrorInvalidPrefix => 'Invalid prefix';
+
+  @override
+  String get importProviderSheetErrorInvalidJson => 'Invalid JSON';
+
+  @override
+  String get importProviderSheetErrorUnsupportedFormat => 'Unsupported format';
+
+  @override
+  String get importProviderSheetErrorUnsupportedContent =>
+      'Unsupported content';
+
+  @override
+  String get importProviderSheetErrorQrNotDetected => 'QR not detected';
+
+  @override
+  String get importProviderSheetErrorUnknown => 'Unknown error';
+
+  @override
+  String importProviderSheetErrorUnknownProviderType(String type) {
+    return 'Unknown provider type: $type';
+  }
+
+  @override
   String get chatHistoryPageTitle => 'Chat History';
 
   @override
@@ -2567,7 +2609,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importProviderSheetDescription =>
-      'Paste share strings (multi-line supported) or ChatBox JSON';
+      'Paste share strings (multi-line supported) or Chatbox JSON';
 
   @override
   String get importProviderSheetInputHint => 'ai-provider:v1:... or JSON';

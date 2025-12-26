@@ -2519,6 +2519,84 @@ abstract class AppLocalizations {
   /// **'Import from Cherry Studio'**
   String get backupPageImportFromCherryStudio;
 
+  /// No description provided for @backupPageImportFromChatbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Chatbox'**
+  String get backupPageImportFromChatbox;
+
+  /// No description provided for @backupPageConversations.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversations'**
+  String get backupPageConversations;
+
+  /// No description provided for @backupPageMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Messages'**
+  String get backupPageMessages;
+
+  /// No description provided for @chatboxImportDefaultConversationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported'**
+  String get chatboxImportDefaultConversationTitle;
+
+  /// No description provided for @cherryImportDefaultConversationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported'**
+  String get cherryImportDefaultConversationTitle;
+
+  /// No description provided for @chatboxImportInvalidBackupJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid Chatbox backup JSON'**
+  String get chatboxImportInvalidBackupJson;
+
+  /// No description provided for @importProviderSheetErrorInvalidPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid prefix'**
+  String get importProviderSheetErrorInvalidPrefix;
+
+  /// No description provided for @importProviderSheetErrorInvalidJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid JSON'**
+  String get importProviderSheetErrorInvalidJson;
+
+  /// No description provided for @importProviderSheetErrorUnsupportedFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported format'**
+  String get importProviderSheetErrorUnsupportedFormat;
+
+  /// No description provided for @importProviderSheetErrorUnsupportedContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported content'**
+  String get importProviderSheetErrorUnsupportedContent;
+
+  /// No description provided for @importProviderSheetErrorQrNotDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'QR not detected'**
+  String get importProviderSheetErrorQrNotDetected;
+
+  /// No description provided for @importProviderSheetErrorUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown error'**
+  String get importProviderSheetErrorUnknown;
+
+  /// No description provided for @importProviderSheetErrorUnknownProviderType.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown provider type: {type}'**
+  String importProviderSheetErrorUnknownProviderType(String type);
+
   /// No description provided for @chatHistoryPageTitle.
   ///
   /// In en, this message translates to:
@@ -4847,7 +4925,7 @@ abstract class AppLocalizations {
   /// No description provided for @importProviderSheetDescription.
   ///
   /// In en, this message translates to:
-  /// **'Paste share strings (multi-line supported) or ChatBox JSON'**
+  /// **'Paste share strings (multi-line supported) or Chatbox JSON'**
   String get importProviderSheetDescription;
 
   /// No description provided for @importProviderSheetInputHint.
