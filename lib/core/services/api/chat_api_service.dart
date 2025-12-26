@@ -937,6 +937,65 @@ class ChatApiService {
     return out ?? messages;
   }
 
+  static dynamic _toJsonEncodable(dynamic v) {
+    if (v is Map) {
+      final out = <String, dynamic>{};
+      v.forEach((k, val) {
+        out[k.toString()] = _toJsonEncodable(val);
+      });
+      return out;
+    }
+    if (v is List) {
+      return [for (final it in v) _toJsonEncodable(it)];
+    }
+    return v;
+  }
+
+  static Map<String, dynamic>? _asJsonObject(dynamic v) {
+    final enc = _toJsonEncodable(v);
+    if (enc is Map<String, dynamic>) return enc;
+    if (enc is Map) return enc.cast<String, dynamic>();
+    return null;
+  }
+
+  static Map<String, dynamic>? _extractToolCallExtraContent(Map<String, dynamic> toolCall) {
+    dynamic extra = toolCall['extra_content'] ?? toolCall['extraContent'];
+    if (extra == null) {
+      final fn = toolCall['function'];
+      if (fn is Map) extra = fn['extra_content'] ?? fn['extraContent'];
+    }
+    final extraObj = _asJsonObject(extra);
+    if (extraObj != null && extraObj.isNotEmpty) return extraObj;
+
+    // Fallback: some payloads may expose Gemini's signature directly.
+    final sig = toolCall['thought_signature'] ?? toolCall['thoughtSignature'];
+    final s = (sig ?? '').toString().trim();
+    if (s.isNotEmpty) {
+      return <String, dynamic>{'google': <String, dynamic>{'thought_signature': s}};
+    }
+    return null;
+  }
+
+  static Map<String, dynamic> _buildOpenAiToolCall({
+    required String id,
+    required String name,
+    required Map<String, dynamic> arguments,
+    Map<String, dynamic>? extraContent,
+  }) {
+    final out = <String, dynamic>{
+      'id': id,
+      'type': 'function',
+      'function': <String, dynamic>{
+        'name': name,
+        'arguments': jsonEncode(arguments),
+      },
+    };
+    if (extraContent != null && extraContent.isNotEmpty) {
+      out['extra_content'] = extraContent;
+    }
+    return out;
+  }
+
   static bool _isOff(int? budget) => (budget != null && budget != -1 && budget < 1024);
   static String _effortForBudget(int? budget) {
     if (budget == null || budget == -1) return 'auto';
@@ -1647,10 +1706,11 @@ class ChatApiService {
               final id = (t['id'] ?? 'call_$i').toString();
               final f = (t['function'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
               final name = (f['name'] ?? '').toString();
+              final extra = _extractToolCallExtraContent(t);
               Map<String, dynamic> args;
               try { args = (jsonDecode((f['arguments'] ?? '{}').toString()) as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
               callInfos.add(ToolCallInfo(id: id, name: name, arguments: args));
-              calls.add({'id': id, 'type': 'function', 'function': {'name': name, 'arguments': jsonEncode(args)}});
+              calls.add(_buildOpenAiToolCall(id: id, name: name, arguments: args, extraContent: extra));
             }
             if (callInfos.isNotEmpty) {
               yield ChatStreamChunk(content: '', isDone: false, totalTokens: aggUsage?.totalTokens ?? 0, usage: aggUsage, toolCalls: callInfos);
@@ -1752,7 +1812,7 @@ class ChatApiService {
     dynamic reasoningDetailsBuffer;
 
     // Track potential tool calls (OpenAI Chat Completions)
-    final Map<int, Map<String, String>> toolAcc = <int, Map<String, String>>{}; // index -> {id,name,args}
+    final Map<int, Map<String, dynamic>> toolAcc = <int, Map<String, dynamic>>{}; // index -> {id,name,args,extra_content}
     // Track potential tool calls (OpenAI Responses API)
     final Map<String, Map<String, String>> toolAccResp = <String, Map<String, String>>{}; // id/name -> {name,args}
     // Responses API: track by output_index to capture call_id reliably
@@ -1778,19 +1838,13 @@ class ChatApiService {
             final callInfos = <ToolCallInfo>[];
             final toolMsgs = <Map<String, dynamic>>[];
             toolAcc.forEach((idx, m) {
-              final id = (m['id'] ?? 'call_$idx');
-              final name = (m['name'] ?? '');
+              final id = (m['id'] ?? 'call_$idx').toString();
+              final name = (m['name'] ?? '').toString();
               Map<String, dynamic> args;
-              try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+              try { args = (jsonDecode((m['args'] ?? '{}').toString()) as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+              final extra = _asJsonObject(m['extra_content']);
               callInfos.add(ToolCallInfo(id: id, name: name, arguments: args));
-              calls.add({
-                'id': id,
-                'type': 'function',
-                'function': {
-                  'name': name,
-                  'arguments': jsonEncode(args),
-                },
-              });
+              calls.add(_buildOpenAiToolCall(id: id, name: name, arguments: args, extraContent: extra));
               toolMsgs.add({'__name': name, '__id': id, '__args': args});
             });
 
@@ -1962,7 +2016,7 @@ class ChatApiService {
               final s2 = resp2.stream.transform(utf8.decoder);
               String buf2 = '';
               // Track potential subsequent tool calls
-              final Map<int, Map<String, String>> toolAcc2 = <int, Map<String, String>>{};
+              final Map<int, Map<String, dynamic>> toolAcc2 = <int, Map<String, dynamic>>{};
               String? finishReason2;
               String contentAccum = ''; // Accumulate content for this round
               String reasoningAccum = '';
@@ -2091,15 +2145,39 @@ class ChatApiService {
                       final tcs = delta?['tool_calls'] as List?;
                       if (tcs != null) {
                         for (final t in tcs) {
+                          if (t is! Map) continue;
                           final idx = (t['index'] as int?) ?? 0;
                           final id = t['id'] as String?;
                           final func = t['function'] as Map<String, dynamic>?;
                           final name = func?['name'] as String?;
                           final argsDelta = func?['arguments'] as String?;
-                          final entry = toolAcc2.putIfAbsent(idx, () => {'id': '', 'name': '', 'args': ''});
+                          final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
+                          final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
                           if (id != null) entry['id'] = id;
                           if (name != null && name.isNotEmpty) entry['name'] = name;
-                          if (argsDelta != null && argsDelta.isNotEmpty) entry['args'] = (entry['args'] ?? '') + argsDelta;
+                          if (argsDelta != null && argsDelta.isNotEmpty) entry['args'] = ((entry['args'] ?? '') as String) + argsDelta;
+                          if (extra != null && extra.isNotEmpty) entry['extra_content'] = extra;
+                        }
+                      }
+                      final mtcs = message?['tool_calls'] as List?;
+                      if (mtcs != null) {
+                        for (int k = 0; k < mtcs.length; k++) {
+                          final raw = mtcs[k];
+                          if (raw is! Map) continue;
+                          final idx = (raw['index'] as int?) ?? k;
+                          final id = (raw['id'] ?? '').toString();
+                          final func = raw['function'] as Map?;
+                          final name = (func?['name'] ?? '').toString();
+                          final argsStr = (func?['arguments'] ?? '').toString();
+                          final extra = _extractToolCallExtraContent((raw as Map).cast<String, dynamic>());
+                          final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
+                          if (id.isNotEmpty) entry['id'] = id;
+                          if (name.isNotEmpty) entry['name'] = name;
+                          if (argsStr.isNotEmpty) {
+                            final prev = (entry['args'] ?? '') as String;
+                            if (argsStr.length >= prev.length) entry['args'] = argsStr;
+                          }
+                          if (extra != null && extra.isNotEmpty) entry['extra_content'] = extra;
                         }
                       }
                     }
@@ -2113,12 +2191,13 @@ class ChatApiService {
                 final callInfos2 = <ToolCallInfo>[];
                 final toolMsgs2 = <Map<String, dynamic>>[];
                 toolAcc2.forEach((idx, m) {
-                  final id = (m['id'] ?? 'call_$idx');
-                  final name = (m['name'] ?? '');
+                  final id = (m['id'] ?? 'call_$idx').toString();
+                  final name = (m['name'] ?? '').toString();
                   Map<String, dynamic> args;
-                  try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+                  try { args = (jsonDecode((m['args'] ?? '{}').toString()) as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+                  final extra = _asJsonObject(m['extra_content']);
                   callInfos2.add(ToolCallInfo(id: id, name: name, arguments: args));
-                  calls2.add({'id': id, 'type': 'function', 'function': {'name': name, 'arguments': jsonEncode(args)}});
+                  calls2.add(_buildOpenAiToolCall(id: id, name: name, arguments: args, extraContent: extra));
                   toolMsgs2.add({'__name': name, '__id': id, '__args': args});
                 });
                 if (callInfos2.isNotEmpty) {
@@ -2646,15 +2725,18 @@ class ChatApiService {
                 final tcs = delta['tool_calls'] as List?;
                 if (tcs != null) {
                   for (final t in tcs) {
+                    if (t is! Map) continue;
                     final idx = (t['index'] as int?) ?? 0;
                     final id = t['id'] as String?;
                     final func = t['function'] as Map<String, dynamic>?;
                     final name = func?['name'] as String?;
                     final argsDelta = func?['arguments'] as String?;
-                    final entry = toolAcc.putIfAbsent(idx, () => {'id': '', 'name': '', 'args': ''});
+                    final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
+                    final entry = toolAcc.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
                     if (id != null) entry['id'] = id;
                     if (name != null && name.isNotEmpty) entry['name'] = name;
-                    if (argsDelta != null && argsDelta.isNotEmpty) entry['args'] = (entry['args'] ?? '') + argsDelta;
+                    if (argsDelta != null && argsDelta.isNotEmpty) entry['args'] = ((entry['args'] ?? '') as String) + argsDelta;
+                    if (extra != null && extra.isNotEmpty) entry['extra_content'] = extra;
                   }
                 }
               }
@@ -2662,6 +2744,28 @@ class ChatApiService {
               if (preserveReasoningDetails && message != null) {
                 final rdMsg = message['reasoning_details'];
                 if (rdMsg is List && rdMsg.isNotEmpty) reasoningDetailsBuffer = rdMsg;
+              }
+              // Some providers place tool_calls on `message`; merge any extra_content/thought_signature.
+              final mtcs = message?['tool_calls'] as List?;
+              if (mtcs != null) {
+                for (int k = 0; k < mtcs.length; k++) {
+                  final raw = mtcs[k];
+                  if (raw is! Map) continue;
+                  final idx = (raw['index'] as int?) ?? k;
+                  final id = (raw['id'] ?? '').toString();
+                  final func = raw['function'] as Map?;
+                  final name = (func?['name'] ?? '').toString();
+                  final argsStr = (func?['arguments'] ?? '').toString();
+                  final extra = _extractToolCallExtraContent((raw as Map).cast<String, dynamic>());
+                  final entry = toolAcc.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
+                  if (id.isNotEmpty) entry['id'] = id;
+                  if (name.isNotEmpty) entry['name'] = name;
+                  if (argsStr.isNotEmpty) {
+                    final prev = (entry['args'] ?? '') as String;
+                    if (argsStr.length >= prev.length) entry['args'] = argsStr;
+                  }
+                  if (extra != null && extra.isNotEmpty) entry['extra_content'] = extra;
+                }
               }
 
               // 2) Fallback and merge: parse choices[0].message.content
@@ -2737,12 +2841,14 @@ class ChatApiService {
                 final name = (func['name'] ?? '').toString();
                 final argsStr = (func['arguments'] ?? '').toString();
                 if (name.isEmpty) continue;
+                final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
                 // print('[ChatApi/XinLiu] Tool call: id=$id, name=$name, args=${argsStr.length} chars');
                 final idx = toolAcc.length;
-                final entry = toolAcc.putIfAbsent(idx, () => {'id': id.isEmpty ? 'call_$idx' : id, 'name': name, 'args': argsStr});
+                final entry = toolAcc.putIfAbsent(idx, () => <String, dynamic>{'id': id.isEmpty ? 'call_$idx' : id, 'name': name, 'args': argsStr});
                 if (id.isNotEmpty) entry['id'] = id;
                 entry['name'] = name;
                 entry['args'] = argsStr;
+                if (extra != null && extra.isNotEmpty) entry['extra_content'] = extra;
               }
               // When root-level tool_calls are present, always treat as tool_calls finish reason
               // (override any other finish_reason from provider)
@@ -2785,10 +2891,11 @@ class ChatApiService {
             final callInfos = <ToolCallInfo>[];
             final toolMsgs = <Map<String, dynamic>>[];
             toolAcc.forEach((idx, m) {
-              final id = (m['id'] ?? 'call_$idx');
-              final name = (m['name'] ?? '');
+              final id = (m['id'] ?? 'call_$idx').toString();
+              final name = (m['name'] ?? '').toString();
               Map<String, dynamic> args;
-              try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+              try { args = (jsonDecode((m['args'] ?? '{}').toString()) as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+              final extra = _asJsonObject(m['extra_content']);
               callInfos.add(ToolCallInfo(id: id, name: name, arguments: args));
               calls.add({
                 'id': id,
@@ -2797,6 +2904,7 @@ class ChatApiService {
                   'name': name,
                   'arguments': jsonEncode(args),
                 },
+                if (extra != null && extra.isNotEmpty) 'extra_content': extra,
               });
               toolMsgs.add({'__name': name, '__id': id, '__args': args});
             });
@@ -2956,7 +3064,7 @@ class ChatApiService {
               }
               final s2 = resp2.stream.transform(utf8.decoder);
               String buf2 = '';
-              final Map<int, Map<String, String>> toolAcc2 = <int, Map<String, String>>{};
+              final Map<int, Map<String, dynamic>> toolAcc2 = <int, Map<String, dynamic>>{};
               String? finishReason2;
               String contentAccum = '';
               String reasoningAccum = '';
@@ -3058,20 +3166,44 @@ class ChatApiService {
                       final tcs = delta?['tool_calls'] as List?;
                       if (tcs != null) {
                         for (final t in tcs) {
+                          if (t is! Map) continue;
                           final idx = (t['index'] as int?) ?? 0;
                           final id = t['id'] as String?;
                           final func = t['function'] as Map<String, dynamic>?;
                           final name = func?['name'] as String?;
                           final argsDelta = func?['arguments'] as String?;
-                          final entry = toolAcc2.putIfAbsent(idx, () => {'id': '', 'name': '', 'args': ''});
+                          final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
+                          final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
                           if (id != null) entry['id'] = id;
                           if (name != null && name.isNotEmpty) entry['name'] = name;
-                          if (argsDelta != null && argsDelta.isNotEmpty) entry['args'] = (entry['args'] ?? '') + argsDelta;
+                          if (argsDelta != null && argsDelta.isNotEmpty) entry['args'] = ((entry['args'] ?? '') as String) + argsDelta;
+                          if (extra != null && extra.isNotEmpty) entry['extra_content'] = extra;
                         }
                       }
 
                       // Fallback/merge: message.content in same chunk (if any)
                       final message = c0['message'] as Map?;
+                      final mtcs = message?['tool_calls'] as List?;
+                      if (mtcs != null) {
+                        for (int k = 0; k < mtcs.length; k++) {
+                          final raw = mtcs[k];
+                          if (raw is! Map) continue;
+                          final idx = (raw['index'] as int?) ?? k;
+                          final id = (raw['id'] ?? '').toString();
+                          final func = raw['function'] as Map?;
+                          final name = (func?['name'] ?? '').toString();
+                          final argsStr = (func?['arguments'] ?? '').toString();
+                          final extra = _extractToolCallExtraContent((raw as Map).cast<String, dynamic>());
+                          final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
+                          if (id.isNotEmpty) entry['id'] = id;
+                          if (name.isNotEmpty) entry['name'] = name;
+                          if (argsStr.isNotEmpty) {
+                            final prev = (entry['args'] ?? '') as String;
+                            if (argsStr.length >= prev.length) entry['args'] = argsStr;
+                          }
+                          if (extra != null && extra.isNotEmpty) entry['extra_content'] = extra;
+                        }
+                      }
                       if (message != null && message['content'] != null) {
                         final mc = message['content'];
                         if (mc is String && mc.isNotEmpty) {
@@ -3105,11 +3237,13 @@ class ChatApiService {
                         final name = (func['name'] ?? '').toString();
                         final argsStr = (func['arguments'] ?? '').toString();
                         if (name.isEmpty) continue;
+                        final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
                         final idx = toolAcc2.length;
-                        final entry = toolAcc2.putIfAbsent(idx, () => {'id': id.isEmpty ? 'call_$idx' : id, 'name': name, 'args': argsStr});
+                        final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': id.isEmpty ? 'call_$idx' : id, 'name': name, 'args': argsStr});
                         if (id.isNotEmpty) entry['id'] = id;
                         entry['name'] = name;
                         entry['args'] = argsStr;
+                        if (extra != null && extra.isNotEmpty) entry['extra_content'] = extra;
                       }
                       if (rootToolCalls2.isNotEmpty) {
                         finishReason2 = 'tool_calls';
@@ -3123,12 +3257,13 @@ class ChatApiService {
                 final callInfos2 = <ToolCallInfo>[];
                 final toolMsgs2 = <Map<String, dynamic>>[];
                 toolAcc2.forEach((idx, m) {
-                  final id = (m['id'] ?? 'call_$idx');
-                  final name = (m['name'] ?? '');
+                  final id = (m['id'] ?? 'call_$idx').toString();
+                  final name = (m['name'] ?? '').toString();
                   Map<String, dynamic> args;
-                  try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+                  try { args = (jsonDecode((m['args'] ?? '{}').toString()) as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+                  final extra = _asJsonObject(m['extra_content']);
                   callInfos2.add(ToolCallInfo(id: id, name: name, arguments: args));
-                  calls2.add({'id': id, 'type': 'function', 'function': {'name': name, 'arguments': jsonEncode(args)}});
+                  calls2.add(_buildOpenAiToolCall(id: id, name: name, arguments: args, extraContent: extra));
                   toolMsgs2.add({'__name': name, '__id': id, '__args': args});
                 });
                 if (callInfos2.isNotEmpty) {
@@ -3185,10 +3320,11 @@ class ChatApiService {
                 final callInfos = <ToolCallInfo>[];
                 final toolMsgs = <Map<String, dynamic>>[];
                 toolAcc.forEach((idx, m) {
-                  final id = (m['id'] ?? 'call_$idx');
-                  final name = (m['name'] ?? '');
+                  final id = (m['id'] ?? 'call_$idx').toString();
+                  final name = (m['name'] ?? '').toString();
                   Map<String, dynamic> args;
-                  try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+                  try { args = (jsonDecode((m['args'] ?? '{}').toString()) as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+                  final extra = _asJsonObject(m['extra_content']);
                   callInfos.add(ToolCallInfo(id: id, name: name, arguments: args));
                   calls.add({
                     'id': id,
@@ -3197,6 +3333,7 @@ class ChatApiService {
                       'name': name,
                       'arguments': jsonEncode(args),
                     },
+                    if (extra != null && extra.isNotEmpty) 'extra_content': extra,
                   });
                   toolMsgs.add({'__name': name, '__id': id, '__args': args});
                 });
@@ -3349,7 +3486,7 @@ class ChatApiService {
                   }
                   final s2 = resp2.stream.transform(utf8.decoder);
                   String buf2 = '';
-                  final Map<int, Map<String, String>> toolAcc2 = <int, Map<String, String>>{};
+                  final Map<int, Map<String, dynamic>> toolAcc2 = <int, Map<String, dynamic>>{};
                   String? finishReason2;
                   String contentAccum = '';
                   String reasoningAccum = '';
@@ -3432,20 +3569,44 @@ class ChatApiService {
                           final tcs = delta?['tool_calls'] as List?;
                           if (tcs != null) {
                             for (final t in tcs) {
+                              if (t is! Map) continue;
                               final idx = (t['index'] as int?) ?? 0;
                               final id = t['id'] as String?;
                               final func = t['function'] as Map<String, dynamic>?;
                               final name = func?['name'] as String?;
                               final argsDelta = func?['arguments'] as String?;
-                              final entry = toolAcc2.putIfAbsent(idx, () => {'id': '', 'name': '', 'args': ''});
+                              final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
+                              final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
                               if (id != null) entry['id'] = id;
                               if (name != null && name.isNotEmpty) entry['name'] = name;
-                              if (argsDelta != null && argsDelta.isNotEmpty) entry['args'] = (entry['args'] ?? '') + argsDelta;
+                              if (argsDelta != null && argsDelta.isNotEmpty) entry['args'] = ((entry['args'] ?? '') as String) + argsDelta;
+                              if (extra != null && extra.isNotEmpty) entry['extra_content'] = extra;
                             }
                           }
 
                           // Fallback/merge: message.content in same chunk (if any)
                           final message = c0['message'] as Map?;
+                          final mtcs = message?['tool_calls'] as List?;
+                          if (mtcs != null) {
+                            for (int k = 0; k < mtcs.length; k++) {
+                              final raw = mtcs[k];
+                              if (raw is! Map) continue;
+                              final idx = (raw['index'] as int?) ?? k;
+                              final id = (raw['id'] ?? '').toString();
+                              final func = raw['function'] as Map?;
+                              final name = (func?['name'] ?? '').toString();
+                              final argsStr = (func?['arguments'] ?? '').toString();
+                              final extra = _extractToolCallExtraContent((raw as Map).cast<String, dynamic>());
+                              final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
+                              if (id.isNotEmpty) entry['id'] = id;
+                              if (name.isNotEmpty) entry['name'] = name;
+                              if (argsStr.isNotEmpty) {
+                                final prev = (entry['args'] ?? '') as String;
+                                if (argsStr.length >= prev.length) entry['args'] = argsStr;
+                              }
+                              if (extra != null && extra.isNotEmpty) entry['extra_content'] = extra;
+                            }
+                          }
                           if (message != null && message['content'] != null) {
                             final mc = message['content'];
                             if (mc is String && mc.isNotEmpty) {
@@ -3479,11 +3640,13 @@ class ChatApiService {
                             final name = (func['name'] ?? '').toString();
                             final argsStr = (func['arguments'] ?? '').toString();
                             if (name.isEmpty) continue;
+                            final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
                             final idx = toolAcc2.length;
-                            final entry = toolAcc2.putIfAbsent(idx, () => {'id': id.isEmpty ? 'call_$idx' : id, 'name': name, 'args': argsStr});
+                            final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': id.isEmpty ? 'call_$idx' : id, 'name': name, 'args': argsStr});
                             if (id.isNotEmpty) entry['id'] = id;
                             entry['name'] = name;
                             entry['args'] = argsStr;
+                            if (extra != null && extra.isNotEmpty) entry['extra_content'] = extra;
                           }
                           if (rootToolCalls2.isNotEmpty && finishReason2 == null) {
                             finishReason2 = 'tool_calls';
@@ -3497,12 +3660,13 @@ class ChatApiService {
                     final callInfos2 = <ToolCallInfo>[];
                     final toolMsgs2 = <Map<String, dynamic>>[];
                     toolAcc2.forEach((idx, m) {
-                      final id = (m['id'] ?? 'call_$idx');
-                      final name = (m['name'] ?? '');
+                      final id = (m['id'] ?? 'call_$idx').toString();
+                      final name = (m['name'] ?? '').toString();
                       Map<String, dynamic> args;
-                      try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+                      try { args = (jsonDecode((m['args'] ?? '{}').toString()) as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+                      final extra = _asJsonObject(m['extra_content']);
                       callInfos2.add(ToolCallInfo(id: id, name: name, arguments: args));
-                      calls2.add({'id': id, 'type': 'function', 'function': {'name': name, 'arguments': jsonEncode(args)}});
+                      calls2.add(_buildOpenAiToolCall(id: id, name: name, arguments: args, extraContent: extra));
                       toolMsgs2.add({'__name': name, '__id': id, '__args': args});
                     });
                     if (callInfos2.isNotEmpty) {
