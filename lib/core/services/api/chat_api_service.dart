@@ -958,7 +958,7 @@ class ChatApiService {
     return null;
   }
 
-  static Map<String, dynamic>? _extractToolCallExtraContent(Map<String, dynamic> toolCall) {
+  static Map<String, dynamic>? _extractToolCallExtraContent(Map toolCall) {
     dynamic extra = toolCall['extra_content'] ?? toolCall['extraContent'];
     if (extra == null) {
       final fn = toolCall['function'];
@@ -2151,7 +2151,7 @@ class ChatApiService {
                           final func = t['function'] as Map<String, dynamic>?;
                           final name = func?['name'] as String?;
                           final argsDelta = func?['arguments'] as String?;
-                          final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
+                          final extra = _extractToolCallExtraContent(t);
                           final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
                           if (id != null) entry['id'] = id;
                           if (name != null && name.isNotEmpty) entry['name'] = name;
@@ -2169,7 +2169,7 @@ class ChatApiService {
                           final func = raw['function'] as Map?;
                           final name = (func?['name'] ?? '').toString();
                           final argsStr = (func?['arguments'] ?? '').toString();
-                          final extra = _extractToolCallExtraContent((raw as Map).cast<String, dynamic>());
+                          final extra = _extractToolCallExtraContent(raw);
                           final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
                           if (id.isNotEmpty) entry['id'] = id;
                           if (name.isNotEmpty) entry['name'] = name;
@@ -2731,7 +2731,7 @@ class ChatApiService {
                     final func = t['function'] as Map<String, dynamic>?;
                     final name = func?['name'] as String?;
                     final argsDelta = func?['arguments'] as String?;
-                    final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
+                    final extra = _extractToolCallExtraContent(t);
                     final entry = toolAcc.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
                     if (id != null) entry['id'] = id;
                     if (name != null && name.isNotEmpty) entry['name'] = name;
@@ -2756,7 +2756,7 @@ class ChatApiService {
                   final func = raw['function'] as Map?;
                   final name = (func?['name'] ?? '').toString();
                   final argsStr = (func?['arguments'] ?? '').toString();
-                  final extra = _extractToolCallExtraContent((raw as Map).cast<String, dynamic>());
+                  final extra = _extractToolCallExtraContent(raw);
                   final entry = toolAcc.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
                   if (id.isNotEmpty) entry['id'] = id;
                   if (name.isNotEmpty) entry['name'] = name;
@@ -2841,7 +2841,7 @@ class ChatApiService {
                 final name = (func['name'] ?? '').toString();
                 final argsStr = (func['arguments'] ?? '').toString();
                 if (name.isEmpty) continue;
-                final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
+                final extra = _extractToolCallExtraContent(t);
                 // print('[ChatApi/XinLiu] Tool call: id=$id, name=$name, args=${argsStr.length} chars');
                 final idx = toolAcc.length;
                 final entry = toolAcc.putIfAbsent(idx, () => <String, dynamic>{'id': id.isEmpty ? 'call_$idx' : id, 'name': name, 'args': argsStr});
@@ -3172,7 +3172,7 @@ class ChatApiService {
                           final func = t['function'] as Map<String, dynamic>?;
                           final name = func?['name'] as String?;
                           final argsDelta = func?['arguments'] as String?;
-                          final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
+                          final extra = _extractToolCallExtraContent(t);
                           final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
                           if (id != null) entry['id'] = id;
                           if (name != null && name.isNotEmpty) entry['name'] = name;
@@ -3193,7 +3193,7 @@ class ChatApiService {
                           final func = raw['function'] as Map?;
                           final name = (func?['name'] ?? '').toString();
                           final argsStr = (func?['arguments'] ?? '').toString();
-                          final extra = _extractToolCallExtraContent((raw as Map).cast<String, dynamic>());
+                          final extra = _extractToolCallExtraContent(raw);
                           final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
                           if (id.isNotEmpty) entry['id'] = id;
                           if (name.isNotEmpty) entry['name'] = name;
@@ -3237,7 +3237,7 @@ class ChatApiService {
                         final name = (func['name'] ?? '').toString();
                         final argsStr = (func['arguments'] ?? '').toString();
                         if (name.isEmpty) continue;
-                        final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
+                        final extra = _extractToolCallExtraContent(t);
                         final idx = toolAcc2.length;
                         final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': id.isEmpty ? 'call_$idx' : id, 'name': name, 'args': argsStr});
                         if (id.isNotEmpty) entry['id'] = id;
@@ -3575,7 +3575,7 @@ class ChatApiService {
                               final func = t['function'] as Map<String, dynamic>?;
                               final name = func?['name'] as String?;
                               final argsDelta = func?['arguments'] as String?;
-                              final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
+                              final extra = _extractToolCallExtraContent(t);
                               final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
                               if (id != null) entry['id'] = id;
                               if (name != null && name.isNotEmpty) entry['name'] = name;
@@ -3596,7 +3596,7 @@ class ChatApiService {
                               final func = raw['function'] as Map?;
                               final name = (func?['name'] ?? '').toString();
                               final argsStr = (func?['arguments'] ?? '').toString();
-                              final extra = _extractToolCallExtraContent((raw as Map).cast<String, dynamic>());
+                              final extra = _extractToolCallExtraContent(raw);
                               final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': '', 'name': '', 'args': ''});
                               if (id.isNotEmpty) entry['id'] = id;
                               if (name.isNotEmpty) entry['name'] = name;
@@ -3640,7 +3640,7 @@ class ChatApiService {
                             final name = (func['name'] ?? '').toString();
                             final argsStr = (func['arguments'] ?? '').toString();
                             if (name.isEmpty) continue;
-                            final extra = _extractToolCallExtraContent((t as Map).cast<String, dynamic>());
+                            final extra = _extractToolCallExtraContent(t);
                             final idx = toolAcc2.length;
                             final entry = toolAcc2.putIfAbsent(idx, () => <String, dynamic>{'id': id.isEmpty ? 'call_$idx' : id, 'name': name, 'args': argsStr});
                             if (id.isNotEmpty) entry['id'] = id;
