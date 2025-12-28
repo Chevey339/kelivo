@@ -21,6 +21,7 @@ import 'dart:ui' as ui show ImageFilter;
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../widgets/provider_avatar.dart';
+import '../../../utils/provider_grouping.dart';
 
 class ProvidersPage extends StatefulWidget {
   const ProvidersPage({super.key});
@@ -71,6 +72,39 @@ class _ProvidersPageState extends State<ProvidersPage> {
     // Append any remaining providers not recorded in order
     tmp.addAll(map.values);
     final items = tmp;
+
+    String groupTitle(String id) {
+      switch (id) {
+        case ProviderGrouping.idOfficial:
+          return l10n.providerGroupOfficial;
+        case ProviderGrouping.idSelfHosted:
+          return l10n.providerGroupSelfHosted;
+        case ProviderGrouping.idLocal:
+          return l10n.providerGroupLocal;
+        case ProviderGrouping.idPublic:
+          return l10n.providerGroupPublic;
+        default:
+          return l10n.providerDetailPageOtherModelsGroupTitle;
+      }
+    }
+
+    // Group providers into sections (official / self-hosted / local / public).
+    final Map<String, List<_Provider>> grouped = <String, List<_Provider>>{};
+    for (final p in items) {
+      final cfg = settings.getProviderConfig(p.keyName, defaultName: p.name);
+      final gid = ProviderGrouping.classify(providerKey: p.keyName, config: cfg);
+      (grouped[gid] ??= <_Provider>[]).add(p);
+    }
+
+    final List<_ProvidersListEntry> rows = <_ProvidersListEntry>[];
+    for (final gid in ProviderGrouping.orderedGroupIds) {
+      final list = grouped[gid];
+      if (list == null || list.isEmpty) continue;
+      rows.add(_ProvidersListHeader(groupId: gid, title: groupTitle(gid), count: list.length));
+      for (int i = 0; i < list.length; i++) {
+        rows.add(_ProvidersListProvider(provider: list[i], groupId: gid, indexInGroup: i, groupSize: list.length));
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -141,7 +175,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
       body: Stack(
         children: [
           _ProvidersList(
-            items: items,
+            rows: rows,
             selectMode: _selectMode,
             selectedKeys: _selected,
             onToggleSelect: (key) {
@@ -156,17 +190,42 @@ class _ProvidersPageState extends State<ProvidersPage> {
             onReorder: (oldIndex, newIndex) async {
               // Normalize newIndex because Flutter passes the index after removal
               if (newIndex > oldIndex) newIndex -= 1;
-              final moved = items[oldIndex];
-              final mut = List<_Provider>.of(items);
+              final movedRow = rows[oldIndex];
+              if (movedRow is! _ProvidersListProvider) return;
+
+              final mut = List<_ProvidersListEntry>.of(rows);
               final item = mut.removeAt(oldIndex);
-              mut.insert(newIndex, item);
-              setState(() => _settleKeys.add(moved.keyName));
-              await context.read<SettingsProvider>().setProvidersOrder([
-                for (final p in mut) p.keyName
+
+              int insertIndex = newIndex.clamp(0, mut.length);
+              // Keep providers after their group header; dropping onto a header means "move to group start".
+              if (insertIndex <= 0) insertIndex = 1;
+              if (insertIndex < mut.length && mut[insertIndex] is _ProvidersListHeader) {
+                insertIndex = (insertIndex + 1).clamp(0, mut.length);
+              }
+              mut.insert(insertIndex, item);
+
+              String targetGroupId = movedRow.groupId;
+              for (int i = insertIndex - 1; i >= 0; i--) {
+                final e = mut[i];
+                if (e is _ProvidersListHeader) {
+                  targetGroupId = e.groupId;
+                  break;
+                }
+              }
+
+              setState(() => _settleKeys.add(movedRow.provider.keyName));
+              final sp = context.read<SettingsProvider>();
+              if (targetGroupId != movedRow.groupId) {
+                final cfg = sp.getProviderConfig(movedRow.provider.keyName, defaultName: movedRow.provider.name);
+                await sp.setProviderConfig(movedRow.provider.keyName, cfg.copyWith(group: targetGroupId));
+              }
+              await sp.setProvidersOrder([
+                for (final e in mut)
+                  if (e is _ProvidersListProvider) e.provider.keyName
               ]);
               Future.delayed(const Duration(milliseconds: 220), () {
                 if (!mounted) return;
-                setState(() => _settleKeys.remove(moved.keyName));
+                setState(() => _settleKeys.remove(movedRow.provider.keyName));
               });
             },
             settlingKeys: _settleKeys,
@@ -303,14 +362,14 @@ class _ProvidersPageState extends State<ProvidersPage> {
 // iOS-style providers list (reorderable by long-press)
 class _ProvidersList extends StatelessWidget {
   const _ProvidersList({
-    required this.items,
+    required this.rows,
     required this.onReorder,
     required this.settlingKeys,
     required this.selectMode,
     required this.selectedKeys,
     required this.onToggleSelect,
   });
-  final List<_Provider> items;
+  final List<_ProvidersListEntry> rows;
   final void Function(int oldIndex, int newIndex) onReorder;
   final Set<String> settlingKeys;
   final bool selectMode;
@@ -339,7 +398,7 @@ class _ProvidersList extends StatelessWidget {
           const double rowH = 44.0;
           const double dividerH = 6.0; // _iosDivider height
           const double listPadV = 8.0; // ReorderableListView vertical padding
-          final int n = items.length;
+          final int n = rows.length;
           final double baseContentH = n == 0 ? 0.0 : (n * rowH + (n - 1) * dividerH + listPadV);
           // Decide if we should treat it as reaching bottom (considering the bottom gap we will add)
           final bool reachesBottom = maxH.isFinite &&
@@ -363,7 +422,7 @@ class _ProvidersList extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: ReorderableListView.builder(
               padding: EdgeInsets.only(top: 4, bottom: reachesBottom ? bottomGapIfFlush : 4),
-              itemCount: items.length,
+              itemCount: rows.length,
               onReorder: onReorder,
               buildDefaultDragHandles: false,
               proxyDecorator: (child, index, animation) => Opacity(
@@ -371,15 +430,22 @@ class _ProvidersList extends StatelessWidget {
                 child: Transform.scale(scale: 0.98, child: child),
               ),
               itemBuilder: (context, index) {
-                final p = items[index];
+                final e = rows[index];
+                if (e is _ProvidersListHeader) {
+                  return KeyedSubtree(
+                    key: ValueKey('__hdr__${e.groupId}'),
+                    child: _ProvidersGroupHeader(title: e.title, count: e.count),
+                  );
+                }
+                final p = (e as _ProvidersListProvider).provider;
                 return KeyedSubtree(
                   key: ValueKey(p.keyName),
                   child: _SettleAnim(
                     active: settlingKeys.contains(p.keyName),
                     child: _ProviderRow(
                       provider: p,
-                      index: index,
-                      total: items.length,
+                      index: e.indexInGroup,
+                      total: e.groupSize,
                       selectMode: selectMode,
                       selected: selectedKeys.contains(p.keyName),
                       onToggleSelect: onToggleSelect,
@@ -390,6 +456,66 @@ class _ProvidersList extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+sealed class _ProvidersListEntry {
+  const _ProvidersListEntry();
+}
+
+class _ProvidersListHeader extends _ProvidersListEntry {
+  const _ProvidersListHeader({required this.groupId, required this.title, required this.count});
+  final String groupId;
+  final String title;
+  final int count;
+}
+
+class _ProvidersListProvider extends _ProvidersListEntry {
+  const _ProvidersListProvider({
+    required this.provider,
+    required this.groupId,
+    required this.indexInGroup,
+    required this.groupSize,
+  });
+  final _Provider provider;
+  final String groupId;
+  final int indexInGroup;
+  final int groupSize;
+}
+
+class _ProvidersGroupHeader extends StatelessWidget {
+  const _ProvidersGroupHeader({required this.title, required this.count});
+  final String title;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 6),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+              color: cs.onSurface.withOpacity(0.55),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface.withOpacity(0.42),
+            ),
+          ),
+        ],
       ),
     );
   }

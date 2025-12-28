@@ -2368,6 +2368,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageOtherModelsGroupTitle => '其他模型';
 
   @override
+  String get providerGroupLabel => '分组';
+
+  @override
+  String get providerGroupAuto => '自动';
+
+  @override
+  String get providerGroupOfficial => '官方';
+
+  @override
+  String get providerGroupSelfHosted => '自建';
+
+  @override
+  String get providerGroupLocal => '本地';
+
+  @override
+  String get providerGroupPublic => '公益站';
+
+  @override
   String get providerDetailPageRemoveGroupTooltip => '移除本组';
 
   @override
@@ -5952,6 +5970,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerDetailPageOtherModelsGroupTitle => '其他模型';
 
   @override
+  String get providerGroupLabel => '分组';
+
+  @override
+  String get providerGroupAuto => '自动';
+
+  @override
+  String get providerGroupOfficial => '官方';
+
+  @override
+  String get providerGroupSelfHosted => '自建';
+
+  @override
+  String get providerGroupLocal => '本地';
+
+  @override
+  String get providerGroupPublic => '公益站';
+
+  @override
   String get providerDetailPageRemoveGroupTooltip => '移除本组';
 
   @override
@@ -9532,6 +9568,24 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageOtherModelsGroupTitle => '其他模型';
+
+  @override
+  String get providerGroupLabel => '分組';
+
+  @override
+  String get providerGroupAuto => '自動';
+
+  @override
+  String get providerGroupOfficial => '官方';
+
+  @override
+  String get providerGroupSelfHosted => '自建';
+
+  @override
+  String get providerGroupLocal => '本地';
+
+  @override
+  String get providerGroupPublic => '公益站';
 
   @override
   String get providerDetailPageRemoveGroupTooltip => '移除本組';

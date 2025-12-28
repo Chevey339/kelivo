@@ -27,6 +27,7 @@ import 'provider_network_page.dart';
 import '../../../core/services/haptics.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../../../utils/model_grouping.dart';
+import '../../../utils/provider_grouping.dart';
 
 class ProviderDetailPage extends StatefulWidget {
   const ProviderDetailPage({super.key, required this.keyName, required this.displayName});
@@ -55,6 +56,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   bool _vertexAI = false; // google
   bool _showApiKey = false; // toggle visibility
   bool _multiKeyEnabled = false; // single/multi key mode
+  String? _groupOverride; // null => auto
   // network proxy (per provider)
   bool _proxyEnabled = false;
   final _proxyHostCtrl = TextEditingController();
@@ -97,6 +99,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     _proxyPassCtrl.text = _cfg.proxyPassword ?? '';
     _multiKeyEnabled = _cfg.multiKeyEnabled ?? false;
     _aihubmixAppCodeEnabled = _cfg.aihubmixAppCodeEnabled ?? false;
+    _groupOverride = ProviderGrouping.normalizeId(_cfg.group);
   }
 
   @override
@@ -558,6 +561,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             label: l10n.providerDetailPageEnabledTitle,
             trailing: IosSwitch(value: _enabled, onChanged: (v) { setState(() => _enabled = v); _save(); }),
           ),
+          _providerGroupRow(context),
           _iosRow(
             context,
             label: l10n.providerDetailPageMultiKeyModeTitle,
@@ -1370,6 +1374,142 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     );
   }
 
+  static const String _autoGroupToken = '__auto__';
+
+  String _groupLabelFor(String id, AppLocalizations l10n) {
+    switch (id) {
+      case ProviderGrouping.idOfficial:
+        return l10n.providerGroupOfficial;
+      case ProviderGrouping.idSelfHosted:
+        return l10n.providerGroupSelfHosted;
+      case ProviderGrouping.idLocal:
+        return l10n.providerGroupLocal;
+      case ProviderGrouping.idPublic:
+        return l10n.providerGroupPublic;
+      default:
+        return l10n.providerDetailPageOtherModelsGroupTitle;
+    }
+  }
+
+  Widget _providerGroupRow(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    // Display the effective group (auto or override) so users understand where it lands.
+    final cfgNow = settings.getProviderConfig(widget.keyName, defaultName: widget.displayName);
+    final autoGroupId = ProviderGrouping.classify(providerKey: widget.keyName, config: cfgNow.copyWith(group: null));
+    final display = _groupOverride == null
+        ? '${l10n.providerGroupAuto} · ${_groupLabelFor(autoGroupId, l10n)}'
+        : _groupLabelFor(_groupOverride!, l10n);
+
+    return _TactileRow(
+      onTap: _showProviderGroupSheet,
+      builder: (pressed) {
+        final cs = Theme.of(context).colorScheme;
+        final base = cs.onSurface;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final target = pressed ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base) : base;
+        return TweenAnimationBuilder<Color?>(
+          tween: ColorTween(end: target),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          builder: (context, color, _) {
+            final c = color ?? base;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(child: Text(l10n.providerGroupLabel, style: TextStyle(fontSize: 15, color: c))),
+                  Flexible(
+                    child: Text(
+                      display,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 15, color: c),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(Lucide.ChevronRight, size: 16, color: c),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showProviderGroupSheet() async {
+    final cs = Theme.of(context).colorScheme;
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) {
+        final l10n = AppLocalizations.of(ctx)!;
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(999)),
+                ),
+                const SizedBox(height: 12),
+                _providerGroupTile(ctx, _autoGroupToken, label: l10n.providerGroupAuto),
+                _providerGroupTile(ctx, ProviderGrouping.idOfficial, label: l10n.providerGroupOfficial),
+                _providerGroupTile(ctx, ProviderGrouping.idSelfHosted, label: l10n.providerGroupSelfHosted),
+                _providerGroupTile(ctx, ProviderGrouping.idLocal, label: l10n.providerGroupLocal),
+                _providerGroupTile(ctx, ProviderGrouping.idPublic, label: l10n.providerGroupPublic),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selected == null) return;
+    final next = selected == _autoGroupToken ? null : ProviderGrouping.normalizeId(selected);
+    if (next == _groupOverride) return;
+    setState(() => _groupOverride = next);
+    await _save();
+  }
+
+  Widget _providerGroupTile(BuildContext ctx, String id, {required String label}) {
+    final cs = Theme.of(ctx).colorScheme;
+    final selected = (_groupOverride == null && id == _autoGroupToken) || (_groupOverride == id);
+    return _TactileRow(
+      pressedScale: 1.00,
+      haptics: false,
+      onTap: () => Navigator.of(ctx).pop(id),
+      builder: (pressed) {
+        final base = cs.onSurface;
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final target = pressed ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base) : base;
+        return TweenAnimationBuilder<Color?>(
+          tween: ColorTween(end: target),
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          builder: (context, color, _) {
+            final c = color ?? base;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: c))),
+                  if (selected) Icon(Icons.check, color: cs.primary),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _showProviderKindSheet() async {
     final cs = Theme.of(context).colorScheme;
     final selected = await showModalBottomSheet<ProviderKind>(
@@ -1453,6 +1593,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       name: _nameCtrl.text.trim().isEmpty ? widget.displayName : _nameCtrl.text.trim(),
       apiKey: _keyCtrl.text.trim(),
       baseUrl: _baseCtrl.text.trim(),
+      group: _groupOverride,
       providerType: _kind,  // Save the selected provider type
       chatPath: _kind == ProviderKind.openai ? _pathCtrl.text.trim() : old.chatPath,
       useResponseApi: _kind == ProviderKind.openai ? _useResp : old.useResponseApi,

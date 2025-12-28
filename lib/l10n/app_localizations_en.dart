@@ -2450,6 +2450,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageOtherModelsGroupTitle => 'Other';
 
   @override
+  String get providerGroupLabel => 'Group';
+
+  @override
+  String get providerGroupAuto => 'Auto';
+
+  @override
+  String get providerGroupOfficial => 'Official';
+
+  @override
+  String get providerGroupSelfHosted => 'Self-hosted';
+
+  @override
+  String get providerGroupLocal => 'Local';
+
+  @override
+  String get providerGroupPublic => 'Public';
+
+  @override
   String get providerDetailPageRemoveGroupTooltip => 'Remove group';
 
   @override

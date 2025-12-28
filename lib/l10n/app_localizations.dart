@@ -4622,6 +4622,42 @@ abstract class AppLocalizations {
   /// **'Other'**
   String get providerDetailPageOtherModelsGroupTitle;
 
+  /// No description provided for @providerGroupLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get providerGroupLabel;
+
+  /// No description provided for @providerGroupAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get providerGroupAuto;
+
+  /// No description provided for @providerGroupOfficial.
+  ///
+  /// In en, this message translates to:
+  /// **'Official'**
+  String get providerGroupOfficial;
+
+  /// No description provided for @providerGroupSelfHosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Self-hosted'**
+  String get providerGroupSelfHosted;
+
+  /// No description provided for @providerGroupLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get providerGroupLocal;
+
+  /// No description provided for @providerGroupPublic.
+  ///
+  /// In en, this message translates to:
+  /// **'Public'**
+  String get providerGroupPublic;
+
   /// No description provided for @providerDetailPageRemoveGroupTooltip.
   ///
   /// In en, this message translates to:
