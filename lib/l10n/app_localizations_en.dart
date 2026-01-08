@@ -1216,14 +1216,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Choose how to import the backup data:';
 
   @override
-  String get backupPageOverwriteMode => 'Complete Overwrite';
+  String get backupPageOverwriteMode => 'Overwrite';
 
   @override
   String get backupPageOverwriteModeDescription =>
       'Clear all local data and restore from backup';
 
   @override
-  String get backupPageMergeMode => 'Smart Merge';
+  String get backupPageMergeMode => 'Merge';
 
   @override
   String get backupPageMergeModeDescription =>
