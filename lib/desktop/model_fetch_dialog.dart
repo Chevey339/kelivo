@@ -11,6 +11,7 @@ import '../icons/lucide_adapter.dart' as lucide;
 import '../utils/brand_assets.dart';
 import 'package:characters/characters.dart';
 import '../utils/model_grouping.dart';
+import '../shared/widgets/model_tag_wrap.dart';
 
 Future<void> showModelFetchDialog(
   BuildContext context, {
@@ -414,36 +415,6 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
     final selected = settings.getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName).models.toSet();
     final added = selected.contains(m.id);
 
-    // Build capsules consistent with desktop list: input/output image + abilities
-    final caps = <Widget>[];
-    Widget pillCapsule(Widget icon, Color color) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final bg = isDark ? color.withOpacity(0.20) : color.withOpacity(0.16);
-      final bd = color.withOpacity(0.25);
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: bd, width: 0.5),
-        ),
-        child: icon,
-      );
-    }
-    if (m.input.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(lucide.Lucide.Eye, size: 12, color: cs.secondary), cs.secondary));
-    }
-    if (m.output.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(lucide.Lucide.Image, size: 12, color: cs.tertiary), cs.tertiary));
-    }
-    for (final ab in m.abilities) {
-      if (ab == ModelAbility.tool) {
-        caps.add(pillCapsule(Icon(lucide.Lucide.Hammer, size: 12, color: cs.primary), cs.primary));
-      } else if (ab == ModelAbility.reasoning) {
-        caps.add(pillCapsule(SvgPicture.asset('assets/icons/deepthink.svg', width: 12, height: 12, colorFilter: ColorFilter.mode(cs.secondary, BlendMode.srcIn)), cs.secondary));
-      }
-    }
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
       child: _TactileRow(
@@ -464,7 +435,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Row(children: caps.map((w) => Padding(padding: const EdgeInsets.only(left: 4), child: w)).toList()),
+                ModelCapsulesRow(model: m),
                 const SizedBox(width: 8),
                 IconButton(
                   padding: EdgeInsets.zero,

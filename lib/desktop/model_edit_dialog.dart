@@ -56,6 +56,12 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
   final Set<Modality> _input = {Modality.text};
   final Set<Modality> _output = {Modality.text};
   final Set<ModelAbility> _abilities = {};
+  // Session-only cache: allow user to flip chat -> embedding -> chat without losing chat settings.
+  Set<Modality>? _cachedChatInput;
+  Set<Modality>? _cachedChatOutput;
+  Set<ModelAbility>? _cachedChatAbilities;
+  // Session-only cache: allow user to flip chat <-> embedding without losing embedding input modes.
+  Set<Modality>? _cachedEmbeddingInput;
   final List<_HeaderKV> _headers = [];
   final List<_BodyKV> _bodies = [];
 
@@ -125,13 +131,26 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
       if (ov != null) {
         _nameCtrl.text = (ov['name'] as String?)?.trim().isNotEmpty == true ? (ov['name'] as String) : _nameCtrl.text;
         final t = (ov['type'] as String?) ?? '';
-        if (t == 'embedding') _type = ModelType.embedding; else if (t == 'chat') _type = ModelType.chat;
+        if (t == 'embedding') {
+          _setType(ModelType.embedding);
+        } else if (t == 'chat') {
+          _setType(ModelType.chat);
+        }
+        if (_type == ModelType.chat) {
         final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
         final outArr = (ov['output'] as List?)?.map((e) => e.toString()).toList() ?? [];
         final abArr = (ov['abilities'] as List?)?.map((e) => e.toString()).toList() ?? [];
         _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
         _output..clear()..addAll(outArr.map((e) => e == 'image' ? Modality.image : Modality.text));
         _abilities..clear()..addAll(abArr.map((e) => e == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool));
+        } else if (_type == ModelType.embedding) {
+          // Embedding supports explicit input modalities (e.g., text/image). Abilities remain chat-only.
+          final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          if (inArr.isNotEmpty) {
+            _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
+            if (_input.isEmpty) _input.add(Modality.text);
+          }
+        }
         final hdrs = (ov['headers'] as List?) ?? const [];
         for (final h in hdrs) { if (h is Map) { final kv = _HeaderKV(); kv.name.text = (h['name'] as String?) ?? ''; kv.value.text = (h['value'] as String?) ?? ''; _headers.add(kv); } }
         final bds = (ov['body'] as List?) ?? const [];
@@ -146,6 +165,71 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
         // OpenAI tools
         _openaiCodeInterpreterTool = builtInSet.contains(BuiltInToolNames.codeInterpreter);
         _openaiImageGenerationTool = builtInSet.contains(BuiltInToolNames.imageGeneration);
+      }
+    }
+  }
+
+  void _setType(ModelType next) {
+    final prev = _type;
+    if (prev == next) return;
+
+    // Cache chat state before switching to embedding.
+    if (prev == ModelType.chat && next == ModelType.embedding) {
+      _cachedChatInput = {..._input};
+      _cachedChatOutput = {..._output};
+      _cachedChatAbilities = {..._abilities};
+    }
+    // Cache embedding input before switching to chat.
+    if (prev == ModelType.embedding && next == ModelType.chat) {
+      _cachedEmbeddingInput = {..._input};
+    }
+
+    _type = next;
+    if (next == ModelType.embedding) {
+      // Prevent chat-only state from leaking into embedding configs.
+      _abilities.clear();
+      _input
+        ..clear()
+        ..addAll(_cachedEmbeddingInput ?? const {Modality.text});
+      if (_input.isEmpty) _input.add(Modality.text);
+      _output..clear()..add(Modality.text);
+      return;
+    }
+
+    // Restore cached chat state when flipping embedding -> chat.
+    if (prev == ModelType.embedding && next == ModelType.chat) {
+      // Fallback: if no cached chat state exists, initialize chat defaults via inference
+      // so we don't remain stuck with embedding's text-only empty state.
+      final inferred = ModelRegistry.infer(
+        ModelInfo(
+          id: (_idCtrl.text.trim().isEmpty ? 'custom' : _idCtrl.text.trim()),
+          displayName: (_idCtrl.text.trim().isEmpty ? '' : _idCtrl.text.trim()),
+        ),
+      );
+      _input
+        ..clear()
+        ..addAll(inferred.input);
+      _output
+        ..clear()
+        ..addAll(inferred.output);
+      _abilities
+        ..clear()
+        ..addAll(inferred.abilities);
+
+      if (_cachedChatInput != null) {
+        _input
+          ..clear()
+          ..addAll(_cachedChatInput!);
+      }
+      if (_cachedChatOutput != null) {
+        _output
+          ..clear()
+          ..addAll(_cachedChatOutput!);
+      }
+      if (_cachedChatAbilities != null) {
+        _abilities
+          ..clear()
+          ..addAll(_cachedChatAbilities!);
       }
     }
   }
@@ -367,9 +451,8 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
             _SegmentedSingle(
               options: [l10n.modelDetailSheetChatType, l10n.modelDetailSheetEmbeddingType],
               value: _type == ModelType.chat ? 0 : 1,
-              onChanged: (i) => setState(() => _type = i == 0 ? ModelType.chat : ModelType.embedding),
+              onChanged: (i) => setState(() => _setType(i == 0 ? ModelType.chat : ModelType.embedding)),
             ),
-            if (_type == ModelType.chat) ...[
               const SizedBox(height: 12),
               _label(context, l10n.modelDetailSheetInputModesLabel),
               const SizedBox(height: 6),
@@ -378,10 +461,15 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
                 isSelected: [_input.contains(Modality.text), _input.contains(Modality.image)],
                 onChanged: (idx) => setState(() {
                   final mod = idx == 0 ? Modality.text : Modality.image;
-                  if (_input.contains(mod)) _input.remove(mod);
-                  else _input.add(mod);
+                if (_input.contains(mod)) {
+                  _input.remove(mod);
+                  if (_input.isEmpty) _input.add(Modality.text);
+                } else {
+                  _input.add(mod);
+                }
                 }),
               ),
+            if (_type == ModelType.chat) ...[
               const SizedBox(height: 12),
               _label(context, l10n.modelDetailSheetOutputModesLabel),
               const SizedBox(height: 6),
@@ -390,8 +478,12 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
                 isSelected: [_output.contains(Modality.text), _output.contains(Modality.image)],
                 onChanged: (idx) => setState(() {
                   final mod = idx == 0 ? Modality.text : Modality.image;
-                  if (_output.contains(mod)) _output.remove(mod);
-                  else _output.add(mod);
+                  if (_output.contains(mod)) {
+                    _output.remove(mod);
+                    if (_output.isEmpty) _output.add(Modality.text);
+                  } else {
+                    _output.add(mod);
+                  }
                 }),
               ),
               const SizedBox(height: 12),
@@ -588,12 +680,16 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     }
 
     final String key = (prevKey.isEmpty || widget.isNew) ? _nextModelKey(old, apiModelId) : prevKey;
+    final bool isEmbedding = _type == ModelType.embedding;
     ov[key] = {
       'apiModelId': apiModelId,
       'name': _nameCtrl.text.trim(),
       'type': _type == ModelType.chat ? 'chat' : 'embedding',
+      // Input modalities are configurable for both chat and embedding.
       'input': _input.map((e) => e == Modality.image ? 'image' : 'text').toList(),
+      if (!isEmbedding)
       'output': _output.map((e) => e == Modality.image ? 'image' : 'text').toList(),
+      if (!isEmbedding)
       'abilities': _abilities.map((e) => e == ModelAbility.reasoning ? 'reasoning' : 'tool').toList(),
       'headers': headers,
       'body': bodies,

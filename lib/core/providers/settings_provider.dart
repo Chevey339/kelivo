@@ -24,6 +24,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _providersOrderKey = 'providers_order_v1';
   static const String _themeModeKey = 'theme_mode_v1';
   static const String _providerConfigsKey = 'provider_configs_v1';
+  static const String _migrationsVersionKey = 'migrations_version_v1';
   static const String _pinnedModelsKey = 'pinned_models_v1';
   static const String _selectedModelKey = 'selected_model_v1';
   static const String _titleModelKey = 'title_model_v1';
@@ -218,6 +219,44 @@ class SettingsProvider extends ChangeNotifier {
     _load();
   }
 
+  Future<bool> _migrateEmbeddingModelOverrides(SharedPreferences prefs) async {
+    Map<String, ProviderConfig>? nextProviderConfigs;
+    bool changed = false;
+
+    _providerConfigs.forEach((providerKey, cfg) {
+      Map<String, dynamic>? nextOverrides;
+      bool ovChanged = false;
+
+      cfg.modelOverrides.forEach((modelKey, rawOv) {
+        if (rawOv is! Map) return;
+        final t = (rawOv['type'] ?? '').toString().toLowerCase();
+        if (t != 'embedding') return;
+
+        // Migration/cleanup (embedding): remove chat-only abilities; embeddings may still use text/image input.
+        final bool needsCleanup = rawOv.containsKey('abilities');
+        if (!needsCleanup) return;
+
+        // First time we detect a change for this provider, clone overrides map lazily.
+        nextOverrides ??= Map<String, dynamic>.from(cfg.modelOverrides);
+        final m = Map<String, dynamic>.from(rawOv);
+        m.remove('abilities');
+        nextOverrides![modelKey] = m;
+        ovChanged = true;
+      });
+
+      if (!ovChanged) return;
+      changed = true;
+      nextProviderConfigs ??= Map<String, ProviderConfig>.from(_providerConfigs);
+      nextProviderConfigs![providerKey] = cfg.copyWith(modelOverrides: nextOverrides!);
+    });
+
+    if (!changed) return false;
+    _providerConfigs = nextProviderConfigs!;
+    final map = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
+    await prefs.setString(_providerConfigsKey, jsonEncode(map));
+    return true;
+  }
+
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     _providersOrder = prefs.getStringList(_providersOrderKey) ?? [];
@@ -240,6 +279,31 @@ class SettingsProvider extends ChangeNotifier {
         final raw = jsonDecode(cfgStr) as Map<String, dynamic>;
         _providerConfigs = raw.map((k, v) => MapEntry(k, ProviderConfig.fromJson(v as Map<String, dynamic>)));
       } catch (_) {}
+    }
+
+    // Migration/cleanup: embedding models should not keep chat-only abilities.
+    // Embeddings still support explicit input modalities like text/image.
+    // This fixes previously persisted overrides where type was switched from chat -> embedding.
+    try {
+      final migrationVersion = prefs.getInt(_migrationsVersionKey) ?? 0;
+      if (migrationVersion < 2) {
+        final migrated = await _migrateEmbeddingModelOverrides(prefs);
+        // Mark as attempted so we don't keep re-scanning on every startup when no changes are needed.
+        await prefs.setInt(_migrationsVersionKey, 2);
+        assert(() {
+          if (migrated) {
+            debugPrint('[SettingsProvider] provider modelOverrides migration applied.');
+          }
+          return true;
+        }());
+      }
+    } catch (e, st) {
+      // Debug-only visibility for migration failures (no behavior change in release).
+      assert(() {
+        debugPrint('[SettingsProvider] provider modelOverrides migration failed: $e');
+        debugPrint('$st');
+        return true;
+      }());
     }
     // load pinned models
     final pinned = prefs.getStringList(_pinnedModelsKey) ?? const <String>[];

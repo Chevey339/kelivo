@@ -77,6 +77,12 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
   final Set<Modality> _input = {Modality.text};
   final Set<Modality> _output = {Modality.text};
   final Set<ModelAbility> _abilities = {};
+  // Session-only cache: allow user to flip chat -> embedding -> chat without losing chat settings.
+  Set<Modality>? _cachedChatInput;
+  Set<Modality>? _cachedChatOutput;
+  Set<ModelAbility>? _cachedChatAbilities;
+  // Session-only cache: allow user to flip chat <-> embedding without losing embedding input modes.
+  Set<Modality>? _cachedEmbeddingInput;
 
   // Advanced (UI only)
   final List<_HeaderKV> _headers = [];
@@ -132,7 +138,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
       ),
     );
     _nameCtrl = TextEditingController(text: base.displayName);
-    _type = base.type;
+    _setType(base.type);
     _input..clear()..addAll(base.input);
     _output..clear()..addAll(base.output);
     _abilities..clear()..addAll(base.abilities);
@@ -143,13 +149,26 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
       if (ov != null) {
         _nameCtrl.text = (ov['name'] as String?)?.trim().isNotEmpty == true ? (ov['name'] as String) : _nameCtrl.text;
         final t = (ov['type'] as String?) ?? '';
-        if (t == 'embedding') _type = ModelType.embedding; else if (t == 'chat') _type = ModelType.chat;
+        if (t == 'embedding') {
+          _setType(ModelType.embedding);
+        } else if (t == 'chat') {
+          _setType(ModelType.chat);
+        }
+        if (_type == ModelType.chat) {
         final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
         final outArr = (ov['output'] as List?)?.map((e) => e.toString()).toList() ?? [];
         final abArr = (ov['abilities'] as List?)?.map((e) => e.toString()).toList() ?? [];
         _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
         _output..clear()..addAll(outArr.map((e) => e == 'image' ? Modality.image : Modality.text));
         _abilities..clear()..addAll(abArr.map((e) => e == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool));
+        } else if (_type == ModelType.embedding) {
+          // Embedding supports explicit input modalities (e.g., text/image). Abilities remain chat-only.
+          final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          if (inArr.isNotEmpty) {
+            _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
+            if (_input.isEmpty) _input.add(Modality.text);
+          }
+        }
         // headers/body
         final rawHdrs = ov['headers'];
         final hdrs = (rawHdrs is List) ? rawHdrs : const <dynamic>[];
@@ -185,6 +204,53 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
         final rawTools = ov['tools'];
         final tools = rawTools is Map ? rawTools : const <dynamic, dynamic>{};
         _googleUrlContextTool = _googleUrlContextTool || ((tools['urlContext'] as bool?) ?? false);
+      }
+    }
+  }
+
+  void _setType(ModelType next) {
+    final prev = _type;
+    if (prev == next) return;
+
+    // Cache chat state before clearing so user can switch back within this session.
+    if (prev == ModelType.chat && next == ModelType.embedding) {
+      _cachedChatInput = {..._input};
+      _cachedChatOutput = {..._output};
+      _cachedChatAbilities = {..._abilities};
+    }
+    // Cache embedding input before switching to chat.
+    if (prev == ModelType.embedding && next == ModelType.chat) {
+      _cachedEmbeddingInput = {..._input};
+    }
+
+    _type = next;
+    if (next == ModelType.embedding) {
+      // Prevent chat-only state from leaking into embedding configs.
+      _abilities.clear();
+      _input
+        ..clear()
+        ..addAll(_cachedEmbeddingInput ?? const {Modality.text});
+      if (_input.isEmpty) _input.add(Modality.text);
+      _output..clear()..add(Modality.text);
+      return;
+    }
+
+    // Restore cached chat state when flipping embedding -> chat.
+    if (prev == ModelType.embedding && next == ModelType.chat) {
+      if (_cachedChatInput != null) {
+        _input
+          ..clear()
+          ..addAll(_cachedChatInput!);
+      }
+      if (_cachedChatOutput != null) {
+        _output
+          ..clear()
+          ..addAll(_cachedChatOutput!);
+      }
+      if (_cachedChatAbilities != null) {
+        _abilities
+          ..clear()
+          ..addAll(_cachedChatAbilities!);
       }
     }
   }
@@ -369,12 +435,12 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
             _SegmentedSingle(
               options: [l10n.modelDetailSheetChatType, l10n.modelDetailSheetEmbeddingType],
               value: _type == ModelType.chat ? 0 : 1,
-              onChanged: (i) => setState(() => _type = i == 0 ? ModelType.chat : ModelType.embedding),
+              onChanged: (i) => setState(() => _setType(i == 0 ? ModelType.chat : ModelType.embedding)),
             ),
           ],
         ),
       ),
-      if (_type == ModelType.chat)
+      // Input modalities are configurable for both chat and embedding.
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Column(
@@ -398,6 +464,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
                   }
                 }),
               ),
+            if (_type == ModelType.chat) ...[
               const SizedBox(height: 12),
               _label(context, l10n.modelDetailSheetOutputModesLabel),
               const SizedBox(height: 6),
@@ -436,6 +503,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
                   }
                 }),
               ),
+            ],
             ],
           ),
         ),
@@ -683,12 +751,16 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
     // Decide which logical key to use for this instance
     final String key = (prevKey.isEmpty || widget.isNew) ? _nextModelKey(old, apiModelId) : prevKey;
+    final bool isEmbedding = _type == ModelType.embedding;
     ov[key] = {
       'apiModelId': apiModelId,
       'name': _nameCtrl.text.trim(),
       'type': _type == ModelType.chat ? 'chat' : 'embedding',
+      // Input modalities are configurable for both chat and embedding.
       'input': _input.map((e) => e == Modality.image ? 'image' : 'text').toList(),
+      if (!isEmbedding)
       'output': _output.map((e) => e == Modality.image ? 'image' : 'text').toList(),
+      if (!isEmbedding)
       'abilities': _abilities.map((e) => e == ModelAbility.reasoning ? 'reasoning' : 'tool').toList(),
       'headers': headers,
       'body': bodies,

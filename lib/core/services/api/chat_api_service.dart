@@ -153,6 +153,7 @@ class ChatApiService {
     ModelType? type;
     final t = (ov['type'] as String?) ?? '';
     if (t == 'embedding') type = ModelType.embedding; else if (t == 'chat') type = ModelType.chat;
+    final effectiveType = type ?? base.type;
     List<Modality>? input;
     if (ov['input'] is List) {
       input = [for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
@@ -161,12 +162,23 @@ class ChatApiService {
     if (ov['output'] is List) {
       output = [for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
     }
+    // Embedding models should not carry chat-only abilities, but should keep/derive modalities
+    // from the inferred base (or explicit overrides) for forward compatibility with multimodal
+    // embedding models.
+    if (effectiveType == ModelType.embedding) {
+      return base.copyWith(
+        type: ModelType.embedding,
+        input: input ?? base.input,
+        output: output ?? base.output,
+        abilities: const [],
+      );
+    }
     List<ModelAbility>? abilities;
     if (ov['abilities'] is List) {
       abilities = [for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)];
     }
     return base.copyWith(
-      type: type ?? base.type,
+      type: effectiveType,
       input: input ?? base.input,
       output: output ?? base.output,
       abilities: abilities ?? base.abilities,

@@ -12,6 +12,7 @@ import '../../provider/pages/provider_detail_page.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../desktop/desktop_home_page.dart' show DesktopHomePage;
 import '../../provider/widgets/provider_avatar.dart';
 
@@ -762,7 +763,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     final settings = context.read<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = m.selected ? (isDark ? cs.primary.withOpacity(0.12) : cs.primary.withOpacity(0.08)) : cs.surface;
-    final effective = m.info; // precomputed effective info
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: RepaintBoundary(
@@ -816,7 +816,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     const SizedBox(height: 4),
-                    _modelTagWrap(context, effective),
+                    ModelTagWrap(model: m.info),
                   ],
                 ),
               ),
@@ -1054,70 +1054,6 @@ class _BrandAvatar extends StatelessWidget {
       child: inner,
     );
   }
-}
-
-Widget _modelTagWrap(BuildContext context, ModelInfo m) {
-  final cs = Theme.of(context).colorScheme;
-  final l10n = AppLocalizations.of(context)!;
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  List<Widget> chips = [];
-  // type tag
-  chips.add(Container(
-    decoration: BoxDecoration(
-      color: isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15),
-      borderRadius: BorderRadius.circular(999),
-      border: Border.all(color: cs.primary.withOpacity(0.2), width: 0.5),
-    ),
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    child: Text(m.type == ModelType.chat ? l10n.modelSelectSheetChatType : l10n.modelSelectSheetEmbeddingType, style: TextStyle(fontSize: 11, color: isDark ? cs.primary : cs.primary.withOpacity(0.9), fontWeight: FontWeight.w500)),
-  ));
-  // modality tag capsule with icons (keep consistent with provider detail page)
-  chips.add(Container(
-    decoration: BoxDecoration(
-      color: isDark ? cs.tertiary.withOpacity(0.25) : cs.tertiary.withOpacity(0.15),
-      borderRadius: BorderRadius.circular(999),
-      border: Border.all(color: cs.tertiary.withOpacity(0.2), width: 0.5),
-    ),
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      for (final mod in m.input)
-        Padding(
-          padding: const EdgeInsets.only(right: 2),
-          child: Icon(mod == Modality.text ? Lucide.Type : Lucide.Image, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-        ),
-      Icon(Lucide.ChevronRight, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-      for (final mod in m.output)
-        Padding(
-          padding: const EdgeInsets.only(left: 2),
-          child: Icon(mod == Modality.text ? Lucide.Type : Lucide.Image, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-        ),
-    ]),
-  ));
-  // abilities capsules
-  for (final ab in m.abilities) {
-    if (ab == ModelAbility.tool) {
-      chips.add(Container(
-        decoration: BoxDecoration(
-          color: isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.primary.withOpacity(0.2), width: 0.5),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        child: Icon(Lucide.Hammer, size: 12, color: isDark ? cs.primary : cs.primary.withOpacity(0.9)),
-      ));
-    } else if (ab == ModelAbility.reasoning) {
-      chips.add(Container(
-        decoration: BoxDecoration(
-          color: isDark ? cs.secondary.withOpacity(0.3) : cs.secondary.withOpacity(0.18),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.secondary.withOpacity(0.25), width: 0.5),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        child: SvgPicture.asset('assets/icons/deepthink.svg', width: 12, height: 12, colorFilter: ColorFilter.mode(isDark ? cs.secondary : cs.secondary.withOpacity(0.9), BlendMode.srcIn)),
-      ));
-    }
-  }
-  return Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: chips);
 }
 
 // ===== Desktop dialog implementation =====
@@ -1530,7 +1466,15 @@ class _DesktopModelSelectDialogBodyState extends State<_DesktopModelSelectDialog
               ),
             ),
             const SizedBox(width: 6),
-            Row(children: _buildDesktopCapsules(context, m.info).map((w) => Padding(padding: const EdgeInsets.only(left: 4), child: w)).toList()),
+            ModelCapsulesRow(
+              model: m.info,
+              iconSize: 11,
+              pillPadding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              bgOpacityDark: 0.18,
+              bgOpacityLight: 0.14,
+              borderOpacity: 0.22,
+              itemSpacing: 4,
+            ),
             const SizedBox(width: 4),
             Builder(builder: (context) {
               final pinnedNow = context.select<SettingsProvider, bool>((s) => s.isModelPinned(m.providerKey, m.id));
@@ -1551,39 +1495,6 @@ class _DesktopModelSelectDialogBodyState extends State<_DesktopModelSelectDialog
         ),
       ),
     );
-  }
-
-  List<Widget> _buildDesktopCapsules(BuildContext context, ModelInfo info) {
-    final cs = Theme.of(context).colorScheme;
-    final caps = <Widget>[];
-    Widget pillCapsule(Widget icon, Color color) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final bg = isDark ? color.withOpacity(0.18) : color.withOpacity(0.14);
-      final bd = color.withOpacity(0.22);
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: bd, width: 0.5),
-        ),
-        child: icon,
-      );
-    }
-    if (info.input.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(Lucide.Eye, size: 11, color: cs.secondary), cs.secondary));
-    }
-    if (info.output.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(Lucide.Image, size: 11, color: cs.tertiary), cs.tertiary));
-    }
-    for (final ab in info.abilities) {
-      if (ab == ModelAbility.tool) {
-        caps.add(pillCapsule(Icon(Lucide.Hammer, size: 11, color: cs.primary), cs.primary));
-      } else if (ab == ModelAbility.reasoning) {
-        caps.add(pillCapsule(SvgPicture.asset('assets/icons/deepthink.svg', width: 11, height: 11, colorFilter: ColorFilter.mode(cs.secondary, BlendMode.srcIn)), cs.secondary));
-      }
-    }
-    return caps;
   }
 
   Widget _favoritesHeader(BuildContext context, String title) {
