@@ -435,7 +435,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                ModelCapsulesRow(model: m),
+                Flexible(child: ModelCapsulesRow(model: m)),
                 const SizedBox(width: 8),
                 IconButton(
                   padding: EdgeInsets.zero,

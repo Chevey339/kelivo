@@ -221,39 +221,47 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<bool> _migrateEmbeddingModelOverrides(SharedPreferences prefs) async {
     Map<String, ProviderConfig>? nextProviderConfigs;
-    bool changed = false;
+    int providersChanged = 0;
+    int modelsChanged = 0;
 
-    _providerConfigs.forEach((providerKey, cfg) {
+    for (final entry in _providerConfigs.entries) {
+      final providerKey = entry.key;
+      final cfg = entry.value;
+
       Map<String, dynamic>? nextOverrides;
-      bool ovChanged = false;
 
-      cfg.modelOverrides.forEach((modelKey, rawOv) {
-        if (rawOv is! Map) return;
-        final t = (rawOv['type'] ?? '').toString().toLowerCase();
-        if (t != 'embedding') return;
+      for (final ovEntry in cfg.modelOverrides.entries) {
+        final modelKey = ovEntry.key;
+        final rawOv = ovEntry.value;
+        if (rawOv is! Map) continue;
+
+        final t = (rawOv['type'] ?? '').toString().trim().toLowerCase();
+        if (t != 'embedding') continue;
 
         // Migration/cleanup (embedding): remove chat-only abilities; embeddings may still use text/image input.
-        final bool needsCleanup = rawOv.containsKey('abilities');
-        if (!needsCleanup) return;
+        if (!rawOv.containsKey('abilities')) continue;
 
-        // First time we detect a change for this provider, clone overrides map lazily.
         nextOverrides ??= Map<String, dynamic>.from(cfg.modelOverrides);
         final m = Map<String, dynamic>.from(rawOv);
         m.remove('abilities');
-        nextOverrides![modelKey] = m;
-        ovChanged = true;
-      });
+        nextOverrides[modelKey] = m;
+        modelsChanged++;
+      }
 
-      if (!ovChanged) return;
-      changed = true;
+      if (nextOverrides == null) continue;
       nextProviderConfigs ??= Map<String, ProviderConfig>.from(_providerConfigs);
-      nextProviderConfigs![providerKey] = cfg.copyWith(modelOverrides: nextOverrides!);
-    });
+      nextProviderConfigs[providerKey] = cfg.copyWith(modelOverrides: nextOverrides);
+      providersChanged++;
+    }
 
-    if (!changed) return false;
-    _providerConfigs = nextProviderConfigs!;
+    if (nextProviderConfigs == null) return false;
+    _providerConfigs = nextProviderConfigs;
     final map = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
     await prefs.setString(_providerConfigsKey, jsonEncode(map));
+    assert(() {
+      debugPrint('[SettingsProvider] embedding overrides migration: providers=$providersChanged, models=$modelsChanged');
+      return true;
+    }());
     return true;
   }
 

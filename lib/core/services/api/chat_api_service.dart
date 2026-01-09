@@ -151,25 +151,32 @@ class ChatApiService {
     final base = ModelRegistry.infer(ModelInfo(id: upstreamId, displayName: upstreamId));
     final ov = _modelOverride(cfg, modelId);
     ModelType? type;
-    final t = (ov['type'] as String?) ?? '';
-    if (t == 'embedding') type = ModelType.embedding; else if (t == 'chat') type = ModelType.chat;
+    final t = ((ov['type'] as String?) ?? '').trim().toLowerCase();
+    if (t == 'embedding') {
+      type = ModelType.embedding;
+    } else if (t == 'chat') {
+      type = ModelType.chat;
+    }
     final effectiveType = type ?? base.type;
     List<Modality>? input;
     if (ov['input'] is List) {
       input = [for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
     }
     List<Modality>? output;
-    if (ov['output'] is List) {
+    // Only chat models support configurable output modalities.
+    if (effectiveType != ModelType.embedding && ov['output'] is List) {
       output = [for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
     }
     // Embedding models should not carry chat-only abilities, but should keep/derive modalities
     // from the inferred base (or explicit overrides) for forward compatibility with multimodal
     // embedding models.
     if (effectiveType == ModelType.embedding) {
+      final inMods = input ?? base.input;
       return base.copyWith(
         type: ModelType.embedding,
-        input: input ?? base.input,
-        output: output ?? base.output,
+        input: (inMods.isEmpty ? const [Modality.text] : inMods),
+        // Embedding output is treated as text-only in UI and should not inherit chat-style output modalities.
+        output: const [Modality.text],
         abilities: const [],
       );
     }

@@ -98,10 +98,15 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
             final n = (ov['name'] as String?)?.trim();
             // type override
             ModelType? type;
-            final t = (ov['type'] as String?)?.trim();
-            if (t != null) {
-              type = (t == 'embedding') ? ModelType.embedding : ModelType.chat;
+            final t = (ov['type'] as String?)?.trim().toLowerCase();
+            if (t != null && t.isNotEmpty) {
+              if (t == 'embedding') {
+                type = ModelType.embedding;
+              } else if (t == 'chat') {
+                type = ModelType.chat;
+              }
             }
+            final effectiveType = type ?? base.type;
             // modality override
             List<Modality>? input;
             if (ov['input'] is List) {
@@ -110,23 +115,24 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
               ];
             }
             List<Modality>? output;
-            if (ov['output'] is List) {
+            if (effectiveType != ModelType.embedding && ov['output'] is List) {
               output = [
                 for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
               ];
             }
             List<ModelAbility>? abilities;
-            if (ov['abilities'] is List) {
+            if (effectiveType != ModelType.embedding && ov['abilities'] is List) {
               abilities = [
                 for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)
               ];
             }
             base = base.copyWith(
               displayName: (n != null && n.isNotEmpty) ? n : base.displayName,
-              type: type ?? base.type,
+              type: effectiveType,
               input: input ?? base.input,
-              output: output ?? base.output,
-              abilities: abilities ?? base.abilities,
+              // Embeddings must not carry chat-only state.
+              output: effectiveType == ModelType.embedding ? const [Modality.text] : (output ?? base.output),
+              abilities: effectiveType == ModelType.embedding ? const <ModelAbility>[] : (abilities ?? base.abilities),
             );
           }
           return _ModelItem(

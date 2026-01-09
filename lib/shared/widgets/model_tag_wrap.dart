@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -55,6 +57,9 @@ class ModelTagWrap extends StatelessWidget {
     final outputMods = isEmbedding
         ? const [Modality.text]
         : (model.type == ModelType.chat && model.output.isEmpty ? const [Modality.text] : model.output);
+    // Dedupe while preserving order (defensive against malformed/duplicated upstream data).
+    final inputModsUnique = LinkedHashSet<Modality>.from(inputMods).toList(growable: false);
+    final outputModsUnique = LinkedHashSet<Modality>.from(outputMods).toList(growable: false);
     chips.add(
       Container(
         decoration: BoxDecoration(
@@ -66,7 +71,7 @@ class ModelTagWrap extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final mod in inputMods)
+            for (final mod in inputModsUnique)
               Padding(
                 padding: const EdgeInsets.only(right: 2),
                 child: Icon(
@@ -76,7 +81,7 @@ class ModelTagWrap extends StatelessWidget {
                 ),
               ),
             Icon(Lucide.ChevronRight, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-            for (final mod in outputMods)
+            for (final mod in outputModsUnique)
               Padding(
                 padding: const EdgeInsets.only(left: 2),
                 child: Icon(
@@ -92,7 +97,8 @@ class ModelTagWrap extends StatelessWidget {
 
     // abilities capsules - chat only
     if (!isEmbedding) {
-      for (final ab in model.abilities) {
+      final uniqueAbilities = LinkedHashSet<ModelAbility>.from(model.abilities).toList(growable: false);
+      for (final ab in uniqueAbilities) {
         if (ab == ModelAbility.tool) {
           chips.add(
             Container(

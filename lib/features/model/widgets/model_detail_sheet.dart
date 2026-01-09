@@ -138,17 +138,26 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
       ),
     );
     _nameCtrl = TextEditingController(text: base.displayName);
-    _setType(base.type);
+    _type = base.type;
     _input..clear()..addAll(base.input);
     _output..clear()..addAll(base.output);
     _abilities..clear()..addAll(base.abilities);
+    // Normalize embedding invariants on init (avoid running transition/caching logic during init).
+    if (_type == ModelType.embedding) {
+      _abilities.clear();
+      _output
+        ..clear()
+        ..add(Modality.text);
+      if (_input.isEmpty) _input.add(Modality.text);
+      _cachedEmbeddingInput = {..._input};
+    }
 
     if (!widget.isNew) {
       final rawOv = cfg.modelOverrides[widget.modelId];
       final ov = _initialOv ?? (rawOv is Map ? rawOv : null);
       if (ov != null) {
         _nameCtrl.text = (ov['name'] as String?)?.trim().isNotEmpty == true ? (ov['name'] as String) : _nameCtrl.text;
-        final t = (ov['type'] as String?) ?? '';
+        final t = ((ov['type'] as String?) ?? '').trim().toLowerCase();
         if (t == 'embedding') {
           _setType(ModelType.embedding);
         } else if (t == 'chat') {
@@ -237,20 +246,30 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
 
     // Restore cached chat state when flipping embedding -> chat.
     if (prev == ModelType.embedding && next == ModelType.chat) {
-      if (_cachedChatInput != null) {
+      if (_cachedChatInput != null && _cachedChatOutput != null && _cachedChatAbilities != null) {
         _input
           ..clear()
           ..addAll(_cachedChatInput!);
-      }
-      if (_cachedChatOutput != null) {
         _output
           ..clear()
           ..addAll(_cachedChatOutput!);
-      }
-      if (_cachedChatAbilities != null) {
         _abilities
           ..clear()
           ..addAll(_cachedChatAbilities!);
+      } else {
+        // Fallback: if no cached chat state exists, initialize chat defaults via inference
+        // so we don't remain stuck with embedding's text-only empty state.
+        final id = _idCtrl.text.trim().isEmpty ? 'custom' : _idCtrl.text.trim();
+        final inferred = ModelRegistry.infer(ModelInfo(id: id, displayName: id.isEmpty ? '' : id));
+        _input
+          ..clear()
+          ..addAll(inferred.input);
+        _output
+          ..clear()
+          ..addAll(inferred.output);
+        _abilities
+          ..clear()
+          ..addAll(inferred.abilities);
       }
     }
   }
@@ -764,7 +783,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
       'abilities': _abilities.map((e) => e == ModelAbility.reasoning ? 'reasoning' : 'tool').toList(),
       'headers': headers,
       'body': bodies,
-      if (builtInTools.isNotEmpty) 'builtInTools': builtInTools,
+      if (!isEmbedding && builtInTools.isNotEmpty) 'builtInTools': builtInTools,
     };
 
     // Apply updates to provider config
