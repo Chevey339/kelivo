@@ -2366,7 +2366,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageOverwriteMode.
   ///
   /// In en, this message translates to:
-  /// **'Complete Overwrite'**
+  /// **'Overwrite'**
   String get backupPageOverwriteMode;
 
   /// No description provided for @backupPageOverwriteModeDescription.
@@ -2378,7 +2378,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageMergeMode.
   ///
   /// In en, this message translates to:
-  /// **'Smart Merge'**
+  /// **'Merge'**
   String get backupPageMergeMode;
 
   /// No description provided for @backupPageMergeModeDescription.

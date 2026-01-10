@@ -5,6 +5,52 @@ enum RestoreMode {
   merge,     // 增量合并：智能去重
 }
 
+enum RestoreAction {
+  ignore,    // 忽略：不恢复此项
+  merge,     // 合并：增量合并，保留本地配置（适合手机/电脑差异化设置）
+  overwrite, // 覆盖：完全覆盖本地配置
+}
+
+class RestoreOptions {
+  final RestoreAction settingsAction;
+  final RestoreAction providersAction;
+  final RestoreAction chatsAction;
+  final RestoreAction filesAction;
+
+  const RestoreOptions({
+    this.settingsAction = RestoreAction.merge,
+    this.providersAction = RestoreAction.merge,
+    this.chatsAction = RestoreAction.merge,
+    this.filesAction = RestoreAction.merge,
+  });
+
+  /// Check if this is a legacy full overwrite (all actions are overwrite)
+  bool get isFullOverwrite =>
+      settingsAction == RestoreAction.overwrite &&
+      providersAction == RestoreAction.overwrite &&
+      chatsAction == RestoreAction.overwrite &&
+      filesAction == RestoreAction.overwrite;
+
+  /// Helper for legacy mode compatibility
+  static RestoreOptions fromMode(RestoreMode mode) {
+    if (mode == RestoreMode.overwrite) {
+      return const RestoreOptions(
+        settingsAction: RestoreAction.overwrite,
+        providersAction: RestoreAction.overwrite,
+        chatsAction: RestoreAction.overwrite,
+        filesAction: RestoreAction.overwrite,
+      );
+    } else {
+      return const RestoreOptions(
+        settingsAction: RestoreAction.merge,
+        providersAction: RestoreAction.merge,
+        chatsAction: RestoreAction.merge,
+        filesAction: RestoreAction.merge,
+      );
+    }
+  }
+}
+
 class WebDavConfig {
   final String url;
   final String username;
