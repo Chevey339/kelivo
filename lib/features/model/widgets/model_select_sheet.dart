@@ -98,8 +98,8 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
             final n = (ov['name'] as String?)?.trim();
             // type override
             ModelType? type;
-            final t = (ov['type'] as String?)?.trim().toLowerCase();
-            if (t != null && t.isNotEmpty) {
+            final t = (ov['type'] ?? '').toString().trim().toLowerCase();
+            if (t.isNotEmpty) {
               if (t == 'embedding') {
                 type = ModelType.embedding;
               } else if (t == 'chat') {
@@ -1472,14 +1472,16 @@ class _DesktopModelSelectDialogBodyState extends State<_DesktopModelSelectDialog
               ),
             ),
             const SizedBox(width: 6),
-            ModelCapsulesRow(
-              model: m.info,
-              iconSize: 11,
-              pillPadding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-              bgOpacityDark: 0.18,
-              bgOpacityLight: 0.14,
-              borderOpacity: 0.22,
-              itemSpacing: 4,
+            Flexible(
+              child: ModelCapsulesRow(
+                model: m.info,
+                iconSize: 11,
+                pillPadding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                bgOpacityDark: 0.18,
+                bgOpacityLight: 0.14,
+                borderOpacity: 0.22,
+                itemSpacing: 4,
+              ),
             ),
             const SizedBox(width: 4),
             Builder(builder: (context) {

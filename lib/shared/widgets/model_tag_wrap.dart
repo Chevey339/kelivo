@@ -60,37 +60,47 @@ class ModelTagWrap extends StatelessWidget {
     // Dedupe while preserving order (defensive against malformed/duplicated upstream data).
     final inputModsUnique = LinkedHashSet<Modality>.from(inputMods).toList(growable: false);
     final outputModsUnique = LinkedHashSet<Modality>.from(outputMods).toList(growable: false);
+    String modLabel(Modality m) => m == Modality.text ? l10n.modelDetailSheetTextMode : l10n.modelDetailSheetImageMode;
+    final ioLabel = '${inputModsUnique.map(modLabel).join(', ')} → ${outputModsUnique.map(modLabel).join(', ')}';
     chips.add(
-      Container(
-        decoration: BoxDecoration(
-          color: isDark ? cs.tertiary.withOpacity(0.25) : cs.tertiary.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.tertiary.withOpacity(0.2), width: 0.5),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final mod in inputModsUnique)
-              Padding(
-                padding: const EdgeInsets.only(right: 2),
-                child: Icon(
-                  mod == Modality.text ? Lucide.Type : Lucide.Image,
-                  size: 12,
-                  color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9),
-                ),
+      Tooltip(
+        message: ioLabel,
+        child: Semantics(
+          label: ioLabel,
+          child: ExcludeSemantics(
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark ? cs.tertiary.withOpacity(0.25) : cs.tertiary.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: cs.tertiary.withOpacity(0.2), width: 0.5),
               ),
-            Icon(Lucide.ChevronRight, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-            for (final mod in outputModsUnique)
-              Padding(
-                padding: const EdgeInsets.only(left: 2),
-                child: Icon(
-                  mod == Modality.text ? Lucide.Type : Lucide.Image,
-                  size: 12,
-                  color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9),
-                ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final mod in inputModsUnique)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 2),
+                      child: Icon(
+                        mod == Modality.text ? Lucide.Type : Lucide.Image,
+                        size: 12,
+                        color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9),
+                      ),
+                    ),
+                  Icon(Lucide.ChevronRight, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
+                  for (final mod in outputModsUnique)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 2),
+                      child: Icon(
+                        mod == Modality.text ? Lucide.Type : Lucide.Image,
+                        size: 12,
+                        color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9),
+                      ),
+                    ),
+                ],
               ),
-          ],
+            ),
+          ),
         ),
       ),
     );
@@ -100,31 +110,49 @@ class ModelTagWrap extends StatelessWidget {
       final uniqueAbilities = LinkedHashSet<ModelAbility>.from(model.abilities).toList(growable: false);
       for (final ab in uniqueAbilities) {
         if (ab == ModelAbility.tool) {
+          final label = l10n.modelDetailSheetToolsAbility;
           chips.add(
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: cs.primary.withOpacity(0.2), width: 0.5),
+            Tooltip(
+              message: label,
+              child: Semantics(
+                label: label,
+                child: ExcludeSemantics(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: cs.primary.withOpacity(0.2), width: 0.5),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    child: Icon(Lucide.Hammer, size: 12, color: isDark ? cs.primary : cs.primary.withOpacity(0.9)),
+                  ),
+                ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              child: Icon(Lucide.Hammer, size: 12, color: isDark ? cs.primary : cs.primary.withOpacity(0.9)),
             ),
           );
         } else if (ab == ModelAbility.reasoning) {
+          final label = l10n.modelDetailSheetReasoningAbility;
           chips.add(
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? cs.secondary.withOpacity(0.3) : cs.secondary.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: cs.secondary.withOpacity(0.25), width: 0.5),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              child: SvgPicture.asset(
-                'assets/icons/deepthink.svg',
-                width: 12,
-                height: 12,
-                colorFilter: ColorFilter.mode(isDark ? cs.secondary : cs.secondary.withOpacity(0.9), BlendMode.srcIn),
+            Tooltip(
+              message: label,
+              child: Semantics(
+                label: label,
+                child: ExcludeSemantics(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? cs.secondary.withOpacity(0.3) : cs.secondary.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: cs.secondary.withOpacity(0.25), width: 0.5),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    child: SvgPicture.asset(
+                      'assets/icons/deepthink.svg',
+                      width: 12,
+                      height: 12,
+                      colorFilter: ColorFilter.mode(isDark ? cs.secondary : cs.secondary.withOpacity(0.9), BlendMode.srcIn),
+                    ),
+                  ),
+                ),
               ),
             ),
           );
@@ -200,7 +228,8 @@ class ModelCapsulesRow extends StatelessWidget {
 
     // Abilities: chat only
     if (model.type == ModelType.chat) {
-      for (final ab in model.abilities) {
+      final uniqueAbilities = LinkedHashSet<ModelAbility>.from(model.abilities);
+      for (final ab in uniqueAbilities) {
         if (ab == ModelAbility.tool) {
           caps.add(pillCapsule(Icon(Lucide.Hammer, size: iconSize, color: cs.primary), cs.primary));
         } else if (ab == ModelAbility.reasoning) {

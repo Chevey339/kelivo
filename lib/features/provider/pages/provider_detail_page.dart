@@ -2341,40 +2341,7 @@ class _ModelCard extends StatelessWidget {
     final cfg = context.watch<SettingsProvider>().getProviderConfig(providerKey);
     final ov = cfg.modelOverrides[modelId] as Map?;
     if (ov == null) return base;
-    ModelType? type;
-    final t = ((ov['type'] as String?) ?? '').trim().toLowerCase();
-    if (t == 'embedding') {
-      type = ModelType.embedding;
-    } else if (t == 'chat') {
-      type = ModelType.chat;
-    }
-    final effectiveType = type ?? base.type;
-    List<Modality>? input;
-    if (ov['input'] is List) {
-      input = [
-        for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-      ];
-    }
-    List<Modality>? output;
-    if (effectiveType != ModelType.embedding && ov['output'] is List) {
-      output = [
-        for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-      ];
-    }
-    List<ModelAbility>? abilities;
-    if (effectiveType != ModelType.embedding && ov['abilities'] is List) {
-      abilities = [
-        for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)
-      ];
-    }
-    return base.copyWith(
-      displayName: (ov['name'] as String?)?.isNotEmpty == true ? ov['name'] as String : base.displayName,
-      type: effectiveType,
-      input: input ?? base.input,
-      // Embeddings must not carry chat-only state.
-      output: effectiveType == ModelType.embedding ? const [Modality.text] : (output ?? base.output),
-      abilities: effectiveType == ModelType.embedding ? const <ModelAbility>[] : (abilities ?? base.abilities),
-    );
+    return _applyModelOverride(base, ov, applyDisplayName: true);
   }
 
   String _displayName(BuildContext context) {
@@ -2634,42 +2601,64 @@ Future<String?> showModelPickerForTest(BuildContext context, String providerKey,
   return sel?.modelId;
 }
 
-ModelInfo _effectiveFor(BuildContext context, String providerKey, String providerDisplayName, ModelInfo base) {
-  final cfg = context.read<SettingsProvider>().getProviderConfig(providerKey, defaultName: providerDisplayName);
-  final ov = cfg.modelOverrides[base.id] as Map?;
-  if (ov == null) return base;
+ModelInfo _applyModelOverride(ModelInfo base, Map ov, {bool applyDisplayName = false}) {
   ModelType? type;
-  final t = ((ov['type'] as String?) ?? '').trim().toLowerCase();
+  final t = (ov['type'] ?? '').toString().trim().toLowerCase();
   if (t == 'embedding') {
     type = ModelType.embedding;
   } else if (t == 'chat') {
     type = ModelType.chat;
   }
   final effectiveType = type ?? base.type;
+
   List<Modality>? input;
   if (ov['input'] is List) {
-    input = [
-      for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-    ];
+    input = [for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
+    if (input.isEmpty) input = const [Modality.text];
   }
+  final inMods = input ?? base.input;
+  final normalizedInput = inMods.isEmpty ? const [Modality.text] : inMods;
+
+  final displayName = (applyDisplayName && (ov['name'] as String?)?.isNotEmpty == true) ? (ov['name'] as String) : base.displayName;
+
+  if (effectiveType == ModelType.embedding) {
+    // Embeddings must not carry chat-only state.
+    return base.copyWith(
+      displayName: displayName,
+      type: ModelType.embedding,
+      input: normalizedInput,
+      output: const [Modality.text],
+      abilities: const <ModelAbility>[],
+    );
+  }
+
   List<Modality>? output;
-  if (effectiveType != ModelType.embedding && ov['output'] is List) {
-    output = [
-      for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-    ];
+  if (ov['output'] is List) {
+    output = [for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
+    if (output.isEmpty) output = const [Modality.text];
   }
+  final outMods = output ?? base.output;
+  final normalizedOutput = outMods.isEmpty ? const [Modality.text] : outMods;
+
   List<ModelAbility>? abilities;
-  if (effectiveType != ModelType.embedding && ov['abilities'] is List) {
-    abilities = [
-      for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)
-    ];
+  if (ov['abilities'] is List) {
+    abilities = [for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)];
   }
+
   return base.copyWith(
+    displayName: displayName,
     type: effectiveType,
-    input: input ?? base.input,
-    output: effectiveType == ModelType.embedding ? const [Modality.text] : (output ?? base.output),
-    abilities: effectiveType == ModelType.embedding ? const <ModelAbility>[] : (abilities ?? base.abilities),
+    input: normalizedInput,
+    output: normalizedOutput,
+    abilities: abilities ?? base.abilities,
   );
+}
+
+ModelInfo _effectiveFor(BuildContext context, String providerKey, String providerDisplayName, ModelInfo base) {
+  final cfg = context.read<SettingsProvider>().getProviderConfig(providerKey, defaultName: providerDisplayName);
+  final ov = cfg.modelOverrides[base.id] as Map?;
+  if (ov == null) return base;
+  return _applyModelOverride(base, ov);
 }
 
 

@@ -4279,13 +4279,26 @@ class _ModelRow extends StatelessWidget {
       final base = _infer(baseId);
       if (ov == null) return base;
       ModelType? type;
-      final t = (ov['type'] as String?) ?? '';
+      final t = (ov['type'] ?? '').toString().trim().toLowerCase();
       if (t == 'embedding') type = ModelType.embedding; else if (t == 'chat') type = ModelType.chat;
+      final effectiveType = type ?? base.type;
       List<Modality>? input;
       if (ov['input'] is List) {
         input = [
           for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
         ];
+      }
+      final inMods = input ?? base.input;
+      final normalizedInput = inMods.isEmpty ? const [Modality.text] : inMods;
+
+      if (effectiveType == ModelType.embedding) {
+        // Embeddings must not carry chat-only state.
+        return base.copyWith(
+          type: ModelType.embedding,
+          input: normalizedInput,
+          output: const [Modality.text],
+          abilities: const <ModelAbility>[],
+        );
       }
       List<Modality>? output;
       if (ov['output'] is List) {
@@ -4293,6 +4306,8 @@ class _ModelRow extends StatelessWidget {
           for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
         ];
       }
+      final outMods = output ?? base.output;
+      final normalizedOutput = outMods.isEmpty ? const [Modality.text] : outMods;
       List<ModelAbility>? abilities;
       if (ov['abilities'] is List) {
         abilities = [
@@ -4300,9 +4315,9 @@ class _ModelRow extends StatelessWidget {
         ];
       }
       return base.copyWith(
-        type: type ?? base.type,
-        input: input ?? base.input,
-        output: output ?? base.output,
+        type: effectiveType,
+        input: normalizedInput,
+        output: normalizedOutput,
         abilities: abilities ?? base.abilities,
       );
     }

@@ -139,7 +139,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
       final ov = _initialOv ?? cfg.modelOverrides[widget.modelId] as Map?;
       if (ov != null) {
         _nameCtrl.text = (ov['name'] as String?)?.trim().isNotEmpty == true ? (ov['name'] as String) : _nameCtrl.text;
-        final t = ((ov['type'] as String?) ?? '').trim().toLowerCase();
+        final t = (ov['type'] ?? '').toString().trim().toLowerCase();
         if (t == 'embedding') {
           _setType(ModelType.embedding);
         } else if (t == 'chat') {
@@ -218,24 +218,15 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
           ..clear()
           ..addAll(_cachedChatAbilities!);
       } else {
-        // Fallback: if no cached chat state exists, initialize chat defaults via inference
-        // so we don't remain stuck with embedding's text-only empty state.
-        final id = _idCtrl.text.trim().isEmpty ? 'custom' : _idCtrl.text.trim();
-        final inferred = ModelRegistry.infer(
-          ModelInfo(
-            id: id,
-            displayName: (id == 'custom' ? '' : id),
-          ),
-        );
+        // Fallback: explicit chat defaults.
+        // Avoid inference bias (e.g., ids like "text-embedding-*" being inferred back to embedding).
         _input
           ..clear()
-          ..addAll(inferred.input);
+          ..add(Modality.text);
         _output
           ..clear()
-          ..addAll(inferred.output);
-        _abilities
-          ..clear()
-          ..addAll(inferred.abilities);
+          ..add(Modality.text);
+        _abilities.clear();
       }
     }
   }
@@ -563,6 +554,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final cfg = settings.getProviderConfig(widget.providerKey);
+    final bool disableTools = _type == ModelType.embedding;
     final bool hasTiles = _providerKind == ProviderKind.google || _providerKind == ProviderKind.openai;
     return [
       _DeskCard(
@@ -602,9 +594,9 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
           desc: l10n.modelDetailSheetUrlContextToolDescription,
           value: _googleUrlContextTool,
           // URL Context is disabled when Code Execution is enabled (mutually exclusive)
-          onChanged: _googleCodeExecutionTool
+          onChanged: disableTools
               ? null
-              : (v) => setState(() => _googleUrlContextTool = v),
+              : (_googleCodeExecutionTool ? null : (v) => setState(() => _googleUrlContextTool = v)),
         ),
         const SizedBox(height: 8),
         _ToolTile(
@@ -612,34 +604,38 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
           desc: l10n.modelDetailSheetCodeExecutionToolDescription,
           value: _googleCodeExecutionTool,
           // Code Execution is disabled when URL Context is enabled (mutually exclusive)
-          onChanged: _googleUrlContextTool
+          onChanged: disableTools
               ? null
-              : (v) => setState(() => _googleCodeExecutionTool = v),
+              : (_googleUrlContextTool ? null : (v) => setState(() => _googleCodeExecutionTool = v)),
         ),
         const SizedBox(height: 8),
         _ToolTile(
           title: l10n.modelDetailSheetYoutubeTool,
           desc: l10n.modelDetailSheetYoutubeToolDescription,
           value: _googleYoutubeTool,
-          onChanged: (v) => setState(() => _googleYoutubeTool = v),
+          onChanged: disableTools ? null : (v) => setState(() => _googleYoutubeTool = v),
         ),
       ] else if (_providerKind == ProviderKind.openai) ...[
         _ToolTile(
           title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
           desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
           value: _openaiCodeInterpreterTool,
-          onChanged: (cfg.useResponseApi == true)
-              ? (v) => setState(() => _openaiCodeInterpreterTool = v)
-              : null,
+          onChanged: disableTools
+              ? null
+              : ((cfg.useResponseApi == true)
+                  ? (v) => setState(() => _openaiCodeInterpreterTool = v)
+                  : null),
         ),
         const SizedBox(height: 8),
         _ToolTile(
           title: l10n.modelDetailSheetOpenaiImageGenerationTool,
           desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
           value: _openaiImageGenerationTool,
-          onChanged: (cfg.useResponseApi == true)
-              ? (v) => setState(() => _openaiImageGenerationTool = v)
-              : null,
+          onChanged: disableTools
+              ? null
+              : ((cfg.useResponseApi == true)
+                  ? (v) => setState(() => _openaiImageGenerationTool = v)
+                  : null),
         ),
       ],
     ];

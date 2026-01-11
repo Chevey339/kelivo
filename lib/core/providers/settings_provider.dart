@@ -238,12 +238,17 @@ class SettingsProvider extends ChangeNotifier {
         final t = (rawOv['type'] ?? '').toString().trim().toLowerCase();
         if (t != 'embedding') continue;
 
-        // Migration/cleanup (embedding): remove chat-only abilities; embeddings may still use text/image input.
-        if (!rawOv.containsKey('abilities')) continue;
+        // Migration/cleanup (embedding): remove chat-only fields.
+        // Embeddings may still use explicit input modalities like text/image.
+        final hasChatOnlyKeys =
+            rawOv.containsKey('abilities') || rawOv.containsKey('output') || rawOv.containsKey('builtInTools');
+        if (!hasChatOnlyKeys) continue;
 
         nextOverrides ??= Map<String, dynamic>.from(cfg.modelOverrides);
         final m = Map<String, dynamic>.from(rawOv);
         m.remove('abilities');
+        m.remove('output');
+        m.remove('builtInTools');
         nextOverrides[modelKey] = m;
         modelsChanged++;
       }
@@ -289,15 +294,15 @@ class SettingsProvider extends ChangeNotifier {
       } catch (_) {}
     }
 
-    // Migration/cleanup: embedding models should not keep chat-only abilities.
+    // Migration/cleanup: embedding models should not keep chat-only fields (abilities/output/builtInTools).
     // Embeddings still support explicit input modalities like text/image.
     // This fixes previously persisted overrides where type was switched from chat -> embedding.
     try {
       final migrationVersion = prefs.getInt(_migrationsVersionKey) ?? 0;
-      if (migrationVersion < 2) {
+      if (migrationVersion < 3) {
         final migrated = await _migrateEmbeddingModelOverrides(prefs);
         // Mark as attempted so we don't keep re-scanning on every startup when no changes are needed.
-        await prefs.setInt(_migrationsVersionKey, 2);
+        await prefs.setInt(_migrationsVersionKey, 3);
         assert(() {
           if (migrated) {
             debugPrint('[SettingsProvider] provider modelOverrides migration applied.');

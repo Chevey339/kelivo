@@ -151,7 +151,7 @@ class ChatApiService {
     final base = ModelRegistry.infer(ModelInfo(id: upstreamId, displayName: upstreamId));
     final ov = _modelOverride(cfg, modelId);
     ModelType? type;
-    final t = ((ov['type'] as String?) ?? '').trim().toLowerCase();
+    final t = (ov['type'] ?? '').toString().trim().toLowerCase();
     if (t == 'embedding') {
       type = ModelType.embedding;
     } else if (t == 'chat') {
