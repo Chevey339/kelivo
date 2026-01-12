@@ -25,6 +25,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import 'multi_key_manager_page.dart';
 import 'provider_network_page.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/services/model_override_resolver.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../../../utils/model_grouping.dart';
 
@@ -2602,63 +2603,7 @@ Future<String?> showModelPickerForTest(BuildContext context, String providerKey,
 }
 
 ModelInfo _applyModelOverride(ModelInfo base, Map ov, {bool applyDisplayName = false}) {
-  ModelType? type;
-  final t = (ov['type'] ?? '').toString().trim().toLowerCase();
-  if (t == 'embedding') {
-    type = ModelType.embedding;
-  } else if (t == 'chat') {
-    type = ModelType.chat;
-  }
-  final effectiveType = type ?? base.type;
-
-  List<Modality>? input;
-  if (ov['input'] is List) {
-    input = [for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
-    if (input.isEmpty) input = const [Modality.text];
-  }
-  final inMods = input ?? base.input;
-  final normalizedInput = inMods.isEmpty ? const [Modality.text] : inMods;
-
-  final displayName = (applyDisplayName && (ov['name'] as String?)?.isNotEmpty == true) ? (ov['name'] as String) : base.displayName;
-
-  if (effectiveType == ModelType.embedding) {
-    // Embeddings must not carry chat-only state.
-    return base.copyWith(
-      displayName: displayName,
-      type: ModelType.embedding,
-      input: normalizedInput,
-      output: const [Modality.text],
-      abilities: const <ModelAbility>[],
-    );
-  }
-
-  List<Modality>? output;
-  if (ov['output'] is List) {
-    output = [for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
-    if (output.isEmpty) output = const [Modality.text];
-  }
-  final outMods = output ?? base.output;
-  final normalizedOutput = outMods.isEmpty ? const [Modality.text] : outMods;
-
-  List<ModelAbility>? abilities;
-  if (ov['abilities'] is List) {
-    abilities = [for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)];
-  }
-
-  return base.copyWith(
-    displayName: displayName,
-    type: effectiveType,
-    input: normalizedInput,
-    output: normalizedOutput,
-    abilities: abilities ?? base.abilities,
-  );
-}
-
-ModelInfo _effectiveFor(BuildContext context, String providerKey, String providerDisplayName, ModelInfo base) {
-  final cfg = context.read<SettingsProvider>().getProviderConfig(providerKey, defaultName: providerDisplayName);
-  final ov = cfg.modelOverrides[base.id] as Map?;
-  if (ov == null) return base;
-  return _applyModelOverride(base, ov);
+  return ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: applyDisplayName);
 }
 
 

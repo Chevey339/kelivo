@@ -133,6 +133,10 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
         ..add(Modality.text);
       if (_input.isEmpty) _input.add(Modality.text);
       _cachedEmbeddingInput = {..._input};
+    } else if (_type == ModelType.chat) {
+      // Defensive: prevent invalid empty modality sets from being loaded.
+      if (_input.isEmpty) _input.add(Modality.text);
+      if (_output.isEmpty) _output.add(Modality.text);
     }
 
     if (!widget.isNew) {
@@ -152,6 +156,8 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
         _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
         _output..clear()..addAll(outArr.map((e) => e == 'image' ? Modality.image : Modality.text));
         _abilities..clear()..addAll(abArr.map((e) => e == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool));
+        if (_input.isEmpty) _input.add(Modality.text);
+        if (_output.isEmpty) _output.add(Modality.text);
         } else if (_type == ModelType.embedding) {
           // Embedding supports explicit input modalities (e.g., text/image). Abilities remain chat-only.
           final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
@@ -217,6 +223,8 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
         _abilities
           ..clear()
           ..addAll(_cachedChatAbilities!);
+        if (_input.isEmpty) _input.add(Modality.text);
+        if (_output.isEmpty) _output.add(Modality.text);
       } else {
         // Fallback: explicit chat defaults.
         // Avoid inference bias (e.g., ids like "text-embedding-*" being inferred back to embedding).

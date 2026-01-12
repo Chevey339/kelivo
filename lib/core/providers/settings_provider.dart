@@ -25,6 +25,9 @@ class SettingsProvider extends ChangeNotifier {
   static const String _themeModeKey = 'theme_mode_v1';
   static const String _providerConfigsKey = 'provider_configs_v1';
   static const String _migrationsVersionKey = 'migrations_version_v1';
+  static const int _embeddingOverridesMigrationVersion = 3;
+  static const String _embeddingType = 'embedding';
+  static const Set<String> _embeddingChatOnlyFields = {'abilities', 'output', 'builtInTools'};
   static const String _pinnedModelsKey = 'pinned_models_v1';
   static const String _selectedModelKey = 'selected_model_v1';
   static const String _titleModelKey = 'title_model_v1';
@@ -236,19 +239,18 @@ class SettingsProvider extends ChangeNotifier {
         if (rawOv is! Map) continue;
 
         final t = (rawOv['type'] ?? '').toString().trim().toLowerCase();
-        if (t != 'embedding') continue;
+        if (t != _embeddingType) continue;
 
         // Migration/cleanup (embedding): remove chat-only fields.
         // Embeddings may still use explicit input modalities like text/image.
-        final hasChatOnlyKeys =
-            rawOv.containsKey('abilities') || rawOv.containsKey('output') || rawOv.containsKey('builtInTools');
+        final hasChatOnlyKeys = _embeddingChatOnlyFields.any(rawOv.containsKey);
         if (!hasChatOnlyKeys) continue;
 
         nextOverrides ??= Map<String, dynamic>.from(cfg.modelOverrides);
         final m = Map<String, dynamic>.from(rawOv);
-        m.remove('abilities');
-        m.remove('output');
-        m.remove('builtInTools');
+        for (final k in _embeddingChatOnlyFields) {
+          m.remove(k);
+        }
         nextOverrides[modelKey] = m;
         modelsChanged++;
       }
@@ -299,10 +301,10 @@ class SettingsProvider extends ChangeNotifier {
     // This fixes previously persisted overrides where type was switched from chat -> embedding.
     try {
       final migrationVersion = prefs.getInt(_migrationsVersionKey) ?? 0;
-      if (migrationVersion < 3) {
+      if (migrationVersion < _embeddingOverridesMigrationVersion) {
         final migrated = await _migrateEmbeddingModelOverrides(prefs);
         // Mark as attempted so we don't keep re-scanning on every startup when no changes are needed.
-        await prefs.setInt(_migrationsVersionKey, 3);
+        await prefs.setInt(_migrationsVersionKey, _embeddingOverridesMigrationVersion);
         assert(() {
           if (migrated) {
             debugPrint('[SettingsProvider] provider modelOverrides migration applied.');
@@ -312,6 +314,9 @@ class SettingsProvider extends ChangeNotifier {
       }
     } catch (e, st) {
       // Debug-only visibility for migration failures (no behavior change in release).
+      try {
+        FlutterLogger.log('[SettingsProvider] provider modelOverrides migration failed: $e\n$st', tag: 'Migration');
+      } catch (_) {}
       assert(() {
         debugPrint('[SettingsProvider] provider modelOverrides migration failed: $e');
         debugPrint('$st');

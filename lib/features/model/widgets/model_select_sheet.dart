@@ -15,6 +15,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../desktop/desktop_home_page.dart' show DesktopHomePage;
 import '../../provider/widgets/provider_avatar.dart';
+import '../../../core/services/model_override_resolver.dart';
 
 class ModelSelection {
   final String providerKey;
@@ -94,46 +95,7 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
           }
           ModelInfo base = ModelRegistry.infer(ModelInfo(id: baseId, displayName: baseId));
           if (ov != null) {
-            // display name override
-            final n = (ov['name'] as String?)?.trim();
-            // type override
-            ModelType? type;
-            final t = (ov['type'] ?? '').toString().trim().toLowerCase();
-            if (t.isNotEmpty) {
-              if (t == 'embedding') {
-                type = ModelType.embedding;
-              } else if (t == 'chat') {
-                type = ModelType.chat;
-              }
-            }
-            final effectiveType = type ?? base.type;
-            // modality override
-            List<Modality>? input;
-            if (ov['input'] is List) {
-              input = [
-                for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-              ];
-            }
-            List<Modality>? output;
-            if (effectiveType != ModelType.embedding && ov['output'] is List) {
-              output = [
-                for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-              ];
-            }
-            List<ModelAbility>? abilities;
-            if (effectiveType != ModelType.embedding && ov['abilities'] is List) {
-              abilities = [
-                for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)
-              ];
-            }
-            base = base.copyWith(
-              displayName: (n != null && n.isNotEmpty) ? n : base.displayName,
-              type: effectiveType,
-              input: input ?? base.input,
-              // Embeddings must not carry chat-only state.
-              output: effectiveType == ModelType.embedding ? const [Modality.text] : (output ?? base.output),
-              abilities: effectiveType == ModelType.embedding ? const <ModelAbility>[] : (abilities ?? base.abilities),
-            );
+            base = ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: true);
           }
           return _ModelItem(
             providerKey: key,

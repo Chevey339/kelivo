@@ -13,6 +13,7 @@ import '../l10n/app_localizations.dart';
 import '../theme/palettes.dart';
 import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
+import '../core/services/model_override_resolver.dart';
 import 'model_fetch_dialog.dart' show showModelFetchDialog;
 import '../shared/widgets/ios_switch.dart';
 import '../shared/widgets/ios_checkbox.dart';
@@ -4278,54 +4279,13 @@ class _ModelRow extends StatelessWidget {
     ModelInfo _effective() {
       final base = _infer(baseId);
       if (ov == null) return base;
-      ModelType? type;
-      final t = (ov['type'] ?? '').toString().trim().toLowerCase();
-      if (t == 'embedding') type = ModelType.embedding; else if (t == 'chat') type = ModelType.chat;
-      final effectiveType = type ?? base.type;
-      List<Modality>? input;
-      if (ov['input'] is List) {
-        input = [
-          for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-        ];
-      }
-      final inMods = input ?? base.input;
-      final normalizedInput = inMods.isEmpty ? const [Modality.text] : inMods;
-
-      if (effectiveType == ModelType.embedding) {
-        // Embeddings must not carry chat-only state.
-        return base.copyWith(
-          type: ModelType.embedding,
-          input: normalizedInput,
-          output: const [Modality.text],
-          abilities: const <ModelAbility>[],
-        );
-      }
-      List<Modality>? output;
-      if (ov['output'] is List) {
-        output = [
-          for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-        ];
-      }
-      final outMods = output ?? base.output;
-      final normalizedOutput = outMods.isEmpty ? const [Modality.text] : outMods;
-      List<ModelAbility>? abilities;
-      if (ov['abilities'] is List) {
-        abilities = [
-          for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)
-        ];
-      }
-      return base.copyWith(
-        type: effectiveType,
-        input: normalizedInput,
-        output: normalizedOutput,
-        abilities: abilities ?? base.abilities,
-      );
+      return ModelOverrideResolver.applyModelOverride(base, ov);
     }
     final info = _effective();
     // Display label: prefer override name, then upstream model id, then logical key
     String displayName = modelId;
     if (ov != null) {
-      final overrideName = (ov['name'] as String?)?.trim();
+      final overrideName = ov['name']?.toString().trim();
       if (overrideName != null && overrideName.isNotEmpty) {
         displayName = overrideName;
       } else {

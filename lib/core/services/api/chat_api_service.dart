@@ -15,6 +15,7 @@ import 'package:Kelivo/secrets/fallback.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../utils/unicode_sanitizer.dart';
 import 'builtin_tools.dart';
+import '../model_override_resolver.dart';
 
 class ChatApiService {
   static const String _aihubmixAppCode = 'ZKRT3588';
@@ -150,46 +151,8 @@ class ChatApiService {
     final upstreamId = _apiModelId(cfg, modelId);
     final base = ModelRegistry.infer(ModelInfo(id: upstreamId, displayName: upstreamId));
     final ov = _modelOverride(cfg, modelId);
-    ModelType? type;
-    final t = (ov['type'] ?? '').toString().trim().toLowerCase();
-    if (t == 'embedding') {
-      type = ModelType.embedding;
-    } else if (t == 'chat') {
-      type = ModelType.chat;
-    }
-    final effectiveType = type ?? base.type;
-    List<Modality>? input;
-    if (ov['input'] is List) {
-      input = [for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
-    }
-    List<Modality>? output;
-    // Only chat models support configurable output modalities.
-    if (effectiveType != ModelType.embedding && ov['output'] is List) {
-      output = [for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
-    }
-    // Embedding models should not carry chat-only abilities, but should keep/derive modalities
-    // from the inferred base (or explicit overrides) for forward compatibility with multimodal
-    // embedding models.
-    if (effectiveType == ModelType.embedding) {
-      final inMods = input ?? base.input;
-      return base.copyWith(
-        type: ModelType.embedding,
-        input: (inMods.isEmpty ? const [Modality.text] : inMods),
-        // Embedding output is treated as text-only in UI and should not inherit chat-style output modalities.
-        output: const [Modality.text],
-        abilities: const [],
-      );
-    }
-    List<ModelAbility>? abilities;
-    if (ov['abilities'] is List) {
-      abilities = [for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)];
-    }
-    return base.copyWith(
-      type: effectiveType,
-      input: input ?? base.input,
-      output: output ?? base.output,
-      abilities: abilities ?? base.abilities,
-    );
+    if (ov.isEmpty) return base;
+    return ModelOverrideResolver.applyModelOverride(base, ov);
   }
   static String _mimeFromPath(String path) {
     final lower = path.toLowerCase();
