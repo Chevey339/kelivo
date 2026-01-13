@@ -7030,6 +7030,28 @@ class ChatApiService {
     return null;
   }
 
+  static int _getMaxOutputTokensForClaudeModel(String modelId) {
+    // Limits based on Google Vertex AI documentation
+    switch (modelId) {
+      case 'claude-opus-4-5@20251101':
+      case 'claude-sonnet-4-5@20250929':
+      case 'claude-haiku-4-5@20251001':
+      case 'claude-sonnet-4@20250514':
+        return 64000;
+      case 'claude-opus-4-1@20250805':
+      case 'claude-opus-4@20250514':
+        return 32000;
+      case 'claude-3-haiku@20240307':
+        return 8000;
+      case 'claude-3-5-sonnet@20240620':
+      case 'claude-3-5-sonnet-v2@20241022':
+        return 8192;
+      default:
+        // Fallback for older models
+        return 4096;
+    }
+  }
+
   static Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     required http.Client client,
     required ProviderConfig config,
@@ -7053,6 +7075,23 @@ class ChatApiService {
     // Vertex AI Anthropic URL
     final url = Uri.parse('https://$loc-aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$endpoint');
 
+    final isReasoning = _effectiveModelInfo(config, modelId)
+        .abilities
+        .contains(ModelAbility.reasoning);
+
+    // Determine effective max_tokens based on model capabilities
+    int effectiveMaxTokens = maxTokens ?? _getMaxOutputTokensForClaudeModel(upstreamId);
+    
+    // Ensure thinking_budget < max_tokens (API requirement)
+    int? effectiveThinkingBudget = thinkingBudget;
+    if (isReasoning && effectiveThinkingBudget != null && effectiveThinkingBudget > 0) {
+      if (effectiveThinkingBudget >= effectiveMaxTokens) {
+        // Reserve at least 1k tokens for response content
+        effectiveThinkingBudget = effectiveMaxTokens - 1024;
+        if (effectiveThinkingBudget < 1024) effectiveThinkingBudget = 1024; // floor
+      }
+    }
+
     final headers = <String, String>{
       'Content-Type': 'application/json',
     };
@@ -7061,10 +7100,6 @@ class ChatApiService {
       headers['Authorization'] = 'Bearer $token';
     }
     if (extraHeaders != null) headers.addAll(extraHeaders);
-
-    final isReasoning = _effectiveModelInfo(config, modelId)
-        .abilities
-        .contains(ModelAbility.reasoning);
 
     // Extract system prompt
     String systemPrompt = '';
@@ -7172,7 +7207,7 @@ class ChatApiService {
         'anthropic_version': 'vertex-2023-10-16',
         'messages': convo,
         'stream': stream,
-        'max_tokens': maxTokens ?? 4096,
+        'max_tokens': effectiveMaxTokens,
         if (systemPrompt.isNotEmpty) 'system': systemPrompt,
         if (temperature != null) 'temperature': temperature,
         if (topP != null) 'top_p': topP,
@@ -7180,9 +7215,9 @@ class ChatApiService {
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
         if (isReasoning)
           'thinking': {
-            'type': (thinkingBudget == 0) ? 'disabled' : 'enabled',
-            if (thinkingBudget != null && thinkingBudget > 0)
-              'budget_tokens': thinkingBudget,
+            'type': (effectiveThinkingBudget == 0) ? 'disabled' : 'enabled',
+            if (effectiveThinkingBudget != null && effectiveThinkingBudget > 0)
+              'budget_tokens': effectiveThinkingBudget,
           },
       };
       if (extraBody != null) {
