@@ -1,48 +1,16 @@
+export '../models/model_types.dart';
+
 import 'dart:convert';
 import 'dart:io' show HttpException;
+
 import 'package:http/http.dart' as http;
+
+import '../models/model_types.dart';
 import 'settings_provider.dart';
 import '../services/network/dio_http_client.dart';
 import '../services/api_key_manager.dart';
 import 'package:Kelivo/secrets/fallback.dart';
 import '../services/api/google_service_account_auth.dart';
-
-enum ModelType { chat, embedding }
-enum Modality { text, image }
-enum ModelAbility { tool, reasoning }
-
-class ModelInfo {
-  final String id;
-  final String displayName;
-  final ModelType type;
-  final List<Modality> input;
-  final List<Modality> output;
-  final List<ModelAbility> abilities;
-  ModelInfo({
-    required this.id,
-    required this.displayName,
-    this.type = ModelType.chat,
-    this.input = const [Modality.text],
-    this.output = const [Modality.text],
-    this.abilities = const [],
-  });
-
-  ModelInfo copyWith({
-    String? id,
-    String? displayName,
-    ModelType? type,
-    List<Modality>? input,
-    List<Modality>? output,
-    List<ModelAbility>? abilities,
-  }) => ModelInfo(
-        id: id ?? this.id,
-        displayName: displayName ?? this.displayName,
-        type: type ?? this.type,
-        input: input ?? this.input,
-        output: output ?? this.output,
-        abilities: abilities ?? this.abilities,
-      );
-}
 
 class ModelRegistry {
   // Updated model groups to reflect new series

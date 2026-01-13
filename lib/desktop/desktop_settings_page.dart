@@ -4268,7 +4268,8 @@ class _ModelRow extends StatelessWidget {
     ModelInfo _infer(String id) => ModelRegistry.infer(ModelInfo(id: id, displayName: id));
     // Resolve upstream/api model id for inference + capsules
     String baseId = modelId;
-    final ov = cfg.modelOverrides[modelId] as Map?;
+    final rawOv = cfg.modelOverrides[modelId];
+    final Map<String, dynamic>? ov = rawOv is Map ? {for (final e in rawOv.entries) e.key.toString(): e.value} : null;
     if (ov != null) {
       final apiId = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
       if (apiId != null && apiId.isNotEmpty) {

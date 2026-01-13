@@ -1,4 +1,6 @@
-import '../providers/model_provider.dart';
+import 'dart:collection';
+
+import '../models/model_types.dart';
 
 /// Shared utilities for parsing and applying per-model override maps.
 ///
@@ -30,17 +32,15 @@ class ModelOverrideResolver {
     final out = <Modality>[];
     for (final e in raw) {
       final s = _norm(e);
-      if (s == 'text') out.add(Modality.text);
-      if (s == 'image') out.add(Modality.image);
+      if (s == 'text') {
+        out.add(Modality.text);
+      } else if (s == 'image') {
+        out.add(Modality.image);
+      }
     }
     if (out.isEmpty) return null;
     // Dedupe while preserving order.
-    final seen = <Modality>{};
-    final uniq = <Modality>[];
-    for (final m in out) {
-      if (seen.add(m)) uniq.add(m);
-    }
-    return uniq;
+    return LinkedHashSet<Modality>.from(out).toList(growable: false);
   }
 
   /// Parse model ability list override.
@@ -51,16 +51,14 @@ class ModelOverrideResolver {
     final out = <ModelAbility>[];
     for (final e in raw) {
       final s = _norm(e);
-      if (s == 'tool') out.add(ModelAbility.tool);
-      if (s == 'reasoning') out.add(ModelAbility.reasoning);
+      if (s == 'tool') {
+        out.add(ModelAbility.tool);
+      } else if (s == 'reasoning') {
+        out.add(ModelAbility.reasoning);
+      }
     }
     if (out.isEmpty) return null;
-    final seen = <ModelAbility>{};
-    final uniq = <ModelAbility>[];
-    for (final a in out) {
-      if (seen.add(a)) uniq.add(a);
-    }
-    return uniq;
+    return LinkedHashSet<ModelAbility>.from(out).toList(growable: false);
   }
 
   static String? _parseName(Map ov) {

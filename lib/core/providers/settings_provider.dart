@@ -315,7 +315,7 @@ class SettingsProvider extends ChangeNotifier {
     } catch (e, st) {
       // Debug-only visibility for migration failures (no behavior change in release).
       try {
-        FlutterLogger.log('[SettingsProvider] provider modelOverrides migration failed: $e\n$st', tag: 'Migration');
+        FlutterLogger.log('[SettingsProvider] provider modelOverrides migration failed', tag: 'Migration');
       } catch (_) {}
       assert(() {
         debugPrint('[SettingsProvider] provider modelOverrides migration failed: $e');

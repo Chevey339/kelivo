@@ -3,7 +3,7 @@ import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../core/providers/model_provider.dart';
+import '../../core/models/model_types.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -198,6 +198,7 @@ class ModelCapsulesRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
     Widget pillCapsule(Widget icon, Color color) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -214,16 +215,40 @@ class ModelCapsulesRow extends StatelessWidget {
       );
     }
 
+    Widget labeledCapsule({required String label, required Widget icon, required Color color}) {
+      return Tooltip(
+        message: label,
+        child: Semantics(
+          label: label,
+          child: ExcludeSemantics(
+            child: pillCapsule(icon, color),
+          ),
+        ),
+      );
+    }
+
     final caps = <Widget>[];
 
     // Input: image eye (chat + embedding)
     if (model.input.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(Lucide.Eye, size: iconSize, color: cs.secondary), cs.secondary));
+      caps.add(
+        labeledCapsule(
+          label: '${l10n.modelDetailSheetInputModesLabel}: ${l10n.modelDetailSheetImageMode}',
+          icon: Icon(Lucide.Eye, size: iconSize, color: cs.secondary),
+          color: cs.secondary,
+        ),
+      );
     }
 
     // Output: image (chat only)
     if (model.type == ModelType.chat && model.output.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(Lucide.Image, size: iconSize, color: cs.tertiary), cs.tertiary));
+      caps.add(
+        labeledCapsule(
+          label: '${l10n.modelDetailSheetOutputModesLabel}: ${l10n.modelDetailSheetImageMode}',
+          icon: Icon(Lucide.Image, size: iconSize, color: cs.tertiary),
+          color: cs.tertiary,
+        ),
+      );
     }
 
     // Abilities: chat only
@@ -231,17 +256,26 @@ class ModelCapsulesRow extends StatelessWidget {
       final uniqueAbilities = LinkedHashSet<ModelAbility>.from(model.abilities);
       for (final ab in uniqueAbilities) {
         if (ab == ModelAbility.tool) {
-          caps.add(pillCapsule(Icon(Lucide.Hammer, size: iconSize, color: cs.primary), cs.primary));
-        } else if (ab == ModelAbility.reasoning) {
-          caps.add(pillCapsule(
-            SvgPicture.asset(
-              'assets/icons/deepthink.svg',
-              width: iconSize,
-              height: iconSize,
-              colorFilter: ColorFilter.mode(cs.secondary, BlendMode.srcIn),
+          caps.add(
+            labeledCapsule(
+              label: l10n.modelDetailSheetToolsAbility,
+              icon: Icon(Lucide.Hammer, size: iconSize, color: cs.primary),
+              color: cs.primary,
             ),
-            cs.secondary,
-          ));
+          );
+        } else if (ab == ModelAbility.reasoning) {
+          caps.add(
+            labeledCapsule(
+              label: l10n.modelDetailSheetReasoningAbility,
+              icon: SvgPicture.asset(
+                'assets/icons/deepthink.svg',
+                width: iconSize,
+                height: iconSize,
+                colorFilter: ColorFilter.mode(cs.secondary, BlendMode.srcIn),
+              ),
+              color: cs.secondary,
+            ),
+          );
         }
       }
     }
