@@ -7197,7 +7197,26 @@ class ChatApiService {
         }
       }
     }
-    // No built-in web search injection for Vertex Claude for now
+    
+    final builtIns = _builtInTools(config, modelId);
+    if (builtIns.contains(BuiltInToolNames.search)) {
+      Map<String, dynamic> ws = const <String, dynamic>{};
+      try {
+        final ov = config.modelOverrides[modelId];
+        if (ov is Map && ov['webSearch'] is Map) {
+          ws = (ov['webSearch'] as Map).cast<String, dynamic>();
+        }
+      } catch (_) {}
+      final entry = <String, dynamic>{
+        'type': 'web_search_20250305',
+        'name': 'web_search',
+      };
+      if (ws['max_uses'] is int && (ws['max_uses'] as int) > 0) entry['max_uses'] = ws['max_uses'];
+      if (ws['allowed_domains'] is List) entry['allowed_domains'] = List<String>.from((ws['allowed_domains'] as List).map((e) => e.toString()));
+      if (ws['blocked_domains'] is List) entry['blocked_domains'] = List<String>.from((ws['blocked_domains'] as List).map((e) => e.toString()));
+      if (ws['user_location'] is Map) entry['user_location'] = (ws['user_location'] as Map).cast<String, dynamic>();
+      allTools.add(entry);
+    }
 
     List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(initialMessages);
     TokenUsage? totalUsage;
@@ -7316,6 +7335,11 @@ class ChatApiService {
       final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
       final StringBuffer textBuf = StringBuffer();
 
+      // Server tool helpers (web_search)
+      final Map<int, String> _srvIndexToId = <int, String>{};
+      final Map<String, String> _srvArgsStr = <String, String>{};
+      final Map<String, Map<String, dynamic>> _srvArgs = <String, Map<String, dynamic>>{};
+
       final Map<int, int> _thinkingIndexToAssistantBlock = <int, int>{};
       final Map<int, StringBuffer> _thinkingText = <int, StringBuffer>{};
       final Map<int, StringBuffer> _thinkingSig = <int, StringBuffer>{};
@@ -7387,6 +7411,54 @@ class ChatApiService {
                     toolCalls: [ToolCallInfo(id: id, name: name, arguments: const <String, dynamic>{})],
                   );
                 }
+              } else if (cb is Map && (cb['type'] == 'server_tool_use')) {
+                final id = (cb['id'] ?? '').toString();
+                final idx2 = idx ?? -1;
+                if (id.isNotEmpty && idx2 >= 0) {
+                  _srvIndexToId[idx2] = id;
+                  _srvArgsStr[id] = '';
+                }
+                // Emit placeholder for server tool to show card (e.g., built-in web_search)
+                if (id.isNotEmpty) {
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: false,
+                    totalTokens: roundTokens,
+                    usage: usage,
+                    toolCalls: [ToolCallInfo(id: id, name: 'search_web', arguments: const <String, dynamic>{})],
+                  );
+                }
+              } else if (cb is Map && (cb['type'] == 'web_search_tool_result')) {
+                // Emit simplified search results to UI
+                final toolUseId = (cb['tool_use_id'] ?? '').toString();
+                final contentBlock = cb['content'];
+                final items = <Map<String, dynamic>>[];
+                String? errorCode;
+                if (contentBlock is List) {
+                  for (int j = 0; j < contentBlock.length; j++) {
+                    final it = contentBlock[j];
+                    if (it is Map && (it['type'] == 'web_search_result')) {
+                      items.add({
+                        'index': j + 1,
+                        'title': (it['title'] ?? '').toString(),
+                        'url': (it['url'] ?? '').toString(),
+                        if ((it['page_age'] ?? '').toString().isNotEmpty) 'page_age': (it['page_age'] ?? '').toString(),
+                      });
+                    }
+                  }
+                } else if (contentBlock is Map && (contentBlock['type'] == 'web_search_tool_result_error')) {
+                  errorCode = (contentBlock['error_code'] ?? '').toString();
+                }
+                Map<String, dynamic> args = const <String, dynamic>{};
+                if (_srvArgs.containsKey(toolUseId)) args = _srvArgs[toolUseId]!;
+                final payload = jsonEncode({'items': items, if ((errorCode ?? '').isNotEmpty) 'error': errorCode});
+                yield ChatStreamChunk(
+                  content: '',
+                  isDone: false,
+                  totalTokens: roundTokens,
+                  usage: usage,
+                  toolResults: [ToolResultInfo(id: toolUseId.isEmpty ? 'builtin_search' : toolUseId, name: 'search_web', arguments: args, content: payload)],
+                );
               }
             } else if (type == 'content_block_delta') {
               final delta = obj['delta'];
@@ -7435,6 +7507,9 @@ class ChatApiService {
                       final id = _cliIndexToId[index]!;
                       final entry = _anthToolUse.putIfAbsent(id, () => {'name': '', 'args': ''});
                       entry['args'] = (entry['args'] ?? '') + part;
+                    } else if (_srvIndexToId.containsKey(index)) {
+                      final id = _srvIndexToId[index]!;
+                      _srvArgsStr[id] = (_srvArgsStr[id] ?? '') + part;
                     }
                   }
                 }
@@ -7473,6 +7548,14 @@ class ChatApiService {
                   _toolResultsContent[id] = res;
                   yield ChatStreamChunk(content: '', isDone: false, totalTokens: roundTokens, toolResults: [ToolResultInfo(id: id, name: name, arguments: args, content: res)], usage: usage);
                 }
+              } else {
+                if (idx != null && _srvIndexToId.containsKey(idx)) {
+                  final sid = _srvIndexToId[idx]!;
+                  Map<String, dynamic> args;
+                  try { args = (jsonDecode((_srvArgsStr[sid] ?? '{}')) as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+                  _srvArgs[sid] = args;
+                  yield ChatStreamChunk(content: '', isDone: false, totalTokens: roundTokens, usage: usage, toolCalls: [ToolCallInfo(id: sid, name: 'search_web', arguments: args)]);
+                }
               }
             } else if (type == 'message_delta') {
               final u = obj['usage'] ?? obj['message']?['usage'];
@@ -7501,7 +7584,9 @@ class ChatApiService {
       if (usage != null) totalUsage = (totalUsage ?? const TokenUsage()).merge(usage!);
 
       if (_anthToolUse.isEmpty) {
-        if (_lastStopReason == 'pause_turn') {
+        final hadServerTool = assistantBlocks.any((b) => (b is Map) && (b['type'] == 'tool_use' || b['type'] == 'text')) && _srvIndexToId.isNotEmpty;
+        final sr = _lastStopReason ?? '';
+        if (sr == 'pause_turn' || hadServerTool) {
           // Continue this turn with assistant content only (not fully supported by Vertex streamRawPredict yet, but good for future proofing)
           convo = [
             ...convo,
