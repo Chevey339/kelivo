@@ -905,6 +905,25 @@ class ChatApiService {
         return '';
       } else {
         // Google
+        // Check for Vertex AI Claude models (prefix "claude-")
+        if ((config.vertexAI == true) && modelId.toLowerCase().startsWith('claude-')) {
+          // Reuse existing streaming method but buffer the output for non-streaming
+          final stream = _sendGoogleVertexClaudeStream(
+            client: client,
+            config: config,
+            modelId: modelId,
+            messages: [
+              {'role': 'user', 'content': prompt}
+            ],
+            extraHeaders: extraHeaders,
+            extraBody: extraBody,
+            thinkingBudget: thinkingBudget,
+            stream: false,
+          );
+          final chunk = await stream.last;
+          return chunk.content;
+        }
+
         String url;
         if (config.vertexAI == true &&
             (config.location?.isNotEmpty == true) &&

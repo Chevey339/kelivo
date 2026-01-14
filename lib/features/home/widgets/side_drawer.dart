@@ -7,6 +7,7 @@ import '../../../icons/lucide_adapter.dart';
 import 'package:provider/provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/models/chat_item.dart';
 import '../../../core/providers/user_provider.dart';
@@ -577,13 +578,27 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   Future<void> _regenerateTitle(BuildContext context, String conversationId) async {
     final settings = context.read<SettingsProvider>();
     final chatService = context.read<ChatService>();
+    final assistantProvider = context.read<AssistantProvider>();
     final convo = chatService.getConversation(conversationId);
     if (convo == null) return;
-    // Decide model
-    final provKey = settings.titleModelProvider ?? settings.currentModelProvider;
-    final mdlId = settings.titleModelId ?? settings.currentModelId;
+
+    // Get assistant for this conversation
+    final assistant = convo.assistantId != null
+        ? assistantProvider.getById(convo.assistantId!)
+        : assistantProvider.currentAssistant;
+
+    // Decide model: prefer title model, else fall back to assistant's model, then to global default
+    final provKey = settings.titleModelProvider ??
+        assistant?.chatModelProvider ??
+        settings.currentModelProvider;
+    final mdlId = settings.titleModelId ??
+        assistant?.chatModelId ??
+        settings.currentModelId;
+
     if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
+    final budget = assistant?.thinkingBudget ?? settings.thinkingBudget;
+
     // Content
     final msgs = chatService.getMessages(conversationId);
     final joined = msgs.where((m) => m.content.isNotEmpty).map((m) => '${m.role == 'assistant' ? 'Assistant' : 'User'}: ${m.content}').join('\n\n');
@@ -591,11 +606,13 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final locale = Localizations.localeOf(context).toLanguageTag();
     final prompt = settings.titlePrompt.replaceAll('{locale}', locale).replaceAll('{content}', content);
     try {
-      final title = (await ChatApiService.generateText(config: cfg, modelId: mdlId, prompt: prompt)).trim();
+      final title = (await ChatApiService.generateText(config: cfg, modelId: mdlId, prompt: prompt, thinkingBudget: budget)).trim();
       if (title.isNotEmpty) {
         await chatService.renameConversation(conversationId, title);
       }
-    } catch (_) {}
+    } catch (e) {
+      FlutterLogger.log('[SideDrawer] Regenerate title failed: $e', tag: 'SideDrawer');
+    }
   }
 
   @override
