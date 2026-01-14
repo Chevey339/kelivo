@@ -128,13 +128,42 @@ class _SelectionActionsCardState extends State<_SelectionActionsCard> {
                 ),
               )
             else ...[
-              ...actions.map((action) => _ActionItem(
-                action: action,
-                onEdit: () => _showActionEditor(context, action),
-                onDelete: () async {
-                  await context.read<SettingsProvider>().removeSelectionAction(action.id);
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                itemCount: actions.length,
+                onReorder: (oldIndex, newIndex) {
+                  context.read<SettingsProvider>().reorderSelectionActions(oldIndex, newIndex);
                 },
-              )),
+                proxyDecorator: (child, index, animation) {
+                  return AnimatedBuilder(
+                    animation: animation,
+                    builder: (context, child) {
+                      final double elevation = Tween<double>(begin: 0, end: 6).evaluate(animation);
+                      return Material(
+                        elevation: elevation,
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        child: child,
+                      );
+                    },
+                    child: child,
+                  );
+                },
+                itemBuilder: (context, index) {
+                  final action = actions[index];
+                  return _ActionItem(
+                    key: ValueKey(action.id),
+                    action: action,
+                    index: index,
+                    onEdit: () => _showActionEditor(context, action),
+                    onDelete: () async {
+                      await context.read<SettingsProvider>().removeSelectionAction(action.id);
+                    },
+                  );
+                },
+              ),
             ],
             const SizedBox(height: 8),
             Container(
@@ -180,10 +209,17 @@ class _SelectionActionsCardState extends State<_SelectionActionsCard> {
 
 class _ActionItem extends StatefulWidget {
   final SelectionAction action;
+  final int index;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
-  const _ActionItem({required this.action, required this.onEdit, required this.onDelete});
+  const _ActionItem({
+    super.key,
+    required this.action,
+    required this.index,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   State<_ActionItem> createState() => _ActionItemState();
@@ -236,6 +272,19 @@ class _ActionItemState extends State<_ActionItem> {
         ),
         child: Row(
           children: [
+            if (_hover)
+              ReorderableDragStartListener(
+                index: widget.index,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.grab,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Icon(lucide.Lucide.GripVertical, size: 16, color: cs.onSurface.withOpacity(0.4)),
+                  ),
+                ),
+              )
+            else
+              const SizedBox(width: 24),
             Icon(_getIcon(widget.action.iconName), size: 18, color: cs.primary),
             const SizedBox(width: 10),
             Expanded(
