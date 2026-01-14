@@ -2354,19 +2354,6 @@ class _ModelCard extends StatelessWidget {
     }
     return modelId;
   }
-
-  Widget _pill(BuildContext context, IconData icon, String label) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(color: cs.primary.withOpacity(0.10), borderRadius: BorderRadius.circular(999)),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 12, color: cs.primary),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: cs.primary)),
-      ]),
-    );
-  }
 }
 
 class _ConnectionTestDialog extends StatefulWidget {

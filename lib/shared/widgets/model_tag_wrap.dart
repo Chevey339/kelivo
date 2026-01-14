@@ -19,6 +19,36 @@ class ModelTagWrap extends StatelessWidget {
 
   final ModelInfo model;
 
+  Widget _abilityChip({
+    required bool isDark,
+    required ColorScheme cs,
+    required String label,
+    required Color baseColor,
+    required EdgeInsets padding,
+    required Widget child,
+    required double darkBgAlpha,
+    required double lightBgAlpha,
+    required double borderAlpha,
+  }) {
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        label: label,
+        child: ExcludeSemantics(
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark ? baseColor.withValues(alpha: darkBgAlpha) : baseColor.withValues(alpha: lightBgAlpha),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: baseColor.withValues(alpha: borderAlpha), width: 0.5),
+            ),
+            padding: padding,
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -32,16 +62,16 @@ class ModelTagWrap extends StatelessWidget {
     chips.add(
       Container(
         decoration: BoxDecoration(
-          color: isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15),
+          color: isDark ? cs.primary.withValues(alpha: 0.25) : cs.primary.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.primary.withOpacity(0.2), width: 0.5),
+          border: Border.all(color: cs.primary.withValues(alpha: 0.2), width: 0.5),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Text(
           model.type == ModelType.chat ? l10n.modelSelectSheetChatType : l10n.modelSelectSheetEmbeddingType,
           style: TextStyle(
             fontSize: 11,
-            color: isDark ? cs.primary : cs.primary.withOpacity(0.9),
+            color: isDark ? cs.primary : cs.primary.withValues(alpha: 0.9),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -70,9 +100,9 @@ class ModelTagWrap extends StatelessWidget {
           child: ExcludeSemantics(
             child: Container(
               decoration: BoxDecoration(
-                color: isDark ? cs.tertiary.withOpacity(0.25) : cs.tertiary.withOpacity(0.15),
+                color: isDark ? cs.tertiary.withValues(alpha: 0.25) : cs.tertiary.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: cs.tertiary.withOpacity(0.2), width: 0.5),
+                border: Border.all(color: cs.tertiary.withValues(alpha: 0.2), width: 0.5),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               child: Row(
@@ -84,17 +114,17 @@ class ModelTagWrap extends StatelessWidget {
                       child: Icon(
                         mod == Modality.text ? Lucide.Type : Lucide.Image,
                         size: 12,
-                        color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9),
+                        color: isDark ? cs.tertiary : cs.tertiary.withValues(alpha: 0.9),
                       ),
                     ),
-                  Icon(Lucide.ChevronRight, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
+                  Icon(Lucide.ChevronRight, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withValues(alpha: 0.9)),
                   for (final mod in outputModsUnique)
                     Padding(
                       padding: const EdgeInsets.only(left: 2),
                       child: Icon(
                         mod == Modality.text ? Lucide.Type : Lucide.Image,
                         size: 12,
-                        color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9),
+                        color: isDark ? cs.tertiary : cs.tertiary.withValues(alpha: 0.9),
                       ),
                     ),
                 ],
@@ -111,51 +141,35 @@ class ModelTagWrap extends StatelessWidget {
       for (final ab in uniqueAbilities) {
         if (ab == ModelAbility.tool) {
           final label = l10n.modelDetailSheetToolsAbility;
-          chips.add(
-            Tooltip(
-              message: label,
-              child: Semantics(
-                label: label,
-                child: ExcludeSemantics(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: cs.primary.withOpacity(0.2), width: 0.5),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    child: Icon(Lucide.Hammer, size: 12, color: isDark ? cs.primary : cs.primary.withOpacity(0.9)),
-                  ),
-                ),
-              ),
-            ),
-          );
+          chips.add(_abilityChip(
+            isDark: isDark,
+            cs: cs,
+            label: label,
+            baseColor: cs.primary,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: Icon(Lucide.Hammer, size: 12, color: isDark ? cs.primary : cs.primary.withValues(alpha: 0.9)),
+            darkBgAlpha: 0.25,
+            lightBgAlpha: 0.15,
+            borderAlpha: 0.2,
+          ));
         } else if (ab == ModelAbility.reasoning) {
           final label = l10n.modelDetailSheetReasoningAbility;
-          chips.add(
-            Tooltip(
-              message: label,
-              child: Semantics(
-                label: label,
-                child: ExcludeSemantics(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isDark ? cs.secondary.withOpacity(0.3) : cs.secondary.withOpacity(0.18),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: cs.secondary.withOpacity(0.25), width: 0.5),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    child: SvgPicture.asset(
-                      'assets/icons/deepthink.svg',
-                      width: 12,
-                      height: 12,
-                      colorFilter: ColorFilter.mode(isDark ? cs.secondary : cs.secondary.withOpacity(0.9), BlendMode.srcIn),
-                    ),
-                  ),
-                ),
-              ),
+          chips.add(_abilityChip(
+            isDark: isDark,
+            cs: cs,
+            label: label,
+            baseColor: cs.secondary,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: SvgPicture.asset(
+              'assets/icons/deepthink.svg',
+              width: 12,
+              height: 12,
+              colorFilter: ColorFilter.mode(isDark ? cs.secondary : cs.secondary.withValues(alpha: 0.9), BlendMode.srcIn),
             ),
-          );
+            darkBgAlpha: 0.3,
+            lightBgAlpha: 0.18,
+            borderAlpha: 0.25,
+          ));
         }
       }
     }
@@ -199,11 +213,11 @@ class ModelCapsulesRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     Widget pillCapsule(Widget icon, Color color) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final bg = isDark ? color.withOpacity(bgOpacityDark) : color.withOpacity(bgOpacityLight);
-      final bd = color.withOpacity(borderOpacity);
+      final bg = isDark ? color.withValues(alpha: bgOpacityDark) : color.withValues(alpha: bgOpacityLight);
+      final bd = color.withValues(alpha: borderOpacity);
       return Container(
         padding: pillPadding,
         decoration: BoxDecoration(

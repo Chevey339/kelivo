@@ -4347,7 +4347,7 @@ class _ModelRow extends StatelessWidget {
               const SizedBox(width: 8),
             ],
             if (!isSelectionMode) ...[
-              Flexible(child: ModelCapsulesRow(model: info)),
+              ModelCapsulesRow(model: info),
               const SizedBox(width: 8),
               _IconBtn(icon: lucide.Lucide.Settings2, onTap: () async { await showDesktopModelEditDialog(context, providerKey: providerKey, modelId: modelId); }),
               const SizedBox(width: 4),

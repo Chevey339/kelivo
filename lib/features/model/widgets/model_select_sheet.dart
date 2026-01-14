@@ -856,9 +856,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     }
   }
 
-  String _displayName(BuildContext context, _ModelItem m) => m.info.displayName;
-  ModelInfo _effectiveInfo(BuildContext context, _ModelItem m) => m.info;
-
   Future<void> _jumpToFavorites() async {
     if (widget.limitProviderKey != null) return;
     // Expand sheet first to reveal more content

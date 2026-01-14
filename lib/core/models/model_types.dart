@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart';
+
 enum ModelType { chat, embedding }
 
 enum Modality { text, image }
 
 enum ModelAbility { tool, reasoning }
 
+@immutable
 class ModelInfo {
   final String id;
   final String displayName;
@@ -38,5 +41,28 @@ class ModelInfo {
       abilities: abilities ?? this.abilities,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other is ModelInfo &&
+            runtimeType == other.runtimeType &&
+            id == other.id &&
+            displayName == other.displayName &&
+            type == other.type &&
+            listEquals(input, other.input) &&
+            listEquals(output, other.output) &&
+            listEquals(abilities, other.abilities));
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        id,
+        displayName,
+        type,
+        Object.hashAll(input),
+        Object.hashAll(output),
+        Object.hashAll(abilities),
+      );
 }
 

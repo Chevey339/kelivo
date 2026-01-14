@@ -711,12 +711,6 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
 
   Widget _label(BuildContext context, String text) => Text(text, style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8)));
 
-  Color _segSelectedColor(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return isDark ? cs.primary.withOpacity(0.20) : cs.primary.withOpacity(0.14);
-  }
-
   // Generate a unique logical key for a model instance within a provider.
   // This allows multiple configurations to share the same upstream API model id.
   String _nextModelKey(ProviderConfig cfg, String apiModelId) {

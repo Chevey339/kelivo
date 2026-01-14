@@ -1,0 +1,80 @@
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:Kelivo/core/models/model_types.dart';
+import 'package:Kelivo/core/services/model_override_resolver.dart';
+
+void main() {
+  group('ModelOverrideResolver.applyModelOverride', () {
+    test('chat -> embedding clears abilities and forces text-only output', () {
+      final base = ModelInfo(
+        id: 'm',
+        displayName: 'm',
+        type: ModelType.chat,
+        input: const [Modality.text],
+        output: const [Modality.text, Modality.image],
+        abilities: const [ModelAbility.tool, ModelAbility.reasoning],
+      );
+
+      final next = ModelOverrideResolver.applyModelOverride(base, {
+        'type': 'embedding',
+        'input': ['image'],
+        'output': ['image'],
+        'abilities': ['tool', 'reasoning'],
+      });
+
+      expect(next.type, ModelType.embedding);
+      expect(next.abilities, isEmpty);
+      expect(next.output, const [Modality.text]);
+      // Embeddings still allow explicit input modalities (image should be preserved)
+      expect(next.input, const [Modality.image]);
+    });
+
+    test('embedding -> chat applies output/abilities overrides', () {
+      final base = ModelInfo(
+        id: 'm',
+        displayName: 'm',
+        type: ModelType.embedding,
+        input: const [Modality.text],
+        output: const [Modality.text],
+        abilities: const [],
+      );
+
+      final next = ModelOverrideResolver.applyModelOverride(base, {
+        'type': 'chat',
+        'input': ['text', 'image'],
+        'output': ['text', 'image'],
+        'abilities': ['tool'],
+      });
+
+      expect(next.type, ModelType.chat);
+      expect(next.input, const [Modality.text, Modality.image]);
+      expect(next.output, const [Modality.text, Modality.image]);
+      expect(next.abilities, const [ModelAbility.tool]);
+    });
+
+    test('unknown override values are ignored (no override)', () {
+      final base = ModelInfo(
+        id: 'm',
+        displayName: 'm',
+        type: ModelType.chat,
+        input: const [Modality.text],
+        output: const [Modality.text],
+        abilities: const [ModelAbility.reasoning],
+      );
+
+      final next = ModelOverrideResolver.applyModelOverride(base, {
+        'type': 'chat',
+        'input': ['bogus'],
+        'output': ['bogus'],
+        'abilities': ['bogus'],
+      });
+
+      // input/output remain base (non-empty mods)
+      expect(next.input, const [Modality.text]);
+      expect(next.output, const [Modality.text]);
+      // abilities override ignored, so base abilities preserved
+      expect(next.abilities, const [ModelAbility.reasoning]);
+    });
+  });
+}
+
