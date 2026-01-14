@@ -8,6 +8,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/logging/flutter_logger.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
@@ -566,6 +567,7 @@ class HomeViewModel extends ChangeNotifier {
         settings.currentModelId;
     if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
+    final budget = assistant?.thinkingBudget ?? settings.thinkingBudget;
 
     // Build content from messages (truncate to reasonable length)
     final msgs = _chatService.getMessages(convo.id);
@@ -587,7 +589,7 @@ class HomeViewModel extends ChangeNotifier {
 
     try {
       final title = (await ChatApiService.generateText(
-              config: cfg, modelId: mdlId, prompt: prompt))
+              config: cfg, modelId: mdlId, prompt: prompt, thinkingBudget: budget))
           .trim();
       if (title.isNotEmpty) {
         await _chatService.renameConversation(convo.id, title);
@@ -597,7 +599,8 @@ class HomeViewModel extends ChangeNotifier {
           notifyListeners();
         }
       }
-    } catch (_) {
+    } catch (e) {
+      FlutterLogger.log('[TitleGen] Generation failed: $e', tag: 'HomeViewModel');
       // Ignore title generation failure silently
     }
   }
@@ -631,6 +634,8 @@ class HomeViewModel extends ChangeNotifier {
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
+    
+    final budget = assistant?.thinkingBudget ?? settings.thinkingBudget;
 
     // Only generate summary if assistant has recent chats reference enabled
     if (assistant?.enableRecentChatsReference != true) return;
@@ -685,7 +690,7 @@ class HomeViewModel extends ChangeNotifier {
 
     try {
       final summary =
-          (await ChatApiService.generateText(config: cfg, modelId: mdlId, prompt: prompt))
+          (await ChatApiService.generateText(config: cfg, modelId: mdlId, prompt: prompt, thinkingBudget: budget))
               .trim();
 
       if (summary.isNotEmpty) {
