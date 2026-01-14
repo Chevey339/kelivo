@@ -1398,11 +1398,20 @@ class _DesktopModelSelectDialogBodyState extends State<_DesktopModelSelectDialog
     }
   }
 
-  Widget _desktopModelTile(BuildContext context, _ModelItem m, {bool showProviderLabel = false}) {
+  Widget _desktopModelTile(
+    BuildContext context,
+    _ModelItem m, {
+    bool showProviderLabel = false,
+  }) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-    final bg = m.selected ? (isDark ? cs.primary.withOpacity(0.12) : cs.primary.withOpacity(0.08)) : cs.surface;
+
+    final bg = m.selected
+        ? (isDark
+            ? cs.primary.withOpacity(0.12)
+            : cs.primary.withOpacity(0.08))
+        : cs.surface;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -1411,11 +1420,20 @@ class _DesktopModelSelectDialogBodyState extends State<_DesktopModelSelectDialog
         borderRadius: BorderRadius.circular(14),
         pressedBlendStrength: 0.10,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        onTap: () => Navigator.of(context).pop(ModelSelection(m.providerKey, m.id)),
+        onTap: () => Navigator.of(context).pop(
+          ModelSelection(m.providerKey, m.id),
+        ),
         child: Row(
           children: [
-            _BrandAvatar(name: m.id, assetOverride: m.asset, size: 18),
+            // Avatar
+            _BrandAvatar(
+              name: m.id,
+              assetOverride: m.asset,
+              size: 18,
+            ),
             const SizedBox(width: 6),
+
+            // Name + Provider
             Expanded(
               child: Text.rich(
                 TextSpan(
@@ -1423,7 +1441,13 @@ class _DesktopModelSelectDialogBodyState extends State<_DesktopModelSelectDialog
                   style: const TextStyle(fontSize: 12.5),
                   children: [
                     if (showProviderLabel)
-                      TextSpan(text: ' | ${m.providerName}', style: TextStyle(fontSize: 11.5, color: cs.onSurface.withOpacity(0.6))),
+                      TextSpan(
+                        text: ' | ${m.providerName}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: cs.onSurface.withOpacity(0.6),
+                        ),
+                      ),
                   ],
                 ),
                 maxLines: 1,
@@ -1431,33 +1455,44 @@ class _DesktopModelSelectDialogBodyState extends State<_DesktopModelSelectDialog
               ),
             ),
             const SizedBox(width: 6),
-            Flexible(
-              child: ModelCapsulesRow(
-                model: m.info,
-                iconSize: 11,
-                pillPadding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                bgOpacityDark: 0.18,
-                bgOpacityLight: 0.14,
-                borderOpacity: 0.22,
-                itemSpacing: 4,
-              ),
+
+            // Capability Capsules
+            ModelCapsulesRow(
+              model: m.info,
+              pillPadding:
+                  const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              bgOpacityDark: 0.18,
+              bgOpacityLight: 0.14,
+              borderOpacity: 0.22,
+              itemSpacing: 4,
             ),
             const SizedBox(width: 4),
-            Builder(builder: (context) {
-              final pinnedNow = context.select<SettingsProvider, bool>((s) => s.isModelPinned(m.providerKey, m.id));
-              final icon = pinnedNow ? Icons.favorite : Icons.favorite_border;
-              return Tooltip(
-                message: l10n.modelSelectSheetFavoriteTooltip,
-                child: IosIconButton(
-                  icon: icon,
-                  size: 16,
-                  color: cs.primary,
-                  onTap: () => context.read<SettingsProvider>().togglePinModel(m.providerKey, m.id),
-                  padding: const EdgeInsets.all(3),
-                  minSize: 26,
-                ),
-              );
-            }),
+
+            // Favorite Toggle
+            Builder(
+              builder: (context) {
+                final pinnedNow = context.select<SettingsProvider, bool>(
+                  (s) => s.isModelPinned(m.providerKey, m.id),
+                );
+                final icon =
+                    pinnedNow ? Icons.favorite : Icons.favorite_border;
+
+                return Tooltip(
+                  message: l10n.modelSelectSheetFavoriteTooltip,
+                  child: IosIconButton(
+                    icon: icon,
+                    size: 16,
+                    color: cs.primary,
+                    onTap: () => context.read<SettingsProvider>().togglePinModel(
+                          m.providerKey,
+                          m.id,
+                        ),
+                    padding: const EdgeInsets.all(3),
+                    minSize: 26,
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
