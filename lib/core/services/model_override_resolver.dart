@@ -26,7 +26,8 @@ class ModelOverrideResolver {
 
   /// Parse modality list override.
   ///
-  /// Returns null when no valid modalities are found (unknown values ignored).
+  /// Returns null only when the raw input is not a List.
+  /// Returns an empty list when the list is empty or contains no valid values.
   static List<Modality>? parseModalities(dynamic raw) {
     if (raw is! List) return null;
     // Explicit empty list => clear to default text (handled by _nonEmptyMods).
@@ -40,14 +41,15 @@ class ModelOverrideResolver {
         out.add(Modality.image);
       }
     }
-    if (out.isEmpty) return null;
+    if (out.isEmpty) return const <Modality>[];
     // Dedupe while preserving order.
     return LinkedHashSet<Modality>.from(out).toList(growable: false);
   }
 
   /// Parse model ability list override.
   ///
-  /// Returns null when no valid abilities are found (unknown values ignored).
+  /// Returns null only when the raw input is not a List.
+  /// Returns an empty list when the list is empty or contains no valid values.
   static List<ModelAbility>? parseAbilities(dynamic raw) {
     if (raw is! List) return null;
     if (raw.isEmpty) return const <ModelAbility>[];
@@ -60,7 +62,7 @@ class ModelOverrideResolver {
         out.add(ModelAbility.reasoning);
       }
     }
-    if (out.isEmpty) return null;
+    if (out.isEmpty) return const <ModelAbility>[];
     return LinkedHashSet<ModelAbility>.from(out).toList(growable: false);
   }
 
@@ -79,14 +81,32 @@ class ModelOverrideResolver {
   /// - Embedding: forces text-only output and clears abilities
   /// - Chat: input/output default to base then `[text]` when empty
   static ModelInfo applyModelOverride(ModelInfo base, Map ov, {bool applyDisplayName = false}) {
+    List<Modality>? resolveModalities(dynamic raw) {
+      final parsed = parseModalities(raw);
+      if (raw is List && raw.isNotEmpty && parsed != null && parsed.isEmpty) {
+        // Non-empty list with no valid values -> treat as no override.
+        return null;
+      }
+      return parsed;
+    }
+
+    List<ModelAbility>? resolveAbilities(dynamic raw) {
+      final parsed = parseAbilities(raw);
+      if (raw is List && raw.isNotEmpty && parsed != null && parsed.isEmpty) {
+        // Non-empty list with no valid values -> treat as no override.
+        return null;
+      }
+      return parsed;
+    }
+
     final type = parseModelTypeOverride(ov);
     final effectiveType = type ?? base.type;
 
     final displayName = (applyDisplayName ? _parseName(ov) : null) ?? base.displayName;
 
-    final inputOv = parseModalities(ov['input']);
-    final outputOv = (effectiveType == ModelType.embedding) ? null : parseModalities(ov['output']);
-    final abilitiesOv = (effectiveType == ModelType.embedding) ? null : parseAbilities(ov['abilities']);
+    final inputOv = resolveModalities(ov['input']);
+    final outputOv = (effectiveType == ModelType.embedding) ? null : resolveModalities(ov['output']);
+    final abilitiesOv = (effectiveType == ModelType.embedding) ? null : resolveAbilities(ov['abilities']);
 
     if (effectiveType == ModelType.embedding) {
       final inMods = _nonEmptyMods((inputOv ?? base.input).toList(growable: false));

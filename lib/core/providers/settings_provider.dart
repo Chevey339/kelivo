@@ -24,6 +24,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _providersOrderKey = 'providers_order_v1';
   static const String _themeModeKey = 'theme_mode_v1';
   static const String _providerConfigsKey = 'provider_configs_v1';
+  static const String _providerConfigsBackupKey = 'provider_configs_backup_v1';
   static const String _migrationsVersionKey = 'migrations_version_v1';
   static const int _embeddingOverridesMigrationVersion = 3;
   static const String _embeddingType = 'embedding';
@@ -302,6 +303,17 @@ class SettingsProvider extends ChangeNotifier {
     try {
       final migrationVersion = prefs.getInt(_migrationsVersionKey) ?? 0;
       if (migrationVersion < _embeddingOverridesMigrationVersion) {
+        try {
+          FlutterLogger.log('[SettingsProvider] provider modelOverrides migration start', tag: 'Migration');
+        } catch (_) {}
+        if (!prefs.containsKey(_providerConfigsBackupKey)) {
+          final backup = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
+          await prefs.setString(_providerConfigsBackupKey, jsonEncode(backup));
+          assert(() {
+            debugPrint('[SettingsProvider] provider configs backup saved before migration.');
+            return true;
+          }());
+        }
         final migrated = await _migrateEmbeddingModelOverrides(prefs);
         // Mark as attempted so we don't keep re-scanning on every startup when no changes are needed.
         await prefs.setInt(_migrationsVersionKey, _embeddingOverridesMigrationVersion);
@@ -311,6 +323,12 @@ class SettingsProvider extends ChangeNotifier {
           }
           return true;
         }());
+        try {
+          FlutterLogger.log(
+            '[SettingsProvider] provider modelOverrides migration done (applied=$migrated)',
+            tag: 'Migration',
+          );
+        } catch (_) {}
       }
     } catch (e, st) {
       // Debug-only visibility for migration failures (no behavior change in release).

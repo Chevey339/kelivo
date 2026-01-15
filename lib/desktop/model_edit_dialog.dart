@@ -141,7 +141,9 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     }
 
     if (!widget.isNew) {
-      final ov = _initialOv ?? cfg.modelOverrides[widget.modelId] as Map?;
+      final rawOv = _initialOv ?? cfg.modelOverrides[widget.modelId];
+      final Map<String, dynamic>? ov =
+          rawOv is Map ? {for (final e in rawOv.entries) e.key.toString(): e.value} : null;
       if (ov != null) {
         _nameCtrl.text = (ov['name'] as String?)?.trim().isNotEmpty == true ? (ov['name'] as String) : _nameCtrl.text;
         final t = (ov['type'] ?? '').toString().trim().toLowerCase();
@@ -657,12 +659,12 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     // Build builtInTools list based on provider type
     final builtInTools = <String>[];
     if (_providerKind == ProviderKind.google) {
-      if (_googleUrlContextTool) builtInTools.add('url_context');
-      if (_googleCodeExecutionTool) builtInTools.add('code_execution');
-      if (_googleYoutubeTool) builtInTools.add('youtube');
+      if (_googleUrlContextTool) builtInTools.add(BuiltInToolNames.urlContext);
+      if (_googleCodeExecutionTool) builtInTools.add(BuiltInToolNames.codeExecution);
+      if (_googleYoutubeTool) builtInTools.add(BuiltInToolNames.youtube);
     } else if (_providerKind == ProviderKind.openai) {
-      if (_openaiCodeInterpreterTool) builtInTools.add('code_interpreter');
-      if (_openaiImageGenerationTool) builtInTools.add('image_generation');
+      if (_openaiCodeInterpreterTool) builtInTools.add(BuiltInToolNames.codeInterpreter);
+      if (_openaiImageGenerationTool) builtInTools.add(BuiltInToolNames.imageGeneration);
     }
 
     final String key = (prevKey.isEmpty || widget.isNew) ? _nextModelKey(old, apiModelId) : prevKey;

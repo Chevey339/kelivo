@@ -54,6 +54,7 @@ class _ModelFetchDialogBody extends StatefulWidget {
 class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
   final TextEditingController _searchCtrl = TextEditingController();
   bool _loading = true;
+  bool _actionBusy = false;
   String _error = '';
   List<ModelInfo> _items = const [];
   final Map<String, bool> _collapsed = <String, bool>{};
@@ -68,6 +69,24 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _runGuarded(Future<void> Function() action) async {
+    if (_actionBusy) return;
+    setState(() => _actionBusy = true);
+    try {
+      await action();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Operation failed: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
   }
 
   Future<void> _load() async {
@@ -219,7 +238,9 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                                         ),
                                         padding: EdgeInsets.zero,
                                         constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
-                                        onPressed: () async {
+                                        onPressed: _actionBusy
+                                            ? null
+                                            : () => _runGuarded(() async {
                                           final settings = context.read<SettingsProvider>();
                                           final cfg = settings.getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
                                           final q = _searchCtrl.text.trim().toLowerCase();
@@ -240,7 +261,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                                             await settings.setProviderConfig(widget.providerKey, cfg.copyWith(models: setIds.toList()));
                                           }
                                           if (mounted) setState(() {});
-                                        },
+                                        }),
                                       ),
                                     ),
                                   ),
@@ -250,7 +271,9 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                                       icon: Icon(lucide.Lucide.Repeat, size: 18, color: cs.onSurface.withOpacity(0.7)),
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
-                                      onPressed: () async {
+                                      onPressed: _actionBusy
+                                          ? null
+                                          : () => _runGuarded(() async {
                                         final settings = context.read<SettingsProvider>();
                                         final cfg = settings.getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
                                         final q = _searchCtrl.text.trim().toLowerCase();
@@ -269,7 +292,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                                         }
                                         await settings.setProviderConfig(widget.providerKey, cfg.copyWith(models: current.toList()));
                                         if (mounted) setState(() {});
-                                      },
+                                      }),
                                     ),
                                   ),
                                 ],
@@ -370,7 +393,9 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
                           icon: Icon(allAdded ? lucide.Lucide.Minus : lucide.Lucide.Plus, size: 18, color: cs.onSurface.withOpacity(0.75)),
-                          onPressed: () async {
+                          onPressed: _actionBusy
+                              ? null
+                              : () => _runGuarded(() async {
                             final old = context.read<SettingsProvider>().getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
                             if (allAdded) {
                               final toRemove = grouped[g]!.map((m) => m.id).toSet();
@@ -384,7 +409,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                               }
                             }
                             if (mounted) setState(() {});
-                          },
+                          }),
                         ),
                       ],
                     ),
@@ -440,7 +465,9 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
-                  onPressed: () async {
+                  onPressed: _actionBusy
+                      ? null
+                      : () => _runGuarded(() async {
                     final old = context.read<SettingsProvider>().getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
                     final list = old.models.toList();
                     if (added) {
@@ -450,7 +477,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                     }
                     await context.read<SettingsProvider>().setProviderConfig(widget.providerKey, old.copyWith(models: list));
                     if (mounted) setState(() {});
-                  },
+                  }),
                   icon: Icon(added ? lucide.Lucide.Minus : lucide.Lucide.Plus, size: 18, color: cs.onSurface.withOpacity(0.75)),
                 ),
               ],

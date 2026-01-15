@@ -2339,7 +2339,9 @@ class _ModelCard extends StatelessWidget {
 
   ModelInfo _effective(BuildContext context) {
     final cfg = context.watch<SettingsProvider>().getProviderConfig(providerKey);
-    final ov = cfg.modelOverrides[modelId] as Map?;
+    final rawOv = cfg.modelOverrides[modelId];
+    final Map<String, dynamic>? ov =
+        rawOv is Map ? {for (final e in rawOv.entries) e.key.toString(): e.value} : null;
     String baseId = modelId;
     if (ov != null) {
       final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
@@ -2352,7 +2354,9 @@ class _ModelCard extends StatelessWidget {
 
   String _displayName(BuildContext context) {
     final cfg = context.watch<SettingsProvider>().getProviderConfig(providerKey);
-    final ov = cfg.modelOverrides[modelId] as Map?;
+    final rawOv = cfg.modelOverrides[modelId];
+    final Map<String, dynamic>? ov =
+        rawOv is Map ? {for (final e in rawOv.entries) e.key.toString(): e.value} : null;
     if (ov != null) {
       final n = (ov['name'] as String?)?.trim();
       if (n != null && n.isNotEmpty) return n;
@@ -2594,7 +2598,7 @@ Future<String?> showModelPickerForTest(BuildContext context, String providerKey,
   return sel?.modelId;
 }
 
-ModelInfo _applyModelOverride(ModelInfo base, Map ov, {bool applyDisplayName = false}) {
+ModelInfo _applyModelOverride(ModelInfo base, Map<String, dynamic> ov, {bool applyDisplayName = false}) {
   return ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: applyDisplayName);
 }
 

@@ -21,7 +21,6 @@ class ModelTagWrap extends StatelessWidget {
 
   Widget _abilityChip({
     required bool isDark,
-    required ColorScheme cs,
     required String label,
     required Color baseColor,
     required EdgeInsets padding,
@@ -143,7 +142,6 @@ class ModelTagWrap extends StatelessWidget {
           final label = l10n.modelDetailSheetToolsAbility;
           chips.add(_abilityChip(
             isDark: isDark,
-            cs: cs,
             label: label,
             baseColor: cs.primary,
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
@@ -156,7 +154,6 @@ class ModelTagWrap extends StatelessWidget {
           final label = l10n.modelDetailSheetReasoningAbility;
           chips.add(_abilityChip(
             isDark: isDark,
-            cs: cs,
             label: label,
             baseColor: cs.secondary,
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),

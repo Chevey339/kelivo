@@ -45,7 +45,7 @@ class ModelEditTypeSwitch {
     if (next == ModelType.embedding) {
       // Prevent chat-only state from leaking into embedding configs.
       abilities.clear();
-      final nextInput = nextCachedEmbeddingInput ?? {...input};
+      final nextInput = nextCachedEmbeddingInput ?? <Modality>{Modality.text};
       input
         ..clear()
         ..addAll(nextInput);
@@ -63,29 +63,19 @@ class ModelEditTypeSwitch {
 
     // Restore cached chat state when flipping embedding -> chat.
     if (prev == ModelType.embedding && next == ModelType.chat) {
-      if (nextCachedChatInput != null && nextCachedChatOutput != null && nextCachedChatAbilities != null) {
-        input
-          ..clear()
-          ..addAll(nextCachedChatInput);
-        output
-          ..clear()
-          ..addAll(nextCachedChatOutput);
-        abilities
-          ..clear()
-          ..addAll(nextCachedChatAbilities);
-        if (input.isEmpty) input.add(Modality.text);
-        if (output.isEmpty) output.add(Modality.text);
-      } else {
-        // Fallback: explicit chat defaults.
-        // Avoid inference bias (e.g., ids like "text-embedding-*" being inferred back to embedding).
-        input
-          ..clear()
-          ..add(Modality.text);
-        output
-          ..clear()
-          ..add(Modality.text);
-        abilities.clear();
-      }
+      input
+        ..clear()
+        ..addAll(nextCachedChatInput ?? const {Modality.text});
+      if (input.isEmpty) input.add(Modality.text);
+
+      output
+        ..clear()
+        ..addAll(nextCachedChatOutput ?? const {Modality.text});
+      if (output.isEmpty) output.add(Modality.text);
+
+      abilities
+        ..clear()
+        ..addAll(nextCachedChatAbilities ?? const <ModelAbility>{});
     }
 
     return ModelTypeSwitchCache(

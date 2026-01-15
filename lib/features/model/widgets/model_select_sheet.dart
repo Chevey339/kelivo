@@ -84,7 +84,9 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
       for (final id in models)
         () {
           final String mid = id.toString();
-          final ov = overrides[mid] as Map?;
+          final rawOv = overrides[mid];
+          final Map<String, dynamic>? ov =
+              rawOv is Map ? {for (final e in rawOv.entries) e.key.toString(): e.value} : null;
           // Use upstream/api model id for inference when available so that
           // brand assets and default capabilities stay accurate even when the
           // logical key is a custom alias.

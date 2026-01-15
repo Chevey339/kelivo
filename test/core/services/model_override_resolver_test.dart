@@ -92,6 +92,25 @@ void main() {
 
       expect(next.type, base.type);
     });
+
+    test('applyDisplayName controls name override behavior', () {
+      final base = ModelInfo(
+        id: 'm',
+        displayName: 'base',
+        type: ModelType.chat,
+        input: const [Modality.text],
+        output: const [Modality.text],
+        abilities: const [],
+      );
+
+      final ov = {'name': 'override'};
+
+      final withName = ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: true);
+      final withoutName = ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: false);
+
+      expect(withName.displayName, 'override');
+      expect(withoutName.displayName, 'base');
+    });
   });
 }
 
