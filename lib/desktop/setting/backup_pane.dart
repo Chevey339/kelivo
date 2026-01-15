@@ -587,16 +587,40 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
                                     await context.read<BackupProvider>().restoreFromItem(it, mode: mode);
                                   }),
                                   onDelete: () async {
-                                    final next = await context.read<BackupProvider>().deleteAndReload(it);
-                                    next.sort((a, b) {
-                                      final aTime = a.lastModified;
-                                      final bTime = b.lastModified;
-                                      if (aTime != null && bTime != null) return bTime.compareTo(aTime);
-                                      if (aTime == null && bTime == null) return b.displayName.compareTo(a.displayName);
-                                      if (aTime == null) return 1;
-                                      return -1;
-                                    });
-                                    if (mounted) setState(() => _items = next);
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (dctx) => AlertDialog(
+                                        backgroundColor: cs.surface,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                        title: Text(l10n.backupPageDeleteConfirmTitle),
+                                        content: Text(l10n.backupPageDeleteConfirmContent(it.displayName)),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.of(dctx).pop(false), child: Text(l10n.backupPageCancel)),
+                                          TextButton(
+                                            onPressed: () => Navigator.of(dctx).pop(true),
+                                            style: TextButton.styleFrom(foregroundColor: cs.error),
+                                            child: Text(l10n.backupPageDeleteTooltip),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm != true) return;
+
+                                    setState(() => _loading = true); // Show loading inside dialog
+                                    try {
+                                      final next = await context.read<BackupProvider>().deleteAndReload(it);
+                                      next.sort((a, b) {
+                                        final aTime = a.lastModified;
+                                        final bTime = b.lastModified;
+                                        if (aTime != null && bTime != null) return bTime.compareTo(aTime);
+                                        if (aTime == null && bTime == null) return b.displayName.compareTo(a.displayName);
+                                        if (aTime == null) return 1;
+                                        return -1;
+                                      });
+                                      if (mounted) setState(() => _items = next);
+                                    } finally {
+                                      if (mounted) setState(() => _loading = false);
+                                    }
                                   },
                                 );
                               },
