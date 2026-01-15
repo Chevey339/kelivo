@@ -12,7 +12,7 @@ class ModelOverrideResolver {
   static const Set<String> _embeddingTypeStrings = {'embedding', 'embeddings'};
   static const Set<String> _chatTypeStrings = {'chat'};
 
-  static String _norm(dynamic v) => v.toString().trim().toLowerCase();
+  static String _norm(dynamic v) => (v == null ? '' : v.toString()).trim().toLowerCase();
 
   /// Parse model type override.
   ///
@@ -29,6 +29,8 @@ class ModelOverrideResolver {
   /// Returns null when no valid modalities are found (unknown values ignored).
   static List<Modality>? parseModalities(dynamic raw) {
     if (raw is! List) return null;
+    // Explicit empty list => clear to default text (handled by _nonEmptyMods).
+    if (raw.isEmpty) return const <Modality>[];
     final out = <Modality>[];
     for (final e in raw) {
       final s = _norm(e);
@@ -48,6 +50,7 @@ class ModelOverrideResolver {
   /// Returns null when no valid abilities are found (unknown values ignored).
   static List<ModelAbility>? parseAbilities(dynamic raw) {
     if (raw is! List) return null;
+    if (raw.isEmpty) return const <ModelAbility>[];
     final out = <ModelAbility>[];
     for (final e in raw) {
       final s = _norm(e);

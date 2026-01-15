@@ -75,6 +75,23 @@ void main() {
       // abilities override ignored, so base abilities preserved
       expect(next.abilities, const [ModelAbility.reasoning]);
     });
+
+    test('unknown type value is ignored', () {
+      final base = ModelInfo(
+        id: 'm',
+        displayName: 'm',
+        type: ModelType.chat,
+        input: const [Modality.text],
+        output: const [Modality.text],
+        abilities: const [],
+      );
+
+      final next = ModelOverrideResolver.applyModelOverride(base, {
+        'type': 'bogus',
+      });
+
+      expect(next.type, base.type);
+    });
   });
 }
 

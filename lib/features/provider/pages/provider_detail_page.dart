@@ -2338,9 +2338,14 @@ class _ModelCard extends StatelessWidget {
   }
 
   ModelInfo _effective(BuildContext context) {
-    final base = _infer(modelId);
     final cfg = context.watch<SettingsProvider>().getProviderConfig(providerKey);
     final ov = cfg.modelOverrides[modelId] as Map?;
+    String baseId = modelId;
+    if (ov != null) {
+      final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+      if (raw != null && raw.isNotEmpty) baseId = raw;
+    }
+    final base = _infer(baseId);
     if (ov == null) return base;
     return _applyModelOverride(base, ov, applyDisplayName: true);
   }

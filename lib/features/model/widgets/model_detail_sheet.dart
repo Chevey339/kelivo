@@ -10,6 +10,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
+import 'model_edit_state_helper.dart';
 
 Future<bool?> showModelDetailSheet(BuildContext context, {required String providerKey, required String modelId}) {
   final cs = Theme.of(context).colorScheme;
@@ -227,55 +228,22 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     final prev = _type;
     if (prev == next) return;
 
-    // Cache chat state before clearing so user can switch back within this session.
-    if (prev == ModelType.chat && next == ModelType.embedding) {
-      _cachedChatInput = {..._input};
-      _cachedChatOutput = {..._output};
-      _cachedChatAbilities = {..._abilities};
-    }
-    // Cache embedding input before switching to chat.
-    if (prev == ModelType.embedding && next == ModelType.chat) {
-      _cachedEmbeddingInput = {..._input};
-    }
-
     _type = next;
-    if (next == ModelType.embedding) {
-      // Prevent chat-only state from leaking into embedding configs.
-      _abilities.clear();
-      _input
-        ..clear()
-        ..addAll(_cachedEmbeddingInput ?? const {Modality.text});
-      if (_input.isEmpty) _input.add(Modality.text);
-      _output..clear()..add(Modality.text);
-      return;
-    }
-
-    // Restore cached chat state when flipping embedding -> chat.
-    if (prev == ModelType.embedding && next == ModelType.chat) {
-      if (_cachedChatInput != null && _cachedChatOutput != null && _cachedChatAbilities != null) {
-        _input
-          ..clear()
-          ..addAll(_cachedChatInput!);
-        _output
-          ..clear()
-          ..addAll(_cachedChatOutput!);
-        _abilities
-          ..clear()
-          ..addAll(_cachedChatAbilities!);
-        if (_input.isEmpty) _input.add(Modality.text);
-        if (_output.isEmpty) _output.add(Modality.text);
-      } else {
-        // Fallback: explicit chat defaults.
-        // Avoid inference bias (e.g., ids like "text-embedding-*" being inferred back to embedding).
-        _input
-          ..clear()
-          ..add(Modality.text);
-        _output
-          ..clear()
-          ..add(Modality.text);
-        _abilities.clear();
-      }
-    }
+    final cache = ModelEditTypeSwitch.apply(
+      prev: prev,
+      next: next,
+      input: _input,
+      output: _output,
+      abilities: _abilities,
+      cachedChatInput: _cachedChatInput,
+      cachedChatOutput: _cachedChatOutput,
+      cachedChatAbilities: _cachedChatAbilities,
+      cachedEmbeddingInput: _cachedEmbeddingInput,
+    );
+    _cachedChatInput = cache.cachedChatInput;
+    _cachedChatOutput = cache.cachedChatOutput;
+    _cachedChatAbilities = cache.cachedChatAbilities;
+    _cachedEmbeddingInput = cache.cachedEmbeddingInput;
   }
 
   @override
@@ -283,6 +251,14 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     _tabCtrl.dispose();
     _idCtrl.dispose();
     _nameCtrl.dispose();
+    for (final h in _headers) {
+      h.name.dispose();
+      h.value.dispose();
+    }
+    for (final b in _bodies) {
+      b.keyCtrl.dispose();
+      b.valueCtrl.dispose();
+    }
     super.dispose();
   }
 

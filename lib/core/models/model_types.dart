@@ -19,10 +19,12 @@ class ModelInfo {
     required this.id,
     required this.displayName,
     this.type = ModelType.chat,
-    this.input = const [Modality.text],
-    this.output = const [Modality.text],
-    this.abilities = const [],
-  });
+    List<Modality> input = const [Modality.text],
+    List<Modality> output = const [Modality.text],
+    List<ModelAbility> abilities = const [],
+  })  : input = List.unmodifiable(input),
+        output = List.unmodifiable(output),
+        abilities = List.unmodifiable(abilities);
 
   ModelInfo copyWith({
     String? id,
