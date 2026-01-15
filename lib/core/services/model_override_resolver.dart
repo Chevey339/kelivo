@@ -82,32 +82,22 @@ class ModelOverrideResolver {
   /// - Embedding: forces text-only output and clears abilities
   /// - Chat: input/output default to base then `[text]` when empty
   static ModelInfo applyModelOverride(ModelInfo base, Map ov, {bool applyDisplayName = false}) {
-    List<Modality>? resolveModalities(dynamic raw) {
-      final parsed = parseModalities(raw);
-      if (raw is List && raw.isNotEmpty && parsed != null && parsed.isEmpty) {
-        // Non-empty list with no valid values -> treat as no override.
-        return null;
-      }
-      return parsed;
-    }
-
-    List<ModelAbility>? resolveAbilities(dynamic raw) {
-      final parsed = parseAbilities(raw);
-      if (raw is List && raw.isNotEmpty && parsed != null && parsed.isEmpty) {
-        // Non-empty list with no valid values -> treat as no override.
-        return null;
-      }
-      return parsed;
-    }
-
     final type = parseModelTypeOverride(ov);
     final effectiveType = type ?? base.type;
 
-    final displayName = (applyDisplayName ? _parseName(ov) : null) ?? base.displayName;
+    final nameOv = applyDisplayName ? _parseName(ov) : null;
+    final displayName = nameOv ?? base.displayName;
 
-    final inputOv = resolveModalities(ov['input']);
-    final outputOv = (effectiveType == ModelType.embedding) ? null : resolveModalities(ov['output']);
-    final abilitiesOv = (effectiveType == ModelType.embedding) ? null : resolveAbilities(ov['abilities']);
+    final inputOv = parseModalities(ov['input']);
+    final outputOv = (effectiveType == ModelType.embedding) ? null : parseModalities(ov['output']);
+    final abilitiesOv = (effectiveType == ModelType.embedding) ? null : parseAbilities(ov['abilities']);
+
+    final hasOverrides = (type != null && type != base.type) ||
+        (nameOv != null && nameOv != base.displayName) ||
+        inputOv != null ||
+        outputOv != null ||
+        abilitiesOv != null;
+    if (!hasOverrides) return base;
 
     if (effectiveType == ModelType.embedding) {
       final inMods = _nonEmptyMods((inputOv ?? base.input).toList(growable: false));

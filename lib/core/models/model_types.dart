@@ -15,6 +15,18 @@ class ModelInfo {
   final List<Modality> output;
   final List<ModelAbility> abilities;
 
+  static List<Modality> _normalizeModalities(Iterable<Modality> mods) {
+    final set = <Modality>{...mods};
+    final list = set.toList()..sort((a, b) => a.index.compareTo(b.index));
+    return List.unmodifiable(list);
+  }
+
+  static List<ModelAbility> _normalizeAbilities(Iterable<ModelAbility> abs) {
+    final set = <ModelAbility>{...abs};
+    final list = set.toList()..sort((a, b) => a.index.compareTo(b.index));
+    return List.unmodifiable(list);
+  }
+
   ModelInfo({
     required this.id,
     required this.displayName,
@@ -22,9 +34,9 @@ class ModelInfo {
     List<Modality> input = const [Modality.text],
     List<Modality> output = const [Modality.text],
     List<ModelAbility> abilities = const [],
-  })  : input = List.unmodifiable(input),
-        output = List.unmodifiable(output),
-        abilities = List.unmodifiable(abilities);
+  })  : input = _normalizeModalities(input),
+        output = _normalizeModalities(output),
+        abilities = _normalizeAbilities(abilities);
 
   ModelInfo copyWith({
     String? id,

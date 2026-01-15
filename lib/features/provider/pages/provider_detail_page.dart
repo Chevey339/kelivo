@@ -2338,6 +2338,22 @@ class _ModelCard extends StatelessWidget {
   }
 
   ModelInfo _effective(BuildContext context) {
+    final resolved = _resolveBaseAndOverride(context);
+    final ov = resolved.ov;
+    if (ov == null) return resolved.base;
+    return _applyModelOverride(resolved.base, ov, applyDisplayName: true);
+  }
+
+  String _displayName(BuildContext context) {
+    final ov = _resolveBaseAndOverride(context).ov;
+    if (ov != null) {
+      final n = ov['name']?.toString().trim();
+      if (n != null && n.isNotEmpty) return n;
+    }
+    return modelId;
+  }
+
+  _ResolvedModelOverride _resolveBaseAndOverride(BuildContext context) {
     final cfg = context.watch<SettingsProvider>().getProviderConfig(providerKey);
     final rawOv = cfg.modelOverrides[modelId];
     final Map<String, dynamic>? ov =
@@ -2348,21 +2364,20 @@ class _ModelCard extends StatelessWidget {
       if (raw != null && raw.isNotEmpty) baseId = raw;
     }
     final base = _infer(baseId);
-    if (ov == null) return base;
-    return _applyModelOverride(base, ov, applyDisplayName: true);
+    return _ResolvedModelOverride(base: base, ov: ov, baseId: baseId);
   }
+}
 
-  String _displayName(BuildContext context) {
-    final cfg = context.watch<SettingsProvider>().getProviderConfig(providerKey);
-    final rawOv = cfg.modelOverrides[modelId];
-    final Map<String, dynamic>? ov =
-        rawOv is Map ? {for (final e in rawOv.entries) e.key.toString(): e.value} : null;
-    if (ov != null) {
-      final n = ov['name']?.toString().trim();
-      if (n != null && n.isNotEmpty) return n;
-    }
-    return modelId;
-  }
+class _ResolvedModelOverride {
+  const _ResolvedModelOverride({
+    required this.base,
+    required this.ov,
+    required this.baseId,
+  });
+
+  final ModelInfo base;
+  final Map<String, dynamic>? ov;
+  final String baseId;
 }
 
 class _ConnectionTestDialog extends StatefulWidget {
@@ -2599,7 +2614,11 @@ Future<String?> showModelPickerForTest(BuildContext context, String providerKey,
 }
 
 ModelInfo _applyModelOverride(ModelInfo base, Map<String, dynamic> ov, {bool applyDisplayName = false}) {
-  return ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: applyDisplayName);
+  try {
+    return ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: applyDisplayName);
+  } catch (_) {
+    return base;
+  }
 }
 
 

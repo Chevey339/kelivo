@@ -152,7 +152,11 @@ class ChatApiService {
     final base = ModelRegistry.infer(ModelInfo(id: upstreamId, displayName: upstreamId));
     final ov = _modelOverride(cfg, modelId);
     if (ov.isEmpty) return base;
-    return ModelOverrideResolver.applyModelOverride(base, ov);
+    try {
+      return ModelOverrideResolver.applyModelOverride(base, ov);
+    } catch (_) {
+      return base;
+    }
   }
   static String _mimeFromPath(String path) {
     final lower = path.toLowerCase();

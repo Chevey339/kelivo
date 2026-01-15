@@ -52,7 +52,7 @@ void main() {
       expect(next.abilities, const [ModelAbility.tool]);
     });
 
-    test('unknown override values are ignored (no override)', () {
+    test('unknown override values clear list overrides', () {
       final base = ModelInfo(
         id: 'm',
         displayName: 'm',
@@ -69,11 +69,11 @@ void main() {
         'abilities': ['bogus'],
       });
 
-      // input/output remain base (non-empty mods)
+      // input/output cleared -> default back to [text]
       expect(next.input, const [Modality.text]);
       expect(next.output, const [Modality.text]);
-      // abilities override ignored, so base abilities preserved
-      expect(next.abilities, const [ModelAbility.reasoning]);
+      // abilities explicitly cleared by empty override list
+      expect(next.abilities, isEmpty);
     });
 
     test('unknown type value is ignored', () {

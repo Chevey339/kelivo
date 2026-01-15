@@ -7,6 +7,7 @@ import '../l10n/app_localizations.dart';
 import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
 import '../core/services/api/builtin_tools.dart';
+import '../core/services/model_override_resolver.dart';
 import '../shared/widgets/ios_switch.dart';
 import '../shared/widgets/snackbar.dart';
 import '../features/model/widgets/model_edit_state_helper.dart';
@@ -104,10 +105,10 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
 
     // Resolve display model id from per-model overrides when present (apiModelId),
     // falling back to the logical key for backwards compatibility.
-    Map? _initialOv;
+    Map<String, dynamic>? _initialOv;
     if (!widget.isNew) {
       final raw = cfg.modelOverrides[widget.modelId];
-      if (raw is Map) _initialOv = raw;
+      if (raw is Map) _initialOv = raw.map((k, v) => MapEntry(k.toString(), v));
     }
     String displayModelId = widget.modelId;
     if (_initialOv != null) {
@@ -121,17 +122,15 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
         displayName: displayModelId.isEmpty ? '' : displayModelId,
       ),
     );
-    _nameCtrl = TextEditingController(text: base.displayName);
-    _type = base.type;
-    _input..clear()..addAll(base.input);
-    _output..clear()..addAll(base.output);
-    _abilities..clear()..addAll(base.abilities);
+    final ov = _initialOv;
+    final effective = ov == null ? base : ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: true);
+    _nameCtrl = TextEditingController(text: effective.displayName);
+    _type = effective.type;
+    _input..clear()..addAll(effective.input);
+    _output..clear()..addAll(effective.output);
+    _abilities..clear()..addAll(effective.abilities);
     // Normalize embedding invariants on init even when there is no explicit override `type`.
     if (_type == ModelType.embedding) {
-      _abilities.clear();
-      _output
-        ..clear()
-        ..add(Modality.text);
       if (_input.isEmpty) _input.add(Modality.text);
       _cachedEmbeddingInput = {..._input};
     } else if (_type == ModelType.chat) {
@@ -140,53 +139,35 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
       if (_output.isEmpty) _output.add(Modality.text);
     }
 
-    if (!widget.isNew) {
-      final rawOv = _initialOv ?? cfg.modelOverrides[widget.modelId];
-      final Map<String, dynamic>? ov =
-          rawOv is Map ? {for (final e in rawOv.entries) e.key.toString(): e.value} : null;
-      if (ov != null) {
-        final overrideName = ov['name']?.toString().trim();
-        if (overrideName != null && overrideName.isNotEmpty) {
-          _nameCtrl.text = overrideName;
+    if (ov != null) {
+      final hdrs = (ov['headers'] as List?) ?? const [];
+      for (final h in hdrs) {
+        if (h is Map) {
+          final kv = _HeaderKV();
+          kv.name.text = (h['name'] as String?) ?? '';
+          kv.value.text = (h['value'] as String?) ?? '';
+          _headers.add(kv);
         }
-        final t = (ov['type'] ?? '').toString().trim().toLowerCase();
-        if (t == 'embedding') {
-          _setType(ModelType.embedding);
-        } else if (t == 'chat') {
-          _setType(ModelType.chat);
-        }
-        if (_type == ModelType.chat) {
-          final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
-          final outArr = (ov['output'] as List?)?.map((e) => e.toString()).toList() ?? [];
-          final abArr = (ov['abilities'] as List?)?.map((e) => e.toString()).toList() ?? [];
-          _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-          _output..clear()..addAll(outArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-          _abilities..clear()..addAll(abArr.map((e) => e == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool));
-          if (_input.isEmpty) _input.add(Modality.text);
-          if (_output.isEmpty) _output.add(Modality.text);
-        } else if (_type == ModelType.embedding) {
-          // Embedding supports explicit input modalities (e.g., text/image). Abilities remain chat-only.
-          final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
-          if (inArr.isNotEmpty) {
-            _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-            if (_input.isEmpty) _input.add(Modality.text);
-          }
-        }
-        final hdrs = (ov['headers'] as List?) ?? const [];
-        for (final h in hdrs) { if (h is Map) { final kv = _HeaderKV(); kv.name.text = (h['name'] as String?) ?? ''; kv.value.text = (h['value'] as String?) ?? ''; _headers.add(kv); } }
-        final bds = (ov['body'] as List?) ?? const [];
-        for (final b in bds) { if (b is Map) { final kv = _BodyKV(); kv.keyCtrl.text = (b['key'] as String?) ?? ''; kv.valueCtrl.text = (b['value'] as String?) ?? ''; _bodies.add(kv); } }
-
-        // Read built-in tools from builtInTools array
-        final builtInSet = BuiltInToolNames.parseAndNormalize(ov['builtInTools']);
-        // Google tools
-        _googleUrlContextTool = builtInSet.contains(BuiltInToolNames.urlContext);
-        _googleCodeExecutionTool = builtInSet.contains(BuiltInToolNames.codeExecution);
-        _googleYoutubeTool = builtInSet.contains(BuiltInToolNames.youtube);
-        // OpenAI tools
-        _openaiCodeInterpreterTool = builtInSet.contains(BuiltInToolNames.codeInterpreter);
-        _openaiImageGenerationTool = builtInSet.contains(BuiltInToolNames.imageGeneration);
       }
+      final bds = (ov['body'] as List?) ?? const [];
+      for (final b in bds) {
+        if (b is Map) {
+          final kv = _BodyKV();
+          kv.keyCtrl.text = (b['key'] as String?) ?? '';
+          kv.valueCtrl.text = (b['value'] as String?) ?? '';
+          _bodies.add(kv);
+        }
+      }
+
+      // Read built-in tools from builtInTools array
+      final builtInSet = BuiltInToolNames.parseAndNormalize(ov['builtInTools']);
+      // Google tools
+      _googleUrlContextTool = builtInSet.contains(BuiltInToolNames.urlContext);
+      _googleCodeExecutionTool = builtInSet.contains(BuiltInToolNames.codeExecution);
+      _googleYoutubeTool = builtInSet.contains(BuiltInToolNames.youtube);
+      // OpenAI tools
+      _openaiCodeInterpreterTool = builtInSet.contains(BuiltInToolNames.codeInterpreter);
+      _openaiImageGenerationTool = builtInSet.contains(BuiltInToolNames.imageGeneration);
     }
   }
 
@@ -196,7 +177,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
 
     _type = next;
     // Pass state-owned sets; helper mutates in place.
-    final cache = ModelEditTypeSwitch.apply(
+    final result = ModelEditTypeSwitch.apply(
       prev: prev,
       next: next,
       input: _input,
@@ -207,10 +188,19 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
       cachedChatAbilities: _cachedChatAbilities,
       cachedEmbeddingInput: _cachedEmbeddingInput,
     );
-    _cachedChatInput = cache.cachedChatInput;
-    _cachedChatOutput = cache.cachedChatOutput;
-    _cachedChatAbilities = cache.cachedChatAbilities;
-    _cachedEmbeddingInput = cache.cachedEmbeddingInput;
+    _input
+      ..clear()
+      ..addAll(result.input);
+    _output
+      ..clear()
+      ..addAll(result.output);
+    _abilities
+      ..clear()
+      ..addAll(result.abilities);
+    _cachedChatInput = result.cachedChatInput;
+    _cachedChatOutput = result.cachedChatOutput;
+    _cachedChatAbilities = result.cachedChatAbilities;
+    _cachedEmbeddingInput = result.cachedEmbeddingInput;
   }
 
   // Desktop input decoration matching provider settings inputs
@@ -591,20 +581,26 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
           title: l10n.modelDetailSheetUrlContextTool,
           desc: l10n.modelDetailSheetUrlContextToolDescription,
           value: _googleUrlContextTool,
-          // URL Context is disabled when Code Execution is enabled (mutually exclusive)
-          onChanged: disableTools
-              ? null
-              : (_googleCodeExecutionTool ? null : (v) => setState(() => _googleUrlContextTool = v)),
+        // Enabling URL Context disables Code Execution (mutually exclusive)
+        onChanged: disableTools
+            ? null
+            : (v) => setState(() {
+                  _googleUrlContextTool = v;
+                  if (v) _googleCodeExecutionTool = false;
+                }),
         ),
         const SizedBox(height: 8),
         _ToolTile(
           title: l10n.modelDetailSheetCodeExecutionTool,
           desc: l10n.modelDetailSheetCodeExecutionToolDescription,
           value: _googleCodeExecutionTool,
-          // Code Execution is disabled when URL Context is enabled (mutually exclusive)
-          onChanged: disableTools
-              ? null
-              : (_googleUrlContextTool ? null : (v) => setState(() => _googleCodeExecutionTool = v)),
+        // Enabling Code Execution disables URL Context (mutually exclusive)
+        onChanged: disableTools
+            ? null
+            : (v) => setState(() {
+                  _googleCodeExecutionTool = v;
+                  if (v) _googleUrlContextTool = false;
+                }),
         ),
         const SizedBox(height: 8),
         _ToolTile(
@@ -667,17 +663,24 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     final ov = Map<String, dynamic>.from(old.modelOverrides);
     final headers = [for (final h in _headers) if (h.name.text.trim().isNotEmpty) {'name': h.name.text.trim(), 'value': h.value.text}];
     final bodies = [for (final b in _bodies) if (b.keyCtrl.text.trim().isNotEmpty) {'key': b.keyCtrl.text.trim(), 'value': b.valueCtrl.text}];
-
-    // Build builtInTools list based on provider type
-    final builtInTools = <String>[];
+    final prev = (prevKey.isNotEmpty && ov[prevKey] is Map)
+        ? (ov[prevKey] as Map).cast<String, dynamic>()
+        : const <String, dynamic>{};
+    final builtInSet = BuiltInToolNames.parseAndNormalize(prev['builtInTools']);
     if (_providerKind == ProviderKind.google) {
-      if (_googleUrlContextTool) builtInTools.add(BuiltInToolNames.urlContext);
-      if (_googleCodeExecutionTool) builtInTools.add(BuiltInToolNames.codeExecution);
-      if (_googleYoutubeTool) builtInTools.add(BuiltInToolNames.youtube);
+      builtInSet.remove(BuiltInToolNames.urlContext);
+      builtInSet.remove(BuiltInToolNames.codeExecution);
+      builtInSet.remove(BuiltInToolNames.youtube);
+      if (_googleUrlContextTool) builtInSet.add(BuiltInToolNames.urlContext);
+      if (_googleCodeExecutionTool) builtInSet.add(BuiltInToolNames.codeExecution);
+      if (_googleYoutubeTool) builtInSet.add(BuiltInToolNames.youtube);
     } else if (_providerKind == ProviderKind.openai) {
-      if (_openaiCodeInterpreterTool) builtInTools.add(BuiltInToolNames.codeInterpreter);
-      if (_openaiImageGenerationTool) builtInTools.add(BuiltInToolNames.imageGeneration);
+      builtInSet.remove(BuiltInToolNames.codeInterpreter);
+      builtInSet.remove(BuiltInToolNames.imageGeneration);
+      if (_openaiCodeInterpreterTool) builtInSet.add(BuiltInToolNames.codeInterpreter);
+      if (_openaiImageGenerationTool) builtInSet.add(BuiltInToolNames.imageGeneration);
     }
+    final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
 
     final String key = (prevKey.isEmpty || widget.isNew) ? _nextModelKey(old, apiModelId) : prevKey;
     final bool isEmbedding = _type == ModelType.embedding;
@@ -693,7 +696,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
       'abilities': _abilities.map((e) => e == ModelAbility.reasoning ? 'reasoning' : 'tool').toList(),
       'headers': headers,
       'body': bodies,
-      if (!isEmbedding) 'builtInTools': builtInTools,
+      if (!isEmbedding && builtInTools.isNotEmpty) 'builtInTools': builtInTools,
     };
 
     if (prevKey.isEmpty || widget.isNew) {

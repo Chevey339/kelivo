@@ -76,11 +76,18 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
     setState(() => _actionBusy = true);
     try {
       await action();
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (kDebugMode) {
+        debugPrint('Model fetch dialog action failed: $e');
+        debugPrint('$st');
+      }
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      if (messenger == null) return;
+      final message = kDebugMode ? 'Operation failed: $e' : 'Operation failed';
+      messenger.showSnackBar(
         SnackBar(
-          content: Text('Operation failed: $e'),
+          content: Text(message),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -273,7 +280,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                                       constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
                                       onPressed: _actionBusy
                                           ? null
-                                          : () => _runGuarded(() async {
+                                      : () => _runGuarded(() async {
                                         final settings = context.read<SettingsProvider>();
                                         final cfg = settings.getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
                                         final q = _searchCtrl.text.trim().toLowerCase();
@@ -396,16 +403,17 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                           onPressed: _actionBusy
                               ? null
                               : () => _runGuarded(() async {
-                            final old = context.read<SettingsProvider>().getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
+                            final settings = context.read<SettingsProvider>();
+                            final old = settings.getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
                             if (allAdded) {
                               final toRemove = grouped[g]!.map((m) => m.id).toSet();
                               final list = old.models.where((id) => !toRemove.contains(id)).toList();
-                              await context.read<SettingsProvider>().setProviderConfig(widget.providerKey, old.copyWith(models: list));
+                              await settings.setProviderConfig(widget.providerKey, old.copyWith(models: list));
                             } else {
                               final toAdd = grouped[g]!.where((m) => !selected.contains(m.id)).map((m) => m.id).toList();
                               if (toAdd.isNotEmpty) {
                                 final set = old.models.toSet()..addAll(toAdd);
-                                await context.read<SettingsProvider>().setProviderConfig(widget.providerKey, old.copyWith(models: set.toList()));
+                                await settings.setProviderConfig(widget.providerKey, old.copyWith(models: set.toList()));
                               }
                             }
                             if (mounted) setState(() {});
@@ -468,14 +476,15 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                   onPressed: _actionBusy
                       ? null
                       : () => _runGuarded(() async {
-                    final old = context.read<SettingsProvider>().getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
+                    final settings = context.read<SettingsProvider>();
+                    final old = settings.getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
                     final list = old.models.toList();
                     if (added) {
                       list.removeWhere((e) => e == m.id);
                     } else {
                       list.add(m.id);
                     }
-                    await context.read<SettingsProvider>().setProviderConfig(widget.providerKey, old.copyWith(models: list));
+                    await settings.setProviderConfig(widget.providerKey, old.copyWith(models: list));
                     if (mounted) setState(() {});
                   }),
                   icon: Icon(added ? lucide.Lucide.Minus : lucide.Lucide.Plus, size: 18, color: cs.onSurface.withOpacity(0.75)),

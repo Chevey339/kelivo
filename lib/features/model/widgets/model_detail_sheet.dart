@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
+import '../../../core/services/model_override_resolver.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -118,10 +119,10 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     });
     // Resolve display model id from per-model overrides when present (apiModelId),
     // falling back to the logical key for backwards compatibility.
-    Map? _initialOv;
+    Map<String, dynamic>? _initialOv;
     if (!widget.isNew) {
       final raw = cfg.modelOverrides[widget.modelId];
-      if (raw is Map) _initialOv = raw;
+      if (raw is Map) _initialOv = raw.map((k, v) => MapEntry(k.toString(), v));
     }
     String displayModelId = widget.modelId;
     if (_initialOv != null) {
@@ -138,17 +139,15 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
         displayName: displayModelId.isEmpty ? '' : displayModelId,
       ),
     );
-    _nameCtrl = TextEditingController(text: base.displayName);
-    _type = base.type;
-    _input..clear()..addAll(base.input);
-    _output..clear()..addAll(base.output);
-    _abilities..clear()..addAll(base.abilities);
+    final ov = _initialOv;
+    final effective = ov == null ? base : ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: true);
+    _nameCtrl = TextEditingController(text: effective.displayName);
+    _type = effective.type;
+    _input..clear()..addAll(effective.input);
+    _output..clear()..addAll(effective.output);
+    _abilities..clear()..addAll(effective.abilities);
     // Normalize embedding invariants on init (avoid running transition/caching logic during init).
     if (_type == ModelType.embedding) {
-      _abilities.clear();
-      _output
-        ..clear()
-        ..add(Modality.text);
       if (_input.isEmpty) _input.add(Modality.text);
       _cachedEmbeddingInput = {..._input};
     } else if (_type == ModelType.chat) {
@@ -157,73 +156,42 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
       if (_output.isEmpty) _output.add(Modality.text);
     }
 
-    if (!widget.isNew) {
-      final rawOv = cfg.modelOverrides[widget.modelId];
-      final ov = _initialOv ?? (rawOv is Map ? rawOv : null);
-      if (ov != null) {
-        final overrideName = ov['name']?.toString().trim();
-        if (overrideName != null && overrideName.isNotEmpty) {
-          _nameCtrl.text = overrideName;
+    if (ov != null) {
+      // headers/body
+      final rawHdrs = ov['headers'];
+      final hdrs = (rawHdrs is List) ? rawHdrs : const <dynamic>[];
+      for (final h in hdrs) {
+        if (h is Map) {
+          final kv = _HeaderKV();
+          kv.name.text = (h['name'] as String?) ?? '';
+          kv.value.text = (h['value'] as String?) ?? '';
+          _headers.add(kv);
         }
-        final t = (ov['type'] ?? '').toString().trim().toLowerCase();
-        if (t == 'embedding') {
-          _setType(ModelType.embedding);
-        } else if (t == 'chat') {
-          _setType(ModelType.chat);
-        }
-        if (_type == ModelType.chat) {
-          final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
-          final outArr = (ov['output'] as List?)?.map((e) => e.toString()).toList() ?? [];
-          final abArr = (ov['abilities'] as List?)?.map((e) => e.toString()).toList() ?? [];
-          _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-          _output..clear()..addAll(outArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-          _abilities..clear()..addAll(abArr.map((e) => e == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool));
-          if (_input.isEmpty) _input.add(Modality.text);
-          if (_output.isEmpty) _output.add(Modality.text);
-        } else if (_type == ModelType.embedding) {
-          // Embedding supports explicit input modalities (e.g., text/image). Abilities remain chat-only.
-          final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
-          if (inArr.isNotEmpty) {
-            _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-            if (_input.isEmpty) _input.add(Modality.text);
-          }
-        }
-        // headers/body
-        final rawHdrs = ov['headers'];
-        final hdrs = (rawHdrs is List) ? rawHdrs : const <dynamic>[];
-        for (final h in hdrs) {
-          if (h is Map) {
-            final kv = _HeaderKV();
-            kv.name.text = (h['name'] as String?) ?? '';
-            kv.value.text = (h['value'] as String?) ?? '';
-            _headers.add(kv);
-          }
-        }
-        final rawBds = ov['body'];
-        final bds = (rawBds is List) ? rawBds : const <dynamic>[];
-        for (final b in bds) {
-          if (b is Map) {
-            final kv = _BodyKV();
-            kv.keyCtrl.text = (b['key'] as String?) ?? '';
-            kv.valueCtrl.text = (b['value'] as String?) ?? '';
-            _bodies.add(kv);
-          }
-        }
-        // Built-in tools toggles
-        final builtInSet = BuiltInToolNames.parseAndNormalize(ov['builtInTools']);
-
-        _googleUrlContextTool = builtInSet.contains(BuiltInToolNames.urlContext);
-        _googleCodeExecutionTool = builtInSet.contains(BuiltInToolNames.codeExecution);
-        _googleYoutubeTool = builtInSet.contains(BuiltInToolNames.youtube);
-
-        _openaiCodeInterpreterTool = builtInSet.contains(BuiltInToolNames.codeInterpreter);
-        _openaiImageGenerationTool = builtInSet.contains(BuiltInToolNames.imageGeneration);
-
-        // Backward compatibility: legacy UI-only tools map (older versions)
-        final rawTools = ov['tools'];
-        final tools = rawTools is Map ? rawTools : const <dynamic, dynamic>{};
-        _googleUrlContextTool = _googleUrlContextTool || ((tools['urlContext'] as bool?) ?? false);
       }
+      final rawBds = ov['body'];
+      final bds = (rawBds is List) ? rawBds : const <dynamic>[];
+      for (final b in bds) {
+        if (b is Map) {
+          final kv = _BodyKV();
+          kv.keyCtrl.text = (b['key'] as String?) ?? '';
+          kv.valueCtrl.text = (b['value'] as String?) ?? '';
+          _bodies.add(kv);
+        }
+      }
+      // Built-in tools toggles
+      final builtInSet = BuiltInToolNames.parseAndNormalize(ov['builtInTools']);
+
+      _googleUrlContextTool = builtInSet.contains(BuiltInToolNames.urlContext);
+      _googleCodeExecutionTool = builtInSet.contains(BuiltInToolNames.codeExecution);
+      _googleYoutubeTool = builtInSet.contains(BuiltInToolNames.youtube);
+
+      _openaiCodeInterpreterTool = builtInSet.contains(BuiltInToolNames.codeInterpreter);
+      _openaiImageGenerationTool = builtInSet.contains(BuiltInToolNames.imageGeneration);
+
+      // Backward compatibility: legacy UI-only tools map (older versions)
+      final rawTools = ov['tools'];
+      final tools = rawTools is Map ? rawTools : const <dynamic, dynamic>{};
+      _googleUrlContextTool = _googleUrlContextTool || ((tools['urlContext'] as bool?) ?? false);
     }
   }
 
@@ -233,7 +201,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
 
     _type = next;
     // Pass state-owned sets; helper mutates in place.
-    final cache = ModelEditTypeSwitch.apply(
+    final result = ModelEditTypeSwitch.apply(
       prev: prev,
       next: next,
       input: _input,
@@ -244,10 +212,19 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
       cachedChatAbilities: _cachedChatAbilities,
       cachedEmbeddingInput: _cachedEmbeddingInput,
     );
-    _cachedChatInput = cache.cachedChatInput;
-    _cachedChatOutput = cache.cachedChatOutput;
-    _cachedChatAbilities = cache.cachedChatAbilities;
-    _cachedEmbeddingInput = cache.cachedEmbeddingInput;
+    _input
+      ..clear()
+      ..addAll(result.input);
+    _output
+      ..clear()
+      ..addAll(result.output);
+    _abilities
+      ..clear()
+      ..addAll(result.abilities);
+    _cachedChatInput = result.cachedChatInput;
+    _cachedChatOutput = result.cachedChatOutput;
+    _cachedChatAbilities = result.cachedChatAbilities;
+    _cachedEmbeddingInput = result.cachedEmbeddingInput;
   }
 
   @override
@@ -616,10 +593,13 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
             title: l10n.modelDetailSheetUrlContextTool,
             desc: l10n.modelDetailSheetUrlContextToolDescription,
             value: _googleUrlContextTool,
-            // URL Context is disabled when Code Execution is enabled (mutually exclusive)
+            // Enabling URL Context disables Code Execution (mutually exclusive)
             onChanged: disableTools
                 ? null
-                : (_googleCodeExecutionTool ? null : (v) => setState(() => _googleUrlContextTool = v)),
+                : (v) => setState(() {
+                      _googleUrlContextTool = v;
+                      if (v) _googleCodeExecutionTool = false;
+                    }),
           ),
         ),
         Padding(
@@ -628,10 +608,13 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
             title: l10n.modelDetailSheetCodeExecutionTool,
             desc: l10n.modelDetailSheetCodeExecutionToolDescription,
             value: _googleCodeExecutionTool,
-            // Code Execution is disabled when URL Context is enabled (mutually exclusive)
+            // Enabling Code Execution disables URL Context (mutually exclusive)
             onChanged: disableTools
                 ? null
-                : (_googleUrlContextTool ? null : (v) => setState(() => _googleCodeExecutionTool = v)),
+                : (v) => setState(() {
+                      _googleCodeExecutionTool = v;
+                      if (v) _googleUrlContextTool = false;
+                    }),
           ),
         ),
         Padding(

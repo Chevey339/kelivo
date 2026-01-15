@@ -142,7 +142,7 @@ class ModelTagWrap extends StatelessWidget {
 
     // abilities capsules - chat only
     if (!isEmbedding) {
-      final uniqueAbilities = LinkedHashSet<ModelAbility>.from(model.abilities).toList(growable: false);
+      final uniqueAbilities = LinkedHashSet<ModelAbility>.from(model.abilities);
       for (final ab in uniqueAbilities) {
         if (ab == ModelAbility.tool) {
           final label = toolsLabel;
@@ -168,6 +168,11 @@ class ModelTagWrap extends StatelessWidget {
               width: 12,
               height: 12,
               colorFilter: ColorFilter.mode(isDark ? cs.secondary : cs.secondary.withOpacity(0.9), BlendMode.srcIn),
+              placeholderBuilder: (_) => Icon(
+                Lucide.Brain,
+                size: 12,
+                color: isDark ? cs.secondary : cs.secondary.withOpacity(0.9),
+              ),
             ),
             darkBgAlpha: 0.3,
             lightBgAlpha: 0.18,
@@ -294,6 +299,11 @@ class ModelCapsulesRow extends StatelessWidget {
                 width: iconSize,
                 height: iconSize,
                 colorFilter: ColorFilter.mode(cs.secondary, BlendMode.srcIn),
+                placeholderBuilder: (_) => Icon(
+                  Lucide.Brain,
+                  size: iconSize,
+                  color: cs.secondary,
+                ),
               ),
               color: cs.secondary,
             ),

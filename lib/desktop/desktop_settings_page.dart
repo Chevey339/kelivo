@@ -4309,7 +4309,7 @@ class _ModelRow extends StatelessWidget {
               ),
               const SizedBox(width: 10),
             ],
-            _BrandCircle(name: displayName, size: 22),
+            _BrandCircle(name: baseId, size: 22),
             const SizedBox(width: 10),
             Expanded(
               child: Text(displayName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5)),
