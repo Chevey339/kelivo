@@ -51,9 +51,15 @@ class ModelTagWrap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isEmbedding = model.type == ModelType.embedding;
+    final chatLabel = l10n?.modelSelectSheetChatType ?? 'Chat';
+    final embeddingLabel = l10n?.modelSelectSheetEmbeddingType ?? 'Embedding';
+    final textLabel = l10n?.modelDetailSheetTextMode ?? 'Text';
+    final imageLabel = l10n?.modelDetailSheetImageMode ?? 'Image';
+    final toolsLabel = l10n?.modelDetailSheetToolsAbility ?? 'Tools';
+    final reasoningLabel = l10n?.modelDetailSheetReasoningAbility ?? 'Reasoning';
 
     final chips = <Widget>[];
 
@@ -67,7 +73,7 @@ class ModelTagWrap extends StatelessWidget {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Text(
-          model.type == ModelType.chat ? l10n.modelSelectSheetChatType : l10n.modelSelectSheetEmbeddingType,
+          model.type == ModelType.chat ? chatLabel : embeddingLabel,
           style: TextStyle(
             fontSize: 11,
             color: isDark ? cs.primary : cs.primary.withOpacity(0.9),
@@ -89,7 +95,7 @@ class ModelTagWrap extends StatelessWidget {
     // Dedupe while preserving order (defensive against malformed/duplicated upstream data).
     final inputModsUnique = LinkedHashSet<Modality>.from(inputMods).toList(growable: false);
     final outputModsUnique = LinkedHashSet<Modality>.from(outputMods).toList(growable: false);
-    String modLabel(Modality m) => m == Modality.text ? l10n.modelDetailSheetTextMode : l10n.modelDetailSheetImageMode;
+    String modLabel(Modality m) => m == Modality.text ? textLabel : imageLabel;
     final ioLabel = '${inputModsUnique.map(modLabel).join(', ')} → ${outputModsUnique.map(modLabel).join(', ')}';
     chips.add(
       Tooltip(
@@ -139,7 +145,7 @@ class ModelTagWrap extends StatelessWidget {
       final uniqueAbilities = LinkedHashSet<ModelAbility>.from(model.abilities).toList(growable: false);
       for (final ab in uniqueAbilities) {
         if (ab == ModelAbility.tool) {
-          final label = l10n.modelDetailSheetToolsAbility;
+          final label = toolsLabel;
           chips.add(_abilityChip(
             isDark: isDark,
             label: label,
@@ -151,7 +157,7 @@ class ModelTagWrap extends StatelessWidget {
             borderAlpha: 0.2,
           ));
         } else if (ab == ModelAbility.reasoning) {
-          final label = l10n.modelDetailSheetReasoningAbility;
+          final label = reasoningLabel;
           chips.add(_abilityChip(
             isDark: isDark,
             label: label,
@@ -209,8 +215,13 @@ class ModelCapsulesRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inputLabel = l10n?.modelDetailSheetInputModesLabel ?? 'Input';
+    final outputLabel = l10n?.modelDetailSheetOutputModesLabel ?? 'Output';
+    final imageLabel = l10n?.modelDetailSheetImageMode ?? 'Image';
+    final toolsLabel = l10n?.modelDetailSheetToolsAbility ?? 'Tools';
+    final reasoningLabel = l10n?.modelDetailSheetReasoningAbility ?? 'Reasoning';
 
     Widget pillCapsule(Widget icon, Color color) {
       final bg = isDark ? color.withOpacity(bgOpacityDark) : color.withOpacity(bgOpacityLight);
@@ -244,7 +255,7 @@ class ModelCapsulesRow extends StatelessWidget {
     if (model.input.contains(Modality.image)) {
       caps.add(
         labeledCapsule(
-          label: '${l10n.modelDetailSheetInputModesLabel}: ${l10n.modelDetailSheetImageMode}',
+          label: '$inputLabel: $imageLabel',
           icon: Icon(Lucide.Eye, size: iconSize, color: cs.secondary),
           color: cs.secondary,
         ),
@@ -255,7 +266,7 @@ class ModelCapsulesRow extends StatelessWidget {
     if (model.type == ModelType.chat && model.output.contains(Modality.image)) {
       caps.add(
         labeledCapsule(
-          label: '${l10n.modelDetailSheetOutputModesLabel}: ${l10n.modelDetailSheetImageMode}',
+          label: '$outputLabel: $imageLabel',
           icon: Icon(Lucide.Image, size: iconSize, color: cs.tertiary),
           color: cs.tertiary,
         ),
@@ -269,7 +280,7 @@ class ModelCapsulesRow extends StatelessWidget {
         if (ab == ModelAbility.tool) {
           caps.add(
             labeledCapsule(
-              label: l10n.modelDetailSheetToolsAbility,
+              label: toolsLabel,
               icon: Icon(Lucide.Hammer, size: iconSize, color: cs.primary),
               color: cs.primary,
             ),
@@ -277,7 +288,7 @@ class ModelCapsulesRow extends StatelessWidget {
         } else if (ab == ModelAbility.reasoning) {
           caps.add(
             labeledCapsule(
-              label: l10n.modelDetailSheetReasoningAbility,
+              label: reasoningLabel,
               icon: SvgPicture.asset(
                 'assets/icons/deepthink.svg',
                 width: iconSize,
@@ -293,14 +304,11 @@ class ModelCapsulesRow extends StatelessWidget {
 
     if (caps.isEmpty) return const SizedBox.shrink();
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (int i = 0; i < caps.length; i++) ...[
-          if (i != 0) SizedBox(width: itemSpacing),
-          caps[i],
-        ],
-      ],
+    return Wrap(
+      spacing: itemSpacing,
+      runSpacing: itemSpacing,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: caps,
     );
   }
 }

@@ -15,6 +15,11 @@ class ModelTypeSwitchCache {
 }
 
 class ModelEditTypeSwitch {
+  /// Applies a model type switch and updates the provided sets in place.
+  ///
+  /// This helper assumes it is called on the UI isolate. The main risk is
+  /// shared references, so callers should pass state-owned sets (not shared
+  /// across widgets) to avoid unintended side effects.
   static ModelTypeSwitchCache apply({
     required ModelType prev,
     required ModelType next,

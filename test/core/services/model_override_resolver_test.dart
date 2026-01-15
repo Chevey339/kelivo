@@ -111,6 +111,33 @@ void main() {
       expect(withName.displayName, 'override');
       expect(withoutName.displayName, 'base');
     });
+
+    test('non-model override keys are a no-op', () {
+      final base = ModelInfo(
+        id: 'm',
+        displayName: 'base',
+        type: ModelType.chat,
+        input: const [Modality.text],
+        output: const [Modality.text],
+        abilities: const [ModelAbility.tool],
+      );
+
+      final next = ModelOverrideResolver.applyModelOverride(base, {
+        'apiModelId': 'gpt-x',
+        'headers': [
+          {'name': 'x', 'value': '1'}
+        ],
+        'body': [
+          {'key': 'k', 'value': 'v'}
+        ],
+      });
+
+      expect(next.type, base.type);
+      expect(next.input, base.input);
+      expect(next.output, base.output);
+      expect(next.abilities, base.abilities);
+      expect(next.displayName, base.displayName);
+    });
   });
 }
 

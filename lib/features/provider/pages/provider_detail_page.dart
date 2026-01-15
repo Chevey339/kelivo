@@ -2358,7 +2358,7 @@ class _ModelCard extends StatelessWidget {
     final Map<String, dynamic>? ov =
         rawOv is Map ? {for (final e in rawOv.entries) e.key.toString(): e.value} : null;
     if (ov != null) {
-      final n = (ov['name'] as String?)?.trim();
+      final n = ov['name']?.toString().trim();
       if (n != null && n.isNotEmpty) return n;
     }
     return modelId;

@@ -42,7 +42,7 @@ class ModelOverrideResolver {
       }
     }
     if (out.isEmpty) return const <Modality>[];
-    // Dedupe while preserving order.
+    // Dedupe while preserving order. Lists are typically tiny, so this is fine.
     return LinkedHashSet<Modality>.from(out).toList(growable: false);
   }
 
@@ -63,6 +63,7 @@ class ModelOverrideResolver {
       }
     }
     if (out.isEmpty) return const <ModelAbility>[];
+    // Dedupe while preserving order. Lists are typically tiny, so this is fine.
     return LinkedHashSet<ModelAbility>.from(out).toList(growable: false);
   }
 

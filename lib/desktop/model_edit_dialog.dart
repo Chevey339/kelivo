@@ -145,7 +145,10 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
       final Map<String, dynamic>? ov =
           rawOv is Map ? {for (final e in rawOv.entries) e.key.toString(): e.value} : null;
       if (ov != null) {
-        _nameCtrl.text = (ov['name'] as String?)?.trim().isNotEmpty == true ? (ov['name'] as String) : _nameCtrl.text;
+        final overrideName = ov['name']?.toString().trim();
+        if (overrideName != null && overrideName.isNotEmpty) {
+          _nameCtrl.text = overrideName;
+        }
         final t = (ov['type'] ?? '').toString().trim().toLowerCase();
         if (t == 'embedding') {
           _setType(ModelType.embedding);
@@ -153,14 +156,14 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
           _setType(ModelType.chat);
         }
         if (_type == ModelType.chat) {
-        final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        final outArr = (ov['output'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        final abArr = (ov['abilities'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-        _output..clear()..addAll(outArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-        _abilities..clear()..addAll(abArr.map((e) => e == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool));
-        if (_input.isEmpty) _input.add(Modality.text);
-        if (_output.isEmpty) _output.add(Modality.text);
+          final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          final outArr = (ov['output'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          final abArr = (ov['abilities'] as List?)?.map((e) => e.toString()).toList() ?? [];
+          _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
+          _output..clear()..addAll(outArr.map((e) => e == 'image' ? Modality.image : Modality.text));
+          _abilities..clear()..addAll(abArr.map((e) => e == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool));
+          if (_input.isEmpty) _input.add(Modality.text);
+          if (_output.isEmpty) _output.add(Modality.text);
         } else if (_type == ModelType.embedding) {
           // Embedding supports explicit input modalities (e.g., text/image). Abilities remain chat-only.
           final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
@@ -192,6 +195,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     if (prev == next) return;
 
     _type = next;
+    // Pass state-owned sets; helper mutates in place.
     final cache = ModelEditTypeSwitch.apply(
       prev: prev,
       next: next,
@@ -505,7 +509,11 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
               for (final h in _headers)
                 _HeaderRow(
                   kv: h,
-                  onDelete: () => setState(() => _headers.remove(h)),
+                  onDelete: () => setState(() {
+                    h.name.dispose();
+                    h.value.dispose();
+                    _headers.remove(h);
+                  }),
                 ),
             ],
           ],
@@ -527,7 +535,11 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
               for (final b in _bodies)
                 _BodyRow(
                   kv: b,
-                  onDelete: () => setState(() => _bodies.remove(b)),
+                  onDelete: () => setState(() {
+                    b.keyCtrl.dispose();
+                    b.valueCtrl.dispose();
+                    _bodies.remove(b);
+                  }),
                 ),
             ],
           ],
