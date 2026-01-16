@@ -752,6 +752,13 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
     // Decide which logical key to use for this instance
     final String key = (prevKey.isEmpty || widget.isNew) ? _nextModelKey(old, apiModelId) : prevKey;
+    if ((prevKey.isEmpty || widget.isNew) && key != apiModelId) {
+      showAppSnackBar(
+        context,
+        message: 'apiModelId 已存在，将保存为 $key',
+        type: NotificationType.warning,
+      );
+    }
     final bool isEmbedding = _type == ModelType.embedding;
     ov[key] = {
       'apiModelId': apiModelId,
@@ -769,13 +776,22 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     };
 
     // Apply updates to provider config
-    if (prevKey.isEmpty || widget.isNew) {
-      // Creating a new model
-      final list = old.models.toList()..add(key);
-      await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov, models: list));
-    } else {
-      // Existing model instance; keep logical key stable and just persist overrides
-      await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov));
+    try {
+      if (prevKey.isEmpty || widget.isNew) {
+        // Creating a new model
+        final list = old.models.toList()..add(key);
+        await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov, models: list));
+      } else {
+        // Existing model instance; keep logical key stable and just persist overrides
+        await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov));
+      }
+    } catch (_) {
+      showAppSnackBar(
+        context,
+        message: '保存失败，请重试',
+        type: NotificationType.error,
+      );
+      return;
     }
     if (!mounted) return;
     Navigator.of(context).pop(true);

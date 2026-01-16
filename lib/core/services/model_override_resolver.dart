@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'package:flutter/foundation.dart';
 
 import '../models/model_types.dart';
 
@@ -39,6 +40,10 @@ class ModelOverrideResolver {
         out.add(Modality.text);
       } else if (s == 'image') {
         out.add(Modality.image);
+      } else if (s.isNotEmpty) {
+        if (kDebugMode) {
+          debugPrint('[ModelOverride] Unknown modality value: $s');
+        }
       }
     }
     if (out.isEmpty) return const <Modality>[];
@@ -60,6 +65,10 @@ class ModelOverrideResolver {
         out.add(ModelAbility.tool);
       } else if (s == 'reasoning') {
         out.add(ModelAbility.reasoning);
+      } else if (s.isNotEmpty) {
+        if (kDebugMode) {
+          debugPrint('[ModelOverride] Unknown ability value: $s');
+        }
       }
     }
     if (out.isEmpty) return const <ModelAbility>[];

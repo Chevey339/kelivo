@@ -54,6 +54,15 @@ class ModelRegistry {
     final inMods = <Modality>[...base.input];
     final outMods = <Modality>[...base.output];
     final ab = <ModelAbility>[...base.abilities];
+    if (base.type == ModelType.embedding) {
+      if (!outMods.contains(Modality.text)) {
+        outMods
+          ..clear()
+          ..add(Modality.text);
+      }
+      ab.clear();
+      return base.copyWith(input: inMods, output: outMods, abilities: ab);
+    }
     // If model id contains 'image', treat it as an image model:
     // - Input and output both include image
     // - No tool or reasoning abilities

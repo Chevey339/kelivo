@@ -73,6 +73,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
 
   Future<void> _runGuarded(Future<void> Function() action) async {
     if (_actionBusy) return;
+    if (!mounted) return;
     setState(() => _actionBusy = true);
     try {
       await action();

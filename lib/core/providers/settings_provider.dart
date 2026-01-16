@@ -20,6 +20,11 @@ import '../../utils/avatar_cache.dart';
 // Desktop: topic list position
 enum DesktopTopicPosition { left, right }
 
+// Desktop: send message shortcut
+enum DesktopSendShortcut { enter, ctrlEnter }
+
+enum _MigrationResult { noChange, applied, failed }
+
 class SettingsProvider extends ChangeNotifier {
   static const String _providersOrderKey = 'providers_order_v1';
   static const String _themeModeKey = 'theme_mode_v1';
@@ -27,7 +32,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _providerConfigsBackupKey = 'provider_configs_backup_v1';
   static const String _migrationsVersionKey = 'migrations_version_v1';
   static const int _embeddingOverridesMigrationVersion = 3;
-  static const String _embeddingType = 'embedding';
+  static const Set<String> _embeddingTypeStrings = {'embedding', 'embeddings'};
   static const Set<String> _embeddingChatOnlyFields = {'abilities', 'output', 'builtInTools'};
   static const String _pinnedModelsKey = 'pinned_models_v1';
   static const String _selectedModelKey = 'selected_model_v1';
@@ -223,7 +228,7 @@ class SettingsProvider extends ChangeNotifier {
     _load();
   }
 
-  Future<bool> _migrateEmbeddingModelOverrides(SharedPreferences prefs) async {
+  Future<_MigrationResult> _migrateEmbeddingModelOverrides(SharedPreferences prefs) async {
     Map<String, ProviderConfig>? nextProviderConfigs;
     int providersChanged = 0;
     int modelsChanged = 0;
@@ -239,8 +244,8 @@ class SettingsProvider extends ChangeNotifier {
         final rawOv = ovEntry.value;
         if (rawOv is! Map) continue;
 
-        final t = (rawOv['type'] ?? '').toString().trim().toLowerCase();
-        if (t != _embeddingType) continue;
+        final t = (rawOv['type'] ?? rawOv['t'] ?? '').toString().trim().toLowerCase();
+        if (!_embeddingTypeStrings.contains(t)) continue;
 
         // Migration/cleanup (embedding): remove chat-only fields.
         // Embeddings may still use explicit input modalities like text/image.
@@ -262,16 +267,16 @@ class SettingsProvider extends ChangeNotifier {
       providersChanged++;
     }
 
-    if (nextProviderConfigs == null) return false;
+    if (nextProviderConfigs == null) return _MigrationResult.noChange;
     final map = nextProviderConfigs.map((k, v) => MapEntry(k, v.toJson()));
     final ok = await prefs.setString(_providerConfigsKey, jsonEncode(map));
-    if (!ok) return false;
+    if (!ok) return _MigrationResult.failed;
     _providerConfigs = nextProviderConfigs;
     assert(() {
       debugPrint('[SettingsProvider] embedding overrides migration: providers=$providersChanged, models=$modelsChanged');
       return true;
     }());
-    return true;
+    return _MigrationResult.applied;
   }
 
   Future<void> _load() async {
@@ -317,18 +322,20 @@ class SettingsProvider extends ChangeNotifier {
             return true;
           }());
         }
-        final migrated = await _migrateEmbeddingModelOverrides(prefs);
+        final result = await _migrateEmbeddingModelOverrides(prefs);
         // Mark as attempted so we don't keep re-scanning on every startup when no changes are needed.
-        await prefs.setInt(_migrationsVersionKey, _embeddingOverridesMigrationVersion);
+        if (result != _MigrationResult.failed) {
+          await prefs.setInt(_migrationsVersionKey, _embeddingOverridesMigrationVersion);
+        }
         assert(() {
-          if (migrated) {
+          if (result == _MigrationResult.applied) {
             debugPrint('[SettingsProvider] provider modelOverrides migration applied.');
           }
           return true;
         }());
         try {
           FlutterLogger.log(
-            '[SettingsProvider] provider modelOverrides migration done (applied=$migrated)',
+            '[SettingsProvider] provider modelOverrides migration done (result=$result)',
             tag: 'Migration',
           );
         } catch (_) {}

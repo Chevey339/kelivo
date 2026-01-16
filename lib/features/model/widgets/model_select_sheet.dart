@@ -229,6 +229,25 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   List<String> _orderedKeys = [];
   bool _autoScrolled = false; // ensure we only auto-scroll once per open
 
+  dynamic _sanitizeJsonValue(dynamic value) {
+    if (value == null || value is num || value is bool || value is String) return value;
+    if (value is Map) {
+      return {
+        for (final entry in value.entries) entry.key.toString(): _sanitizeJsonValue(entry.value),
+      };
+    }
+    if (value is Iterable) {
+      return [for (final item in value) _sanitizeJsonValue(item)];
+    }
+    return value.toString();
+  }
+
+  Map<String, dynamic> _sanitizeOverrides(Map<String, dynamic> overrides) {
+    return {
+      for (final entry in overrides.entries) entry.key.toString(): _sanitizeJsonValue(entry.value),
+    };
+  }
+
   @override
   void initState() {
     super.initState();
@@ -259,7 +278,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
             'enabled': value.enabled,
             'name': value.name,
             'models': value.models,
-            'overrides': value.modelOverrides,
+            'overrides': _sanitizeOverrides(value.modelOverrides),
           })),
         ),
         pinnedModels: settings.pinnedModels,
@@ -317,7 +336,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           'enabled': value.enabled,
           'name': value.name,
           'models': value.models,
-          'overrides': value.modelOverrides,
+          'overrides': _sanitizeOverrides(value.modelOverrides),
         })),
       ),
       pinnedModels: settings.pinnedModels,
@@ -753,60 +772,61 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           child: SizedBox(
             width: double.infinity,
             child: Row(
-            children: [
-              _BrandAvatar(name: m.id, assetOverride: m.asset, size: 28),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (!showProviderLabel)
-                      Text(
-                        m.info.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                      )
-                    else
-                      Text.rich(
-                        TextSpan(
-                          text: m.info.displayName,
+              children: [
+                _BrandAvatar(name: m.id, assetOverride: m.asset, size: 28),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (!showProviderLabel)
+                        Text(
+                          m.info.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                          children: [
-                            TextSpan(
-                              text: ' | ${m.providerName}',
-                              style: TextStyle(
-                                color: cs.onSurface.withOpacity(0.6),
-                                fontSize: 12,
+                        )
+                      else
+                        Text.rich(
+                          TextSpan(
+                            text: m.info.displayName,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                            children: [
+                              TextSpan(
+                                text: ' | ${m.providerName}',
+                                style: TextStyle(
+                                  color: cs.onSurface.withOpacity(0.6),
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    const SizedBox(height: 4),
-                    ModelTagWrap(model: m.info),
-                  ],
-                ),
-              ),
-              Builder(builder: (context) {
-                final pinnedNow = context.select<SettingsProvider, bool>((s) => s.isModelPinned(m.providerKey, m.id));
-                final icon = pinnedNow ? Icons.favorite : Icons.favorite_border;
-                return Tooltip(
-                  message: l10n.modelSelectSheetFavoriteTooltip,
-                  child: IosIconButton(
-                    icon: icon,
-                    size: 20,
-                    color: cs.primary,
-                    onTap: () => settings.togglePinModel(m.providerKey, m.id),
-                    padding: const EdgeInsets.all(6),
-                    minSize: 36,
+                      const SizedBox(height: 4),
+                      ModelTagWrap(model: m.info),
+                    ],
                   ),
-                );
-              }),
-            ],
-          )),
+                ),
+                Builder(builder: (context) {
+                  final pinnedNow = context.select<SettingsProvider, bool>((s) => s.isModelPinned(m.providerKey, m.id));
+                  final icon = pinnedNow ? Icons.favorite : Icons.favorite_border;
+                  return Tooltip(
+                    message: l10n.modelSelectSheetFavoriteTooltip,
+                    child: IosIconButton(
+                      icon: icon,
+                      size: 20,
+                      color: cs.primary,
+                      onTap: () => settings.togglePinModel(m.providerKey, m.id),
+                      padding: const EdgeInsets.all(6),
+                      minSize: 36,
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
         ),
       ),
     );
