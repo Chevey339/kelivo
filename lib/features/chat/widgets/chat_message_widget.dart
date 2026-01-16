@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:open_filex/open_filex.dart';
 // import 'package:easy_image_viewer/easy_image_viewer.dart';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:characters/characters.dart';
 import '../pages/image_viewer_page.dart';
 import '../../../core/models/chat_message.dart';
@@ -36,6 +37,26 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
+
+/// Extract image paths from tool result content.
+/// Returns (cleanText, imagePaths). Supports local file paths and HTTP URLs.
+(String, List<String>) _parseMcpImagePaths(String? content) {
+  if (content == null || content.isEmpty) return ('', const []);
+
+  final images = <String>[];
+  final imgRe = RegExp(r'\[image:(.+?)\]');
+
+  final cleanText = content.replaceAllMapped(imgRe, (m) {
+    final path = m.group(1)!;
+    // Filter invalid values
+    if (path.isNotEmpty && path != 'generated') {
+      images.add(path);
+    }
+    return '';
+  });
+
+  return (cleanText.trim(), images);
+}
 
 class ChatMessageWidget extends StatefulWidget {
   final ChatMessage message;
@@ -2138,9 +2159,70 @@ class ReasoningSegment {
   });
 }
 
-class _ToolCallItem extends StatelessWidget {
+class _ToolCallItem extends StatefulWidget {
   const _ToolCallItem({required this.part});
   final ToolUIPart part;
+
+  @override
+  State<_ToolCallItem> createState() => _ToolCallItemState();
+}
+
+class _ToolCallItemState extends State<_ToolCallItem> {
+  // Cache image paths (local file or URL)
+  List<String> _imagePaths = const [];
+  String? _lastContent;
+
+  void _updateImageCache() {
+    final content = widget.part.content;
+    if (content == _lastContent) return;
+    _lastContent = content;
+
+    final (_, paths) = _parseMcpImagePaths(content);
+    _imagePaths = paths;
+  }
+
+  /// Build image widget from path (supports local file and HTTP URL)
+  Widget _buildImageFromPath(String path, {double? height, BoxFit fit = BoxFit.contain}) {
+    final cs = Theme.of(context).colorScheme;
+    Widget errorWidget() => Container(
+      width: height != null ? height * 0.67 : 120,
+      height: height ?? 180,
+      color: cs.surfaceContainerHighest,
+      child: Icon(Lucide.ImageOff, size: 24, color: cs.onSurface.withOpacity(0.5)),
+    );
+
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      // HTTP URL
+      return Image.network(
+        path,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => errorWidget(),
+      );
+    } else {
+      // Local file path
+      return Image.file(
+        File(path),
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => errorWidget(),
+      );
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _updateImageCache();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ToolCallItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.part.content != widget.part.content) {
+      _updateImageCache();
+    }
+  }
 
   IconData _iconFor(String name) {
     switch (name) {
@@ -2184,7 +2266,7 @@ class _ToolCallItem extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = cs.primaryContainer.withOpacity(isDark ? 0.25 : 0.30);
-    final fg = cs.onPrimaryContainer;
+    final hasImages = _imagePaths.isNotEmpty;
 
     return IosCardPress(
       borderRadius: BorderRadius.circular(16),
@@ -2193,37 +2275,64 @@ class _ToolCallItem extends StatelessWidget {
       duration: const Duration(milliseconds: 260),
       onTap: () => _showDetail(context),
       padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          part.loading
-              ? SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
-                  ),
-                )
-              : SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: Center(
-                    child: Icon(_iconFor(part.toolName), size: 18, color: cs.secondary),
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              widget.part.loading
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                      ),
+                    )
+                  : SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: Center(
+                        child: Icon(_iconFor(widget.part.toolName), size: 18, color: cs.secondary),
+                      ),
+                    ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _titleFor(context, widget.part.toolName, widget.part.arguments, isResult: !widget.part.loading),
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cs.secondary),
+                    ),
+                  ],
                 ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _titleFor(context, part.toolName, part.arguments, isResult: !part.loading),
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cs.secondary),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
+          // Show image thumbnails if available
+          if (hasImages) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 180,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _imagePaths.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (ctx, i) {
+                  final path = _imagePaths[i];
+                  return GestureDetector(
+                    onTap: () => _showFullImage(context, path),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: _buildImageFromPath(path, height: 180),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -2232,8 +2341,9 @@ class _ToolCallItem extends StatelessWidget {
   void _showDetail(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    final argsPretty = const JsonEncoder.withIndent('  ').convert(part.arguments);
-    final resultText = (part.content ?? '').isNotEmpty ? part.content! : l10n.chatMessageWidgetNoResultYet;
+    final argsPretty = const JsonEncoder.withIndent('  ').convert(widget.part.arguments);
+    final (cleanText, images) = _parseMcpImagePaths(widget.part.content);
+    final resultText = cleanText.isNotEmpty ? cleanText : l10n.chatMessageWidgetNoResultYet;
 
     final bool isDesktop = defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.windows ||
@@ -2262,11 +2372,11 @@ class _ToolCallItem extends StatelessWidget {
                         padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
                         child: Row(
                           children: [
-                            Icon(_iconFor(part.toolName), size: 18, color: cs.primary),
+                            Icon(_iconFor(widget.part.toolName), size: 18, color: cs.primary),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                _titleFor(context, part.toolName, part.arguments, isResult: !part.loading),
+                                _titleFor(context, widget.part.toolName, widget.part.arguments, isResult: !widget.part.loading),
                                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -2316,6 +2426,25 @@ class _ToolCallItem extends StatelessWidget {
                                   ),
                                   child: SelectableText(resultText, style: const TextStyle(fontSize: 12)),
                                 ),
+                                // Show images if available
+                                if (images.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  Text(l10n.chatMessageWidgetImages, style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.6))),
+                                  const SizedBox(height: 6),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: images.map((path) {
+                                      return GestureDetector(
+                                        onTap: () => _showFullImage(context, path),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: _buildImageFromPath(path, height: 280),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -2353,11 +2482,11 @@ class _ToolCallItem extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(_iconFor(part.toolName), size: 18, color: cs.primary),
+                        Icon(_iconFor(widget.part.toolName), size: 18, color: cs.primary),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            _titleFor(context, part.toolName, part.arguments, isResult: !part.loading),
+                            _titleFor(context, widget.part.toolName, widget.part.arguments, isResult: !widget.part.loading),
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                           ),
                         ),
@@ -2389,6 +2518,25 @@ class _ToolCallItem extends StatelessWidget {
                       ),
                       child: SelectableText(resultText, style: const TextStyle(fontSize: 12)),
                     ),
+                    // Show images if available
+                    if (images.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(l10n.chatMessageWidgetImages, style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.6))),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: images.map((path) {
+                          return GestureDetector(
+                            onTap: () => _showFullImage(context, path),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: _buildImageFromPath(path, height: 240),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -2396,6 +2544,36 @@ class _ToolCallItem extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  /// Show full-size image using ImageViewerPage for save/share/copy support.
+  /// [path] can be a local file path or HTTP URL.
+  void _showFullImage(BuildContext context, String path) {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: false,
+        pageBuilder: (_, __, ___) => ImageViewerPage(images: [path]),
+        transitionDuration: const Duration(milliseconds: 360),
+        reverseTransitionDuration: const Duration(milliseconds: 280),
+        transitionsBuilder: (context, anim, sec, child) {
+          final curved = CurvedAnimation(
+            parent: anim,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.02),
+                end: Offset.zero,
+              ).animate(curved),
+              child: child,
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -2772,7 +2950,7 @@ class _ReasoningSectionState extends State<_ReasoningSection> with SingleTickerP
     }
 
     // Enable long-press text selection in reasoning body
-    // body = SelectionArea(child: body);
+    body = SelectionArea(child: body);
 
 
     return AnimatedSize(

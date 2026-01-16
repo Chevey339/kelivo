@@ -87,11 +87,16 @@ class MessageGenerationService {
     required String providerKey,
     required String modelId,
   }) async {
+    final cfg = settings.getProviderConfig(providerKey);
+    final kind = ProviderConfig.classify(providerKey, explicitType: cfg.providerType);
+    final includeOpenAIToolMessages = kind == ProviderKind.openai;
+
     // Build API messages
     final apiMessages = messageBuilderService.buildApiMessages(
       messages: messages,
       versionSelections: versionSelections,
       currentConversation: currentConversation,
+      includeOpenAIToolMessages: includeOpenAIToolMessages,
     );
 
     // Process user messages (documents, OCR, templates)

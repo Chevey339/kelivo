@@ -212,7 +212,7 @@ jobs:
           License:        MIT
           Source0:        %{name}-%{version}.tar.gz
           BuildArch:      aarch64
-          Requires:       gtk3, libstdc++(>=6), mesa-libGLU, gstreamer1, gstreamer1-plugins-base, glib2, glibc
+          Requires:       gtk3, libstdc++ >= 6, mesa-libGLU, gstreamer1, gstreamer1-plugins-base, glib2, glibc
 
           %description
           A Flutter application for Linux
@@ -250,6 +250,31 @@ jobs:
           # 构建 RPM
           rpmbuild -bb ~/rpmbuild/SPECS/kelivo.spec
           cp ~/rpmbuild/RPMS/aarch64/kelivo-${VERSION_NUMBER}-1.*.rpm Kelivo_linux_${VERSION}_arm64.rpm
+      - name: 🔍 RPM 元数据（调试）
+        shell: bash
+        run: |
+          set -euxo pipefail
+          RPM_FILE="Kelivo_linux_${VERSION}_arm64.rpm"
+          echo "RPM file: ${RPM_FILE}"
+          cp -f ~/rpmbuild/SPECS/kelivo.spec rpm-spec.spec
+          rpm -qp --info "${RPM_FILE}" | tee rpm-info.txt
+          rpm -qp --requires "${RPM_FILE}" | tee rpm-requires.txt
+          rpm -qp --provides "${RPM_FILE}" | tee rpm-provides.txt
+      - name: 📤 上传 RPM 元数据（调试）
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux-ARM64-RPM-Metadata
+          path: |
+            rpm-spec.spec
+            rpm-info.txt
+            rpm-requires.txt
+            rpm-provides.txt
+      - name: 🧪 Fedora 43 安装测试
+        shell: bash
+        run: |
+          set -euxo pipefail
+          RPM_FILE="Kelivo_linux_${VERSION}_arm64.rpm"
+          docker run --rm -v "${PWD}:/work" -w /work fedora:43 bash -lc "dnf -y install ./${RPM_FILE}"
 
       - name: 🚀 发布到 Release
         if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}

@@ -19,6 +19,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/backup/cherry_importer.dart';
+import '../../../core/services/backup/chatbox_importer.dart';
 
 // File size formatter (B, KB, MB, GB)
 String _fmtBytes(int bytes) {
@@ -506,6 +507,63 @@ class _BackupPageState extends State<BackupPage> {
                               ' • Conversations: ${res.conversations}\n'
                               ' • Messages: ${res.messages}\n'
                               ' • Files: ${res.files}\n\n'
+                              '${l10n.backupPageRestartContent}',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(dctx).pop(),
+                                child: Text(l10n.backupPageOK),
+                              ),
+                            ],
+                          ),
+                        );
+                      } catch (e) {
+                        if (!mounted) return;
+                        showAppSnackBar(
+                          context,
+                          message: e.toString(),
+                          type: NotificationType.error,
+                        );
+                      }
+                    });
+                  },
+                ),
+                _iosDivider(context),
+                _iosNavRow(
+                  context,
+                  icon: Lucide.Box,
+                  label: l10n.backupPageImportFromChatbox,
+                  onTap: () async {
+                    // Pick Chatbox exported json
+                    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['json']);
+                    final path = result?.files.single.path;
+                    if (path == null) return;
+
+                    final mode = await _chooseImportModeDialog(context);
+                    if (mode == null) return;
+
+                    await _runWithImportingOverlay(context, () async {
+                      try {
+                        final cs = context.read<ChatService>();
+                        final settings = context.read<SettingsProvider>();
+                        final file = File(path);
+                        final res = await ChatboxImporter.importFromChatbox(
+                          file: file,
+                          mode: mode,
+                          settings: settings,
+                          chatService: cs,
+                        );
+                        if (!mounted) return;
+                        await showDialog(
+                          context: context,
+                          builder: (dctx) => AlertDialog(
+                            title: Text(l10n.backupPageRestartRequired),
+                            content: Text(
+                              '${l10n.backupPageImportFromChatbox}:\n'
+                              ' • Providers: ${res.providers}\n'
+                              ' • Assistants: ${res.assistants}\n'
+                              ' • Conversations: ${res.conversations}\n'
+                              ' • Messages: ${res.messages}\n\n'
                               '${l10n.backupPageRestartContent}',
                             ),
                             actions: [

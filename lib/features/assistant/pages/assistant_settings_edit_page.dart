@@ -3350,7 +3350,7 @@ class _PromptTabState extends State<_PromptTab> {
         allowMultiple: false,
         withData: true,
         type: FileType.custom,
-        allowedExtensions: const ['txt','md','json','js','pdf','docx','html','xml','py','java','kt','dart','ts','tsx','markdown','mdx','yml','yaml'],
+        allowedExtensions: const ['txt','md','json','js','html','xml','py','java','kt','dart','ts','tsx','markdown','mdx','yml','yaml'],
       );
       if (res == null || res.files.isEmpty) return;
       final picked = res.files.first;

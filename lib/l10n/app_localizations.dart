@@ -2519,6 +2519,12 @@ abstract class AppLocalizations {
   /// **'Import from Cherry Studio'**
   String get backupPageImportFromCherryStudio;
 
+  /// No description provided for @backupPageImportFromChatbox.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Chatbox'**
+  String get backupPageImportFromChatbox;
+
   /// No description provided for @chatHistoryPageTitle.
   ///
   /// In en, this message translates to:
@@ -3016,6 +3022,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Result'**
   String get chatMessageWidgetResult;
+
+  /// No description provided for @chatMessageWidgetImages.
+  ///
+  /// In en, this message translates to:
+  /// **'Images'**
+  String get chatMessageWidgetImages;
 
   /// No description provided for @chatMessageWidgetCitationsCount.
   ///
@@ -5564,6 +5576,30 @@ abstract class AppLocalizations {
   /// **'New Chat on Launch'**
   String get displaySettingsPageNewChatOnLaunchTitle;
 
+  /// No description provided for @displaySettingsPageEnterToSendTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Key to Send'**
+  String get displaySettingsPageEnterToSendTitle;
+
+  /// No description provided for @displaySettingsPageSendShortcutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Shortcut'**
+  String get displaySettingsPageSendShortcutTitle;
+
+  /// No description provided for @displaySettingsPageSendShortcutEnter.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter'**
+  String get displaySettingsPageSendShortcutEnter;
+
+  /// No description provided for @displaySettingsPageSendShortcutCtrlEnter.
+  ///
+  /// In en, this message translates to:
+  /// **'Ctrl/Cmd + Enter'**
+  String get displaySettingsPageSendShortcutCtrlEnter;
+
   /// No description provided for @displaySettingsPageAutoSwitchTopicsTitle.
   ///
   /// In en, this message translates to:
@@ -6973,6 +7009,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open Logs Folder'**
   String get logViewerOpenFolder;
+
+  /// No description provided for @logViewerRequestsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} requests'**
+  String logViewerRequestsCount(int count);
+
+  /// No description provided for @logViewerFieldId.
+  ///
+  /// In en, this message translates to:
+  /// **'ID'**
+  String get logViewerFieldId;
+
+  /// No description provided for @logViewerFieldMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Method'**
+  String get logViewerFieldMethod;
+
+  /// No description provided for @logViewerFieldStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get logViewerFieldStatus;
+
+  /// No description provided for @logViewerFieldStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Started'**
+  String get logViewerFieldStarted;
+
+  /// No description provided for @logViewerFieldEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Ended'**
+  String get logViewerFieldEnded;
+
+  /// No description provided for @logViewerFieldDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get logViewerFieldDuration;
+
+  /// No description provided for @logViewerSectionSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary'**
+  String get logViewerSectionSummary;
+
+  /// No description provided for @logViewerSectionParameters.
+  ///
+  /// In en, this message translates to:
+  /// **'Parameters'**
+  String get logViewerSectionParameters;
+
+  /// No description provided for @logViewerSectionRequestHeaders.
+  ///
+  /// In en, this message translates to:
+  /// **'Request Headers'**
+  String get logViewerSectionRequestHeaders;
+
+  /// No description provided for @logViewerSectionRequestBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Request Body'**
+  String get logViewerSectionRequestBody;
+
+  /// No description provided for @logViewerSectionResponseHeaders.
+  ///
+  /// In en, this message translates to:
+  /// **'Response Headers'**
+  String get logViewerSectionResponseHeaders;
+
+  /// No description provided for @logViewerSectionResponseBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Response Body'**
+  String get logViewerSectionResponseBody;
+
+  /// No description provided for @logViewerSectionWarnings.
+  ///
+  /// In en, this message translates to:
+  /// **'Warnings'**
+  String get logViewerSectionWarnings;
+
+  /// No description provided for @logViewerErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get logViewerErrorTitle;
+
+  /// No description provided for @logViewerMoreCount.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} more'**
+  String logViewerMoreCount(int count);
 
   /// No description provided for @assistantEditManageSummariesTitle.
   ///

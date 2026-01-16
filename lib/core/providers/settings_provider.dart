@@ -67,6 +67,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayNewChatOnAssistantSwitchKey = 'display_new_chat_on_assistant_switch_v1';
   static const String _displayNewChatOnLaunchKey = 'display_new_chat_on_launch_v1';
   static const String _displayNewChatAfterDeleteKey = 'display_new_chat_after_delete_v1';
+  static const String _displayEnterToSendOnMobileKey = 'display_enter_to_send_on_mobile_v1';
+  static const String _desktopSendShortcutKey = 'desktop_send_shortcut_v1';
   static const String _displayChatFontScaleKey = 'display_chat_font_scale_v1';
   static const String _displayAutoScrollEnabledKey = 'display_auto_scroll_enabled_v1';
   static const String _displayAutoScrollIdleSecondsKey = 'display_auto_scroll_idle_seconds_v1';
@@ -460,6 +462,24 @@ class SettingsProvider extends ChangeNotifier {
     _newChatOnLaunch = prefs.getBool(_displayNewChatOnLaunchKey) ?? true;
     _newChatOnAssistantSwitch = prefs.getBool(_displayNewChatOnAssistantSwitchKey) ?? false;
     _newChatAfterDelete = prefs.getBool(_displayNewChatAfterDeleteKey) ?? false;
+    // Enter to send on mobile: iOS defaults to true, Android defaults to false
+    final enterToSendPref = prefs.getBool(_displayEnterToSendOnMobileKey);
+    if (enterToSendPref == null) {
+      _enterToSendOnMobile = Platform.isIOS;
+      await prefs.setBool(_displayEnterToSendOnMobileKey, _enterToSendOnMobile);
+    } else {
+      _enterToSendOnMobile = enterToSendPref;
+    }
+    // Desktop send shortcut: Enter (default) or Ctrl/Cmd+Enter
+    final sendShortcutStr = prefs.getString(_desktopSendShortcutKey);
+    switch (sendShortcutStr) {
+      case 'ctrlEnter':
+        _desktopSendShortcut = DesktopSendShortcut.ctrlEnter;
+        break;
+      case 'enter':
+      default:
+        _desktopSendShortcut = DesktopSendShortcut.enter;
+    }
     _chatFontScale = prefs.getDouble(_displayChatFontScaleKey) ?? 1.0;
     _autoScrollEnabled = prefs.getBool(_displayAutoScrollEnabledKey) ?? true;
     _autoScrollIdleSeconds = prefs.getInt(_displayAutoScrollIdleSecondsKey) ?? 8;
@@ -1843,6 +1863,29 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_displayNewChatAfterDeleteKey, v);
+  }
+
+  // Display: enter key sends message on mobile (iOS defaults true, Android defaults false)
+  bool _enterToSendOnMobile = false;
+  bool get enterToSendOnMobile => _enterToSendOnMobile;
+  Future<void> setEnterToSendOnMobile(bool v) async {
+    if (_enterToSendOnMobile == v) return;
+    _enterToSendOnMobile = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayEnterToSendOnMobileKey, v);
+  }
+
+  // Desktop: send shortcut (Enter or Ctrl/Cmd+Enter)
+  DesktopSendShortcut _desktopSendShortcut = DesktopSendShortcut.enter;
+  DesktopSendShortcut get desktopSendShortcut => _desktopSendShortcut;
+  Future<void> setDesktopSendShortcut(DesktopSendShortcut v) async {
+    if (_desktopSendShortcut == v) return;
+    _desktopSendShortcut = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    final str = v == DesktopSendShortcut.ctrlEnter ? 'ctrlEnter' : 'enter';
+    await prefs.setString(_desktopSendShortcutKey, str);
   }
 
   // Display: chat font scale (0.5 - 1.5, default 1.0)

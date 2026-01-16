@@ -1181,6 +1181,8 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
           _iosSwitchRow(context, icon: Lucide.Trash2, label: l10n.displaySettingsPageNewChatAfterDeleteTitle, value: sp.newChatAfterDelete, onChanged: (v) => context.read<SettingsProvider>().setNewChatAfterDelete(v)),
           _iosDivider(context),
           _iosSwitchRow(context, icon: Lucide.MessageCirclePlus, label: l10n.displaySettingsPageNewChatOnLaunchTitle, value: sp.newChatOnLaunch, onChanged: (v) => context.read<SettingsProvider>().setNewChatOnLaunch(v)),
+          _iosDivider(context),
+          _iosSwitchRow(context, icon: Lucide.CornerDownLeft, label: l10n.displaySettingsPageEnterToSendTitle, value: sp.enterToSendOnMobile, onChanged: (v) => context.read<SettingsProvider>().setEnterToSendOnMobile(v)),
         ]),
       ]),
     );

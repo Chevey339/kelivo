@@ -1259,6 +1259,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
 
   @override
+  String get backupPageImportFromChatbox => '从 Chatbox 导入';
+
+  @override
   String get chatHistoryPageTitle => '聊天历史';
 
   @override
@@ -1525,6 +1528,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatMessageWidgetResult => '结果';
+
+  @override
+  String get chatMessageWidgetImages => '图片';
 
   @override
   String chatMessageWidgetCitationsCount(int count) {
@@ -2852,6 +2858,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageNewChatOnLaunchTitle => '启动时新建对话';
 
   @override
+  String get displaySettingsPageEnterToSendTitle => '回车键发送消息';
+
+  @override
+  String get displaySettingsPageSendShortcutTitle => '发送快捷键';
+
+  @override
+  String get displaySettingsPageSendShortcutEnter => 'Enter';
+
+  @override
+  String get displaySettingsPageSendShortcutCtrlEnter => 'Ctrl/Cmd + Enter';
+
+  @override
   String get displaySettingsPageAutoSwitchTopicsTitle => '自动切换话题';
 
   @override
@@ -3582,6 +3600,58 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get logViewerOpenFolder => '打开日志目录';
+
+  @override
+  String logViewerRequestsCount(int count) {
+    return '$count 条请求';
+  }
+
+  @override
+  String get logViewerFieldId => 'ID';
+
+  @override
+  String get logViewerFieldMethod => '方法';
+
+  @override
+  String get logViewerFieldStatus => '状态';
+
+  @override
+  String get logViewerFieldStarted => '开始';
+
+  @override
+  String get logViewerFieldEnded => '结束';
+
+  @override
+  String get logViewerFieldDuration => '耗时';
+
+  @override
+  String get logViewerSectionSummary => '概览';
+
+  @override
+  String get logViewerSectionParameters => '参数';
+
+  @override
+  String get logViewerSectionRequestHeaders => '请求头';
+
+  @override
+  String get logViewerSectionRequestBody => '请求体';
+
+  @override
+  String get logViewerSectionResponseHeaders => '响应头';
+
+  @override
+  String get logViewerSectionResponseBody => '响应体';
+
+  @override
+  String get logViewerSectionWarnings => '警告';
+
+  @override
+  String get logViewerErrorTitle => '错误';
+
+  @override
+  String logViewerMoreCount(int count) {
+    return '+$count 条更多';
+  }
 
   @override
   String get assistantEditManageSummariesTitle => '管理摘要';
@@ -4857,6 +4927,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
 
   @override
+  String get backupPageImportFromChatbox => '从 Chatbox 导入';
+
+  @override
   String get chatHistoryPageTitle => '聊天历史';
 
   @override
@@ -5123,6 +5196,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetResult => '结果';
+
+  @override
+  String get chatMessageWidgetImages => '图片';
 
   @override
   String chatMessageWidgetCitationsCount(int count) {
@@ -6433,6 +6509,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageNewChatOnLaunchTitle => '启动时新建对话';
 
   @override
+  String get displaySettingsPageEnterToSendTitle => '回车键发送消息';
+
+  @override
+  String get displaySettingsPageSendShortcutTitle => '发送快捷键';
+
+  @override
+  String get displaySettingsPageSendShortcutEnter => 'Enter';
+
+  @override
+  String get displaySettingsPageSendShortcutCtrlEnter => 'Ctrl/Cmd + Enter';
+
+  @override
   String get displaySettingsPageAutoSwitchTopicsTitle => '自动切换话题';
 
   @override
@@ -7163,6 +7251,58 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get logViewerOpenFolder => '打开日志目录';
+
+  @override
+  String logViewerRequestsCount(int count) {
+    return '$count 条请求';
+  }
+
+  @override
+  String get logViewerFieldId => 'ID';
+
+  @override
+  String get logViewerFieldMethod => '方法';
+
+  @override
+  String get logViewerFieldStatus => '状态';
+
+  @override
+  String get logViewerFieldStarted => '开始';
+
+  @override
+  String get logViewerFieldEnded => '结束';
+
+  @override
+  String get logViewerFieldDuration => '耗时';
+
+  @override
+  String get logViewerSectionSummary => '概览';
+
+  @override
+  String get logViewerSectionParameters => '参数';
+
+  @override
+  String get logViewerSectionRequestHeaders => '请求头';
+
+  @override
+  String get logViewerSectionRequestBody => '请求体';
+
+  @override
+  String get logViewerSectionResponseHeaders => '响应头';
+
+  @override
+  String get logViewerSectionResponseBody => '响应体';
+
+  @override
+  String get logViewerSectionWarnings => '警告';
+
+  @override
+  String get logViewerErrorTitle => '错误';
+
+  @override
+  String logViewerMoreCount(int count) {
+    return '+$count 条更多';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -8420,6 +8560,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageImportFromCherryStudio => '從 Cherry Studio 匯入';
 
   @override
+  String get backupPageImportFromChatbox => '從 Chatbox 匯入';
+
+  @override
   String get chatHistoryPageTitle => '聊天歷史';
 
   @override
@@ -8685,6 +8828,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetResult => '結果';
+
+  @override
+  String get chatMessageWidgetImages => '圖片';
 
   @override
   String chatMessageWidgetCitationsCount(int count) {
@@ -10011,6 +10157,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageNewChatOnLaunchTitle => '啟動時新建對話';
 
   @override
+  String get displaySettingsPageEnterToSendTitle => '回車鍵發送訊息';
+
+  @override
+  String get displaySettingsPageSendShortcutTitle => '發送快捷鍵';
+
+  @override
+  String get displaySettingsPageSendShortcutEnter => 'Enter';
+
+  @override
+  String get displaySettingsPageSendShortcutCtrlEnter => 'Ctrl/Cmd + Enter';
+
+  @override
   String get displaySettingsPageAutoSwitchTopicsTitle => '自動切換話題';
 
   @override
@@ -10743,6 +10901,58 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get logViewerOpenFolder => '開啟日誌目錄';
+
+  @override
+  String logViewerRequestsCount(int count) {
+    return '$count 個請求';
+  }
+
+  @override
+  String get logViewerFieldId => 'ID';
+
+  @override
+  String get logViewerFieldMethod => '方法';
+
+  @override
+  String get logViewerFieldStatus => '狀態';
+
+  @override
+  String get logViewerFieldStarted => '開始';
+
+  @override
+  String get logViewerFieldEnded => '結束';
+
+  @override
+  String get logViewerFieldDuration => '耗時';
+
+  @override
+  String get logViewerSectionSummary => '概覽';
+
+  @override
+  String get logViewerSectionParameters => '參數';
+
+  @override
+  String get logViewerSectionRequestHeaders => '請求標頭';
+
+  @override
+  String get logViewerSectionRequestBody => '請求本文';
+
+  @override
+  String get logViewerSectionResponseHeaders => '回應標頭';
+
+  @override
+  String get logViewerSectionResponseBody => '回應本文';
+
+  @override
+  String get logViewerSectionWarnings => '警告';
+
+  @override
+  String get logViewerErrorTitle => '錯誤';
+
+  @override
+  String logViewerMoreCount(int count) {
+    return '+$count 條更多';
+  }
 
   @override
   String get assistantEditManageSummariesTitle => '管理摘要';

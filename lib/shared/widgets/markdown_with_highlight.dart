@@ -568,7 +568,9 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
       },
       // Inline `code` styling via highlightBuilder in gpt_markdown
       highlightBuilder: (ctx, inline, style) {
-        String softened = _softBreakInline(inline);
+        // Unmask dollar signs that were protected during preprocessing
+        String unmasked = inline.replaceAll('___CODE_DOLLAR_MASK___', r'$');
+        String softened = _softBreakInline(unmasked);
         final bool isDarkCtx = Theme.of(ctx).brightness == Brightness.dark;
         final csCtx = Theme.of(ctx).colorScheme;
         final bg = isDarkCtx ? Colors.white12 : const Color(0xFFF1F3F5);
@@ -699,6 +701,43 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     // Normalize newlines to simplify regex handling
     var out = input.replaceAll('\r\n', '\n');
 
+    // STEP 1: MASKING - Protect code blocks from LaTeX processing
+    // This prevents $...$ inside code from being converted to LaTeX
+    final Map<String, String> codeMap = {};
+    int codeCount = 0;
+
+    // Match fenced code blocks and inline code (`...`)
+    // Fenced: CommonMark-style variable-length fences (>= 3 backticks or tildes)
+    // Group 1: entire fenced block, Group 2: opening fence, Group 3: fence char
+    // Closing fence must use same char and be >= opening length
+    final codeRegex = RegExp(
+      r'([ \t]*(([`~])\3{2,})[ \t]*[^\n]*\n(?:[\s\S]*?^[ \t]*\2\3*[ \t]*$|[\s\S]*))'
+      r'|(`[^`\n]+`)',
+      multiLine: true,
+    );
+
+    out = out.replaceAllMapped(codeRegex, (match) {
+      final key = '__CODE_MASK_${codeCount++}__';
+      var codeContent = match.group(0)!;
+
+      // For inline code (`...`), escape dollar signs to prevent LaTeX interpretation
+      // Inline code is single-line and delimited by single backticks (not fenced)
+      final isInlineCode = !codeContent.contains('\n') &&
+          codeContent.startsWith('`') &&
+          codeContent.endsWith('`');
+      if (isInlineCode) {
+        codeContent = codeContent.replaceAllMapped(
+          RegExp(r'\$'),
+          (m) => '___CODE_DOLLAR_MASK___',
+        );
+      }
+
+      codeMap[key] = codeContent;
+      return key;
+    });
+
+    // STEP 2: PROCESSING (on masked string, code is now protected)
+
     // 2025-10-23 Fix: Remove title attributes from markdown links to work around gpt_markdown's
     // link regex limitation. The package's regex `[^\s]*` stops at spaces, so
     // [text](url "title") breaks. Strip titles while preserving the URL.
@@ -713,9 +752,12 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     // Normalize inline $...$ math into \( ... \) so it always matches the LaTeX
     // renderer (even when vendors emit single-dollar math mixed with prose).
     // Skips $$...$$ blocks, which are handled separately.
+    // NOW SAFE: Code blocks are masked, so $variables in code won't be converted.
     if (enableMath && enableDollarLatex) {
       final inlineDollar = RegExp(r"(?<!\$)\$([^\$\n]+?)\$(?!\$)");
-      out = out.replaceAllMapped(inlineDollar, (m) => "\\(${m[1]}\\)");
+      out = out.replaceAllMapped(inlineDollar, (m) {
+        return "\\(${m[1]}\\)";
+      });
     }
 
     // Ensure display-math blocks stay as standalone blocks even when generated inline.
@@ -777,15 +819,7 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     );
     out = out.replaceAllMapped(atxEnum, (m) => "${m[1]}.\u200C${m[2]}${m[3]}");
 
-    // 7) Auto-close an unmatched opening code fence at EOF
-    final fenceAtBol = RegExp(r"^\s*```", multiLine: true);
-    final count = fenceAtBol.allMatches(out).length;
-    if (count % 2 == 1) {
-      if (!out.endsWith('\n')) out += '\n';
-      out += '```';
-    }
-
-    // 8) Fix: when multiple markdown links are placed on separate lines using
+    // 7) Fix: when multiple markdown links are placed on separate lines using
     //    trailing double-spaces (hard line breaks), gpt_markdown may treat them
     //    as a single paragraph and only render the first link correctly.
     //    To avoid this, convert such lines into separate paragraphs by
@@ -808,6 +842,18 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
       }
       out = buf.toString();
     }
+
+    // STEP 3: UNMASKING - Restore code blocks
+    // Replace all mask placeholders with their original content
+    // NOTE: We do NOT restore ___CODE_DOLLAR_MASK___ here because we want LaTeX components
+    // to never see dollar signs inside code. The unmask will happen later in highlightBuilder.
+    out = out.replaceAllMapped(
+      RegExp(r'__CODE_MASK_\d+__'),
+      (match) {
+        final key = match.group(0)!;
+        return codeMap[key] ?? key;
+      },
+    );
 
     return out;
   }
@@ -1959,15 +2005,20 @@ class SoftHrLine extends BlockMd {
 // Robust fenced code block that takes precedence over other blocks
 class FencedCodeBlockMd extends BlockMd {
   @override
-  // Match ```lang\n...\n``` at line starts. Non-greedy to stop at first closing fence.
-  String get expString => (r"^\s*```([^\n`]*)\s*\n([\s\S]*?)\n```$");
+  // CommonMark-style fences:
+  // - fence length is variable (>= 3)
+  // - closing fence must use the same marker and be >= opening length
+  // - supports both ``` and ~~~
+  String get expString =>
+      (r"[ \t]*(([`~])\2{2,})[ \t]*([^\n]*?)\n"
+          r"(?:(?:([\s\S]*?)^[ \t]*\1\2*[ \t]*)|([\s\S]*))");
 
   @override
   Widget build(BuildContext context, String text, GptMarkdownConfig config) {
     final m = exp.firstMatch(text);
     if (m == null) return const SizedBox.shrink();
-    final lang = (m.group(1) ?? '').trim();
-    final code = (m.group(2) ?? '');
+    final lang = (m.group(3) ?? '').trim();
+    final code = (m.group(4) ?? m.group(5) ?? '');
     final langLower = lang.toLowerCase();
     if (langLower == 'mermaid') {
       return _MermaidBlock(code: code);
@@ -2545,7 +2596,8 @@ class BackslashEscapeMd extends InlineMd {
   @override
   // CommonMark escape set (subset), excluding parentheses to keep LaTeX intact.
   // Matches a backslash followed by one escapable punctuation character.
-  RegExp get exp => RegExp(r"\\([\\`*_{}\[\]#+\-.!])");
+  // Include $ so \$ in regular text renders as literal dollar sign.
+  RegExp get exp => RegExp(r"\\([\\`*_{}\[\]#+\-.!$])");
 
   @override
   InlineSpan span(BuildContext context, String text, GptMarkdownConfig config) {

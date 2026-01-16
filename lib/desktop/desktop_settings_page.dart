@@ -23,7 +23,7 @@ import '../core/providers/assistant_provider.dart';
 import '../core/models/assistant.dart';
 import '../utils/avatar_cache.dart';
 import '../utils/sandbox_path_resolver.dart';
-import 'dart:io' show Directory, File;
+import 'dart:io' show Directory, File, Platform;
 import '../utils/app_directories.dart';
 import 'package:characters/characters.dart';
 import '../features/provider/pages/multi_key_manager_page.dart';
@@ -4524,6 +4524,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowNewChatAfterDelete(),
                   _RowDivider(),
                   _ToggleRowNewChatOnLaunch(),
+                  _RowDivider(),
+                  _SendShortcutRow(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -7089,6 +7091,239 @@ class _BackgroundMaskRowState extends State<_BackgroundMaskRow> {
           const SizedBox(width: 8),
           Text('%', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 14, decoration: TextDecoration.none)),
         ],
+      ),
+    );
+  }
+}
+
+// --- Send shortcut ---
+class _SendShortcutRow extends StatelessWidget {
+  const _SendShortcutRow();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return _LabeledRow(
+      label: l10n.displaySettingsPageSendShortcutTitle,
+      trailing: const _SendShortcutDropdown(),
+    );
+  }
+}
+
+class _SendShortcutDropdown extends StatefulWidget {
+  const _SendShortcutDropdown();
+  @override
+  State<_SendShortcutDropdown> createState() => _SendShortcutDropdownState();
+}
+
+class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
+  bool _hover = false;
+  bool _open = false;
+  final LayerLink _link = LayerLink();
+  final GlobalKey _triggerKey = GlobalKey();
+  OverlayEntry? _entry;
+
+  void _toggle() {
+    if (_open) {
+      _close();
+    } else {
+      _openMenu();
+    }
+  }
+
+  void _close() {
+    _entry?.remove();
+    _entry = null;
+    if (mounted) setState(() => _open = false);
+  }
+
+  String _labelFor(BuildContext context, DesktopSendShortcut s) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (s) {
+      case DesktopSendShortcut.ctrlEnter:
+        final modifier = Platform.isMacOS ? '⌘' : 'Ctrl';
+        return '$modifier + Enter';
+      case DesktopSendShortcut.enter:
+      default:
+        return l10n.displaySettingsPageSendShortcutEnter;
+    }
+  }
+
+  void _openMenu() {
+    if (_entry != null) return;
+    final rb = _triggerKey.currentContext?.findRenderObject() as RenderBox?;
+    if (rb == null) return;
+    final triggerSize = rb.size;
+    final triggerWidth = triggerSize.width;
+
+    _entry = OverlayEntry(builder: (ctx) {
+      final cs = Theme.of(ctx).colorScheme;
+      final isDark = Theme.of(ctx).brightness == Brightness.dark;
+      final usePure = Provider.of<SettingsProvider>(ctx, listen: false).usePureBackground;
+      final bgColor = usePure ? (isDark ? Colors.black : Colors.white) : (isDark ? const Color(0xFF1C1C1E) : Colors.white);
+      final sp = Provider.of<SettingsProvider>(ctx, listen: false);
+
+      return Stack(children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _close,
+            child: const SizedBox.expand(),
+          ),
+        ),
+        CompositedTransformFollower(
+          link: _link,
+          showWhenUnlinked: false,
+          offset: Offset(0, triggerSize.height + 6),
+          child: _SendShortcutOverlay(
+            width: triggerWidth,
+            backgroundColor: bgColor,
+            selected: sp.desktopSendShortcut,
+            onSelected: (shortcut) async {
+              await sp.setDesktopSendShortcut(shortcut);
+              _close();
+            },
+          ),
+        ),
+      ]);
+    });
+    Overlay.of(context)?.insert(_entry!);
+    setState(() => _open = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sp = context.watch<SettingsProvider>();
+    final label = _labelFor(context, sp.desktopSendShortcut);
+
+    final baseBorder = cs.outlineVariant.withOpacity(0.18);
+    final hoverBorder = cs.primary;
+    final borderColor = _open || _hover ? hoverBorder : baseBorder;
+
+    return CompositedTransformTarget(
+      link: _link,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          onTap: _toggle,
+          child: AnimatedContainer(
+            key: _triggerKey,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+            constraints: const BoxConstraints(minWidth: 130, minHeight: 34),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF141414) : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: borderColor, width: 1),
+              boxShadow: _open
+                  ? [BoxShadow(color: cs.primary.withOpacity(0.10), blurRadius: 0, spreadRadius: 2)]
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.88)),
+                ),
+                const SizedBox(width: 8),
+                AnimatedRotation(
+                  turns: _open ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  child: Icon(lucide.Lucide.ChevronDown, size: 14, color: cs.onSurface.withOpacity(0.5)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SendShortcutOverlay extends StatefulWidget {
+  const _SendShortcutOverlay({
+    required this.width,
+    required this.backgroundColor,
+    required this.selected,
+    required this.onSelected,
+  });
+  final double width;
+  final Color backgroundColor;
+  final DesktopSendShortcut selected;
+  final ValueChanged<DesktopSendShortcut> onSelected;
+  @override
+  State<_SendShortcutOverlay> createState() => _SendShortcutOverlayState();
+}
+
+class _SendShortcutOverlayState extends State<_SendShortcutOverlay> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _opacity;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 200));
+    _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
+    _slide = Tween<Offset>(begin: const Offset(0, -0.06), end: Offset.zero).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ctrl.forward());
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = cs.outlineVariant.withOpacity(0.12);
+
+    // Platform-specific modifier key
+    final modifier = Platform.isMacOS ? '⌘' : 'Ctrl';
+    final items = <(DesktopSendShortcut, String)>[
+      (DesktopSendShortcut.enter, AppLocalizations.of(context)!.displaySettingsPageSendShortcutEnter),
+      (DesktopSendShortcut.ctrlEnter, '$modifier + Enter'),
+    ];
+
+    return FadeTransition(
+      opacity: _opacity,
+      child: SlideTransition(
+        position: _slide,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            width: widget.width,
+            decoration: BoxDecoration(
+              color: widget.backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor, width: 0.5),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.32 : 0.08), blurRadius: 16, offset: const Offset(0, 6))],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final it in items)
+                  _SimpleOptionTile(
+                    label: it.$2,
+                    selected: widget.selected == it.$1,
+                    onTap: () => widget.onSelected(it.$1),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

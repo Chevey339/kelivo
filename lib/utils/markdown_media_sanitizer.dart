@@ -33,7 +33,7 @@ class MarkdownMediaSanitizer {
     for (final m in matches) {
       sb.write(markdown.substring(last, m.start));
       final dataUrl = m.group(1)!;
-      String ext = _extFromMime(_mimeOf(dataUrl));
+      String ext = AppDirectories.extFromMime(_mimeOf(dataUrl));
 
       // Extract base64 payload
       final b64Index = dataUrl.indexOf('base64,');
@@ -160,20 +160,5 @@ class MarkdownMediaSanitizer {
       }
     } catch (_) {}
     return 'image/png';
-  }
-
-  static String _extFromMime(String mime) {
-    switch (mime.toLowerCase()) {
-      case 'image/jpeg':
-      case 'image/jpg':
-        return 'jpg';
-      case 'image/webp':
-        return 'webp';
-      case 'image/gif':
-        return 'gif';
-      case 'image/png':
-      default:
-        return 'png';
-    }
   }
 }

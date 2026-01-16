@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
@@ -94,6 +95,7 @@ class MessageBuilderService {
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
     required Conversation? currentConversation,
+    bool includeOpenAIToolMessages = false,
   }) {
     final tIndex = currentConversation?.truncateIndex ?? -1;
     final List<ChatMessage> sourceAll = (tIndex >= 0 && tIndex <= messages.length)
@@ -101,19 +103,70 @@ class MessageBuilderService {
         : List.of(messages);
     final List<ChatMessage> source = collapseVersions(sourceAll, versionSelections);
 
-    return source
-        .where((m) => m.content.isNotEmpty)
-        .map<Map<String, dynamic>>((m) {
-          var content = m.content;
-          if (m.role == 'assistant' && geminiThoughtSignatureHandler != null) {
-            content = geminiThoughtSignatureHandler!(m, content);
+    final out = <Map<String, dynamic>>[];
+
+    for (final m in source) {
+      if (includeOpenAIToolMessages && m.role == 'assistant') {
+        final events = chatService.getToolEvents(m.id);
+        if (events.isNotEmpty) {
+          final calls = <Map<String, dynamic>>[];
+          final toolMessages = <Map<String, dynamic>>[];
+
+          for (int i = 0; i < events.length; i++) {
+            final e = events[i];
+            final name = (e['name'] ?? '').toString().trim();
+            if (name.isEmpty) continue;
+            final rawId = (e['id'] ?? '').toString().trim();
+            final id = rawId.isNotEmpty
+                ? rawId
+                : 'call_${m.id.substring(0, m.id.length < 8 ? m.id.length : 8)}_$i';
+
+            Map<String, dynamic> args = const <String, dynamic>{};
+            final a = e['arguments'];
+            if (a is Map) {
+              args = a.map((k, v) => MapEntry(k.toString(), v));
+            }
+            String argumentsJson = '{}';
+            try {
+              argumentsJson = jsonEncode(args);
+            } catch (_) {}
+
+            calls.add({
+              'id': id,
+              'type': 'function',
+              'function': {'name': name, 'arguments': argumentsJson},
+            });
+
+            final c = e['content'];
+            if (c != null) {
+              toolMessages.add({
+                'role': 'tool',
+                'name': name,
+                'tool_call_id': id,
+                'content': c.toString(),
+              });
+            }
           }
-          return <String, dynamic>{
-            'role': m.role == 'assistant' ? 'assistant' : 'user',
-            'content': content,
-          };
-        })
-        .toList();
+
+          if (calls.isNotEmpty) {
+            out.add({'role': 'assistant', 'content': '\n\n', 'tool_calls': calls});
+            out.addAll(toolMessages);
+          }
+        }
+      }
+
+      var content = m.content;
+      if (m.role == 'assistant' && geminiThoughtSignatureHandler != null) {
+        content = geminiThoughtSignatureHandler!(m, content);
+      }
+      if (content.isEmpty) continue;
+      out.add(<String, dynamic>{
+        'role': m.role == 'assistant' ? 'assistant' : 'user',
+        'content': content,
+      });
+    }
+
+    return out;
   }
 
   /// Parse input data from raw message content (extracts images and documents).
@@ -431,6 +484,10 @@ class MessageBuilderService {
         apiMessages
           ..removeRange(startIdx, apiMessages.length)
           ..addAll(trimmed);
+      }
+      // Context trimming can cut in the middle of a tool-call triplet; avoid sending dangling tool messages.
+      while (apiMessages.length > startIdx && (apiMessages[startIdx]['role'] ?? '').toString() == 'tool') {
+        apiMessages.removeAt(startIdx);
       }
     }
   }

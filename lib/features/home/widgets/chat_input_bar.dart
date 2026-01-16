@@ -413,7 +413,7 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
     final isArrow = key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight;
     final isPasteV = key == LogicalKeyboardKey.keyV;
 
-    // Enter handling on tablet/desktop: Enter=send, Shift+Enter=newline
+    // Enter handling on tablet/desktop: configurable shortcut
     if (isEnter && isTabletOrDesktop) {
       if (!isDown) return KeyEventResult.handled; // ignore key up
       // Respect IME composition (e.g., Chinese Pinyin). If composing, let IME handle Enter.
@@ -422,10 +422,28 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
       if (composingActive) return KeyEventResult.ignored;
       final keys = RawKeyboard.instance.keysPressed;
       final shift = keys.contains(LogicalKeyboardKey.shiftLeft) || keys.contains(LogicalKeyboardKey.shiftRight);
-      if (shift) {
-        _insertNewlineAtCursor();
+      final ctrl = keys.contains(LogicalKeyboardKey.controlLeft) || keys.contains(LogicalKeyboardKey.controlRight);
+      final meta = keys.contains(LogicalKeyboardKey.metaLeft) || keys.contains(LogicalKeyboardKey.metaRight);
+      final ctrlOrMeta = ctrl || meta;
+      // Get send shortcut setting
+      final sendShortcut = Provider.of<SettingsProvider>(node.context!, listen: false).desktopSendShortcut;
+      if (sendShortcut == DesktopSendShortcut.ctrlEnter) {
+        // Ctrl/Cmd+Enter to send, Enter to newline
+        if (ctrlOrMeta) {
+          _handleSend();
+        } else if (!shift) {
+          _insertNewlineAtCursor();
+        } else {
+          // Shift+Enter also newline
+          _insertNewlineAtCursor();
+        }
       } else {
-        _handleSend();
+        // Enter to send, Shift+Enter to newline (default)
+        if (shift) {
+          _insertNewlineAtCursor();
+        } else {
+          _handleSend();
+        }
       }
       return KeyEventResult.handled;
     }
@@ -1381,6 +1399,7 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
                           //   );
                           // }
 
+                            final enterToSend = context.watch<SettingsProvider>().enterToSendOnMobile;
                             return GestureDetector(
                               behavior: HitTestBehavior.deferToChild,
                               // onSecondaryTapDown: (details) {
@@ -1392,11 +1411,11 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
                                 onChanged: _onTextChanged,
                                 minLines: 1,
                                 maxLines: _isExpanded ? 25 : 5,
-                                // On iOS, show "Send" on the return key and submit on tap.
+                                // On mobile, optionally show "Send" on the return key and submit on tap.
                                 // Still keep multiline so pasted text preserves line breaks.
                                 keyboardType: TextInputType.multiline,
-                                textInputAction: Platform.isIOS ? TextInputAction.send : TextInputAction.newline,
-                                onSubmitted: Platform.isIOS ? (_) => _handleSend() : null,
+                                textInputAction: enterToSend ? TextInputAction.send : TextInputAction.newline,
+                                onSubmitted: enterToSend ? (_) => _handleSend() : null,
                                 // Custom context menu: use instance method to avoid flickering
                                 // caused by recreating the callback on every build.
                                 // See: https://github.com/flutter/flutter/issues/150551

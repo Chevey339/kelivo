@@ -199,46 +199,6 @@ class ChatApiService {
     dotAll: true,
   );
 
-  // Get file extension from MIME type
-  static String _extFromMime(String mime) {
-    switch (mime.toLowerCase()) {
-      case 'image/jpeg':
-      case 'image/jpg':
-        return 'jpg';
-      case 'image/webp':
-        return 'webp';
-      case 'image/gif':
-        return 'gif';
-      case 'image/png':
-      default:
-        return 'png';
-    }
-  }
-
-  // Save base64 image data to file and return the path
-  static Future<String?> _saveInlineImageToFile(String mime, String data) async {
-    try {
-      final dir = await AppDirectories.getImagesDirectory();
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-      final cleaned = data.replaceAll(RegExp(r'\s'), '');
-      List<int> bytes;
-      try {
-        bytes = base64Decode(cleaned);
-      } catch (_) {
-        bytes = base64Url.decode(cleaned);
-      }
-      final ext = _extFromMime(mime);
-      final path = '${dir.path}/img_${DateTime.now().microsecondsSinceEpoch}.$ext';
-      final f = File(path);
-      await f.writeAsBytes(bytes, flush: true);
-      return path;
-    } catch (_) {
-      return null;
-    }
-  }
-
   // YouTube URL regex: watch, shorts, embed, youtu.be (with optional timestamps)
   static final RegExp _youtubeUrlRegex = RegExp(
     r'(https?://(?:www\.)?(?:youtube\.com/(?:watch\?v=|shorts/|embed/)|youtu\.be/)[a-zA-Z0-9_-]+(?:[?&][^\s<>()]*)?)',
@@ -2287,7 +2247,7 @@ class ChatApiService {
                       // it['result'] is directly the base64 image data
                       final b64 = (it['result'] ?? '').toString();
                       if (b64.isNotEmpty) {
-                        final savedPath = await _saveInlineImageToFile('image/png', b64);
+                        final savedPath = await AppDirectories.saveBase64Image('image/png', b64);
                         if (savedPath != null && savedPath.isNotEmpty) {
                           final mdImg = '\n![Generated Image]($savedPath)\n';
                           yield ChatStreamChunk(
@@ -4826,7 +4786,7 @@ class ChatApiService {
       Future<String> _takeBufferedImageMarkdown() async {
         if (!_bufferingInlineImage || _pendingImageData.isEmpty) return '';
         final trailing = _pendingImageTrailingText;
-        final path = await _saveInlineImageToFile(_imageMime, _pendingImageData);
+        final path = await AppDirectories.saveBase64Image(_imageMime, _pendingImageData);
         _bufferingInlineImage = false;
         _pendingImageData = '';
         _pendingImageTrailingText = '';

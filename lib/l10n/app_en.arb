@@ -544,6 +544,7 @@
   "backupPageBackupNow": "Backup Now",
   "backupPageLocalBackup": "Local Backup",
   "backupPageImportFromCherryStudio": "Import from Cherry Studio",
+  "backupPageImportFromChatbox": "Import from Chatbox",
   "chatHistoryPageTitle": "Chat History",
   "chatHistoryPageSearchTooltip": "Search",
   "chatHistoryPageDeleteAllTooltip": "Delete Unpinned",
@@ -690,6 +691,7 @@
   "chatMessageWidgetNoResultYet": "(No result yet)",
   "chatMessageWidgetArguments": "Arguments",
   "chatMessageWidgetResult": "Result",
+  "chatMessageWidgetImages": "Images",
   "chatMessageWidgetCitationsCount": "Citations ({count})",
   "@chatMessageWidgetCitationsCount": {
     "placeholders": {
@@ -1237,6 +1239,10 @@
   "displaySettingsPageNewChatAfterDeleteTitle": "New chat after deleting topic",
   "displaySettingsPageNewChatOnAssistantSwitchTitle": "New chat when switching assistants",
   "displaySettingsPageNewChatOnLaunchTitle": "New Chat on Launch",
+  "displaySettingsPageEnterToSendTitle": "Enter Key to Send",
+  "displaySettingsPageSendShortcutTitle": "Send Shortcut",
+  "displaySettingsPageSendShortcutEnter": "Enter",
+  "displaySettingsPageSendShortcutCtrlEnter": "Ctrl/Cmd + Enter",
   "displaySettingsPageAutoSwitchTopicsTitle": "Auto switch to Topics",
   "desktopDisplaySettingsTopicPositionTitle": "Topic position",
   "desktopDisplaySettingsTopicPositionLeft": "Left",
@@ -1526,6 +1532,36 @@
   "logViewerCurrentLog": "Current Log",
   "logViewerExport": "Export",
   "logViewerOpenFolder": "Open Logs Folder",
+  "logViewerRequestsCount": "{count} requests",
+  "@logViewerRequestsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "logViewerFieldId": "ID",
+  "logViewerFieldMethod": "Method",
+  "logViewerFieldStatus": "Status",
+  "logViewerFieldStarted": "Started",
+  "logViewerFieldEnded": "Ended",
+  "logViewerFieldDuration": "Duration",
+  "logViewerSectionSummary": "Summary",
+  "logViewerSectionParameters": "Parameters",
+  "logViewerSectionRequestHeaders": "Request Headers",
+  "logViewerSectionRequestBody": "Request Body",
+  "logViewerSectionResponseHeaders": "Response Headers",
+  "logViewerSectionResponseBody": "Response Body",
+  "logViewerSectionWarnings": "Warnings",
+  "logViewerErrorTitle": "Error",
+  "logViewerMoreCount": "+{count} more",
+  "@logViewerMoreCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "assistantEditManageSummariesTitle": "Manage Summaries",
   "assistantEditSummaryEmpty": "No summaries yet",
   "assistantEditSummaryDialogTitle": "Edit Summary",

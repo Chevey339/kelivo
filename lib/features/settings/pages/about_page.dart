@@ -69,7 +69,8 @@ class _AboutPageState extends State<AboutPage> {
   void _onVersionTap() {
     final now = DateTime.now();
     // Reset the counter if taps are spaced too far apart
-    if (_lastVersionTap == null || now.difference(_lastVersionTap!) > const Duration(seconds: 2)) {
+    if (_lastVersionTap == null ||
+        now.difference(_lastVersionTap!) > const Duration(seconds: 2)) {
       _versionTapCount = 0;
     }
     _lastVersionTap = now;
@@ -103,7 +104,7 @@ class _AboutPageState extends State<AboutPage> {
         return StatefulBuilder(
           builder: (dialogContext, dialogSetState) {
             int testCounter = 0;
-            
+
             return SafeArea(
               child: FractionallySizedBox(
                 heightFactor: 0.7,
@@ -125,31 +126,53 @@ class _AboutPageState extends State<AboutPage> {
                                 Material(
                                   color: Colors.transparent,
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                      vertical: 6,
+                                    ),
                                     child: Row(
                                       children: [
                                         Expanded(
                                           child: Text(
                                             l10n.requestLogSettingTitle,
-                                            style: TextStyle(color: cs.onSurface.withValues(alpha: 0.9)),
+                                            style: TextStyle(
+                                              color: cs.onSurface.withValues(
+                                                alpha: 0.9,
+                                              ),
+                                            ),
                                           ),
                                         ),
                                         InkWell(
-                                          borderRadius: BorderRadius.circular(6),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
                                           onTap: () {
                                             Navigator.of(context).push(
-                                              MaterialPageRoute(builder: (_) => const LogViewerPage()),
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const LogViewerPage(
+                                                      initialTab: 0,
+                                                    ),
+                                              ),
                                             );
                                           },
                                           child: Padding(
                                             padding: const EdgeInsets.all(6),
-                                            child: Icon(Lucide.FolderOpen, size: 20, color: cs.primary),
+                                            child: Icon(
+                                              Lucide.FolderOpen,
+                                              size: 20,
+                                              color: cs.primary,
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
                                         IosSwitch(
-                                          value: dialogContext.watch<SettingsProvider>().requestLogEnabled,
-                                          onChanged: (v) => dialogContext.read<SettingsProvider>().setRequestLogEnabled(v),
+                                          value: dialogContext
+                                              .watch<SettingsProvider>()
+                                              .requestLogEnabled,
+                                          onChanged: (v) => dialogContext
+                                              .read<SettingsProvider>()
+                                              .setRequestLogEnabled(v),
                                         ),
                                       ],
                                     ),
@@ -160,38 +183,66 @@ class _AboutPageState extends State<AboutPage> {
                                   alignment: Alignment.centerLeft,
                                   child: Text(
                                     l10n.requestLogSettingSubtitle,
-                                    style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.65), height: 1.25),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.65,
+                                      ),
+                                      height: 1.25,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 12),
                                 Material(
                                   color: Colors.transparent,
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                      vertical: 6,
+                                    ),
                                     child: Row(
                                       children: [
                                         Expanded(
                                           child: Text(
                                             l10n.flutterLogSettingTitle,
-                                            style: TextStyle(color: cs.onSurface.withValues(alpha: 0.9)),
+                                            style: TextStyle(
+                                              color: cs.onSurface.withValues(
+                                                alpha: 0.9,
+                                              ),
+                                            ),
                                           ),
                                         ),
                                         InkWell(
-                                          borderRadius: BorderRadius.circular(6),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
                                           onTap: () {
                                             Navigator.of(context).push(
-                                              MaterialPageRoute(builder: (_) => const LogViewerPage()),
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const LogViewerPage(
+                                                      initialTab: 1,
+                                                    ),
+                                              ),
                                             );
                                           },
                                           child: Padding(
                                             padding: const EdgeInsets.all(6),
-                                            child: Icon(Lucide.FolderOpen, size: 20, color: cs.primary),
+                                            child: Icon(
+                                              Lucide.FolderOpen,
+                                              size: 20,
+                                              color: cs.primary,
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
                                         IosSwitch(
-                                          value: dialogContext.watch<SettingsProvider>().flutterLogEnabled,
-                                          onChanged: (v) => dialogContext.read<SettingsProvider>().setFlutterLogEnabled(v),
+                                          value: dialogContext
+                                              .watch<SettingsProvider>()
+                                              .flutterLogEnabled,
+                                          onChanged: (v) => dialogContext
+                                              .read<SettingsProvider>()
+                                              .setFlutterLogEnabled(v),
                                         ),
                                       ],
                                     ),
@@ -202,7 +253,13 @@ class _AboutPageState extends State<AboutPage> {
                                   alignment: Alignment.centerLeft,
                                   child: Text(
                                     l10n.flutterLogSettingSubtitle,
-                                    style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.65), height: 1.25),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.65,
+                                      ),
+                                      height: 1.25,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -230,7 +287,8 @@ class _AboutPageState extends State<AboutPage> {
                                       testCounter++;
                                       showAppSnackBar(
                                         context,
-                                        message: 'Operation completed successfully! #$testCounter',
+                                        message:
+                                            'Operation completed successfully! #$testCounter',
                                         type: NotificationType.success,
                                       );
                                     },
@@ -242,7 +300,8 @@ class _AboutPageState extends State<AboutPage> {
                                       testCounter++;
                                       showAppSnackBar(
                                         context,
-                                        message: 'An error occurred. Please try again. #$testCounter',
+                                        message:
+                                            'An error occurred. Please try again. #$testCounter',
                                         type: NotificationType.error,
                                       );
                                     },
@@ -254,7 +313,8 @@ class _AboutPageState extends State<AboutPage> {
                                       testCounter++;
                                       showAppSnackBar(
                                         context,
-                                        message: 'Warning: Low battery detected #$testCounter',
+                                        message:
+                                            'Warning: Low battery detected #$testCounter',
                                         type: NotificationType.warning,
                                       );
                                     },
@@ -266,7 +326,8 @@ class _AboutPageState extends State<AboutPage> {
                                       testCounter++;
                                       showAppSnackBar(
                                         context,
-                                        message: 'New message received #$testCounter',
+                                        message:
+                                            'New message received #$testCounter',
                                         type: NotificationType.info,
                                       );
                                     },
@@ -278,7 +339,8 @@ class _AboutPageState extends State<AboutPage> {
                                       testCounter++;
                                       showAppSnackBar(
                                         context,
-                                        message: 'File downloaded #$testCounter',
+                                        message:
+                                            'File downloaded #$testCounter',
                                         type: NotificationType.success,
                                         actionLabel: 'Open',
                                         onAction: () {
@@ -298,7 +360,8 @@ class _AboutPageState extends State<AboutPage> {
                                       testCounter++;
                                       showAppSnackBar(
                                         context,
-                                        message: 'This is a very long message that demonstrates how the toast notification handles multiline text gracefully #$testCounter',
+                                        message:
+                                            'This is a very long message that demonstrates how the toast notification handles multiline text gracefully #$testCounter',
                                         type: NotificationType.info,
                                         duration: const Duration(seconds: 5),
                                       );
@@ -309,16 +372,22 @@ class _AboutPageState extends State<AboutPage> {
                                     color: cs.onSurface.withValues(alpha: 0.7),
                                     onTap: () {
                                       for (int i = 0; i < 5; i++) {
-                                        Future.delayed(Duration(milliseconds: i * 100), () {
-                                          if (mounted) {
-                                            showAppSnackBar(
-                                              context,
-                                              message: 'Rapid notification ${i + 1}',
-                                              type: NotificationType.info,
-                                              duration: const Duration(seconds: 2),
-                                            );
-                                          }
-                                        });
+                                        Future.delayed(
+                                          Duration(milliseconds: i * 100),
+                                          () {
+                                            if (mounted) {
+                                              showAppSnackBar(
+                                                context,
+                                                message:
+                                                    'Rapid notification ${i + 1}',
+                                                type: NotificationType.info,
+                                                duration: const Duration(
+                                                  seconds: 2,
+                                                ),
+                                              );
+                                            }
+                                          },
+                                        );
                                       }
                                     },
                                   ),
@@ -364,22 +433,32 @@ class _AboutPageState extends State<AboutPage> {
                                       label: e[0] as String,
                                       color: cs.primary,
                                       onTap: () async {
-                                        if (!context.read<SettingsProvider>().hapticsGlobalEnabled) return;
+                                        if (!context
+                                            .read<SettingsProvider>()
+                                            .hapticsGlobalEnabled)
+                                          return;
                                         try {
-                                          final can = await HF.Haptics.canVibrate();
+                                          final can =
+                                              await HF.Haptics.canVibrate();
                                           if (can) {
-                                            await HF.Haptics.vibrate(e[1] as HF.HapticsType);
+                                            await HF.Haptics.vibrate(
+                                              e[1] as HF.HapticsType,
+                                            );
                                           }
                                         } catch (_) {}
                                       },
-                              ),
-                              _TestButton(
-                                label: 'Play All',
-                                color: cs.secondary,
-                                onTap: () async {
-                                      if (!context.read<SettingsProvider>().hapticsGlobalEnabled) return;
+                                    ),
+                                  _TestButton(
+                                    label: 'Play All',
+                                    color: cs.secondary,
+                                    onTap: () async {
+                                      if (!context
+                                          .read<SettingsProvider>()
+                                          .hapticsGlobalEnabled)
+                                        return;
                                       try {
-                                        final can = await HF.Haptics.canVibrate();
+                                        final can =
+                                            await HF.Haptics.canVibrate();
                                         if (!can) return;
                                         final types = <HF.HapticsType>[
                                           HF.HapticsType.success,
@@ -394,7 +473,9 @@ class _AboutPageState extends State<AboutPage> {
                                         ];
                                         for (final t in types) {
                                           await HF.Haptics.vibrate(t);
-                                          await Future.delayed(const Duration(milliseconds: 180));
+                                          await Future.delayed(
+                                            const Duration(milliseconds: 180),
+                                          );
                                         }
                                       } catch (_) {}
                                     },
@@ -416,17 +497,26 @@ class _AboutPageState extends State<AboutPage> {
                               Material(
                                 color: Colors.transparent,
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 6,
+                                  ),
                                   child: Row(
                                     children: [
                                       Text(
                                         'iOS‑style switch',
-                                        style: TextStyle(color: cs.onSurface.withValues(alpha: 0.9)),
+                                        style: TextStyle(
+                                          color: cs.onSurface.withValues(
+                                            alpha: 0.9,
+                                          ),
+                                        ),
                                       ),
                                       const Spacer(),
                                       IosSwitch(
                                         value: iosSwitchValue,
-                                        onChanged: (v) => dialogSetState(() => iosSwitchValue = v),
+                                        onChanged: (v) => dialogSetState(
+                                          () => iosSwitchValue = v,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -475,106 +565,128 @@ class _AboutPageState extends State<AboutPage> {
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
         children: [
           // Header card: left icon + right title/description
-          _iosSectionCard(children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox(
-                      width: 54,
-                      height: 54,
-                      child: Image.asset('assets/app_icon.png', fit: BoxFit.cover),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Kelivo',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+          _iosSectionCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        width: 54,
+                        height: 54,
+                        child: Image.asset(
+                          'assets/app_icon.png',
+                          fit: BoxFit.cover,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          l10n.aboutPageAppDescription,
-                          style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.65), height: 1.2),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Kelivo',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            l10n.aboutPageAppDescription,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: cs.onSurface.withOpacity(0.65),
+                              height: 1.2,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
 
           const SizedBox(height: 12),
 
           // iOS-style list card
-          _iosSectionCard(children: [
-            // Version (tap 7x to unlock easter egg) — logic unchanged
-            _iosNavRow(
-              context,
-              icon: Lucide.Code,
-              label: l10n.aboutPageVersion,
-              detailBuilder: (_) => Text(_version.isEmpty ? '...' : '$_version / $_buildNumber'),
-              onTap: _onVersionTap,
-            ),
-            _iosDivider(context),
-            _iosNavRow(
-              context,
-              icon: Lucide.Phone,
-              label: l10n.aboutPageSystem,
-              detailBuilder: (_) => Text(_systemInfo.isEmpty ? '...' : _systemInfo),
-              onTap: null, // informational only
-            ),
-            _iosDivider(context),
-            _iosNavRow(
-              context,
-              icon: Lucide.Earth,
-              label: l10n.aboutPageWebsite,
-              onTap: () async {
-                final uri = Uri.parse('https://kelivo.psycheas.top/');
-                if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-            ),
-            _iosDivider(context),
-            _iosNavRow(
-              context,
-              icon: Lucide.Github,
-              label: 'GitHub',
-              onTap: () => _openUrl('https://github.com/Chevey339/kelivo'),
-            ),
-            _iosDivider(context),
-          _iosNavRow(
-            context,
-            icon: Lucide.FileText,
-            label: l10n.aboutPageLicense,
-            onTap: () => _openUrl('https://github.com/Chevey339/kelivo/blob/master/LICENSE'),
+          _iosSectionCard(
+            children: [
+              // Version (tap 7x to unlock easter egg) — logic unchanged
+              _iosNavRow(
+                context,
+                icon: Lucide.Code,
+                label: l10n.aboutPageVersion,
+                detailBuilder: (_) => Text(
+                  _version.isEmpty ? '...' : '$_version / $_buildNumber',
+                ),
+                onTap: _onVersionTap,
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Phone,
+                label: l10n.aboutPageSystem,
+                detailBuilder: (_) =>
+                    Text(_systemInfo.isEmpty ? '...' : _systemInfo),
+                onTap: null, // informational only
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Earth,
+                label: l10n.aboutPageWebsite,
+                onTap: () async {
+                  final uri = Uri.parse('https://kelivo.psycheas.top/');
+                  if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Github,
+                label: 'GitHub',
+                onTap: () => _openUrl('https://github.com/Chevey339/kelivo'),
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.FileText,
+                label: l10n.aboutPageLicense,
+                onTap: () => _openUrl(
+                  'https://github.com/Chevey339/kelivo/blob/master/LICENSE',
+                ),
+              ),
+              _iosDivider(context),
+              _iosNavRowSvgLeading(
+                context,
+                svgAsset: 'assets/icons/tencent-qq.svg',
+                label: l10n.aboutPageJoinQQGroup,
+                onTap: () => _openUrl('https://qm.qq.com/q/OQaXetKssC'),
+              ),
+              _iosDivider(context),
+              _iosNavRowSvgLeading(
+                context,
+                svgAsset: 'assets/icons/discord.svg',
+                label: l10n.aboutPageJoinDiscord,
+                onTap: () => _openUrl('https://discord.gg/Tb8DyvvV5T'),
+              ),
+            ],
           ),
-          _iosDivider(context),
-          _iosNavRowSvgLeading(
-            context,
-            svgAsset: 'assets/icons/tencent-qq.svg',
-            label: l10n.aboutPageJoinQQGroup,
-            onTap: () => _openUrl('https://qm.qq.com/q/OQaXetKssC'),
-          ),
-          _iosDivider(context),
-          _iosNavRowSvgLeading(
-            context,
-            svgAsset: 'assets/icons/discord.svg',
-            label: l10n.aboutPageJoinDiscord,
-            onTap: () => _openUrl('https://discord.gg/Tb8DyvvV5T'),
-          ),
-          ]),
 
           const SizedBox(height: 24),
         ],
@@ -586,40 +698,57 @@ class _AboutPageState extends State<AboutPage> {
 // --- iOS-style helpers (mirroring Settings/Display pages) ---
 
 Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(builder: (context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final Color bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
-    return Container(
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06), width: 0.6),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(children: children),
-      ),
-    );
-  });
+  return Builder(
+    builder: (context) {
+      final theme = Theme.of(context);
+      final cs = theme.colorScheme;
+      final isDark = theme.brightness == Brightness.dark;
+      final Color bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+      return Container(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+            width: 0.6,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(children: children),
+        ),
+      );
+    },
+  );
 }
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
-  return Divider(height: 6, thickness: 0.6, indent: 54, endIndent: 12, color: cs.outlineVariant.withOpacity(0.18));
+  return Divider(
+    height: 6,
+    thickness: 0.6,
+    indent: 54,
+    endIndent: 12,
+    color: cs.outlineVariant.withOpacity(0.18),
+  );
 }
 
 class _AnimatedPressColor extends StatelessWidget {
-  const _AnimatedPressColor({required this.pressed, required this.base, required this.builder});
+  const _AnimatedPressColor({
+    required this.pressed,
+    required this.base,
+    required this.builder,
+  });
   final bool pressed;
   final Color base;
   final Widget Function(Color color) builder;
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final target = pressed ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base) : base;
+    final target = pressed
+        ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base)
+        : base;
     return TweenAnimationBuilder<Color?>(
       tween: ColorTween(end: target),
       duration: const Duration(milliseconds: 220),
@@ -630,7 +759,12 @@ class _AnimatedPressColor extends StatelessWidget {
 }
 
 class _TactileRow extends StatefulWidget {
-  const _TactileRow({required this.builder, this.onTap, this.pressedScale = 1.00, this.haptics = false});
+  const _TactileRow({
+    required this.builder,
+    this.onTap,
+    this.pressedScale = 1.00,
+    this.haptics = false,
+  });
   final Widget Function(bool pressed) builder;
   final VoidCallback? onTap;
   final double pressedScale;
@@ -644,6 +778,7 @@ class _TactileRowState extends State<_TactileRow> {
   void _setPressed(bool v) {
     if (_pressed != v) setState(() => _pressed = v);
   }
+
   @override
   Widget build(BuildContext context) {
     final child = widget.builder(_pressed);
@@ -655,7 +790,9 @@ class _TactileRowState extends State<_TactileRow> {
       onTap: widget.onTap == null
           ? null
           : () {
-              if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
+              if (widget.haptics &&
+                  context.read<SettingsProvider>().hapticsOnListItemTap)
+                Haptics.soft();
               widget.onTap!.call();
             },
       child: widget.pressedScale == 1.0
@@ -708,14 +845,23 @@ Widget _iosNavRow(
                   Padding(
                     padding: const EdgeInsets.only(right: 6),
                     child: DefaultTextStyle(
-                      style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.6)),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withOpacity(0.6),
+                      ),
                       child: detailBuilder(context),
                     ),
                   )
                 else if (detailText != null)
                   Padding(
                     padding: const EdgeInsets.only(right: 6),
-                    child: Text(detailText, style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.6))),
+                    child: Text(
+                      detailText,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withOpacity(0.6),
+                      ),
+                    ),
                   ),
                 if (interactive) Icon(Lucide.ChevronRight, size: 16, color: c),
               ],
@@ -773,14 +919,23 @@ Widget _iosNavRowSvgLeading(
                   Padding(
                     padding: const EdgeInsets.only(right: 6),
                     child: DefaultTextStyle(
-                      style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.6)),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withOpacity(0.6),
+                      ),
                       child: detailBuilder(context),
                     ),
                   )
                 else if (detailText != null)
                   Padding(
                     padding: const EdgeInsets.only(right: 6),
-                    child: Text(detailText, style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.6))),
+                    child: Text(
+                      detailText,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withOpacity(0.6),
+                      ),
+                    ),
                   ),
                 if (interactive) Icon(Lucide.ChevronRight, size: 16, color: c),
               ],
@@ -823,7 +978,12 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   Widget build(BuildContext context) {
     final base = widget.color;
     final pressColor = base.withOpacity(0.7);
-    final icon = Icon(widget.icon, size: widget.size, color: _pressed ? pressColor : base, semanticLabel: widget.semanticLabel);
+    final icon = Icon(
+      widget.icon,
+      size: widget.size,
+      color: _pressed ? pressColor : base,
+      semanticLabel: widget.semanticLabel,
+    );
 
     return Semantics(
       button: true,

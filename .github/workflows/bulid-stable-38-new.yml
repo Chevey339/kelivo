@@ -1,7 +1,7 @@
-name: Flutter Multi-Platform Build Stable
+name: Flutter Multi-Platform Build Stable 3.38 New
 
 env:
-  FLUTTER_VERSION: '3.35.7'  # 修改为你需要的 Flutter 版本
+  FLUTTER_VERSION: '3.38.4'  # 修改为你需要的 Flutter 版本
 
 on:
   # 手动触发
@@ -126,15 +126,6 @@ jobs:
             abi=$(echo "$file" | sed -E 's/app-(.*)-release\.apk/\1/')
             mv "$file" "Kelivo_android_${VERSION}_${abi}.apk"
           done
-      - name: 🚀 发布到 Release
-        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: ${{ github.event.inputs.release_tag }}
-          prerelease: ${{ github.event.inputs.prerelease }}
-          files: build/app/outputs/flutter-apk/Kelivo_android_*.apk
-
       - name: 📤 上传构建产物 (arm64-v8a)
         uses: actions/upload-artifact@v4
         with:
@@ -197,15 +188,6 @@ jobs:
           mkdir Payload
           cp -r Runner.app Payload/
           zip -r ../../../Kelivo_ios_${VERSION}.ipa Payload
-      - name: 🚀 发布到 Release
-        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: ${{ github.event.inputs.release_tag }}
-          prerelease: ${{ github.event.inputs.prerelease }}
-          files: Kelivo_ios_*.ipa
-
       - name: 📤 上传构建产物
         uses: actions/upload-artifact@v4
         with:
@@ -265,15 +247,6 @@ jobs:
           if [ ! -f "Kelivo_macos_${VERSION}.dmg" ]; then
             hdiutil create -volname Kelivo -srcfolder build/macos/Build/Products/Release/kelivo.app -ov -format UDZO Kelivo_macos_${VERSION}.dmg
           fi
-      - name: 🚀 发布到 Release
-        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: ${{ github.event.inputs.release_tag }}
-          prerelease: ${{ github.event.inputs.prerelease }}
-          files: Kelivo_macos_*.dmg
-
       - name: 📤 上传构建产物
         uses: actions/upload-artifact@v4
         with:
@@ -419,16 +392,6 @@ jobs:
           
           # 编译安装程序
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer.iss"
-      - name: 🚀 发布到 Release
-        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: ${{ github.event.inputs.release_tag }}
-          prerelease: ${{ github.event.inputs.prerelease }}
-          files: |
-            Kelivo_windows_*.zip
-            Kelivo_windows_*_setup.exe
       - name: 📤 上传构建产物 (ZIP)
         uses: actions/upload-artifact@v4
         with:
@@ -693,18 +656,6 @@ jobs:
           set -euxo pipefail
           RPM_FILE="Kelivo_linux_${VERSION}.rpm"
           docker run --rm -v "${PWD}:/work" -w /work fedora:43 bash -lc "dnf -y install ./${RPM_FILE}"
-      - name: 🚀 发布到 Release
-        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: ${{ github.event.inputs.release_tag }}
-          prerelease: ${{ github.event.inputs.prerelease }}
-          files: |
-            Kelivo_linux_*.tar.gz
-            Kelivo_linux_*.AppImage
-            Kelivo_linux_*_amd64.deb
-            Kelivo_linux_*.rpm
       - name: 📤 上传构建产物 (tar.gz)
         uses: actions/upload-artifact@v4
         with:
@@ -728,3 +679,47 @@ jobs:
         with:
           name: Linux-RPM
           path: Kelivo_linux_*.rpm
+
+  # 统一发布 Release（避免竞态条件）
+  release:
+    name: 发布 Release
+    runs-on: ubuntu-latest
+    permissions: write-all
+    needs: [android, ios, macos, windows, linux]
+    # 即使部分 job 被跳过或失败，只要有成功的就继续发布
+    if: |
+      always() &&
+      github.event.inputs.publish_release == 'true' &&
+      github.event.inputs.release_tag != '' &&
+      (needs.android.result == 'success' || needs.android.result == 'skipped') &&
+      (needs.ios.result == 'success' || needs.ios.result == 'skipped') &&
+      (needs.macos.result == 'success' || needs.macos.result == 'skipped') &&
+      (needs.windows.result == 'success' || needs.windows.result == 'skipped') &&
+      (needs.linux.result == 'success' || needs.linux.result == 'skipped')
+
+    steps:
+      - name: 📥 下载所有构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 📋 列出下载的文件
+        run: |
+          echo "下载的构建产物："
+          find artifacts -type f | head -50
+
+      - name: 📦 整理发布文件
+        run: |
+          mkdir -p release-files
+          # 复制所有构建产物到 release-files（扁平化目录结构）
+          find artifacts -type f \( -name "*.apk" -o -name "*.ipa" -o -name "*.dmg" -o -name "*.zip" -o -name "*.exe" -o -name "*.tar.gz" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) -exec cp {} release-files/ \;
+          echo "准备发布的文件："
+          ls -la release-files/
+
+      - name: 🚀 发布到 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: release-files/*

@@ -1293,6 +1293,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageImportFromCherryStudio => 'Import from Cherry Studio';
 
   @override
+  String get backupPageImportFromChatbox => 'Import from Chatbox';
+
+  @override
   String get chatHistoryPageTitle => 'Chat History';
 
   @override
@@ -1569,6 +1572,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatMessageWidgetResult => 'Result';
+
+  @override
+  String get chatMessageWidgetImages => 'Images';
 
   @override
   String chatMessageWidgetCitationsCount(int count) {
@@ -2961,6 +2967,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get displaySettingsPageNewChatOnLaunchTitle => 'New Chat on Launch';
 
   @override
+  String get displaySettingsPageEnterToSendTitle => 'Enter Key to Send';
+
+  @override
+  String get displaySettingsPageSendShortcutTitle => 'Send Shortcut';
+
+  @override
+  String get displaySettingsPageSendShortcutEnter => 'Enter';
+
+  @override
+  String get displaySettingsPageSendShortcutCtrlEnter => 'Ctrl/Cmd + Enter';
+
+  @override
   String get displaySettingsPageAutoSwitchTopicsTitle =>
       'Auto switch to Topics';
 
@@ -3719,6 +3737,58 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get logViewerOpenFolder => 'Open Logs Folder';
+
+  @override
+  String logViewerRequestsCount(int count) {
+    return '$count requests';
+  }
+
+  @override
+  String get logViewerFieldId => 'ID';
+
+  @override
+  String get logViewerFieldMethod => 'Method';
+
+  @override
+  String get logViewerFieldStatus => 'Status';
+
+  @override
+  String get logViewerFieldStarted => 'Started';
+
+  @override
+  String get logViewerFieldEnded => 'Ended';
+
+  @override
+  String get logViewerFieldDuration => 'Duration';
+
+  @override
+  String get logViewerSectionSummary => 'Summary';
+
+  @override
+  String get logViewerSectionParameters => 'Parameters';
+
+  @override
+  String get logViewerSectionRequestHeaders => 'Request Headers';
+
+  @override
+  String get logViewerSectionRequestBody => 'Request Body';
+
+  @override
+  String get logViewerSectionResponseHeaders => 'Response Headers';
+
+  @override
+  String get logViewerSectionResponseBody => 'Response Body';
+
+  @override
+  String get logViewerSectionWarnings => 'Warnings';
+
+  @override
+  String get logViewerErrorTitle => 'Error';
+
+  @override
+  String logViewerMoreCount(int count) {
+    return '+$count more';
+  }
 
   @override
   String get assistantEditManageSummariesTitle => 'Manage Summaries';

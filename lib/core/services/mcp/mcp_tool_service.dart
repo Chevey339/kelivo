@@ -5,6 +5,7 @@ import 'package:mcp_client/mcp_client.dart' as mcp;
 import '../../providers/mcp_provider.dart';
 import '../chat/chat_service.dart';
 import '../../providers/assistant_provider.dart';
+import '../../../utils/app_directories.dart';
 
 class McpToolService extends ChangeNotifier {
   McpToolService();
@@ -106,9 +107,17 @@ class McpToolService extends ChangeNotifier {
           continue;
         }
         if (c is mcp.ImageContent) {
-          final url = (c.url ?? '').toString();
-          final mime = (c.mimeType ?? '').toString();
-          buf.writeln('[image:${url.isNotEmpty ? url : mime}]');
+          final data = (c.data ?? '').toString();
+          final mime = (c.mimeType ?? 'image/png').toString();
+          if (data.isNotEmpty) {
+            final savedPath = await AppDirectories.saveBase64Image(mime, data, prefix: 'mcp_img');
+            if (savedPath != null) {
+              buf.writeln('[image:$savedPath]');
+            }
+          } else {
+            final url = (c.url ?? '').toString();
+            if (url.isNotEmpty) buf.writeln('[image:$url]');
+          }
           continue;
         }
         // Try dynamic accessors that some adapters may expose
@@ -189,9 +198,17 @@ class McpToolService extends ChangeNotifier {
               continue;
             }
             if (c is mcp.ImageContent) {
-              final url = (c.url ?? '').toString();
-              final mime = (c.mimeType ?? '').toString();
-              buf.writeln('[image:${url.isNotEmpty ? url : mime}]');
+              final data = (c.data ?? '').toString();
+              final mime = (c.mimeType ?? 'image/png').toString();
+              if (data.isNotEmpty) {
+                final savedPath = await AppDirectories.saveBase64Image(mime, data, prefix: 'mcp_img');
+                if (savedPath != null) {
+                  buf.writeln('[image:$savedPath]');
+                }
+              } else {
+                final url = (c.url ?? '').toString();
+                if (url.isNotEmpty) buf.writeln('[image:$url]');
+              }
               continue;
             }
             final dyn = c as dynamic;
