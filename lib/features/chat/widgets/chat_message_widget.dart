@@ -37,6 +37,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
+import '../../../shared/widgets/selectable_with_actions.dart';
 
 /// Extract image paths from tool result content.
 /// Returns (cleanText, imagePaths). Supports local file paths and HTTP URLs.
@@ -716,7 +717,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     }
 
                     // Enable desktop selection/copy for user messages
-                    return isDesktop ? SelectionArea(key: ValueKey('user_${widget.message.id}'), child: content) : content;
+                    return isDesktop ? SelectableWithActions(messageId: 'user_${widget.message.id}', child: content) : content;
                   }),
                 if (parsed.images.isNotEmpty) ...[
                   const SizedBox(height: 8),
@@ -1328,8 +1329,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       defaultTargetPlatform == TargetPlatform.linux;
                   final double baseAssistant = isDesktop ? 14.0 : 15.7;
                   return RepaintBoundary(
-                    child: SelectionArea(
-                      key: ValueKey('assistant_${widget.message.id}'),
+                    child: SelectableWithActions(
+                      messageId: 'assistant_${widget.message.id}',
                       child: DefaultTextStyle.merge(
                         style: TextStyle(fontSize: baseAssistant, height: 1.5),
                         child: MarkdownWithCodeHighlight(
@@ -1428,8 +1429,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
                                 child: RepaintBoundary(
-                                  child: SelectionArea(
-                                    key: ValueKey('translation_${widget.message.id}'),
+                                  child: SelectableWithActions(
+                                    messageId: 'translation_${widget.message.id}',
                                     child: Builder(builder: (context) {
                                       final bool isDesktop = defaultTargetPlatform == TargetPlatform.macOS ||
                                           defaultTargetPlatform == TargetPlatform.windows ||

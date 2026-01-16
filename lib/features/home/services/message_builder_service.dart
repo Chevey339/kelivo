@@ -151,6 +151,12 @@ class MessageBuilderService {
           if (calls.isNotEmpty) {
             out.add({'role': 'assistant', 'content': '\n\n', 'tool_calls': calls});
             out.addAll(toolMessages);
+            // If this message had tool events, also add the final content as a separate message
+            // (the LLM's response after tools completed)
+            if (m.content.trim().isNotEmpty) {
+              out.add({'role': 'assistant', 'content': m.content});
+            }
+            continue; // Skip the duplicate content addition below
           }
         }
       }

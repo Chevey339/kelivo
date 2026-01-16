@@ -12,6 +12,7 @@ import '../services/network/request_logger.dart';
 import '../services/logging/flutter_logger.dart';
 import '../models/api_keys.dart';
 import '../models/backup.dart';
+import '../models/selection_action.dart';
 import '../services/haptics.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
@@ -120,6 +121,8 @@ class SettingsProvider extends ChangeNotifier {
   // TTS services (network)
   static const String _ttsServicesKey = 'tts_services_v1';
   static const String _ttsSelectedKey = 'tts_selected_v1';
+  // Selection actions: configurable scripts for floating action bar
+  static const String _selectionActionsKey = 'selection_actions_v1';
   // Desktop UI
   static const String _desktopSidebarWidthKey = 'desktop_sidebar_width_v1';
   static const String _desktopSidebarOpenKey = 'desktop_sidebar_open_v1';
@@ -134,6 +137,10 @@ class SettingsProvider extends ChangeNotifier {
   TtsServiceOptions? get selectedTtsService => (_ttsServiceSelected >= 0 && _ttsServiceSelected < _ttsServices.length)
       ? _ttsServices[_ttsServiceSelected]
       : null;
+
+  // ===== Selection actions: configurable scripts =====
+  List<SelectionAction> _selectionActions = const <SelectionAction>[];
+  List<SelectionAction> get selectionActions => _selectionActions;
 
   List<String> _providersOrder = const [];
   List<String> get providersOrder => _providersOrder;
@@ -520,6 +527,11 @@ class SettingsProvider extends ChangeNotifier {
       _ttsServiceSelected = _ttsServices.isEmpty ? -1 : 0;
       await prefs.setInt(_ttsSelectedKey, _ttsServiceSelected);
     }
+    // Selection actions: configurable scripts
+    final selActionsJson = prefs.getString(_selectionActionsKey);
+    _selectionActions = (selActionsJson == null || selActionsJson.trim().isEmpty) 
+        ? const <SelectionAction>[] 
+        : SelectionAction.listFromJson(selActionsJson);
     // webdav config
     final webdavStr = prefs.getString(_webDavConfigKey);
     if (webdavStr != null && webdavStr.isNotEmpty) {
@@ -632,6 +644,50 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_ttsSelectedKey, _ttsServiceSelected);
+  }
+  // ===== Selection Actions CRUD =====
+  Future<void> _saveSelectionActions() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_selectionActions.isEmpty) {
+      await prefs.remove(_selectionActionsKey);
+    } else {
+      await prefs.setString(_selectionActionsKey, SelectionAction.listToJson(_selectionActions));
+    }
+  }
+
+  Future<void> addSelectionAction(SelectionAction action) async {
+    _selectionActions = [..._selectionActions, action];
+    notifyListeners();
+    await _saveSelectionActions();
+  }
+
+  Future<void> updateSelectionAction(SelectionAction action) async {
+    final index = _selectionActions.indexWhere((a) => a.id == action.id);
+    if (index >= 0) {
+      _selectionActions = [
+        ..._selectionActions.sublist(0, index),
+        action,
+        ..._selectionActions.sublist(index + 1),
+      ];
+      notifyListeners();
+      await _saveSelectionActions();
+    }
+  }
+
+  Future<void> removeSelectionAction(String actionId) async {
+    _selectionActions = _selectionActions.where((a) => a.id != actionId).toList();
+    notifyListeners();
+    await _saveSelectionActions();
+  }
+
+  Future<void> reorderSelectionActions(int oldIndex, int newIndex) async {
+    if (oldIndex < newIndex) newIndex -= 1;
+    final list = [..._selectionActions];
+    final item = list.removeAt(oldIndex);
+    list.insert(newIndex, item);
+    _selectionActions = list;
+    notifyListeners();
+    await _saveSelectionActions();
   }
 
   // ===== User Font Settings =====
