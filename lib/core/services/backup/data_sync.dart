@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:archive/archive_io.dart';
 import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
@@ -15,6 +16,7 @@ import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 import '../chat/chat_service.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/sandbox_path_resolver.dart';
 
 class DataSync {
   final ChatService chatService;
@@ -267,7 +269,11 @@ class DataSync {
     return items;
   }
 
-  Future<void> restoreFromWebDav(WebDavConfig cfg, BackupFileItem item, {RestoreMode mode = RestoreMode.overwrite}) async {
+  Future<void> restoreFromWebDav(WebDavConfig cfg, BackupFileItem item, {RestoreOptions? options, RestoreMode mode = RestoreMode.overwrite}) async {
+    await SandboxPathResolver.init();
+    // Backward compatibility: if options is null, construct from legacy mode
+    final opts = options ?? RestoreOptions.fromMode(mode);
+
     final res = await http.get(item.href, headers: _authHeaders(cfg));
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('Download failed: ${res.statusCode}');
@@ -275,7 +281,7 @@ class DataSync {
     final tmpDir = await _ensureTempDir();
     final file = File(p.join(tmpDir.path, item.displayName));
     await file.writeAsBytes(res.bodyBytes);
-    await _restoreFromBackupFile(file, cfg, mode: mode);
+    await _restoreFromBackupFile(file, cfg, options: opts);
     try { await file.delete(); } catch (_) {}
   }
 
@@ -290,9 +296,12 @@ class DataSync {
 
   Future<File> exportToFile(WebDavConfig cfg) => prepareBackupFile(cfg);
 
-  Future<void> restoreFromLocalFile(File file, WebDavConfig cfg, {RestoreMode mode = RestoreMode.overwrite}) async {
+  Future<void> restoreFromLocalFile(File file, WebDavConfig cfg, {RestoreOptions? options, RestoreMode mode = RestoreMode.overwrite}) async {
     if (!await file.exists()) throw Exception('备份文件不存在');
-    await _restoreFromBackupFile(file, cfg, mode: mode);
+    await SandboxPathResolver.init();
+    // Backward compatibility
+    final opts = options ?? RestoreOptions.fromMode(mode);
+    await _restoreFromBackupFile(file, cfg, options: opts);
   }
 
   // ===== Internal helpers =====
@@ -337,14 +346,84 @@ class DataSync {
     if (!chatService.initialized) {
       await chatService.init();
     }
+    
+    // Prepare directory info for relativizing paths
+    final uploadDir = await _getUploadDir();
+    final imagesDir = await _getImagesDir();
+    final avatarsDir = await _getAvatarsDir();
+    
+    // Helper to make path relative if inside app dirs
+    // We use aggressive matching because on some platforms (iOS/macOS),
+    // the stored path might be a resolved symlink (/private/var/...) while
+    // the directory path is different (/var/...), causing startsWith to fail.
+    String makeRelative(String absolutePath) {
+      if (absolutePath.isEmpty) return absolutePath;
+      try {
+        // 1. Try robust startsWith (handling potential symlinks prefixes if feasible, but tricky)
+        // 2. Aggressive fallback: Check if path contains known structure
+        // This is safe because we only care about files *we* manage in these subfolders.
+        if (absolutePath.contains('/Documents/upload/')) {
+           final idx = absolutePath.indexOf('/Documents/upload/');
+           return absolutePath.substring(idx + '/Documents/'.length); // "upload/..."
+        }
+        if (absolutePath.contains('/Documents/images/')) {
+           final idx = absolutePath.indexOf('/Documents/images/');
+           return absolutePath.substring(idx + '/Documents/'.length); // "images/..."
+        }
+        if (absolutePath.contains('/Documents/avatars/')) {
+           final idx = absolutePath.indexOf('/Documents/avatars/');
+           return absolutePath.substring(idx + '/Documents/'.length); // "avatars/..."
+        }
+        
+        // Also check standard startsWith logic for non-iOS platforms or matches without /Documents/
+        if (absolutePath.startsWith(uploadDir.path)) {
+          return p.join('upload', p.relative(absolutePath, from: uploadDir.path));
+        } else if (absolutePath.startsWith(imagesDir.path)) {
+          return p.join('images', p.relative(absolutePath, from: imagesDir.path));
+        } else if (absolutePath.startsWith(avatarsDir.path)) {
+          return p.join('avatars', p.relative(absolutePath, from: avatarsDir.path));
+        }
+      } catch (_) {}
+      return absolutePath; // Keep absolute if outside known dirs
+    }
+
     final conversations = chatService.getAllConversations();
     final allMsgs = <ChatMessage>[];
     final toolEvents = <String, List<Map<String, dynamic>>>{};
     final geminiThoughtSigs = <String, String>{};
+    
+    final imgRe = RegExp(r"\[image:(.+?)\]");
+    final fileRe = RegExp(r"\[file:(.+?)\|(.+?)\|(.+?)\]");
+
     for (final c in conversations) {
       final msgs = chatService.getMessages(c.id);
-      allMsgs.addAll(msgs);
+      
+      // Process messages to relativize paths
       for (final m in msgs) {
+        var mToAdd = m;
+        // Check for content paths
+        String updated = m.content;
+        updated = updated.replaceAllMapped(imgRe, (match) {
+          final raw = (match.group(1) ?? '').trim();
+          final rel = makeRelative(raw);
+          // Ensure we store portable paths with forward slashes
+          final portable = rel.replaceAll('\\', '/');
+          return '[image:$portable]';
+        });
+        updated = updated.replaceAllMapped(fileRe, (match) {
+          final raw = (match.group(1) ?? '').trim();
+          final name = (match.group(2) ?? '').trim();
+          final mime = (match.group(3) ?? '').trim();
+          final rel = makeRelative(raw);
+          final portable = rel.replaceAll('\\', '/');
+          return '[file:$portable|$name|$mime]';
+        });
+        
+        if (updated != m.content) {
+          mToAdd = m.copyWith(content: updated);
+        }
+        allMsgs.add(mToAdd);
+
         if (m.role == 'assistant') {
           final ev = chatService.getToolEvents(m.id);
           if (ev.isNotEmpty) toolEvents[m.id] = ev;
@@ -353,6 +432,7 @@ class DataSync {
         }
       }
     }
+    
     final obj = {
       'version': 1,
       'conversations': conversations.map((c) => c.toJson()).toList(),
@@ -363,7 +443,7 @@ class DataSync {
     return jsonEncode(obj);
   }
 
-  Future<void> _restoreFromBackupFile(File file, WebDavConfig cfg, {RestoreMode mode = RestoreMode.overwrite}) async {
+  Future<void> _restoreFromBackupFile(File file, WebDavConfig cfg, {required RestoreOptions options}) async {
     // Extract to temp
     final tmp = await _ensureTempDir();
     final extractDir = Directory(p.join(tmp.path, 'restore_${DateTime.now().millisecondsSinceEpoch}'));
@@ -377,6 +457,193 @@ class DataSync {
           .split('/')
           .where((seg) => seg.isNotEmpty && seg != '.' && seg != '..')
           .toList();
+      final outPath = p.joinAll([extractDir.path, ...parts]);
+      if (entry.isFile) {
+        final outFile = File(outPath)..createSync(recursive: true);
+        outFile.writeAsBytesSync(entry.content as List<int>);
+      } else {
+        Directory(outPath).createSync(recursive: true);
+      }
+    }
+
+    // 1. Settings & Providers Restoration
+    final settingsFile = File(p.join(extractDir.path, 'settings.json'));
+    if (await settingsFile.exists()) {
+      try {
+        final txt = await settingsFile.readAsString();
+        final map = jsonDecode(txt) as Map<String, dynamic>;
+        final prefs = await SharedPreferencesAsync.instance;
+        final existing = await prefs.snapshot();
+
+        // Categorize keys
+        const providerKeys = {
+          'provider_configs_v1',
+          'providers_order_v1',
+          'pinned_models_v1',
+          'assistants_v1',
+          'assistant_tags_v1',
+          'assistant_tag_map_v1',
+          'assistant_tag_collapsed_v1',
+          'search_services_v1',
+          'quick_phrases_v1',
+        };
+
+        // Determine action for each key and apply
+        for (final entry in map.entries) {
+          final key = entry.key;
+          final newValue = entry.value;
+
+          final isProviderKey = providerKeys.contains(key);
+          final action = isProviderKey ? options.providersAction : options.settingsAction;
+
+          if (action == RestoreAction.ignore) {
+            continue;
+          } else if (action == RestoreAction.overwrite) {
+             await prefs.restoreSingle(key, newValue);
+          } else if (action == RestoreAction.merge) {
+             // Merge logic (reused from legacy)
+             // ... [Duplicate merge logic or abstract it] ...
+             // For simplicity, we can reuse the specific merge logic for known keys,
+             // and fallback to "preserve existing" for others.
+             await _mergeSetting(prefs, existing, key, newValue);
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Prepare Data (Clear first if overwrite is requested)
+    if (options.chatsAction == RestoreAction.overwrite) {
+       await chatService.clearAllData();
+    }
+
+    // 3. Files Restoration (First restore files so paths exist)
+    if (options.filesAction != RestoreAction.ignore && cfg.includeFiles) {
+      final isOverwrite = options.filesAction == RestoreAction.overwrite;
+      
+      // Uploads
+      await _restoreDirectory(
+        Directory(p.join(extractDir.path, 'upload')),
+        await _getUploadDir(),
+        overwrite: isOverwrite
+      );
+      
+      // Images
+      await _restoreDirectory(
+        Directory(p.join(extractDir.path, 'images')),
+        await _getImagesDir(),
+        overwrite: isOverwrite
+      );
+      
+      // Avatars
+      await _restoreDirectory(
+        Directory(p.join(extractDir.path, 'avatars')),
+        await _getAvatarsDir(),
+        overwrite: isOverwrite
+      );
+    }
+
+    // 4. Chats Restoration
+    if (options.chatsAction != RestoreAction.ignore) {
+      final chatsFile = File(p.join(extractDir.path, 'chats.json'));
+      if (cfg.includeChats && await chatsFile.exists()) {
+        try {
+          final obj = jsonDecode(await chatsFile.readAsString()) as Map<String, dynamic>;
+          // Parse data
+          final convs = (obj['conversations'] as List?)
+                  ?.map((e) => Conversation.fromJson((e as Map).cast<String, dynamic>()))
+                  .toList() ?? const [];
+          var msgs = (obj['messages'] as List?)
+                  ?.map((e) => ChatMessage.fromJson((e as Map).cast<String, dynamic>()))
+                  .toList() ?? const [];
+
+          // Prepare path resolution
+          final appDataDir = await AppDirectories.getAppDataDirectory();
+          
+          // Helper to resolve paths
+          String resolvePath(String path) {
+             // 1. Check if relative (portable)
+             // On macOS/Linux, path.startsWith('/') is true for absolute paths.
+             // On Windows, path usually contains ':' (e.g. C:\) or starts with '\\'.
+             // We need to be careful: if the path is ALREADY relative (e.g. "upload/foo.jpg"),
+             // we MUST expand it to absolute for the app to use it.
+             bool isAbsolute = path.startsWith('/') || path.startsWith('\\') || (Platform.isWindows && path.contains(':'));
+             
+             if (!isAbsolute) {
+               // It's a relative path like "images/foo.jpg".
+               // The app expects absolute paths at runtime.
+               // So we expand it: /Users/.../Documents + / + images/foo.jpg
+               return p.join(appDataDir.path, path);
+             }
+             
+             // 2. It's absolute (Legacy) -> Use "Heal" strategy
+             // Force check against new appDataDir if SandboxPathResolver fails (e.g. file check failed)
+             // We manually apply the fix logic here to ensure it points to the new location.
+             final fixed = SandboxPathResolver.fix(path);
+             if (fixed != path) return fixed;
+
+             // Fallback: manually rewrite if it looks like a legacy path but resolver missed it
+             // Also look for just generic subfolders (Android/Mac support)
+             if (path.contains('/upload/')) return p.join(appDataDir.path, 'upload', path.split('/upload/').last);
+             if (path.contains('/images/')) return p.join(appDataDir.path, 'images', path.split('/images/').last);
+             if (path.contains('/avatars/')) return p.join(appDataDir.path, 'avatars', path.split('/avatars/').last);
+             
+             return path;
+          }
+
+          final imgRe = RegExp(r"\[image:(.+?)\]");
+          final fileRe = RegExp(r"\[file:(.+?)\|(.+?)\|(.+?)\]");
+
+          msgs = msgs.map((m) {
+            String updated = m.content;
+            updated = updated.replaceAllMapped(imgRe, (match) {
+              final raw = (match.group(1) ?? '').trim();
+              final fixed = resolvePath(raw);
+              return '[image:$fixed]';
+            });
+            updated = updated.replaceAllMapped(fileRe, (match) {
+              final raw = (match.group(1) ?? '').trim();
+              final name = (match.group(2) ?? '').trim();
+              final mime = (match.group(3) ?? '').trim();
+              final fixed = resolvePath(raw);
+              return '[file:$fixed|$name|$mime]';
+            });
+            
+            if (updated != m.content) {
+              return m.copyWith(content: updated);
+            }
+            return m;
+          }).toList();
+
+          final toolEvents = ((obj['toolEvents'] as Map?) ?? const <String, dynamic>{})
+              .map((k, v) => MapEntry(k.toString(), (v as List).cast<Map>().map((e) => e.cast<String, dynamic>()).toList()));
+          final geminiThoughtSigs = ((obj['geminiThoughtSigs'] as Map?) ?? const <String, dynamic>{})
+              .map((k, v) => MapEntry(k.toString(), v.toString()));
+
+          if (options.chatsAction == RestoreAction.overwrite) {
+             // Already cleared data above at step 2.
+             await _restoreChats(convs, msgs, toolEvents, geminiThoughtSigs, overwrite: false);
+          } else {
+             // Merge
+             await _restoreChats(convs, msgs, toolEvents, geminiThoughtSigs, overwrite: false);
+          }
+        } catch (_) {}
+      }
+    }
+
+    try { await extractDir.delete(recursive: true); } catch (_) {}
+  }
+  
+  /// Original logic for full overwrite (renamed)
+  Future<void> _legacyRestoreFromBackupFile(File file, WebDavConfig cfg, {RestoreMode mode = RestoreMode.overwrite}) async {
+    // Extract to temp
+    final tmp = await _ensureTempDir();
+    final extractDir = Directory(p.join(tmp.path, 'restore_legacy_${DateTime.now().millisecondsSinceEpoch}'));
+    await extractDir.create(recursive: true);
+    final bytes = await file.readAsBytes();
+    final archive = ZipDecoder().decodeBytes(bytes);
+    for (final entry in archive) {
+      final normalized = entry.name.replaceAll('\\', '/');
+      final parts = normalized.split('/').where((seg) => seg.isNotEmpty && seg != '.' && seg != '..').toList();
       final outPath = p.joinAll([extractDir.path, ...parts]);
       if (entry.isFile) {
         final outFile = File(outPath)..createSync(recursive: true);
@@ -594,209 +861,72 @@ class DataSync {
       } catch (_) {}
     }
 
+    // Legacy mode: Clear data first if overwrite
+    if (mode == RestoreMode.overwrite) {
+      await chatService.clearAllData();
+    }
+
+    // Restore files (First)
+    if (cfg.includeFiles) {
+       final isOverwrite = mode == RestoreMode.overwrite;
+       await _restoreDirectory(Directory(p.join(extractDir.path, 'upload')), await _getUploadDir(), overwrite: isOverwrite);
+       await _restoreDirectory(Directory(p.join(extractDir.path, 'images')), await _getImagesDir(), overwrite: isOverwrite);
+       await _restoreDirectory(Directory(p.join(extractDir.path, 'avatars')), await _getAvatarsDir(), overwrite: isOverwrite);
+    }
+
     // Restore chats
     final chatsFile = File(p.join(extractDir.path, 'chats.json'));
     if (cfg.includeChats && await chatsFile.exists()) {
       try {
         final obj = jsonDecode(await chatsFile.readAsString()) as Map<String, dynamic>;
-        final convs = (obj['conversations'] as List?)
-                ?.map((e) => Conversation.fromJson((e as Map).cast<String, dynamic>()))
-                .toList() ??
-            const <Conversation>[];
-        final msgs = (obj['messages'] as List?)
-                ?.map((e) => ChatMessage.fromJson((e as Map).cast<String, dynamic>()))
-                .toList() ??
-            const <ChatMessage>[];
-        final toolEvents = ((obj['toolEvents'] as Map?) ?? const <String, dynamic>{})
-            .map((k, v) => MapEntry(k.toString(), (v as List).cast<Map>().map((e) => e.cast<String, dynamic>()).toList()));
-        final geminiThoughtSigs = ((obj['geminiThoughtSigs'] as Map?) ?? const <String, dynamic>{})
-            .map((k, v) => MapEntry(k.toString(), v.toString()));
+        final convs = (obj['conversations'] as List?)?.map((e) => Conversation.fromJson((e as Map).cast<String, dynamic>())).toList() ?? const [];
+        var msgs = (obj['messages'] as List?)?.map((e) => ChatMessage.fromJson((e as Map).cast<String, dynamic>())).toList() ?? const [];
         
-        if (mode == RestoreMode.overwrite) {
-          // Clear and restore via ChatService
-          await chatService.clearAllData();
-          final byConv = <String, List<ChatMessage>>{};
-          for (final m in msgs) {
-            (byConv[m.conversationId] ??= <ChatMessage>[]).add(m);
-          }
-          for (final c in convs) {
-            final list = byConv[c.id] ?? const <ChatMessage>[];
-            await chatService.restoreConversation(c, list);
-          }
-          // Tool events
-          for (final entry in toolEvents.entries) {
-            try { await chatService.setToolEvents(entry.key, entry.value); } catch (_) {}
-          }
-          for (final entry in geminiThoughtSigs.entries) {
-            try { await chatService.setGeminiThoughtSignature(entry.key, entry.value); } catch (_) {}
-          }
-        } else {
-          // Merge mode: Add only non-existing conversations and messages
-          final existingConvs = chatService.getAllConversations();
-          final existingConvIds = existingConvs.map((c) => c.id).toSet();
-          
-          // Create a map of message IDs to avoid duplicates
-          final existingMsgIds = <String>{};
-          for (final conv in existingConvs) {
-            final messages = chatService.getMessages(conv.id);
-            existingMsgIds.addAll(messages.map((m) => m.id));
-          }
-          
-          // Group messages by conversation
-          final byConv = <String, List<ChatMessage>>{};
-          for (final m in msgs) {
-            if (!existingMsgIds.contains(m.id)) {
-              (byConv[m.conversationId] ??= <ChatMessage>[]).add(m);
-            }
-          }
-          
-          // Restore non-existing conversations and their messages
-          for (final c in convs) {
-            if (!existingConvIds.contains(c.id)) {
-              final list = byConv[c.id] ?? const <ChatMessage>[];
-              await chatService.restoreConversation(c, list);
-            } else if (byConv.containsKey(c.id)) {
-              // Conversation exists but has new messages
-              final newMessages = byConv[c.id]!;
-              for (final msg in newMessages) {
-                await chatService.addMessageDirectly(c.id, msg);
-              }
-            }
-          }
-          
-          // Merge tool events
-          for (final entry in toolEvents.entries) {
-            final existing = chatService.getToolEvents(entry.key);
-            if (existing.isEmpty) {
-              try { await chatService.setToolEvents(entry.key, entry.value); } catch (_) {}
-            }
-          }
-          for (final entry in geminiThoughtSigs.entries) {
-            final existingSig = chatService.getGeminiThoughtSignature(entry.key);
-            if (existingSig == null || existingSig.isEmpty) {
-              try { await chatService.setGeminiThoughtSignature(entry.key, entry.value); } catch (_) {}
-            }
-          }
+        // Prepare path resolution
+        final appDataDir = await AppDirectories.getAppDataDirectory();
+        String resolvePath(String path) {
+           if (!path.startsWith('/') && !path.startsWith('\\') && !path.contains(':')) {
+             return p.join(appDataDir.path, path);
+           }
+           final fixed = SandboxPathResolver.fix(path);
+           if (fixed != path) return fixed;
+           // Fallback for non-iOS
+           if (path.contains('/upload/')) return p.join(appDataDir.path, 'upload', path.split('/upload/').last);
+           if (path.contains('/images/')) return p.join(appDataDir.path, 'images', path.split('/images/').last);
+           if (path.contains('/avatars/')) return p.join(appDataDir.path, 'avatars', path.split('/avatars/').last);
+           return path;
         }
+
+        final imgRe = RegExp(r"\[image:(.+?)\]");
+        final fileRe = RegExp(r"\[file:(.+?)\|(.+?)\|(.+?)\]");
+
+        msgs = msgs.map((m) {
+          String updated = m.content;
+          updated = updated.replaceAllMapped(imgRe, (match) {
+            final raw = (match.group(1) ?? '').trim();
+            final fixed = resolvePath(raw);
+            return '[image:$fixed]';
+          });
+          updated = updated.replaceAllMapped(fileRe, (match) {
+            final raw = (match.group(1) ?? '').trim();
+            final name = (match.group(2) ?? '').trim();
+            final mime = (match.group(3) ?? '').trim();
+            final fixed = resolvePath(raw);
+            return '[file:$fixed|$name|$mime]';
+          });
+          
+          if (updated != m.content) {
+            return m.copyWith(content: updated);
+          }
+          return m;
+        }).toList();
+
+        final toolEvents = ((obj['toolEvents'] as Map?) ?? const <String, dynamic>{}).map((k, v) => MapEntry(k.toString(), (v as List).cast<Map>().map((e) => e.cast<String, dynamic>()).toList()));
+        final geminiThoughtSigs = ((obj['geminiThoughtSigs'] as Map?) ?? const <String, dynamic>{}).map((k, v) => MapEntry(k.toString(), v.toString()));
+        
+        // Use overwrite: false because we already cleared data manually
+        await _restoreChats(convs, msgs, toolEvents, geminiThoughtSigs, overwrite: false);
       } catch (_) {}
-    }
-
-    // Restore files
-    if (cfg.includeFiles) {
-      if (mode == RestoreMode.overwrite) {
-        // Overwrite mode: Delete existing directories and copy all
-        // Restore upload directory
-        final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
-        if (await uploadSrc.exists()) {
-          final dst = await _getUploadDir();
-          if (await dst.exists()) {
-            try { await dst.delete(recursive: true); } catch (_) {}
-          }
-          await dst.create(recursive: true);
-          for (final ent in uploadSrc.listSync(recursive: true)) {
-            if (ent is File) {
-              final rel = p.relative(ent.path, from: uploadSrc.path);
-              final target = File(p.join(dst.path, rel));
-              await target.parent.create(recursive: true);
-              await ent.copy(target.path);
-            }
-          }
-        }
-
-        // Restore images directory
-        final imagesSrc = Directory(p.join(extractDir.path, 'images'));
-        if (await imagesSrc.exists()) {
-          final dst = await _getImagesDir();
-          if (await dst.exists()) {
-            try { await dst.delete(recursive: true); } catch (_) {}
-          }
-          await dst.create(recursive: true);
-          for (final ent in imagesSrc.listSync(recursive: true)) {
-            if (ent is File) {
-              final rel = p.relative(ent.path, from: imagesSrc.path);
-              final target = File(p.join(dst.path, rel));
-              await target.parent.create(recursive: true);
-              await ent.copy(target.path);
-            }
-          }
-        }
-
-        // Restore avatars directory
-        final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
-        if (await avatarsSrc.exists()) {
-          final dst = await _getAvatarsDir();
-          if (await dst.exists()) {
-            try { await dst.delete(recursive: true); } catch (_) {}
-          }
-          await dst.create(recursive: true);
-          for (final ent in avatarsSrc.listSync(recursive: true)) {
-            if (ent is File) {
-              final rel = p.relative(ent.path, from: avatarsSrc.path);
-              final target = File(p.join(dst.path, rel));
-              await target.parent.create(recursive: true);
-              await ent.copy(target.path);
-            }
-          }
-        }
-      } else {
-        // Merge mode: Only copy non-existing files
-        // Merge upload directory
-        final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
-        if (await uploadSrc.exists()) {
-          final dst = await _getUploadDir();
-          if (!await dst.exists()) {
-            await dst.create(recursive: true);
-          }
-          for (final ent in uploadSrc.listSync(recursive: true)) {
-            if (ent is File) {
-              final rel = p.relative(ent.path, from: uploadSrc.path);
-              final target = File(p.join(dst.path, rel));
-              if (!await target.exists()) {
-                await target.parent.create(recursive: true);
-                await ent.copy(target.path);
-              }
-            }
-          }
-        }
-
-        // Merge images directory
-        final imagesSrc = Directory(p.join(extractDir.path, 'images'));
-        if (await imagesSrc.exists()) {
-          final dst = await _getImagesDir();
-          if (!await dst.exists()) {
-            await dst.create(recursive: true);
-          }
-          for (final ent in imagesSrc.listSync(recursive: true)) {
-            if (ent is File) {
-              final rel = p.relative(ent.path, from: imagesSrc.path);
-              final target = File(p.join(dst.path, rel));
-              if (!await target.exists()) {
-                await target.parent.create(recursive: true);
-                await ent.copy(target.path);
-              }
-            }
-          }
-        }
-
-        // Merge avatars directory
-        final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
-        if (await avatarsSrc.exists()) {
-          final dst = await _getAvatarsDir();
-          if (!await dst.exists()) {
-            await dst.create(recursive: true);
-          }
-          for (final ent in avatarsSrc.listSync(recursive: true)) {
-            if (ent is File) {
-              final rel = p.relative(ent.path, from: avatarsSrc.path);
-              final target = File(p.join(dst.path, rel));
-              if (!await target.exists()) {
-                await target.parent.create(recursive: true);
-                await ent.copy(target.path);
-              }
-            }
-          }
-        }
-      }
     }
 
     try { await extractDir.delete(recursive: true); } catch (_) {}
