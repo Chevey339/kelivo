@@ -1409,10 +1409,28 @@ class ChatApiService {
               }
             }
           }
-          mm.add({'role': role, 'content': parts});
+          final entry = <String, dynamic>{'role': role, 'content': parts};
+          // Preserve tool-related fields for OpenAI-compatible APIs
+          if (role == 'tool') {
+            if (m['tool_call_id'] != null) entry['tool_call_id'] = m['tool_call_id'];
+            if (m['name'] != null) entry['name'] = m['name'];
+          }
+          if (role == 'assistant' && m['tool_calls'] != null) {
+            entry['tool_calls'] = m['tool_calls'];
+          }
+          mm.add(entry);
         } else {
           // No images, use simple string content
-          mm.add({'role': role, 'content': raw});
+          final entry = <String, dynamic>{'role': role, 'content': raw};
+          // Preserve tool-related fields for OpenAI-compatible APIs
+          if (role == 'tool') {
+            if (m['tool_call_id'] != null) entry['tool_call_id'] = m['tool_call_id'];
+            if (m['name'] != null) entry['name'] = m['name'];
+          }
+          if (role == 'assistant' && m['tool_calls'] != null) {
+            entry['tool_calls'] = m['tool_calls'];
+          }
+          mm.add(entry);
         }
       }
       body = {
@@ -1684,7 +1702,11 @@ class ChatApiService {
             req.headers.addAll(headers2);
             final next = <Map<String, dynamic>>[];
             for (final m in messages) {
-              next.add({'role': m['role'] ?? 'user', 'content': m['content'] ?? ''});
+              final entry = <String, dynamic>{'role': m['role'] ?? 'user', 'content': m['content'] ?? ''};
+              if (m['tool_calls'] != null) entry['tool_calls'] = m['tool_calls'];
+              if (m['tool_call_id'] != null) entry['tool_call_id'] = m['tool_call_id'];
+              if (m['name'] != null) entry['name'] = m['name'];
+              next.add(entry);
             }
             final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
             if (needsReasoningEcho) {
@@ -1824,7 +1846,11 @@ class ChatApiService {
             // Build follow-up messages
             final mm2 = <Map<String, dynamic>>[];
             for (final m in messages) {
-              mm2.add({'role': m['role'] ?? 'user', 'content': m['content'] ?? ''});
+              final entry = <String, dynamic>{'role': m['role'] ?? 'user', 'content': m['content'] ?? ''};
+              if (m['tool_calls'] != null) entry['tool_calls'] = m['tool_calls'];
+              if (m['tool_call_id'] != null) entry['tool_call_id'] = m['tool_call_id'];
+              if (m['name'] != null) entry['name'] = m['name'];
+              mm2.add(entry);
             }
             final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
             if (needsReasoningEcho) {
@@ -2828,7 +2854,11 @@ class ChatApiService {
             // Build follow-up messages
             final mm2 = <Map<String, dynamic>>[];
             for (final m in messages) {
-              mm2.add({'role': m['role'] ?? 'user', 'content': m['content'] ?? ''});
+              final entry = <String, dynamic>{'role': m['role'] ?? 'user', 'content': m['content'] ?? ''};
+              if (m['tool_calls'] != null) entry['tool_calls'] = m['tool_calls'];
+              if (m['tool_call_id'] != null) entry['tool_call_id'] = m['tool_call_id'];
+              if (m['name'] != null) entry['name'] = m['name'];
+              mm2.add(entry);
             }
             final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
             if (needsReasoningEcho) {
@@ -3228,7 +3258,11 @@ class ChatApiService {
                 // Build follow-up messages
                 final mm2 = <Map<String, dynamic>>[];
                 for (final m in messages) {
-                  mm2.add({'role': m['role'] ?? 'user', 'content': m['content'] ?? ''});
+                  final entry = <String, dynamic>{'role': m['role'] ?? 'user', 'content': m['content'] ?? ''};
+              if (m['tool_calls'] != null) entry['tool_calls'] = m['tool_calls'];
+              if (m['tool_call_id'] != null) entry['tool_call_id'] = m['tool_call_id'];
+              if (m['name'] != null) entry['name'] = m['name'];
+              mm2.add(entry);
                 }
                 final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
                 if (needsReasoningEcho) {
@@ -3619,7 +3653,11 @@ class ChatApiService {
             // Follow-up request with assistant tool_calls + tool messages
             final mm2 = <Map<String, dynamic>>[];
             for (final m in messages) {
-              mm2.add({'role': m['role'] ?? 'user', 'content': m['content'] ?? ''});
+              final entry = <String, dynamic>{'role': m['role'] ?? 'user', 'content': m['content'] ?? ''};
+              if (m['tool_calls'] != null) entry['tool_calls'] = m['tool_calls'];
+              if (m['tool_call_id'] != null) entry['tool_call_id'] = m['tool_call_id'];
+              if (m['name'] != null) entry['name'] = m['name'];
+              mm2.add(entry);
             }
             final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
             if (needsReasoningEcho) {
