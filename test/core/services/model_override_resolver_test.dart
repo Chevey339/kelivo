@@ -72,7 +72,7 @@ void main() {
       // input/output cleared -> default back to [text]
       expect(next.input, const [Modality.text]);
       expect(next.output, const [Modality.text]);
-      // abilities explicitly cleared by empty override list
+      // abilities cleared because unknown values are ignored, leaving an empty parsed result
       expect(next.abilities, isEmpty);
     });
 

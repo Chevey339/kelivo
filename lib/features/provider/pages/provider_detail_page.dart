@@ -2241,6 +2241,16 @@ class _ModelCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final resolved = _resolveBaseAndOverride(context);
+    final ov = resolved.ov;
+    final effective = ov == null ? resolved.base : _applyModelOverride(resolved.base, ov, applyDisplayName: true);
+    String displayName = modelId;
+    if (ov != null) {
+      final n = ov['name']?.toString().trim();
+      if (n != null && n.isNotEmpty) {
+        displayName = n;
+      }
+    }
     return _TactileRow(
       pressedScale: 0.98,
       haptics: false,
@@ -2271,7 +2281,7 @@ class _ModelCard extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(_displayName(context), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                            child: Text(displayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                           ),
                           if (isDetecting) ...[
                             const SizedBox(width: 8),
@@ -2307,7 +2317,7 @@ class _ModelCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      ModelTagWrap(model: _effective(context)),
+                      ModelTagWrap(model: effective),
                     ],
                   ),
                 ),
@@ -2335,22 +2345,6 @@ class _ModelCard extends StatelessWidget {
   ModelInfo _infer(String id) {
     // build a minimal ModelInfo and let registry infer
     return ModelRegistry.infer(ModelInfo(id: id, displayName: id));
-  }
-
-  ModelInfo _effective(BuildContext context) {
-    final resolved = _resolveBaseAndOverride(context);
-    final ov = resolved.ov;
-    if (ov == null) return resolved.base;
-    return _applyModelOverride(resolved.base, ov, applyDisplayName: true);
-  }
-
-  String _displayName(BuildContext context) {
-    final ov = _resolveBaseAndOverride(context).ov;
-    if (ov != null) {
-      final n = ov['name']?.toString().trim();
-      if (n != null && n.isNotEmpty) return n;
-    }
-    return modelId;
   }
 
   _ResolvedModelOverride _resolveBaseAndOverride(BuildContext context) {
@@ -2616,7 +2610,11 @@ Future<String?> showModelPickerForTest(BuildContext context, String providerKey,
 ModelInfo _applyModelOverride(ModelInfo base, Map<String, dynamic> ov, {bool applyDisplayName = false}) {
   try {
     return ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: applyDisplayName);
-  } catch (_) {
+  } catch (e) {
+    assert(() {
+      debugPrint('[ModelOverride] applyModelOverride failed: $e');
+      return true;
+    }());
     return base;
   }
 }

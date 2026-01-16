@@ -163,8 +163,8 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
       for (final h in hdrs) {
         if (h is Map) {
           final kv = _HeaderKV();
-          kv.name.text = (h['name'] as String?) ?? '';
-          kv.value.text = (h['value'] as String?) ?? '';
+            kv.name.text = h['name']?.toString() ?? '';
+            kv.value.text = h['value']?.toString() ?? '';
           _headers.add(kv);
         }
       }
@@ -173,8 +173,8 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
       for (final b in bds) {
         if (b is Map) {
           final kv = _BodyKV();
-          kv.keyCtrl.text = (b['key'] as String?) ?? '';
-          kv.valueCtrl.text = (b['value'] as String?) ?? '';
+            kv.keyCtrl.text = b['key']?.toString() ?? '';
+            kv.valueCtrl.text = b['value']?.toString() ?? '';
           _bodies.add(kv);
         }
       }

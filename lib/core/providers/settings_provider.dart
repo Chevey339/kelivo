@@ -263,9 +263,10 @@ class SettingsProvider extends ChangeNotifier {
     }
 
     if (nextProviderConfigs == null) return false;
+    final map = nextProviderConfigs.map((k, v) => MapEntry(k, v.toJson()));
+    final ok = await prefs.setString(_providerConfigsKey, jsonEncode(map));
+    if (!ok) return false;
     _providerConfigs = nextProviderConfigs;
-    final map = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
-    await prefs.setString(_providerConfigsKey, jsonEncode(map));
     assert(() {
       debugPrint('[SettingsProvider] embedding overrides migration: providers=$providersChanged, models=$modelsChanged');
       return true;
@@ -289,11 +290,13 @@ class SettingsProvider extends ChangeNotifier {
     }
     _themePaletteId = prefs.getString(_themePaletteKey) ?? 'default';
     _useDynamicColor = prefs.getBool(_useDynamicColorKey) ?? true;
+    var providerConfigsLoaded = false;
     final cfgStr = prefs.getString(_providerConfigsKey);
     if (cfgStr != null && cfgStr.isNotEmpty) {
       try {
         final raw = jsonDecode(cfgStr) as Map<String, dynamic>;
         _providerConfigs = raw.map((k, v) => MapEntry(k, ProviderConfig.fromJson(v as Map<String, dynamic>)));
+        providerConfigsLoaded = true;
       } catch (_) {}
     }
 
@@ -302,7 +305,7 @@ class SettingsProvider extends ChangeNotifier {
     // This fixes previously persisted overrides where type was switched from chat -> embedding.
     try {
       final migrationVersion = prefs.getInt(_migrationsVersionKey) ?? 0;
-      if (migrationVersion < _embeddingOverridesMigrationVersion) {
+      if (providerConfigsLoaded && migrationVersion < _embeddingOverridesMigrationVersion) {
         try {
           FlutterLogger.log('[SettingsProvider] provider modelOverrides migration start', tag: 'Migration');
         } catch (_) {}

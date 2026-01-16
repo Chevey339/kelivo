@@ -42,10 +42,10 @@ class ModelEditTypeSwitch {
         input: {...input},
         output: {...output},
         abilities: {...abilities},
-        cachedChatInput: cachedChatInput,
-        cachedChatOutput: cachedChatOutput,
-        cachedChatAbilities: cachedChatAbilities,
-        cachedEmbeddingInput: cachedEmbeddingInput,
+        cachedChatInput: cachedChatInput != null ? {...cachedChatInput} : null,
+        cachedChatOutput: cachedChatOutput != null ? {...cachedChatOutput} : null,
+        cachedChatAbilities: cachedChatAbilities != null ? {...cachedChatAbilities} : null,
+        cachedEmbeddingInput: cachedEmbeddingInput != null ? {...cachedEmbeddingInput} : null,
       );
     }
 

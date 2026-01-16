@@ -154,7 +154,11 @@ class ChatApiService {
     if (ov.isEmpty) return base;
     try {
       return ModelOverrideResolver.applyModelOverride(base, ov);
-    } catch (_) {
+    } catch (e) {
+      assert(() {
+        debugPrint('[ModelOverride] applyModelOverride failed: $e');
+        return true;
+      }());
       return base;
     }
   }

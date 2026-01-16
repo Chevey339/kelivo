@@ -140,21 +140,23 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     }
 
     if (ov != null) {
-      final hdrs = (ov['headers'] as List?) ?? const [];
+      final rawHdrs = ov['headers'];
+      final hdrs = (rawHdrs is List) ? rawHdrs : const <dynamic>[];
       for (final h in hdrs) {
         if (h is Map) {
           final kv = _HeaderKV();
-          kv.name.text = (h['name'] as String?) ?? '';
-          kv.value.text = (h['value'] as String?) ?? '';
+          kv.name.text = h['name']?.toString() ?? '';
+          kv.value.text = h['value']?.toString() ?? '';
           _headers.add(kv);
         }
       }
-      final bds = (ov['body'] as List?) ?? const [];
+      final rawBds = ov['body'];
+      final bds = (rawBds is List) ? rawBds : const <dynamic>[];
       for (final b in bds) {
         if (b is Map) {
           final kv = _BodyKV();
-          kv.keyCtrl.text = (b['key'] as String?) ?? '';
-          kv.valueCtrl.text = (b['value'] as String?) ?? '';
+          kv.keyCtrl.text = b['key']?.toString() ?? '';
+          kv.valueCtrl.text = b['value']?.toString() ?? '';
           _bodies.add(kv);
         }
       }
@@ -216,6 +218,16 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     );
+  }
+
+  void _toggleModality(Set<Modality> modalities, int index) {
+    final mod = index == 0 ? Modality.text : Modality.image;
+    if (modalities.contains(mod)) {
+      modalities.remove(mod);
+      if (modalities.isEmpty) modalities.add(Modality.text);
+    } else {
+      modalities.add(mod);
+    }
   }
 
   @override
@@ -430,22 +442,14 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
               value: _type == ModelType.chat ? 0 : 1,
               onChanged: (i) => setState(() => _setType(i == 0 ? ModelType.chat : ModelType.embedding)),
             ),
-              const SizedBox(height: 12),
-              _label(context, l10n.modelDetailSheetInputModesLabel),
-              const SizedBox(height: 6),
-              _SegmentedMulti(
-                options: [l10n.modelDetailSheetTextMode, l10n.modelDetailSheetImageMode],
-                isSelected: [_input.contains(Modality.text), _input.contains(Modality.image)],
-                onChanged: (idx) => setState(() {
-                  final mod = idx == 0 ? Modality.text : Modality.image;
-                if (_input.contains(mod)) {
-                  _input.remove(mod);
-                  if (_input.isEmpty) _input.add(Modality.text);
-                } else {
-                  _input.add(mod);
-                }
-                }),
-              ),
+            const SizedBox(height: 12),
+            _label(context, l10n.modelDetailSheetInputModesLabel),
+            const SizedBox(height: 6),
+            _SegmentedMulti(
+              options: [l10n.modelDetailSheetTextMode, l10n.modelDetailSheetImageMode],
+              isSelected: [_input.contains(Modality.text), _input.contains(Modality.image)],
+              onChanged: (idx) => setState(() => _toggleModality(_input, idx)),
+            ),
             if (_type == ModelType.chat) ...[
               const SizedBox(height: 12),
               _label(context, l10n.modelDetailSheetOutputModesLabel),
@@ -453,15 +457,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
               _SegmentedMulti(
                 options: [l10n.modelDetailSheetTextMode, l10n.modelDetailSheetImageMode],
                 isSelected: [_output.contains(Modality.text), _output.contains(Modality.image)],
-                onChanged: (idx) => setState(() {
-                  final mod = idx == 0 ? Modality.text : Modality.image;
-                  if (_output.contains(mod)) {
-                    _output.remove(mod);
-                    if (_output.isEmpty) _output.add(Modality.text);
-                  } else {
-                    _output.add(mod);
-                  }
-                }),
+                onChanged: (idx) => setState(() => _toggleModality(_output, idx)),
               ),
               const SizedBox(height: 12),
               _label(context, l10n.modelDetailSheetAbilitiesLabel),
@@ -664,7 +660,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     final headers = [for (final h in _headers) if (h.name.text.trim().isNotEmpty) {'name': h.name.text.trim(), 'value': h.value.text}];
     final bodies = [for (final b in _bodies) if (b.keyCtrl.text.trim().isNotEmpty) {'key': b.keyCtrl.text.trim(), 'value': b.valueCtrl.text}];
     final prev = (prevKey.isNotEmpty && ov[prevKey] is Map)
-        ? (ov[prevKey] as Map).cast<String, dynamic>()
+        ? {for (final e in (ov[prevKey] as Map).entries) e.key.toString(): e.value}
         : const <String, dynamic>{};
     final builtInSet = BuiltInToolNames.parseAndNormalize(prev['builtInTools']);
     if (_providerKind == ProviderKind.google) {
