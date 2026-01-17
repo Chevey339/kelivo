@@ -42,6 +42,8 @@
 	<string>允许访问相册以选择头像图片 / Allow access to your photos to pick an avatar.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIDesignRequiresCompatibility</key>
+	<true/>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
