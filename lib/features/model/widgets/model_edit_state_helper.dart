@@ -37,6 +37,11 @@ class ModelEditTypeSwitch {
     required Set<ModelAbility>? cachedChatAbilities,
     required Set<Modality>? cachedEmbeddingInput,
   }) {
+    Set<Modality> ensureText(Set<Modality> mods) {
+      if (mods.isEmpty) return {Modality.text};
+      return mods;
+    }
+
     if (prev == next) {
       return ModelTypeSwitchResult(
         input: {...input},
@@ -72,11 +77,11 @@ class ModelEditTypeSwitch {
     if (next == ModelType.embedding) {
       // Prevent chat-only state from leaking into embedding configs.
       nextAbilities.clear();
-      final resolvedInput = nextCachedEmbeddingInput ?? <Modality>{Modality.text};
+      final resolvedInput = <Modality>{Modality.text};
       nextInput
         ..clear()
         ..addAll(resolvedInput);
-      if (nextInput.isEmpty) nextInput.add(Modality.text);
+      nextInput = ensureText(nextInput);
       nextOutput
         ..clear()
         ..add(Modality.text);
@@ -96,12 +101,12 @@ class ModelEditTypeSwitch {
       nextInput
         ..clear()
         ..addAll(nextCachedChatInput ?? const {Modality.text});
-      if (nextInput.isEmpty) nextInput.add(Modality.text);
+      nextInput = ensureText(nextInput);
 
       nextOutput
         ..clear()
         ..addAll(nextCachedChatOutput ?? const {Modality.text});
-      if (nextOutput.isEmpty) nextOutput.add(Modality.text);
+      nextOutput = ensureText(nextOutput);
 
       nextAbilities
         ..clear()

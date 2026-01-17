@@ -55,11 +55,9 @@ class ModelRegistry {
     final outMods = <Modality>[...base.output];
     final ab = <ModelAbility>[...base.abilities];
     if (base.type == ModelType.embedding) {
-      if (!outMods.contains(Modality.text)) {
-        outMods
-          ..clear()
-          ..add(Modality.text);
-      }
+      outMods
+        ..clear()
+        ..add(Modality.text);
       ab.clear();
       return base.copyWith(input: inMods, output: outMods, abilities: ab);
     }

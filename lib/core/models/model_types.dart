@@ -18,6 +18,7 @@ class ModelInfo {
   static List<Modality> _normalizeModalities(Iterable<Modality> mods) {
     final set = <Modality>{...mods};
     final list = set.toList()..sort((a, b) => a.index.compareTo(b.index));
+    if (list.isEmpty) list.add(Modality.text);
     return List.unmodifiable(list);
   }
 

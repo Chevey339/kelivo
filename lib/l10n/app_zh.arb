@@ -1035,6 +1035,15 @@
   "searchProviderExaDescription": "具备语义理解的神经搜索引擎。适合研究与查找特定内容。",
   "searchProviderLinkUpDescription": "提供来源可追溯答案的搜索 API，同时提供搜索结果与 AI 摘要。",
   "modelFetchInvertTooltip": "反选",
+  "modelDetailSheetDuplicateApiModelIdWarning": "apiModelId 已存在，将保存为 {key}",
+  "@modelDetailSheetDuplicateApiModelIdWarning": {
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+  "modelDetailSheetSaveFailedMessage": "保存失败，请重试",
   "searchProviderMetasoDescription": "秘塔中文搜索引擎。面向中文内容优化并提供 AI 能力。",
   "searchProviderSearXNGDescription": "注重隐私的元搜索引擎。需自建实例，无跟踪。",
   "searchProviderTavilyDescription": "为大型语言模型（LLMs）优化的 AI 搜索 API，提供高质量、相关的搜索结果。",

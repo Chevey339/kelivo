@@ -991,6 +991,15 @@
   "modelDetailSheetAddHeader": "Add Header",
   "modelDetailSheetCustomBodyTitle": "Custom Body",
   "modelFetchInvertTooltip": "Invert",
+  "modelDetailSheetDuplicateApiModelIdWarning": "apiModelId already exists; it will be saved as {key}.",
+  "@modelDetailSheetDuplicateApiModelIdWarning": {
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+  "modelDetailSheetSaveFailedMessage": "Save failed. Please try again.",
   "modelDetailSheetAddBody": "Add Body",
   "modelDetailSheetBuiltinToolsDescription": "Built-in tools only support official APIs.",
   "modelDetailSheetGeminiCodeExecutionMutuallyExclusiveHint": "Code execution cannot coexist with Search/URL Context/MCP tools.",

@@ -5,6 +5,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/model_override_resolver.dart';
+import '../../../core/services/logging/flutter_logger.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -753,9 +754,10 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     // Decide which logical key to use for this instance
     final String key = (prevKey.isEmpty || widget.isNew) ? _nextModelKey(old, apiModelId) : prevKey;
     if ((prevKey.isEmpty || widget.isNew) && key != apiModelId) {
+      final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
         context,
-        message: 'apiModelId 已存在，将保存为 $key',
+        message: l10n.modelDetailSheetDuplicateApiModelIdWarning(key),
         type: NotificationType.warning,
       );
     }
@@ -785,10 +787,13 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
         // Existing model instance; keep logical key stable and just persist overrides
         await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov));
       }
-    } catch (_) {
+    } catch (e, st) {
+      FlutterLogger.log('[ModelDetailSheet] save failed: $e\n$st', tag: 'Model');
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
         context,
-        message: '保存失败，请重试',
+        message: l10n.modelDetailSheetSaveFailedMessage,
         type: NotificationType.error,
       );
       return;

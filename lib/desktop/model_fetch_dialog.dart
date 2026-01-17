@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../core/providers/settings_provider.dart';
+import '../core/services/logging/flutter_logger.dart';
 import '../core/providers/model_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart' as lucide;
@@ -79,12 +80,12 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
       await action();
     } catch (e, st) {
       if (!mounted) return;
-      if (kDebugMode) {
-        debugPrint('Model fetch dialog action failed: $e');
-        debugPrint('$st');
-      }
+      FlutterLogger.log('Model fetch dialog action failed: $e\n$st', tag: 'ModelFetch');
       final messenger = ScaffoldMessenger.maybeOf(context);
-      if (messenger == null) return;
+      if (messenger == null) {
+        setState(() => _error = 'Operation failed');
+        return;
+      }
       final message = kDebugMode ? 'Operation failed: $e' : 'Operation failed';
       messenger.showSnackBar(
         SnackBar(

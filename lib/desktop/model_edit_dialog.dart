@@ -221,7 +221,9 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
   }
 
   void _toggleModality(Set<Modality> modalities, int index) {
-    final mod = index == 0 ? Modality.text : Modality.image;
+    const modalityOrder = <Modality>[Modality.text, Modality.image];
+    if (index < 0 || index >= modalityOrder.length) return;
+    final mod = modalityOrder[index];
     if (modalities.contains(mod)) {
       modalities.remove(mod);
       if (modalities.isEmpty) modalities.add(Modality.text);

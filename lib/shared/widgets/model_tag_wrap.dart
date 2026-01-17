@@ -168,6 +168,11 @@ class ModelTagWrap extends StatelessWidget {
               width: 12,
               height: 12,
               colorFilter: ColorFilter.mode(isDark ? cs.secondary : cs.secondary.withOpacity(0.9), BlendMode.srcIn),
+              errorBuilder: (_, __, ___) => Icon(
+                Lucide.Brain,
+                size: 12,
+                color: isDark ? cs.secondary : cs.secondary.withOpacity(0.9),
+              ),
               placeholderBuilder: (_) => Icon(
                 Lucide.Brain,
                 size: 12,
@@ -299,6 +304,11 @@ class ModelCapsulesRow extends StatelessWidget {
                 width: iconSize,
                 height: iconSize,
                 colorFilter: ColorFilter.mode(cs.secondary, BlendMode.srcIn),
+                errorBuilder: (_, __, ___) => Icon(
+                  Lucide.Brain,
+                  size: iconSize,
+                  color: cs.secondary,
+                ),
                 placeholderBuilder: (_) => Icon(
                   Lucide.Brain,
                   size: iconSize,

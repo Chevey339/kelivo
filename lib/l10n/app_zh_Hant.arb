@@ -1021,6 +1021,15 @@
   "searchProviderExaDescription": "具備語義理解的神經搜尋引擎。適合研究與查找特定內容。",
   "searchProviderLinkUpDescription": "提供來源可追溯答案的搜尋 API，同時提供搜尋結果與 AI 摘要。",
   "modelFetchInvertTooltip": "反選",
+  "modelDetailSheetDuplicateApiModelIdWarning": "apiModelId 已存在，將保存為 {key}",
+  "@modelDetailSheetDuplicateApiModelIdWarning": {
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+  "modelDetailSheetSaveFailedMessage": "保存失敗，請重試",
   "searchProviderMetasoDescription": "秘塔中文搜尋引擎。針對中文內容優化並提供 AI 能力。",
   "searchProviderSearXNGDescription": "重視隱私的元搜尋引擎。需自建實例，無追蹤。",
   "searchProviderTavilyDescription": "為大型語言模型（LLM）優化的 AI 搜尋 API，提供高品質、相關的搜尋結果。",

@@ -246,16 +246,17 @@ class SettingsProvider extends ChangeNotifier {
         final rawOv = ovEntry.value;
         if (rawOv is! Map) continue;
 
-        final t = (rawOv['type'] ?? rawOv['t'] ?? '').toString().trim().toLowerCase();
+        final normalizedRawOv = rawOv.map((k, v) => MapEntry(k.toString(), v));
+        final t = (normalizedRawOv['type'] ?? normalizedRawOv['t'] ?? '').toString().trim().toLowerCase();
         if (!_embeddingTypeStrings.contains(t)) continue;
 
         // Migration/cleanup (embedding): remove chat-only fields.
         // Embeddings may still use explicit input modalities like text/image.
-        final hasChatOnlyKeys = _embeddingChatOnlyFields.any(rawOv.containsKey);
+        final hasChatOnlyKeys = _embeddingChatOnlyFields.any(normalizedRawOv.containsKey);
         if (!hasChatOnlyKeys) continue;
 
         nextOverrides ??= Map<String, dynamic>.from(cfg.modelOverrides);
-        final m = Map<String, dynamic>.from(rawOv);
+        final m = Map<String, dynamic>.from(normalizedRawOv);
         for (final k in _embeddingChatOnlyFields) {
           m.remove(k);
         }

@@ -2244,13 +2244,8 @@ class _ModelCard extends StatelessWidget {
     final resolved = _resolveBaseAndOverride(context);
     final ov = resolved.ov;
     final effective = ov == null ? resolved.base : _applyModelOverride(resolved.base, ov, applyDisplayName: true);
-    String displayName = modelId;
-    if (ov != null) {
-      final n = ov['name']?.toString().trim();
-      if (n != null && n.isNotEmpty) {
-        displayName = n;
-      }
-    }
+    String displayName = effective.displayName.trim();
+    if (displayName.isEmpty) displayName = modelId;
     return _TactileRow(
       pressedScale: 0.98,
       haptics: false,
@@ -2348,7 +2343,12 @@ class _ModelCard extends StatelessWidget {
   }
 
   _ResolvedModelOverride _resolveBaseAndOverride(BuildContext context) {
-    final cfg = context.watch<SettingsProvider>().getProviderConfig(providerKey);
+    final configs = context.watch<SettingsProvider>().providerConfigs;
+    final cfg = configs[providerKey];
+    if (cfg == null) {
+      final base = _infer(modelId);
+      return _ResolvedModelOverride(base: base, ov: null, baseId: modelId);
+    }
     final rawOv = cfg.modelOverrides[modelId];
     final Map<String, dynamic>? ov =
         rawOv is Map ? {for (final e in rawOv.entries) e.key.toString(): e.value} : null;

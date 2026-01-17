@@ -154,11 +154,8 @@ class ChatApiService {
     if (ov.isEmpty) return base;
     try {
       return ModelOverrideResolver.applyModelOverride(base, ov);
-    } catch (e) {
-      assert(() {
-        debugPrint('[ModelOverride] applyModelOverride failed: $e');
-        return true;
-      }());
+    } catch (e, st) {
+      FlutterLogger.log('[ModelOverride] applyModelOverride failed: $e\n$st', tag: 'ModelOverride');
       return base;
     }
   }

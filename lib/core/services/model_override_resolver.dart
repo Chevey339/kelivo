@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'package:flutter/foundation.dart';
+import '../services/logging/flutter_logger.dart';
 
 import '../models/model_types.dart';
 
@@ -44,6 +45,7 @@ class ModelOverrideResolver {
         if (kDebugMode) {
           debugPrint('[ModelOverride] Unknown modality value: $s');
         }
+        FlutterLogger.log('[ModelOverride] Unknown modality value: $s', tag: 'ModelOverride');
       }
     }
     if (out.isEmpty) return const <Modality>[];
@@ -69,6 +71,7 @@ class ModelOverrideResolver {
         if (kDebugMode) {
           debugPrint('[ModelOverride] Unknown ability value: $s');
         }
+        FlutterLogger.log('[ModelOverride] Unknown ability value: $s', tag: 'ModelOverride');
       }
     }
     if (out.isEmpty) return const <ModelAbility>[];
