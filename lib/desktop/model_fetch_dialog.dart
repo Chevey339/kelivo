@@ -86,7 +86,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
         setState(() => _error = 'Operation failed');
         return;
       }
-      final message = kDebugMode ? 'Operation failed: $e' : 'Operation failed';
+      const message = 'Operation failed';
       messenger.showSnackBar(
         SnackBar(
           content: Text(message),

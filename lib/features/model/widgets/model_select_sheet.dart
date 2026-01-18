@@ -33,6 +33,7 @@ class _ModelProcessingData {
   final String currentModelKey;
   final List<String> providersOrder;
   final String? limitProviderKey;
+  final bool disableResolverPlatformLogging;
   
   _ModelProcessingData({
     required this.providerConfigs,
@@ -40,6 +41,7 @@ class _ModelProcessingData {
     required this.currentModelKey,
     required this.providersOrder,
     this.limitProviderKey,
+    required this.disableResolverPlatformLogging,
   });
 }
 
@@ -62,6 +64,10 @@ String? _assetForNameStatic(String n) {
 
 // Static function for compute - must be top-level
 _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
+  if (data.disableResolverPlatformLogging) {
+    ModelOverrideResolver.setPlatformLoggingEnabled(false);
+    ModelOverrideResolver.setUnknownValueLoggingEnabled(false);
+  }
   final providers = data.limitProviderKey == null
       ? data.providerConfigs
       : {
@@ -285,6 +291,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         currentModelKey: currentKey,
         providersOrder: settings.providersOrder,
         limitProviderKey: widget.limitProviderKey,
+        disableResolverPlatformLogging: true,
       );
       
       // Process in background isolate
@@ -343,6 +350,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       currentModelKey: currentKey,
       providersOrder: settings.providersOrder,
       limitProviderKey: widget.limitProviderKey,
+      disableResolverPlatformLogging: false,
     );
     
     final result = _processModelsInBackground(processingData);
@@ -1122,6 +1130,7 @@ class _DesktopModelSelectDialogBodyState extends State<_DesktopModelSelectDialog
       currentModelKey: currentKey,
       providersOrder: settings.providersOrder,
       limitProviderKey: widget.limitProviderKey,
+      disableResolverPlatformLogging: false,
     );
     // Synchronous processing is fast enough here
     final result = _processModelsInBackground(data);

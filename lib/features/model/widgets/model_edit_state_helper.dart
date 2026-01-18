@@ -38,19 +38,22 @@ class ModelEditTypeSwitch {
     required Set<Modality>? cachedEmbeddingInput,
   }) {
     Set<Modality> ensureText(Set<Modality> mods) {
-      if (mods.isEmpty) return {Modality.text};
+      if (!mods.contains(Modality.text)) mods.add(Modality.text);
       return mods;
     }
 
+    Set<T> freezeSet<T>(Set<T> set) => Set.unmodifiable(Set<T>.from(set));
+    Set<T>? freezeNullableSet<T>(Set<T>? set) => set == null ? null : freezeSet(set);
+
     if (prev == next) {
       return ModelTypeSwitchResult(
-        input: {...input},
-        output: {...output},
-        abilities: {...abilities},
-        cachedChatInput: cachedChatInput != null ? {...cachedChatInput} : null,
-        cachedChatOutput: cachedChatOutput != null ? {...cachedChatOutput} : null,
-        cachedChatAbilities: cachedChatAbilities != null ? {...cachedChatAbilities} : null,
-        cachedEmbeddingInput: cachedEmbeddingInput != null ? {...cachedEmbeddingInput} : null,
+        input: freezeSet(input),
+        output: freezeSet(output),
+        abilities: freezeSet(abilities),
+        cachedChatInput: freezeNullableSet(cachedChatInput),
+        cachedChatOutput: freezeNullableSet(cachedChatOutput),
+        cachedChatAbilities: freezeNullableSet(cachedChatAbilities),
+        cachedEmbeddingInput: freezeNullableSet(cachedEmbeddingInput),
       );
     }
 
@@ -77,7 +80,7 @@ class ModelEditTypeSwitch {
     if (next == ModelType.embedding) {
       // Prevent chat-only state from leaking into embedding configs.
       nextAbilities.clear();
-      final resolvedInput = <Modality>{Modality.text};
+      final resolvedInput = {...(nextCachedEmbeddingInput ?? const {Modality.text})};
       nextInput
         ..clear()
         ..addAll(resolvedInput);
@@ -86,13 +89,13 @@ class ModelEditTypeSwitch {
         ..clear()
         ..add(Modality.text);
       return ModelTypeSwitchResult(
-        input: nextInput,
-        output: nextOutput,
-        abilities: nextAbilities,
-        cachedChatInput: nextCachedChatInput,
-        cachedChatOutput: nextCachedChatOutput,
-        cachedChatAbilities: nextCachedChatAbilities,
-        cachedEmbeddingInput: nextCachedEmbeddingInput,
+        input: freezeSet(nextInput),
+        output: freezeSet(nextOutput),
+        abilities: freezeSet(nextAbilities),
+        cachedChatInput: freezeNullableSet(nextCachedChatInput),
+        cachedChatOutput: freezeNullableSet(nextCachedChatOutput),
+        cachedChatAbilities: freezeNullableSet(nextCachedChatAbilities),
+        cachedEmbeddingInput: freezeNullableSet(nextCachedEmbeddingInput),
       );
     }
 
@@ -114,13 +117,13 @@ class ModelEditTypeSwitch {
     }
 
     return ModelTypeSwitchResult(
-      input: nextInput,
-      output: nextOutput,
-      abilities: nextAbilities,
-      cachedChatInput: nextCachedChatInput,
-      cachedChatOutput: nextCachedChatOutput,
-      cachedChatAbilities: nextCachedChatAbilities,
-      cachedEmbeddingInput: nextCachedEmbeddingInput,
+      input: freezeSet(nextInput),
+      output: freezeSet(nextOutput),
+      abilities: freezeSet(nextAbilities),
+      cachedChatInput: freezeNullableSet(nextCachedChatInput),
+      cachedChatOutput: freezeNullableSet(nextCachedChatOutput),
+      cachedChatAbilities: freezeNullableSet(nextCachedChatAbilities),
+      cachedEmbeddingInput: freezeNullableSet(nextCachedEmbeddingInput),
     );
   }
 }

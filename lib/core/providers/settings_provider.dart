@@ -33,7 +33,13 @@ class SettingsProvider extends ChangeNotifier {
   static const String _migrationsVersionKey = 'migrations_version_v1';
   static const int _embeddingOverridesMigrationVersion = 3;
   static const Set<String> _embeddingTypeStrings = {'embedding', 'embeddings'};
-  static const Set<String> _embeddingChatOnlyFields = {'abilities', 'output', 'builtInTools'};
+  static const Set<String> _embeddingChatOnlyFields = {
+    'abilities',
+    'output',
+    'builtInTools',
+    'built_in_tools',
+    'tools',
+  };
   static const String _pinnedModelsKey = 'pinned_models_v1';
   static const String _selectedModelKey = 'selected_model_v1';
   static const String _titleModelKey = 'title_model_v1';
@@ -271,9 +277,19 @@ class SettingsProvider extends ChangeNotifier {
     }
 
     if (nextProviderConfigs == null) return _MigrationResult.noChange;
-    final map = nextProviderConfigs.map((k, v) => MapEntry(k, v.toJson()));
-    final ok = await prefs.setString(_providerConfigsKey, jsonEncode(map));
-    if (!ok) return _MigrationResult.failed;
+    try {
+      final map = nextProviderConfigs.map((k, v) => MapEntry(k, v.toJson()));
+      final encoded = jsonEncode(map);
+      final ok = await prefs.setString(_providerConfigsKey, encoded);
+      if (!ok) return _MigrationResult.failed;
+    } catch (e, st) {
+      assert(() {
+        debugPrint('[SettingsProvider] provider configs migration persist failed: $e');
+        debugPrint('$st');
+        return true;
+      }());
+      return _MigrationResult.failed;
+    }
     _providerConfigs = nextProviderConfigs;
     assert(() {
       debugPrint('[SettingsProvider] embedding overrides migration: providers=$providersChanged, models=$modelsChanged');
@@ -305,7 +321,13 @@ class SettingsProvider extends ChangeNotifier {
         final raw = jsonDecode(cfgStr) as Map<String, dynamic>;
         _providerConfigs = raw.map((k, v) => MapEntry(k, ProviderConfig.fromJson(v as Map<String, dynamic>)));
         providerConfigsLoaded = true;
-      } catch (_) {}
+      } catch (e, st) {
+        assert(() {
+          debugPrint('[SettingsProvider] providerConfigs decode failed: $e');
+          debugPrint('$st');
+          return true;
+        }());
+      }
     }
 
     // Migration/cleanup: embedding models should not keep chat-only fields (abilities/output/builtInTools).
@@ -317,36 +339,45 @@ class SettingsProvider extends ChangeNotifier {
         try {
           FlutterLogger.log('[SettingsProvider] provider modelOverrides migration start', tag: 'Migration');
         } catch (_) {}
+        var backupOk = true;
         if (!prefs.containsKey(_providerConfigsBackupKey)) {
           final backup = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
-          await prefs.setString(_providerConfigsBackupKey, jsonEncode(backup));
+          backupOk = await prefs.setString(_providerConfigsBackupKey, jsonEncode(backup));
           assert(() {
             debugPrint('[SettingsProvider] provider configs backup saved before migration.');
             return true;
           }());
-        }
-        final result = await _migrateEmbeddingModelOverrides(prefs);
-        // Mark as attempted so we don't keep re-scanning on every startup when no changes are needed.
-        if (result != _MigrationResult.failed) {
-          await prefs.setInt(_migrationsVersionKey, _embeddingOverridesMigrationVersion);
-        }
-        assert(() {
-          if (result == _MigrationResult.applied) {
-            debugPrint('[SettingsProvider] provider modelOverrides migration applied.');
+          if (!backupOk) {
+            assert(() {
+              debugPrint('[SettingsProvider] provider configs backup failed; abort migration.');
+              return true;
+            }());
           }
-          return true;
-        }());
-        try {
-          FlutterLogger.log(
-            '[SettingsProvider] provider modelOverrides migration done (result=$result)',
-            tag: 'Migration',
-          );
-        } catch (_) {}
+        }
+        if (backupOk) {
+          final result = await _migrateEmbeddingModelOverrides(prefs);
+          // Mark as attempted so we don't keep re-scanning on every startup when no changes are needed.
+          if (result != _MigrationResult.failed) {
+            await prefs.setInt(_migrationsVersionKey, _embeddingOverridesMigrationVersion);
+          }
+          assert(() {
+            if (result == _MigrationResult.applied) {
+              debugPrint('[SettingsProvider] provider modelOverrides migration applied.');
+            }
+            return true;
+          }());
+          try {
+            FlutterLogger.log(
+              '[SettingsProvider] provider modelOverrides migration done (result=$result)',
+              tag: 'Migration',
+            );
+          } catch (_) {}
+        }
       }
     } catch (e, st) {
       // Debug-only visibility for migration failures (no behavior change in release).
       try {
-        FlutterLogger.log('[SettingsProvider] provider modelOverrides migration failed', tag: 'Migration');
+        FlutterLogger.log('[SettingsProvider] provider modelOverrides migration failed: $e\n$st', tag: 'Migration');
       } catch (_) {}
       assert(() {
         debugPrint('[SettingsProvider] provider modelOverrides migration failed: $e');

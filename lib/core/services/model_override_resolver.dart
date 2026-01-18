@@ -13,6 +13,16 @@ import '../models/model_types.dart';
 class ModelOverrideResolver {
   static const Set<String> _embeddingTypeStrings = {'embedding', 'embeddings'};
   static const Set<String> _chatTypeStrings = {'chat'};
+  static bool _platformLogEnabled = true;
+  static bool _unknownValueLoggingEnabled = kDebugMode;
+
+  static void setPlatformLoggingEnabled(bool enabled) {
+    _platformLogEnabled = enabled;
+  }
+
+  static void setUnknownValueLoggingEnabled(bool enabled) {
+    _unknownValueLoggingEnabled = enabled;
+  }
 
   static String _norm(dynamic v) => (v == null ? '' : v.toString()).trim().toLowerCase();
 
@@ -42,10 +52,14 @@ class ModelOverrideResolver {
       } else if (s == 'image') {
         out.add(Modality.image);
       } else if (s.isNotEmpty) {
-        if (kDebugMode) {
-          debugPrint('[ModelOverride] Unknown modality value: $s');
+        if (_unknownValueLoggingEnabled) {
+          if (kDebugMode) {
+            debugPrint('[ModelOverride] Unknown modality value: $s');
+          }
+          if (_platformLogEnabled) {
+            FlutterLogger.log('[ModelOverride] Unknown modality value: $s', tag: 'ModelOverride');
+          }
         }
-        FlutterLogger.log('[ModelOverride] Unknown modality value: $s', tag: 'ModelOverride');
       }
     }
     if (out.isEmpty) return const <Modality>[];
@@ -68,10 +82,14 @@ class ModelOverrideResolver {
       } else if (s == 'reasoning') {
         out.add(ModelAbility.reasoning);
       } else if (s.isNotEmpty) {
-        if (kDebugMode) {
-          debugPrint('[ModelOverride] Unknown ability value: $s');
+        if (_unknownValueLoggingEnabled) {
+          if (kDebugMode) {
+            debugPrint('[ModelOverride] Unknown ability value: $s');
+          }
+          if (_platformLogEnabled) {
+            FlutterLogger.log('[ModelOverride] Unknown ability value: $s', tag: 'ModelOverride');
+          }
         }
-        FlutterLogger.log('[ModelOverride] Unknown ability value: $s', tag: 'ModelOverride');
       }
     }
     if (out.isEmpty) return const <ModelAbility>[];

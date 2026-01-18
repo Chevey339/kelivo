@@ -18,6 +18,7 @@ import '../widgets/share_provider_sheet.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../core/services/logging/flutter_logger.dart';
 import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_switch.dart';
@@ -2610,7 +2611,8 @@ Future<String?> showModelPickerForTest(BuildContext context, String providerKey,
 ModelInfo _applyModelOverride(ModelInfo base, Map<String, dynamic> ov, {bool applyDisplayName = false}) {
   try {
     return ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: applyDisplayName);
-  } catch (e) {
+  } catch (e, st) {
+    FlutterLogger.log('[ModelOverride] applyModelOverride failed: $e\n$st', tag: 'ModelOverride');
     assert(() {
       debugPrint('[ModelOverride] applyModelOverride failed: $e');
       return true;

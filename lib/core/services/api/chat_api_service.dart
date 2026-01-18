@@ -16,6 +16,7 @@ import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../utils/unicode_sanitizer.dart';
 import 'builtin_tools.dart';
 import '../model_override_resolver.dart';
+import '../logging/flutter_logger.dart';
 
 class ChatApiService {
   static const String _aihubmixAppCode = 'ZKRT3588';

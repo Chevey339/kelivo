@@ -8,6 +8,7 @@ import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
 import '../core/services/api/builtin_tools.dart';
 import '../core/services/model_override_resolver.dart';
+import '../core/services/logging/flutter_logger.dart';
 import '../shared/widgets/ios_switch.dart';
 import '../shared/widgets/snackbar.dart';
 import '../features/model/widgets/model_edit_state_helper.dart';
@@ -697,11 +698,21 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
       if (!isEmbedding && builtInTools.isNotEmpty) 'builtInTools': builtInTools,
     };
 
-    if (prevKey.isEmpty || widget.isNew) {
-      final list = old.models.toList()..add(key);
-      await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov, models: list));
-    } else {
-      await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov));
+    try {
+      if (prevKey.isEmpty || widget.isNew) {
+        final list = old.models.toList()..add(key);
+        await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov, models: list));
+      } else {
+        await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov));
+      }
+    } catch (e, st) {
+      FlutterLogger.log('[ModelEditDialog] save failed: $e\n$st', tag: 'Model');
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.modelDetailSheetSaveFailedMessage), backgroundColor: Theme.of(context).colorScheme.error),
+      );
+      return;
     }
     if (!mounted) return;
     Navigator.of(context).pop(true);
