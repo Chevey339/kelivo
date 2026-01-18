@@ -329,6 +329,17 @@ class HomeViewModel extends ChangeNotifier {
     }
   }
 
+  /// Save scroll offset for a conversation.
+  Future<void> saveScrollOffset(String conversationId, double offset) async {
+    await _chatService.saveScrollOffset(conversationId, offset);
+  }
+
+  /// Get saved scroll offset for a conversation (-1.0 means no saved position).
+  double getScrollOffset(String conversationId) {
+    final convo = _chatService.getConversation(conversationId);
+    return convo?.scrollOffset ?? -1.0;
+  }
+
   /// Create a new conversation.
   Future<void> createNewConversation() async {
     // Flush current conversation progress before creating new

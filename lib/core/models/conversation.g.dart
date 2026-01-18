@@ -25,17 +25,18 @@ class ConversationAdapter extends TypeAdapter<Conversation> {
       isPinned: fields[5] as bool,
       mcpServerIds: (fields[6] as List?)?.cast<String>(),
       assistantId: fields[7] as String?,
-      truncateIndex: (fields[8] as int?) ?? -1,
-      versionSelections: (fields[9] as Map?)?.map((k, v) => MapEntry(k.toString(), (v as num).toInt())) ?? <String, int>{},
+      truncateIndex: fields[8] as int?,
+      versionSelections: (fields[9] as Map?)?.cast<String, int>(),
       summary: fields[10] as String?,
-      lastSummarizedMessageCount: (fields[11] as int?) ?? 0,
+      lastSummarizedMessageCount: fields[11] as int?,
+      scrollOffset: fields[12] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Conversation obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(13)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -59,7 +60,9 @@ class ConversationAdapter extends TypeAdapter<Conversation> {
       ..writeByte(10)
       ..write(obj.summary)
       ..writeByte(11)
-      ..write(obj.lastSummarizedMessageCount);
+      ..write(obj.lastSummarizedMessageCount)
+      ..writeByte(12)
+      ..write(obj.scrollOffset);
   }
 
   @override
