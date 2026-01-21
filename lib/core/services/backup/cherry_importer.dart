@@ -304,8 +304,13 @@ class CherryImporter {
       if (id.isEmpty) continue;
       final type = (p['type'] ?? '').toString().toLowerCase();
       final name = (p['name'] ?? id).toString();
-      final apiKey = (p['apiKey'] ?? '').toString();
+      final apiKeyRaw = (p['apiKey'] ?? '').toString();
       final apiHostRaw = (p['apiHost'] ?? '').toString().trim();
+
+      // Parse comma-separated API keys (Cherry Studio stores multiple keys in one string)
+      final apiKeys = _splitApiKeyString(apiKeyRaw);
+      final apiKey = apiKeys.isNotEmpty ? apiKeys.first : '';
+      final multiKeyEnabled = apiKeys.length > 1;
 
       // Determine provider kind mapping
       String? kind;
@@ -381,8 +386,8 @@ class CherryImporter {
         'proxyPort': '8080',
         'proxyUsername': '',
         'proxyPassword': '',
-        'multiKeyEnabled': false,
-        'apiKeys': const <dynamic>[],
+        'multiKeyEnabled': multiKeyEnabled,
+        'apiKeys': multiKeyEnabled ? apiKeys : const <dynamic>[],
         'keyManagement': const <String, dynamic>{},
       };
       imported[id] = map;
@@ -1033,4 +1038,25 @@ class _PendingAttachmentRef {
   final String? mime;
   final bool isImage;
   const _PendingAttachmentRef({this.fileId, this.dataUrl, this.url, this.name, this.mime, this.isImage = true});
+}
+
+/// Splits a comma-separated API key string into a list of keys.
+/// Handles escaped commas (\,) and trims whitespace.
+/// Mirrors Cherry Studio's splitApiKeyString behavior.
+List<String> _splitApiKeyString(String keyStr) {
+  if (keyStr.trim().isEmpty) return const <String>[];
+  
+  // Split by comma but not escaped comma (\,)
+  final parts = keyStr.split(RegExp(r'(?<!\\),'));
+  final result = <String>[];
+  
+  for (final part in parts) {
+    // Unescape \, to , and trim
+    final key = part.replaceAll(r'\,', ',').trim();
+    if (key.isNotEmpty) {
+      result.add(key);
+    }
+  }
+  
+  return result;
 }
