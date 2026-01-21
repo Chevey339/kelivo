@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../models/api_keys.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
@@ -387,7 +388,9 @@ class CherryImporter {
         'proxyUsername': '',
         'proxyPassword': '',
         'multiKeyEnabled': multiKeyEnabled,
-        'apiKeys': multiKeyEnabled ? apiKeys : const <dynamic>[],
+        'apiKeys': multiKeyEnabled
+            ? apiKeys.map((k) => ApiKeyConfig.create(k).toJson()).toList()
+            : const <dynamic>[],
         'keyManagement': const <String, dynamic>{},
       };
       imported[id] = map;
@@ -1045,18 +1048,20 @@ class _PendingAttachmentRef {
 /// Mirrors Cherry Studio's splitApiKeyString behavior.
 List<String> _splitApiKeyString(String keyStr) {
   if (keyStr.trim().isEmpty) return const <String>[];
-  
-  // Split by comma but not escaped comma (\,)
-  final parts = keyStr.split(RegExp(r'(?<!\\),'));
+
+  // Use placeholder to handle escaped commas (avoids regex lookbehind for web compatibility)
+  const placeholder = '\x00';
+  final escaped = keyStr.replaceAll(r'\,', placeholder);
+  final parts = escaped.split(',');
+
   final result = <String>[];
-  
   for (final part in parts) {
-    // Unescape \, to , and trim
-    final key = part.replaceAll(r'\,', ',').trim();
+    // Restore escaped commas and trim
+    final key = part.replaceAll(placeholder, ',').trim();
     if (key.isNotEmpty) {
       result.add(key);
     }
   }
-  
+
   return result;
 }
