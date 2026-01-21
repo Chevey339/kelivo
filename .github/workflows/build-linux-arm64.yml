@@ -28,7 +28,7 @@ jobs:
   linux-arm64:
     name: 构建 Linux ARM64
     # 使用 GitHub 提供的 ARM64 runner（仅公开仓库可用）
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-22.04-arm
     permissions: write-all
 
     steps:

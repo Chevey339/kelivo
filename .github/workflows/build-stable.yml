@@ -445,7 +445,7 @@ jobs:
   linux:
     if: ${{ github.event.inputs.build_linux == 'true' }}
     name: 构建 Linux
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions: write-all
 
     steps:
