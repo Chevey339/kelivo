@@ -52,6 +52,9 @@ class MessageBuilderService {
   final String Function(ChatMessage message, String content)?
       geminiThoughtSignatureHandler;
 
+  /// Cache for document text extraction to avoid re-reading files on every message
+  final Map<String, String?> _docTextCache = <String, String?>{};
+
   /// Collapse message versions to show only selected version per group.
   List<ChatMessage> collapseVersions(
     List<ChatMessage> items,
@@ -228,15 +231,14 @@ class MessageBuilderService {
       }
     }
 
-    final Map<String, String?> docTextCache = <String, String?>{};
     Future<String?> readDocument(DocumentAttachment d) async {
-      if (docTextCache.containsKey(d.path)) return docTextCache[d.path];
+      if (_docTextCache.containsKey(d.path)) return _docTextCache[d.path];
       try {
         final text = await DocumentTextExtractor.extract(path: d.path, mime: d.mime);
-        docTextCache[d.path] = text;
+        _docTextCache[d.path] = text;
         return text;
       } catch (_) {
-        docTextCache[d.path] = null;
+        _docTextCache[d.path] = null;
         return null;
       }
     }
