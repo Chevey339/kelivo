@@ -2,13 +2,10 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/cupertino.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
-import 'package:cross_file/cross_file.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/animations/widgets.dart';
@@ -597,24 +594,13 @@ class _BackupPageState extends State<BackupPage> {
     final l10n = AppLocalizations.of(context)!;
     final file = await _runWithExportingOverlay(context, () => vm.exportToFile());
     if (!mounted) return;
-    
-    // iPad: anchor popover to the overlay's center
-    Rect rect;
-    final overlay = Overlay.of(context);
-    final ro = overlay?.context.findRenderObject();
-    if (ro is RenderBox && ro.hasSize) {
-      final center = ro.size.center(Offset.zero);
-      final global = ro.localToGlobal(center);
-      rect = Rect.fromCenter(center: global, width: 1, height: 1);
-    } else {
-      final size = MediaQuery.of(context).size;
-      rect = Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: 1, height: 1);
-    }
-    
-    await Future.delayed(const Duration(milliseconds: 50));
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      sharePositionOrigin: rect,
+
+    await FilePicker.platform.saveFile(
+      dialogTitle: l10n.backupPageExportToFile,
+      fileName: file.uri.pathSegments.last,
+      type: FileType.custom,
+      allowedExtensions: ['zip'],
+      bytes: await file.readAsBytes(),
     );
   }
 
