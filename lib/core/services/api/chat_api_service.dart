@@ -1295,10 +1295,21 @@ class ChatApiService {
         final isLast = i == messages.length - 1;
         final raw = (m['content'] ?? '').toString();
         final role = (m['role'] ?? 'user').toString();
+        final outMsg = Map<String, dynamic>.from(m);
+        outMsg['role'] = role;
 
         // System 消息保持为纯文本，不解析为图片
         if (role == 'system') {
-          mm.add({'role': role, 'content': raw});
+          outMsg['content'] = raw;
+          mm.add(outMsg);
+          continue;
+        }
+
+        // Tool / tool_calls messages must preserve tool-specific fields (tool_call_id / tool_calls / name).
+        // Also do not convert tool output to multimodal parts, as many OpenAI-compatible backends require tool content to be a string.
+        if (role == 'tool' || (role == 'assistant' && outMsg['tool_calls'] is List && (outMsg['tool_calls'] as List).isNotEmpty)) {
+          outMsg['content'] = raw;
+          mm.add(outMsg);
           continue;
         }
 
@@ -1369,10 +1380,12 @@ class ChatApiService {
               }
             }
           }
-          mm.add({'role': role, 'content': parts});
+          outMsg['content'] = parts;
+          mm.add(outMsg);
         } else {
           // No images, use simple string content
-          mm.add({'role': role, 'content': raw});
+          outMsg['content'] = raw;
+          mm.add(outMsg);
         }
       }
       body = {
