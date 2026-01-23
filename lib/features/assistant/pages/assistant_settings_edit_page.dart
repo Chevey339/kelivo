@@ -6648,40 +6648,44 @@ class _DesktopAssistantBasicPaneState extends State<_DesktopAssistantBasicPane> 
                 children: [
                   labelWithHelp(l10n.assistantEditMaxTokensTitle, l10n.assistantEditMaxTokensDescription),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: _maxTokensCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      hintText: l10n.assistantEditMaxTokensHint,
-                      isDense: true,
-                      // Increase height for desktop spec
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
-                      filled: true,
-                      fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.2)),
+                  Focus(
+                    onFocusChange: (has) {
+                      if (!has) {
+                        final trimmed = _maxTokensCtrl.text.trim();
+                        final n = int.tryParse(trimmed);
+                        context.read<AssistantProvider>().updateAssistant(
+                          a.copyWith(maxTokens: n, clearMaxTokens: trimmed.isEmpty),
+                        );
+                      }
+                    },
+                    child: TextField(
+                      controller: _maxTokensCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: l10n.assistantEditMaxTokensHint,
+                        isDense: true,
+                        // Increase height for desktop spec
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+                        filled: true,
+                        fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.2)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                        ),
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
-                      ),
+                      style: const TextStyle(fontSize: 13.5),
+                      onSubmitted: (v) {
+                        final trimmed = v.trim();
+                        final n = int.tryParse(trimmed);
+                        context.read<AssistantProvider>().updateAssistant(
+                          a.copyWith(maxTokens: n, clearMaxTokens: trimmed.isEmpty),
+                        );
+                      },
                     ),
-                    style: const TextStyle(fontSize: 13.5),
-                    onSubmitted: (v) {
-                      final trimmed = v.trim();
-                      final n = int.tryParse(trimmed);
-                      context.read<AssistantProvider>().updateAssistant(
-                        a.copyWith(maxTokens: n, clearMaxTokens: trimmed.isEmpty),
-                      );
-                    },
-                    onEditingComplete: () {
-                      final trimmed = _maxTokensCtrl.text.trim();
-                      final n = int.tryParse(trimmed);
-                      context.read<AssistantProvider>().updateAssistant(
-                        a.copyWith(maxTokens: n, clearMaxTokens: trimmed.isEmpty),
-                      );
-                    },
                   ),
                 ],
               ),
