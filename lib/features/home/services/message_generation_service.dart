@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
@@ -69,6 +70,12 @@ class MessageGenerationService {
   OnShowWarning? onShowWarning;
   OnHapticFeedback? onHapticFeedback;
 
+  /// Called when file processing starts.
+  VoidCallback? onFileProcessingStarted;
+
+  /// Called when file processing finishes.
+  VoidCallback? onFileProcessingFinished;
+
   /// Check if reasoning is enabled for given budget
   bool isReasoningEnabled(int? budget) {
     if (budget == null) return true;
@@ -91,56 +98,65 @@ class MessageGenerationService {
     final kind = ProviderConfig.classify(providerKey, explicitType: cfg.providerType);
     final includeOpenAIToolMessages = kind == ProviderKind.openai;
 
-    // Build API messages
-    final apiMessages = messageBuilderService.buildApiMessages(
-      messages: messages,
-      versionSelections: versionSelections,
-      currentConversation: currentConversation,
-      includeOpenAIToolMessages: includeOpenAIToolMessages,
-    );
+    try {
+      onFileProcessingStarted?.call();
+      
+      // Build API messages
+      final apiMessages = messageBuilderService.buildApiMessages(
+        messages: messages,
+        versionSelections: versionSelections,
+        currentConversation: currentConversation,
+        includeOpenAIToolMessages: includeOpenAIToolMessages,
+      );
 
-    // Process user messages (documents, OCR, templates)
-    final lastUserImagePaths = await messageBuilderService.processUserMessagesForApi(
-      apiMessages,
-      settings,
-      assistant,
-    );
+      // Process user messages (documents, OCR, templates)
+      final lastUserImagePaths = await messageBuilderService.processUserMessagesForApi(
+        apiMessages,
+        settings,
+        assistant,
+      );
 
-    // Inject prompts
-    messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
-    await messageBuilderService.injectMemoryAndRecentChats(
-      apiMessages,
-      assistant,
-      currentConversationId: currentConversation?.id,
-    );
+      // Signal processing finished
+      onFileProcessingFinished?.call();
+      
+      // Inject prompts
+      messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
+      await messageBuilderService.injectMemoryAndRecentChats(
+        apiMessages,
+        assistant,
+        currentConversationId: currentConversation?.id,
+      );
 
-    final hasBuiltInSearch = messageBuilderService.hasBuiltInGeminiSearch(settings, providerKey, modelId);
-    messageBuilderService.injectSearchPrompt(apiMessages, settings, hasBuiltInSearch);
-    await messageBuilderService.injectInstructionPrompts(apiMessages, assistantId);
+      final hasBuiltInSearch = messageBuilderService.hasBuiltInGeminiSearch(settings, providerKey, modelId);
+      messageBuilderService.injectSearchPrompt(apiMessages, settings, hasBuiltInSearch);
+      await messageBuilderService.injectInstructionPrompts(apiMessages, assistantId);
 
-    // Apply context limit and inline images
-    messageBuilderService.applyContextLimit(apiMessages, assistant);
-    await messageBuilderService.inlineLocalImages(apiMessages);
+      // Apply context limit and inline images
+      messageBuilderService.applyContextLimit(apiMessages, assistant);
+      await messageBuilderService.inlineLocalImages(apiMessages);
 
-    // Prepare tools
-    final toolDefs = generationController.buildToolDefinitions(
-      settings,
-      assistant,
-      providerKey,
-      modelId,
-      hasBuiltInSearch,
-    );
-    final onToolCall = toolDefs.isNotEmpty
-        ? generationController.buildToolCallHandler(settings, assistant)
-        : null;
+      // Prepare tools
+      final toolDefs = generationController.buildToolDefinitions(
+        settings,
+        assistant,
+        providerKey,
+        modelId,
+        hasBuiltInSearch,
+      );
+      final onToolCall = toolDefs.isNotEmpty
+          ? generationController.buildToolCallHandler(settings, assistant)
+          : null;
 
-    return PreparedGeneration(
-      apiMessages: apiMessages,
-      toolDefs: toolDefs,
-      onToolCall: onToolCall,
-      hasBuiltInSearch: hasBuiltInSearch,
-      lastUserImagePaths: lastUserImagePaths,
-    );
+      return PreparedGeneration(
+        apiMessages: apiMessages,
+        toolDefs: toolDefs,
+        onToolCall: onToolCall,
+        hasBuiltInSearch: hasBuiltInSearch,
+        lastUserImagePaths: lastUserImagePaths,
+      );
+    } catch (e) {
+      rethrow;
+    }
   }
 
   /// Create user message from input data.

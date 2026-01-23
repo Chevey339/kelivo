@@ -212,6 +212,8 @@ class HomePageController extends ChangeNotifier {
     return loadingConversationIds.contains(cid);
   }
 
+  ValueNotifier<bool> get isProcessingFiles => _viewModel.isProcessingFiles;
+
   // ============================================================================
   // Initialization
   // ============================================================================
@@ -292,6 +294,7 @@ class HomePageController extends ChangeNotifier {
       contextProvider: _context,
       getTitleForLocale: _titleForLocale,
     );
+    _viewModel.addListener(notifyListeners);
   }
 
   void _wireViewModelCallbacks() {

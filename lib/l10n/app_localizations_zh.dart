@@ -3681,6 +3681,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get assistantEditDeleteSummaryContent => '确定要清除此摘要吗？';
+
+  @override
+  String get homePageProcessingFiles => '正在解析文件……';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).

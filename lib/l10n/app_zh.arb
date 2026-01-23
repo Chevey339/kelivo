@@ -1255,5 +1255,6 @@
   "assistantEditSummaryDialogTitle": "编辑摘要",
   "assistantEditSummaryDialogHint": "输入摘要内容",
   "assistantEditDeleteSummaryTitle": "清除摘要",
-  "assistantEditDeleteSummaryContent": "确定要清除此摘要吗？"
+  "assistantEditDeleteSummaryContent": "确定要清除此摘要吗？",
+  "homePageProcessingFiles": "正在解析文件……"
 }

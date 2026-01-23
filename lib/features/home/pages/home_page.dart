@@ -535,6 +535,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     required EdgeInsetsGeometry dividerPadding,
   }) {
     return MessageListView(
+      isProcessingFiles: _controller.isProcessingFiles,
       scrollController: _scrollController,
       messages: _controller.messages,
       versionSelections: _controller.versionSelections,

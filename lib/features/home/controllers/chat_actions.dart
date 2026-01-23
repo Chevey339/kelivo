@@ -15,6 +15,7 @@ import '../../../utils/markdown_media_sanitizer.dart';
 import '../services/message_generation_service.dart';
 import 'chat_controller.dart';
 import 'generation_controller.dart';
+import 'home_view_model.dart';
 import 'stream_controller.dart' as stream_ctrl;
 
 /// Result of a send/regenerate action.
@@ -59,8 +60,10 @@ class ChatActions {
     required this.generationController,
     required this.messageGenerationService,
     required this.contextProvider,
+    required this.viewModel,
   });
 
+  final HomeViewModel viewModel;
   final ChatService chatService;
   final ChatController chatController;
   final stream_ctrl.StreamController streamController;
@@ -97,6 +100,12 @@ class ChatActions {
 
   /// Called when streaming finishes.
   VoidCallback? onStreamFinished;
+
+  /// Called when file processing starts.
+  VoidCallback? onFileProcessingStarted;
+
+  /// Called when file processing finishes.
+  VoidCallback? onFileProcessingFinished;
 
   // ============================================================================
   // Private Helpers
@@ -204,41 +213,49 @@ class ChatActions {
         messageId: assistantMessage.id, enableReasoning: enableReasoning);
 
     // Prepare API messages
-    final prepared =
-        await messageGenerationService.prepareApiMessagesWithInjections(
-      messages: _messages,
-      versionSelections: _versionSelections,
-      currentConversation: conversation,
-      settings: settings,
-      assistant: assistant,
-      assistantId: assistantId,
-      providerKey: providerKey,
-      modelId: modelId,
-    );
+    messageGenerationService.onFileProcessingStarted = onFileProcessingStarted;
+    messageGenerationService.onFileProcessingFinished = onFileProcessingFinished;
+    try {
+      final prepared =
+          await messageGenerationService.prepareApiMessagesWithInjections(
+        messages: _messages,
+        versionSelections: _versionSelections,
+        currentConversation: conversation,
+        settings: settings,
+        assistant: assistant,
+        assistantId: assistantId,
+        providerKey: providerKey,
+        modelId: modelId,
+      );
 
-    // Build user image paths
-    final userImagePaths = messageGenerationService.buildUserImagePaths(
-      input: input,
-      lastUserImagePaths: prepared.lastUserImagePaths,
-      settings: settings,
-    );
+      // Build user image paths
+      final userImagePaths = messageGenerationService.buildUserImagePaths(
+        input: input,
+        lastUserImagePaths: prepared.lastUserImagePaths,
+        settings: settings,
+      );
 
-    // Execute generation
-    final ctx = messageGenerationService.buildGenerationContext(
-      assistantMessage: assistantMessage,
-      prepared: prepared,
-      userImagePaths: userImagePaths,
-      providerKey: providerKey,
-      modelId: modelId,
-      assistant: assistant,
-      settings: settings,
-      supportsReasoning: supportsReasoning,
-      enableReasoning: enableReasoning,
-      generateTitleOnFinish: true,
-    );
+      // Execute generation
+      final ctx = messageGenerationService.buildGenerationContext(
+        assistantMessage: assistantMessage,
+        prepared: prepared,
+        userImagePaths: userImagePaths,
+        providerKey: providerKey,
+        modelId: modelId,
+        assistant: assistant,
+        settings: settings,
+        supportsReasoning: supportsReasoning,
+        enableReasoning: enableReasoning,
+        generateTitleOnFinish: true,
+      );
 
-    await _executeGeneration(ctx);
-    return ChatActionResult.success(assistantMessage);
+      await _executeGeneration(ctx);
+      return ChatActionResult.success(assistantMessage);
+    } catch (e) {
+      // Ensure file processing indicator is cleared on error
+      onFileProcessingFinished?.call();
+      return ChatActionResult.error(e.toString());
+    }
   }
 
   // ============================================================================
@@ -377,6 +394,9 @@ class ChatActions {
   Future<void> cancelStreaming(Conversation? conversation) async {
     final cid = conversation?.id;
     if (cid == null) return;
+    
+    // Reset file processing state on cancel
+    onFileProcessingFinished?.call();
 
     // Cancel active stream for current conversation only
     final sub = _conversationStreams.remove(cid);
@@ -819,6 +839,9 @@ class ChatActions {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
     final errorText = e.toString();
+    
+    // Reset file processing state on error
+    onFileProcessingFinished?.call();
 
     // Mark streaming as ended to allow UI rebuilds again
     streamController.markStreamingEnded(messageId);
@@ -872,6 +895,9 @@ class ChatActions {
 
   /// Handle stream done callback.
   Future<void> _handleStreamDone(stream_ctrl.StreamingState state) async {
+    // Reset file processing state on done (just in case)
+    onFileProcessingFinished?.call();
+    
     final conversationId = state.conversationId;
 
     // Ensure streaming is marked as ended
