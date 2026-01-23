@@ -714,7 +714,8 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     // renderer (even when vendors emit single-dollar math mixed with prose).
     // Skips $$...$$ blocks, which are handled separately.
     if (enableMath && enableDollarLatex) {
-      final inlineDollar = RegExp(r"(?<!\$)\$([^\$\n]+?)\$(?!\$)");
+      // Exclude | to prevent matching across table cells
+      final inlineDollar = RegExp(r"(?<!\$)\$([^\$\n|]+?)\$(?!\$)");
       out = out.replaceAllMapped(inlineDollar, (m) => "\\(${m[1]}\\)");
     }
 
