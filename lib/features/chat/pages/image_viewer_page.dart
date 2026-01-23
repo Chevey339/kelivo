@@ -142,6 +142,24 @@ class _ImageViewerPageState extends State<ImageViewerPage> with TickerProviderSt
     return (s >= 0.98 && s <= 1.02);
   }
 
+  void _goToPreviousImage() {
+    if (_index > 0) {
+      _controller.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _goToNextImage() {
+    if (_index < widget.images.length - 1) {
+      _controller.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
   void _handleVerticalDragStart(DragStartDetails d) {
     _dragActive = _canDragDismiss();
     if (!_dragActive) return;
@@ -568,7 +586,15 @@ class _ImageViewerPageState extends State<ImageViewerPage> with TickerProviderSt
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () => Navigator.of(context).maybePop(),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): _goToPreviousImage,
+        const SingleActivator(LogicalKeyboardKey.arrowRight): _goToNextImage,
+      },
+      child: Focus(
+        autofocus: true,
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
@@ -774,8 +800,36 @@ class _ImageViewerPageState extends State<ImageViewerPage> with TickerProviderSt
               ),
             ),
           ),
+          // Left navigation arrow (only show when not at first image and multiple images)
+          if (widget.images.length > 1 && _index > 0)
+            Positioned(
+              left: 16,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: _GlassCircleButton(
+                  onTap: _goToPreviousImage,
+                  child: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
+                ),
+              ),
+            ),
+          // Right navigation arrow (only show when not at last image and multiple images)
+          if (widget.images.length > 1 && _index < widget.images.length - 1)
+            Positioned(
+              right: 16,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: _GlassCircleButton(
+                  onTap: _goToNextImage,
+                  child: const Icon(Icons.chevron_right, color: Colors.white, size: 28),
+                ),
+              ),
+            ),
         ],
         ),
+      ),
+    ),
       ),
     );
   }
