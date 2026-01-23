@@ -3804,7 +3804,7 @@ class ChatApiService {
       // Prepare request body per round
       final body = <String, dynamic>{
         'model': upstreamModelId,
-        'max_tokens': maxTokens ?? 4096,
+        'max_tokens': maxTokens ?? 64000,
         'messages': convo,
         'stream': stream,
         if (systemPrompt.isNotEmpty) 'system': systemPrompt,
