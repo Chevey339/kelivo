@@ -438,8 +438,8 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
           _insertNewlineAtCursor();
         }
       } else {
-        // Enter to send, Shift+Enter to newline (default)
-        if (shift) {
+        // Enter to send, Shift+Enter or Ctrl/Cmd+Enter to newline (default)
+        if (shift || ctrlOrMeta) {
           _insertNewlineAtCursor();
         } else {
           _handleSend();
