@@ -13,6 +13,7 @@ import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
 import '../../chat/pages/image_viewer_page.dart';
+import 'log_viewer_page.dart';
 
 class StorageSpacePage extends StatefulWidget {
   const StorageSpacePage({super.key, this.embedded = false});
@@ -932,12 +933,28 @@ class _CategoryDetail extends StatelessWidget {
         ],
       );
     } else if (category.key == StorageUsageCategoryKey.logs) {
-      actions = IosTileButton(
-        label: l10n.storageSpaceClearLogsButton,
-        icon: Lucide.Trash2,
-        backgroundColor: cs.primary,
-        enabled: !clearing && onClearLogs != null,
-        onTap: () => onClearLogs?.call(),
+      actions = Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          IosTileButton(
+            label: l10n.storageSpaceViewLogsButton,
+            icon: Lucide.Eye,
+            backgroundColor: cs.primary,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LogViewerPage()),
+              );
+            },
+          ),
+          IosTileButton(
+            label: l10n.storageSpaceClearLogsButton,
+            icon: Lucide.Trash2,
+            backgroundColor: cs.primary,
+            enabled: !clearing && onClearLogs != null,
+            onTap: () => onClearLogs?.call(),
+          ),
+        ],
       );
     }
 

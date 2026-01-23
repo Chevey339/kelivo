@@ -215,6 +215,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceClearLogsButton => 'Clear Logs';
 
   @override
+  String get storageSpaceViewLogsButton => 'View Logs';
+
+  @override
   String get storageSpaceDeleteConfirmTitle => 'Confirm deletion';
 
   @override

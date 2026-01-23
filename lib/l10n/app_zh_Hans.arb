@@ -62,6 +62,7 @@
   "storageSpaceClearAvatarCacheButton": "清理头像缓存",
   "storageSpaceClearCacheButton": "清理缓存",
   "storageSpaceClearLogsButton": "清理日志",
+  "storageSpaceViewLogsButton": "查看日志",
   "storageSpaceDeleteConfirmTitle": "确认删除",
   "storageSpaceDeleteUploadsConfirmMessage": "删除 {count} 个项目？删除后聊天记录中的附件可能无法打开。",
   "storageSpaceDeletedUploadsDone": "已删除 {count} 个项目",

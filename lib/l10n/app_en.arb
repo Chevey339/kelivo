@@ -114,6 +114,7 @@
   "storageSpaceClearAvatarCacheButton": "Clear Avatar Cache",
   "storageSpaceClearCacheButton": "Clear Cache",
   "storageSpaceClearLogsButton": "Clear Logs",
+  "storageSpaceViewLogsButton": "View Logs",
   "storageSpaceDeleteConfirmTitle": "Confirm deletion",
   "storageSpaceDeleteUploadsConfirmMessage": "Delete {count} items? Attachments in chat history may become unavailable.",
   "@storageSpaceDeleteUploadsConfirmMessage": {

@@ -478,6 +478,12 @@ abstract class AppLocalizations {
   /// **'Clear Logs'**
   String get storageSpaceClearLogsButton;
 
+  /// No description provided for @storageSpaceViewLogsButton.
+  ///
+  /// In en, this message translates to:
+  /// **'View Logs'**
+  String get storageSpaceViewLogsButton;
+
   /// No description provided for @storageSpaceDeleteConfirmTitle.
   ///
   /// In en, this message translates to:

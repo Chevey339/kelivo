@@ -212,6 +212,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceClearLogsButton => '清理日志';
 
   @override
+  String get storageSpaceViewLogsButton => '查看日志';
+
+  @override
   String get storageSpaceDeleteConfirmTitle => '确认删除';
 
   @override
@@ -3880,6 +3883,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceClearLogsButton => '清理日志';
 
   @override
+  String get storageSpaceViewLogsButton => '查看日志';
+
+  @override
   String get storageSpaceDeleteConfirmTitle => '确认删除';
 
   @override
@@ -7511,6 +7517,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLogsButton => '清理日誌';
+
+  @override
+  String get storageSpaceViewLogsButton => '查看日誌';
 
   @override
   String get storageSpaceDeleteConfirmTitle => '確認刪除';
