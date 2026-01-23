@@ -47,6 +47,10 @@ class Conversation extends HiveObject {
   @HiveField(11)
   int lastSummarizedMessageCount;
 
+  // Last scroll position in the conversation (-1.0 means no saved position)
+  @HiveField(12)
+  double scrollOffset;
+
   Conversation({
     String? id,
     required this.title,
@@ -60,6 +64,7 @@ class Conversation extends HiveObject {
     Map<String, int>? versionSelections,
     this.summary,
     int? lastSummarizedMessageCount,
+    double? scrollOffset,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now(),
@@ -68,7 +73,8 @@ class Conversation extends HiveObject {
         assistantId = assistantId,
         truncateIndex = truncateIndex ?? -1,
         versionSelections = versionSelections ?? <String, int>{},
-        lastSummarizedMessageCount = lastSummarizedMessageCount ?? 0;
+        lastSummarizedMessageCount = lastSummarizedMessageCount ?? 0,
+        scrollOffset = scrollOffset ?? -1.0;
 
   Conversation copyWith({
     String? id,
@@ -84,6 +90,7 @@ class Conversation extends HiveObject {
     String? summary,
     int? lastSummarizedMessageCount,
     bool clearSummary = false,
+    double? scrollOffset,
   }) {
     return Conversation(
       id: id ?? this.id,
@@ -99,6 +106,7 @@ class Conversation extends HiveObject {
       summary: clearSummary ? null : (summary ?? this.summary),
       lastSummarizedMessageCount:
           lastSummarizedMessageCount ?? this.lastSummarizedMessageCount,
+      scrollOffset: scrollOffset ?? this.scrollOffset,
     );
   }
 
@@ -116,6 +124,7 @@ class Conversation extends HiveObject {
       'versionSelections': versionSelections,
       'summary': summary,
       'lastSummarizedMessageCount': lastSummarizedMessageCount,
+      'scrollOffset': scrollOffset,
     };
   }
 
@@ -133,6 +142,7 @@ class Conversation extends HiveObject {
       versionSelections: (json['versionSelections'] as Map?)?.map((k, v) => MapEntry(k.toString(), (v as num).toInt())) ?? <String, int>{},
       summary: json['summary'] as String?,
       lastSummarizedMessageCount: json['lastSummarizedMessageCount'] as int? ?? 0,
+      scrollOffset: (json['scrollOffset'] as num?)?.toDouble() ?? -1.0,
     );
   }
 }

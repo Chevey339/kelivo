@@ -317,7 +317,7 @@ class HomePageController extends ChangeNotifier {
     };
     _viewModel.onConversationSwitched = () {
       _restoreMessageUiState();
-      _scrollToBottom(animate: false);
+      // Scroll restoration is now handled by switchConversationAnimated
     };
     _viewModel.onStreamFinished = () {
       // Trigger UI update when streaming finishes
@@ -487,6 +487,10 @@ class HomePageController extends ChangeNotifier {
   Future<void> switchConversationAnimated(String id) async {
     try { await _viewModel.flushCurrentConversationProgress(); } catch (_) {}
     if (currentConversation?.id == id) return;
+
+    // Save current scroll position before switching
+    _saveCurrentScrollPosition();
+
     if (!isDesktopPlatform) {
       try { await _convoFadeController.reverse(); } catch (_) {}
     } else {
@@ -496,7 +500,9 @@ class HomePageController extends ChangeNotifier {
     await _viewModel.switchConversation(id);
     notifyListeners();
     try { await WidgetsBinding.instance.endOfFrame; } catch (_) {}
-    _scrollToBottom(animate: false);
+
+    // Restore scroll position or scroll to bottom if none saved
+    _restoreScrollPosition(animate: false);
 
     if (!isDesktopPlatform) {
       try { await _convoFadeController.forward(); } catch (_) {}
@@ -510,6 +516,10 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> createNewConversationAnimated() async {
     try { await _viewModel.flushCurrentConversationProgress(); } catch (_) {}
+
+    // Save current scroll position before creating new conversation
+    _saveCurrentScrollPosition();
+
     if (!isDesktopPlatform) {
       try { await _convoFadeController.reverse(); } catch (_) {}
     }
@@ -1046,6 +1056,62 @@ class HomePageController extends ChangeNotifier {
 
   void _scrollToBottom({bool animate = true}) => _scrollCtrl.scrollToBottom(animate: animate);
   void _scrollToBottomSoon({bool animate = true}) => _scrollCtrl.scrollToBottomSoon(animate: animate);
+
+  /// Save current scroll position to the current conversation.
+  void _saveCurrentScrollPosition() {
+    try {
+      final convoId = currentConversation?.id;
+      if (convoId == null) return;
+      if (!_scrollController.hasClients) return;
+      final offset = _scrollController.position.pixels;
+      _viewModel.saveScrollOffset(convoId, offset);
+    } catch (_) {}
+  }
+
+  /// Restore saved scroll position for the current conversation.
+  /// If no position saved (scrollOffset == -1.0), scrolls to bottom.
+  void _restoreScrollPosition({bool animate = false}) {
+    try {
+      final convoId = currentConversation?.id;
+      if (convoId == null) {
+        _scrollToBottom(animate: animate);
+        return;
+      }
+      final savedOffset = _viewModel.getScrollOffset(convoId);
+      if (savedOffset < 0) {
+        // No saved position, scroll to bottom
+        _scrollToBottom(animate: animate);
+        return;
+      }
+      // Restore saved position after frames to ensure list is fully built
+      void doRestore() {
+        if (!_scrollController.hasClients) return;
+        final maxExtent = _scrollController.position.maxScrollExtent;
+        // If maxExtent is 0 or too small, the list hasn't built yet
+        if (maxExtent < 10) return;
+        final targetOffset = savedOffset.clamp(0.0, maxExtent);
+        if (animate) {
+          _scrollController.animateTo(
+            targetOffset,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+          );
+        } else {
+          _scrollController.jumpTo(targetOffset);
+        }
+      }
+      // First attempt after immediate frame
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        doRestore();
+      });
+      // Second attempt after a short delay (for lazy-loaded content)
+      Future.delayed(const Duration(milliseconds: 150), () {
+        doRestore();
+      });
+    } catch (_) {
+      _scrollToBottom(animate: animate);
+    }
+  }
 
   (double, double) _getViewportBounds() {
     final size = MediaQuery.sizeOf(_context);

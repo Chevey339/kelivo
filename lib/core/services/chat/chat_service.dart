@@ -453,6 +453,25 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Saves scroll offset for a conversation (silently, no notifyListeners).
+  Future<void> saveScrollOffset(String conversationId, double offset) async {
+    if (!_initialized) return;
+
+    if (_draftConversations.containsKey(conversationId)) {
+      final draft = _draftConversations[conversationId]!;
+      draft.scrollOffset = offset;
+      // No notifyListeners - scroll offset is UI state, not data
+      return;
+    }
+
+    final conversation = _conversationsBox.get(conversationId);
+    if (conversation == null) return;
+
+    conversation.scrollOffset = offset;
+    await conversation.save();
+    // No notifyListeners - scroll offset is UI state, not data
+  }
+
   Future<void> togglePinConversation(String id) async {
     if (!_initialized) return;
 

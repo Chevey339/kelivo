@@ -32,7 +32,7 @@ class ChatMessageAdapter extends TypeAdapter<ChatMessage> {
       translation: fields[12] as String?,
       reasoningSegmentsJson: fields[13] as String?,
       groupId: fields[14] as String?,
-      version: (fields[15] as int?) ?? 0,
+      version: fields[15] as int?,
     );
   }
 

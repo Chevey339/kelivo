@@ -49,6 +49,7 @@ import 'setting/backup_pane.dart';
 import 'setting/hotkeys_pane.dart';
 import 'setting/network_proxy_pane.dart';
 import 'setting/about_pane.dart';
+import 'setting/selection_actions_pane.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -79,6 +80,7 @@ enum _SettingsMenuItem {
   mcp,
   quickPhrases,
   instructionInjection,
+  selectionActions,
   tts,
   networkProxy,
   backup,
@@ -122,6 +124,8 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
           return l10n.settingsPageQuickPhrase;
         case _SettingsMenuItem.instructionInjection:
           return l10n.settingsPageInstructionInjection;
+        case _SettingsMenuItem.selectionActions:
+          return 'Selection Actions';
         case _SettingsMenuItem.tts:
           return l10n.settingsPageTts;
         case _SettingsMenuItem.networkProxy:
@@ -203,6 +207,8 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           return const DesktopQuickPhrasesPane(key: ValueKey('quickPhrases'));
                         case _SettingsMenuItem.instructionInjection:
                           return const DesktopInstructionInjectionPane(key: ValueKey('instructionInjection'));
+                        case _SettingsMenuItem.selectionActions:
+                          return const DesktopSelectionActionsPane(key: ValueKey('selectionActions'));
                         case _SettingsMenuItem.tts:
                           return const DesktopTtsServicesPane(key: ValueKey('tts'));
                         case _SettingsMenuItem.about:
@@ -244,6 +250,7 @@ class _SettingsMenu extends StatelessWidget {
       (_SettingsMenuItem.mcp, lucide.Lucide.Terminal, l10n.settingsPageMcp),
       (_SettingsMenuItem.quickPhrases, lucide.Lucide.Zap, l10n.settingsPageQuickPhrase),
       (_SettingsMenuItem.instructionInjection, lucide.Lucide.Layers, l10n.settingsPageInstructionInjection),
+      (_SettingsMenuItem.selectionActions, lucide.Lucide.TextSelect, 'Selection Actions'),
       (_SettingsMenuItem.tts, lucide.Lucide.Volume2, l10n.settingsPageTts),
       (_SettingsMenuItem.networkProxy, lucide.Lucide.EthernetPort, l10n.settingsPageNetworkProxy),
       (_SettingsMenuItem.backup, lucide.Lucide.Database, l10n.settingsPageBackup),
