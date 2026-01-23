@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../models/api_keys.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
@@ -304,8 +305,13 @@ class CherryImporter {
       if (id.isEmpty) continue;
       final type = (p['type'] ?? '').toString().toLowerCase();
       final name = (p['name'] ?? id).toString();
-      final apiKey = (p['apiKey'] ?? '').toString();
+      final apiKeyRaw = (p['apiKey'] ?? '').toString();
       final apiHostRaw = (p['apiHost'] ?? '').toString().trim();
+
+      // Parse comma-separated API keys (Cherry Studio stores multiple keys in one string)
+      final apiKeys = _splitApiKeyString(apiKeyRaw);
+      final apiKey = apiKeys.isNotEmpty ? apiKeys.first : '';
+      final multiKeyEnabled = apiKeys.length > 1;
 
       // Determine provider kind mapping
       String? kind;
@@ -381,8 +387,10 @@ class CherryImporter {
         'proxyPort': '8080',
         'proxyUsername': '',
         'proxyPassword': '',
-        'multiKeyEnabled': false,
-        'apiKeys': const <dynamic>[],
+        'multiKeyEnabled': multiKeyEnabled,
+        'apiKeys': multiKeyEnabled
+            ? apiKeys.map((k) => ApiKeyConfig.create(k).toJson()).toList()
+            : const <dynamic>[],
         'keyManagement': const <String, dynamic>{},
       };
       imported[id] = map;
@@ -1033,4 +1041,27 @@ class _PendingAttachmentRef {
   final String? mime;
   final bool isImage;
   const _PendingAttachmentRef({this.fileId, this.dataUrl, this.url, this.name, this.mime, this.isImage = true});
+}
+
+/// Splits a comma-separated API key string into a list of keys.
+/// Handles escaped commas (\,) and trims whitespace.
+/// Mirrors Cherry Studio's splitApiKeyString behavior.
+List<String> _splitApiKeyString(String keyStr) {
+  if (keyStr.trim().isEmpty) return const <String>[];
+
+  // Use placeholder to handle escaped commas (avoids regex lookbehind for web compatibility)
+  const placeholder = '\x00';
+  final escaped = keyStr.replaceAll(r'\,', placeholder);
+  final parts = escaped.split(',');
+
+  final result = <String>[];
+  for (final part in parts) {
+    // Restore escaped commas and trim
+    final key = part.replaceAll(placeholder, ',').trim();
+    if (key.isNotEmpty) {
+      result.add(key);
+    }
+  }
+
+  return result;
 }
