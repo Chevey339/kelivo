@@ -110,6 +110,9 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     final inlineComponents = List<MarkdownComponent>.from(
       MarkdownComponent.inlineComponents,
     );
+    // Add whitelist-based HTML tag renderer (e.g., <br>)
+    inlineComponents.insert(0, AllowedHtmlTagsMd());
+
     final linkIdxInline = inlineComponents.indexWhere((c) => c is ATagMd);
     if (linkIdxInline != -1) {
       inlineComponents[linkIdxInline] = LineSafeLinkMd();
@@ -2606,6 +2609,18 @@ class BackslashEscapeMd extends InlineMd {
     final ch = m.group(1) ?? '';
     // Render only the escaped character (drop the backslash)
     return TextSpan(text: ch, style: config.style);
+  }
+}
+
+/// Whitelist-based HTML tag renderer.
+/// Currently supports <br> tags for manual line breaks.
+class AllowedHtmlTagsMd extends InlineMd {
+  @override
+  RegExp get exp => RegExp(r"<br\s*/?>", caseSensitive: false);
+
+  @override
+  InlineSpan span(BuildContext context, String text, GptMarkdownConfig config) {
+    return const TextSpan(text: '\n');
   }
 }
 
