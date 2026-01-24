@@ -1151,7 +1151,44 @@ class ChatApiService {
           continue;
         }
 
+        // Handle tool result messages (role: 'tool') - convert to function_call_output format
+        if (roleRaw == 'tool') {
+          final toolCallId = (m['tool_call_id'] ?? '').toString();
+          final content = (m['content'] ?? '').toString();
+          if (toolCallId.isNotEmpty) {
+            input.add({
+              'type': 'function_call_output',
+              'call_id': toolCallId,
+              'output': content,
+            });
+          }
+          continue;
+        }
+
         final isAssistant = roleRaw == 'assistant';
+
+        // Handle assistant messages with tool_calls - convert to function_call format
+        if (isAssistant && m['tool_calls'] is List) {
+          final toolCalls = m['tool_calls'] as List;
+          for (final tc in toolCalls) {
+            if (tc is! Map) continue;
+            final callId = (tc['id'] ?? '').toString();
+            final fn = tc['function'];
+            if (fn is! Map) continue;
+            final name = (fn['name'] ?? '').toString();
+            final arguments = (fn['arguments'] ?? '{}').toString();
+            if (callId.isNotEmpty && name.isNotEmpty) {
+              input.add({
+                'type': 'function_call',
+                'call_id': callId,
+                'name': name,
+                'arguments': arguments,
+              });
+            }
+          }
+          // Skip adding the assistant message content if it only contains tool calls
+          if (raw.trim().isEmpty || raw.trim() == '\n\n') continue;
+        }
 
         // Only parse images if there are images to process
         final hasMarkdownImages = raw.contains('![') && raw.contains('](');
