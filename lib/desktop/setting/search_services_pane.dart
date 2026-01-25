@@ -183,7 +183,7 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                                   ),
                                 )
                           : null,
-                      onPlus: common.resultSize < 20
+                      onPlus: common.resultSize < 50
                           ? () => context
                                 .read<SettingsProvider>()
                                 .setSearchCommonOptions(

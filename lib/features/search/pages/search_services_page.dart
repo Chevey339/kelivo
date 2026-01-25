@@ -337,7 +337,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
                                     ),
                                   )
                             : () {},
-                        onPlus: common.resultSize < 20
+                        onPlus: common.resultSize < 50
                             ? () => context
                                   .read<SettingsProvider>()
                                   .updateSettings(
