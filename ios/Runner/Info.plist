@@ -33,11 +33,11 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>需要使用相机以拍摄照片 / We need camera access to take photos.</string>
+	<string>Kelivo 需要使用相机拍摄照片，以便您将图片发送给 AI 助手进行分析。您可以选择是否上传照片。 / Kelivo uses the camera to capture photos that you can share with AI assistants for analysis. Your photo may be uploaded by your choice.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>需要使用麦克风以录制视频音频 / We need microphone access to record audio in videos.</string>
+	<string>我们使用您的音频数据进行语音识别。您的数据由系统处理；我们不会收集这些信息 / We use your audio data for speech recognition. Your data is processed by system; we do not collect that information.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>允许保存图片到相册 / Allow saving images to your photo library.</string>
+	<string>允许保存图片到相册，您的数据将保存在本地。/ Allow saving images to your photo library.Your data will be saved locally.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>允许访问相册以选择头像图片 / Allow access to your photos to pick an avatar.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
