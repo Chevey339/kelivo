@@ -1241,6 +1241,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageDeleteTooltip => '删除';
 
   @override
+  String get backupPageDeleteConfirmTitle => '确认删除';
+
+  @override
+  String backupPageDeleteConfirmContent(Object name) {
+    return '确定要删除远程备份“$name”吗？此操作不可撤销。';
+  }
+
+  @override
   String get backupPageBackupManagement => '备份管理';
 
   @override

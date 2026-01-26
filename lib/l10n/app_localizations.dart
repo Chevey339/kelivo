@@ -2483,6 +2483,18 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get backupPageDeleteTooltip;
 
+  /// No description provided for @backupPageDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Deletion'**
+  String get backupPageDeleteConfirmTitle;
+
+  /// No description provided for @backupPageDeleteConfirmContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete remote backup \"{name}\"? This action cannot be undone.'**
+  String backupPageDeleteConfirmContent(Object name);
+
   /// No description provided for @backupPageBackupManagement.
   ///
   /// In en, this message translates to:

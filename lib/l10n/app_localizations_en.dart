@@ -1275,6 +1275,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageDeleteTooltip => 'Delete';
 
   @override
+  String get backupPageDeleteConfirmTitle => 'Confirm Deletion';
+
+  @override
+  String backupPageDeleteConfirmContent(Object name) {
+    return 'Are you sure you want to delete remote backup \"$name\"? This action cannot be undone.';
+  }
+
+  @override
   String get backupPageBackupManagement => 'Backup Management';
 
   @override
