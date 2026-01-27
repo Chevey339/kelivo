@@ -1247,5 +1247,7 @@
   "assistantEditSummaryDialogTitle": "編輯摘要",
   "assistantEditSummaryDialogHint": "輸入摘要內容",
   "assistantEditDeleteSummaryTitle": "清除摘要",
-  "assistantEditDeleteSummaryContent": "確定要清除此摘要嗎？"
+  "assistantEditDeleteSummaryContent": "確定要清除此摘要嗎？",
+  "backupPageDeleteConfirmTitle": "確認刪除",
+  "backupPageDeleteConfirmContent": "確定要刪除遠端備份「{name}」嗎？此操作不可撤銷。"
 }

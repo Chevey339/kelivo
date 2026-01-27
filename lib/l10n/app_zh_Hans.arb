@@ -1241,5 +1241,7 @@
   "logViewerSectionResponseBody": "响应体",
   "logViewerSectionWarnings": "警告",
   "logViewerErrorTitle": "错误",
-  "logViewerMoreCount": "+{count} 条更多"
+  "logViewerMoreCount": "+{count} 条更多",
+  "backupPageDeleteConfirmTitle": "确认删除",
+  "backupPageDeleteConfirmContent": "确定要删除远程备份“{name}”吗？此操作不可撤销。"
 }
