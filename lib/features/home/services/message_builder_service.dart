@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
@@ -53,7 +54,8 @@ class MessageBuilderService {
       geminiThoughtSignatureHandler;
 
   /// Cache for document text extraction to avoid re-reading files on every message
-  final Map<String, String?> _docTextCache = <String, String?>{};
+  /// Keyed by path, validated with (modified + size) to avoid stale reuse.
+  final Map<String, _DocTextCacheEntry> _docTextCache = <String, _DocTextCacheEntry>{};
 
   /// Collapse message versions to show only selected version per group.
   List<ChatMessage> collapseVersions(
@@ -232,13 +234,37 @@ class MessageBuilderService {
     }
 
     Future<String?> readDocument(DocumentAttachment d) async {
-      if (_docTextCache.containsKey(d.path)) return _docTextCache[d.path];
+      // Use file stat to detect content changes without hashing.
+      final FileStat? stat = await File(d.path).stat().catchError((_) => null);
+      debugPrint('[doc-cache] path=${d.path} stat=' + (stat == null ? 'null' : '${stat.modified.toIso8601String()} size=${stat.size}'));
+      if (stat != null) {
+        final cached = _docTextCache[d.path];
+        debugPrint('[doc-cache] cached=' + (cached == null ? 'miss' : 'hit(${cached.modifiedMs},${cached.size})'));
+        if (cached != null && cached.modifiedMs == stat.modified.millisecondsSinceEpoch && cached.size == stat.size) {
+          debugPrint('[doc-cache] reuse');
+          return cached.text;
+        }
+      }
+      debugPrint('[doc-cache] reparse');
       try {
         final text = await DocumentTextExtractor.extract(path: d.path, mime: d.mime);
-        _docTextCache[d.path] = text;
+        // Cache only when stat is available; otherwise avoid staleness.
+        if (stat != null) {
+          _docTextCache[d.path] = _DocTextCacheEntry(
+            text: text,
+            modifiedMs: stat.modified.millisecondsSinceEpoch,
+            size: stat.size,
+          );
+        }
         return text;
       } catch (_) {
-        _docTextCache[d.path] = null;
+        if (stat != null) {
+          _docTextCache[d.path] = _DocTextCacheEntry(
+            text: null,
+            modifiedMs: stat.modified.millisecondsSinceEpoch,
+            size: stat.size,
+          );
+        }
         return null;
       }
     }
@@ -517,4 +543,16 @@ class MessageBuilderService {
       return false;
     }
   }
+}
+
+class _DocTextCacheEntry {
+  const _DocTextCacheEntry({
+    required this.text,
+    required this.modifiedMs,
+    required this.size,
+  });
+
+  final String? text;
+  final int modifiedMs;
+  final int size;
 }
