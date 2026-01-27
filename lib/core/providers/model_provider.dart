@@ -340,16 +340,22 @@ class ProviderManager {
         final base = cfg.baseUrl.endsWith('/') ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1) : cfg.baseUrl;
         final path = (cfg.useResponseApi == true) ? '/responses' : (cfg.chatPath ?? '/chat/completions');
         final url = Uri.parse('$base$path');
+        final ov = _modelOverride(cfg, modelId);
+        String upstreamId = modelId;
+        try {
+          final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+          if (raw != null && raw.isNotEmpty) upstreamId = raw;
+        } catch (_) {}
         final body = cfg.useResponseApi == true
             ? {
-                'model': modelId,
+                'model': upstreamId,
                 'input': [
                   {'role': 'user', 'content': 'hello'}
                 ],
                 if (useStream) 'stream': true,
               }
             : {
-                'model': modelId,
+                'model': upstreamId,
                 'messages': [
                   {'role': 'user', 'content': 'hello'}
                 ],
@@ -392,8 +398,14 @@ class ProviderManager {
       } else if (kind == ProviderKind.claude) {
         final base = cfg.baseUrl.endsWith('/') ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1) : cfg.baseUrl;
         final url = Uri.parse('$base/messages');
+        final ov = _modelOverride(cfg, modelId);
+        String upstreamId = modelId;
+        try {
+          final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+          if (raw != null && raw.isNotEmpty) upstreamId = raw;
+        } catch (_) {}
         final body = {
-          'model': modelId,
+          'model': upstreamId,
           'max_tokens': 8,
           'messages': [
             {
