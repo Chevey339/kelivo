@@ -1571,5 +1571,16 @@
   "assistantEditSummaryDialogHint": "Enter summary content",
   "assistantEditDeleteSummaryTitle": "Clear Summary",
   "assistantEditDeleteSummaryContent": "Are you sure you want to clear this summary?",
-  "homePageProcessingFiles": "Processing files..."
+  "homePageProcessingFiles": "Processing files...",
+  "fileUploadDuplicateTitle": "File already exists",
+  "fileUploadDuplicateContent": "A file named {fileName} already exists. Use the existing file?",
+  "@fileUploadDuplicateContent": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "fileUploadDuplicateUseExisting": "Use existing",
+  "fileUploadDuplicateUploadNew": "Upload new"
 }

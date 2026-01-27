@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/app_directories.dart';
@@ -21,12 +22,16 @@ import '../widgets/chat_input_bar.dart';
 /// - 文件复制到应用目录
 class FileUploadService {
   FileUploadService({
+    required BuildContext context,
     required this.mediaController,
     required this.onScrollToBottom,
-  });
+  }) : _context = context;
 
   /// 媒体控制器，用于添加图片和文件到输入栏
   final ChatInputBarController mediaController;
+
+  /// UI context for duplicate prompt dialogs.
+  final BuildContext _context;
 
   /// 滚动到底部的回调
   final VoidCallback onScrollToBottom;
@@ -44,12 +49,77 @@ class FileUploadService {
     for (final f in files) {
       try {
         final name = f.name.isNotEmpty ? f.name : DateTime.now().millisecondsSinceEpoch.toString();
-        final dest = File("${dir.path}/$name");
+        final srcPath = f.path;
+        final FileStat? srcStat = srcPath.isNotEmpty
+            ? await File(srcPath).stat().catchError((_) => null)
+            : null;
+        debugPrint('[upload-dup] src name=$name path=$srcPath stat=' 
+            '${srcStat == null ? 'null' : 'size=${srcStat.size} mtime=${srcStat.modified.toIso8601String()}'}');
+        File dest = File(p.join(dir.path, name));
+        if (await dest.exists()) {
+          // If same file (modified+size), ask to reuse; else versioned copy.
+          final destStat = await dest.stat().catchError((_) => null);
+          debugPrint('[upload-dup] dest exists path=${dest.path} stat=' 
+              '${destStat == null ? 'null' : 'size=${destStat.size} mtime=${destStat.modified.toIso8601String()}'}');
+          final srcModifiedSec = srcStat == null ? null : (srcStat.modified.millisecondsSinceEpoch ~/ 1000);
+          final destModifiedSec = destStat == null ? null : (destStat.modified.millisecondsSinceEpoch ~/ 1000);
+          final sameSize = srcStat != null && destStat != null && srcStat.size == destStat.size;
+          final sameModified = srcModifiedSec != null && destModifiedSec != null && srcModifiedSec == destModifiedSec;
+          final same = sameSize && sameModified;
+          debugPrint('[upload-dup] compare same=$same sameSize=$sameSize sameModified=$sameModified srcSec=$srcModifiedSec destSec=$destModifiedSec');
+          if (same) {
+            final useExisting = await _confirmUseExistingFile(name);
+            debugPrint('[upload-dup] user decision useExisting=$useExisting');
+            if (useExisting) {
+              out.add(dest.path);
+              continue;
+            }
+          }
+          final base = p.basenameWithoutExtension(name);
+          final ext = p.extension(name);
+          var counter = 1;
+          String candidate;
+          do {
+            candidate = p.join(dir.path, '$base($counter)$ext');
+            counter++;
+          } while (await File(candidate).exists());
+          dest = File(candidate);
+          debugPrint('[upload-dup] versioned dest=${dest.path}');
+        }
         await dest.writeAsBytes(await f.readAsBytes());
+        debugPrint('[upload-dup] wrote file dest=${dest.path}');
+        // Keep modified time to help cache keying.
+        if (srcStat != null) {
+          try { await dest.setLastModified(srcStat.modified); } catch (_) {}
+          debugPrint('[upload-dup] setLastModified dest=${dest.path} mtime=${srcStat.modified.toIso8601String()}');
+        }
         out.add(dest.path);
       } catch (_) {}
     }
     return out;
+  }
+
+  Future<bool> _confirmUseExistingFile(String fileName) async {
+    final l10n = AppLocalizations.of(_context)!;
+    final res = await showDialog<bool>(
+      context: _context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.fileUploadDuplicateTitle),
+        content: Text(l10n.fileUploadDuplicateContent(fileName)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.fileUploadDuplicateUseExisting),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.fileUploadDuplicateUploadNew),
+          ),
+        ],
+      ),
+    );
+    return res == true;
   }
 
   /// 从相册选取图片
@@ -213,12 +283,12 @@ class FileUploadService {
       for (int i = 0; i < saved.length; i++) {
         final savedPath = saved[i];
         final isImage = kinds[i];
+        final savedName = p.basename(savedPath);
         if (isImage) {
           images.add(savedPath);
         } else {
-          final name = names[i];
-          final mime = inferMimeByExtension(name);
-          docs.add(DocumentAttachment(path: savedPath, fileName: name, mime: mime));
+          final mime = inferMimeByExtension(savedName);
+          docs.add(DocumentAttachment(path: savedPath, fileName: savedName, mime: mime));
         }
       }
       if (images.isNotEmpty) {
@@ -254,12 +324,12 @@ class FileUploadService {
       for (int i = 0; i < saved.length; i++) {
         final savedPath = saved[i];
         final isImage = kinds[i];
+        final savedName = p.basename(savedPath);
         if (isImage) {
           images.add(savedPath);
         } else {
-          final name = names[i];
-          final mime = inferMimeByExtension(name);
-          docs.add(DocumentAttachment(path: savedPath, fileName: name, mime: mime));
+          final mime = inferMimeByExtension(savedName);
+          docs.add(DocumentAttachment(path: savedPath, fileName: savedName, mime: mime));
         }
       }
       if (images.isNotEmpty) mediaController.addImages(images);

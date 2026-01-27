@@ -3822,4 +3822,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homePageProcessingFiles => 'Processing files...';
+
+  @override
+  String get fileUploadDuplicateTitle => 'File already exists';
+
+  @override
+  String fileUploadDuplicateContent(String fileName) {
+    return 'A file named $fileName already exists. Use the existing file?';
+  }
+
+  @override
+  String get fileUploadDuplicateUseExisting => 'Use existing';
+
+  @override
+  String get fileUploadDuplicateUploadNew => 'Upload new';
 }
