@@ -3517,6 +3517,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get networkProxyPassword => '密码';
 
   @override
+  String get networkProxyBypassLabel => '代理绕过';
+
+  @override
+  String get networkProxyBypassHint =>
+      '用逗号分隔的主机或 CIDR，例如：localhost,127.0.0.1,192.168.0.0/16,*.local';
+
+  @override
   String get networkProxyOptionalHint => '可选';
 
   @override
@@ -7196,6 +7203,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get networkProxyPassword => '密码';
 
   @override
+  String get networkProxyBypassLabel => '代理绕过';
+
+  @override
+  String get networkProxyBypassHint =>
+      '用逗号分隔的主机或 CIDR，例如：localhost,127.0.0.1,192.168.0.0/16,*.local';
+
+  @override
   String get networkProxyOptionalHint => '可选';
 
   @override
@@ -10869,6 +10883,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get networkProxyPassword => '密碼';
+
+  @override
+  String get networkProxyBypassLabel => '代理繞過';
+
+  @override
+  String get networkProxyBypassHint =>
+      '以逗號分隔的主機或 CIDR，例如：localhost,127.0.0.1,192.168.0.0/16,*.local';
 
   @override
   String get networkProxyOptionalHint => '可選';

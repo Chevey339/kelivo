@@ -1196,6 +1196,8 @@
   "networkProxyPort": "端口",
   "networkProxyUsername": "用户名",
   "networkProxyPassword": "密码",
+  "networkProxyBypassLabel": "代理绕过",
+  "networkProxyBypassHint": "用逗号分隔的主机或 CIDR，例如：localhost,127.0.0.1,192.168.0.0/16,*.local",
   "networkProxyOptionalHint": "可选",
   "networkProxyTestHeader": "连接测试",
   "networkProxyTestUrlHint": "测试地址",

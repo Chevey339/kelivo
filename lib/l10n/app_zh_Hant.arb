@@ -1192,6 +1192,8 @@
   "networkProxyPort": "連接埠",
   "networkProxyUsername": "使用者名稱",
   "networkProxyPassword": "密碼",
+  "networkProxyBypassLabel": "代理繞過",
+  "networkProxyBypassHint": "以逗號分隔的主機或 CIDR，例如：localhost,127.0.0.1,192.168.0.0/16,*.local",
   "networkProxyOptionalHint": "可選",
   "networkProxyTestHeader": "連線測試",
   "networkProxyTestUrlHint": "測試地址",

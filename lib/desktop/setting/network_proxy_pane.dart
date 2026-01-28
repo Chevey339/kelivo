@@ -23,10 +23,12 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
   late final TextEditingController _portCtl;
   late final TextEditingController _userCtl;
   late final TextEditingController _passCtl;
+  late final TextEditingController _bypassCtl;
   final FocusNode _hostFn = FocusNode();
   final FocusNode _portFn = FocusNode();
   final FocusNode _userFn = FocusNode();
   final FocusNode _passFn = FocusNode();
+  final FocusNode _bypassFn = FocusNode();
 
   String _type = 'http';
   bool _enabled = false;
@@ -47,10 +49,12 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
     _portCtl = TextEditingController(text: sp.globalProxyPort);
     _userCtl = TextEditingController(text: sp.globalProxyUsername);
     _passCtl = TextEditingController(text: sp.globalProxyPassword);
+    _bypassCtl = TextEditingController(text: sp.globalProxyBypass);
     _hostFn.addListener(() { if (!_hostFn.hasFocus) sp.setGlobalProxyHost(_hostCtl.text); });
     _portFn.addListener(() { if (!_portFn.hasFocus) sp.setGlobalProxyPort(_portCtl.text); });
     _userFn.addListener(() { if (!_userFn.hasFocus) sp.setGlobalProxyUsername(_userCtl.text); });
     _passFn.addListener(() { if (!_passFn.hasFocus) sp.setGlobalProxyPassword(_passCtl.text); });
+    _bypassFn.addListener(() { if (!_bypassFn.hasFocus) sp.setGlobalProxyBypass(_bypassCtl.text); });
   }
 
   @override
@@ -59,10 +63,12 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
     _portCtl.dispose();
     _userCtl.dispose();
     _passCtl.dispose();
+    _bypassCtl.dispose();
     _hostFn.dispose();
     _portFn.dispose();
     _userFn.dispose();
     _passFn.dispose();
+    _bypassFn.dispose();
     _testUrlCtl.dispose();
     super.dispose();
   }
@@ -172,6 +178,21 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                       obscureText: true,
                       style: const TextStyle(fontSize: 14),
                       decoration: _deskInputDecoration(context).copyWith(hintText: '••••••••'),
+                    ),
+                  ),
+                ),
+                _rowDivider(context),
+                _ItemRow(
+                  label: l10n.networkProxyBypassLabel,
+                  trailing: ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 140, maxWidth: 420),
+                    child: TextField(
+                      controller: _bypassCtl,
+                      focusNode: _bypassFn,
+                      minLines: 1,
+                      maxLines: 3,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: _deskInputDecoration(context).copyWith(hintText: l10n.networkProxyBypassHint),
                     ),
                   ),
                 ),

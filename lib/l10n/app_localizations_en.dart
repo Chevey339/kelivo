@@ -3650,6 +3650,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get networkProxyPassword => 'Password';
 
   @override
+  String get networkProxyBypassLabel => 'Proxy bypass';
+
+  @override
+  String get networkProxyBypassHint =>
+      'Comma-separated hosts/CIDR, e.g. localhost,127.0.0.1,192.168.0.0/16,*.local';
+
+  @override
   String get networkProxyOptionalHint => 'Optional';
 
   @override

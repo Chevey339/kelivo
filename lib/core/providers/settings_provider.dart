@@ -112,11 +112,14 @@ class SettingsProvider extends ChangeNotifier {
   static const String _webDavConfigKey = 'webdav_config_v1';
   // Global network proxy
   static const String _globalProxyEnabledKey = 'global_proxy_enabled_v1';
-  static const String _globalProxyTypeKey = 'global_proxy_type_v1'; // http|https|socks5 (socks5 not yet supported)
+  static const String _globalProxyTypeKey = 'global_proxy_type_v1'; // http|https|socks5
   static const String _globalProxyHostKey = 'global_proxy_host_v1';
   static const String _globalProxyPortKey = 'global_proxy_port_v1';
   static const String _globalProxyUsernameKey = 'global_proxy_username_v1';
   static const String _globalProxyPasswordKey = 'global_proxy_password_v1';
+  static const String _globalProxyBypassKey = 'global_proxy_bypass_v1';
+  static const String _defaultGlobalProxyBypassRules =
+      'localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1';
   // TTS services (network)
   static const String _ttsServicesKey = 'tts_services_v1';
   static const String _ttsSelectedKey = 'tts_selected_v1';
@@ -211,6 +214,7 @@ class SettingsProvider extends ChangeNotifier {
   String _globalProxyPort = '8080';
   String _globalProxyUsername = '';
   String _globalProxyPassword = '';
+  String _globalProxyBypass = _defaultGlobalProxyBypassRules;
 
   bool get globalProxyEnabled => _globalProxyEnabled;
   String get globalProxyType => _globalProxyType; // http|https|socks5
@@ -218,6 +222,7 @@ class SettingsProvider extends ChangeNotifier {
   String get globalProxyPort => _globalProxyPort;
   String get globalProxyUsername => _globalProxyUsername;
   String get globalProxyPassword => _globalProxyPassword;
+  String get globalProxyBypass => _globalProxyBypass;
 
   SettingsProvider() {
     _load();
@@ -499,6 +504,13 @@ class SettingsProvider extends ChangeNotifier {
     _globalProxyPort = prefs.getString(_globalProxyPortKey) ?? '8080';
     _globalProxyUsername = prefs.getString(_globalProxyUsernameKey) ?? '';
     _globalProxyPassword = prefs.getString(_globalProxyPasswordKey) ?? '';
+    final bypass = prefs.getString(_globalProxyBypassKey);
+    if (bypass == null) {
+      _globalProxyBypass = _defaultGlobalProxyBypassRules;
+      await prefs.setString(_globalProxyBypassKey, _globalProxyBypass);
+    } else {
+      _globalProxyBypass = bypass;
+    }
 
     // load network TTS services
     try {
@@ -587,6 +599,13 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_globalProxyPasswordKey, _globalProxyPassword);
   }
 
+  Future<void> setGlobalProxyBypass(String v) async {
+    _globalProxyBypass = v.trim();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_globalProxyBypassKey, _globalProxyBypass);
+  }
+
   // Apply global proxy to Dart IO layer; provider-level proxies take precedence at call sites.
   String _lastProxySignature = '';
   void applyGlobalProxyOverridesIfNeeded() {
@@ -597,7 +616,8 @@ class SettingsProvider extends ChangeNotifier {
       final user = _globalProxyUsername.trim();
       final pass = _globalProxyPassword;
       final type = _globalProxyType;
-      final sig = [enabled, type, host, portStr, user, pass].join('|');
+      final bypass = _globalProxyBypass;
+      final sig = [enabled, type, host, portStr, user, pass, bypass].join('|');
       if (_lastProxySignature == sig) return;
       _lastProxySignature = sig;
       if (!enabled || host.isEmpty || portStr.isEmpty) {
@@ -606,9 +626,21 @@ class SettingsProvider extends ChangeNotifier {
       }
       final port = int.tryParse(portStr) ?? 8080;
       if (type == 'socks5') {
-        HttpOverrides.global = _SocksProxyHttpOverrides(host: host, port: port, username: user.isEmpty ? null : user, password: pass);
+        HttpOverrides.global = _SocksProxyHttpOverrides(
+          host: host,
+          port: port,
+          username: user.isEmpty ? null : user,
+          password: pass,
+          bypassRules: bypass,
+        );
       } else {
-        HttpOverrides.global = _ProxyHttpOverrides(host: host, port: port, username: user.isEmpty ? null : user, password: pass);
+        HttpOverrides.global = _ProxyHttpOverrides(
+          host: host,
+          port: port,
+          username: user.isEmpty ? null : user,
+          password: pass,
+          bypassRules: bypass,
+        );
       }
     } catch (_) {
       // ignore
@@ -2225,16 +2257,94 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
   }
 }
 
+String _normalizeProxyHost(String host) {
+  var h = host.trim().toLowerCase();
+  if (h.startsWith('[') && h.endsWith(']') && h.length > 2) {
+    h = h.substring(1, h.length - 1);
+  }
+  final zoneIndex = h.indexOf('%');
+  if (zoneIndex > 0) {
+    h = h.substring(0, zoneIndex);
+  }
+  if (h.endsWith('.')) {
+    h = h.substring(0, h.length - 1);
+  }
+  return h;
+}
+
+bool _shouldBypassProxy(String host, String bypassRules) {
+  final h = _normalizeProxyHost(host);
+  if (h.isEmpty) return false;
+
+  final rules = bypassRules.split(RegExp(r'[,;\s]+'));
+  for (final rawRule in rules) {
+    final rule = rawRule.trim();
+    if (rule.isEmpty) continue;
+    final r = rule.toLowerCase();
+
+    if (r == '*') return true;
+
+    if (r.startsWith('*.') || r.startsWith('*')) {
+      final suffix = r.substring(1);
+      if (suffix.isNotEmpty && h.endsWith(suffix)) return true;
+      continue;
+    }
+
+    if (r.contains('/')) {
+      final addr = InternetAddress.tryParse(h);
+      if (addr != null && _matchesCidr(addr, r)) return true;
+      continue;
+    }
+
+    if (h == r) return true;
+  }
+
+  return false;
+}
+
+BigInt _bytesToBigInt(List<int> bytes) {
+  var n = BigInt.zero;
+  for (final b in bytes) {
+    n = (n << 8) | BigInt.from(b);
+  }
+  return n;
+}
+
+BigInt _internetAddressToBigInt(InternetAddress addr) => _bytesToBigInt(addr.rawAddress);
+
+bool _matchesCidr(InternetAddress addr, String cidr) {
+  final parts = cidr.split('/');
+  if (parts.length != 2) return false;
+  final networkStr = parts[0].trim();
+  final prefixLen = int.tryParse(parts[1].trim());
+  if (prefixLen == null) return false;
+  final network = InternetAddress.tryParse(networkStr);
+  if (network == null) return false;
+
+  if (addr.type != network.type) return false;
+  final totalBits = addr.type == InternetAddressType.IPv4 ? 32 : 128;
+  if (prefixLen < 0 || prefixLen > totalBits) return false;
+
+  final mask = prefixLen == 0
+      ? BigInt.zero
+      : ((BigInt.one << prefixLen) - BigInt.one) << (totalBits - prefixLen);
+
+  final a = _internetAddressToBigInt(addr);
+  final n = _internetAddressToBigInt(network);
+  return (a & mask) == (n & mask);
+}
+
 class _ProxyHttpOverrides extends HttpOverrides {
   final String host;
   final int port;
   final String? username;
   final String? password;
-  _ProxyHttpOverrides({required this.host, required this.port, this.username, this.password});
+  final String bypassRules;
+  _ProxyHttpOverrides({required this.host, required this.port, this.username, this.password, required this.bypassRules});
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context);
-    client.findProxy = (_) => 'PROXY $host:$port';
+    client.findProxy = (uri) => _shouldBypassProxy(uri.host, bypassRules) ? 'DIRECT' : 'PROXY $host:$port';
     if (username != null && username!.isNotEmpty) {
       client.addProxyCredentials(host, port, '', HttpClientBasicCredentials(username!, password ?? ''));
     }
@@ -2246,17 +2356,71 @@ class _SocksProxyHttpOverrides extends HttpOverrides {
   final int port;
   final String? username;
   final String? password;
-  _SocksProxyHttpOverrides({required this.host, required this.port, this.username, this.password});
+  final String bypassRules;
+  _SocksProxyHttpOverrides({required this.host, required this.port, this.username, this.password, required this.bypassRules});
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context);
+    Future<InternetAddress?>? proxyAddrFuture;
+
+    ConnectionTask<Socket> directConnection(Uri uri) {
+      if (uri.scheme == 'https') {
+        final Future<SecureSocket> socket = SecureSocket.connect(uri.host, uri.port, context: context);
+        return ConnectionTask.fromSocket(socket, () async => (await socket).close());
+      }
+      final Future<Socket> socket = Socket.connect(uri.host, uri.port);
+      return ConnectionTask.fromSocket(socket, () async => (await socket).close());
+    }
+
+    Future<InternetAddress?> resolveProxyAddress() async {
+      final parsed = InternetAddress.tryParse(host);
+      if (parsed != null) return parsed;
+      proxyAddrFuture ??= InternetAddress.lookup(host).then((list) => list.isNotEmpty ? list.first : null);
+      try {
+        return await proxyAddrFuture;
+      } catch (_) {
+        return null;
+      }
+    }
+
     try {
-      final List<socks.ProxySettings> proxies = [
-        socks.ProxySettings(InternetAddress(host), port,
-            username: username, password: password),
-      ];
-      socks.SocksTCPClient.assignToHttpClient(client, proxies);
-    } catch (_) {}
+      client.connectionFactory = (uri, proxyHost, proxyPort) async {
+        if (_shouldBypassProxy(uri.host, bypassRules)) {
+          return directConnection(uri);
+        }
+
+        final proxyAddr = await resolveProxyAddress();
+        if (proxyAddr == null) {
+          // Preserve previous behavior: if proxy cannot be configured, fall back to direct.
+          return directConnection(uri);
+        }
+
+        final proxies = <socks.ProxySettings>[
+          socks.ProxySettings(proxyAddr, port, username: username, password: password),
+        ];
+
+        final socket = socks.SocksTCPClient.connect(
+          proxies,
+          InternetAddress(uri.host, type: InternetAddressType.unix),
+          uri.port,
+        );
+
+        if (uri.scheme == 'https') {
+          final Future<SecureSocket> secureSocket;
+          return ConnectionTask.fromSocket(
+            secureSocket = (await socket).secure(uri.host, context: context),
+            () async => (await secureSocket).close(),
+          );
+        }
+
+        return ConnectionTask.fromSocket(
+          socket,
+          () async => (await socket).close(),
+        );
+      };
+    } catch (_) {
+      // ignore
+    }
     return client;
   }
 }

@@ -6842,6 +6842,18 @@ abstract class AppLocalizations {
   /// **'Password'**
   String get networkProxyPassword;
 
+  /// No description provided for @networkProxyBypassLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy bypass'**
+  String get networkProxyBypassLabel;
+
+  /// No description provided for @networkProxyBypassHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Comma-separated hosts/CIDR, e.g. localhost,127.0.0.1,192.168.0.0/16,*.local'**
+  String get networkProxyBypassHint;
+
   /// No description provided for @networkProxyOptionalHint.
   ///
   /// In en, this message translates to:
