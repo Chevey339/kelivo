@@ -255,7 +255,7 @@ class HomePageController extends ChangeNotifier {
       contextProvider: _context,
     );
     _fileUploadService = FileUploadService(
-      context: _context,
+      getContext: () => _context,
       mediaController: _mediaController,
       onScrollToBottom: () => _scrollToBottomSoon(),
     );

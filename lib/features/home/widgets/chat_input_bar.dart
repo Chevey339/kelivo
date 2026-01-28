@@ -6,6 +6,7 @@ import '../../../icons/lucide_adapter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/dialogs/file_duplicate_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -698,13 +699,19 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
           String destPath = p.join(dir.path, baseName);
           // Avoid overwriting existing files
           if (await File(destPath).exists()) {
-            final srcStat = await from.stat().catchError((_) => null);
-            final destStat = await File(destPath).stat().catchError((_) => null);
+            FileStat? srcStat;
+            FileStat? destStat;
+            try {
+              srcStat = await from.stat();
+            } catch (_) {}
+            try {
+              destStat = await File(destPath).stat();
+            } catch (_) {}
             final same = srcStat != null && destStat != null &&
                 srcStat.size == destStat.size &&
                 srcStat.modified.millisecondsSinceEpoch == destStat.modified.millisecondsSinceEpoch;
             if (same) {
-              final useExisting = await _confirmUseExistingFile(baseName);
+              final useExisting = await FileDuplicateDialog.show(context, baseName);
               if (useExisting) {
                 if (_isImageExtension(baseName)) {
                   images.add(destPath);
@@ -728,8 +735,8 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
           await File(destPath).writeAsBytes(await from.readAsBytes());
           // Keep modified time to help cache keying.
           try {
-            final srcStat = await from.stat().catchError((_) => null);
-            if (srcStat != null) await File(destPath).setLastModified(srcStat.modified);
+            final srcStat = await from.stat();
+            await File(destPath).setLastModified(srcStat.modified);
           } catch (_) {}
           final savedName = p.basename(destPath);
           if (_isImageExtension(savedName)) {
@@ -744,28 +751,6 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
     return (images: images, docs: docs);
   }
 
-  Future<bool> _confirmUseExistingFile(String fileName) async {
-    final l10n = AppLocalizations.of(context)!;
-    final res = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.fileUploadDuplicateTitle),
-        content: Text(l10n.fileUploadDuplicateContent(fileName)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.fileUploadDuplicateUseExisting),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.fileUploadDuplicateUploadNew),
-          ),
-        ],
-      ),
-    );
-    return res == true;
-  }
 
   // Build a responsive left action bar that hides overflowing actions
   // into an anchored "+" menu using DesktopContextMenu style.

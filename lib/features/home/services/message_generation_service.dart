@@ -98,65 +98,61 @@ class MessageGenerationService {
     final kind = ProviderConfig.classify(providerKey, explicitType: cfg.providerType);
     final includeOpenAIToolMessages = kind == ProviderKind.openai;
 
-    try {
-      onFileProcessingStarted?.call();
-      
-      // Build API messages
-      final apiMessages = messageBuilderService.buildApiMessages(
-        messages: messages,
-        versionSelections: versionSelections,
-        currentConversation: currentConversation,
-        includeOpenAIToolMessages: includeOpenAIToolMessages,
-      );
+    onFileProcessingStarted?.call();
 
-      // Process user messages (documents, OCR, templates)
-      final lastUserImagePaths = await messageBuilderService.processUserMessagesForApi(
-        apiMessages,
-        settings,
-        assistant,
-      );
+    // Build API messages
+    final apiMessages = messageBuilderService.buildApiMessages(
+      messages: messages,
+      versionSelections: versionSelections,
+      currentConversation: currentConversation,
+      includeOpenAIToolMessages: includeOpenAIToolMessages,
+    );
 
-      // Signal processing finished
-      onFileProcessingFinished?.call();
-      
-      // Inject prompts
-      messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
-      await messageBuilderService.injectMemoryAndRecentChats(
-        apiMessages,
-        assistant,
-        currentConversationId: currentConversation?.id,
-      );
+    // Process user messages (documents, OCR, templates)
+    final lastUserImagePaths = await messageBuilderService.processUserMessagesForApi(
+      apiMessages,
+      settings,
+      assistant,
+    );
 
-      final hasBuiltInSearch = messageBuilderService.hasBuiltInGeminiSearch(settings, providerKey, modelId);
-      messageBuilderService.injectSearchPrompt(apiMessages, settings, hasBuiltInSearch);
-      await messageBuilderService.injectInstructionPrompts(apiMessages, assistantId);
+    // Signal processing finished
+    onFileProcessingFinished?.call();
 
-      // Apply context limit and inline images
-      messageBuilderService.applyContextLimit(apiMessages, assistant);
-      await messageBuilderService.inlineLocalImages(apiMessages);
+    // Inject prompts
+    messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
+    await messageBuilderService.injectMemoryAndRecentChats(
+      apiMessages,
+      assistant,
+      currentConversationId: currentConversation?.id,
+    );
 
-      // Prepare tools
-      final toolDefs = generationController.buildToolDefinitions(
-        settings,
-        assistant,
-        providerKey,
-        modelId,
-        hasBuiltInSearch,
-      );
-      final onToolCall = toolDefs.isNotEmpty
-          ? generationController.buildToolCallHandler(settings, assistant)
-          : null;
+    final hasBuiltInSearch = messageBuilderService.hasBuiltInGeminiSearch(settings, providerKey, modelId);
+    messageBuilderService.injectSearchPrompt(apiMessages, settings, hasBuiltInSearch);
+    await messageBuilderService.injectInstructionPrompts(apiMessages, assistantId);
 
-      return PreparedGeneration(
-        apiMessages: apiMessages,
-        toolDefs: toolDefs,
-        onToolCall: onToolCall,
-        hasBuiltInSearch: hasBuiltInSearch,
-        lastUserImagePaths: lastUserImagePaths,
-      );
-    } catch (e) {
-      rethrow;
-    }
+    // Apply context limit and inline images
+    messageBuilderService.applyContextLimit(apiMessages, assistant);
+    await messageBuilderService.inlineLocalImages(apiMessages);
+
+    // Prepare tools
+    final toolDefs = generationController.buildToolDefinitions(
+      settings,
+      assistant,
+      providerKey,
+      modelId,
+      hasBuiltInSearch,
+    );
+    final onToolCall = toolDefs.isNotEmpty
+        ? generationController.buildToolCallHandler(settings, assistant)
+        : null;
+
+    return PreparedGeneration(
+      apiMessages: apiMessages,
+      toolDefs: toolDefs,
+      onToolCall: onToolCall,
+      hasBuiltInSearch: hasBuiltInSearch,
+      lastUserImagePaths: lastUserImagePaths,
+    );
   }
 
   /// Create user message from input data.

@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/dialogs/file_duplicate_dialog.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -22,16 +23,16 @@ import '../widgets/chat_input_bar.dart';
 /// - 文件复制到应用目录
 class FileUploadService {
   FileUploadService({
-    required BuildContext context,
+    required BuildContext Function() getContext,
     required this.mediaController,
     required this.onScrollToBottom,
-  }) : _context = context;
+  }) : _getContext = getContext;
 
   /// 媒体控制器，用于添加图片和文件到输入栏
   final ChatInputBarController mediaController;
 
-  /// UI context for duplicate prompt dialogs.
-  final BuildContext _context;
+  /// Context provider callback to avoid storing stale context
+  final BuildContext Function() _getContext;
 
   /// 滚动到底部的回调
   final VoidCallback onScrollToBottom;
@@ -50,26 +51,30 @@ class FileUploadService {
       try {
         final name = f.name.isNotEmpty ? f.name : DateTime.now().millisecondsSinceEpoch.toString();
         final srcPath = f.path;
-        final FileStat? srcStat = srcPath.isNotEmpty
-            ? await File(srcPath).stat().catchError((_) => null)
-            : null;
-        debugPrint('[upload-dup] src name=$name path=$srcPath stat=' 
-            '${srcStat == null ? 'null' : 'size=${srcStat.size} mtime=${srcStat.modified.toIso8601String()}'}');
+        FileStat? srcStat;
+        if (srcPath.isNotEmpty) {
+          try {
+            srcStat = await File(srcPath).stat();
+          } catch (_) {
+            srcStat = null;
+          }
+        }
         File dest = File(p.join(dir.path, name));
         if (await dest.exists()) {
           // If same file (modified+size), ask to reuse; else versioned copy.
-          final destStat = await dest.stat().catchError((_) => null);
-          debugPrint('[upload-dup] dest exists path=${dest.path} stat=' 
-              '${destStat == null ? 'null' : 'size=${destStat.size} mtime=${destStat.modified.toIso8601String()}'}');
+          FileStat? destStat;
+          try {
+            destStat = await dest.stat();
+          } catch (_) {
+            destStat = null;
+          }
           final srcModifiedSec = srcStat == null ? null : (srcStat.modified.millisecondsSinceEpoch ~/ 1000);
           final destModifiedSec = destStat == null ? null : (destStat.modified.millisecondsSinceEpoch ~/ 1000);
           final sameSize = srcStat != null && destStat != null && srcStat.size == destStat.size;
           final sameModified = srcModifiedSec != null && destModifiedSec != null && srcModifiedSec == destModifiedSec;
           final same = sameSize && sameModified;
-          debugPrint('[upload-dup] compare same=$same sameSize=$sameSize sameModified=$sameModified srcSec=$srcModifiedSec destSec=$destModifiedSec');
           if (same) {
-            final useExisting = await _confirmUseExistingFile(name);
-            debugPrint('[upload-dup] user decision useExisting=$useExisting');
+            final useExisting = await FileDuplicateDialog.show(_getContext(), name);
             if (useExisting) {
               out.add(dest.path);
               continue;
@@ -84,14 +89,11 @@ class FileUploadService {
             counter++;
           } while (await File(candidate).exists());
           dest = File(candidate);
-          debugPrint('[upload-dup] versioned dest=${dest.path}');
         }
         await dest.writeAsBytes(await f.readAsBytes());
-        debugPrint('[upload-dup] wrote file dest=${dest.path}');
         // Keep modified time to help cache keying.
         if (srcStat != null) {
           try { await dest.setLastModified(srcStat.modified); } catch (_) {}
-          debugPrint('[upload-dup] setLastModified dest=${dest.path} mtime=${srcStat.modified.toIso8601String()}');
         }
         out.add(dest.path);
       } catch (_) {}
@@ -99,28 +101,6 @@ class FileUploadService {
     return out;
   }
 
-  Future<bool> _confirmUseExistingFile(String fileName) async {
-    final l10n = AppLocalizations.of(_context)!;
-    final res = await showDialog<bool>(
-      context: _context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.fileUploadDuplicateTitle),
-        content: Text(l10n.fileUploadDuplicateContent(fileName)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.fileUploadDuplicateUseExisting),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.fileUploadDuplicateUploadNew),
-          ),
-        ],
-      ),
-    );
-    return res == true;
-  }
 
   /// 从相册选取图片
   Future<void> onPickPhotos() async {

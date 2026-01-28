@@ -210,8 +210,6 @@ class HomeViewModel extends ChangeNotifier {
 
     if (input.documents.isNotEmpty) {
       isProcessingFiles.value = true;
-      // Allow the UI to update before proceeding
-      await Future.delayed(const Duration(milliseconds: 50));
     }
 
     onHapticFeedback?.call();

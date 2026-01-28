@@ -235,17 +235,18 @@ class MessageBuilderService {
 
     Future<String?> readDocument(DocumentAttachment d) async {
       // Use file stat to detect content changes without hashing.
-      final FileStat? stat = await File(d.path).stat().catchError((_) => null);
-      debugPrint('[doc-cache] path=${d.path} stat=' + (stat == null ? 'null' : '${stat.modified.toIso8601String()} size=${stat.size}'));
+      FileStat? stat;
+      try {
+        stat = await File(d.path).stat();
+      } catch (_) {
+        stat = null;
+      }
       if (stat != null) {
         final cached = _docTextCache[d.path];
-        debugPrint('[doc-cache] cached=' + (cached == null ? 'miss' : 'hit(${cached.modifiedMs},${cached.size})'));
         if (cached != null && cached.modifiedMs == stat.modified.millisecondsSinceEpoch && cached.size == stat.size) {
-          debugPrint('[doc-cache] reuse');
           return cached.text;
         }
       }
-      debugPrint('[doc-cache] reparse');
       try {
         final text = await DocumentTextExtractor.extract(path: d.path, mime: d.mime);
         // Cache only when stat is available; otherwise avoid staleness.
