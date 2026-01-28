@@ -227,28 +227,54 @@ class GoogleProvider extends BaseProvider {
           headers['x-goog-api-key'] = key;
         }
       }
-      final res = await client.get(Uri.parse(url), headers: headers);
-      if (res.statusCode >= 200 && res.statusCode < 300) {
-        final obj = jsonDecode(res.body) as Map<String, dynamic>;
-        final arr = (obj['models'] as List?) ?? [];
-        final out = <ModelInfo>[];
-        for (final e in arr) {
-          if (e is Map) {
-            final name = (e['name'] as String?) ?? '';
-            final id = name.startsWith('models/') ? name.substring('models/'.length) : name;
-            final displayName = (e['displayName'] as String?) ?? id;
-            final methods = (e['supportedGenerationMethods'] as List?)?.map((m) => m.toString()).toSet() ?? {};
-            if (!(methods.contains('generateContent') || methods.contains('embedContent'))) continue;
-            out.add(ModelRegistry.infer(ModelInfo(
-              id: id,
-              displayName: displayName,
-              type: methods.contains('generateContent') ? ModelType.chat : ModelType.embedding,
-            )));
+      final out = <ModelInfo>[];
+      try {
+        final res = await client.get(Uri.parse(url), headers: headers);
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          final obj = jsonDecode(res.body) as Map<String, dynamic>;
+          final arr = (obj['models'] as List?) ?? [];
+          for (final e in arr) {
+            if (e is Map) {
+              final name = (e['name'] as String?) ?? '';
+              final id = name.startsWith('models/') ? name.substring('models/'.length) : name;
+              final displayName = (e['displayName'] as String?) ?? id;
+              final methods = (e['supportedGenerationMethods'] as List?)?.map((m) => m.toString()).toSet() ?? {};
+              if (!(methods.contains('generateContent') || methods.contains('embedContent'))) continue;
+              out.add(ModelRegistry.infer(ModelInfo(
+                id: id,
+                displayName: displayName,
+                type: methods.contains('generateContent') ? ModelType.chat : ModelType.embedding,
+              )));
+            }
           }
         }
-        return out;
+      } catch (_) {}
+
+      // If this is Vertex AI, augment with known Anthropic models
+      // Since Google listModels API often only returns Gemini models under publishers/google,
+      // we manually inject known supported Claude models for convenience.
+      if (cfg.vertexAI == true) {
+        final knownClaude = [
+          'claude-opus-4-5@20251101',
+          'claude-opus-4-1@20250805',
+          'claude-opus-4@20250514',
+          'claude-sonnet-4-5@20250929',
+          'claude-sonnet-4@20250514',
+          'claude-3-7-sonnet@20250219',
+          'claude-3-5-sonnet-v2@20241022',
+          'claude-haiku-4-5@20251001',
+          'claude-3-5-haiku@20241022',
+          'claude-3-5-sonnet@20240620',
+          'claude-3-opus@20240229',
+          'claude-3-haiku@20240307',
+        ];
+        for (final id in knownClaude) {
+          if (!out.any((m) => m.id == id)) {
+            out.add(ModelRegistry.infer(ModelInfo(id: id, displayName: id)));
+          }
+        }
       }
-      return [];
+      return out;
     } finally {
       client.close();
     }
@@ -450,7 +476,13 @@ class ProviderManager {
         if (cfg.vertexAI == true && (cfg.location?.isNotEmpty == true) && (cfg.projectId?.isNotEmpty == true)) {
           final loc = cfg.location!;
           final proj = cfg.projectId!;
-          url = 'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$upstreamId:$endpoint';
+          // Special path for Anthropic models on Vertex AI
+          if (upstreamId.toLowerCase().startsWith('claude-')) {
+            final ep = useStream ? 'streamRawPredict' : 'rawPredict';
+            url = 'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$ep';
+          } else {
+            url = 'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$upstreamId:$endpoint';
+          }
         } else {
           final base = cfg.baseUrl.endsWith('/') ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1) : cfg.baseUrl;
           url = '$base/models/$upstreamId:$endpoint';
