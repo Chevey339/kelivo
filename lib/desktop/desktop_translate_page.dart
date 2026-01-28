@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:re_editor/re_editor.dart';
 
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
@@ -22,8 +23,8 @@ class DesktopTranslatePage extends StatefulWidget {
 }
 
 class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
-  final TextEditingController _source = TextEditingController();
-  final TextEditingController _output = TextEditingController();
+  final CodeLineEditingController _source = CodeLineEditingController();
+  final CodeLineEditingController _output = CodeLineEditingController();
 
   LanguageOption? _targetLang;
   String? _modelProviderKey;
@@ -121,6 +122,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   }
 
   Future<void> _startTranslate() async {
+    // TODO: Guard against concurrent translate runs (e.g., if triggered twice quickly).
     final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
 
@@ -143,7 +145,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
     setState(() {
       _translating = true;
-      _output.text = '';
+      _output.value = const CodeLineEditingValue.empty();
     });
 
     try {
@@ -160,9 +162,10 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
           // live update; remove leading whitespace on first chunk to avoid top gap
           final s = chunk.content;
           if (_output.text.isEmpty) {
-            _output.text = s.replaceFirst(RegExp(r'^\s+'), '');
+            _setOutputText(s.replaceFirst(RegExp(r'^\s+'), ''));
           } else {
-            _output.text += s;
+            // TODO: Avoid repeated string concatenation during streaming (consider buffering / incremental append).
+            _setOutputText('${_output.text}$s');
           }
         },
         onDone: () {
@@ -187,6 +190,21 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
       await _subscription?.cancel();
     } catch (_) {}
     if (mounted) setState(() => _translating = false);
+  }
+
+  void _setOutputText(String text) {
+    if (text.isEmpty) {
+      _output.value = const CodeLineEditingValue.empty();
+      return;
+    }
+    final lines = text.codeLines;
+    final lastIndex = lines.length - 1;
+    final lastOffset = lines.last.length;
+    _output.value = CodeLineEditingValue(
+      codeLines: lines,
+      selection: CodeLineSelection.collapsed(index: lastIndex, offset: lastOffset),
+      composing: TextRange.empty,
+    );
   }
 
   @override
@@ -268,22 +286,29 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                   icon: lucide.Lucide.Eraser,
                                   label: '清空',
                                   onTap: () {
-                                    _source.clear();
-                                    _output.clear();
+                                    // TODO: Replace hard-coded label with AppLocalizations (i18n).
+                                    // TODO: Confirm before clearing when either source or output is non-empty to prevent accidental data loss.
+                                    _source.value = const CodeLineEditingValue.empty();
+                                    _output.value = const CodeLineEditingValue.empty();
                                   },
                                 ),
-                                child: TextField(
+                                child: CodeEditor(
                                   controller: _source,
-                                  keyboardType: TextInputType.multiline,
-                                  maxLines: null,
-                                  expands: true,
-                                  decoration: InputDecoration(
-                                    hintText: l10n.translatePageInputHint,
-                                    border: InputBorder.none,
-                                    isCollapsed: true,
-                                    contentPadding: const EdgeInsets.all(14),
+                                  autofocus: false,
+                                  wordWrap: true,
+                                  indicatorBuilder: null,
+                                  chunkAnalyzer: const NonCodeChunkAnalyzer(),
+                                  hint: l10n.translatePageInputHint,
+                                  padding: const EdgeInsets.all(14),
+                                  style: CodeEditorStyle(
+                                    fontSize: 14.5,
+                                    fontHeight: 1.4,
+                                    textColor: Theme.of(context).colorScheme.onSurface,
+                                    hintTextColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                    cursorColor: Theme.of(context).colorScheme.primary,
+                                    backgroundColor: Colors.transparent,
+                                    selectionColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
                                   ),
-                                  style: const TextStyle(fontSize: 14.5, height: 1.4),
                                 ),
                               ),
                             ),
@@ -294,6 +319,8 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                   icon: lucide.Lucide.Copy,
                                   label: '复制',
                                   onTap: () async {
+                                    // TODO: Replace hard-coded label with AppLocalizations (i18n).
+                                    // TODO: Handle Clipboard.setData failures and provide user feedback when copying fails.
                                     await Clipboard.setData(ClipboardData(text: _output.text));
                                     if (!mounted) return;
                                     showAppSnackBar(
@@ -303,19 +330,24 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                     );
                                   },
                                 ),
-                                child: TextField(
+                                child: CodeEditor(
                                   controller: _output,
                                   readOnly: true,
-                                  keyboardType: TextInputType.multiline,
-                                  maxLines: null,
-                                  expands: true,
-                                  decoration: InputDecoration(
-                                    hintText: l10n.translatePageOutputHint,
-                                    border: InputBorder.none,
-                                    isCollapsed: true,
-                                    contentPadding: const EdgeInsets.all(14),
+                                  autofocus: false,
+                                  wordWrap: true,
+                                  indicatorBuilder: null,
+                                  chunkAnalyzer: const NonCodeChunkAnalyzer(),
+                                  hint: l10n.translatePageOutputHint,
+                                  padding: const EdgeInsets.all(14),
+                                  style: CodeEditorStyle(
+                                    fontSize: 14.5,
+                                    fontHeight: 1.4,
+                                    textColor: Theme.of(context).colorScheme.onSurface,
+                                    hintTextColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                    cursorColor: Theme.of(context).colorScheme.primary,
+                                    backgroundColor: Colors.transparent,
+                                    selectionColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
                                   ),
-                                  style: const TextStyle(fontSize: 14.5, height: 1.4),
                                 ),
                               ),
                             ),

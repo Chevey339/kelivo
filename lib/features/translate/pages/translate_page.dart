@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
+import 'package:re_editor/re_editor.dart';
 
 import '../../../icons/lucide_adapter.dart' as lucide;
 import '../../../l10n/app_localizations.dart';
@@ -24,8 +25,8 @@ class TranslatePage extends StatefulWidget {
 }
 
 class _TranslatePageState extends State<TranslatePage> {
-  final TextEditingController _src = TextEditingController();
-  final TextEditingController _dst = TextEditingController();
+  final CodeLineEditingController _src = CodeLineEditingController();
+  final CodeLineEditingController _dst = CodeLineEditingController();
   LanguageOption? _lang;
   String? _providerKey;
   String? _modelId;
@@ -78,7 +79,8 @@ class _TranslatePageState extends State<TranslatePage> {
     final lang = await showLanguageSelector(context);
     if (!mounted || lang == null) return;
     if (lang.code == '__clear__') {
-      setState(() => _dst.clear());
+      // TODO: Decide whether clearing the language selector should also reset the selected language state (_lang) to a default/unset value.
+      setState(() => _dst.value = const CodeLineEditingValue.empty());
       return;
     }
     setState(() => _lang = lang);
@@ -103,7 +105,7 @@ class _TranslatePageState extends State<TranslatePage> {
 
     setState(() {
       _loading = true;
-      _dst.text = '';
+      _dst.value = const CodeLineEditingValue.empty();
     });
 
     try {
@@ -120,9 +122,10 @@ class _TranslatePageState extends State<TranslatePage> {
           if (_dst.text.isEmpty) {
             // Remove any leading whitespace/newlines from the first chunk to avoid top gap
             final cleaned = s.replaceFirst(RegExp(r'^\s+'), '');
-            _dst.text = cleaned;
+            _setOutputText(cleaned);
           } else {
-            _dst.text += s;
+            // TODO: Avoid repeated string concatenation during streaming (consider buffering / incremental append).
+            _setOutputText('${_dst.text}$s');
           }
         },
         onError: (e) {
@@ -140,6 +143,21 @@ class _TranslatePageState extends State<TranslatePage> {
       setState(() => _loading = false);
       showAppSnackBar(context, message: l10n.homePageTranslateFailed(e.toString()), type: NotificationType.error);
     }
+  }
+
+  void _setOutputText(String text) {
+    if (text.isEmpty) {
+      _dst.value = const CodeLineEditingValue.empty();
+      return;
+    }
+    final lines = text.codeLines;
+    final lastIndex = lines.length - 1;
+    final lastOffset = lines.last.length;
+    _dst.value = CodeLineEditingValue(
+      codeLines: lines,
+      selection: CodeLineSelection.collapsed(index: lastIndex, offset: lastOffset),
+      composing: TextRange.empty,
+    );
   }
 
   Future<void> _stop() async {
@@ -186,7 +204,10 @@ class _TranslatePageState extends State<TranslatePage> {
 
   Future<void> _clearAll() async {
     await _stop();
-    setState(() { _src.clear(); _dst.clear(); });
+    setState(() {
+      _src.value = const CodeLineEditingValue.empty();
+      _dst.value = const CodeLineEditingValue.empty();
+    });
   }
 
   @override
@@ -195,6 +216,16 @@ class _TranslatePageState extends State<TranslatePage> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final asset = (_modelId != null) ? BrandAssets.assetForName(_modelId!) : null;
+    final codeEditorPadding = const EdgeInsets.fromLTRB(12, 8, 12, 12);
+    final codeEditorStyle = CodeEditorStyle(
+      fontSize: 15,
+      fontHeight: 1.4,
+      textColor: cs.onSurface,
+      hintTextColor: cs.onSurface.withOpacity(0.5),
+      cursorColor: cs.primary,
+      backgroundColor: Colors.transparent,
+      selectionColor: cs.primary.withOpacity(0.3),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -255,9 +286,11 @@ class _TranslatePageState extends State<TranslatePage> {
               padding: const EdgeInsets.all(8),
               builder: (color) {
                 if (asset != null && asset.toLowerCase().endsWith('.svg')) {
+                  // TODO: Add error handling/fallback UI if the brand asset path is invalid or the asset fails to load.
                   return SvgPicture.asset(asset, width: 22, height: 22);
                 }
                 if (asset != null) {
+                  // TODO: Add error handling/fallback UI if the brand asset path is invalid or the asset fails to load.
                   return Image.asset(asset, width: 22, height: 22);
                 }
                 return Icon(lucide.Lucide.Bot, size: 22, color: color);
@@ -276,19 +309,15 @@ class _TranslatePageState extends State<TranslatePage> {
               child: SizedBox(
                 height: 200,
                 child: _Card(
-                  child: TextField(
+                  child: CodeEditor(
                     controller: _src,
-                    keyboardType: TextInputType.multiline,
-                    expands: true,
-                    maxLines: null,
-                    minLines: null,
-                    decoration: InputDecoration(
-                      hintText: l10n.translatePageInputHint,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                    ),
-                    contextMenuBuilder: (context, editableTextState) => const SizedBox.shrink(),
-                    style: const TextStyle(fontSize: 15, height: 1.4),
+                    autofocus: false,
+                    wordWrap: true,
+                    indicatorBuilder: null,
+                    chunkAnalyzer: const NonCodeChunkAnalyzer(),
+                    hint: l10n.translatePageInputHint,
+                    padding: codeEditorPadding,
+                    style: codeEditorStyle,
                   ),
                 ),
               ),
@@ -298,20 +327,16 @@ class _TranslatePageState extends State<TranslatePage> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
                 child: _Card(
-                  child: TextField(
+                  child: CodeEditor(
                     controller: _dst,
                     readOnly: true,
-                    keyboardType: TextInputType.multiline,
-                    maxLines: null,
-                    expands: true,
-                    decoration: InputDecoration(
-                      hintText: l10n.translatePageOutputHint,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                    ),
-                    enableInteractiveSelection: false,
-                    contextMenuBuilder: (context, editableTextState) => const SizedBox.shrink(),
-                    style: const TextStyle(fontSize: 15, height: 1.4),
+                    autofocus: false,
+                    wordWrap: true,
+                    indicatorBuilder: null,
+                    chunkAnalyzer: const NonCodeChunkAnalyzer(),
+                    hint: l10n.translatePageOutputHint,
+                    padding: codeEditorPadding,
+                    style: codeEditorStyle,
                   ),
                 ),
               ),

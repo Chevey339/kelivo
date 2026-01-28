@@ -7,6 +7,7 @@ import '../../features/model/widgets/model_select_sheet.dart';
 import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:characters/characters.dart';
+import '../../shared/widgets/input_height_constraints.dart';
 
 class DesktopDefaultModelPane extends StatelessWidget {
   const DesktopDefaultModelPane({super.key});
@@ -174,10 +175,19 @@ class DesktopDefaultModelPane extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.read<SettingsProvider>();
     final ctrl = TextEditingController(text: sp.titlePrompt);
+    // TODO: Dispose this temporary TextEditingController when the dialog is closed.
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
+        final rawMaxPromptHeight = computeInputMaxHeight(
+          context: ctx,
+          reservedHeight: 220,
+          softCapFraction: 0.6,
+          minHeight: 160,
+        );
+        // TODO: computeInputMaxHeight already enforces minHeight; remove this redundant clamp and consolidate repeated height calculations across dialogs.
+        final maxPromptHeight = rawMaxPromptHeight < 160 ? 160.0 : rawMaxPromptHeight;
         return Dialog(
           backgroundColor: cs.surface,
           shape: RoundedRectangleBorder(
@@ -214,9 +224,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 160),
+                    constraints: BoxConstraints(minHeight: 160, maxHeight: maxPromptHeight),
                     child: TextField(
                       controller: ctrl,
+                      // TODO: Consider adding input constraints (e.g., maxLength) and validating prompt length to avoid excessively long prompts.
                       maxLines: null,
                       minLines: 8,
                       style: const TextStyle(fontSize: 14),
@@ -271,10 +282,19 @@ class DesktopDefaultModelPane extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.read<SettingsProvider>();
     final ctrl = TextEditingController(text: sp.translatePrompt);
+    // TODO: Dispose this temporary TextEditingController when the dialog is closed.
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
+        final rawMaxPromptHeight = computeInputMaxHeight(
+          context: ctx,
+          reservedHeight: 220,
+          softCapFraction: 0.6,
+          minHeight: 160,
+        );
+        // TODO: computeInputMaxHeight already enforces minHeight; remove this redundant clamp and consolidate repeated height calculations across dialogs.
+        final maxPromptHeight = rawMaxPromptHeight < 160 ? 160.0 : rawMaxPromptHeight;
         return Dialog(
           backgroundColor: cs.surface,
           shape: RoundedRectangleBorder(
@@ -311,9 +331,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 160),
+                    constraints: BoxConstraints(minHeight: 160, maxHeight: maxPromptHeight),
                     child: TextField(
                       controller: ctrl,
+                      // TODO: Consider adding input constraints (e.g., maxLength) and validating prompt length to avoid excessively long prompts.
                       maxLines: null,
                       minLines: 8,
                       style: const TextStyle(fontSize: 14),
@@ -371,10 +392,19 @@ class DesktopDefaultModelPane extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.read<SettingsProvider>();
     final ctrl = TextEditingController(text: sp.ocrPrompt);
+    // TODO: Dispose this temporary TextEditingController when the dialog is closed.
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
+        final rawMaxPromptHeight = computeInputMaxHeight(
+          context: ctx,
+          reservedHeight: 220,
+          softCapFraction: 0.6,
+          minHeight: 160,
+        );
+        // TODO: computeInputMaxHeight already enforces minHeight; remove this redundant clamp and consolidate repeated height calculations across dialogs.
+        final maxPromptHeight = rawMaxPromptHeight < 160 ? 160.0 : rawMaxPromptHeight;
         return Dialog(
           backgroundColor: cs.surface,
           shape: RoundedRectangleBorder(
@@ -411,9 +441,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 160),
+                    constraints: BoxConstraints(minHeight: 160, maxHeight: maxPromptHeight),
                     child: TextField(
                       controller: ctrl,
+                      // TODO: Consider adding input constraints (e.g., maxLength) and validating prompt length to avoid excessively long prompts.
                       maxLines: null,
                       minLines: 8,
                       style: const TextStyle(fontSize: 14),
@@ -460,10 +491,19 @@ class DesktopDefaultModelPane extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.read<SettingsProvider>();
     final ctrl = TextEditingController(text: sp.summaryPrompt);
+    // TODO: Dispose this temporary TextEditingController when the dialog is closed.
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
+        final rawMaxPromptHeight = computeInputMaxHeight(
+          context: ctx,
+          reservedHeight: 220,
+          softCapFraction: 0.6,
+          minHeight: 160,
+        );
+        // TODO: computeInputMaxHeight already enforces minHeight; remove this redundant clamp and consolidate repeated height calculations across dialogs.
+        final maxPromptHeight = rawMaxPromptHeight < 160 ? 160.0 : rawMaxPromptHeight;
         return Dialog(
           backgroundColor: cs.surface,
           shape: RoundedRectangleBorder(
@@ -500,9 +540,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 160),
+                    constraints: BoxConstraints(minHeight: 160, maxHeight: maxPromptHeight),
                     child: TextField(
                       controller: ctrl,
+                      // TODO: Consider adding input constraints (e.g., maxLength) and validating prompt length to avoid excessively long prompts.
                       maxLines: null,
                       minLines: 8,
                       style: const TextStyle(fontSize: 14),

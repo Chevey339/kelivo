@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
+import 'package:re_editor/re_editor.dart';
 
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -388,13 +389,51 @@ class _InstructionInjectionEditSheet extends StatefulWidget {
 
 class _InstructionInjectionEditSheetState extends State<_InstructionInjectionEditSheet> {
   late final TextEditingController _titleController;
-  late final TextEditingController _promptController;
+  late final CodeLineEditingController _promptController;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.item?.title ?? '');
-    _promptController = TextEditingController(text: widget.item?.prompt ?? '');
+    _promptController = CodeLineEditingController.fromText(widget.item?.prompt ?? '');
+  }
+
+  @override
+  void didUpdateWidget(covariant _InstructionInjectionEditSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldTitle = oldWidget.item?.title ?? '';
+    final newTitle = widget.item?.title ?? '';
+    if (oldTitle != newTitle && _titleController.text == oldTitle) {
+      _syncTitleText(newTitle);
+    }
+    final oldPrompt = oldWidget.item?.prompt ?? '';
+    final newPrompt = widget.item?.prompt ?? '';
+    if (oldPrompt != newPrompt && _promptController.text == oldPrompt) {
+      _syncPromptText(newPrompt);
+    }
+  }
+
+  void _syncTitleText(String text) {
+    _titleController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+      composing: TextRange.empty,
+    );
+  }
+
+  void _syncPromptText(String text) {
+    if (text.isEmpty) {
+      _promptController.value = const CodeLineEditingValue.empty();
+      return;
+    }
+    final lines = text.codeLines;
+    final lastIndex = lines.length - 1;
+    final lastOffset = lines.last.length;
+    _promptController.value = CodeLineEditingValue(
+      codeLines: lines,
+      selection: CodeLineSelection.collapsed(index: lastIndex, offset: lastOffset),
+      composing: TextRange.empty,
+    );
   }
 
   @override
@@ -467,31 +506,44 @@ class _InstructionInjectionEditSheetState extends State<_InstructionInjectionEdi
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _promptController,
-              maxLines: 8,
-              decoration: InputDecoration(
-                labelText: l10n.instructionInjectionPromptLabel,
-                alignLabelWithHint: true,
-                filled: true,
-                fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 12, bottom: 6),
+                  child: Text(
+                    l10n.instructionInjectionPromptLabel,
+                    style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.6)),
                   ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                Container(
+                  height: 180,
+                  // TODO: Replace fixed height with responsive constraints to avoid overflow on small screens/keyboard.
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: CodeEditor(
+                    controller: _promptController,
+                    autofocus: false,
+                    wordWrap: true,
+                    indicatorBuilder: null,
+                    chunkAnalyzer: const NonCodeChunkAnalyzer(),
+                    padding: const EdgeInsets.all(12),
+                    style: CodeEditorStyle(
+                      fontSize: 14,
+                      fontHeight: 1.4,
+                      textColor: cs.onSurface,
+                      hintTextColor: cs.onSurface.withOpacity(0.5),
+                      cursorColor: cs.primary,
+                      backgroundColor: Colors.transparent,
+                      selectionColor: cs.primary.withOpacity(0.3),
+                    ),
                   ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
-                ),
-              ),
+              ],
             ),
             const SizedBox(height: 16),
             Row(
@@ -507,6 +559,7 @@ class _InstructionInjectionEditSheetState extends State<_InstructionInjectionEdi
                   child: _IosFilledButton(
                     label: l10n.quickPhraseSaveButton,
                     onTap: () {
+                      // TODO: Add immediate validation/UX feedback (e.g., disable Save or show error) when title or prompt is empty/invalid.
                       Navigator.of(context).pop({
                         'title': _titleController.text,
                         'prompt': _promptController.text,

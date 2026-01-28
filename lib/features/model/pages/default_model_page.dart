@@ -8,9 +8,11 @@ import '../widgets/model_select_sheet.dart';
 import '../widgets/ocr_prompt_sheet.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:characters/characters.dart';
+import 'package:re_editor/re_editor.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../core/services/haptics.dart';
+import '../../../shared/widgets/input_height_constraints.dart';
 
 class DefaultModelPage extends StatelessWidget {
   const DefaultModelPage({super.key});
@@ -162,7 +164,7 @@ class DefaultModelPage extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
-    final controller = TextEditingController(text: settings.titlePrompt);
+    final controller = CodeLineEditingController.fromText(settings.titlePrompt);
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -192,23 +194,53 @@ class DefaultModelPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(l10n.defaultModelPagePromptLabel, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: controller,
-                  maxLines: 8,
-                  decoration: InputDecoration(
-                    hintText: l10n.defaultModelPageTitlePromptHint,
-                    filled: true,
-                    fillColor: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary.withOpacity(0.5))),
-                  ),
+                Builder(
+                  builder: (innerCtx) {
+                    final rawMaxPromptHeight = computeInputMaxHeight(
+                      context: innerCtx,
+                      reservedHeight: 220,
+                      softCapFraction: 0.45,
+                      minHeight: 120,
+                    );
+                    // TODO: computeInputMaxHeight already enforces minHeight; remove this redundant clamp and consider extracting the repeated Builder/ConstrainedBox/TextField pattern.
+                    final maxPromptHeight = rawMaxPromptHeight < 120 ? 120.0 : rawMaxPromptHeight;
+                    return ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: 120, maxHeight: maxPromptHeight),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: CodeEditor(
+                          controller: controller,
+                          autofocus: false,
+                          wordWrap: true,
+                          indicatorBuilder: null,
+                          chunkAnalyzer: const NonCodeChunkAnalyzer(),
+                          hint: l10n.defaultModelPageTitlePromptHint,
+                          padding: const EdgeInsets.all(12),
+                          style: CodeEditorStyle(
+                            fontSize: 14,
+                            fontHeight: 1.4,
+                            textColor: cs.onSurface,
+                            hintTextColor: cs.onSurface.withOpacity(0.5),
+                            cursorColor: cs.primary,
+                            backgroundColor: Colors.transparent,
+                            selectionColor: cs.primary.withOpacity(0.3),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     TextButton(
                       onPressed: () async {
+                        // TODO: Add try/catch and user feedback if resetTitlePrompt fails.
                         await settings.resetTitlePrompt();
                         controller.text = settings.titlePrompt;
                       },
@@ -217,6 +249,7 @@ class DefaultModelPage extends StatelessWidget {
                     const Spacer(),
                     FilledButton(
                       onPressed: () async {
+                        // TODO: Add try/catch and user feedback if setTitlePrompt fails.
                         await settings.setTitlePrompt(controller.text.trim());
                         if (ctx.mounted) Navigator.of(ctx).pop();
                       },
@@ -238,7 +271,7 @@ class DefaultModelPage extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
-    final controller = TextEditingController(text: settings.translatePrompt);
+    final controller = CodeLineEditingController.fromText(settings.translatePrompt);
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -268,23 +301,53 @@ class DefaultModelPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(l10n.defaultModelPagePromptLabel, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: controller,
-                  maxLines: 8,
-                  decoration: InputDecoration(
-                    hintText: l10n.defaultModelPageTranslatePromptHint,
-                    filled: true,
-                    fillColor: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary.withOpacity(0.5))),
-                  ),
+                Builder(
+                  builder: (innerCtx) {
+                    final rawMaxPromptHeight = computeInputMaxHeight(
+                      context: innerCtx,
+                      reservedHeight: 220,
+                      softCapFraction: 0.45,
+                      minHeight: 120,
+                    );
+                    // TODO: computeInputMaxHeight already enforces minHeight; remove this redundant clamp and consider extracting the repeated Builder/ConstrainedBox/TextField pattern.
+                    final maxPromptHeight = rawMaxPromptHeight < 120 ? 120.0 : rawMaxPromptHeight;
+                    return ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: 120, maxHeight: maxPromptHeight),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: CodeEditor(
+                          controller: controller,
+                          autofocus: false,
+                          wordWrap: true,
+                          indicatorBuilder: null,
+                          chunkAnalyzer: const NonCodeChunkAnalyzer(),
+                          hint: l10n.defaultModelPageTranslatePromptHint,
+                          padding: const EdgeInsets.all(12),
+                          style: CodeEditorStyle(
+                            fontSize: 14,
+                            fontHeight: 1.4,
+                            textColor: cs.onSurface,
+                            hintTextColor: cs.onSurface.withOpacity(0.5),
+                            cursorColor: cs.primary,
+                            backgroundColor: Colors.transparent,
+                            selectionColor: cs.primary.withOpacity(0.3),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     TextButton(
                       onPressed: () async {
+                        // TODO: Add try/catch and user feedback if resetTranslatePrompt fails.
                         await settings.resetTranslatePrompt();
                         controller.text = settings.translatePrompt;
                       },
@@ -293,6 +356,7 @@ class DefaultModelPage extends StatelessWidget {
                     const Spacer(),
                     FilledButton(
                       onPressed: () async {
+                        // TODO: Add try/catch and user feedback if setTranslatePrompt fails.
                         await settings.setTranslatePrompt(controller.text.trim());
                         if (ctx.mounted) Navigator.of(ctx).pop();
                       },
@@ -314,7 +378,7 @@ class DefaultModelPage extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
-    final controller = TextEditingController(text: settings.summaryPrompt);
+    final controller = CodeLineEditingController.fromText(settings.summaryPrompt);
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -344,23 +408,53 @@ class DefaultModelPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(l10n.defaultModelPagePromptLabel, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: controller,
-                  maxLines: 8,
-                  decoration: InputDecoration(
-                    hintText: l10n.defaultModelPageSummaryPromptHint,
-                    filled: true,
-                    fillColor: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary.withOpacity(0.5))),
-                  ),
+                Builder(
+                  builder: (innerCtx) {
+                    final rawMaxPromptHeight = computeInputMaxHeight(
+                      context: innerCtx,
+                      reservedHeight: 220,
+                      softCapFraction: 0.45,
+                      minHeight: 120,
+                    );
+                    // TODO: computeInputMaxHeight already enforces minHeight; remove this redundant clamp and consider extracting the repeated Builder/ConstrainedBox/TextField pattern.
+                    final maxPromptHeight = rawMaxPromptHeight < 120 ? 120.0 : rawMaxPromptHeight;
+                    return ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: 120, maxHeight: maxPromptHeight),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: CodeEditor(
+                          controller: controller,
+                          autofocus: false,
+                          wordWrap: true,
+                          indicatorBuilder: null,
+                          chunkAnalyzer: const NonCodeChunkAnalyzer(),
+                          hint: l10n.defaultModelPageSummaryPromptHint,
+                          padding: const EdgeInsets.all(12),
+                          style: CodeEditorStyle(
+                            fontSize: 14,
+                            fontHeight: 1.4,
+                            textColor: cs.onSurface,
+                            hintTextColor: cs.onSurface.withOpacity(0.5),
+                            cursorColor: cs.primary,
+                            backgroundColor: Colors.transparent,
+                            selectionColor: cs.primary.withOpacity(0.3),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     TextButton(
                       onPressed: () async {
+                        // TODO: Add try/catch and user feedback if resetSummaryPrompt fails.
                         await settings.resetSummaryPrompt();
                         controller.text = settings.summaryPrompt;
                       },
@@ -369,6 +463,7 @@ class DefaultModelPage extends StatelessWidget {
                     const Spacer(),
                     FilledButton(
                       onPressed: () async {
+                        // TODO: Add try/catch and user feedback if setSummaryPrompt fails.
                         await settings.setSummaryPrompt(controller.text.trim());
                         if (ctx.mounted) Navigator.of(ctx).pop();
                       },
