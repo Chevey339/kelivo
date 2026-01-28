@@ -239,11 +239,6 @@ jobs:
           cat > lib/secrets/fallback.dart <<'EOF'
           const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
           EOF
-      - name: 🧹 清理并获取依赖
-        run: |
-          flutter clean
-          flutter pub get
-
       - name: 📝 获取版本号
         run: |
           VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
