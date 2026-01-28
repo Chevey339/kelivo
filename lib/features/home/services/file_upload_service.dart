@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/dialogs/file_duplicate_dialog.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/file_import_helper.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/models/chat_input_data.dart';
@@ -43,60 +44,13 @@ class FileUploadService {
   /// 返回复制后的文件路径列表
   Future<List<String>> copyPickedFiles(List<XFile> files) async {
     final dir = await AppDirectories.getUploadDirectory();
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
     final out = <String>[];
+    final context = _getContext();
     for (final f in files) {
-      try {
-        final name = f.name.isNotEmpty ? f.name : DateTime.now().millisecondsSinceEpoch.toString();
-        final srcPath = f.path;
-        FileStat? srcStat;
-        if (srcPath.isNotEmpty) {
-          try {
-            srcStat = await File(srcPath).stat();
-          } catch (_) {
-            srcStat = null;
-          }
-        }
-        File dest = File(p.join(dir.path, name));
-        if (await dest.exists()) {
-          // If same file (modified+size), ask to reuse; else versioned copy.
-          FileStat? destStat;
-          try {
-            destStat = await dest.stat();
-          } catch (_) {
-            destStat = null;
-          }
-          final srcModifiedSec = srcStat == null ? null : (srcStat.modified.millisecondsSinceEpoch ~/ 1000);
-          final destModifiedSec = destStat == null ? null : (destStat.modified.millisecondsSinceEpoch ~/ 1000);
-          final sameSize = srcStat != null && destStat != null && srcStat.size == destStat.size;
-          final sameModified = srcModifiedSec != null && destModifiedSec != null && srcModifiedSec == destModifiedSec;
-          final same = sameSize && sameModified;
-          if (same) {
-            final useExisting = await FileDuplicateDialog.show(_getContext(), name);
-            if (useExisting) {
-              out.add(dest.path);
-              continue;
-            }
-          }
-          final base = p.basenameWithoutExtension(name);
-          final ext = p.extension(name);
-          var counter = 1;
-          String candidate;
-          do {
-            candidate = p.join(dir.path, '$base($counter)$ext');
-            counter++;
-          } while (await File(candidate).exists());
-          dest = File(candidate);
-        }
-        await dest.writeAsBytes(await f.readAsBytes());
-        // Keep modified time to help cache keying.
-        if (srcStat != null) {
-          try { await dest.setLastModified(srcStat.modified); } catch (_) {}
-        }
-        out.add(dest.path);
-      } catch (_) {}
+      final savedPath = await FileImportHelper.copyXFile(f, dir, context);
+      if (savedPath != null) {
+        out.add(savedPath);
+      }
     }
     return out;
   }

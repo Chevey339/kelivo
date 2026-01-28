@@ -6,7 +6,8 @@ import '../../../icons/lucide_adapter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/dialogs/file_duplicate_dialog.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../../utils/file_import_helper.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
@@ -687,65 +688,18 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
     final docs = <DocumentAttachment>[];
     try {
       final dir = await AppDirectories.getUploadDirectory();
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
       for (final raw in srcPaths) {
-        try {
-          final src = raw.startsWith('file://') ? raw.substring(7) : raw;
-          final from = File(src);
-          if (!await from.exists()) continue;
-          final baseName = p.basename(src);
-          String destPath = p.join(dir.path, baseName);
-          // Avoid overwriting existing files
-          if (await File(destPath).exists()) {
-            FileStat? srcStat;
-            FileStat? destStat;
-            try {
-              srcStat = await from.stat();
-            } catch (_) {}
-            try {
-              destStat = await File(destPath).stat();
-            } catch (_) {}
-            final same = srcStat != null && destStat != null &&
-                srcStat.size == destStat.size &&
-                srcStat.modified.millisecondsSinceEpoch == destStat.modified.millisecondsSinceEpoch;
-            if (same) {
-              final useExisting = await FileDuplicateDialog.show(context, baseName);
-              if (useExisting) {
-                if (_isImageExtension(baseName)) {
-                  images.add(destPath);
-                } else {
-                  final mime = _inferMimeByExtension(baseName);
-                  docs.add(DocumentAttachment(path: destPath, fileName: baseName, mime: mime));
-                }
-                continue;
-              }
-            }
-            final name = p.basenameWithoutExtension(baseName);
-            final ext = p.extension(baseName);
-            var counter = 1;
-            String candidate;
-            do {
-              candidate = p.join(dir.path, '$name($counter)$ext');
-              counter++;
-            } while (await File(candidate).exists());
-            destPath = candidate;
-          }
-          await File(destPath).writeAsBytes(await from.readAsBytes());
-          // Keep modified time to help cache keying.
-          try {
-            final srcStat = await from.stat();
-            await File(destPath).setLastModified(srcStat.modified);
-          } catch (_) {}
-          final savedName = p.basename(destPath);
+        final src = raw.startsWith('file://') ? raw.substring(7) : raw;
+        final savedPath = await FileImportHelper.copyXFile(XFile(src), dir, context);
+        if (savedPath != null) {
+          final savedName = p.basename(savedPath);
           if (_isImageExtension(savedName)) {
-            images.add(destPath);
+            images.add(savedPath);
           } else {
             final mime = _inferMimeByExtension(savedName);
-            docs.add(DocumentAttachment(path: destPath, fileName: savedName, mime: mime));
+            docs.add(DocumentAttachment(path: savedPath, fileName: savedName, mime: mime));
           }
-        } catch (_) {}
+        }
       }
     } catch (_) {}
     return (images: images, docs: docs);
