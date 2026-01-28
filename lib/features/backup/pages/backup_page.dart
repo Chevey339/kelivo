@@ -127,43 +127,10 @@ class _BackupPageState extends State<BackupPage> {
     );
   }
 
-  Future<RestoreMode?> _chooseImportModeDialog(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
-
-    return showDialog<RestoreMode>(
+  Future<RestoreOptions?> _chooseImportOptionsDialog(BuildContext context) {
+    return showDialog<RestoreOptions>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.backupPageSelectImportMode),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ActionCard(
-              color: cardColor,
-              icon: Lucide.RotateCw,
-              title: l10n.backupPageOverwriteMode,
-              subtitle: l10n.backupPageOverwriteModeDescription,
-              onTap: () => Navigator.of(ctx).pop(RestoreMode.overwrite),
-            ),
-            const SizedBox(height: 10),
-            _ActionCard(
-              color: cardColor,
-              icon: Lucide.GitFork,
-              title: l10n.backupPageMergeMode,
-              subtitle: l10n.backupPageMergeModeDescription,
-              onTap: () => Navigator.of(ctx).pop(RestoreMode.merge),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(l10n.backupPageCancel),
-          ),
-        ],
-      ),
+      builder: (ctx) => const _RestoreOptionsDialog(),
     );
   }
 
@@ -491,9 +458,9 @@ class _BackupPageState extends State<BackupPage> {
                                 onRestore: (item) async {
                                   Navigator.of(ctx).pop();
                                   if (!mounted) return;
-                                  final mode = await _chooseImportModeDialog(context);
-                                  if (mode == null) return;
-                                  await _runWithImportingOverlay(context, () => vm.restoreFromItem(item, mode: mode));
+                                  final options = await _chooseImportOptionsDialog(context);
+                                  if (options == null) return;
+                                  await _runWithImportingOverlay(context, () => vm.restoreFromItem(item, options: options));
                                   if (!mounted) return;
                                   await showDialog(
                                     context: context,
@@ -523,11 +490,11 @@ class _BackupPageState extends State<BackupPage> {
                           Navigator.of(ctx).pop();
                           
                           if (!mounted) return;
-                          final mode = await _chooseImportModeDialog(context);
+                          final options = await _chooseImportOptionsDialog(context);
                           
-                          if (mode == null) return;
+                          if (options == null) return;
                           
-                          await _runWithImportingOverlay(context, () => vm.restoreFromItem(item, mode: mode));
+                          await _runWithImportingOverlay(context, () => vm.restoreFromItem(item, options: options));
                           if (!mounted) return;
                           await showDialog(
                             context: context,
@@ -595,8 +562,8 @@ class _BackupPageState extends State<BackupPage> {
                     final path = result?.files.single.path;
                     if (path == null) return;
 
-                    final mode = await _chooseImportModeDialog(context);
-                    if (mode == null) return;
+                    final options = await _chooseImportOptionsDialog(context);
+                    if (options == null) return;
 
                     await _runWithImportingOverlay(context, () async {
                       try {
@@ -606,7 +573,7 @@ class _BackupPageState extends State<BackupPage> {
                         // Defer import to service
                         final res = await CherryImporter.importFromCherryStudio(
                           file: file,
-                          mode: mode,
+                          mode: options.isFullOverwrite ? RestoreMode.overwrite : RestoreMode.merge, // TODO: Update CherryImporter to support granular options
                           settings: settings,
                           chatService: cs,
                         );
@@ -654,8 +621,8 @@ class _BackupPageState extends State<BackupPage> {
                     final path = result?.files.single.path;
                     if (path == null) return;
 
-                    final mode = await _chooseImportModeDialog(context);
-                    if (mode == null) return;
+                    final options = await _chooseImportOptionsDialog(context);
+                    if (options == null) return;
 
                     await _runWithImportingOverlay(context, () async {
                       try {
@@ -664,7 +631,7 @@ class _BackupPageState extends State<BackupPage> {
                         final file = File(path);
                         final res = await ChatboxImporter.importFromChatbox(
                           file: file,
-                          mode: mode,
+                          mode: options.isFullOverwrite ? RestoreMode.overwrite : RestoreMode.merge, // TODO: Update ChatboxImporter
                           settings: settings,
                           chatService: cs,
                         );
@@ -729,11 +696,11 @@ class _BackupPageState extends State<BackupPage> {
     if (path == null) return;
     
     if (!mounted) return;
-    final mode = await _chooseImportModeDialog(context);
+    final options = await _chooseImportOptionsDialog(context);
     
-    if (mode == null) return;
+    if (options == null) return;
     
-    await _runWithImportingOverlay(context, () => vm.restoreFromLocalFile(File(path), mode: mode));
+    await _runWithImportingOverlay(context, () => vm.restoreFromLocalFile(File(path), options: options));
     if (!mounted) return;
     await showDialog(
       context: context,
@@ -1090,7 +1057,7 @@ class _IosFilledButton extends StatefulWidget {
 
 class _IosFilledButtonState extends State<_IosFilledButton> {
   bool _pressed = false;
-  void _set(bool v){ if(_pressed!=v) setState(()=>_pressed=v);} 
+  void _set(bool v){ if(_pressed!=v) setState(()=>_pressed=v);}
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1104,7 +1071,7 @@ class _IosFilledButtonState extends State<_IosFilledButton> {
         scale: _pressed ? 0.97 : 1.0,
         duration: const Duration(milliseconds: 110), curve: Curves.easeOutCubic,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
           alignment: Alignment.center,
           decoration: BoxDecoration(color: cs.primary, borderRadius: BorderRadius.circular(12)),
           child: Text(widget.label, style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.w600)),
@@ -1481,6 +1448,282 @@ class _PasswordToggleButtonState extends State<_PasswordToggleButton> {
             color: color,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _RestoreOptionsDialog extends StatefulWidget {
+  const _RestoreOptionsDialog();
+
+  @override
+  State<_RestoreOptionsDialog> createState() => _RestoreOptionsDialogState();
+}
+
+class _RestoreOptionsDialogState extends State<_RestoreOptionsDialog> {
+  RestoreAction _settings = RestoreAction.merge;
+  RestoreAction _providers = RestoreAction.merge;
+  RestoreAction _chats = RestoreAction.merge;
+  RestoreAction _files = RestoreAction.merge;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+
+    return Dialog(
+      backgroundColor: cs.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.backupPageSelectImportMode,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l10n.backupPageSelectImportModeDescription,
+                style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.7)),
+              ),
+              const SizedBox(height: 20),
+              
+              _OptionRow(
+                icon: Lucide.Settings,
+                label: l10n.settingsPageTitle,
+                value: _settings,
+                onChanged: (v) => setState(() => _settings = v),
+                l10n: l10n,
+              ),
+              const SizedBox(height: 12),
+              _OptionRow(
+                icon: Lucide.Cpu,
+                label: l10n.providersPageTitle,
+                value: _providers,
+                onChanged: (v) => setState(() => _providers = v),
+                l10n: l10n,
+              ),
+              const SizedBox(height: 12),
+              _OptionRow(
+                icon: Lucide.MessageSquare,
+                label: l10n.backupPageChatsLabel,
+                value: _chats,
+                onChanged: (v) => setState(() => _chats = v),
+                l10n: l10n,
+              ),
+              const SizedBox(height: 12),
+              _OptionRow(
+                icon: Lucide.FileText,
+                label: l10n.backupPageFilesLabel,
+                value: _files,
+                onChanged: (v) => setState(() => _files = v),
+                l10n: l10n,
+              ),
+
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(l10n.backupPageCancel),
+                  ),
+                  const SizedBox(width: 8),
+                  _IosFilledButton(
+                    label: l10n.backupPageOK,
+                    onTap: () {
+                      Navigator.of(context).pop(RestoreOptions(
+                        settingsAction: _settings,
+                        providersAction: _providers,
+                        chatsAction: _chats,
+                        filesAction: _files,
+                      ));
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OptionRow extends StatelessWidget {
+  const _OptionRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.l10n,
+  });
+
+  final IconData icon;
+  final String label;
+  final RestoreAction value;
+  final ValueChanged<RestoreAction> onChanged;
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    
+    // Determine checkbox state:
+    // Ignore -> unchecked
+    // Merge/Overwrite -> checked
+    final bool isChecked = value != RestoreAction.ignore;
+
+    return Row(
+      children: [
+        // Enable/Disable Checkbox
+        _TactileScale(
+          onTap: () {
+            if (isChecked) {
+              onChanged(RestoreAction.ignore);
+            } else {
+              onChanged(RestoreAction.merge);
+            }
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: 22, height: 22,
+            decoration: BoxDecoration(
+              color: isChecked ? cs.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: isChecked ? cs.primary : cs.outline.withOpacity(0.5),
+                width: 2,
+              ),
+            ),
+            child: isChecked
+              ? Icon(Lucide.Check, size: 14, color: cs.onPrimary)
+              : null,
+          ),
+        ),
+        const SizedBox(width: 12),
+        
+        // Icon + Label
+        Icon(icon, size: 18, color: cs.onSurface.withOpacity(isChecked ? 0.9 : 0.5)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: cs.onSurface.withOpacity(isChecked ? 0.9 : 0.5),
+            ),
+          ),
+        ),
+
+        // Action Dropdown/Toggle (only visible if checked)
+        if (isChecked) ...[
+          _ActionSelector(
+            value: value,
+            onChanged: onChanged,
+            l10n: l10n,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ActionSelector extends StatelessWidget {
+  const _ActionSelector({required this.value, required this.onChanged, required this.l10n});
+  final RestoreAction value;
+  final ValueChanged<RestoreAction> onChanged;
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isOverwrite = value == RestoreAction.overwrite;
+    
+    return Container(
+      height: 28,
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _Segment(
+            label: l10n.backupPageMergeMode,
+            selected: !isOverwrite,
+            onTap: () => onChanged(RestoreAction.merge),
+          ),
+          Container(width: 1, height: 14, color: cs.outline.withOpacity(0.2)),
+          _Segment(
+            label: l10n.backupPageOverwriteMode,
+            selected: isOverwrite,
+            onTap: () => onChanged(RestoreAction.overwrite),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Segment extends StatelessWidget {
+  const _Segment({required this.label, required this.selected, required this.onTap});
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            color: selected ? cs.primary : cs.onSurface.withOpacity(0.6),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TactileScale extends StatefulWidget {
+  const _TactileScale({required this.child, required this.onTap});
+  final Widget child;
+  final VoidCallback onTap;
+  @override State<_TactileScale> createState() => _TactileScaleState();
+}
+
+class _TactileScaleState extends State<_TactileScale> {
+  bool _pressed = false;
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: () {
+        Haptics.light();
+        widget.onTap();
+      },
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _pressed ? 0.9 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        child: widget.child,
       ),
     );
   }
