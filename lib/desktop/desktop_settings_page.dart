@@ -13,6 +13,7 @@ import '../l10n/app_localizations.dart';
 import '../theme/palettes.dart';
 import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
+import '../core/services/model_override_resolver.dart';
 import 'model_fetch_dialog.dart' show showModelFetchDialog;
 import '../shared/widgets/ios_switch.dart';
 import '../shared/widgets/ios_checkbox.dart';
@@ -34,6 +35,7 @@ import '../features/model/widgets/model_select_sheet.dart' show showModelSelecto
 import '../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:async';
+import '../shared/widgets/model_tag_wrap.dart';
 import '../core/models/api_keys.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
@@ -4266,7 +4268,8 @@ class _ModelRow extends StatelessWidget {
     ModelInfo _infer(String id) => ModelRegistry.infer(ModelInfo(id: id, displayName: id));
     // Resolve upstream/api model id for inference + capsules
     String baseId = modelId;
-    final ov = cfg.modelOverrides[modelId] as Map?;
+    final rawOv = cfg.modelOverrides[modelId];
+    final Map<String, dynamic>? ov = rawOv is Map ? {for (final e in rawOv.entries) e.key.toString(): e.value} : null;
     if (ov != null) {
       final apiId = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
       if (apiId != null && apiId.isNotEmpty) {
@@ -4277,39 +4280,13 @@ class _ModelRow extends StatelessWidget {
     ModelInfo _effective() {
       final base = _infer(baseId);
       if (ov == null) return base;
-      ModelType? type;
-      final t = (ov['type'] as String?) ?? '';
-      if (t == 'embedding') type = ModelType.embedding; else if (t == 'chat') type = ModelType.chat;
-      List<Modality>? input;
-      if (ov['input'] is List) {
-        input = [
-          for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-        ];
-      }
-      List<Modality>? output;
-      if (ov['output'] is List) {
-        output = [
-          for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-        ];
-      }
-      List<ModelAbility>? abilities;
-      if (ov['abilities'] is List) {
-        abilities = [
-          for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)
-        ];
-      }
-      return base.copyWith(
-        type: type ?? base.type,
-        input: input ?? base.input,
-        output: output ?? base.output,
-        abilities: abilities ?? base.abilities,
-      );
+      return ModelOverrideResolver.applyModelOverride(base, ov);
     }
     final info = _effective();
     // Display label: prefer override name, then upstream model id, then logical key
     String displayName = modelId;
     if (ov != null) {
-      final overrideName = (ov['name'] as String?)?.trim();
+      final overrideName = ov['name']?.toString().trim();
       if (overrideName != null && overrideName.isNotEmpty) {
         displayName = overrideName;
       } else {
@@ -4317,48 +4294,6 @@ class _ModelRow extends StatelessWidget {
       }
     } else {
       displayName = baseId;
-    }
-
-    Widget cap(String text) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final bg = isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF2F3F5);
-      final fg = cs.onSurface.withOpacity(0.85);
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
-        child: Text(text, style: TextStyle(fontSize: 11, color: fg)),
-      );
-    }
-
-    // Build capsule pill style like mobile
-    final caps = <Widget>[];
-    Widget pillCapsule(Widget icon, Color color) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final bg = isDark ? color.withOpacity(0.20) : color.withOpacity(0.16);
-      final bd = color.withOpacity(0.25);
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: bd, width: 0.5),
-        ),
-        child: icon,
-      );
-    }
-    // Build from effective info similar to mobile
-    if (info.input.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(lucide.Lucide.Eye, size: 12, color: cs.secondary), cs.secondary));
-    }
-    if (info.output.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(lucide.Lucide.Image, size: 12, color: cs.tertiary), cs.tertiary));
-    }
-    for (final ab in info.abilities) {
-      if (ab == ModelAbility.tool) {
-        caps.add(pillCapsule(Icon(lucide.Lucide.Hammer, size: 12, color: cs.primary), cs.primary));
-      } else if (ab == ModelAbility.reasoning) {
-        caps.add(pillCapsule(SvgPicture.asset('assets/icons/deepthink.svg', width: 12, height: 12, colorFilter: ColorFilter.mode(cs.secondary, BlendMode.srcIn)), cs.secondary));
-      }
     }
 
     return GestureDetector(
@@ -4374,7 +4309,7 @@ class _ModelRow extends StatelessWidget {
               ),
               const SizedBox(width: 10),
             ],
-            _BrandCircle(name: displayName, size: 22),
+            _BrandCircle(name: baseId, size: 22),
             const SizedBox(width: 10),
             Expanded(
               child: Text(displayName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5)),
@@ -4412,7 +4347,7 @@ class _ModelRow extends StatelessWidget {
               const SizedBox(width: 8),
             ],
             if (!isSelectionMode) ...[
-              Row(children: caps.map((w) => Padding(padding: const EdgeInsets.only(left: 4), child: w)).toList()),
+              ModelCapsulesRow(model: info),
               const SizedBox(width: 8),
               _IconBtn(icon: lucide.Lucide.Settings2, onTap: () async { await showDesktopModelEditDialog(context, providerKey: providerKey, modelId: modelId); }),
               const SizedBox(width: 4),
