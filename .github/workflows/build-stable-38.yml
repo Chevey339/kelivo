@@ -1,7 +1,7 @@
 name: Flutter Multi-Platform Build Stable 3.38
 
 env:
-  FLUTTER_VERSION: '3.38.4'  # 修改为你需要的 Flutter 版本
+  FLUTTER_VERSION: '3.38.5'  # 修改为你需要的 Flutter 版本
 
 on:
   # 手动触发
