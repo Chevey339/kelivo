@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform, Process;
 
 import 'package:flutter/foundation.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
@@ -217,6 +218,7 @@ class McpProvider extends ChangeNotifier {
   // Heartbeat timers for live-connection health checks
   final Map<String, Timer> _heartbeats = <String, Timer>{};
   Duration _requestTimeout = const Duration(seconds: 30);
+  String? _cachedSystemPath;
 
   McpProvider() {
     _load();
@@ -650,7 +652,7 @@ class McpProvider extends ChangeNotifier {
       }
 
       final mergedHeaders = <String, String>{...server.headers};
-      final transportConfig = () {
+      final transportConfig = await () async {
         if (server.transport == McpTransportType.sse) {
           return mcp.TransportConfig.sse(
             serverUrl: server.url,
@@ -671,11 +673,19 @@ class McpProvider extends ChangeNotifier {
           if (cmd == null || cmd.isEmpty) {
             throw StateError('STDIO command is empty');
           }
+          final mergedEnv = await _resolveEnvironmentWithPath(server.env);
+          final commandExists = await _validateCommand(cmd, mergedEnv);
+          if (!commandExists) {
+            throw StateError(
+              'Command "$cmd" not found in PATH. '
+              'Ensure the command is installed and accessible.',
+            );
+          }
           return mcp.TransportConfig.stdio(
             command: cmd,
             arguments: server.args,
             workingDirectory: server.workingDirectory,
-            environment: server.env.isEmpty ? null : server.env,
+            environment: mergedEnv.isEmpty ? null : mergedEnv,
           );
         }
       }();
@@ -1267,6 +1277,45 @@ class McpProvider extends ChangeNotifier {
     }
     _heartbeats.clear();
     super.dispose();
+  }
+
+  Future<String?> _getSystemPath() async {
+    if (_cachedSystemPath != null) return _cachedSystemPath;
+    if (!Platform.isMacOS) return null;
+    try {
+      final result = await Process.run('launchctl', ['getenv', 'PATH']);
+      if (result.exitCode == 0) {
+        _cachedSystemPath = (result.stdout as String).trim();
+        return _cachedSystemPath;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<Map<String, String>> _resolveEnvironmentWithPath(Map<String, String> userEnv) async {
+    final merged = Map<String, String>.from(userEnv);
+    if (!merged.containsKey('PATH')) {
+      final systemPath = await _getSystemPath();
+      if (systemPath != null && systemPath.isNotEmpty) {
+        merged['PATH'] = systemPath;
+      }
+    }
+    return merged;
+  }
+
+  Future<bool> _validateCommand(String command, Map<String, String> environment) async {
+    try {
+      final whichCmd = Platform.isWindows ? 'where' : 'which';
+      final result = await Process.run(
+        whichCmd,
+        [command],
+        environment: environment,
+        runInShell: true,
+      );
+      return result.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
   }
 
   bool _isDesktopPlatform() {
