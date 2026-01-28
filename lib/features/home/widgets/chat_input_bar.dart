@@ -12,7 +12,6 @@ import 'package:path/path.dart' as p;
 import '../../../shared/responsive/breakpoints.dart';
 import 'dart:async';
 import 'dart:typed_data';
-
 import 'dart:io';
 import '../../../core/models/chat_input_data.dart';
 import '../../../utils/clipboard_images.dart';
@@ -699,21 +698,73 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
           String destPath = p.join(dir.path, baseName);
           // Avoid overwriting existing files
           if (await File(destPath).exists()) {
+            final srcStat = await from.stat().catchError((_) => null);
+            final destStat = await File(destPath).stat().catchError((_) => null);
+            final same = srcStat != null && destStat != null &&
+                srcStat.size == destStat.size &&
+                srcStat.modified.millisecondsSinceEpoch == destStat.modified.millisecondsSinceEpoch;
+            if (same) {
+              final useExisting = await _confirmUseExistingFile(baseName);
+              if (useExisting) {
+                if (_isImageExtension(baseName)) {
+                  images.add(destPath);
+                } else {
+                  final mime = _inferMimeByExtension(baseName);
+                  docs.add(DocumentAttachment(path: destPath, fileName: baseName, mime: mime));
+                }
+                continue;
+              }
+            }
             final name = p.basenameWithoutExtension(baseName);
             final ext = p.extension(baseName);
-            destPath = p.join(dir.path, '${name}_${DateTime.now().millisecondsSinceEpoch}$ext');
+            var counter = 1;
+            String candidate;
+            do {
+              candidate = p.join(dir.path, '$name($counter)$ext');
+              counter++;
+            } while (await File(candidate).exists());
+            destPath = candidate;
           }
           await File(destPath).writeAsBytes(await from.readAsBytes());
-          if (_isImageExtension(baseName)) {
+          // Keep modified time to help cache keying.
+          try {
+            final srcStat = await from.stat().catchError((_) => null);
+            if (srcStat != null) await File(destPath).setLastModified(srcStat.modified);
+          } catch (_) {}
+          final savedName = p.basename(destPath);
+          if (_isImageExtension(savedName)) {
             images.add(destPath);
           } else {
-            final mime = _inferMimeByExtension(baseName);
-            docs.add(DocumentAttachment(path: destPath, fileName: baseName, mime: mime));
+            final mime = _inferMimeByExtension(savedName);
+            docs.add(DocumentAttachment(path: destPath, fileName: savedName, mime: mime));
           }
         } catch (_) {}
       }
     } catch (_) {}
     return (images: images, docs: docs);
+  }
+
+  Future<bool> _confirmUseExistingFile(String fileName) async {
+    final l10n = AppLocalizations.of(context)!;
+    final res = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.fileUploadDuplicateTitle),
+        content: Text(l10n.fileUploadDuplicateContent(fileName)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.fileUploadDuplicateUseExisting),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.fileUploadDuplicateUploadNew),
+          ),
+        ],
+      ),
+    );
+    return res == true;
   }
 
   // Build a responsive left action bar that hides overflowing actions

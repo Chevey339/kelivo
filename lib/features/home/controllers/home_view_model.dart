@@ -53,6 +53,7 @@ class HomeViewModel extends ChangeNotifier {
       generationController: generationController,
       messageGenerationService: messageGenerationService,
       contextProvider: contextProvider,
+      viewModel: this,
     );
 
     // Wire up callbacks
@@ -63,6 +64,8 @@ class HomeViewModel extends ChangeNotifier {
     _chatActions.onMaybeGenerateTitle = _onMaybeGenerateTitle;
     _chatActions.onMaybeGenerateSummary = _onMaybeGenerateSummary;
     _chatActions.onStreamFinished = _onStreamFinished;
+    _chatActions.onFileProcessingStarted = _onFileProcessingStarted;
+    _chatActions.onFileProcessingFinished = _onFileProcessingFinished;
   }
 
   // ============================================================================
@@ -132,6 +135,8 @@ class HomeViewModel extends ChangeNotifier {
   bool get isCurrentConversationLoading =>
       _chatController.isCurrentConversationLoading;
 
+  final ValueNotifier<bool> isProcessingFiles = ValueNotifier<bool>(false);
+
   // ============================================================================
   // Internal Callbacks
   // ============================================================================
@@ -176,6 +181,14 @@ class HomeViewModel extends ChangeNotifier {
     onStreamFinished?.call();
   }
 
+  void _onFileProcessingStarted() {
+    isProcessingFiles.value = true;
+  }
+
+  void _onFileProcessingFinished() {
+    isProcessingFiles.value = false;
+  }
+
   // ============================================================================
   // Public Methods - Message Actions
   // ============================================================================
@@ -193,8 +206,13 @@ class HomeViewModel extends ChangeNotifier {
       return false;
     }
 
-    // Set up image sanitization callback before sending
     _chatActions.onScheduleImageSanitize = onScheduleImageSanitize;
+
+    if (input.documents.isNotEmpty) {
+      isProcessingFiles.value = true;
+      // Allow the UI to update before proceeding
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
 
     onHapticFeedback?.call();
     onScrollToBottom?.call();
@@ -317,6 +335,9 @@ class HomeViewModel extends ChangeNotifier {
     // Flush current conversation progress before switching
     await _chatActions.flushConversationProgress(currentConversation);
 
+    // Reset processing state on switch
+    isProcessingFiles.value = false;
+
     if (currentConversation?.id == id) return;
 
     _chatService.setCurrentConversation(id);
@@ -333,6 +354,9 @@ class HomeViewModel extends ChangeNotifier {
   Future<void> createNewConversation() async {
     // Flush current conversation progress before creating new
     await _chatActions.flushConversationProgress(currentConversation);
+
+    // Reset processing state on create
+    isProcessingFiles.value = false;
 
     final ap = _contextProvider.read<AssistantProvider>();
     final assistantId = ap.currentAssistantId;

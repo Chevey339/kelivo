@@ -13,6 +13,7 @@ import 'package:open_filex/open_filex.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:characters/characters.dart';
+import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -97,6 +98,8 @@ class ChatMessageWidget extends StatefulWidget {
   final List<ToolUIPart>? toolParts;
   // Hide streaming dots when pinned globally
   final bool hideStreamingIndicator;
+  // Whether files are currently being processed
+  final bool isProcessingFiles;
 
   const ChatMessageWidget({
     super.key,
@@ -131,6 +134,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.onToggleTranslation,
     this.toolParts,
     this.hideStreamingIndicator = false,
+    this.isProcessingFiles = false,
   });
 
   @override
@@ -1204,6 +1208,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             ],
           ),
           const SizedBox(height: 8),
+          
+          // File Processing Indicator (inserted before content)
+          if (widget.isProcessingFiles) ...[
+            const FileProcessingIndicator(),
+            const SizedBox(height: 8),
+          ],
+
           // Mixed reasoning and tool sections
           if (widget.reasoningSegments != null && widget.reasoningSegments!.isNotEmpty) ...[
             // Build mixed content using tool index ranges carried by segments

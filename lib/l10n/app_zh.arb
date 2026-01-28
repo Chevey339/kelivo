@@ -1255,5 +1255,10 @@
   "assistantEditSummaryDialogTitle": "编辑摘要",
   "assistantEditSummaryDialogHint": "输入摘要内容",
   "assistantEditDeleteSummaryTitle": "清除摘要",
-  "assistantEditDeleteSummaryContent": "确定要清除此摘要吗？"
+  "assistantEditDeleteSummaryContent": "确定要清除此摘要吗？",
+  "homePageProcessingFiles": "正在解析文件……",
+  "fileUploadDuplicateTitle": "文件已存在",
+  "fileUploadDuplicateContent": "检测到同名文件 {fileName}，是否使用已有文件？",
+  "fileUploadDuplicateUseExisting": "使用已有",
+  "fileUploadDuplicateUploadNew": "重新上传"
 }
