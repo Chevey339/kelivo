@@ -269,6 +269,8 @@
   "homePageCancel": "Cancel",
   "homePageDelete": "Delete",
   "homePageSelectMessagesToShare": "Please select messages to share",
+  "homePageSelectAll": "Select all",
+  "homePageClearAll": "Clear selection",
   "homePageDone": "Done",
   "homePageDropToUpload": "Drop files to upload",
   "assistantEditPageTitle": "Assistant",

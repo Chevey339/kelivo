@@ -10,10 +10,14 @@ class SelectionToolbar extends StatelessWidget {
     super.key,
     required this.onCancel,
     required this.onConfirm,
+    required this.onSelectAll,
+    required this.onClearAll,
   });
 
   final VoidCallback onCancel;
   final VoidCallback onConfirm;
+  final VoidCallback onSelectAll;
+  final VoidCallback onClearAll;
 
   @override
   Widget build(BuildContext context) {
@@ -28,12 +32,26 @@ class SelectionToolbar extends StatelessWidget {
           onTap: onCancel,
           semanticLabel: AppLocalizations.of(context)!.homePageCancel,
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 12),
         GlassCircleButtonSmall(
           icon: Lucide.Check,
           color: cs.primary,
           onTap: onConfirm,
           semanticLabel: AppLocalizations.of(context)!.homePageDone,
+        ),
+        const SizedBox(width: 12),
+        GlassCircleButtonSmall(
+          icon: Lucide.CopyCheck,
+          color: cs.onSurface,
+          onTap: onSelectAll,
+          semanticLabel: AppLocalizations.of(context)!.homePageSelectAll,
+        ),
+        const SizedBox(width: 12),
+        GlassCircleButtonSmall(
+          icon: Lucide.CopyMinus,
+          color: cs.onSurface,
+          onTap: onClearAll,
+          semanticLabel: AppLocalizations.of(context)!.homePageClearAll,
         ),
       ],
     );

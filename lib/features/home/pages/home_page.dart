@@ -675,6 +675,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             child: SelectionToolbar(
               onCancel: _controller.cancelSelection,
               onConfirm: _controller.confirmSelection,
+              onSelectAll: _controller.selectAllMessages,
+              onClearAll: _controller.clearSelection,
             ),
           ),
         ),

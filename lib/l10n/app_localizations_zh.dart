@@ -497,6 +497,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePageSelectMessagesToShare => '请选择要分享的消息';
 
   @override
+  String get homePageSelectAll => '全选';
+
+  @override
+  String get homePageClearAll => '清空选择';
+
+  @override
   String get homePageDone => '完成';
 
   @override
@@ -4200,6 +4206,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get homePageSelectMessagesToShare => '请选择要分享的消息';
 
   @override
+  String get homePageSelectAll => '全选';
+
+  @override
+  String get homePageClearAll => '清空选择';
+
+  @override
   String get homePageDone => '完成';
 
   @override
@@ -7863,6 +7875,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get homePageSelectMessagesToShare => '請選擇要分享的訊息';
+
+  @override
+  String get homePageSelectAll => '全選';
+
+  @override
+  String get homePageClearAll => '清空選擇';
 
   @override
   String get homePageDone => '完成';

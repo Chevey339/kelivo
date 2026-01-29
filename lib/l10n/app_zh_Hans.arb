@@ -472,6 +472,8 @@
   "homePageCancel": "取消",
   "homePageDelete": "删除",
   "homePageSelectMessagesToShare": "请选择要分享的消息",
+  "homePageSelectAll": "全选",
+  "homePageClearAll": "清空选择",
   "homePageDone": "完成",
   "homePageDropToUpload": "将文件拖拽到此处上传",
   "chatHistoryPageTitle": "聊天历史",

@@ -1013,6 +1013,18 @@ abstract class AppLocalizations {
   /// **'Please select messages to share'**
   String get homePageSelectMessagesToShare;
 
+  /// No description provided for @homePageSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get homePageSelectAll;
+
+  /// No description provided for @homePageClearAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear selection'**
+  String get homePageClearAll;
+
   /// No description provided for @homePageDone.
   ///
   /// In en, this message translates to:

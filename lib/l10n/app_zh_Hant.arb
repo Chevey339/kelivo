@@ -426,6 +426,8 @@
   "homePageCancel": "取消",
   "homePageDelete": "刪除",
   "homePageSelectMessagesToShare": "請選擇要分享的訊息",
+  "homePageSelectAll": "全選",
+  "homePageClearAll": "清空選擇",
   "homePageDone": "完成",
   "homePageDropToUpload": "將檔案拖曳到此處以上傳",
   "chatHistoryPageTitle": "聊天歷史",
