@@ -21,37 +21,71 @@ class SelectionToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    Widget buildAction({
+      required IconData icon,
+      required Color color,
+      required VoidCallback onTap,
+      required String semanticLabel,
+      required String caption,
+    }) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GlassCircleButtonSmall(
+            icon: icon,
+            color: color,
+            onTap: onTap,
+            semanticLabel: semanticLabel,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            caption,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontSize: 11,
+              height: 1.1,
+            ),
+          ),
+        ],
+      );
+    }
     // Use compact icon-only glass buttons to avoid taking too much width
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        GlassCircleButtonSmall(
+        buildAction(
           icon: Lucide.X,
           color: cs.onSurface,
           onTap: onCancel,
           semanticLabel: AppLocalizations.of(context)!.homePageCancel,
+          caption: AppLocalizations.of(context)!.homePageCancel,
         ),
         const SizedBox(width: 12),
-        GlassCircleButtonSmall(
+        buildAction(
           icon: Lucide.Check,
           color: cs.primary,
           onTap: onConfirm,
           semanticLabel: AppLocalizations.of(context)!.homePageDone,
+          caption: AppLocalizations.of(context)!.homePageDone,
         ),
         const SizedBox(width: 12),
-        GlassCircleButtonSmall(
+        buildAction(
           icon: Lucide.CopyCheck,
           color: cs.onSurface,
           onTap: onSelectAll,
           semanticLabel: AppLocalizations.of(context)!.homePageSelectAll,
+          caption: AppLocalizations.of(context)!.homePageSelectAll,
         ),
         const SizedBox(width: 12),
-        GlassCircleButtonSmall(
+        buildAction(
           icon: Lucide.CopyMinus,
           color: cs.onSurface,
           onTap: onClearAll,
           semanticLabel: AppLocalizations.of(context)!.homePageClearAll,
+          caption: AppLocalizations.of(context)!.homePageClearAll,
         ),
       ],
     );
