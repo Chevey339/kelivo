@@ -721,6 +721,23 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void selectAllMessages() {
+    final collapsed = collapseVersions(messages);
+    _selectedItems
+      ..clear()
+      ..addAll(
+        collapsed
+            .where((m) => m.role == 'user' || m.role == 'assistant')
+            .map((m) => m.id),
+      );
+    notifyListeners();
+  }
+
+  void clearSelection() {
+    _selectedItems.clear();
+    notifyListeners();
+  }
+
   // ============================================================================
   // Public Methods - Version Management
   // ============================================================================
