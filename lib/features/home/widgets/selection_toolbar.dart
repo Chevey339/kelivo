@@ -52,42 +52,61 @@ class SelectionToolbar extends StatelessWidget {
         ],
       );
     }
+    final isDark = theme.brightness == Brightness.dark;
+    final glassBase = isDark ? Colors.black.withOpacity(0.12) : Colors.white.withOpacity(0.72);
+    final borderColor = isDark
+        ? cs.outlineVariant.withOpacity(0.25)
+        : cs.onSurfaceVariant.withOpacity(0.12);
     // Use compact icon-only glass buttons to avoid taking too much width
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        buildAction(
-          icon: Lucide.X,
-          color: cs.onSurface,
-          onTap: onCancel,
-          semanticLabel: AppLocalizations.of(context)!.homePageCancel,
-          caption: AppLocalizations.of(context)!.homePageCancel,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: glassBase,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor, width: 1.0),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              buildAction(
+                icon: Lucide.X,
+                color: cs.onSurface,
+                onTap: onCancel,
+                semanticLabel: AppLocalizations.of(context)!.homePageCancel,
+                caption: AppLocalizations.of(context)!.homePageCancel,
+              ),
+              const SizedBox(width: 12),
+              buildAction(
+                icon: Lucide.Check,
+                color: cs.primary,
+                onTap: onConfirm,
+                semanticLabel: AppLocalizations.of(context)!.homePageDone,
+                caption: AppLocalizations.of(context)!.homePageDone,
+              ),
+              const SizedBox(width: 12),
+              buildAction(
+                icon: Lucide.CopyCheck,
+                color: cs.onSurface,
+                onTap: onSelectAll,
+                semanticLabel: AppLocalizations.of(context)!.homePageSelectAll,
+                caption: AppLocalizations.of(context)!.homePageSelectAll,
+              ),
+              const SizedBox(width: 12),
+              buildAction(
+                icon: Lucide.CopyMinus,
+                color: cs.onSurface,
+                onTap: onClearAll,
+                semanticLabel: AppLocalizations.of(context)!.homePageClearAll,
+                caption: AppLocalizations.of(context)!.homePageClearAll,
+              ),
+            ],
+          ),
         ),
-        const SizedBox(width: 12),
-        buildAction(
-          icon: Lucide.Check,
-          color: cs.primary,
-          onTap: onConfirm,
-          semanticLabel: AppLocalizations.of(context)!.homePageDone,
-          caption: AppLocalizations.of(context)!.homePageDone,
-        ),
-        const SizedBox(width: 12),
-        buildAction(
-          icon: Lucide.CopyCheck,
-          color: cs.onSurface,
-          onTap: onSelectAll,
-          semanticLabel: AppLocalizations.of(context)!.homePageSelectAll,
-          caption: AppLocalizations.of(context)!.homePageSelectAll,
-        ),
-        const SizedBox(width: 12),
-        buildAction(
-          icon: Lucide.CopyMinus,
-          color: cs.onSurface,
-          onTap: onClearAll,
-          semanticLabel: AppLocalizations.of(context)!.homePageClearAll,
-          caption: AppLocalizations.of(context)!.homePageClearAll,
-        ),
-      ],
+      ),
     );
   }
 }
