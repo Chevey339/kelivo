@@ -1016,13 +1016,13 @@ abstract class AppLocalizations {
   /// No description provided for @homePageSelectAll.
   ///
   /// In en, this message translates to:
-  /// **'Select all'**
+  /// **'Select All'**
   String get homePageSelectAll;
 
   /// No description provided for @homePageClearAll.
   ///
   /// In en, this message translates to:
-  /// **'Clear selection'**
+  /// **'Clear All'**
   String get homePageClearAll;
 
   /// No description provided for @homePageDone.

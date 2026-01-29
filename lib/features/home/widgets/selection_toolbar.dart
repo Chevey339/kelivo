@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import '../../../l10n/app_localizations.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -23,6 +24,31 @@ class SelectionToolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final captionStyle = theme.textTheme.labelSmall?.copyWith(
+      color: cs.onSurfaceVariant,
+      fontSize: 11,
+      height: 1.1,
+    );
+
+    double measureCaptionWidth(String text) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: captionStyle),
+        textDirection: Directionality.of(context),
+        maxLines: 2,
+        textAlign: TextAlign.center,
+      )..layout();
+      return painter.size.width;
+    }
+
+    final captions = <String>[
+      AppLocalizations.of(context)!.homePageCancel,
+      AppLocalizations.of(context)!.homePageDone,
+      AppLocalizations.of(context)!.homePageSelectAll,
+      AppLocalizations.of(context)!.homePageClearAll,
+    ];
+    final maxCaptionWidth = captions.map(measureCaptionWidth).fold(0.0, math.max);
+    final actionWidth = math.max(maxCaptionWidth, 40).toDouble();
+
     Widget buildAction({
       required IconData icon,
       required Color color,
@@ -43,6 +69,7 @@ class SelectionToolbar extends StatelessWidget {
           Text(
             caption,
             textAlign: TextAlign.center,
+            maxLines: 2,
             style: theme.textTheme.labelSmall?.copyWith(
               color: cs.onSurfaceVariant,
               fontSize: 11,
@@ -72,36 +99,48 @@ class SelectionToolbar extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              buildAction(
-                icon: Lucide.X,
-                color: cs.onSurface,
-                onTap: onCancel,
-                semanticLabel: AppLocalizations.of(context)!.homePageCancel,
-                caption: AppLocalizations.of(context)!.homePageCancel,
+              SizedBox(
+                width: actionWidth,
+                child: buildAction(
+                  icon: Lucide.X,
+                  color: cs.onSurface,
+                  onTap: onCancel,
+                  semanticLabel: AppLocalizations.of(context)!.homePageCancel,
+                  caption: AppLocalizations.of(context)!.homePageCancel,
+                ),
               ),
-              const SizedBox(width: 12),
-              buildAction(
-                icon: Lucide.Check,
-                color: cs.primary,
-                onTap: onConfirm,
-                semanticLabel: AppLocalizations.of(context)!.homePageDone,
-                caption: AppLocalizations.of(context)!.homePageDone,
+              const SizedBox(width: 8),
+              SizedBox(
+                width: actionWidth,
+                child: buildAction(
+                  icon: Lucide.Check,
+                  color: cs.primary,
+                  onTap: onConfirm,
+                  semanticLabel: AppLocalizations.of(context)!.homePageDone,
+                  caption: AppLocalizations.of(context)!.homePageDone,
+                ),
               ),
-              const SizedBox(width: 12),
-              buildAction(
-                icon: Lucide.CopyCheck,
-                color: cs.onSurface,
-                onTap: onSelectAll,
-                semanticLabel: AppLocalizations.of(context)!.homePageSelectAll,
-                caption: AppLocalizations.of(context)!.homePageSelectAll,
+              const SizedBox(width: 8),
+              SizedBox(
+                width: actionWidth,
+                child: buildAction(
+                  icon: Lucide.CopyCheck,
+                  color: cs.onSurface,
+                  onTap: onSelectAll,
+                  semanticLabel: AppLocalizations.of(context)!.homePageSelectAll,
+                  caption: AppLocalizations.of(context)!.homePageSelectAll,
+                ),
               ),
-              const SizedBox(width: 12),
-              buildAction(
-                icon: Lucide.CopyMinus,
-                color: cs.onSurface,
-                onTap: onClearAll,
-                semanticLabel: AppLocalizations.of(context)!.homePageClearAll,
-                caption: AppLocalizations.of(context)!.homePageClearAll,
+              const SizedBox(width: 8),
+              SizedBox(
+                width: actionWidth,
+                child: buildAction(
+                  icon: Lucide.CopyMinus,
+                  color: cs.onSurface,
+                  onTap: onClearAll,
+                  semanticLabel: AppLocalizations.of(context)!.homePageClearAll,
+                  caption: AppLocalizations.of(context)!.homePageClearAll,
+                ),
               ),
             ],
           ),

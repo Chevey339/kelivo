@@ -506,10 +506,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePageSelectMessagesToShare => 'Please select messages to share';
 
   @override
-  String get homePageSelectAll => 'Select all';
+  String get homePageSelectAll => 'Select All';
 
   @override
-  String get homePageClearAll => 'Clear selection';
+  String get homePageClearAll => 'Clear All';
 
   @override
   String get homePageDone => 'Done';
