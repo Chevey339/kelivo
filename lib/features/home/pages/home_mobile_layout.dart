@@ -39,6 +39,7 @@ class HomeMobileScaffold extends StatelessWidget {
     required this.onOpenMiniMap,
     required this.onCreateNewConversation,
     required this.onSelectModel,
+    this.appBarOverride,
     required this.body,
   });
 
@@ -56,6 +57,7 @@ class HomeMobileScaffold extends StatelessWidget {
   final VoidCallback onOpenMiniMap;
   final Future<void> Function() onCreateNewConversation;
   final VoidCallback onSelectModel;
+  final PreferredSizeWidget? appBarOverride;
   final Widget body;
 
   @override
@@ -87,7 +89,7 @@ class HomeMobileScaffold extends StatelessWidget {
         key: scaffoldKey,
         resizeToAvoidBottomInset: true,
         extendBodyBehindAppBar: true,
-        appBar: _buildAppBar(context, cs),
+        appBar: appBarOverride ?? _buildAppBar(context, cs),
         body: body,
       ),
     );

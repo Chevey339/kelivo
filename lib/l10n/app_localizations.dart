@@ -3053,6 +3053,42 @@ abstract class AppLocalizations {
   /// **'Citations ({count})'**
   String chatMessageWidgetCitationsCount(int count);
 
+  /// No description provided for @chatSelectionSelectedCountTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected {count} message(s)'**
+  String chatSelectionSelectedCountTitle(int count);
+
+  /// No description provided for @chatSelectionExportTxt.
+  ///
+  /// In en, this message translates to:
+  /// **'TXT'**
+  String get chatSelectionExportTxt;
+
+  /// No description provided for @chatSelectionExportMd.
+  ///
+  /// In en, this message translates to:
+  /// **'MD'**
+  String get chatSelectionExportMd;
+
+  /// No description provided for @chatSelectionExportImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get chatSelectionExportImage;
+
+  /// No description provided for @chatSelectionThinkingTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking tools'**
+  String get chatSelectionThinkingTools;
+
+  /// No description provided for @chatSelectionThinkingContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking content'**
+  String get chatSelectionThinkingContent;
+
   /// No description provided for @messageExportSheetAssistant.
   ///
   /// In en, this message translates to:
@@ -3214,6 +3250,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show thinking content'**
   String get messageExportSheetShowThinkingContent;
+
+  /// No description provided for @messageExportThinkingContentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking content'**
+  String get messageExportThinkingContentLabel;
 
   /// No description provided for @messageExportSheetDateTimeWithSecondsPattern.
   ///

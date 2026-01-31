@@ -1593,6 +1593,26 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String chatSelectionSelectedCountTitle(int count) {
+    return 'Selected $count message(s)';
+  }
+
+  @override
+  String get chatSelectionExportTxt => 'TXT';
+
+  @override
+  String get chatSelectionExportMd => 'MD';
+
+  @override
+  String get chatSelectionExportImage => 'Image';
+
+  @override
+  String get chatSelectionThinkingTools => 'Thinking tools';
+
+  @override
+  String get chatSelectionThinkingContent => 'Thinking content';
+
+  @override
   String get messageExportSheetAssistant => 'Assistant';
 
   @override
@@ -1691,6 +1711,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get messageExportSheetShowThinkingContent => 'Show thinking content';
+
+  @override
+  String get messageExportThinkingContentLabel => 'Thinking content';
 
   @override
   String get messageExportSheetDateTimeWithSecondsPattern =>

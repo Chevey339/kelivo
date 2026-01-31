@@ -130,6 +130,8 @@ class HomePageController extends ChangeNotifier {
   // Selection mode
   bool _selecting = false;
   final Set<String> _selectedItems = <String>{};
+  bool _showThinkingTools = false;
+  bool _showThinkingContent = false;
 
   // Desktop drag-and-drop
   bool _isDragHovering = false;
@@ -173,6 +175,9 @@ class HomePageController extends ChangeNotifier {
   Map<String, GlobalKey> get messageKeys => _messageKeys;
   bool get selecting => _selecting;
   Set<String> get selectedItems => _selectedItems;
+  int get selectedCount => _selectedItems.length;
+  bool get showThinkingTools => _showThinkingTools;
+  bool get showThinkingContent => _showThinkingContent;
   bool get isDragHovering => _isDragHovering;
   bool get tabletSidebarOpen => _tabletSidebarOpen;
   bool get rightSidebarOpen => _rightSidebarOpen;
@@ -672,14 +677,189 @@ class HomePageController extends ChangeNotifier {
   }
 
   void shareMessage(int messageIndex, List<ChatMessage> messageList) {
+    dismissKeyboard();
     _selecting = true;
     _selectedItems.clear();
-    for (int i = 0; i <= messageIndex && i < messageList.length; i++) {
-      final m = messageList[i];
-      final enabled = (m.role == 'user' || m.role == 'assistant');
-      if (enabled) _selectedItems.add(m.id);
+    _showThinkingTools = false;
+    _showThinkingContent = false;
+
+    if (messageIndex < 0 || messageIndex >= messageList.length) {
+      notifyListeners();
+      return;
+    }
+
+    final anchor = messageList[messageIndex];
+    const userRole = 'user';
+    const assistantRole = 'assistant';
+
+    int? findPrevRoleIndex(int start, String role) {
+      for (int i = start; i >= 0; i--) {
+        if (messageList[i].role == role) return i;
+      }
+      return null;
+    }
+
+    int? findNextRoleIndex(int start, String role) {
+      for (int i = start; i < messageList.length; i++) {
+        if (messageList[i].role == role) return i;
+      }
+      return null;
+    }
+
+    void addIfSelectable(int? index) {
+      if (index == null) return;
+      final m = messageList[index];
+      if (m.role == userRole || m.role == assistantRole) {
+        _selectedItems.add(m.id);
+      }
+    }
+
+    if (anchor.role == assistantRole) {
+      addIfSelectable(messageIndex);
+      addIfSelectable(findPrevRoleIndex(messageIndex - 1, userRole));
+    } else if (anchor.role == userRole) {
+      addIfSelectable(messageIndex);
+      addIfSelectable(findNextRoleIndex(messageIndex + 1, assistantRole));
+    } else {
+      addIfSelectable(findPrevRoleIndex(messageIndex, userRole));
+      addIfSelectable(findNextRoleIndex(messageIndex, assistantRole));
+    }
+
+    if (_selectedItems.isEmpty && (anchor.role == userRole || anchor.role == assistantRole)) {
+      _selectedItems.add(anchor.id);
     }
     notifyListeners();
+  }
+
+  void selectAll() {
+    final collapsed = collapseVersions(messages);
+    for (final m in collapsed) {
+      if (m.role == 'user' || m.role == 'assistant') {
+        _selectedItems.add(m.id);
+      }
+    }
+    notifyListeners();
+  }
+
+  void toggleSelectAll() {
+    final collapsed = collapseVersions(messages);
+    final selectable = collapsed.where((m) => m.role == 'user' || m.role == 'assistant').toList();
+    if (selectable.isEmpty) return;
+
+    final allSelected = selectable.every((m) => _selectedItems.contains(m.id));
+    if (allSelected) {
+      for (final m in selectable) {
+        _selectedItems.remove(m.id);
+      }
+    } else {
+      for (final m in selectable) {
+        _selectedItems.add(m.id);
+      }
+    }
+    notifyListeners();
+  }
+
+  void invertSelection() {
+    final collapsed = collapseVersions(messages);
+    for (final m in collapsed) {
+      if (m.role != 'user' && m.role != 'assistant') continue;
+      if (_selectedItems.contains(m.id)) {
+        _selectedItems.remove(m.id);
+      } else {
+        _selectedItems.add(m.id);
+      }
+    }
+    notifyListeners();
+  }
+
+  void toggleThinkingTools() {
+    _showThinkingTools = !_showThinkingTools;
+    if (!_showThinkingTools) _showThinkingContent = false;
+    notifyListeners();
+  }
+
+  void toggleThinkingContent() {
+    if (!_showThinkingTools) return;
+    _showThinkingContent = !_showThinkingContent;
+    notifyListeners();
+  }
+
+  List<ChatMessage> _selectedCollapsedMessages() {
+    final collapsed = collapseVersions(messages);
+    final selected = <ChatMessage>[];
+    for (final m in collapsed) {
+      if (_selectedItems.contains(m.id)) selected.add(m);
+    }
+    return selected;
+  }
+
+  Future<void> exportSelectedAsMarkdown() async {
+    final convo = currentConversation;
+    if (convo == null) return;
+
+    final selected = _selectedCollapsedMessages();
+    if (selected.isEmpty) {
+      final l10n = AppLocalizations.of(_context)!;
+      showAppSnackBar(_context, message: l10n.homePageSelectMessagesToShare, type: NotificationType.info);
+      return;
+    }
+
+    final showThinkingTools = _showThinkingTools;
+    final showThinkingContent = _showThinkingContent;
+    cancelSelection();
+    await exportChatMessagesMarkdown(
+      _context,
+      conversation: convo,
+      messages: selected,
+      showThinkingAndToolCards: showThinkingTools,
+      expandThinkingContent: showThinkingContent,
+    );
+  }
+
+  Future<void> exportSelectedAsTxt() async {
+    final convo = currentConversation;
+    if (convo == null) return;
+
+    final selected = _selectedCollapsedMessages();
+    if (selected.isEmpty) {
+      final l10n = AppLocalizations.of(_context)!;
+      showAppSnackBar(_context, message: l10n.homePageSelectMessagesToShare, type: NotificationType.info);
+      return;
+    }
+
+    final showThinkingTools = _showThinkingTools;
+    final showThinkingContent = _showThinkingContent;
+    cancelSelection();
+    await exportChatMessagesTxt(
+      _context,
+      conversation: convo,
+      messages: selected,
+      showThinkingAndToolCards: showThinkingTools,
+      expandThinkingContent: showThinkingContent,
+    );
+  }
+
+  Future<void> exportSelectedAsImage() async {
+    final convo = currentConversation;
+    if (convo == null) return;
+
+    final selected = _selectedCollapsedMessages();
+    if (selected.isEmpty) {
+      final l10n = AppLocalizations.of(_context)!;
+      showAppSnackBar(_context, message: l10n.homePageSelectMessagesToShare, type: NotificationType.info);
+      return;
+    }
+
+    final showThinkingTools = _showThinkingTools;
+    final showThinkingContent = _showThinkingContent;
+    cancelSelection();
+    await exportChatMessagesImage(
+      _context,
+      conversation: convo,
+      messages: selected,
+      showThinkingAndToolCards: showThinkingTools,
+      expandThinkingContent: showThinkingContent,
+    );
   }
 
   Future<void> confirmSelection() async {

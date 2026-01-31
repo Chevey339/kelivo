@@ -171,6 +171,311 @@ String _softBreakMd(String input) {
   return out.toString();
 }
 
+class _ThinkingExportData {
+  const _ThinkingExportData({
+    required this.cleanedContent,
+    required this.thinkingTexts,
+  });
+
+  final String cleanedContent;
+  final List<String> thinkingTexts;
+}
+
+_ThinkingExportData _thinkingExportDataForMessage(ChatMessage message) {
+  // Always strip <think> blocks from the visible content for exports, so users
+  // don't accidentally leak thinking content when "Show thinking content" is off.
+  final cleanedContent = message.content.replaceAll(thinkingRegex, '').trim();
+
+  final thinkingTexts = <String>[];
+
+  // Prefer structured reasoning segments (may include multiple blocks).
+  final segJson = (message.reasoningSegmentsJson ?? '').trim();
+  if (segJson.isNotEmpty) {
+    try {
+      final decoded = jsonDecode(segJson);
+      if (decoded is List) {
+        for (final item in decoded) {
+          if (item is Map) {
+            final t = (item['text']?.toString() ?? '').trim();
+            if (t.isNotEmpty) thinkingTexts.add(t);
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Fall back to <think> tags if segments are not available.
+  if (thinkingTexts.isEmpty) {
+    final thinkingMatches = thinkingRegex.allMatches(message.content);
+    if (thinkingMatches.isNotEmpty) {
+      final texts = thinkingMatches
+          .map((m) => (m.group(1) ?? '').trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      thinkingTexts.addAll(texts);
+    }
+  }
+
+  // Fall back to the legacy reasoningText field.
+  if (thinkingTexts.isEmpty) {
+    final rt = (message.reasoningText ?? '').trim();
+    if (rt.isNotEmpty) thinkingTexts.add(rt);
+  }
+
+  return _ThinkingExportData(cleanedContent: cleanedContent, thinkingTexts: thinkingTexts);
+}
+
+String _formatExportTime(BuildContext context, DateTime time) {
+  final l10n = AppLocalizations.of(context)!;
+  final fmt = DateFormat(l10n.messageExportSheetDateTimeWithSecondsPattern);
+  return fmt.format(time);
+}
+
+Future<void> _saveExportTextWithPicker(
+  BuildContext context, {
+  required String filename,
+  required String content,
+  required List<String> allowedExtensions,
+}) async {
+  final l10n = AppLocalizations.of(context)!;
+
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    final String? savePath = await FilePicker.platform.saveFile(
+      dialogTitle: l10n.backupPageExportToFile,
+      fileName: filename,
+      type: FileType.custom,
+      allowedExtensions: allowedExtensions,
+    );
+    if (savePath == null) return; // user cancelled
+
+    try {
+      await File(savePath).parent.create(recursive: true);
+      await File(savePath).writeAsString(content);
+    } catch (e) {
+      showAppSnackBar(
+        context,
+        message: l10n.messageExportSheetExportFailed('$e'),
+        type: NotificationType.error,
+      );
+      return;
+    }
+
+    showAppSnackBar(
+      context,
+      message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
+      type: NotificationType.success,
+    );
+    return;
+  }
+
+  // Mobile: use FilePicker with bytes parameter (required on Android & iOS).
+  final contentBytes = utf8.encode(content);
+  final String? savePath = await FilePicker.platform.saveFile(
+    dialogTitle: l10n.backupPageExportToFile,
+    fileName: filename,
+    type: FileType.custom,
+    allowedExtensions: allowedExtensions,
+    bytes: Uint8List.fromList(contentBytes),
+  );
+  if (savePath == null) return;
+  showAppSnackBar(
+    context,
+    message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
+    type: NotificationType.success,
+  );
+}
+
+Future<void> exportChatMessagesMarkdown(
+  BuildContext context, {
+  required Conversation conversation,
+  required List<ChatMessage> messages,
+  bool showThinkingAndToolCards = false,
+  bool expandThinkingContent = false,
+}) async {
+  final l10n = AppLocalizations.of(context)!;
+  final thinkingLabel = l10n.messageExportThinkingContentLabel;
+  try {
+    showAppSnackBar(
+      context,
+      message: l10n.messageExportSheetExporting,
+      type: NotificationType.info,
+    );
+
+    final title = (conversation.title.trim().isNotEmpty) ? conversation.title : l10n.messageExportSheetDefaultTitle;
+    final includeThinking = showThinkingAndToolCards && expandThinkingContent;
+
+    final buf = StringBuffer();
+    buf.writeln('# $title');
+    buf.writeln('');
+
+    for (final msg in messages) {
+      final time = _formatExportTime(context, msg.timestamp);
+      buf.writeln('> $time · ${_getRoleName(context, msg)}');
+      buf.writeln('');
+
+      final exportData = (msg.role == 'assistant') ? _thinkingExportDataForMessage(msg) : null;
+      final contentForExport = exportData?.cleanedContent ?? msg.content;
+
+      final parsed = _parseContent(contentForExport);
+      if (parsed.text.isNotEmpty) {
+        buf.writeln(parsed.text);
+        buf.writeln('');
+      }
+
+      for (final p in parsed.images) {
+        final fixed = SandboxPathResolver.fix(p);
+        try {
+          final f = File(fixed);
+          if (await f.exists()) {
+            final bytes = await f.readAsBytes();
+            final b64 = base64Encode(bytes);
+            final mime = _guessImageMime(fixed);
+            buf.writeln('![](data:$mime;base64,$b64)');
+          } else {
+            buf.writeln('![image]($fixed)');
+          }
+        } catch (_) {
+          buf.writeln('![image]($fixed)');
+        }
+        buf.writeln('');
+      }
+
+      for (final d in parsed.docs) {
+        buf.writeln('- ${d.fileName}  `(${d.mime})`');
+      }
+
+      if (includeThinking && exportData != null && exportData.thinkingTexts.isNotEmpty) {
+        final t = exportData.thinkingTexts.join('\n\n').trim();
+        if (t.isNotEmpty) {
+          buf.writeln('');
+          buf.writeln('**$thinkingLabel**');
+          buf.writeln('');
+          buf.writeln('```text');
+          buf.writeln(t);
+          buf.writeln('```');
+          buf.writeln('');
+        }
+      }
+
+      buf.writeln('\n---\n');
+    }
+
+    final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.md';
+    await _saveExportTextWithPicker(
+      context,
+      filename: filename,
+      content: buf.toString(),
+      allowedExtensions: const ['md'],
+    );
+  } catch (e) {
+    showAppSnackBar(
+      context,
+      message: l10n.messageExportSheetExportFailed('$e'),
+      type: NotificationType.error,
+    );
+  }
+}
+
+Future<void> exportChatMessagesTxt(
+  BuildContext context, {
+  required Conversation conversation,
+  required List<ChatMessage> messages,
+  bool showThinkingAndToolCards = false,
+  bool expandThinkingContent = false,
+}) async {
+  final l10n = AppLocalizations.of(context)!;
+  final thinkingLabel = l10n.messageExportThinkingContentLabel;
+  try {
+    showAppSnackBar(
+      context,
+      message: l10n.messageExportSheetExporting,
+      type: NotificationType.info,
+    );
+
+    final title = (conversation.title.trim().isNotEmpty) ? conversation.title : l10n.messageExportSheetDefaultTitle;
+    final includeThinking = showThinkingAndToolCards && expandThinkingContent;
+
+    final buf = StringBuffer();
+    buf.writeln(title);
+    buf.writeln('');
+
+    for (final msg in messages) {
+      final time = _formatExportTime(context, msg.timestamp);
+      buf.writeln('$time · ${_getRoleName(context, msg)}');
+      buf.writeln('');
+
+      final exportData = (msg.role == 'assistant') ? _thinkingExportDataForMessage(msg) : null;
+      final contentForExport = exportData?.cleanedContent ?? msg.content;
+
+      final parsed = _parseContent(contentForExport);
+      if (parsed.text.isNotEmpty) {
+        buf.writeln(parsed.text);
+        buf.writeln('');
+      }
+
+      for (final d in parsed.docs) {
+        buf.writeln('- ${d.fileName} (${d.mime})');
+      }
+
+      if (includeThinking && exportData != null && exportData.thinkingTexts.isNotEmpty) {
+        final t = exportData.thinkingTexts.join('\n\n').trim();
+        if (t.isNotEmpty) {
+          buf.writeln('');
+          buf.writeln('[$thinkingLabel]');
+          buf.writeln(t);
+          buf.writeln('');
+        }
+      }
+
+      buf.writeln('\n---\n');
+    }
+
+    final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.txt';
+    await _saveExportTextWithPicker(
+      context,
+      filename: filename,
+      content: buf.toString(),
+      allowedExtensions: const ['txt'],
+    );
+  } catch (e) {
+    showAppSnackBar(
+      context,
+      message: l10n.messageExportSheetExportFailed('$e'),
+      type: NotificationType.error,
+    );
+  }
+}
+
+Future<void> exportChatMessagesImage(
+  BuildContext context, {
+  required Conversation conversation,
+  required List<ChatMessage> messages,
+  bool showThinkingAndToolCards = false,
+  bool expandThinkingContent = false,
+}) async {
+  try {
+    File? file;
+    await _runWithExportingOverlay(context, () async {
+      file = await _renderAndSaveChatImage(
+        context,
+        conversation,
+        messages,
+        showThinkingAndToolCards: showThinkingAndToolCards,
+        expandThinkingContent: expandThinkingContent,
+      );
+    });
+    if (file == null) throw 'render error';
+    await showImagePreviewSheet(context, file: file!);
+  } catch (e) {
+    final l10n = AppLocalizations.of(context)!;
+    showAppSnackBar(
+      context,
+      message: l10n.messageExportSheetExportFailed('$e'),
+      type: NotificationType.error,
+    );
+  }
+}
+
 Future<File?> _renderAndSaveMessageImage(
   BuildContext context,
   ChatMessage message, {
@@ -599,60 +904,14 @@ class _ExportDialogState extends State<_ExportDialog> {
       final msg = widget.message;
       final service = pctx.read<ChatService>();
       final convo = service.getConversation(msg.conversationId);
-      final l10n = AppLocalizations.of(pctx)!;
-      final title = ((convo?.title ?? '').trim().isNotEmpty) ? (convo?.title ?? '') : l10n.messageExportSheetDefaultTitle;
-      final time = _formatTime(pctx, msg.timestamp);
-
-      final parsed = _parseContent(msg.content);
-
-      final buf = StringBuffer();
-      buf.writeln('# $title');
-      buf.writeln('');
-      buf.writeln('> $time · ${_getRoleName(pctx, msg)}');
-      buf.writeln('');
-      if (parsed.text.isNotEmpty) {
-        buf.writeln(parsed.text);
-        buf.writeln('');
-      }
-      for (final p in parsed.images) {
-        final fixed = SandboxPathResolver.fix(p);
-        try {
-          final f = File(fixed);
-          if (await f.exists()) {
-            final bytes = await f.readAsBytes();
-            final b64 = base64Encode(bytes);
-            final mime = _guessImageMime(fixed);
-            buf.writeln('![](data:$mime;base64,$b64)');
-          } else {
-            buf.writeln('![image]($fixed)');
-          }
-        } catch (_) {
-          buf.writeln('![image]($fixed)');
-        }
-        buf.writeln('');
-      }
-      for (final d in parsed.docs) {
-        buf.writeln('- ${d.fileName}  `(${d.mime})`');
-      }
-
-      final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.md';
-      // Desktop save
-      final String? savePath = await FilePicker.platform.saveFile(
-        dialogTitle: AppLocalizations.of(pctx)!.backupPageExportToFile,
-        fileName: filename,
-        type: FileType.custom,
-        allowedExtensions: const ['md'],
+      final effectiveConvo = convo ?? Conversation(id: msg.conversationId, title: '');
+      await exportChatMessagesMarkdown(
+        pctx,
+        conversation: effectiveConvo,
+        messages: [msg],
+        showThinkingAndToolCards: _showThinkingAndToolCards,
+        expandThinkingContent: _expandThinkingContent,
       );
-      if (savePath != null) {
-        await File(savePath).parent.create(recursive: true);
-        await File(savePath).writeAsString(buf.toString());
-        final l10n = AppLocalizations.of(pctx)!;
-        showAppSnackBar(
-          pctx,
-          message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
-          type: NotificationType.success,
-        );
-      }
     } catch (e) {
       final pctx = widget.parentContext;
       final l10n = AppLocalizations.of(pctx)!;
@@ -673,43 +932,14 @@ class _ExportDialogState extends State<_ExportDialog> {
       final msg = widget.message;
       final service = pctx.read<ChatService>();
       final convo = service.getConversation(msg.conversationId);
-      final l10n = AppLocalizations.of(pctx)!;
-      final title = ((convo?.title ?? '').trim().isNotEmpty) ? (convo?.title ?? '') : l10n.messageExportSheetDefaultTitle;
-      final time = _formatTime(pctx, msg.timestamp);
-
-      final parsed = _parseContent(msg.content);
-
-      final buf = StringBuffer();
-      buf.writeln(title);
-      buf.writeln('');
-      buf.writeln('$time · ${_getRoleName(pctx, msg)}');
-      buf.writeln('');
-      if (parsed.text.isNotEmpty) {
-        buf.writeln(parsed.text);
-        buf.writeln('');
-      }
-      for (final d in parsed.docs) {
-        buf.writeln('- ${d.fileName} (${d.mime})');
-      }
-
-      final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.txt';
-      // Desktop save
-      final String? savePath = await FilePicker.platform.saveFile(
-        dialogTitle: AppLocalizations.of(pctx)!.backupPageExportToFile,
-        fileName: filename,
-        type: FileType.custom,
-        allowedExtensions: const ['txt'],
+      final effectiveConvo = convo ?? Conversation(id: msg.conversationId, title: '');
+      await exportChatMessagesTxt(
+        pctx,
+        conversation: effectiveConvo,
+        messages: [msg],
+        showThinkingAndToolCards: _showThinkingAndToolCards,
+        expandThinkingContent: _expandThinkingContent,
       );
-      if (savePath != null) {
-        await File(savePath).parent.create(recursive: true);
-        await File(savePath).writeAsString(buf.toString());
-        final l10n = AppLocalizations.of(pctx)!;
-        showAppSnackBar(
-          pctx,
-          message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
-          type: NotificationType.success,
-        );
-      }
     } catch (e) {
       final pctx = widget.parentContext;
       final l10n = AppLocalizations.of(pctx)!;
@@ -897,145 +1127,26 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
     if (_exporting) return;
     // Close dialog first to avoid overlapping UI
     if (mounted) await Navigator.of(context).maybePop();
-    try {
-      final pctx = widget.parentContext;
-      final conv = widget.conversation;
-      final l10n = AppLocalizations.of(pctx)!;
-      final title = (conv.title.trim().isNotEmpty) ? conv.title : l10n.messageExportSheetDefaultTitle;
-      final buf = StringBuffer();
-      buf.writeln('# $title');
-      buf.writeln('');
-      for (final msg in widget.messages) {
-        final time = _formatTime(pctx, msg.timestamp);
-        buf.writeln('> $time · ${_getRoleName(pctx, msg)}');
-        buf.writeln('');
-        final parsed = _parseContent(msg.content);
-        if (parsed.text.isNotEmpty) {
-          buf.writeln(parsed.text);
-          buf.writeln('');
-        }
-        for (final p in parsed.images) {
-          final fixed = SandboxPathResolver.fix(p);
-          try {
-            final f = File(fixed);
-            if (await f.exists()) {
-              final bytes = await f.readAsBytes();
-              final b64 = base64Encode(bytes);
-              final mime = _guessImageMime(fixed);
-              buf.writeln('![](data:$mime;base64,$b64)');
-            } else {
-              buf.writeln('![image]($fixed)');
-            }
-          } catch (_) {
-            buf.writeln('![image]($fixed)');
-          }
-          buf.writeln('');
-        }
-        for (final d in parsed.docs) {
-          buf.writeln('- ${d.fileName}  `(${d.mime})`');
-        }
-        buf.writeln('\n---\n');
-      }
-
-      final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.md';
-      final String? savePath = await FilePicker.platform.saveFile(
-        dialogTitle: AppLocalizations.of(pctx)!.backupPageExportToFile,
-        fileName: filename,
-        type: FileType.custom,
-        allowedExtensions: const ['md'],
-      );
-      if (savePath == null) {
-        return; // user cancelled
-      }
-      try {
-        await File(savePath).parent.create(recursive: true);
-        await File(savePath).writeAsString(buf.toString());
-      } catch (e) {
-        showAppSnackBar(
-          pctx,
-          message: l10n.messageExportSheetExportFailed('$e'),
-          type: NotificationType.error,
-        );
-        return;
-      }
-      showAppSnackBar(
-        pctx,
-        message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
-        type: NotificationType.success,
-      );
-    } catch (e) {
-      final pctx = widget.parentContext;
-      final l10n = AppLocalizations.of(pctx)!;
-      showAppSnackBar(
-        pctx,
-        message: l10n.messageExportSheetExportFailed('$e'),
-        type: NotificationType.error,
-      );
-    }
+    await exportChatMessagesMarkdown(
+      widget.parentContext,
+      conversation: widget.conversation,
+      messages: widget.messages,
+      showThinkingAndToolCards: _showThinkingAndToolCards,
+      expandThinkingContent: _expandThinkingContent,
+    );
   }
 
   Future<void> _onExportTxt() async {
     if (_exporting) return;
     // Close dialog first to avoid overlapping UI
     if (mounted) await Navigator.of(context).maybePop();
-    try {
-      final pctx = widget.parentContext;
-      final conv = widget.conversation;
-      final l10n = AppLocalizations.of(pctx)!;
-      final title = (conv.title.trim().isNotEmpty) ? conv.title : l10n.messageExportSheetDefaultTitle;
-      final buf = StringBuffer();
-      buf.writeln(title);
-      buf.writeln('');
-      for (final msg in widget.messages) {
-        final time = _formatTime(pctx, msg.timestamp);
-        buf.writeln('$time · ${_getRoleName(pctx, msg)}');
-        buf.writeln('');
-        final parsed = _parseContent(msg.content);
-        if (parsed.text.isNotEmpty) {
-          buf.writeln(parsed.text);
-          buf.writeln('');
-        }
-        for (final d in parsed.docs) {
-          buf.writeln('- ${d.fileName} (${d.mime})');
-        }
-        buf.writeln('\n---\n');
-      }
-
-      final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.txt';
-      final String? savePath = await FilePicker.platform.saveFile(
-        dialogTitle: AppLocalizations.of(pctx)!.backupPageExportToFile,
-        fileName: filename,
-        type: FileType.custom,
-        allowedExtensions: const ['txt'],
-      );
-      if (savePath == null) {
-        return; // user cancelled
-      }
-      try {
-        await File(savePath).parent.create(recursive: true);
-        await File(savePath).writeAsString(buf.toString());
-      } catch (e) {
-        showAppSnackBar(
-          pctx,
-          message: l10n.messageExportSheetExportFailed('$e'),
-          type: NotificationType.error,
-        );
-        return;
-      }
-      showAppSnackBar(
-        pctx,
-        message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
-        type: NotificationType.success,
-      );
-    } catch (e) {
-      final pctx = widget.parentContext;
-      final l10n = AppLocalizations.of(pctx)!;
-      showAppSnackBar(
-        pctx,
-        message: l10n.messageExportSheetExportFailed('$e'),
-        type: NotificationType.error,
-      );
-    }
+    await exportChatMessagesTxt(
+      widget.parentContext,
+      conversation: widget.conversation,
+      messages: widget.messages,
+      showThinkingAndToolCards: _showThinkingAndToolCards,
+      expandThinkingContent: _expandThinkingContent,
+    );
   }
 
   Future<void> _onExportImage() async {
@@ -1228,126 +1339,17 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
 
   Future<void> _onExportMarkdown() async {
     if (_exporting) return;
-    
+
     // Dismiss dialog immediately
     if (mounted) Navigator.of(context).maybePop();
-    
-    setState(() => _exporting = true);
-    try {
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        showAppSnackBar(
-          context,
-          message: l10n.messageExportSheetExporting,
-          type: NotificationType.info,
-        );
-      }
-      final ctx = context;
-      final conv = widget.conversation;
-      final l10n = AppLocalizations.of(ctx)!;
-      final title = (conv.title.trim().isNotEmpty) ? conv.title : l10n.messageExportSheetDefaultTitle;
-      final buf = StringBuffer();
-      buf.writeln('# $title');
-      buf.writeln('');
-      for (final msg in widget.messages) {
-        final time = _formatTime(ctx, msg.timestamp);
-        buf.writeln('> $time · ${_getRoleName(ctx, msg)}');
-        buf.writeln('');
-        final parsed = _parseContent(msg.content);
-        if (parsed.text.isNotEmpty) {
-          buf.writeln(parsed.text);
-          buf.writeln('');
-        }
-        for (final p in parsed.images) {
-          final fixed = SandboxPathResolver.fix(p);
-          try {
-            final f = File(fixed);
-            if (await f.exists()) {
-              final bytes = await f.readAsBytes();
-              final b64 = base64Encode(bytes);
-              final mime = _guessImageMime(fixed);
-              buf.writeln('![](data:$mime;base64,$b64)');
-            } else {
-              buf.writeln('![image]($fixed)');
-            }
-          } catch (_) {
-            buf.writeln('![image]($fixed)');
-          }
-          buf.writeln('');
-        }
-        for (final d in parsed.docs) {
-          buf.writeln('- ${d.fileName}  `(${d.mime})`');
-        }
-        buf.writeln('\n---\n');
-      }
 
-      final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.md';
-
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        // Desktop: choose save location
-        final l10n = AppLocalizations.of(context)!;
-        final String? savePath = await FilePicker.platform.saveFile(
-          dialogTitle: l10n.backupPageExportToFile,
-          fileName: filename,
-          type: FileType.custom,
-          allowedExtensions: const ['md'],
-        );
-        if (savePath == null) {
-          return; // user cancelled
-        }
-        try {
-          await File(savePath).parent.create(recursive: true);
-          await File(savePath).writeAsString(buf.toString());
-        } catch (e) {
-          if (!mounted) return;
-          showAppSnackBar(
-            context,
-            message: l10n.messageExportSheetExportFailed('$e'),
-            type: NotificationType.error,
-          );
-          return;
-        }
-        if (mounted) {
-          showAppSnackBar(
-            context,
-            message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
-            type: NotificationType.success,
-          );
-        }
-      } else {
-        // Mobile: use FilePicker with bytes parameter (required on Android & iOS)
-        final l10n = AppLocalizations.of(context)!;
-        final contentBytes = utf8.encode(buf.toString());
-        final String? savePath = await FilePicker.platform.saveFile(
-          dialogTitle: l10n.backupPageExportToFile,
-          fileName: filename,
-          type: FileType.custom,
-          allowedExtensions: const ['md'],
-          bytes: Uint8List.fromList(contentBytes),
-        );
-        if (savePath == null) {
-          return; // user cancelled
-        }
-        if (mounted) {
-          showAppSnackBar(
-            context,
-            message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
-            type: NotificationType.success,
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        showAppSnackBar(
-          context,
-          message: l10n.messageExportSheetExportFailed('$e'),
-          type: NotificationType.error,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _exporting = false);
-    }
+    await exportChatMessagesMarkdown(
+      widget.parentContext,
+      conversation: widget.conversation,
+      messages: widget.messages,
+      showThinkingAndToolCards: _showThinkingAndToolCards,
+      expandThinkingContent: _expandThinkingContent,
+    );
   }
 
   Future<void> _onExportTxt() async {
@@ -1356,103 +1358,13 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
     // Dismiss dialog immediately
     if (mounted) Navigator.of(context).maybePop();
 
-    setState(() => _exporting = true);
-    try {
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        showAppSnackBar(
-          context,
-          message: l10n.messageExportSheetExporting,
-          type: NotificationType.info,
-        );
-      }
-      final ctx = context;
-      final conv = widget.conversation;
-      final l10n = AppLocalizations.of(ctx)!;
-      final title = (conv.title.trim().isNotEmpty) ? conv.title : l10n.messageExportSheetDefaultTitle;
-      final buf = StringBuffer();
-      buf.writeln(title);
-      buf.writeln('');
-      for (final msg in widget.messages) {
-        final time = _formatTime(ctx, msg.timestamp);
-        buf.writeln('$time · ${_getRoleName(ctx, msg)}');
-        buf.writeln('');
-        final parsed = _parseContent(msg.content);
-        if (parsed.text.isNotEmpty) {
-          buf.writeln(parsed.text);
-          buf.writeln('');
-        }
-        for (final d in parsed.docs) {
-          buf.writeln('- ${d.fileName} (${d.mime})');
-        }
-        buf.writeln('\n---\n');
-      }
-
-      final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.txt';
-
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        // Desktop: choose save location
-        final String? savePath = await FilePicker.platform.saveFile(
-          dialogTitle: l10n.backupPageExportToFile,
-          fileName: filename,
-          type: FileType.custom,
-          allowedExtensions: const ['txt'],
-        );
-        if (savePath == null) {
-          return; // user cancelled
-        }
-        try {
-          await File(savePath).parent.create(recursive: true);
-          await File(savePath).writeAsString(buf.toString());
-        } catch (e) {
-          if (!mounted) return;
-          showAppSnackBar(
-            context,
-            message: l10n.messageExportSheetExportFailed('$e'),
-            type: NotificationType.error,
-          );
-          return;
-        }
-        if (mounted) {
-          showAppSnackBar(
-            context,
-            message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
-            type: NotificationType.success,
-          );
-        }
-      } else {
-        // Mobile: use FilePicker with bytes parameter (required on Android & iOS)
-        final contentBytes = utf8.encode(buf.toString());
-        final String? savePath = await FilePicker.platform.saveFile(
-          dialogTitle: l10n.backupPageExportToFile,
-          fileName: filename,
-          type: FileType.custom,
-          allowedExtensions: const ['txt'],
-          bytes: Uint8List.fromList(contentBytes),
-        );
-        if (savePath == null) {
-          return; // user cancelled
-        }
-        if (mounted) {
-          showAppSnackBar(
-            context,
-            message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
-            type: NotificationType.success,
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        showAppSnackBar(
-          context,
-          message: l10n.messageExportSheetExportFailed('$e'),
-          type: NotificationType.error,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _exporting = false);
-    }
+    await exportChatMessagesTxt(
+      widget.parentContext,
+      conversation: widget.conversation,
+      messages: widget.messages,
+      showThinkingAndToolCards: _showThinkingAndToolCards,
+      expandThinkingContent: _expandThinkingContent,
+    );
   }
 
   Future<void> _onExportImage() async {
@@ -1629,91 +1541,18 @@ class _ExportSheetState extends State<_ExportSheet> {
     if (_exporting) return;
     setState(() => _exporting = true);
     try {
-      final ctx = context;
+      final pctx = widget.parentContext;
       final msg = widget.message;
-      final service = ctx.read<ChatService>();
+      final service = pctx.read<ChatService>();
       final convo = service.getConversation(msg.conversationId);
-      final l10n = AppLocalizations.of(ctx)!;
-      final title = ((convo?.title ?? '').trim().isNotEmpty) ? (convo?.title ?? '') : l10n.messageExportSheetDefaultTitle;
-      final time = _formatTime(ctx, msg.timestamp);
-
-      final parsed = _parseContent(msg.content);
-
-      final buf = StringBuffer();
-      buf.writeln('# $title');
-      buf.writeln('');
-      buf.writeln('> $time · ${_getRoleName(ctx, msg)}');
-      buf.writeln('');
-      if (parsed.text.isNotEmpty) {
-        buf.writeln(parsed.text);
-        buf.writeln('');
-      }
-      // Inline images as data URLs where possible
-      for (final p in parsed.images) {
-        final fixed = SandboxPathResolver.fix(p);
-        try {
-          final f = File(fixed);
-          if (await f.exists()) {
-            final bytes = await f.readAsBytes();
-            final b64 = base64Encode(bytes);
-            final mime = _guessImageMime(fixed);
-            buf.writeln('![](data:$mime;base64,$b64)');
-          } else {
-            buf.writeln('![image]($fixed)');
-          }
-        } catch (_) {
-          buf.writeln('![image]($fixed)');
-        }
-        buf.writeln('');
-      }
-      // List file attachments as links (path only)
-      for (final d in parsed.docs) {
-        buf.writeln('- ${d.fileName}  `(${d.mime})`');
-      }
-
-      final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.md';
-
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        // Desktop: choose save location
-        final String? savePath = await FilePicker.platform.saveFile(
-          dialogTitle: AppLocalizations.of(context)!.backupPageExportToFile,
-          fileName: filename,
-          type: FileType.custom,
-          allowedExtensions: const ['md'],
-        );
-        if (savePath != null) {
-          await File(savePath).parent.create(recursive: true);
-          await File(savePath).writeAsString(buf.toString());
-          if (mounted) {
-            final l10n = AppLocalizations.of(context)!;
-            showAppSnackBar(
-              context,
-              message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
-              type: NotificationType.success,
-            );
-          }
-        }
-      } else {
-        // Mobile: use FilePicker with bytes parameter (required on Android & iOS)
-        final contentBytes = utf8.encode(buf.toString());
-        final String? savePath = await FilePicker.platform.saveFile(
-          dialogTitle: AppLocalizations.of(context)!.backupPageExportToFile,
-          fileName: filename,
-          type: FileType.custom,
-          allowedExtensions: const ['md'],
-          bytes: Uint8List.fromList(contentBytes),
-        );
-        if (savePath != null) {
-          if (mounted) {
-            final l10n = AppLocalizations.of(context)!;
-            showAppSnackBar(
-              context,
-              message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
-              type: NotificationType.success,
-            );
-          }
-        }
-      }
+      final effectiveConvo = convo ?? Conversation(id: msg.conversationId, title: '');
+      await exportChatMessagesMarkdown(
+        pctx,
+        conversation: effectiveConvo,
+        messages: [msg],
+        showThinkingAndToolCards: _showThinkingAndToolCards,
+        expandThinkingContent: _expandThinkingContent,
+      );
     } catch (e) {
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
@@ -1732,72 +1571,18 @@ class _ExportSheetState extends State<_ExportSheet> {
     if (_exporting) return;
     setState(() => _exporting = true);
     try {
-      final ctx = context;
+      final pctx = widget.parentContext;
       final msg = widget.message;
-      final service = ctx.read<ChatService>();
+      final service = pctx.read<ChatService>();
       final convo = service.getConversation(msg.conversationId);
-      final l10n = AppLocalizations.of(ctx)!;
-      final title = ((convo?.title ?? '').trim().isNotEmpty) ? (convo?.title ?? '') : l10n.messageExportSheetDefaultTitle;
-      final time = _formatTime(ctx, msg.timestamp);
-
-      final parsed = _parseContent(msg.content);
-
-      final buf = StringBuffer();
-      buf.writeln(title);
-      buf.writeln('');
-      buf.writeln('$time · ${_getRoleName(ctx, msg)}');
-      buf.writeln('');
-      if (parsed.text.isNotEmpty) {
-        buf.writeln(parsed.text);
-        buf.writeln('');
-      }
-      for (final d in parsed.docs) {
-        buf.writeln('- ${d.fileName} (${d.mime})');
-      }
-
-      final filename = 'chat-export-${DateTime.now().millisecondsSinceEpoch}.txt';
-
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        // Desktop: choose save location
-        final String? savePath = await FilePicker.platform.saveFile(
-          dialogTitle: AppLocalizations.of(context)!.backupPageExportToFile,
-          fileName: filename,
-          type: FileType.custom,
-          allowedExtensions: const ['txt'],
-        );
-        if (savePath != null) {
-          await File(savePath).parent.create(recursive: true);
-          await File(savePath).writeAsString(buf.toString());
-          if (mounted) {
-            final l10n = AppLocalizations.of(context)!;
-            showAppSnackBar(
-              context,
-              message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
-              type: NotificationType.success,
-            );
-          }
-        }
-      } else {
-        // Mobile: use FilePicker with bytes parameter (required on Android & iOS)
-        final contentBytes = utf8.encode(buf.toString());
-        final String? savePath = await FilePicker.platform.saveFile(
-          dialogTitle: AppLocalizations.of(context)!.backupPageExportToFile,
-          fileName: filename,
-          type: FileType.custom,
-          allowedExtensions: const ['txt'],
-          bytes: Uint8List.fromList(contentBytes),
-        );
-        if (savePath != null) {
-          if (mounted) {
-            final l10n = AppLocalizations.of(context)!;
-            showAppSnackBar(
-              context,
-              message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
-              type: NotificationType.success,
-            );
-          }
-        }
-      }
+      final effectiveConvo = convo ?? Conversation(id: msg.conversationId, title: '');
+      await exportChatMessagesTxt(
+        pctx,
+        conversation: effectiveConvo,
+        messages: [msg],
+        showThinkingAndToolCards: _showThinkingAndToolCards,
+        expandThinkingContent: _expandThinkingContent,
+      );
     } catch (e) {
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;

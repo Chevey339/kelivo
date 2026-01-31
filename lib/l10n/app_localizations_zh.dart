@@ -1549,6 +1549,26 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String chatSelectionSelectedCountTitle(int count) {
+    return '已选择$count条消息';
+  }
+
+  @override
+  String get chatSelectionExportTxt => 'TXT';
+
+  @override
+  String get chatSelectionExportMd => 'MD';
+
+  @override
+  String get chatSelectionExportImage => '图片';
+
+  @override
+  String get chatSelectionThinkingTools => '思考工具';
+
+  @override
+  String get chatSelectionThinkingContent => '思考内容';
+
+  @override
   String get messageExportSheetAssistant => '助手';
 
   @override
@@ -1634,6 +1654,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get messageExportSheetShowThinkingContent => '显示思考内容';
+
+  @override
+  String get messageExportThinkingContentLabel => '思考内容';
 
   @override
   String get messageExportSheetDateTimeWithSecondsPattern =>
@@ -5252,6 +5275,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String chatSelectionSelectedCountTitle(int count) {
+    return '已选择$count条消息';
+  }
+
+  @override
+  String get chatSelectionExportTxt => 'TXT';
+
+  @override
+  String get chatSelectionExportMd => 'MD';
+
+  @override
+  String get chatSelectionExportImage => '图片';
+
+  @override
+  String get chatSelectionThinkingTools => '思考工具';
+
+  @override
+  String get chatSelectionThinkingContent => '思考内容';
+
+  @override
   String get messageExportSheetAssistant => '助手';
 
   @override
@@ -5337,6 +5380,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get messageExportSheetShowThinkingContent => '显示思考内容';
+
+  @override
+  String get messageExportThinkingContentLabel => '思考内容';
 
   @override
   String get messageExportSheetDateTimeWithSecondsPattern =>
@@ -8916,6 +8962,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String chatSelectionSelectedCountTitle(int count) {
+    return '已選擇$count條訊息';
+  }
+
+  @override
+  String get chatSelectionExportTxt => 'TXT';
+
+  @override
+  String get chatSelectionExportMd => 'MD';
+
+  @override
+  String get chatSelectionExportImage => '圖片';
+
+  @override
+  String get chatSelectionThinkingTools => '思考工具';
+
+  @override
+  String get chatSelectionThinkingContent => '思考內容';
+
+  @override
   String get messageExportSheetAssistant => '助理';
 
   @override
@@ -9001,6 +9067,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageExportSheetShowThinkingContent => '顯示思考內容';
+
+  @override
+  String get messageExportThinkingContentLabel => '思考內容';
 
   @override
   String get messageExportSheetDateTimeWithSecondsPattern =>

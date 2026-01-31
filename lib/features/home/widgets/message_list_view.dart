@@ -301,56 +301,70 @@ class MessageListView extends StatelessWidget {
                 ),
               ),
             Expanded(
-              child: Builder(
-                builder: (context) {
-                  final textScale = MediaQuery.textScaleFactorOf(context);
-                  final baseMediaQuery = context.getInheritedWidgetOfExactType<MediaQuery>();
-                  final baseData = baseMediaQuery?.data;
-                  return MediaQuery(
-                    // Keep chat font scaling without rebuilding on keyboard insets.
-                    data: (baseData ?? MediaQuery.of(context)).copyWith(
-                      textScaleFactor: textScale * chatScale,
-                    ),
-                    child: isStreaming
-                        ? _buildStreamingMessageWidget(
-                            context,
-                            message: message,
-                            index: index,
-                            messages: messages,
-                            byGroup: byGroup,
-                            r: r,
-                            t: t,
-                            useAssist: useAssist,
-                            assistant: assistant,
-                            showMsgNav: showMsgNav,
-                            gid: gid,
-                            selectedIdx: selectedIdx,
-                            total: total,
-                            effectiveIndex: effectiveIndex,
-                            effectiveTotal: effectiveTotal,
-                            isProcessingFiles: isProcessingFiles,
-                          )
-                        : _buildChatMessageWidget(
-                            context,
-                            message: message,
-                            index: index,
-                            messages: messages,
-                            byGroup: byGroup,
-                            r: r,
-                            t: t,
-                            useAssist: useAssist,
-                            assistant: assistant,
-                            showMsgNav: showMsgNav,
-                            gid: gid,
-                            selectedIdx: selectedIdx,
-                            total: total,
-                            effectiveIndex: effectiveIndex,
-                            effectiveTotal: effectiveTotal,
-                            isProcessingFiles: isProcessingFiles,
-                          ),
+              child: (() {
+                Widget content = Builder(
+                  builder: (context) {
+                    final textScale = MediaQuery.textScaleFactorOf(context);
+                    final baseMediaQuery = context.getInheritedWidgetOfExactType<MediaQuery>();
+                    final baseData = baseMediaQuery?.data;
+                    return MediaQuery(
+                      // Keep chat font scaling without rebuilding on keyboard insets.
+                      data: (baseData ?? MediaQuery.of(context)).copyWith(
+                        textScaleFactor: textScale * chatScale,
+                      ),
+                      child: isStreaming
+                          ? _buildStreamingMessageWidget(
+                              context,
+                              message: message,
+                              index: index,
+                              messages: messages,
+                              byGroup: byGroup,
+                              r: r,
+                              t: t,
+                              useAssist: useAssist,
+                              assistant: assistant,
+                              showMsgNav: showMsgNav,
+                              gid: gid,
+                              selectedIdx: selectedIdx,
+                              total: total,
+                              effectiveIndex: effectiveIndex,
+                              effectiveTotal: effectiveTotal,
+                              isProcessingFiles: isProcessingFiles,
+                            )
+                          : _buildChatMessageWidget(
+                              context,
+                              message: message,
+                              index: index,
+                              messages: messages,
+                              byGroup: byGroup,
+                              r: r,
+                              t: t,
+                              useAssist: useAssist,
+                              assistant: assistant,
+                              showMsgNav: showMsgNav,
+                              gid: gid,
+                              selectedIdx: selectedIdx,
+                              total: total,
+                              effectiveIndex: effectiveIndex,
+                              effectiveTotal: effectiveTotal,
+                              isProcessingFiles: isProcessingFiles,
+                            ),
+                    );
+                  },
+                );
+
+                final canSelect = (message.role == 'user' || message.role == 'assistant');
+                if (selecting && canSelect) {
+                  final isSelected = selectedItems.contains(message.id);
+                  content = GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => onToggleSelection?.call(message.id, !isSelected),
+                    child: IgnorePointer(ignoring: true, child: content),
                   );
-                },
-              ),
+                }
+
+                return content;
+              })(),
             ),
           ],
         ),

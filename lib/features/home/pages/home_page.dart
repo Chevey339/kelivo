@@ -39,9 +39,10 @@ import '../widgets/mini_map_sheet.dart';
 import '../widgets/instruction_injection_sheet.dart';
 import '../widgets/learning_prompt_sheet.dart';
 import '../widgets/scroll_nav_buttons.dart';
-import '../widgets/selection_toolbar.dart';
 import '../widgets/message_list_view.dart';
 import '../widgets/chat_input_section.dart';
+import '../widgets/chat_selection_app_bar.dart';
+import '../widgets/chat_selection_export_bar.dart';
 import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
 import '../controllers/home_page_controller.dart';
@@ -238,6 +239,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     required String? modelDisplay,
     required ColorScheme cs,
   }) {
+    final collapsed = _controller.collapseVersions(_controller.messages);
+    final selectable = collapsed.where((m) => m.role == 'user' || m.role == 'assistant').toList();
+    final allSelected = selectable.isNotEmpty && selectable.every((m) => _controller.selectedItems.contains(m.id));
+
     return HomeMobileScaffold(
       scaffoldKey: _scaffoldKey,
       drawerController: _drawerController,
@@ -274,6 +279,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         }
       },
       onSelectModel: () => showModelSelectSheet(context),
+      appBarOverride: _controller.selecting
+          ? ChatSelectionAppBar(
+              selectedCount: _controller.selectedCount,
+              allSelected: allSelected,
+              onClose: _controller.cancelSelection,
+              onToggleSelectAll: _controller.toggleSelectAll,
+              onInvertSelection: _controller.invertSelection,
+            )
+          : null,
       body: _wrapWithDropTarget(_buildMobileBody(context, cs)),
     );
   }
@@ -310,23 +324,32 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   },
                 ),
               ),
-              // Input bar
-              NotificationListener<SizeChangedLayoutNotification>(
-                onNotification: (n) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) => _controller.measureInputBar());
-                  return false;
-                },
-                child: SizeChangedLayoutNotifier(
-                  child: Builder(
-                    builder: (context) => _buildChatInputBar(context, isTablet: false),
+              if (_controller.selecting)
+                ChatSelectionExportBar(
+                  onExportMarkdown: _controller.exportSelectedAsMarkdown,
+                  onExportTxt: _controller.exportSelectedAsTxt,
+                  onExportImage: _controller.exportSelectedAsImage,
+                  showThinkingTools: _controller.showThinkingTools,
+                  showThinkingContent: _controller.showThinkingContent,
+                  onToggleThinkingTools: _controller.toggleThinkingTools,
+                  onToggleThinkingContent: _controller.toggleThinkingContent,
+                )
+              else
+                // Input bar
+                NotificationListener<SizeChangedLayoutNotification>(
+                  onNotification: (n) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) => _controller.measureInputBar());
+                    return false;
+                  },
+                  child: SizeChangedLayoutNotifier(
+                    child: Builder(
+                      builder: (context) => _buildChatInputBar(context, isTablet: false),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
-        // Selection toolbar overlay
-        _buildSelectionToolbarOverlay(),
         // Scroll navigation buttons
         _buildScrollButtons(),
       ],
@@ -341,6 +364,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     required ColorScheme cs,
   }) {
     _controller.initDesktopUi();
+
+    final collapsed = _controller.collapseVersions(_controller.messages);
+    final selectable = collapsed.where((m) => m.role == 'user' || m.role == 'assistant').toList();
+    final allSelected = selectable.isNotEmpty && selectable.every((m) => _controller.selectedItems.contains(m.id));
 
     return HomeDesktopScaffold(
       scaffoldKey: _scaffoldKey,
@@ -373,6 +400,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       onRightSidebarWidthChanged: _controller.updateRightSidebarWidth,
       onRightSidebarWidthChangeEnd: _controller.saveRightSidebarWidth,
       buildAssistantBackground: _buildAssistantBackground,
+      appBarOverride: _controller.selecting
+          ? ChatSelectionAppBar(
+              selectedCount: _controller.selectedCount,
+              allSelected: allSelected,
+              onClose: _controller.cancelSelection,
+              onToggleSelectAll: _controller.toggleSelectAll,
+              onInvertSelection: _controller.invertSelection,
+            )
+          : null,
       body: _wrapWithDropTarget(_buildTabletBody(context, cs)),
     );
   }
@@ -398,32 +434,47 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                    .fadeIn(duration: 200.ms, curve: Curves.easeOutCubic),
                 ),
               ),
-              NotificationListener<SizeChangedLayoutNotification>(
-                onNotification: (n) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) => _controller.measureInputBar());
-                  return false;
-                },
-                child: SizeChangedLayoutNotifier(
-                  child: Builder(
-                    builder: (context) {
-                      Widget input = _buildChatInputBar(context, isTablet: true);
-                      input = Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            maxWidth: ChatLayoutConstants.maxInputWidth,
+              if (_controller.selecting)
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: ChatLayoutConstants.maxInputWidth),
+                    child: ChatSelectionExportBar(
+                      onExportMarkdown: _controller.exportSelectedAsMarkdown,
+                      onExportTxt: _controller.exportSelectedAsTxt,
+                      onExportImage: _controller.exportSelectedAsImage,
+                      showThinkingTools: _controller.showThinkingTools,
+                      showThinkingContent: _controller.showThinkingContent,
+                      onToggleThinkingTools: _controller.toggleThinkingTools,
+                      onToggleThinkingContent: _controller.toggleThinkingContent,
+                    ),
+                  ),
+                )
+              else
+                NotificationListener<SizeChangedLayoutNotification>(
+                  onNotification: (n) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) => _controller.measureInputBar());
+                    return false;
+                  },
+                  child: SizeChangedLayoutNotifier(
+                    child: Builder(
+                      builder: (context) {
+                        Widget input = _buildChatInputBar(context, isTablet: true);
+                        input = Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              maxWidth: ChatLayoutConstants.maxInputWidth,
+                            ),
+                            child: input,
                           ),
-                          child: input,
-                        ),
-                      );
-                      return input;
-                    },
+                        );
+                        return input;
+                      },
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
-        _buildSelectionToolbarOverlay(),
         _buildScrollButtons(),
       ],
     );
@@ -663,28 +714,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     );
   }
 
-  Widget _buildSelectionToolbarOverlay() {
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 122),
-          child: AnimatedSelectionBar(
-            visible: _controller.selecting,
-            child: SelectionToolbar(
-              onCancel: _controller.cancelSelection,
-              onConfirm: _controller.confirmSelection,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildScrollButtons() {
     return Builder(builder: (context) {
       final showSetting = context.watch<SettingsProvider>().showMessageNavButtons;
+      if (_controller.selecting) return const SizedBox.shrink();
       if (!showSetting || _controller.messages.isEmpty) return const SizedBox.shrink();
       return ScrollNavButtonsPanel(
         visible: _controller.scrollCtrl.showNavButtons,

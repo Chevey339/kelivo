@@ -48,6 +48,7 @@ class HomeDesktopScaffold extends StatelessWidget {
     required this.onRightSidebarWidthChanged,
     required this.onRightSidebarWidthChangeEnd,
     required this.buildAssistantBackground,
+    this.appBarOverride,
     required this.body,
   });
 
@@ -78,6 +79,7 @@ class HomeDesktopScaffold extends StatelessWidget {
   final void Function(double dx) onRightSidebarWidthChanged;
   final VoidCallback onRightSidebarWidthChangeEnd;
   final Widget Function(BuildContext context) buildAssistantBackground;
+  final PreferredSizeWidget? appBarOverride;
   final Widget body;
 
   static const Duration _sidebarAnimDuration = Duration(milliseconds: 260);
@@ -129,7 +131,7 @@ class HomeDesktopScaffold extends StatelessWidget {
                   resizeToAvoidBottomInset: true,
                   extendBodyBehindAppBar: true,
                   backgroundColor: Colors.transparent,
-                  appBar: _buildAppBar(context, cs, topicsOnRight),
+                  appBar: appBarOverride ?? _buildAppBar(context, cs, topicsOnRight),
                   body: body,
                 ),
               ),
