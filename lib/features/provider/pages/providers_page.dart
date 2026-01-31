@@ -208,6 +208,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
 
   List<_Provider> _providers({required AppLocalizations l10n}) => [
         _p('OpenAI', 'OpenAI', enabled: true, models: 0),
+        _p('MemoryLake', 'MemoryLake', enabled: true, models: 0),
         _p(l10n.providersPageSiliconFlowName, 'SiliconFlow', enabled: true, models: 0),
         _p('Gemini', 'Gemini', enabled: true, models: 0),
         _p('OpenRouter', 'OpenRouter', enabled: true, models: 0),
