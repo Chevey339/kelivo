@@ -105,8 +105,14 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       context: context,
       builder: (ctx) => _RestoreModeDialog(),
     );
+<<<<<<< HEAD
     if (mode == null) return;
     await action(mode);
+=======
+    if (options == null) return;
+    await action(options);
+    if (!mounted) return;
+>>>>>>> 5f17865 (fix(backup): resolve cross-platform path issues and restore crash (Fixes #243))
     // Inform restart requirement
     await showDialog(
       context: context,
@@ -528,10 +534,18 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     }
   }
 
+<<<<<<< HEAD
   Future<void> _chooseRestoreModeAndRun(Future<void> Function(RestoreMode) action) async {
     final mode = await showDialog<RestoreMode>(context: context, builder: (_) => _RestoreModeDialog());
     if (mode == null) return;
     await action(mode);
+=======
+  Future<void> _chooseRestoreOptionsAndRun(Future<void> Function(RestoreOptions) action) async {
+    final options = await showDialog<RestoreOptions>(context: context, builder: (_) => const _RestoreOptionsDialog());
+    if (options == null) return;
+    await action(options);
+    if (!mounted) return;
+>>>>>>> 5f17865 (fix(backup): resolve cross-platform path issues and restore crash (Fixes #243))
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     await showDialog(context: context, builder: (_) => AlertDialog(
