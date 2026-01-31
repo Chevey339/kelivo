@@ -5,7 +5,18 @@ import '../../../core/models/chat_message.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 
-Future<String?> showMiniMapSheet(BuildContext context, List<ChatMessage> messages) async {
+Future<String?> showMiniMapSheet(
+  BuildContext context,
+  List<ChatMessage> messages, {
+  bool selecting = false,
+  Set<String>? selectedMessageIds,
+  Listenable? selectionListenable,
+  ValueChanged<String>? onToggleSelection,
+}) async {
+  assert(
+    !selecting || (selectedMessageIds != null && onToggleSelection != null),
+    'Mini map selection mode requires selectedMessageIds and onToggleSelection.',
+  );
   return await showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
@@ -13,13 +24,30 @@ Future<String?> showMiniMapSheet(BuildContext context, List<ChatMessage> message
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
-    builder: (ctx) => _MiniMapSheet(messages: messages),
+    builder: (ctx) => _MiniMapSheet(
+      messages: messages,
+      selecting: selecting,
+      selectedMessageIds: selectedMessageIds,
+      selectionListenable: selectionListenable,
+      onToggleSelection: onToggleSelection,
+    ),
   );
 }
 
 class _MiniMapSheet extends StatefulWidget {
   final List<ChatMessage> messages;
-  const _MiniMapSheet({required this.messages});
+  final bool selecting;
+  final Set<String>? selectedMessageIds;
+  final Listenable? selectionListenable;
+  final ValueChanged<String>? onToggleSelection;
+
+  const _MiniMapSheet({
+    required this.messages,
+    this.selecting = false,
+    this.selectedMessageIds,
+    this.selectionListenable,
+    this.onToggleSelection,
+  });
 
   @override
   State<_MiniMapSheet> createState() => _MiniMapSheetState();
@@ -72,7 +100,6 @@ class _MiniMapSheetState extends State<_MiniMapSheet> with TickerProviderStateMi
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final pairs = _filteredPairs(_buildPairs(widget.messages));
     final searchWidth = min(MediaQuery.sizeOf(context).width * 0.6, 260.0);
 
     return SafeArea(
@@ -119,14 +146,37 @@ class _MiniMapSheetState extends State<_MiniMapSheet> with TickerProviderStateMi
                 const SizedBox(height: 12),
                 // Scrollable content
                 Expanded(
-                  child: ListView(
-                    controller: controller,
-                    children: [
-                      ...[
-                        for (final p in pairs) _MiniMapRow(pair: p),
-                      ],
-                    ],
-                  ),
+                  child: widget.selecting && widget.selectionListenable != null
+                      ? AnimatedBuilder(
+                          animation: widget.selectionListenable!,
+                          builder: (context, child) {
+                            final pairs = _filteredPairs(_buildPairs(widget.messages));
+                            return ListView(
+                              controller: controller,
+                              children: [
+                                for (final p in pairs)
+                                  _MiniMapRow(
+                                    pair: p,
+                                    selecting: true,
+                                    selectedMessageIds: widget.selectedMessageIds!,
+                                    onToggleSelection: widget.onToggleSelection!,
+                                  ),
+                              ],
+                            );
+                          },
+                        )
+                      : ListView(
+                          controller: controller,
+                          children: [
+                            for (final p in _filteredPairs(_buildPairs(widget.messages)))
+                              _MiniMapRow(
+                                pair: p,
+                                selecting: widget.selecting,
+                                selectedMessageIds: widget.selectedMessageIds,
+                                onToggleSelection: widget.onToggleSelection,
+                              ),
+                          ],
+                        ),
                 ),
               ],
             ),
@@ -271,7 +321,16 @@ class _QaPair {
 
 class _MiniMapRow extends StatelessWidget {
   final _QaPair pair;
-  const _MiniMapRow({required this.pair});
+  final bool selecting;
+  final Set<String>? selectedMessageIds;
+  final ValueChanged<String>? onToggleSelection;
+
+  const _MiniMapRow({
+    required this.pair,
+    this.selecting = false,
+    this.selectedMessageIds,
+    this.onToggleSelection,
+  });
 
   String _oneLine(String s) {
     // Strip inline embed markers used in user messages to avoid noise
@@ -292,6 +351,19 @@ class _MiniMapRow extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final userText = pair.user?.content ?? '';
     final asstText = pair.assistant?.content ?? '';
+
+    final bool userSelected =
+        selectedMessageIds != null && pair.user != null && selectedMessageIds!.contains(pair.user!.id);
+    final bool assistantSelected =
+        selectedMessageIds != null && pair.assistant != null && selectedMessageIds!.contains(pair.assistant!.id);
+
+    final userBg = (isDark ? cs.primary.withOpacity(0.15) : cs.primary.withOpacity(0.08));
+    final userSelectedBg = (isDark ? cs.primary.withOpacity(0.26) : cs.primary.withOpacity(0.14));
+    final userBorder = cs.primary.withOpacity(isDark ? 0.45 : 0.35);
+
+    final assistantSelectedBg = (isDark ? cs.primary.withOpacity(0.18) : cs.primary.withOpacity(0.10));
+    final assistantBorder = cs.primary.withOpacity(isDark ? 0.38 : 0.28);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(
@@ -306,24 +378,44 @@ class _MiniMapRow extends StatelessWidget {
               ),
               child: Material(
                 color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: pair.user != null ? () => Navigator.of(context).pop(pair.user!.id) : null,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isDark ? cs.primary.withOpacity(0.15) : cs.primary.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      userText.isNotEmpty ? _oneLine(userText) : ' ',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 15.5, height: 1.4, color: cs.onSurface),
-                      textAlign: TextAlign.left,
-                    ),
-                  ),
-                ),
+                child: selecting
+                    ? GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: pair.user != null ? () => onToggleSelection?.call(pair.user!.id) : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: userSelected ? userSelectedBg : userBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: userSelected ? Border.all(color: userBorder, width: 1) : null,
+                          ),
+                          child: Text(
+                            userText.isNotEmpty ? _oneLine(userText) : ' ',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 15.5, height: 1.4, color: cs.onSurface),
+                            textAlign: TextAlign.left,
+                          ),
+                        ),
+                      )
+                    : InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: pair.user != null ? () => Navigator.of(context).pop(pair.user!.id) : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: userBg,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            userText.isNotEmpty ? _oneLine(userText) : ' ',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 15.5, height: 1.4, color: cs.onSurface),
+                            textAlign: TextAlign.left,
+                          ),
+                        ),
+                      ),
               ),
             ),
           ),
@@ -331,20 +423,40 @@ class _MiniMapRow extends StatelessWidget {
           // Assistant message
           Material(
             color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: pair.assistant != null ? () => Navigator.of(context).pop(pair.assistant!.id) : null,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                child: Text(
-                  asstText.isNotEmpty ? _oneLine(asstText) : ' ',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 15.7, height: 1.5),
-                  textAlign: TextAlign.left,
-                ),
-              ),
-            ),
+            child: selecting
+                ? GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: pair.assistant != null ? () => onToggleSelection?.call(pair.assistant!.id) : null,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: assistantSelected ? assistantSelectedBg : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: assistantSelected ? Border.all(color: assistantBorder, width: 1) : null,
+                      ),
+                      child: Text(
+                        asstText.isNotEmpty ? _oneLine(asstText) : ' ',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 15.7, height: 1.5),
+                        textAlign: TextAlign.left,
+                      ),
+                    ),
+                  )
+                : InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: pair.assistant != null ? () => Navigator.of(context).pop(pair.assistant!.id) : null,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      child: Text(
+                        asstText.isNotEmpty ? _oneLine(asstText) : ' ',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 15.7, height: 1.5),
+                        textAlign: TextAlign.left,
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),

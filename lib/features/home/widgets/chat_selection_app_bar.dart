@@ -11,6 +11,8 @@ class ChatSelectionAppBar extends StatelessWidget implements PreferredSizeWidget
     required this.selectedCount,
     required this.allSelected,
     required this.onClose,
+    this.onOpenMiniMap,
+    this.miniMapKey,
     required this.onToggleSelectAll,
     required this.onInvertSelection,
   });
@@ -18,6 +20,8 @@ class ChatSelectionAppBar extends StatelessWidget implements PreferredSizeWidget
   final int selectedCount;
   final bool allSelected;
   final VoidCallback onClose;
+  final VoidCallback? onOpenMiniMap;
+  final Key? miniMapKey;
   final VoidCallback onToggleSelectAll;
   final VoidCallback onInvertSelection;
 
@@ -32,12 +36,27 @@ class ChatSelectionAppBar extends StatelessWidget implements PreferredSizeWidget
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
-      leading: IosIconButton(
-        icon: Lucide.X,
-        size: 22,
-        minSize: 44,
-        semanticLabel: l10n.homePageCancel,
-        onTap: onClose,
+      leadingWidth: (onOpenMiniMap != null) ? 92 : null,
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IosIconButton(
+            icon: Lucide.X,
+            size: 22,
+            minSize: 44,
+            semanticLabel: l10n.homePageCancel,
+            onTap: onClose,
+          ),
+          if (onOpenMiniMap != null)
+            IosIconButton(
+              key: miniMapKey,
+              icon: Lucide.Map,
+              size: 20,
+              minSize: 44,
+              semanticLabel: l10n.miniMapTooltip,
+              onTap: onOpenMiniMap,
+            ),
+        ],
       ),
       title: Text(
         l10n.chatSelectionSelectedCountTitle(selectedCount),

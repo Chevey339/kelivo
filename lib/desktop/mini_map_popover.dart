@@ -9,7 +9,15 @@ Future<String?> showDesktopMiniMapPopover(
   BuildContext context, {
   required GlobalKey anchorKey,
   required List<ChatMessage> messages,
+  bool selecting = false,
+  Set<String>? selectedMessageIds,
+  Listenable? selectionListenable,
+  ValueChanged<String>? onToggleSelection,
 }) async {
+  assert(
+    !selecting || (selectedMessageIds != null && onToggleSelection != null),
+    'Mini map selection mode requires selectedMessageIds and onToggleSelection.',
+  );
   final overlay = Overlay.of(context);
   if (overlay == null) return null;
   final keyContext = anchorKey.currentContext;
@@ -29,10 +37,16 @@ Future<String?> showDesktopMiniMapPopover(
       anchorRect: anchorRect,
       anchorWidth: size.width,
       messages: messages,
-      onSelect: (id) {
-        try { entry.remove(); } catch (_) {}
-        if (!completer.isCompleted) completer.complete(id);
-      },
+      selecting: selecting,
+      selectedMessageIds: selectedMessageIds,
+      selectionListenable: selectionListenable,
+      onToggleSelection: onToggleSelection,
+      onSelect: selecting
+          ? null
+          : (id) {
+              try { entry.remove(); } catch (_) {}
+              if (!completer.isCompleted) completer.complete(id);
+            },
       onClose: () {
         try { entry.remove(); } catch (_) {}
         if (!completer.isCompleted) completer.complete(null);
@@ -49,13 +63,21 @@ class _MiniMapPopover extends StatefulWidget {
     required this.anchorWidth,
     required this.messages,
     required this.onSelect,
+    required this.selecting,
+    required this.selectedMessageIds,
+    required this.selectionListenable,
+    required this.onToggleSelection,
     required this.onClose,
   });
 
   final Rect anchorRect;
   final double anchorWidth;
   final List<ChatMessage> messages;
-  final ValueChanged<String> onSelect;
+  final ValueChanged<String>? onSelect;
+  final bool selecting;
+  final Set<String>? selectedMessageIds;
+  final Listenable? selectionListenable;
+  final ValueChanged<String>? onToggleSelection;
   final VoidCallback onClose;
 
   @override
@@ -132,9 +154,16 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
                         child: _MiniMapList(
                           messages: widget.messages,
-                          onSelect: (id) {
+                          selecting: widget.selecting,
+                          selectedMessageIds: widget.selectedMessageIds,
+                          selectionListenable: widget.selectionListenable,
+                          onTapMessage: (id) {
                             if (_closing) return;
-                            widget.onSelect(id);
+                            if (widget.selecting) {
+                              widget.onToggleSelection?.call(id);
+                            } else {
+                              widget.onSelect?.call(id);
+                            }
                           },
                         ),
                       ),
@@ -182,9 +211,18 @@ class _GlassPanel extends StatelessWidget {
 }
 
 class _MiniMapList extends StatelessWidget {
-  const _MiniMapList({required this.messages, required this.onSelect});
+  const _MiniMapList({
+    required this.messages,
+    required this.onTapMessage,
+    required this.selecting,
+    this.selectedMessageIds,
+    this.selectionListenable,
+  });
   final List<ChatMessage> messages;
-  final ValueChanged<String> onSelect;
+  final ValueChanged<String> onTapMessage;
+  final bool selecting;
+  final Set<String>? selectedMessageIds;
+  final Listenable? selectionListenable;
 
   String _oneLine(String s) {
     var t = s
@@ -219,6 +257,51 @@ class _MiniMapList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Widget buildList(List<_QaPair> pairs) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 2),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 420),
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
+            primary: false,
+            shrinkWrap: true,
+            itemCount: pairs.length,
+            itemBuilder: (context, index) {
+              final p = pairs[index];
+              final userSelected = selecting &&
+                  selectedMessageIds != null &&
+                  p.user != null &&
+                  selectedMessageIds!.contains(p.user!.id);
+              final assistantSelected = selecting &&
+                  selectedMessageIds != null &&
+                  p.assistant != null &&
+                  selectedMessageIds!.contains(p.assistant!.id);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: _MiniMapRow(
+                  user: p.user,
+                  assistant: p.assistant,
+                  userSelected: userSelected,
+                  assistantSelected: assistantSelected,
+                  toOneLine: _oneLine,
+                  onTapMessage: onTapMessage,
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
+
+    if (selecting && selectionListenable != null) {
+      return AnimatedBuilder(
+        animation: selectionListenable!,
+        builder: (context, child) => buildList(_buildPairs(messages)),
+      );
+    }
+
     final pairs = _buildPairs(messages);
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
@@ -236,8 +319,10 @@ class _MiniMapList extends StatelessWidget {
               child: _MiniMapRow(
                 user: p.user,
                 assistant: p.assistant,
+                userSelected: false,
+                assistantSelected: false,
                 toOneLine: _oneLine,
-                onSelect: onSelect,
+                onTapMessage: onTapMessage,
               ),
             );
           },
@@ -254,11 +339,20 @@ class _QaPair {
 }
 
 class _MiniMapRow extends StatefulWidget {
-  const _MiniMapRow({required this.user, required this.assistant, required this.toOneLine, required this.onSelect});
+  const _MiniMapRow({
+    required this.user,
+    required this.assistant,
+    required this.toOneLine,
+    required this.onTapMessage,
+    required this.userSelected,
+    required this.assistantSelected,
+  });
   final ChatMessage? user;
   final ChatMessage? assistant;
   final String Function(String) toOneLine;
-  final ValueChanged<String> onSelect;
+  final ValueChanged<String> onTapMessage;
+  final bool userSelected;
+  final bool assistantSelected;
 
   @override
   State<_MiniMapRow> createState() => _MiniMapRowState();
@@ -274,6 +368,11 @@ class _MiniMapRowState extends State<_MiniMapRow> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final userText = widget.user?.content ?? '';
     final asstText = widget.assistant?.content ?? '';
+    final userBorder = cs.primary.withOpacity(isDark ? 0.45 : 0.35);
+
+    final assistantSelectedBg = (isDark ? cs.primary.withOpacity(0.18) : cs.primary.withOpacity(0.10));
+    final assistantBorder = cs.primary.withOpacity(isDark ? 0.38 : 0.28);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -286,14 +385,18 @@ class _MiniMapRowState extends State<_MiniMapRow> {
             onExit: (_) => setState(() => _hoverUser = false),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: widget.user != null ? () => widget.onSelect(widget.user!.id) : null,
+              onTap: widget.user != null ? () => widget.onTapMessage(widget.user!.id) : null,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 120),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: (isDark ? cs.primary.withOpacity(0.15) : cs.primary.withOpacity(0.08))
-                      .withOpacity(_hoverUser ? (isDark ? 0.22 : 0.14) : (isDark ? 0.15 : 0.08)),
+                  color: cs.primary.withOpacity(
+                    _hoverUser
+                        ? (widget.userSelected ? (isDark ? 0.32 : 0.18) : (isDark ? 0.22 : 0.14))
+                        : (widget.userSelected ? (isDark ? 0.26 : 0.14) : (isDark ? 0.15 : 0.08)),
+                  ),
                   borderRadius: BorderRadius.circular(16),
+                  border: widget.userSelected ? Border.all(color: userBorder, width: 1) : null,
                 ),
                 child: Text(
                   userText.isNotEmpty ? widget.toOneLine(userText) : ' ',
@@ -314,12 +417,15 @@ class _MiniMapRowState extends State<_MiniMapRow> {
           onExit: (_) => setState(() => _hoverAssistant = false),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: widget.assistant != null ? () => widget.onSelect(widget.assistant!.id) : null,
+            onTap: widget.assistant != null ? () => widget.onTapMessage(widget.assistant!.id) : null,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               decoration: BoxDecoration(
-                color: _hoverAssistant ? cs.onSurface.withOpacity(0.05) : Colors.transparent,
+                color: widget.assistantSelected
+                    ? assistantSelectedBg
+                    : (_hoverAssistant ? cs.onSurface.withOpacity(0.05) : Colors.transparent),
                 borderRadius: BorderRadius.circular(8),
+                border: widget.assistantSelected ? Border.all(color: assistantBorder, width: 1) : null,
               ),
               child: Text(
                 asstText.isNotEmpty ? widget.toOneLine(asstText) : ' ',

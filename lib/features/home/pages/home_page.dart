@@ -70,6 +70,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   final ChatInputBarController _mediaController = ChatInputBarController();
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _inputBarKey = GlobalKey();
+  final GlobalKey _selectionMiniMapKey = GlobalKey();
+  final GlobalKey _selectionExportBarKey = GlobalKey();
   StreamSubscription<String>? _processTextSub;
 
   // ============================================================================
@@ -284,6 +286,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               selectedCount: _controller.selectedCount,
               allSelected: allSelected,
               onClose: _controller.cancelSelection,
+              onOpenMiniMap: () {
+                unawaited(_openSelectionMiniMap());
+              },
+              miniMapKey: _selectionMiniMapKey,
               onToggleSelectAll: _controller.toggleSelectAll,
               onInvertSelection: _controller.invertSelection,
             )
@@ -326,6 +332,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
               if (_controller.selecting)
                 ChatSelectionExportBar(
+                  key: _selectionExportBarKey,
                   onExportMarkdown: _controller.exportSelectedAsMarkdown,
                   onExportTxt: _controller.exportSelectedAsTxt,
                   onExportImage: _controller.exportSelectedAsImage,
@@ -405,11 +412,42 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               selectedCount: _controller.selectedCount,
               allSelected: allSelected,
               onClose: _controller.cancelSelection,
+              onOpenMiniMap: () {
+                unawaited(_openSelectionMiniMap());
+              },
+              miniMapKey: _selectionMiniMapKey,
               onToggleSelectAll: _controller.toggleSelectAll,
               onInvertSelection: _controller.invertSelection,
             )
           : null,
       body: _wrapWithDropTarget(_buildTabletBody(context, cs)),
+    );
+  }
+
+  Future<void> _openSelectionMiniMap() async {
+    final collapsed = _controller.collapseVersions(_controller.messages);
+    if (collapsed.isEmpty) return;
+
+    if (PlatformUtils.isDesktop && _selectionExportBarKey.currentContext != null) {
+      await showDesktopMiniMapPopover(
+        context,
+        anchorKey: _selectionExportBarKey,
+        messages: collapsed,
+        selecting: true,
+        selectedMessageIds: _controller.selectedItems,
+        selectionListenable: _controller,
+        onToggleSelection: (id) => _controller.toggleSelection(id, !_controller.selectedItems.contains(id)),
+      );
+      return;
+    }
+
+    await showMiniMapSheet(
+      context,
+      collapsed,
+      selecting: true,
+      selectedMessageIds: _controller.selectedItems,
+      selectionListenable: _controller,
+      onToggleSelection: (id) => _controller.toggleSelection(id, !_controller.selectedItems.contains(id)),
     );
   }
 
@@ -439,6 +477,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: ChatLayoutConstants.maxInputWidth),
                     child: ChatSelectionExportBar(
+                      key: _selectionExportBarKey,
                       onExportMarkdown: _controller.exportSelectedAsMarkdown,
                       onExportTxt: _controller.exportSelectedAsTxt,
                       onExportImage: _controller.exportSelectedAsImage,
