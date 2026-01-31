@@ -361,6 +361,7 @@ class _MiniMapRow extends StatelessWidget {
     final userSelectedBg = (isDark ? cs.primary.withOpacity(0.26) : cs.primary.withOpacity(0.14));
     final userBorder = cs.primary.withOpacity(isDark ? 0.45 : 0.35);
 
+    final assistantBg = cs.onSurface.withOpacity(isDark ? 0.06 : 0.04);
     final assistantSelectedBg = (isDark ? cs.primary.withOpacity(0.18) : cs.primary.withOpacity(0.10));
     final assistantBorder = cs.primary.withOpacity(isDark ? 0.38 : 0.28);
 
@@ -421,42 +422,54 @@ class _MiniMapRow extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           // Assistant message
-          Material(
-            color: Colors.transparent,
-            child: selecting
-                ? GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: pair.assistant != null ? () => onToggleSelection?.call(pair.assistant!.id) : null,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: assistantSelected ? assistantSelectedBg : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                        border: assistantSelected ? Border.all(color: assistantBorder, width: 1) : null,
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width //* 0.75 - 32, // subtract side paddings approx in sheet
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: selecting
+                    ? GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: pair.assistant != null ? () => onToggleSelection?.call(pair.assistant!.id) : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: assistantSelected ? assistantSelectedBg : assistantBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: assistantSelected ? Border.all(color: assistantBorder, width: 1) : null,
+                          ),
+                          child: Text(
+                            asstText.isNotEmpty ? _oneLine(asstText) : ' ',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 15.7, height: 1.5),
+                            textAlign: TextAlign.left,
+                          ),
+                        ),
+                      )
+                    : InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: pair.assistant != null ? () => Navigator.of(context).pop(pair.assistant!.id) : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: assistantBg,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            asstText.isNotEmpty ? _oneLine(asstText) : ' ',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 15.7, height: 1.5),
+                            textAlign: TextAlign.left,
+                          ),
+                        ),
                       ),
-                      child: Text(
-                        asstText.isNotEmpty ? _oneLine(asstText) : ' ',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 15.7, height: 1.5),
-                        textAlign: TextAlign.left,
-                      ),
-                    ),
-                  )
-                : InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: pair.assistant != null ? () => Navigator.of(context).pop(pair.assistant!.id) : null,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                      child: Text(
-                        asstText.isNotEmpty ? _oneLine(asstText) : ' ',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 15.7, height: 1.5),
-                        textAlign: TextAlign.left,
-                      ),
-                    ),
-                  ),
+              ),
+            ),
           ),
         ],
       ),

@@ -411,28 +411,33 @@ class _MiniMapRowState extends State<_MiniMapRow> {
         ),
         const SizedBox(height: 6),
         // Assistant line
-        MouseRegion(
-          cursor: widget.assistant != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
-          onEnter: (_) => setState(() => _hoverAssistant = true),
-          onExit: (_) => setState(() => _hoverAssistant = false),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: widget.assistant != null ? () => widget.onTapMessage(widget.assistant!.id) : null,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              decoration: BoxDecoration(
-                color: widget.assistantSelected
-                    ? assistantSelectedBg
-                    : (_hoverAssistant ? cs.onSurface.withOpacity(0.05) : Colors.transparent),
-                borderRadius: BorderRadius.circular(8),
-                border: widget.assistantSelected ? Border.all(color: assistantBorder, width: 1) : null,
-              ),
-              child: Text(
-                asstText.isNotEmpty ? widget.toOneLine(asstText) : ' ',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 15.2, height: 1.4, decoration: TextDecoration.none),
-                textAlign: TextAlign.left,
+        Align(
+          alignment: Alignment.centerLeft,
+          child: MouseRegion(
+            cursor: widget.assistant != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+            onEnter: (_) => setState(() => _hoverAssistant = true),
+            onExit: (_) => setState(() => _hoverAssistant = false),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: widget.assistant != null ? () => widget.onTapMessage(widget.assistant!.id) : null,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: widget.assistantSelected
+                      ? assistantSelectedBg
+                      : cs.onSurface.withOpacity(
+                          _hoverAssistant ? (isDark ? 0.07 : 0.05) : (isDark ? 0.05 : 0.03),
+                        ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: widget.assistantSelected ? Border.all(color: assistantBorder, width: 1) : null,
+                ),
+                child: Text(
+                  asstText.isNotEmpty ? widget.toOneLine(asstText) : ' ',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 15.2, height: 1.4, decoration: TextDecoration.none),
+                  textAlign: TextAlign.left,
+                ),
               ),
             ),
           ),
