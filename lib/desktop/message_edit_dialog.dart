@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:re_editor/re_editor.dart';
 import '../core/models/chat_message.dart';
 import '../features/chat/models/message_edit_result.dart';
 import '../l10n/app_localizations.dart';
@@ -21,12 +22,45 @@ class _MessageEditDesktopDialog extends StatefulWidget {
 }
 
 class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
-  late final TextEditingController _controller;
+  late final CodeLineEditingController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.message.content);
+    _controller = CodeLineEditingController();
+    _syncControllerText(widget.message.content);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MessageEditDesktopDialog oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message.content != widget.message.content &&
+        _controller.text == oldWidget.message.content) {
+      _syncControllerText(widget.message.content);
+    }
+  }
+
+  void _syncControllerText(String text) {
+    if (text.isEmpty) {
+      _controller.value = const CodeLineEditingValue.empty();
+      return;
+    }
+    try {
+      final lines = text.codeLines;
+      if (lines.isEmpty) {
+        _controller.value = const CodeLineEditingValue.empty();
+        return;
+      }
+      final lastIndex = lines.length - 1;
+      final lastOffset = lines.last.length;
+      _controller.value = CodeLineEditingValue(
+        codeLines: lines,
+        selection: CodeLineSelection.collapsed(index: lastIndex, offset: lastOffset),
+        composing: TextRange.empty,
+      );
+    } catch (_) {
+      _controller.value = const CodeLineEditingValue.empty();
+    }
   }
 
   @override
@@ -63,6 +97,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                       TextButton.icon(
                         onPressed: () {
                           final text = _controller.text.trim();
+                          if (text.isEmpty) return;
                           Navigator.of(context).pop<MessageEditResult>(
                             MessageEditResult(content: text, shouldSend: true),
                           );
@@ -74,6 +109,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                       TextButton.icon(
                         onPressed: () {
                           final text = _controller.text.trim();
+                          if (text.isEmpty) return;
                           Navigator.of(context).pop<MessageEditResult>(
                             MessageEditResult(content: text, shouldSend: false),
                           );
@@ -84,7 +120,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                       IconButton(
                         tooltip: l10n.mcpPageClose,
                         onPressed: () => Navigator.of(context).maybePop(),
-                        icon: Icon(Lucide.X, size: 18, color: cs.onSurface.withOpacity(0.75)),
+                      icon: Icon(Lucide.X, size: 18, color: cs.onSurface.withValues(alpha: 0.75)),
                       ),
                     ],
                   ),
@@ -94,31 +130,34 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: TextField(
-                      controller: _controller,
-                      autofocus: true,
-                      keyboardType: TextInputType.multiline,
-                      minLines: 10,
-                      maxLines: null,
-                      decoration: InputDecoration(
-                        hintText: l10n.messageEditPageHint,
-                        filled: true,
-                        fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.18), width: 0.6),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.18),
+                          width: 0.6,
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.18), width: 0.6),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                       ),
-                      style: const TextStyle(fontSize: 15, height: 1.5),
+                      clipBehavior: Clip.antiAlias,
+                      child: CodeEditor(
+                        controller: _controller,
+                        autofocus: true,
+                        wordWrap: true,
+                        indicatorBuilder: null,
+                        chunkAnalyzer: const NonCodeChunkAnalyzer(),
+                        hint: l10n.messageEditPageHint,
+                        padding: const EdgeInsets.all(12),
+                        style: CodeEditorStyle(
+                          fontSize: 15,
+                          fontHeight: 1.5,
+                          textColor: cs.onSurface,
+                          hintTextColor: cs.onSurface.withValues(alpha: 0.5),
+                          cursorColor: cs.primary,
+                          backgroundColor: Colors.transparent,
+                          selectionColor: cs.primary.withValues(alpha: 0.3),
+                        ),
+                      ),
                     ),
                   ),
                 ),

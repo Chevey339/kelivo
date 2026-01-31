@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
+import 'package:re_editor/re_editor.dart';
 
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -13,6 +14,7 @@ import '../../../core/providers/instruction_injection_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/input_height_constraints.dart';
 
 class InstructionInjectionPage extends StatefulWidget {
   const InstructionInjectionPage({super.key});
@@ -69,6 +71,7 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
       },
     );
 
+    if (!mounted) return;
     if (result != null) {
       final title = result['title']?.trim() ?? '';
       final prompt = result['prompt']?.trim() ?? '';
@@ -125,6 +128,7 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
       return;
     }
     if (result == null || result.files.isEmpty) return;
+    if (!mounted) return;
 
     final l10n = AppLocalizations.of(context)!;
     final provider = context.read<InstructionInjectionProvider>();
@@ -207,13 +211,13 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                   Icon(
                     Lucide.Layers,
                     size: 64,
-                    color: cs.onSurface.withOpacity(0.3),
+                    color: cs.onSurface.withValues(alpha: 0.3),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     l10n.instructionInjectionEmptyMessage,
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 14,
                     ),
                   ),
@@ -265,10 +269,10 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                                 width: double.infinity,
                                 height: double.infinity,
                                 decoration: BoxDecoration(
-                                  color: isDark ? cs.error.withOpacity(0.22) : cs.error.withOpacity(0.14),
+                                  color: isDark ? cs.error.withValues(alpha: 0.22) : cs.error.withValues(alpha: 0.14),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: cs.error.withOpacity(0.35),
+                                    color: cs.error.withValues(alpha: 0.35),
                                   ),
                                 ),
                                 padding: const EdgeInsets.symmetric(
@@ -306,13 +310,13 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                           pressedScale: 0.98,
                           onTap: () => _showAddEditSheet(item: item),
                           builder: (pressed, overlay) {
-                            final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+                            final baseBg = isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96);
                             return Container(
                               decoration: BoxDecoration(
                                 color: Color.alphaBlend(overlay, baseBg),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: cs.outlineVariant.withOpacity(isDark ? 0.1 : 0.08),
+                                  color: cs.outlineVariant.withValues(alpha: isDark ? 0.1 : 0.08),
                                   width: 0.6,
                                 ),
                               ),
@@ -347,7 +351,7 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                               fontSize: 13,
-                                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                                             ),
                                           ),
                                         ],
@@ -357,7 +361,7 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                                     Icon(
                                       Lucide.ChevronRight,
                                       size: 16,
-                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                     ),
                                   ],
                                 ),
@@ -388,13 +392,51 @@ class _InstructionInjectionEditSheet extends StatefulWidget {
 
 class _InstructionInjectionEditSheetState extends State<_InstructionInjectionEditSheet> {
   late final TextEditingController _titleController;
-  late final TextEditingController _promptController;
+  late final CodeLineEditingController _promptController;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.item?.title ?? '');
-    _promptController = TextEditingController(text: widget.item?.prompt ?? '');
+    _promptController = CodeLineEditingController.fromText(widget.item?.prompt ?? '');
+  }
+
+  @override
+  void didUpdateWidget(covariant _InstructionInjectionEditSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldTitle = oldWidget.item?.title ?? '';
+    final newTitle = widget.item?.title ?? '';
+    if (oldTitle != newTitle && _titleController.text == oldTitle) {
+      _syncTitleText(newTitle);
+    }
+    final oldPrompt = oldWidget.item?.prompt ?? '';
+    final newPrompt = widget.item?.prompt ?? '';
+    if (oldPrompt != newPrompt && _promptController.text == oldPrompt) {
+      _syncPromptText(newPrompt);
+    }
+  }
+
+  void _syncTitleText(String text) {
+    _titleController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+      composing: TextRange.empty,
+    );
+  }
+
+  void _syncPromptText(String text) {
+    if (text.isEmpty) {
+      _promptController.value = const CodeLineEditingValue.empty();
+      return;
+    }
+    final lines = text.codeLines;
+    final lastIndex = lines.length - 1;
+    final lastOffset = lines.last.length;
+    _promptController.value = CodeLineEditingValue(
+      codeLines: lines,
+      selection: CodeLineSelection.collapsed(index: lastIndex, offset: lastOffset),
+      composing: TextRange.empty,
+    );
   }
 
   @override
@@ -428,7 +470,7 @@ class _InstructionInjectionEditSheetState extends State<_InstructionInjectionEdi
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: cs.onSurface.withOpacity(0.2),
+                  color: cs.onSurface.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -451,47 +493,69 @@ class _InstructionInjectionEditSheetState extends State<_InstructionInjectionEdi
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _promptController,
-              maxLines: 8,
-              decoration: InputDecoration(
-                labelText: l10n.instructionInjectionPromptLabel,
-                alignLabelWithHint: true,
-                filled: true,
-                fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 12, bottom: 6),
+                  child: Text(
+                    l10n.instructionInjectionPromptLabel,
+                    style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.6)),
                   ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: 120,
+                    maxHeight: computeInputMaxHeight(
+                      context: context,
+                      reservedHeight: 260,
+                      softCapFraction: 0.45,
+                      minHeight: 120,
+                    ),
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: CodeEditor(
+                      controller: _promptController,
+                      autofocus: false,
+                      wordWrap: true,
+                      indicatorBuilder: null,
+                      chunkAnalyzer: const NonCodeChunkAnalyzer(),
+                      padding: const EdgeInsets.all(12),
+                      style: CodeEditorStyle(
+                        fontSize: 14,
+                        fontHeight: 1.4,
+                        textColor: cs.onSurface,
+                        hintTextColor: cs.onSurface.withValues(alpha: 0.5),
+                        cursorColor: cs.primary,
+                        backgroundColor: Colors.transparent,
+                        selectionColor: cs.primary.withValues(alpha: 0.3),
+                      ),
+                    ),
                   ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
-                ),
-              ),
+              ],
             ),
             const SizedBox(height: 16),
             Row(
@@ -507,6 +571,7 @@ class _InstructionInjectionEditSheetState extends State<_InstructionInjectionEdi
                   child: _IosFilledButton(
                     label: l10n.quickPhraseSaveButton,
                     onTap: () {
+                      // TODO: Add immediate validation/UX feedback (e.g., disable Save or show error) when title or prompt is empty/invalid.
                       Navigator.of(context).pop({
                         'title': _titleController.text,
                         'prompt': _promptController.text,
@@ -540,7 +605,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final press = base.withOpacity(0.7);
+    final press = base.withValues(alpha: 0.7);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => setState(() => _pressed = true),
@@ -579,7 +644,7 @@ class _TactileCardState extends State<_TactileCard> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final overlay = _pressed
-        ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05))
+        ? (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -639,7 +704,7 @@ class _IosOutlineButtonState extends State<_IosOutlineButton> {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
           ),
           child: Text(
             widget.label,
