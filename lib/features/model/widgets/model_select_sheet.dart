@@ -12,8 +12,10 @@ import '../../provider/pages/provider_detail_page.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../desktop/desktop_home_page.dart' show DesktopHomePage;
 import '../../provider/widgets/provider_avatar.dart';
+import '../../../core/services/model_override_resolver.dart';
 
 class ModelSelection {
   final String providerKey;
@@ -31,6 +33,7 @@ class _ModelProcessingData {
   final String currentModelKey;
   final List<String> providersOrder;
   final String? limitProviderKey;
+  final bool disableResolverPlatformLogging;
   
   _ModelProcessingData({
     required this.providerConfigs,
@@ -38,6 +41,7 @@ class _ModelProcessingData {
     required this.currentModelKey,
     required this.providersOrder,
     this.limitProviderKey,
+    required this.disableResolverPlatformLogging,
   });
 }
 
@@ -60,6 +64,10 @@ String? _assetForNameStatic(String n) {
 
 // Static function for compute - must be top-level
 _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
+  if (data.disableResolverPlatformLogging) {
+    ModelOverrideResolver.setPlatformLoggingEnabled(false);
+    ModelOverrideResolver.setUnknownValueLoggingEnabled(false);
+  }
   final providers = data.limitProviderKey == null
       ? data.providerConfigs
       : {
@@ -82,7 +90,9 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
       for (final id in models)
         () {
           final String mid = id.toString();
-          final ov = overrides[mid] as Map?;
+          final rawOv = overrides[mid];
+          final Map<String, dynamic>? ov =
+              rawOv is Map ? {for (final e in rawOv.entries) e.key.toString(): e.value} : null;
           // Use upstream/api model id for inference when available so that
           // brand assets and default capabilities stay accurate even when the
           // logical key is a custom alias.
@@ -93,40 +103,7 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
           }
           ModelInfo base = ModelRegistry.infer(ModelInfo(id: baseId, displayName: baseId));
           if (ov != null) {
-            // display name override
-            final n = (ov['name'] as String?)?.trim();
-            // type override
-            ModelType? type;
-            final t = (ov['type'] as String?)?.trim();
-            if (t != null) {
-              type = (t == 'embedding') ? ModelType.embedding : ModelType.chat;
-            }
-            // modality override
-            List<Modality>? input;
-            if (ov['input'] is List) {
-              input = [
-                for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-              ];
-            }
-            List<Modality>? output;
-            if (ov['output'] is List) {
-              output = [
-                for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-              ];
-            }
-            List<ModelAbility>? abilities;
-            if (ov['abilities'] is List) {
-              abilities = [
-                for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)
-              ];
-            }
-            base = base.copyWith(
-              displayName: (n != null && n.isNotEmpty) ? n : base.displayName,
-              type: type ?? base.type,
-              input: input ?? base.input,
-              output: output ?? base.output,
-              abilities: abilities ?? base.abilities,
-            );
+            base = ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: true);
           }
           return _ModelItem(
             providerKey: key,
@@ -258,6 +235,25 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   List<String> _orderedKeys = [];
   bool _autoScrolled = false; // ensure we only auto-scroll once per open
 
+  dynamic _sanitizeJsonValue(dynamic value) {
+    if (value == null || value is num || value is bool || value is String) return value;
+    if (value is Map) {
+      return {
+        for (final entry in value.entries) entry.key.toString(): _sanitizeJsonValue(entry.value),
+      };
+    }
+    if (value is Iterable) {
+      return [for (final item in value) _sanitizeJsonValue(item)];
+    }
+    return value.toString();
+  }
+
+  Map<String, dynamic> _sanitizeOverrides(Map<String, dynamic> overrides) {
+    return {
+      for (final entry in overrides.entries) entry.key.toString(): _sanitizeJsonValue(entry.value),
+    };
+  }
+
   @override
   void initState() {
     super.initState();
@@ -288,13 +284,14 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
             'enabled': value.enabled,
             'name': value.name,
             'models': value.models,
-            'overrides': value.modelOverrides,
+            'overrides': _sanitizeOverrides(value.modelOverrides),
           })),
         ),
         pinnedModels: settings.pinnedModels,
         currentModelKey: currentKey,
         providersOrder: settings.providersOrder,
         limitProviderKey: widget.limitProviderKey,
+        disableResolverPlatformLogging: true,
       );
       
       // Process in background isolate
@@ -346,13 +343,14 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           'enabled': value.enabled,
           'name': value.name,
           'models': value.models,
-          'overrides': value.modelOverrides,
+          'overrides': _sanitizeOverrides(value.modelOverrides),
         })),
       ),
       pinnedModels: settings.pinnedModels,
       currentModelKey: currentKey,
       providersOrder: settings.providersOrder,
       limitProviderKey: widget.limitProviderKey,
+      disableResolverPlatformLogging: false,
     );
     
     final result = _processModelsInBackground(processingData);
@@ -762,7 +760,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     final settings = context.read<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = m.selected ? (isDark ? cs.primary.withOpacity(0.12) : cs.primary.withOpacity(0.08)) : cs.surface;
-    final effective = m.info; // precomputed effective info
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: RepaintBoundary(
@@ -783,60 +780,61 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           child: SizedBox(
             width: double.infinity,
             child: Row(
-            children: [
-              _BrandAvatar(name: m.id, assetOverride: m.asset, size: 28),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (!showProviderLabel)
-                      Text(
-                        m.info.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                      )
-                    else
-                      Text.rich(
-                        TextSpan(
-                          text: m.info.displayName,
+              children: [
+                _BrandAvatar(name: m.id, assetOverride: m.asset, size: 28),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (!showProviderLabel)
+                        Text(
+                          m.info.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                          children: [
-                            TextSpan(
-                              text: ' | ${m.providerName}',
-                              style: TextStyle(
-                                color: cs.onSurface.withOpacity(0.6),
-                                fontSize: 12,
+                        )
+                      else
+                        Text.rich(
+                          TextSpan(
+                            text: m.info.displayName,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                            children: [
+                              TextSpan(
+                                text: ' | ${m.providerName}',
+                                style: TextStyle(
+                                  color: cs.onSurface.withOpacity(0.6),
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    const SizedBox(height: 4),
-                    _modelTagWrap(context, effective),
-                  ],
-                ),
-              ),
-              Builder(builder: (context) {
-                final pinnedNow = context.select<SettingsProvider, bool>((s) => s.isModelPinned(m.providerKey, m.id));
-                final icon = pinnedNow ? Icons.favorite : Icons.favorite_border;
-                return Tooltip(
-                  message: l10n.modelSelectSheetFavoriteTooltip,
-                  child: IosIconButton(
-                    icon: icon,
-                    size: 20,
-                    color: cs.primary,
-                    onTap: () => settings.togglePinModel(m.providerKey, m.id),
-                    padding: const EdgeInsets.all(6),
-                    minSize: 36,
+                      const SizedBox(height: 4),
+                      ModelTagWrap(model: m.info),
+                    ],
                   ),
-                );
-              }),
-            ],
-          )),
+                ),
+                Builder(builder: (context) {
+                  final pinnedNow = context.select<SettingsProvider, bool>((s) => s.isModelPinned(m.providerKey, m.id));
+                  final icon = pinnedNow ? Icons.favorite : Icons.favorite_border;
+                  return Tooltip(
+                    message: l10n.modelSelectSheetFavoriteTooltip,
+                    child: IosIconButton(
+                      icon: icon,
+                      size: 20,
+                      color: cs.primary,
+                      onTap: () => settings.togglePinModel(m.providerKey, m.id),
+                      padding: const EdgeInsets.all(6),
+                      minSize: 36,
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -887,9 +885,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       } catch (_) {}
     }
   }
-
-  String _displayName(BuildContext context, _ModelItem m) => m.info.displayName;
-  ModelInfo _effectiveInfo(BuildContext context, _ModelItem m) => m.info;
 
   Future<void> _jumpToFavorites() async {
     if (widget.limitProviderKey != null) return;
@@ -1056,70 +1051,6 @@ class _BrandAvatar extends StatelessWidget {
   }
 }
 
-Widget _modelTagWrap(BuildContext context, ModelInfo m) {
-  final cs = Theme.of(context).colorScheme;
-  final l10n = AppLocalizations.of(context)!;
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  List<Widget> chips = [];
-  // type tag
-  chips.add(Container(
-    decoration: BoxDecoration(
-      color: isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15),
-      borderRadius: BorderRadius.circular(999),
-      border: Border.all(color: cs.primary.withOpacity(0.2), width: 0.5),
-    ),
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    child: Text(m.type == ModelType.chat ? l10n.modelSelectSheetChatType : l10n.modelSelectSheetEmbeddingType, style: TextStyle(fontSize: 11, color: isDark ? cs.primary : cs.primary.withOpacity(0.9), fontWeight: FontWeight.w500)),
-  ));
-  // modality tag capsule with icons (keep consistent with provider detail page)
-  chips.add(Container(
-    decoration: BoxDecoration(
-      color: isDark ? cs.tertiary.withOpacity(0.25) : cs.tertiary.withOpacity(0.15),
-      borderRadius: BorderRadius.circular(999),
-      border: Border.all(color: cs.tertiary.withOpacity(0.2), width: 0.5),
-    ),
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      for (final mod in m.input)
-        Padding(
-          padding: const EdgeInsets.only(right: 2),
-          child: Icon(mod == Modality.text ? Lucide.Type : Lucide.Image, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-        ),
-      Icon(Lucide.ChevronRight, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-      for (final mod in m.output)
-        Padding(
-          padding: const EdgeInsets.only(left: 2),
-          child: Icon(mod == Modality.text ? Lucide.Type : Lucide.Image, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-        ),
-    ]),
-  ));
-  // abilities capsules
-  for (final ab in m.abilities) {
-    if (ab == ModelAbility.tool) {
-      chips.add(Container(
-        decoration: BoxDecoration(
-          color: isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.primary.withOpacity(0.2), width: 0.5),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        child: Icon(Lucide.Hammer, size: 12, color: isDark ? cs.primary : cs.primary.withOpacity(0.9)),
-      ));
-    } else if (ab == ModelAbility.reasoning) {
-      chips.add(Container(
-        decoration: BoxDecoration(
-          color: isDark ? cs.secondary.withOpacity(0.3) : cs.secondary.withOpacity(0.18),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.secondary.withOpacity(0.25), width: 0.5),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        child: SvgPicture.asset('assets/icons/deepthink.svg', width: 12, height: 12, colorFilter: ColorFilter.mode(isDark ? cs.secondary : cs.secondary.withOpacity(0.9), BlendMode.srcIn)),
-      ));
-    }
-  }
-  return Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: chips);
-}
-
 // ===== Desktop dialog implementation =====
 
 Future<ModelSelection?> _showDesktopModelSelector(BuildContext context, {String? limitProviderKey}) async {
@@ -1199,6 +1130,7 @@ class _DesktopModelSelectDialogBodyState extends State<_DesktopModelSelectDialog
       currentModelKey: currentKey,
       providersOrder: settings.providersOrder,
       limitProviderKey: widget.limitProviderKey,
+      disableResolverPlatformLogging: false,
     );
     // Synchronous processing is fast enough here
     final result = _processModelsInBackground(data);
@@ -1497,11 +1429,20 @@ class _DesktopModelSelectDialogBodyState extends State<_DesktopModelSelectDialog
     }
   }
 
-  Widget _desktopModelTile(BuildContext context, _ModelItem m, {bool showProviderLabel = false}) {
+  Widget _desktopModelTile(
+    BuildContext context,
+    _ModelItem m, {
+    bool showProviderLabel = false,
+  }) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-    final bg = m.selected ? (isDark ? cs.primary.withOpacity(0.12) : cs.primary.withOpacity(0.08)) : cs.surface;
+
+    final bg = m.selected
+        ? (isDark
+            ? cs.primary.withOpacity(0.12)
+            : cs.primary.withOpacity(0.08))
+        : cs.surface;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -1510,11 +1451,20 @@ class _DesktopModelSelectDialogBodyState extends State<_DesktopModelSelectDialog
         borderRadius: BorderRadius.circular(14),
         pressedBlendStrength: 0.10,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        onTap: () => Navigator.of(context).pop(ModelSelection(m.providerKey, m.id)),
+        onTap: () => Navigator.of(context).pop(
+          ModelSelection(m.providerKey, m.id),
+        ),
         child: Row(
           children: [
-            _BrandAvatar(name: m.id, assetOverride: m.asset, size: 18),
+            // Avatar
+            _BrandAvatar(
+              name: m.id,
+              assetOverride: m.asset,
+              size: 18,
+            ),
             const SizedBox(width: 6),
+
+            // Name + Provider
             Expanded(
               child: Text.rich(
                 TextSpan(
@@ -1522,7 +1472,13 @@ class _DesktopModelSelectDialogBodyState extends State<_DesktopModelSelectDialog
                   style: const TextStyle(fontSize: 12.5),
                   children: [
                     if (showProviderLabel)
-                      TextSpan(text: ' | ${m.providerName}', style: TextStyle(fontSize: 11.5, color: cs.onSurface.withOpacity(0.6))),
+                      TextSpan(
+                        text: ' | ${m.providerName}',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: cs.onSurface.withOpacity(0.6),
+                        ),
+                      ),
                   ],
                 ),
                 maxLines: 1,
@@ -1530,60 +1486,48 @@ class _DesktopModelSelectDialogBodyState extends State<_DesktopModelSelectDialog
               ),
             ),
             const SizedBox(width: 6),
-            Row(children: _buildDesktopCapsules(context, m.info).map((w) => Padding(padding: const EdgeInsets.only(left: 4), child: w)).toList()),
+
+            // Capability Capsules
+            ModelCapsulesRow(
+              model: m.info,
+              pillPadding:
+                  const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              bgOpacityDark: 0.18,
+              bgOpacityLight: 0.14,
+              borderOpacity: 0.22,
+              itemSpacing: 4,
+            ),
             const SizedBox(width: 4),
-            Builder(builder: (context) {
-              final pinnedNow = context.select<SettingsProvider, bool>((s) => s.isModelPinned(m.providerKey, m.id));
-              final icon = pinnedNow ? Icons.favorite : Icons.favorite_border;
-              return Tooltip(
-                message: l10n.modelSelectSheetFavoriteTooltip,
-                child: IosIconButton(
-                  icon: icon,
-                  size: 16,
-                  color: cs.primary,
-                  onTap: () => context.read<SettingsProvider>().togglePinModel(m.providerKey, m.id),
-                  padding: const EdgeInsets.all(3),
-                  minSize: 26,
-                ),
-              );
-            }),
+
+            // Favorite Toggle
+            Builder(
+              builder: (context) {
+                final pinnedNow = context.select<SettingsProvider, bool>(
+                  (s) => s.isModelPinned(m.providerKey, m.id),
+                );
+                final icon =
+                    pinnedNow ? Icons.favorite : Icons.favorite_border;
+
+                return Tooltip(
+                  message: l10n.modelSelectSheetFavoriteTooltip,
+                  child: IosIconButton(
+                    icon: icon,
+                    size: 16,
+                    color: cs.primary,
+                    onTap: () => context.read<SettingsProvider>().togglePinModel(
+                          m.providerKey,
+                          m.id,
+                        ),
+                    padding: const EdgeInsets.all(3),
+                    minSize: 26,
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
     );
-  }
-
-  List<Widget> _buildDesktopCapsules(BuildContext context, ModelInfo info) {
-    final cs = Theme.of(context).colorScheme;
-    final caps = <Widget>[];
-    Widget pillCapsule(Widget icon, Color color) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final bg = isDark ? color.withOpacity(0.18) : color.withOpacity(0.14);
-      final bd = color.withOpacity(0.22);
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: bd, width: 0.5),
-        ),
-        child: icon,
-      );
-    }
-    if (info.input.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(Lucide.Eye, size: 11, color: cs.secondary), cs.secondary));
-    }
-    if (info.output.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(Lucide.Image, size: 11, color: cs.tertiary), cs.tertiary));
-    }
-    for (final ab in info.abilities) {
-      if (ab == ModelAbility.tool) {
-        caps.add(pillCapsule(Icon(Lucide.Hammer, size: 11, color: cs.primary), cs.primary));
-      } else if (ab == ModelAbility.reasoning) {
-        caps.add(pillCapsule(SvgPicture.asset('assets/icons/deepthink.svg', width: 11, height: 11, colorFilter: ColorFilter.mode(cs.secondary, BlendMode.srcIn)), cs.secondary));
-      }
-    }
-    return caps;
   }
 
   Widget _favoritesHeader(BuildContext context, String title) {
