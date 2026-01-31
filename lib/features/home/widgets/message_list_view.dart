@@ -295,6 +295,8 @@ class MessageListView extends StatelessWidget {
                 padding: const EdgeInsets.only(left: 10, right: 6),
                 child: IosCheckbox(
                   value: selectedItems.contains(message.id),
+                  size: 20,
+                  hitTestSize: 28,
                   onChanged: (v) {
                     onToggleSelection?.call(message.id, v);
                   },
