@@ -904,6 +904,56 @@ class ChatApiService {
     return out ?? messages;
   }
 
+  // Build a follow-up transcript for OpenAI-style Chat Completions tool-calls.
+  //
+  // Important: tool messages must preserve `tool_call_id`, and assistant messages must
+  // preserve `tool_calls`, otherwise OpenRouter->Anthropic translation will fail with
+  // `tool_result.tool_use_id: Field required` on subsequent tool rounds.
+  static Map<String, dynamic> _copyChatCompletionMessage(Map<String, dynamic> m) {
+    final role = (m['role'] ?? 'user').toString();
+    final out = <String, dynamic>{
+      'role': role,
+      'content': m.containsKey('content') ? (m['content'] ?? '') : '',
+    };
+
+    // Preserve optional name (some providers support it on non-tool roles).
+    final name = m['name'];
+    if (role != 'tool' && name != null && name.toString().isNotEmpty) {
+      out['name'] = name;
+    }
+
+    // Preserve assistant tool_calls + vendor reasoning echoes (when present).
+    if (role == 'assistant') {
+      final toolCalls = m['tool_calls'];
+      if (toolCalls is List && toolCalls.isNotEmpty) {
+        out['tool_calls'] = toolCalls;
+      }
+      final functionCall = m['function_call'];
+      if (functionCall != null) {
+        out['function_call'] = functionCall;
+      }
+      if (m['reasoning_content'] != null) {
+        out['reasoning_content'] = m['reasoning_content'];
+      }
+      if (m['reasoning_details'] != null) {
+        out['reasoning_details'] = m['reasoning_details'];
+      }
+    }
+
+    // Preserve tool linkage fields.
+    if (role == 'tool') {
+      final toolCallId = m['tool_call_id'];
+      if (toolCallId != null && toolCallId.toString().isNotEmpty) {
+        out['tool_call_id'] = toolCallId;
+      }
+      if (name != null && name.toString().isNotEmpty) {
+        out['name'] = name;
+      }
+    }
+
+    return out;
+  }
+
   static bool _isOff(int? budget) => (budget != null && budget != -1 && budget < 1024);
   static String _effortForBudget(int? budget) {
     if (budget == null || budget == -1) return 'auto';
@@ -1694,7 +1744,7 @@ class ChatApiService {
             req.headers.addAll(headers2);
             final next = <Map<String, dynamic>>[];
             for (final m in messages) {
-              next.add({'role': m['role'] ?? 'user', 'content': m['content'] ?? ''});
+              next.add(_copyChatCompletionMessage(m));
             }
             final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
             if (needsReasoningEcho) {
@@ -1834,7 +1884,7 @@ class ChatApiService {
             // Build follow-up messages
             final mm2 = <Map<String, dynamic>>[];
             for (final m in messages) {
-              mm2.add({'role': m['role'] ?? 'user', 'content': m['content'] ?? ''});
+              mm2.add(_copyChatCompletionMessage(m));
             }
             final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
             if (needsReasoningEcho) {
@@ -2838,7 +2888,7 @@ class ChatApiService {
             // Build follow-up messages
             final mm2 = <Map<String, dynamic>>[];
             for (final m in messages) {
-              mm2.add({'role': m['role'] ?? 'user', 'content': m['content'] ?? ''});
+              mm2.add(_copyChatCompletionMessage(m));
             }
             final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
             if (needsReasoningEcho) {
@@ -3238,7 +3288,7 @@ class ChatApiService {
                 // Build follow-up messages
                 final mm2 = <Map<String, dynamic>>[];
                 for (final m in messages) {
-                  mm2.add({'role': m['role'] ?? 'user', 'content': m['content'] ?? ''});
+                  mm2.add(_copyChatCompletionMessage(m));
                 }
                 final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
                 if (needsReasoningEcho) {
@@ -3629,7 +3679,7 @@ class ChatApiService {
             // Follow-up request with assistant tool_calls + tool messages
             final mm2 = <Map<String, dynamic>>[];
             for (final m in messages) {
-              mm2.add({'role': m['role'] ?? 'user', 'content': m['content'] ?? ''});
+              mm2.add(_copyChatCompletionMessage(m));
             }
             final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
             if (needsReasoningEcho) {
