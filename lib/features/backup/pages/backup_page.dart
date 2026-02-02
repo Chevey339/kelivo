@@ -17,6 +17,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
+import '../../../utils/platform_utils.dart';
 
 // File size formatter (B, KB, MB, GB)
 String _fmtBytes(int bytes) {
@@ -500,7 +501,10 @@ class _BackupPageState extends State<BackupPage> {
                                     builder: (dctx) => AlertDialog(
                                       title: Text(l10n.backupPageRestartRequired),
                                       content: Text(l10n.backupPageRestartContent),
-                                      actions: [TextButton(onPressed: () => Navigator.of(dctx).pop(), child: Text(l10n.backupPageOK))],
+                                      actions: [TextButton(onPressed: () async {
+                                        Navigator.of(dctx).pop();
+                                        PlatformUtils.restartApp();
+                                      }, child: Text(l10n.backupPageOK))],
                                     ),
                                   );
                                 },
@@ -521,12 +525,12 @@ class _BackupPageState extends State<BackupPage> {
                         },
                         onRestore: (item) async {
                           Navigator.of(ctx).pop();
-                          
+
                           if (!mounted) return;
                           final mode = await _chooseImportModeDialog(context);
-                          
+
                           if (mode == null) return;
-                          
+
                           await _runWithImportingOverlay(context, () => vm.restoreFromItem(item, mode: mode));
                           if (!mounted) return;
                           await showDialog(
@@ -535,7 +539,10 @@ class _BackupPageState extends State<BackupPage> {
                               title: Text(l10n.backupPageRestartRequired),
                               content: Text(l10n.backupPageRestartContent),
                               actions: [
-                                TextButton(onPressed: () => Navigator.of(dctx).pop(), child: Text(l10n.backupPageOK)),
+                                TextButton(onPressed: () async {
+                                  Navigator.of(dctx).pop();
+                                  PlatformUtils.restartApp();
+                                }, child: Text(l10n.backupPageOK)),
                               ],
                             ),
                           );
@@ -626,7 +633,10 @@ class _BackupPageState extends State<BackupPage> {
                             ),
                             actions: [
                               TextButton(
-                                onPressed: () => Navigator.of(dctx).pop(),
+                                onPressed: () async {
+                                  Navigator.of(dctx).pop();
+                                  PlatformUtils.restartApp();
+                                },
                                 child: Text(l10n.backupPageOK),
                               ),
                             ],
@@ -683,7 +693,10 @@ class _BackupPageState extends State<BackupPage> {
                             ),
                             actions: [
                               TextButton(
-                                onPressed: () => Navigator.of(dctx).pop(),
+                                onPressed: () async {
+                                  Navigator.of(dctx).pop();
+                                  PlatformUtils.restartApp();
+                                },
                                 child: Text(l10n.backupPageOK),
                               ),
                             ],
@@ -740,7 +753,10 @@ class _BackupPageState extends State<BackupPage> {
       builder: (dctx) => AlertDialog(
         title: Text(l10n.backupPageRestartRequired),
         content: Text(l10n.backupPageRestartContent),
-        actions: [TextButton(onPressed: () => Navigator.of(dctx).pop(), child: Text(l10n.backupPageOK))],
+        actions: [TextButton(onPressed: () async {
+          Navigator.of(dctx).pop();
+          PlatformUtils.restartApp();
+        }, child: Text(l10n.backupPageOK))],
       ),
     );
   }
