@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/models/instruction_injection.dart';
+import '../core/providers/instruction_injection_group_provider.dart';
 import '../core/providers/instruction_injection_provider.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
@@ -15,7 +16,7 @@ Future<void> showDesktopInstructionInjectionPopover(
   String? assistantId,
 }) async {
   if (items.isEmpty) return;
-  final overlay = Overlay.of(context);
+  final overlay = Overlay.maybeOf(context);
   if (overlay == null) return;
   final keyContext = anchorKey.currentContext;
   if (keyContext == null) return;
@@ -24,7 +25,12 @@ Future<void> showDesktopInstructionInjectionPopover(
   if (box == null) return;
   final offset = box.localToGlobal(Offset.zero);
   final size = box.size;
-  final anchorRect = Rect.fromLTWH(offset.dx, offset.dy, size.width, size.height);
+  final anchorRect = Rect.fromLTWH(
+    offset.dx,
+    offset.dy,
+    size.width,
+    size.height,
+  );
 
   late OverlayEntry entry;
   entry = OverlayEntry(
@@ -59,10 +65,12 @@ class _InstructionInjectionPopover extends StatefulWidget {
   final VoidCallback onClose;
 
   @override
-  State<_InstructionInjectionPopover> createState() => _InstructionInjectionPopoverState();
+  State<_InstructionInjectionPopover> createState() =>
+      _InstructionInjectionPopoverState();
 }
 
-class _InstructionInjectionPopoverState extends State<_InstructionInjectionPopover>
+class _InstructionInjectionPopoverState
+    extends State<_InstructionInjectionPopover>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _fadeIn;
@@ -72,7 +80,10 @@ class _InstructionInjectionPopoverState extends State<_InstructionInjectionPopov
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 260));
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    );
     _fadeIn = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -104,8 +115,11 @@ class _InstructionInjectionPopoverState extends State<_InstructionInjectionPopov
     final screen = MediaQuery.of(context).size;
     // Match search popover width behavior
     final width = (widget.anchorWidth - 16).clamp(260.0, 720.0);
-    final left = (widget.anchorRect.left + (widget.anchorRect.width - width) / 2)
-        .clamp(8.0, screen.width - width - 8.0);
+    final left =
+        (widget.anchorRect.left + (widget.anchorRect.width - width) / 2).clamp(
+          8.0,
+          screen.width - width - 8.0,
+        );
     final clipHeight = widget.anchorRect.top.clamp(0.0, screen.height);
 
     return Stack(
@@ -135,7 +149,9 @@ class _InstructionInjectionPopoverState extends State<_InstructionInjectionPopov
                       curve: Curves.easeOutCubic,
                       offset: _offset,
                       child: _GlassPanel(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(14),
+                        ),
                         child: _InstructionInjectionList(
                           items: widget.items,
                           assistantId: widget.assistantId,
@@ -168,17 +184,25 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: (isDark ? Colors.black : Colors.white).withOpacity(isDark ? 0.28 : 0.56),
+            color: (isDark ? Colors.black : Colors.white).withOpacity(
+              isDark ? 0.28 : 0.56,
+            ),
             border: Border(
-              top: BorderSide(color: Colors.white.withOpacity(isDark ? 0.06 : 0.18), width: 0.7),
-              left: BorderSide(color: Colors.white.withOpacity(isDark ? 0.04 : 0.12), width: 0.6),
-              right: BorderSide(color: Colors.white.withOpacity(isDark ? 0.04 : 0.12), width: 0.6),
+              top: BorderSide(
+                color: Colors.white.withOpacity(isDark ? 0.06 : 0.18),
+                width: 0.7,
+              ),
+              left: BorderSide(
+                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                width: 0.6,
+              ),
+              right: BorderSide(
+                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                width: 0.6,
+              ),
             ),
           ),
-          child: Material(
-            type: MaterialType.transparency,
-            child: child,
-          ),
+          child: Material(type: MaterialType.transparency, child: child),
         ),
       ),
     );
@@ -226,7 +250,24 @@ class _InstructionInjectionListInner extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final provider = context.watch<InstructionInjectionProvider>();
+    final groupUi = context.watch<InstructionInjectionGroupProvider>();
     final selected = provider.activeIdsFor(assistantId).toSet();
+
+    final Map<String, List<InstructionInjection>> grouped =
+        <String, List<InstructionInjection>>{};
+    for (final item in items) {
+      final g = item.group.trim();
+      (grouped[g] ??= <InstructionInjection>[]).add(item);
+    }
+    final groupNames = grouped.keys.toList()
+      ..sort((a, b) {
+        final aa = a.trim();
+        final bb = b.trim();
+        if (aa.isEmpty && bb.isNotEmpty) return -1;
+        if (aa.isNotEmpty && bb.isEmpty) return 1;
+        return aa.toLowerCase().compareTo(bb.toLowerCase());
+      });
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
       child: Column(
@@ -239,35 +280,145 @@ class _InstructionInjectionListInner extends StatelessWidget {
               label: l10n.homePageCancel,
               onTap: () async {
                 try {
-                  await context.read<InstructionInjectionProvider>().setActiveIds(const <String>[], assistantId: assistantId);
+                  await context
+                      .read<InstructionInjectionProvider>()
+                      .setActiveIds(const <String>[], assistantId: assistantId);
                 } catch (_) {}
                 onClose();
               },
             ),
           ),
-          for (final p in items)
+          for (final groupName in groupNames) ...[
             Padding(
-              padding: const EdgeInsets.only(bottom: 1),
-              child: _RowItem(
-                title: p.title.trim().isEmpty ? l10n.instructionInjectionDefaultTitle : p.title,
-                preview: p.prompt,
-                active: selected.contains(p.id),
-                onTap: () async {
-                  try {
-                    final prov = context.read<InstructionInjectionProvider>();
-                    await prov.toggleActiveId(p.id, assistantId: assistantId);
-                  } catch (_) {}
-                },
+              padding: const EdgeInsets.only(top: 6, bottom: 2),
+              child: _GroupHeaderRow(
+                title: groupName.trim().isEmpty
+                    ? l10n.instructionInjectionUngroupedGroup
+                    : groupName.trim(),
+                collapsed: groupUi.isCollapsed(groupName),
+                onTap: () => context
+                    .read<InstructionInjectionGroupProvider>()
+                    .toggleCollapsed(groupName),
               ),
             ),
+            if (!groupUi.isCollapsed(groupName))
+              for (final p
+                  in grouped[groupName] ?? const <InstructionInjection>[])
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 1),
+                  child: _RowItem(
+                    title: p.title.trim().isEmpty
+                        ? l10n.instructionInjectionDefaultTitle
+                        : p.title,
+                    preview: p.prompt,
+                    active: selected.contains(p.id),
+                    onTap: () async {
+                      try {
+                        final prov = context
+                            .read<InstructionInjectionProvider>();
+                        await prov.toggleActiveId(
+                          p.id,
+                          assistantId: assistantId,
+                        );
+                      } catch (_) {}
+                    },
+                  ),
+                ),
+          ],
         ],
       ),
     );
   }
 }
 
+class _GroupHeaderRow extends StatefulWidget {
+  const _GroupHeaderRow({
+    required this.title,
+    required this.collapsed,
+    required this.onTap,
+  });
+
+  final String title;
+  final bool collapsed;
+  final VoidCallback onTap;
+
+  @override
+  State<_GroupHeaderRow> createState() => _GroupHeaderRowState();
+}
+
+class _GroupHeaderRowState extends State<_GroupHeaderRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(
+      isDark ? 0.10 : 0.06,
+    );
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: _hovered ? hoverBg : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: Center(
+                  child: AnimatedRotation(
+                    turns: widget.collapsed ? 0.0 : 0.25, // right -> down
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    child: Icon(
+                      Lucide.ChevronRight,
+                      size: 16,
+                      color: cs.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface.withOpacity(0.85),
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CancelRow extends StatefulWidget {
-  const _CancelRow({required this.leading, required this.label, required this.onTap});
+  const _CancelRow({
+    required this.leading,
+    required this.label,
+    required this.onTap,
+  });
   final Widget leading;
   final String label;
   final VoidCallback onTap;
@@ -284,7 +435,9 @@ class _CancelRowState extends State<_CancelRow> {
     final cs = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(isDark ? 0.10 : 0.06);
+    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(
+      isDark ? 0.10 : 0.06,
+    );
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -302,7 +455,11 @@ class _CancelRowState extends State<_CancelRow> {
           ),
           child: Row(
             children: [
-              SizedBox(width: 22, height: 22, child: Center(child: widget.leading)),
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: Center(child: widget.leading),
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -350,7 +507,9 @@ class _RowItemState extends State<_RowItem> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final baseBg = Colors.transparent;
-    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(isDark ? 0.12 : 0.10);
+    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(
+      isDark ? 0.12 : 0.10,
+    );
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -413,11 +572,7 @@ class _RowItemState extends State<_RowItem> {
                     ),
                     if (widget.active) ...[
                       const SizedBox(width: 6),
-                      Icon(
-                        Lucide.Check,
-                        size: 14,
-                        color: cs.primary,
-                      ),
+                      Icon(Lucide.Check, size: 14, color: cs.primary),
                     ],
                   ],
                 ),

@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../core/models/instruction_injection.dart';
+import '../../core/providers/instruction_injection_group_provider.dart';
 import '../../core/providers/instruction_injection_provider.dart';
 import '../../shared/widgets/snackbar.dart';
 
@@ -16,10 +17,12 @@ class DesktopInstructionInjectionPane extends StatefulWidget {
   const DesktopInstructionInjectionPane({super.key});
 
   @override
-  State<DesktopInstructionInjectionPane> createState() => _DesktopInstructionInjectionPaneState();
+  State<DesktopInstructionInjectionPane> createState() =>
+      _DesktopInstructionInjectionPaneState();
 }
 
-class _DesktopInstructionInjectionPaneState extends State<DesktopInstructionInjectionPane> {
+class _DesktopInstructionInjectionPaneState
+    extends State<DesktopInstructionInjectionPane> {
   static const List<String> _textExtensions = <String>[
     'txt',
     'json',
@@ -56,7 +59,23 @@ class _DesktopInstructionInjectionPaneState extends State<DesktopInstructionInje
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final provider = context.watch<InstructionInjectionProvider>();
+    final groupUi = context.watch<InstructionInjectionGroupProvider>();
     final items = provider.items;
+
+    final Map<String, List<InstructionInjection>> grouped =
+        <String, List<InstructionInjection>>{};
+    for (final item in items) {
+      final g = item.group.trim();
+      (grouped[g] ??= <InstructionInjection>[]).add(item);
+    }
+    final groupNames = grouped.keys.toList()
+      ..sort((a, b) {
+        final aa = a.trim();
+        final bb = b.trim();
+        if (aa.isEmpty && bb.isNotEmpty) return -1;
+        if (aa.isNotEmpty && bb.isEmpty) return 1;
+        return aa.toLowerCase().compareTo(bb.toLowerCase());
+      });
 
     return Container(
       alignment: Alignment.topCenter,
@@ -79,7 +98,7 @@ class _DesktopInstructionInjectionPaneState extends State<DesktopInstructionInje
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w400,
-                          color: cs.onSurface.withOpacity(0.9),
+                              color: cs.onSurface.withOpacity(0.9),
                             ),
                           ),
                         ),
@@ -105,14 +124,21 @@ class _DesktopInstructionInjectionPaneState extends State<DesktopInstructionInje
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 32),
                     child: Center(
-                          child: Column(
+                      child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(lucide.Lucide.Layers, size: 56, color: cs.onSurface.withOpacity(0.28)),
+                          Icon(
+                            lucide.Lucide.Layers,
+                            size: 56,
+                            color: cs.onSurface.withOpacity(0.28),
+                          ),
                           const SizedBox(height: 12),
                           Text(
                             l10n.instructionInjectionEmptyMessage,
-                            style: TextStyle(color: cs.onSurface.withOpacity(0.65), fontSize: 14),
+                            style: TextStyle(
+                              color: cs.onSurface.withOpacity(0.65),
+                              fontSize: 14,
+                            ),
                           ),
                         ],
                       ),
@@ -120,38 +146,64 @@ class _DesktopInstructionInjectionPaneState extends State<DesktopInstructionInje
                   ),
                 )
               else
-                SliverReorderableList(
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    final displayTitle = item.title.trim().isEmpty ? l10n.instructionInjectionDefaultTitle : item.title;
-                    return KeyedSubtree(
-                      key: ValueKey('desktop-instruction-injection-${item.id}'),
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: ReorderableDragStartListener(
-                          index: index,
-                          child: _InstructionInjectionCard(
-                            title: displayTitle,
-                            prompt: item.prompt,
-                            onTap: () => _showAddEditDialog(context, item: item),
-                            onEdit: () => _showAddEditDialog(context, item: item),
-                            onDelete: () async {
-                              await context.read<InstructionInjectionProvider>().delete(item.id);
-                            },
+                for (final groupName in groupNames) ...[
+                  SliverToBoxAdapter(
+                    child: _GroupHeader(
+                      title: groupName.trim().isEmpty
+                          ? l10n.instructionInjectionUngroupedGroup
+                          : groupName.trim(),
+                      collapsed: groupUi.isCollapsed(groupName),
+                      onToggle: () => context
+                          .read<InstructionInjectionGroupProvider>()
+                          .toggleCollapsed(groupName),
+                    ),
+                  ),
+                  if (!groupUi.isCollapsed(groupName))
+                    SliverReorderableList(
+                      itemCount: grouped[groupName]?.length ?? 0,
+                      itemBuilder: (context, index) {
+                        final item = grouped[groupName]![index];
+                        final displayTitle = item.title.trim().isEmpty
+                            ? l10n.instructionInjectionDefaultTitle
+                            : item.title;
+                        return KeyedSubtree(
+                          key: ValueKey(
+                            'desktop-instruction-injection-${item.id}',
                           ),
-                        ),
-                      ),
-                    );
-                  },
-                  onReorder: (oldIndex, newIndex) async {
-                    if (newIndex > oldIndex) newIndex -= 1;
-                    await context.read<InstructionInjectionProvider>().reorder(
-                          oldIndex: oldIndex,
-                          newIndex: newIndex,
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: ReorderableDragStartListener(
+                              index: index,
+                              child: _InstructionInjectionCard(
+                                title: displayTitle,
+                                prompt: item.prompt,
+                                onTap: () =>
+                                    _showAddEditDialog(context, item: item),
+                                onEdit: () =>
+                                    _showAddEditDialog(context, item: item),
+                                onDelete: () async {
+                                  await context
+                                      .read<InstructionInjectionProvider>()
+                                      .delete(item.id);
+                                },
+                              ),
+                            ),
+                          ),
                         );
-                  },
-                ),
+                      },
+                      onReorder: (oldIndex, newIndex) async {
+                        if (newIndex > oldIndex) newIndex -= 1;
+                        await context
+                            .read<InstructionInjectionProvider>()
+                            .reorderWithinGroup(
+                              group: groupName,
+                              oldIndex: oldIndex,
+                              newIndex: newIndex,
+                            );
+                      },
+                    ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 4)),
+                ],
             ],
           ),
         ),
@@ -159,18 +211,25 @@ class _DesktopInstructionInjectionPaneState extends State<DesktopInstructionInje
     );
   }
 
-  Future<void> _showAddEditDialog(BuildContext context, {InstructionInjection? item}) async {
+  Future<void> _showAddEditDialog(
+    BuildContext context, {
+    InstructionInjection? item,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
     final result = await showDialog<Map<String, String>?>(
       context: context,
       builder: (ctx) => _InstructionInjectionEditDialog(
-        title: item == null ? l10n.instructionInjectionAddTitle : l10n.instructionInjectionEditTitle,
+        title: item == null
+            ? l10n.instructionInjectionAddTitle
+            : l10n.instructionInjectionEditTitle,
         initTitle: item?.title ?? '',
+        initGroup: item?.group ?? '',
         initPrompt: item?.prompt ?? '',
       ),
     );
     if (result == null) return;
     final title = (result['title'] ?? '').trim();
+    final group = (result['group'] ?? '').trim();
     final prompt = (result['prompt'] ?? '').trim();
     if (title.isEmpty || prompt.isEmpty) return;
 
@@ -180,10 +239,13 @@ class _DesktopInstructionInjectionPaneState extends State<DesktopInstructionInje
         id: const Uuid().v4(),
         title: title,
         prompt: prompt,
+        group: group,
       );
       await provider.add(newItem);
     } else {
-      await provider.update(item.copyWith(title: title, prompt: prompt));
+      await provider.update(
+        item.copyWith(title: title, group: group, prompt: prompt),
+      );
     }
   }
 
@@ -247,7 +309,9 @@ class _DesktopInstructionInjectionPaneState extends State<DesktopInstructionInje
     showAppSnackBar(
       context,
       message: l10n.instructionInjectionImportSuccess(imports.length),
-      type: imports.isEmpty ? NotificationType.warning : NotificationType.success,
+      type: imports.isEmpty
+          ? NotificationType.warning
+          : NotificationType.success,
     );
   }
 }
@@ -267,7 +331,8 @@ class _InstructionInjectionCard extends StatefulWidget {
   final VoidCallback onDelete;
 
   @override
-  State<_InstructionInjectionCard> createState() => _InstructionInjectionCardState();
+  State<_InstructionInjectionCard> createState() =>
+      _InstructionInjectionCardState();
 }
 
 class _InstructionInjectionCardState extends State<_InstructionInjectionCard> {
@@ -310,20 +375,29 @@ class _InstructionInjectionCardState extends State<_InstructionInjectionCard> {
                       widget.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       widget.prompt,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.75)),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withOpacity(0.75),
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              _SmallIconBtn(icon: lucide.Lucide.Settings2, onTap: widget.onEdit),
+              _SmallIconBtn(
+                icon: lucide.Lucide.Settings2,
+                onTap: widget.onEdit,
+              ),
               const SizedBox(width: 6),
               _SmallIconBtn(icon: lucide.Lucide.Trash2, onTap: widget.onDelete),
             ],
@@ -338,30 +412,37 @@ class _InstructionInjectionEditDialog extends StatefulWidget {
   const _InstructionInjectionEditDialog({
     required this.title,
     required this.initTitle,
+    required this.initGroup,
     required this.initPrompt,
   });
   final String title;
   final String initTitle;
+  final String initGroup;
   final String initPrompt;
 
   @override
-  State<_InstructionInjectionEditDialog> createState() => _InstructionInjectionEditDialogState();
+  State<_InstructionInjectionEditDialog> createState() =>
+      _InstructionInjectionEditDialogState();
 }
 
-class _InstructionInjectionEditDialogState extends State<_InstructionInjectionEditDialog> {
+class _InstructionInjectionEditDialogState
+    extends State<_InstructionInjectionEditDialog> {
   late final TextEditingController _titleController;
+  late final TextEditingController _groupController;
   late final TextEditingController _promptController;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.initTitle);
+    _groupController = TextEditingController(text: widget.initGroup);
     _promptController = TextEditingController(text: widget.initPrompt);
   }
 
   @override
   void dispose() {
     _titleController.dispose();
+    _groupController.dispose();
     _promptController.dispose();
     super.dispose();
   }
@@ -389,22 +470,40 @@ class _InstructionInjectionEditDialogState extends State<_InstructionInjectionEd
                       Expanded(
                         child: Text(
                           widget.title,
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                      _SmallIconBtn(icon: lucide.Lucide.X, onTap: () => Navigator.of(context).maybePop()),
+                      _SmallIconBtn(
+                        icon: lucide.Lucide.X,
+                        onTap: () => Navigator.of(context).maybePop(),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _titleController,
-                    decoration: _deskInputDecoration(context).copyWith(hintText: l10n.instructionInjectionNameLabel),
+                    decoration: _deskInputDecoration(
+                      context,
+                    ).copyWith(hintText: l10n.instructionInjectionNameLabel),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _groupController,
+                    decoration: _deskInputDecoration(context).copyWith(
+                      hintText: l10n.instructionInjectionGroupLabel,
+                      helperText: l10n.instructionInjectionGroupHint,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _promptController,
                     maxLines: 8,
-                    decoration: _deskInputDecoration(context).copyWith(hintText: l10n.instructionInjectionPromptLabel),
+                    decoration: _deskInputDecoration(
+                      context,
+                    ).copyWith(hintText: l10n.instructionInjectionPromptLabel),
                   ),
                 ],
               ),
@@ -419,6 +518,7 @@ class _InstructionInjectionEditDialogState extends State<_InstructionInjectionEd
                 onTap: () {
                   Navigator.of(context).pop({
                     'title': _titleController.text,
+                    'group': _groupController.text,
                     'prompt': _promptController.text,
                   });
                 },
@@ -448,7 +548,11 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = _hover ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05)) : Colors.transparent;
+    final bg = _hover
+        ? (isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.05))
+        : Colors.transparent;
     final btn = MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -458,7 +562,10 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
         child: Container(
           width: 28,
           height: 28,
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(8),
+          ),
           alignment: Alignment.center,
           child: Icon(widget.icon, size: 18, color: cs.onSurface),
         ),
@@ -470,7 +577,12 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
 }
 
 class _DeskIosButton extends StatefulWidget {
-  const _DeskIosButton({required this.label, required this.filled, required this.dense, required this.onTap});
+  const _DeskIosButton({
+    required this.label,
+    required this.filled,
+    required this.dense,
+    required this.onTap,
+  });
   final String label;
   final bool filled;
   final bool dense;
@@ -488,11 +600,19 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = widget.filled ? cs.onPrimary : cs.onSurface.withOpacity(0.9);
+    final textColor = widget.filled
+        ? cs.onPrimary
+        : cs.onSurface.withOpacity(0.9);
     final bg = widget.filled
         ? (_hover ? cs.primary.withOpacity(0.92) : cs.primary)
-        : (_hover ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05)) : Colors.transparent);
-    final borderColor = widget.filled ? Colors.transparent : cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18);
+        : (_hover
+              ? (isDark
+                    ? Colors.white.withOpacity(0.06)
+                    : Colors.black.withOpacity(0.05))
+              : Colors.transparent);
+    final borderColor = widget.filled
+        ? Colors.transparent
+        : cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -508,7 +628,10 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
           duration: const Duration(milliseconds: 110),
           curve: Curves.easeOutCubic,
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: widget.dense ? 8 : 12, horizontal: 12),
+            padding: EdgeInsets.symmetric(
+              vertical: widget.dense ? 8 : 12,
+              horizontal: 12,
+            ),
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: bg,
@@ -539,11 +662,17 @@ InputDecoration _deskInputDecoration(BuildContext context) {
     fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.2), width: 0.8),
+      borderSide: BorderSide(
+        color: cs.outlineVariant.withOpacity(0.2),
+        width: 0.8,
+      ),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.2), width: 0.8),
+      borderSide: BorderSide(
+        color: cs.outlineVariant.withOpacity(0.2),
+        width: 0.8,
+      ),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
@@ -551,4 +680,86 @@ InputDecoration _deskInputDecoration(BuildContext context) {
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
   );
+}
+
+class _GroupHeader extends StatefulWidget {
+  const _GroupHeader({
+    required this.title,
+    required this.collapsed,
+    required this.onToggle,
+  });
+
+  final String title;
+  final bool collapsed;
+  final VoidCallback onToggle;
+
+  @override
+  State<_GroupHeader> createState() => _GroupHeaderState();
+}
+
+class _GroupHeaderState extends State<_GroupHeader> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(
+      isDark ? 0.08 : 0.05,
+    );
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onToggle,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(0, 6, 0, 6),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            decoration: BoxDecoration(
+              color: _hover ? hoverBg : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: Center(
+                    child: AnimatedRotation(
+                      turns: widget.collapsed ? 0.0 : 0.25, // right -> down
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      child: Icon(
+                        lucide.Lucide.ChevronRight,
+                        size: 16,
+                        color: cs.onSurface.withOpacity(0.7),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface.withOpacity(0.9),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
