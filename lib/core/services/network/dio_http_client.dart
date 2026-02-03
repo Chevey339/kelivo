@@ -93,6 +93,9 @@ class DioHttpClient extends http.BaseClient {
     final uri = request.url;
     final method = request.method.toUpperCase();
 
+    final reqHeaders = Map<String, String>.from(request.headers);
+    reqHeaders.putIfAbsent('User-Agent', () => 'Kelivo');
+
     List<int> bodyBytes = const <int>[];
     try {
       bodyBytes = await request.finalize().toBytes();
@@ -100,8 +103,8 @@ class DioHttpClient extends http.BaseClient {
 
     if (RequestLogger.enabled) {
       RequestLogger.logLine('[REQ $reqId] $method $uri');
-      if (request.headers.isNotEmpty) {
-        RequestLogger.logLine('[REQ $reqId] headers=${RequestLogger.encodeObject(request.headers)}');
+      if (reqHeaders.isNotEmpty) {
+        RequestLogger.logLine('[REQ $reqId] headers=${RequestLogger.encodeObject(reqHeaders)}');
       }
       if (bodyBytes.isNotEmpty) {
         final decoded = RequestLogger.safeDecodeUtf8(bodyBytes);
@@ -116,7 +119,7 @@ class DioHttpClient extends http.BaseClient {
         data: bodyBytes.isEmpty ? null : bodyBytes,
         options: Options(
           method: method,
-          headers: request.headers,
+          headers: reqHeaders,
           responseType: ResponseType.stream,
           followRedirects: request.followRedirects,
           maxRedirects: request.maxRedirects,
