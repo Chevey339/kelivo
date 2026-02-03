@@ -6,9 +6,13 @@ import '../services/instruction_injection_store.dart';
 class InstructionInjectionProvider with ChangeNotifier {
   List<InstructionInjection> _items = const <InstructionInjection>[];
   bool _initialized = false;
-  Map<String, List<String>> _activeIdsByAssistant = const <String, List<String>>{};
+  Map<String, List<String>> _activeIdsByAssistant =
+      const <String, List<String>>{};
 
-  List<InstructionInjection> get items => List<InstructionInjection>.unmodifiable(_items);
+  String _normGroup(String g) => g.trim();
+
+  List<InstructionInjection> get items =>
+      List<InstructionInjection>.unmodifiable(_items);
   List<String> get activeIds => activeIdsFor(null);
 
   List<String> activeIdsFor(String? assistantId) {
@@ -16,11 +20,14 @@ class InstructionInjectionProvider with ChangeNotifier {
     if (_activeIdsByAssistant.containsKey(key)) {
       return List<String>.unmodifiable(_activeIdsByAssistant[key]!);
     }
-    final fallback = _activeIdsByAssistant[InstructionInjectionStore.assistantKey(null)] ?? const <String>[];
+    final fallback =
+        _activeIdsByAssistant[InstructionInjectionStore.assistantKey(null)] ??
+        const <String>[];
     return List<String>.unmodifiable(fallback);
   }
 
-  bool isActive(String id, {String? assistantId}) => activeIdsFor(assistantId).contains(id);
+  bool isActive(String id, {String? assistantId}) =>
+      activeIdsFor(assistantId).contains(id);
 
   List<InstructionInjection> get actives => activesFor(null);
 
@@ -51,7 +58,8 @@ class InstructionInjectionProvider with ChangeNotifier {
   Future<void> loadAll() async {
     try {
       _items = await InstructionInjectionStore.getAll();
-      _activeIdsByAssistant = await InstructionInjectionStore.getActiveIdsByAssistant();
+      _activeIdsByAssistant =
+          await InstructionInjectionStore.getActiveIdsByAssistant();
       notifyListeners();
     } catch (e) {
       debugPrint('Failed to load instruction injections: $e');
@@ -96,6 +104,45 @@ class InstructionInjectionProvider with ChangeNotifier {
     final list = List<InstructionInjection>.from(_items);
     final item = list.removeAt(oldIndex);
     list.insert(newIndex, item);
+    _items = list;
+    notifyListeners();
+    await InstructionInjectionStore.save(_items);
+  }
+
+  Future<void> reorderWithinGroup({
+    required String group,
+    required int oldIndex,
+    required int newIndex,
+  }) async {
+    if (_items.isEmpty) return;
+
+    final targetGroup = _normGroup(group);
+    final indices = <int>[];
+    for (int i = 0; i < _items.length; i++) {
+      if (_normGroup(_items[i].group) == targetGroup) indices.add(i);
+    }
+    if (indices.isEmpty) return;
+    if (oldIndex < 0 || oldIndex >= indices.length) return;
+    if (newIndex < 0 || newIndex > indices.length) return;
+
+    final globalOld = indices[oldIndex];
+    final list = List<InstructionInjection>.from(_items);
+    final moved = list.removeAt(globalOld);
+
+    // Recompute group indices after removal.
+    final after = <int>[];
+    for (int i = 0; i < list.length; i++) {
+      if (_normGroup(list[i].group) == targetGroup) after.add(i);
+    }
+
+    int insertAt;
+    if (newIndex >= after.length) {
+      insertAt = after.isEmpty ? list.length : after.last + 1;
+    } else {
+      insertAt = after[newIndex];
+    }
+    list.insert(insertAt, moved);
+
     _items = list;
     notifyListeners();
     await InstructionInjectionStore.save(_items);

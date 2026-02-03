@@ -1127,6 +1127,9 @@
   "instructionInjectionEditTitle": "编辑指令注入",
   "instructionInjectionNameLabel": "名称",
   "instructionInjectionPromptLabel": "提示词",
+  "instructionInjectionUngroupedGroup": "未分组",
+  "instructionInjectionGroupLabel": "分组",
+  "instructionInjectionGroupHint": "可选",
   "instructionInjectionImportSuccess": "已导入 {count} 个指令注入",
   "@instructionInjectionImportSuccess": {
     "placeholders": {

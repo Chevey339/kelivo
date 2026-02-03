@@ -10,6 +10,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/models/instruction_injection.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
+import '../../../core/providers/instruction_injection_group_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -18,7 +19,8 @@ class InstructionInjectionPage extends StatefulWidget {
   const InstructionInjectionPage({super.key});
 
   @override
-  State<InstructionInjectionPage> createState() => _InstructionInjectionPageState();
+  State<InstructionInjectionPage> createState() =>
+      _InstructionInjectionPageState();
 }
 
 class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
@@ -63,15 +65,14 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        return _InstructionInjectionEditSheet(
-          item: item,
-        );
+        return _InstructionInjectionEditSheet(item: item);
       },
     );
 
     if (result != null) {
       final title = result['title']?.trim() ?? '';
       final prompt = result['prompt']?.trim() ?? '';
+      final group = result['group']?.trim() ?? '';
       if (title.isEmpty || prompt.isEmpty) return;
 
       final provider = context.read<InstructionInjectionProvider>();
@@ -80,10 +81,13 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
           id: const Uuid().v4(),
           title: title,
           prompt: prompt,
+          group: group,
         );
         await provider.add(newItem);
       } else {
-        await provider.update(item.copyWith(title: title, prompt: prompt));
+        await provider.update(
+          item.copyWith(title: title, prompt: prompt, group: group),
+        );
       }
     }
   }
@@ -152,7 +156,9 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
     showAppSnackBar(
       context,
       message: l10n.instructionInjectionImportSuccess(imports.length),
-      type: imports.isEmpty ? NotificationType.warning : NotificationType.success,
+      type: imports.isEmpty
+          ? NotificationType.warning
+          : NotificationType.success,
     );
   }
 
@@ -163,7 +169,23 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final provider = context.watch<InstructionInjectionProvider>();
+    final groupUi = context.watch<InstructionInjectionGroupProvider>();
     final items = provider.items;
+
+    final Map<String, List<InstructionInjection>> grouped =
+        <String, List<InstructionInjection>>{};
+    for (final item in items) {
+      final g = item.group.trim();
+      (grouped[g] ??= <InstructionInjection>[]).add(item);
+    }
+    final groupNames = grouped.keys.toList()
+      ..sort((a, b) {
+        final aa = a.trim();
+        final bb = b.trim();
+        if (aa.isEmpty && bb.isNotEmpty) return -1;
+        if (aa.isNotEmpty && bb.isEmpty) return 1;
+        return aa.toLowerCase().compareTo(bb.toLowerCase());
+      });
 
     return Scaffold(
       appBar: AppBar(
@@ -220,186 +242,331 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                 ],
               ),
             )
-          : ReorderableListView.builder(
+          : ListView(
               padding: const EdgeInsets.all(16),
-              itemCount: items.length,
-              buildDefaultDragHandles: false,
-              proxyDecorator: (child, index, animation) {
-                return AnimatedBuilder(
-                  animation: animation,
-                  builder: (context, _) {
-                    final t = Curves.easeOut.transform(animation.value);
-                    return Transform.scale(
-                      scale: 0.98 + 0.02 * t,
-                      child: child,
-                    );
-                  },
-                );
-              },
-              onReorder: (oldIndex, newIndex) {
-                if (newIndex > oldIndex) newIndex -= 1;
-                context.read<InstructionInjectionProvider>().reorder(
-                      oldIndex: oldIndex,
-                      newIndex: newIndex,
-                    );
-              },
-              itemBuilder: (context, index) {
-                final item = items[index];
-                final displayTitle = item.title.trim().isEmpty ? l10n.instructionInjectionDefaultTitle : item.title;
-                return KeyedSubtree(
-                  key: ValueKey('reorder-instruction-injection-${item.id}'),
-                  child: ReorderableDelayedDragStartListener(
-                    index: index,
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Slidable(
-                        key: ValueKey(item.id),
-                        endActionPane: ActionPane(
-                          motion: const StretchMotion(),
-                          extentRatio: 0.35,
-                          children: [
-                            CustomSlidableAction(
-                              autoClose: true,
-                              backgroundColor: Colors.transparent,
-                              child: Container(
-                                width: double.infinity,
-                                height: double.infinity,
-                                decoration: BoxDecoration(
-                                  color: isDark ? cs.error.withOpacity(0.22) : cs.error.withOpacity(0.14),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: cs.error.withOpacity(0.35),
-                                  ),
+              children: [
+                for (final groupName in groupNames) ...[
+                  _GroupHeader(
+                    title: groupName.trim().isEmpty
+                        ? l10n.instructionInjectionUngroupedGroup
+                        : groupName.trim(),
+                    collapsed: groupUi.isCollapsed(groupName),
+                    onToggle: () => context
+                        .read<InstructionInjectionGroupProvider>()
+                        .toggleCollapsed(groupName),
+                  ),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeInOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: groupUi.isCollapsed(groupName)
+                        ? const SizedBox.shrink()
+                        : ReorderableListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: grouped[groupName]?.length ?? 0,
+                            buildDefaultDragHandles: false,
+                            proxyDecorator: (child, index, animation) {
+                              return AnimatedBuilder(
+                                animation: animation,
+                                builder: (context, _) {
+                                  final t = Curves.easeOut.transform(
+                                    animation.value,
+                                  );
+                                  return Transform.scale(
+                                    scale: 0.98 + 0.02 * t,
+                                    child: child,
+                                  );
+                                },
+                              );
+                            },
+                            onReorder: (oldIndex, newIndex) {
+                              if (newIndex > oldIndex) newIndex -= 1;
+                              context
+                                  .read<InstructionInjectionProvider>()
+                                  .reorderWithinGroup(
+                                    group: groupName,
+                                    oldIndex: oldIndex,
+                                    newIndex: newIndex,
+                                  );
+                            },
+                            itemBuilder: (context, index) {
+                              final item = grouped[groupName]![index];
+                              final displayTitle = item.title.trim().isEmpty
+                                  ? l10n.instructionInjectionDefaultTitle
+                                  : item.title;
+                              return KeyedSubtree(
+                                key: ValueKey(
+                                  'reorder-instruction-injection-${item.id}',
                                 ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                alignment: Alignment.center,
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Lucide.Trash2,
-                                        color: cs.error,
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        l10n.quickPhraseDeleteButton,
-                                        style: TextStyle(
-                                          color: cs.error,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              onPressed: (_) => _deleteItem(item),
-                            ),
-                          ],
-                        ),
-                        child: _TactileCard(
-                          pressedScale: 0.98,
-                          onTap: () => _showAddEditSheet(item: item),
-                          builder: (pressed, overlay) {
-                            final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
-                            return Container(
-                              decoration: BoxDecoration(
-                                color: Color.alphaBlend(overlay, baseBg),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: cs.outlineVariant.withOpacity(isDark ? 0.1 : 0.08),
-                                  width: 0.6,
-                                ),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(14),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
+                                child: ReorderableDelayedDragStartListener(
+                                  index: index,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Slidable(
+                                      key: ValueKey(item.id),
+                                      endActionPane: ActionPane(
+                                        motion: const StretchMotion(),
+                                        extentRatio: 0.35,
                                         children: [
-                                          Row(
-                                            children: [
-                                              Icon(Lucide.Layers, size: 18, color: cs.primary),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                                child: Text(
-                                                  displayTitle,
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                                          CustomSlidableAction(
+                                            autoClose: true,
+                                            backgroundColor: Colors.transparent,
+                                            child: Container(
+                                              width: double.infinity,
+                                              height: double.infinity,
+                                              decoration: BoxDecoration(
+                                                color: isDark
+                                                    ? cs.error.withOpacity(0.22)
+                                                    : cs.error.withOpacity(
+                                                        0.14,
+                                                      ),
+                                                borderRadius:
+                                                    BorderRadius.circular(14),
+                                                border: Border.all(
+                                                  color: cs.error.withOpacity(
+                                                    0.35,
+                                                  ),
                                                 ),
                                               ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            item.prompt,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8,
+                                                  ),
+                                              alignment: Alignment.center,
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Lucide.Trash2,
+                                                      color: cs.error,
+                                                      size: 18,
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Text(
+                                                      l10n.quickPhraseDeleteButton,
+                                                      style: TextStyle(
+                                                        color: cs.error,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
                                             ),
+                                            onPressed: (_) => _deleteItem(item),
                                           ),
                                         ],
                                       ),
+                                      child: _TactileCard(
+                                        pressedScale: 0.98,
+                                        onTap: () =>
+                                            _showAddEditSheet(item: item),
+                                        builder: (pressed, overlay) {
+                                          final baseBg = isDark
+                                              ? Colors.white10
+                                              : Colors.white.withOpacity(0.96);
+                                          return Container(
+                                            decoration: BoxDecoration(
+                                              color: Color.alphaBlend(
+                                                overlay,
+                                                baseBg,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                              border: Border.all(
+                                                color: cs.outlineVariant
+                                                    .withOpacity(
+                                                      isDark ? 0.1 : 0.08,
+                                                    ),
+                                                width: 0.6,
+                                              ),
+                                            ),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(14),
+                                              child: Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.center,
+                                                children: [
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Row(
+                                                          children: [
+                                                            Icon(
+                                                              Lucide.Layers,
+                                                              size: 18,
+                                                              color: cs.primary,
+                                                            ),
+                                                            const SizedBox(
+                                                              width: 8,
+                                                            ),
+                                                            Expanded(
+                                                              child: Text(
+                                                                displayTitle,
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                style: const TextStyle(
+                                                                  fontSize: 15,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 8,
+                                                        ),
+                                                        Text(
+                                                          item.prompt,
+                                                          maxLines: 2,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          style: TextStyle(
+                                                            fontSize: 13,
+                                                            color:
+                                                                Theme.of(
+                                                                      context,
+                                                                    )
+                                                                    .colorScheme
+                                                                    .onSurface
+                                                                    .withOpacity(
+                                                                      0.7,
+                                                                    ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Icon(
+                                                    Lucide.ChevronRight,
+                                                    size: 16,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurface
+                                                        .withOpacity(0.5),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Icon(
-                                      Lucide.ChevronRight,
-                                      size: 16,
-                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                                    ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+                              );
+                            },
+                          ),
                   ),
-                );
-              },
+                ],
+              ],
             ),
     );
   }
 }
 
-class _InstructionInjectionEditSheet extends StatefulWidget {
-  const _InstructionInjectionEditSheet({
-    required this.item,
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader({
+    required this.title,
+    required this.collapsed,
+    required this.onToggle,
   });
+
+  final String title;
+  final bool collapsed;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textBase = cs.onSurface;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onToggle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: Center(
+                child: AnimatedRotation(
+                  turns: collapsed ? 0.0 : 0.25,
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  child: Icon(
+                    Lucide.ChevronRight,
+                    size: 16,
+                    color: textBase.withOpacity(0.7),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: textBase,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InstructionInjectionEditSheet extends StatefulWidget {
+  const _InstructionInjectionEditSheet({required this.item});
 
   final InstructionInjection? item;
 
   @override
-  State<_InstructionInjectionEditSheet> createState() => _InstructionInjectionEditSheetState();
+  State<_InstructionInjectionEditSheet> createState() =>
+      _InstructionInjectionEditSheetState();
 }
 
-class _InstructionInjectionEditSheetState extends State<_InstructionInjectionEditSheet> {
+class _InstructionInjectionEditSheetState
+    extends State<_InstructionInjectionEditSheet> {
   late final TextEditingController _titleController;
+  late final TextEditingController _groupController;
   late final TextEditingController _promptController;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.item?.title ?? '');
+    _groupController = TextEditingController(text: widget.item?.group ?? '');
     _promptController = TextEditingController(text: widget.item?.prompt ?? '');
   }
 
   @override
   void dispose() {
     _titleController.dispose();
+    _groupController.dispose();
     _promptController.dispose();
     super.dispose();
   }
@@ -436,8 +603,13 @@ class _InstructionInjectionEditSheetState extends State<_InstructionInjectionEdi
             const SizedBox(height: 12),
             Center(
               child: Text(
-                widget.item == null ? l10n.instructionInjectionAddTitle : l10n.instructionInjectionEditTitle,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                widget.item == null
+                    ? l10n.instructionInjectionAddTitle
+                    : l10n.instructionInjectionEditTitle,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -446,6 +618,32 @@ class _InstructionInjectionEditSheetState extends State<_InstructionInjectionEdi
               autofocus: true,
               decoration: InputDecoration(
                 labelText: l10n.instructionInjectionNameLabel,
+                filled: true,
+                fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: cs.outlineVariant.withOpacity(0.4),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: cs.outlineVariant.withOpacity(0.4),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _groupController,
+              decoration: InputDecoration(
+                labelText: l10n.instructionInjectionGroupLabel,
+                hintText: l10n.instructionInjectionGroupHint,
                 filled: true,
                 fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
                 border: OutlineInputBorder(
@@ -509,6 +707,7 @@ class _InstructionInjectionEditSheetState extends State<_InstructionInjectionEdi
                     onTap: () {
                       Navigator.of(context).pop({
                         'title': _titleController.text,
+                        'group': _groupController.text,
                         'prompt': _promptController.text,
                       });
                     },
@@ -524,7 +723,12 @@ class _InstructionInjectionEditSheetState extends State<_InstructionInjectionEdi
 }
 
 class _TactileIconButton extends StatefulWidget {
-  const _TactileIconButton({required this.icon, required this.color, required this.onTap, this.size = 22});
+  const _TactileIconButton({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    this.size = 22,
+  });
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
@@ -552,14 +756,22 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
       },
       child: Padding(
         padding: const EdgeInsets.all(6),
-        child: Icon(widget.icon, size: widget.size, color: _pressed ? press : base),
+        child: Icon(
+          widget.icon,
+          size: widget.size,
+          color: _pressed ? press : base,
+        ),
       ),
     );
   }
 }
 
 class _TactileCard extends StatefulWidget {
-  const _TactileCard({required this.builder, this.onTap, this.pressedScale = 0.98});
+  const _TactileCard({
+    required this.builder,
+    this.onTap,
+    this.pressedScale = 0.98,
+  });
   final Widget Function(bool pressed, Color overlay) builder;
   final VoidCallback? onTap;
   final double pressedScale;
@@ -579,12 +791,19 @@ class _TactileCardState extends State<_TactileCard> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final overlay = _pressed
-        ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05))
+        ? (isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.05))
         : Colors.transparent;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: widget.onTap == null ? null : (_) => _set(true),
-      onTapUp: widget.onTap == null ? null : (_) => Future.delayed(const Duration(milliseconds: 120), () => _set(false)),
+      onTapUp: widget.onTap == null
+          ? null
+          : (_) => Future.delayed(
+              const Duration(milliseconds: 120),
+              () => _set(false),
+            ),
       onTapCancel: widget.onTap == null ? null : () => _set(false),
       onTap: widget.onTap == null
           ? null
@@ -624,7 +843,8 @@ class _IosOutlineButtonState extends State<_IosOutlineButton> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => _set(true),
-      onTapUp: (_) => Future.delayed(const Duration(milliseconds: 80), () => _set(false)),
+      onTapUp: (_) =>
+          Future.delayed(const Duration(milliseconds: 80), () => _set(false)),
       onTapCancel: () => _set(false),
       onTap: () {
         Haptics.soft();
@@ -677,7 +897,8 @@ class _IosFilledButtonState extends State<_IosFilledButton> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => _set(true),
-      onTapUp: (_) => Future.delayed(const Duration(milliseconds: 80), () => _set(false)),
+      onTapUp: (_) =>
+          Future.delayed(const Duration(milliseconds: 80), () => _set(false)),
       onTapCancel: () => _set(false),
       onTap: () {
         Haptics.soft();

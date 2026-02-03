@@ -1422,6 +1422,9 @@
   "instructionInjectionEditTitle": "Edit Instruction Injection",
   "instructionInjectionNameLabel": "Name",
   "instructionInjectionPromptLabel": "Prompt",
+  "instructionInjectionUngroupedGroup": "Ungrouped",
+  "instructionInjectionGroupLabel": "Group",
+  "instructionInjectionGroupHint": "Optional",
   "instructionInjectionImportSuccess": "Imported {count} instruction(s)",
   "@instructionInjectionImportSuccess": {
     "placeholders": {

@@ -1100,6 +1100,9 @@
   "instructionInjectionEditTitle": "編輯指令注入",
   "instructionInjectionNameLabel": "名稱",
   "instructionInjectionPromptLabel": "提示詞",
+  "instructionInjectionUngroupedGroup": "未分組",
+  "instructionInjectionGroupLabel": "分組",
+  "instructionInjectionGroupHint": "可選",
   "instructionInjectionImportSuccess": "已匯入 {count} 個指令注入",
   "@instructionInjectionImportSuccess": {
     "placeholders": {

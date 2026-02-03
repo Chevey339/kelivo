@@ -3322,6 +3322,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get instructionInjectionPromptLabel => '提示词';
 
   @override
+  String get instructionInjectionUngroupedGroup => '未分组';
+
+  @override
+  String get instructionInjectionGroupLabel => '分组';
+
+  @override
+  String get instructionInjectionGroupHint => '可选';
+
+  @override
   String instructionInjectionImportSuccess(int count) {
     return '已导入 $count 个指令注入';
   }
@@ -7031,6 +7040,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get instructionInjectionPromptLabel => '提示词';
 
   @override
+  String get instructionInjectionUngroupedGroup => '未分组';
+
+  @override
+  String get instructionInjectionGroupLabel => '分组';
+
+  @override
+  String get instructionInjectionGroupHint => '可选';
+
+  @override
   String instructionInjectionImportSuccess(int count) {
     return '已导入 $count 个指令注入';
   }
@@ -10733,6 +10751,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get instructionInjectionPromptLabel => '提示詞';
+
+  @override
+  String get instructionInjectionUngroupedGroup => '未分組';
+
+  @override
+  String get instructionInjectionGroupLabel => '分組';
+
+  @override
+  String get instructionInjectionGroupHint => '可選';
 
   @override
   String instructionInjectionImportSuccess(int count) {

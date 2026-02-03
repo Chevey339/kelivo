@@ -3449,6 +3449,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get instructionInjectionPromptLabel => 'Prompt';
 
   @override
+  String get instructionInjectionUngroupedGroup => 'Ungrouped';
+
+  @override
+  String get instructionInjectionGroupLabel => 'Group';
+
+  @override
+  String get instructionInjectionGroupHint => 'Optional';
+
+  @override
   String instructionInjectionImportSuccess(int count) {
     return 'Imported $count instruction(s)';
   }

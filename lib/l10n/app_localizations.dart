@@ -6464,6 +6464,24 @@ abstract class AppLocalizations {
   /// **'Prompt'**
   String get instructionInjectionPromptLabel;
 
+  /// No description provided for @instructionInjectionUngroupedGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Ungrouped'**
+  String get instructionInjectionUngroupedGroup;
+
+  /// No description provided for @instructionInjectionGroupLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get instructionInjectionGroupLabel;
+
+  /// No description provided for @instructionInjectionGroupHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get instructionInjectionGroupHint;
+
   /// No description provided for @instructionInjectionImportSuccess.
   ///
   /// In en, this message translates to:

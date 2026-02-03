@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'dart:async';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
@@ -25,6 +26,7 @@ import 'core/providers/tag_provider.dart';
 import 'core/providers/update_provider.dart';
 import 'core/providers/quick_phrase_provider.dart';
 import 'core/providers/instruction_injection_provider.dart';
+import 'core/providers/instruction_injection_group_provider.dart';
 import 'core/providers/memory_provider.dart';
 import 'core/providers/backup_provider.dart';
 import 'core/providers/hotkey_provider.dart';
@@ -36,16 +38,19 @@ import 'shared/widgets/snackbar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'package:flutter/painting.dart' show PaintingBinding;
-import 'dart:io' show HttpOverrides, Platform; // kept for global override usage inside provider
+import 'dart:io'
+    show
+        HttpOverrides,
+        Platform; // kept for global override usage inside provider
 import 'core/services/android_background.dart';
 import 'core/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-final RouteObserver<ModalRoute<dynamic>> routeObserver = RouteObserver<ModalRoute<dynamic>>();
+final RouteObserver<ModalRoute<dynamic>> routeObserver =
+    RouteObserver<ModalRoute<dynamic>>();
 bool _didCheckUpdates = false; // one-time update check flag
 bool _didEnsureAssistants = false; // ensure defaults after l10n ready
 bool _didEnsureSystemFonts = false; // one-time system fonts load when needed
-
 
 Future<void> main() async {
   await runZoned(
@@ -60,7 +65,8 @@ Future<void> main() async {
       // Trim Flutter global image cache to reduce memory pressure from large images
       try {
         PaintingBinding.instance.imageCache.maximumSize = 200;
-        PaintingBinding.instance.imageCache.maximumSizeBytes = 48 << 20; // ~48MB
+        PaintingBinding.instance.imageCache.maximumSizeBytes =
+            48 << 20; // ~48MB
       } catch (_) {}
       // Desktop (Windows) window setup: hide native title bar for custom Flutter bar
       await _initDesktopWindow();
@@ -122,6 +128,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UpdateProvider()),
         ChangeNotifierProvider(create: (_) => QuickPhraseProvider()),
         ChangeNotifierProvider(create: (_) => InstructionInjectionProvider()),
+        ChangeNotifierProvider(
+          create: (_) => InstructionInjectionGroupProvider(),
+        ),
         ChangeNotifierProvider(create: (_) => MemoryProvider()),
         // Desktop hotkeys provider
         ChangeNotifierProvider(create: (_) => HotkeyProvider()),
@@ -141,20 +150,36 @@ class MyApp extends StatelessWidget {
           // Load ONLY selected families to avoid huge memory from loading all system fonts.
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             try {
-              final isDesktop = !kIsWeb && (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.linux);
+              final isDesktop =
+                  !kIsWeb &&
+                  (defaultTargetPlatform == TargetPlatform.windows ||
+                      defaultTargetPlatform == TargetPlatform.macOS ||
+                      defaultTargetPlatform == TargetPlatform.linux);
               if (!isDesktop) return;
               // Selected system app/code fonts (not Google, not local alias)
-              final wantsAppSystem = (settings.appFontFamily?.isNotEmpty == true) && !settings.appFontIsGoogle && (settings.appFontLocalAlias == null || settings.appFontLocalAlias!.isEmpty);
-              final wantsCodeSystem = (settings.codeFontFamily?.isNotEmpty == true) && !settings.codeFontIsGoogle && (settings.codeFontLocalAlias == null || settings.codeFontLocalAlias!.isEmpty);
+              final wantsAppSystem =
+                  (settings.appFontFamily?.isNotEmpty == true) &&
+                  !settings.appFontIsGoogle &&
+                  (settings.appFontLocalAlias == null ||
+                      settings.appFontLocalAlias!.isEmpty);
+              final wantsCodeSystem =
+                  (settings.codeFontFamily?.isNotEmpty == true) &&
+                  !settings.codeFontIsGoogle &&
+                  (settings.codeFontLocalAlias == null ||
+                      settings.codeFontLocalAlias!.isEmpty);
               if (wantsAppSystem || wantsCodeSystem) {
                 final sf = SystemFonts();
                 if (wantsAppSystem) {
                   final fam = settings.appFontFamily!;
-                  try { await sf.loadFont(fam); } catch (_) {}
+                  try {
+                    await sf.loadFont(fam);
+                  } catch (_) {}
                 }
                 if (wantsCodeSystem) {
                   final fam = settings.codeFontFamily!;
-                  try { if (fam != settings.appFontFamily) await sf.loadFont(fam); } catch (_) {}
+                  try {
+                    if (fam != settings.appFontFamily) await sf.loadFont(fam);
+                  } catch (_) {}
                 }
               }
             } catch (_) {}
@@ -163,7 +188,9 @@ class MyApp extends StatelessWidget {
           if (settings.showAppUpdates && !_didCheckUpdates) {
             _didCheckUpdates = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              try { context.read<UpdateProvider>().checkForUpdates(); } catch (_) {}
+              try {
+                context.read<UpdateProvider>().checkForUpdates();
+              } catch (_) {}
             });
           }
           return DynamicColorBuilder(
@@ -178,9 +205,11 @@ class MyApp extends StatelessWidget {
               // } else {
               //   debugPrint('[DynamicColor] Dark dynamic not available');
               // }
-              final isAndroid = Theme.of(context).platform == TargetPlatform.android;
+              final isAndroid =
+                  Theme.of(context).platform == TargetPlatform.android;
               // Update dynamic color capability for settings UI (avoid notify during build)
-              final dynSupported = isAndroid && (lightDynamic != null || darkDynamic != null);
+              final dynSupported =
+                  isAndroid && (lightDynamic != null || darkDynamic != null);
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 try {
                   settings.setDynamicColorSupported(dynSupported);
@@ -190,7 +219,11 @@ class MyApp extends StatelessWidget {
               // Initialize desktop hotkeys on supported platforms
               WidgetsBinding.instance.addPostFrameCallback((_) async {
                 try {
-                  final isDesktop = !kIsWeb && (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.linux);
+                  final isDesktop =
+                      !kIsWeb &&
+                      (defaultTargetPlatform == TargetPlatform.windows ||
+                          defaultTargetPlatform == TargetPlatform.macOS ||
+                          defaultTargetPlatform == TargetPlatform.linux);
                   if (isDesktop) {
                     await context.read<HotkeyProvider>().initialize();
                   }
@@ -205,11 +238,16 @@ class MyApp extends StatelessWidget {
                     if (mode != AndroidBackgroundChatMode.off) {
                       // Enable only if currently disabled to avoid duplicate ROM prompts
                       try {
-                        final already = await AndroidBackgroundManager.isEnabled();
+                        final already =
+                            await AndroidBackgroundManager.isEnabled();
                         if (!already) {
                           await AndroidBackgroundManager.ensureInitialized(
-                            notificationTitle: AppLocalizations.of(context)!.androidBackgroundNotificationTitle,
-                            notificationText: AppLocalizations.of(context)!.androidBackgroundNotificationText,
+                            notificationTitle: AppLocalizations.of(
+                              context,
+                            )!.androidBackgroundNotificationTitle,
+                            notificationText: AppLocalizations.of(
+                              context,
+                            )!.androidBackgroundNotificationText,
                           );
                           await AndroidBackgroundManager.setEnabled(true);
                         }
@@ -250,12 +288,15 @@ class MyApp extends StatelessWidget {
                 }
                 return fam;
               }
+
               final effectiveAppFont = _effectiveAppFontFamily();
 
               // Apply user-selected app font to theme text styles and app bar
               ThemeData _applyAppFont(ThemeData base) {
-                if (effectiveAppFont == null || effectiveAppFont.isEmpty) return base;
-                TextStyle? _f(TextStyle? s) => s?.copyWith(fontFamily: effectiveAppFont);
+                if (effectiveAppFont == null || effectiveAppFont.isEmpty)
+                  return base;
+                TextStyle? _f(TextStyle? s) =>
+                    s?.copyWith(fontFamily: effectiveAppFont);
                 TextTheme _apply(TextTheme t) => t.copyWith(
                   displayLarge: _f(t.displayLarge),
                   displayMedium: _f(t.displayMedium),
@@ -275,8 +316,10 @@ class MyApp extends StatelessWidget {
                 );
                 final bar = base.appBarTheme;
                 final appBar = bar.copyWith(
-                  titleTextStyle: (bar.titleTextStyle ?? const TextStyle()).copyWith(fontFamily: effectiveAppFont),
-                  toolbarTextStyle: (bar.toolbarTextStyle ?? const TextStyle()).copyWith(fontFamily: effectiveAppFont),
+                  titleTextStyle: (bar.titleTextStyle ?? const TextStyle())
+                      .copyWith(fontFamily: effectiveAppFont),
+                  toolbarTextStyle: (bar.toolbarTextStyle ?? const TextStyle())
+                      .copyWith(fontFamily: effectiveAppFont),
                 );
                 // Apply as default family to all text in ThemeData
                 return base.copyWith(
@@ -285,6 +328,7 @@ class MyApp extends StatelessWidget {
                   appBarTheme: appBar,
                 );
               }
+
               final themedLight = _applyAppFont(light);
               final themedDark = _applyAppFont(dark);
               // Log top-level colors likely used by widgets (card/bg/shadow approximations)
@@ -306,30 +350,42 @@ class MyApp extends StatelessWidget {
                   final bright = Theme.of(ctx).brightness;
                   final overlay = bright == Brightness.dark
                       ? const SystemUiOverlayStyle(
-                    statusBarColor: Colors.transparent,
-                    statusBarIconBrightness: Brightness.light,
-                    statusBarBrightness: Brightness.dark,
-                    systemNavigationBarColor: Colors.transparent,
-                    systemNavigationBarIconBrightness: Brightness.light,
-                    systemNavigationBarDividerColor: Colors.transparent,
-                    systemNavigationBarContrastEnforced: false,
-                  )
+                          statusBarColor: Colors.transparent,
+                          statusBarIconBrightness: Brightness.light,
+                          statusBarBrightness: Brightness.dark,
+                          systemNavigationBarColor: Colors.transparent,
+                          systemNavigationBarIconBrightness: Brightness.light,
+                          systemNavigationBarDividerColor: Colors.transparent,
+                          systemNavigationBarContrastEnforced: false,
+                        )
                       : const SystemUiOverlayStyle(
-                    statusBarColor: Colors.transparent,
-                    statusBarIconBrightness: Brightness.dark,
-                    statusBarBrightness: Brightness.light,
-                    systemNavigationBarColor: Colors.transparent,
-                    systemNavigationBarIconBrightness: Brightness.dark,
-                    systemNavigationBarDividerColor: Colors.transparent,
-                    systemNavigationBarContrastEnforced: false,
-                  );
+                          statusBarColor: Colors.transparent,
+                          statusBarIconBrightness: Brightness.dark,
+                          statusBarBrightness: Brightness.light,
+                          systemNavigationBarColor: Colors.transparent,
+                          systemNavigationBarIconBrightness: Brightness.dark,
+                          systemNavigationBarDividerColor: Colors.transparent,
+                          systemNavigationBarContrastEnforced: false,
+                        );
                   // Ensure localized defaults (assistants and chat default title) after first frame
                   if (!_didEnsureAssistants) {
                     _didEnsureAssistants = true;
                     WidgetsBinding.instance.addPostFrameCallback((_) {
-                      try { ctx.read<AssistantProvider>().ensureDefaults(ctx); } catch (_) {}
-                      try { ctx.read<ChatService>().setDefaultConversationTitle(AppLocalizations.of(ctx)!.chatServiceDefaultConversationTitle); } catch (_) {}
-                      try { ctx.read<UserProvider>().setDefaultNameIfUnset(AppLocalizations.of(ctx)!.userProviderDefaultUserName); } catch (_) {}
+                      try {
+                        ctx.read<AssistantProvider>().ensureDefaults(ctx);
+                      } catch (_) {}
+                      try {
+                        ctx.read<ChatService>().setDefaultConversationTitle(
+                          AppLocalizations.of(
+                            ctx,
+                          )!.chatServiceDefaultConversationTitle,
+                        );
+                      } catch (_) {}
+                      try {
+                        ctx.read<UserProvider>().setDefaultNameIfUnset(
+                          AppLocalizations.of(ctx)!.userProviderDefaultUserName,
+                        );
+                      } catch (_) {}
                     });
                   }
 
@@ -338,15 +394,18 @@ class MyApp extends StatelessWidget {
                   if (l10n != null) {
                     WidgetsBinding.instance.addPostFrameCallback((_) async {
                       try {
-                        final isDesktop = !kIsWeb && (defaultTargetPlatform == TargetPlatform.windows ||
-                            defaultTargetPlatform == TargetPlatform.macOS ||
-                            defaultTargetPlatform == TargetPlatform.linux);
+                        final isDesktop =
+                            !kIsWeb &&
+                            (defaultTargetPlatform == TargetPlatform.windows ||
+                                defaultTargetPlatform == TargetPlatform.macOS ||
+                                defaultTargetPlatform == TargetPlatform.linux);
                         if (!isDesktop) return;
                         final sp = ctx.read<SettingsProvider>();
                         await DesktopTrayController.instance.syncFromSettings(
                           l10n,
                           showTray: sp.desktopShowTray,
-                          minimizeToTrayOnClose: sp.desktopMinimizeToTrayOnClose,
+                          minimizeToTrayOnClose:
+                              sp.desktopMinimizeToTrayOnClose,
                         );
                       } catch (_) {}
                     });
@@ -356,11 +415,15 @@ class MyApp extends StatelessWidget {
                   return AnnotatedRegion<SystemUiOverlayStyle>(
                     value: overlay,
                     child: effectiveAppFont == null
-                        ? AppSnackBarOverlay(child: child ?? const SizedBox.shrink())
+                        ? AppSnackBarOverlay(
+                            child: child ?? const SizedBox.shrink(),
+                          )
                         : DefaultTextStyle.merge(
-                      style: TextStyle(fontFamily: effectiveAppFont),
-                      child: AppSnackBarOverlay(child: child ?? const SizedBox.shrink()),
-                    ),
+                            style: TextStyle(fontFamily: effectiveAppFont),
+                            child: AppSnackBarOverlay(
+                              child: child ?? const SizedBox.shrink(),
+                            ),
+                          ),
                   );
                 },
               );
@@ -375,7 +438,8 @@ class MyApp extends StatelessWidget {
 Widget _selectHome() {
   // Mobile remains the default platform. Desktop is an added platform.
   if (kIsWeb) return const HomePage();
-  final isDesktop = defaultTargetPlatform == TargetPlatform.macOS ||
+  final isDesktop =
+      defaultTargetPlatform == TargetPlatform.macOS ||
       defaultTargetPlatform == TargetPlatform.windows ||
       defaultTargetPlatform == TargetPlatform.linux;
   return isDesktop ? const DesktopHomePage() : const HomePage();
