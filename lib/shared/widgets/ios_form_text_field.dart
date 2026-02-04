@@ -16,6 +16,9 @@ class IosFormTextField extends StatelessWidget {
     this.autofocus = false,
     this.enabled = true,
     this.onChanged,
+    this.selectAllOnFocus = false,
+    this.cursorToEndOnFocus = false,
+    this.cursorToEndOnTap = false,
     this.textInputAction,
     this.textCapitalization = TextCapitalization.none,
   });
@@ -33,6 +36,9 @@ class IosFormTextField extends StatelessWidget {
   final bool autofocus;
   final bool enabled;
   final ValueChanged<String>? onChanged;
+  final bool selectAllOnFocus;
+  final bool cursorToEndOnFocus;
+  final bool cursorToEndOnTap;
   final TextInputAction? textInputAction;
   final TextCapitalization textCapitalization;
 
@@ -57,8 +63,21 @@ class IosFormTextField extends StatelessWidget {
     final resolvedOuterPadding =
         outerPadding ??
         const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
+    final fieldHorizontalPadding = (fieldWidth != null && fieldWidth! <= 60)
+        ? 10.0
+        : 12.0;
 
-    final field = TextField(
+    void selectAll() {
+      final len = controller.text.length;
+      controller.selection = TextSelection(baseOffset: 0, extentOffset: len);
+    }
+
+    void moveCursorToEnd() {
+      final len = controller.text.length;
+      controller.selection = TextSelection.collapsed(offset: len);
+    }
+
+    Widget field = TextField(
       controller: controller,
       maxLines: maxLines,
       minLines: minLines,
@@ -72,6 +91,15 @@ class IosFormTextField extends StatelessWidget {
       textInputAction: textInputAction,
       textCapitalization: textCapitalization,
       onChanged: onChanged,
+      onTap: cursorToEndOnTap
+          ? () {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                try {
+                  moveCursorToEnd();
+                } catch (_) {}
+              });
+            }
+          : null,
       style: TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.w500,
@@ -92,6 +120,24 @@ class IosFormTextField extends StatelessWidget {
       ),
     );
 
+    if (selectAllOnFocus || cursorToEndOnFocus) {
+      field = Focus(
+        onFocusChange: (hasFocus) {
+          if (!hasFocus) return;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            try {
+              if (selectAllOnFocus) {
+                selectAll();
+              } else if (cursorToEndOnFocus) {
+                moveCursorToEnd();
+              }
+            } catch (_) {}
+          });
+        },
+        child: field,
+      );
+    }
+
     if (_useInlineLabel) {
       final labelWidget = Text(
         label,
@@ -110,7 +156,10 @@ class IosFormTextField extends StatelessWidget {
           color: enabled ? fieldBg : fieldBg.withOpacity(0.55),
           borderRadius: BorderRadius.circular(10),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        padding: EdgeInsets.symmetric(
+          horizontal: fieldHorizontalPadding,
+          vertical: 9,
+        ),
         child: field,
       );
       return Padding(

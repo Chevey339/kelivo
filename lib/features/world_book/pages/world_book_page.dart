@@ -347,7 +347,7 @@ class _WorldBookPageState extends State<WorldBookPage> {
           Tooltip(
             message: l10n.providersPageImportTooltip,
             child: IosIconButton(
-              icon: Lucide.Import2,
+              icon: Lucide.cloudDownload,
               minSize: 44,
               size: 22,
               onTap: () async {
@@ -657,7 +657,7 @@ class _WorldBookSection extends StatelessWidget {
             onTap: onAddEntry,
           ),
           _HeaderIconButton(
-            icon: Lucide.Export,
+            icon: Lucide.Share2,
             tooltip: l10n.worldBookExport,
             onTap: onExport,
           ),
@@ -1747,7 +1747,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                           label: l10n.worldBookEntryScanDepthLabel,
                           controller: _scanDepthController,
                           keyboardType: TextInputType.number,
-                          fieldWidth: 72,
+                          fieldWidth: 64,
                         ),
                       ],
                     ),
@@ -1765,7 +1765,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                             label: l10n.worldBookEntryInjectDepthLabel,
                             controller: _injectDepthController,
                             keyboardType: TextInputType.number,
-                            fieldWidth: 72,
+                            fieldWidth: 64,
                           ),
                         ],
                         valueRow(
@@ -1777,7 +1777,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                           label: l10n.worldBookEntryPriorityLabel,
                           controller: _priorityController,
                           keyboardType: TextInputType.number,
-                          fieldWidth: 72,
+                          fieldWidth: 64,
                         ),
                       ],
                     ),
