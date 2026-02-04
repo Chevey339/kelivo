@@ -58,6 +58,23 @@ class WorldBookProvider with ChangeNotifier {
   }
 
   Future<void> updateBook(WorldBook book) async {
+    if (!book.enabled) {
+      try {
+        final map = await WorldBookStore.getActiveIdsByAssistant();
+        final next = <String, List<String>>{};
+        bool changed = false;
+        for (final entry in map.entries) {
+          final filtered = entry.value
+              .where((e) => e != book.id)
+              .toList(growable: false);
+          if (filtered.length != entry.value.length) changed = true;
+          next[entry.key] = filtered;
+        }
+        if (changed) {
+          await WorldBookStore.setActiveIdsMap(next);
+        }
+      } catch (_) {}
+    }
     await WorldBookStore.update(book);
     await loadAll();
   }
@@ -103,6 +120,9 @@ class WorldBookProvider with ChangeNotifier {
     if (set.contains(id)) {
       set.remove(id);
     } else {
+      final book = getById(id);
+      if (book == null) return;
+      if (!book.enabled) return;
       set.add(id);
     }
     await setActiveBookIds(

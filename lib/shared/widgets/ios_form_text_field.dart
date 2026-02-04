@@ -9,6 +9,7 @@ class IosFormTextField extends StatelessWidget {
     this.maxLines = 1,
     this.minLines,
     this.inlineLabel,
+    this.fieldWidth,
     this.keyboardType,
     this.textAlign,
     this.autofocus = false,
@@ -24,6 +25,7 @@ class IosFormTextField extends StatelessWidget {
   final int maxLines;
   final int? minLines;
   final bool? inlineLabel;
+  final double? fieldWidth;
   final TextInputType? keyboardType;
   final TextAlign? textAlign;
   final bool autofocus;
@@ -82,38 +84,37 @@ class IosFormTextField extends StatelessWidget {
     );
 
     if (_useInlineLabel) {
+      final labelWidget = Text(
+        label,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+          color: labelColor,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+      final fieldWidget = Container(
+        decoration: BoxDecoration(
+          color: enabled ? fieldBg : fieldBg.withOpacity(0.55),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        child: field,
+      );
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            Expanded(
-              flex: 5,
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: labelColor,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+            if (fieldWidth == null)
+              Expanded(flex: 5, child: labelWidget)
+            else
+              Expanded(child: labelWidget),
             const SizedBox(width: 12),
-            Expanded(
-              flex: 6,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: enabled ? fieldBg : fieldBg.withOpacity(0.55),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
-                ),
-                child: field,
-              ),
-            ),
+            if (fieldWidth == null)
+              Expanded(flex: 6, child: fieldWidget)
+            else
+              SizedBox(width: fieldWidth, child: fieldWidget),
           ],
         ),
       );

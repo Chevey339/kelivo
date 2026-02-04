@@ -55,24 +55,33 @@ class WorldBookSheet extends StatelessWidget {
                       for (final book in books)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: _SelectableRow(
-                            icon: Lucide.BookOpen,
-                            label: book.name.trim().isEmpty
-                                ? l10n.worldBookUnnamed
-                                : book.name.trim(),
-                            subtitle: book.description.trim().isEmpty
-                                ? null
-                                : book.description.trim(),
-                            selected: activeIds.contains(book.id),
-                            disabled: !book.enabled,
-                            onTap: () async {
-                              Haptics.light();
-                              await ctx
-                                  .read<WorldBookProvider>()
-                                  .toggleActiveBookId(
-                                    book.id,
-                                    assistantId: assistantId,
-                                  );
+                          child: Builder(
+                            builder: (rowCtx) {
+                              final selected = activeIds.contains(book.id);
+                              final disabled = !book.enabled;
+                              final canTap = !disabled || selected;
+                              return _SelectableRow(
+                                icon: Lucide.BookOpen,
+                                label: book.name.trim().isEmpty
+                                    ? l10n.worldBookUnnamed
+                                    : book.name.trim(),
+                                subtitle: book.description.trim().isEmpty
+                                    ? null
+                                    : book.description.trim(),
+                                selected: selected,
+                                disabled: disabled,
+                                onTap: !canTap
+                                    ? null
+                                    : () async {
+                                        Haptics.light();
+                                        await rowCtx
+                                            .read<WorldBookProvider>()
+                                            .toggleActiveBookId(
+                                              book.id,
+                                              assistantId: assistantId,
+                                            );
+                                      },
+                              );
                             },
                           ),
                         ),
@@ -162,7 +171,7 @@ class _SelectableRow extends StatelessWidget {
   final String? subtitle;
   final bool selected;
   final bool disabled;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

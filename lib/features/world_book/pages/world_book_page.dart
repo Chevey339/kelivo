@@ -382,6 +382,17 @@ class _WorldBookSection extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: localCs.onSurface.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   _IosSectionCard(
                     children: [
                       actionRow(
@@ -841,19 +852,18 @@ class _WorldBookEditSheetState extends State<_WorldBookEditSheet> {
                           controller: _nameController,
                           autofocus: base == null,
                           textAlign: TextAlign.start,
+                          textInputAction: TextInputAction.next,
+                          inlineLabel: false,
                         ),
                         IosFormTextField(
                           label: l10n.worldBookDescriptionLabel,
                           controller: _descController,
                           maxLines: 2,
-                          inlineLabel: false,
+                          minLines: 2,
                           textAlign: TextAlign.start,
+                          textInputAction: TextInputAction.done,
+                          inlineLabel: false,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _IosSectionCard(
-                      children: [
                         switchRow(
                           label: l10n.worldBookEnabledLabel,
                           value: _enabled,
@@ -1446,40 +1456,49 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                               Row(
                                 children: [
                                   Expanded(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: isDark
-                                            ? Colors.white12
-                                            : const Color(0xFFF2F3F5),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 2,
-                                      ),
-                                      child: TextField(
-                                        controller: _keywordInputController,
-                                        onChanged: (_) => setState(() {}),
-                                        textInputAction: TextInputAction.done,
-                                        onSubmitted: (_) =>
-                                            addKeywordsFromInput(),
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w500,
-                                          color: cs.onSurface.withOpacity(0.92),
+                                    child: SizedBox(
+                                      height: 40,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: isDark
+                                              ? Colors.white12
+                                              : const Color(0xFFF2F3F5),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
-                                        decoration: InputDecoration(
-                                          isDense: true,
-                                          hintText: l10n
-                                              .worldBookEntryKeywordInputHint,
-                                          hintStyle: TextStyle(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 2,
+                                        ),
+                                        child: TextField(
+                                          controller: _keywordInputController,
+                                          onChanged: (_) => setState(() {}),
+                                          textInputAction: TextInputAction.done,
+                                          onSubmitted: (_) =>
+                                              addKeywordsFromInput(),
+                                          textAlignVertical:
+                                              TextAlignVertical.center,
+                                          style: TextStyle(
                                             fontSize: 15,
                                             fontWeight: FontWeight.w500,
                                             color: cs.onSurface.withOpacity(
-                                              isDark ? 0.42 : 0.46,
+                                              0.92,
                                             ),
                                           ),
-                                          border: InputBorder.none,
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            hintText: l10n
+                                                .worldBookEntryKeywordInputHint,
+                                            hintStyle: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w500,
+                                              color: cs.onSurface.withOpacity(
+                                                isDark ? 0.42 : 0.46,
+                                              ),
+                                            ),
+                                            border: InputBorder.none,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1551,6 +1570,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                           label: l10n.worldBookEntryScanDepthLabel,
                           controller: _scanDepthController,
                           keyboardType: TextInputType.number,
+                          fieldWidth: 72,
                         ),
                       ],
                     ),
@@ -1568,6 +1588,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                             label: l10n.worldBookEntryInjectDepthLabel,
                             controller: _injectDepthController,
                             keyboardType: TextInputType.number,
+                            fieldWidth: 72,
                           ),
                         ],
                         valueRow(
@@ -1579,6 +1600,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                           label: l10n.worldBookEntryPriorityLabel,
                           controller: _priorityController,
                           keyboardType: TextInputType.number,
+                          fieldWidth: 72,
                         ),
                       ],
                     ),
