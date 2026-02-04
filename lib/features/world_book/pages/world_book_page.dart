@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/models/world_book.dart';
@@ -72,16 +72,175 @@ class _WorldBookPageState extends State<WorldBookPage> {
     );
   }
 
+  Future<String?> _readPickedFileAsString(PlatformFile file) async {
+    try {
+      if (file.bytes != null && file.bytes!.isNotEmpty) {
+        return utf8.decode(file.bytes!, allowMalformed: true);
+      }
+    } catch (_) {}
+    final path = file.path;
+    if (path == null || path.isEmpty) return null;
+    try {
+      return await File(path).readAsString();
+    } catch (_) {
+      try {
+        final bytes = await File(path).readAsBytes();
+        return utf8.decode(bytes, allowMalformed: true);
+      } catch (_) {
+        return null;
+      }
+    }
+  }
+
+  WorldBook? _parseWorldBookImport(dynamic decoded) {
+    try {
+      if (decoded is Map) {
+        final map = decoded.cast<String, dynamic>();
+        final data = map['data'];
+        if (data is Map) {
+          return WorldBook.fromJson(data.cast<String, dynamic>());
+        }
+        if (map.containsKey('entries')) {
+          return WorldBook.fromJson(map);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  WorldBook _normalizeImportedBook(
+    WorldBook book, {
+    required Set<String> existingBookIds,
+  }) {
+    var bookId = book.id.trim();
+    if (bookId.isEmpty || existingBookIds.contains(bookId)) {
+      bookId = const Uuid().v4();
+    }
+
+    final seenEntryIds = <String>{};
+    final nextEntries = <WorldBookEntry>[];
+    for (final entry in book.entries) {
+      var entryId = entry.id.trim();
+      if (entryId.isEmpty || !seenEntryIds.add(entryId)) {
+        entryId = const Uuid().v4();
+      }
+      nextEntries.add(entry.copyWith(id: entryId));
+    }
+
+    return book.copyWith(id: bookId, entries: nextEntries);
+  }
+
+  Future<void> _importBookFromFile() async {
+    final l10n = AppLocalizations.of(context)!;
+    final provider = context.read<WorldBookProvider>();
+    await provider.initialize();
+    if (!mounted) return;
+
+    FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        withData: true,
+      );
+    } catch (_) {
+      return;
+    }
+
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final content = await _readPickedFileAsString(file);
+    if (!mounted) return;
+    if (content == null || content.trim().isEmpty) {
+      showAppSnackBar(
+        context,
+        message: l10n.assistantEditSystemPromptImportEmpty,
+        type: NotificationType.warning,
+      );
+      return;
+    }
+
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(content);
+    } catch (_) {
+      showAppSnackBar(
+        context,
+        message: l10n.mcpJsonEditParseFailed,
+        type: NotificationType.error,
+      );
+      return;
+    }
+
+    final imported = _parseWorldBookImport(decoded);
+    if (imported == null) {
+      showAppSnackBar(
+        context,
+        message: l10n.assistantEditSystemPromptImportFailed,
+        type: NotificationType.error,
+      );
+      return;
+    }
+
+    final normalized = _normalizeImportedBook(
+      imported,
+      existingBookIds: provider.books.map((e) => e.id).toSet(),
+    );
+    await provider.addBook(normalized);
+  }
+
+  String _baseName(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    final parts = normalized.split('/');
+    if (parts.isEmpty) return path;
+    return parts.last.isEmpty ? path : parts.last;
+  }
+
   Future<void> _exportBook(WorldBook book) async {
     final l10n = AppLocalizations.of(context)!;
     try {
-      final dir = await getTemporaryDirectory();
       final fileName = _safeFileName(
         book.name.trim().isEmpty ? 'lorebook' : book.name.trim(),
       );
-      final file = File('${dir.path}/$fileName.json');
-      await file.writeAsString(jsonEncode(_toRikkaHubExportJson(book)));
-      await Share.shareXFiles([XFile(file.path)], subject: fileName);
+      final exportName = '$fileName.json';
+      final json = jsonEncode(_toRikkaHubExportJson(book));
+
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        final String? savePath = await FilePicker.platform.saveFile(
+          dialogTitle: l10n.backupPageExportToFile,
+          fileName: exportName,
+          type: FileType.custom,
+          allowedExtensions: const ['json'],
+        );
+        if (savePath == null) return;
+
+        await File(savePath).parent.create(recursive: true);
+        await File(savePath).writeAsString(json);
+        if (!mounted) return;
+        showAppSnackBar(
+          context,
+          message: l10n.messageExportSheetExportedAs(_baseName(savePath)),
+          type: NotificationType.success,
+        );
+        return;
+      }
+
+      final bytes = Uint8List.fromList(utf8.encode(json));
+      final String? savePath = await FilePicker.platform.saveFile(
+        dialogTitle: l10n.backupPageExportToFile,
+        fileName: exportName,
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        bytes: bytes,
+      );
+      if (savePath == null) return;
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.messageExportSheetExportedAs(_baseName(savePath)),
+        type: NotificationType.success,
+      );
     } catch (e) {
       if (!mounted) return;
       showAppSnackBar(
@@ -185,6 +344,18 @@ class _WorldBookPageState extends State<WorldBookPage> {
         ),
         title: Text(l10n.worldBookTitle),
         actions: [
+          Tooltip(
+            message: l10n.providersPageImportTooltip,
+            child: IosIconButton(
+              icon: Lucide.Import2,
+              minSize: 44,
+              size: 22,
+              onTap: () async {
+                Haptics.light();
+                await _importBookFromFile();
+              },
+            ),
+          ),
           Tooltip(
             message: l10n.worldBookAdd,
             child: IosIconButton(
@@ -486,7 +657,7 @@ class _WorldBookSection extends StatelessWidget {
             onTap: onAddEntry,
           ),
           _HeaderIconButton(
-            icon: Lucide.Share2,
+            icon: Lucide.Export,
             tooltip: l10n.worldBookExport,
             onTap: onExport,
           ),
