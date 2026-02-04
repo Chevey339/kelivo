@@ -3970,7 +3970,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get worldBookEntryKeywordsLabel => 'Keywords';
 
   @override
-  String get worldBookEntryKeywordsHint => 'Separate with commas or new lines';
+  String get worldBookEntryKeywordsHint =>
+      'Type a keyword and tap +. You can paste multiple, separated by commas or new lines.';
+
+  @override
+  String get worldBookEntryKeywordInputHint => 'Type a keyword';
+
+  @override
+  String get worldBookEntryKeywordAddTooltip => 'Add keyword';
 
   @override
   String get worldBookEntryUseRegexLabel => 'Use regex';

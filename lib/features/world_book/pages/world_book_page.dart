@@ -910,11 +910,12 @@ class _WorldBookEntryEditSheet extends StatefulWidget {
 
 class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
   late final TextEditingController _nameController;
-  late final TextEditingController _keywordsController;
+  late final TextEditingController _keywordInputController;
   late final TextEditingController _contentController;
   late final TextEditingController _priorityController;
   late final TextEditingController _scanDepthController;
   late final TextEditingController _injectDepthController;
+  List<String> _keywords = <String>[];
 
   bool _enabled = true;
   bool _useRegex = false;
@@ -928,9 +929,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
     super.initState();
     final entry = widget.entry;
     _nameController = TextEditingController(text: entry?.name ?? '');
-    _keywordsController = TextEditingController(
-      text: (entry?.keywords ?? const <String>[]).join(', '),
-    );
+    _keywordInputController = TextEditingController();
     _contentController = TextEditingController(text: entry?.content ?? '');
     _priorityController = TextEditingController(
       text: (entry?.priority ?? 0).toString(),
@@ -945,6 +944,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
     _useRegex = entry?.useRegex ?? false;
     _caseSensitive = entry?.caseSensitive ?? false;
     _constantActive = entry?.constantActive ?? false;
+    _keywords = _cleanKeywords(entry?.keywords ?? const <String>[]);
     _position = entry?.position ?? WorldBookInjectionPosition.afterSystemPrompt;
     _role = entry?.role ?? WorldBookInjectionRole.user;
   }
@@ -952,7 +952,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
   @override
   void dispose() {
     _nameController.dispose();
-    _keywordsController.dispose();
+    _keywordInputController.dispose();
     _contentController.dispose();
     _priorityController.dispose();
     _scanDepthController.dispose();
@@ -960,24 +960,38 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
     super.dispose();
   }
 
-  List<String> _parseKeywords(String raw) {
-    return raw
-        .split(RegExp(r'[\\n,，;；]'))
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList(growable: false);
+  List<String> _cleanKeywords(Iterable<String> raw) {
+    final seen = <String>{};
+    final out = <String>[];
+    for (final item in raw) {
+      final k = item.trim();
+      if (k.isEmpty) continue;
+      if (seen.add(k)) out.add(k);
+    }
+    return out;
+  }
+
+  List<String> _parseKeywordInput(String raw) {
+    final parts = raw.split(RegExp(r'[\\n,，;；]'));
+    final seen = <String>{};
+    final out = <String>[];
+    for (final p in parts) {
+      final k = p.trim();
+      if (k.isEmpty) continue;
+      if (seen.add(k)) out.add(k);
+    }
+    return out;
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final base = widget.entry;
 
-    final keywords = _parseKeywords(_keywordsController.text);
-    final canSave = _constantActive || keywords.isNotEmpty;
+    final canSave = _constantActive || _keywords.isNotEmpty;
 
     String positionLabel(WorldBookInjectionPosition p) {
       return switch (p) {
@@ -1000,6 +1014,18 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
         WorldBookInjectionRole.assistant =>
           l10n.worldBookInjectionRoleAssistant,
       };
+    }
+
+    void addKeywordsFromInput() {
+      final parts = _parseKeywordInput(_keywordInputController.text);
+      if (parts.isEmpty) return;
+      setState(() {
+        for (final k in parts) {
+          if (_keywords.contains(k)) continue;
+          _keywords.add(k);
+        }
+      });
+      _keywordInputController.clear();
     }
 
     Widget switchRow({
@@ -1095,6 +1121,49 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
               ),
             ],
           ),
+        ),
+      );
+    }
+
+    Widget keywordChip(String keyword) {
+      final color = cs.primary;
+      final bg = color.withOpacity(isDark ? 0.22 : 0.12);
+      final border = color.withOpacity(isDark ? 0.36 : 0.26);
+      return Container(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: border, width: 0.6),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(
+                left: 10,
+                right: 6,
+                top: 6,
+                bottom: 6,
+              ),
+              child: Text(
+                keyword,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface.withOpacity(0.9),
+                ),
+              ),
+            ),
+            IosIconButton(
+              icon: Lucide.X,
+              size: 14,
+              padding: const EdgeInsets.all(6),
+              color: cs.onSurface.withOpacity(0.65),
+              onTap: () => setState(() => _keywords.remove(keyword)),
+            ),
+            const SizedBox(width: 2),
+          ],
         ),
       );
     }
@@ -1350,14 +1419,123 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                           value: _constantActive,
                           onChanged: (v) => setState(() => _constantActive = v),
                         ),
-                        IosFormTextField(
-                          label: l10n.worldBookEntryKeywordsLabel,
-                          controller: _keywordsController,
-                          maxLines: 2,
-                          inlineLabel: false,
-                          hintText: l10n.worldBookEntryKeywordsHint,
-                          textAlign: TextAlign.start,
-                          onChanged: (_) => setState(() {}),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.worldBookEntryKeywordsLabel,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.onSurface.withOpacity(0.85),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              if (_keywords.isNotEmpty)
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    for (final k in _keywords) keywordChip(k),
+                                  ],
+                                ),
+                              if (_keywords.isNotEmpty)
+                                const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? Colors.white12
+                                            : const Color(0xFFF2F3F5),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 2,
+                                      ),
+                                      child: TextField(
+                                        controller: _keywordInputController,
+                                        onChanged: (_) => setState(() {}),
+                                        textInputAction: TextInputAction.done,
+                                        onSubmitted: (_) =>
+                                            addKeywordsFromInput(),
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500,
+                                          color: cs.onSurface.withOpacity(0.92),
+                                        ),
+                                        decoration: InputDecoration(
+                                          isDense: true,
+                                          hintText: l10n
+                                              .worldBookEntryKeywordInputHint,
+                                          hintStyle: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w500,
+                                            color: cs.onSurface.withOpacity(
+                                              isDark ? 0.42 : 0.46,
+                                            ),
+                                          ),
+                                          border: InputBorder.none,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  SizedBox(
+                                    width: 40,
+                                    height: 40,
+                                    child: Tooltip(
+                                      message:
+                                          l10n.worldBookEntryKeywordAddTooltip,
+                                      child: IosCardPress(
+                                        baseColor: isDark
+                                            ? Colors.white12
+                                            : const Color(0xFFF2F3F5),
+                                        borderRadius: BorderRadius.circular(12),
+                                        pressedScale: 0.98,
+                                        haptics: false,
+                                        onTap:
+                                            _keywordInputController.text
+                                                .trim()
+                                                .isEmpty
+                                            ? null
+                                            : () {
+                                                Haptics.light();
+                                                addKeywordsFromInput();
+                                              },
+                                        child: Center(
+                                          child: Icon(
+                                            Lucide.Plus,
+                                            size: 18,
+                                            color: cs.onSurface.withOpacity(
+                                              _keywordInputController.text
+                                                      .trim()
+                                                      .isEmpty
+                                                  ? 0.35
+                                                  : 0.9,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                l10n.worldBookEntryKeywordsHint,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: cs.onSurface.withOpacity(0.6),
+                                  height: 1.2,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         switchRow(
                           label: l10n.worldBookEntryUseRegexLabel,
@@ -1436,7 +1614,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                     enabled: canSave,
                     onTap: () {
                       final id = base?.id ?? const Uuid().v4();
-                      final keywords = _parseKeywords(_keywordsController.text);
+                      final keywords = List<String>.from(_keywords);
                       final priority =
                           int.tryParse(_priorityController.text.trim()) ??
                           (base?.priority ?? 0);

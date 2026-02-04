@@ -7439,8 +7439,20 @@ abstract class AppLocalizations {
   /// No description provided for @worldBookEntryKeywordsHint.
   ///
   /// In en, this message translates to:
-  /// **'Separate with commas or new lines'**
+  /// **'Type a keyword and tap +. You can paste multiple, separated by commas or new lines.'**
   String get worldBookEntryKeywordsHint;
+
+  /// No description provided for @worldBookEntryKeywordInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type a keyword'**
+  String get worldBookEntryKeywordInputHint;
+
+  /// No description provided for @worldBookEntryKeywordAddTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add keyword'**
+  String get worldBookEntryKeywordAddTooltip;
 
   /// No description provided for @worldBookEntryUseRegexLabel.
   ///

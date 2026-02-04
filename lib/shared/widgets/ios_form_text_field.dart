@@ -46,6 +46,7 @@ class IosFormTextField extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fieldBg = isDark ? Colors.white12 : const Color(0xFFF2F3F5);
     final labelColor = cs.onSurface.withOpacity(0.85);
     final valueColor = cs.onSurface.withOpacity(enabled ? 0.92 : 0.55);
     final hintColor = cs.onSurface.withOpacity(isDark ? 0.42 : 0.46);
@@ -99,7 +100,20 @@ class IosFormTextField extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Expanded(flex: 6, child: field),
+            Expanded(
+              flex: 6,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: enabled ? fieldBg : fieldBg.withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
+                ),
+                child: field,
+              ),
+            ),
           ],
         ),
       );
@@ -119,7 +133,17 @@ class IosFormTextField extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          field,
+          Container(
+            decoration: BoxDecoration(
+              color: enabled ? fieldBg : fieldBg.withOpacity(0.55),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: maxLines > 1 ? 10 : 8,
+            ),
+            child: field,
+          ),
         ],
       ),
     );
