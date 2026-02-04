@@ -7,7 +7,9 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../home/widgets/instruction_injection_sheet.dart';
+import '../../home/widgets/world_book_sheet.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
+import '../../world_book/pages/world_book_page.dart';
 import '../../model/widgets/ocr_prompt_sheet.dart';
 
 class BottomToolsSheet extends StatelessWidget {
@@ -237,6 +239,31 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
                 MaterialPageRoute(
                   builder: (_) => const InstructionInjectionPage(),
                 ),
+              );
+            });
+          },
+          trailing: Icon(
+            Lucide.ChevronRight,
+            size: 18,
+            color: cs.onSurface.withOpacity(0.55),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _row(
+          icon: Lucide.BookOpen,
+          label: l10n.worldBookTitle,
+          selected: false,
+          onTap: () async {
+            Haptics.light();
+            await showWorldBookSheet(context, assistantId: widget.assistantId);
+          },
+          onLongPress: () {
+            Haptics.light();
+            final rootNav = Navigator.of(context, rootNavigator: true);
+            Navigator.of(context).maybePop();
+            Future.microtask(() {
+              rootNav.push(
+                MaterialPageRoute(builder: (_) => const WorldBookPage()),
               );
             });
           },

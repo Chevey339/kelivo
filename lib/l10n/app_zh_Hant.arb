@@ -1266,5 +1266,71 @@
   "fileUploadDuplicateUseExisting": "使用現有",
   "fileUploadDuplicateUploadNew": "重新上傳",
   "backupPageDeleteConfirmTitle": "確認刪除",
-  "backupPageDeleteConfirmContent": "確定要刪除遠端備份「{name}」嗎？此操作不可撤銷。"
+  "backupPageDeleteConfirmContent": "確定要刪除遠端備份「{name}」嗎？此操作不可撤銷。",
+  "settingsPageWorldBook": "世界書",
+  "worldBookTitle": "世界書",
+  "worldBookAdd": "新增世界書",
+  "worldBookEmptyMessage": "暫無世界書",
+  "worldBookUnnamed": "未命名世界書",
+  "worldBookDisabledTag": "已停用",
+  "worldBookAlwaysOnTag": "常駐",
+  "worldBookAddEntry": "新增條目",
+  "worldBookExport": "分享/匯出",
+  "worldBookConfig": "設定",
+  "worldBookDeleteTitle": "刪除世界書",
+  "worldBookDeleteMessage": "確定刪除「{name}」？此操作無法復原。",
+  "@worldBookDeleteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "worldBookCancel": "取消",
+  "worldBookDelete": "刪除",
+  "worldBookExportFailed": "匯出失敗：{error}",
+  "@worldBookExportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "worldBookNoEntriesHint": "暫無條目",
+  "worldBookUnnamedEntry": "未命名條目",
+  "worldBookKeywordsLine": "關鍵詞：{keywords}",
+  "@worldBookKeywordsLine": {
+    "placeholders": {
+      "keywords": {
+        "type": "String"
+      }
+    }
+  },
+  "worldBookEditEntry": "編輯條目",
+  "worldBookDeleteEntry": "刪除條目",
+  "worldBookNameLabel": "名稱",
+  "worldBookDescriptionLabel": "簡介",
+  "worldBookEnabledLabel": "啟用",
+  "worldBookSave": "儲存",
+  "worldBookEntryNameLabel": "條目名稱",
+  "worldBookEntryEnabledLabel": "啟用條目",
+  "worldBookEntryPriorityLabel": "優先級",
+  "worldBookEntryKeywordsLabel": "關鍵詞",
+  "worldBookEntryKeywordsHint": "使用逗號或換行分隔",
+  "worldBookEntryUseRegexLabel": "使用正則",
+  "worldBookEntryCaseSensitiveLabel": "區分大小寫",
+  "worldBookEntryAlwaysOnLabel": "常駐啟用",
+  "worldBookEntryAlwaysOnHint": "無需匹配也會注入",
+  "worldBookEntryScanDepthLabel": "掃描深度",
+  "worldBookEntryContentLabel": "內容",
+  "worldBookEntryInjectionPositionLabel": "注入位置",
+  "worldBookEntryInjectionRoleLabel": "注入角色",
+  "worldBookEntryInjectDepthLabel": "注入深度",
+  "worldBookInjectionPositionBeforeSystemPrompt": "系統提示前",
+  "worldBookInjectionPositionAfterSystemPrompt": "系統提示後",
+  "worldBookInjectionPositionTopOfChat": "對話頂部",
+  "worldBookInjectionPositionBottomOfChat": "對話底部",
+  "worldBookInjectionPositionAtDepth": "指定深度",
+  "worldBookInjectionRoleUser": "使用者",
+  "worldBookInjectionRoleAssistant": "助手"
 }

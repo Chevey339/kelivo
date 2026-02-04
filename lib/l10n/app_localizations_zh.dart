@@ -3740,6 +3740,147 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get fileUploadDuplicateUploadNew => '重新上传';
+
+  @override
+  String get settingsPageWorldBook => '世界书';
+
+  @override
+  String get worldBookTitle => '世界书';
+
+  @override
+  String get worldBookAdd => '添加世界书';
+
+  @override
+  String get worldBookEmptyMessage => '暂无世界书';
+
+  @override
+  String get worldBookUnnamed => '未命名世界书';
+
+  @override
+  String get worldBookDisabledTag => '已停用';
+
+  @override
+  String get worldBookAlwaysOnTag => '常驻';
+
+  @override
+  String get worldBookAddEntry => '添加条目';
+
+  @override
+  String get worldBookExport => '分享/导出';
+
+  @override
+  String get worldBookConfig => '配置';
+
+  @override
+  String get worldBookDeleteTitle => '删除世界书';
+
+  @override
+  String worldBookDeleteMessage(String name) {
+    return '确定删除「$name」？此操作无法撤销。';
+  }
+
+  @override
+  String get worldBookCancel => '取消';
+
+  @override
+  String get worldBookDelete => '删除';
+
+  @override
+  String worldBookExportFailed(String error) {
+    return '导出失败：$error';
+  }
+
+  @override
+  String get worldBookNoEntriesHint => '暂无条目';
+
+  @override
+  String get worldBookUnnamedEntry => '未命名条目';
+
+  @override
+  String worldBookKeywordsLine(String keywords) {
+    return '关键词：$keywords';
+  }
+
+  @override
+  String get worldBookEditEntry => '编辑条目';
+
+  @override
+  String get worldBookDeleteEntry => '删除条目';
+
+  @override
+  String get worldBookNameLabel => '名称';
+
+  @override
+  String get worldBookDescriptionLabel => '简介';
+
+  @override
+  String get worldBookEnabledLabel => '启用';
+
+  @override
+  String get worldBookSave => '保存';
+
+  @override
+  String get worldBookEntryNameLabel => '条目名称';
+
+  @override
+  String get worldBookEntryEnabledLabel => '启用条目';
+
+  @override
+  String get worldBookEntryPriorityLabel => '优先级';
+
+  @override
+  String get worldBookEntryKeywordsLabel => '关键词';
+
+  @override
+  String get worldBookEntryKeywordsHint => '使用逗号或换行分隔';
+
+  @override
+  String get worldBookEntryUseRegexLabel => '使用正则';
+
+  @override
+  String get worldBookEntryCaseSensitiveLabel => '区分大小写';
+
+  @override
+  String get worldBookEntryAlwaysOnLabel => '常驻激活';
+
+  @override
+  String get worldBookEntryAlwaysOnHint => '无需匹配也会注入';
+
+  @override
+  String get worldBookEntryScanDepthLabel => '扫描深度';
+
+  @override
+  String get worldBookEntryContentLabel => '内容';
+
+  @override
+  String get worldBookEntryInjectionPositionLabel => '注入位置';
+
+  @override
+  String get worldBookEntryInjectionRoleLabel => '注入角色';
+
+  @override
+  String get worldBookEntryInjectDepthLabel => '注入深度';
+
+  @override
+  String get worldBookInjectionPositionBeforeSystemPrompt => '系统提示前';
+
+  @override
+  String get worldBookInjectionPositionAfterSystemPrompt => '系统提示后';
+
+  @override
+  String get worldBookInjectionPositionTopOfChat => '对话顶部';
+
+  @override
+  String get worldBookInjectionPositionBottomOfChat => '对话底部';
+
+  @override
+  String get worldBookInjectionPositionAtDepth => '指定深度';
+
+  @override
+  String get worldBookInjectionRoleUser => '用户';
+
+  @override
+  String get worldBookInjectionRoleAssistant => '助手';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -7440,6 +7581,147 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get fileUploadDuplicateUploadNew => '重新上传';
+
+  @override
+  String get settingsPageWorldBook => '世界书';
+
+  @override
+  String get worldBookTitle => '世界书';
+
+  @override
+  String get worldBookAdd => '添加世界书';
+
+  @override
+  String get worldBookEmptyMessage => '暂无世界书';
+
+  @override
+  String get worldBookUnnamed => '未命名世界书';
+
+  @override
+  String get worldBookDisabledTag => '已停用';
+
+  @override
+  String get worldBookAlwaysOnTag => '常驻';
+
+  @override
+  String get worldBookAddEntry => '添加条目';
+
+  @override
+  String get worldBookExport => '分享/导出';
+
+  @override
+  String get worldBookConfig => '配置';
+
+  @override
+  String get worldBookDeleteTitle => '删除世界书';
+
+  @override
+  String worldBookDeleteMessage(String name) {
+    return '确定删除「$name」？此操作无法撤销。';
+  }
+
+  @override
+  String get worldBookCancel => '取消';
+
+  @override
+  String get worldBookDelete => '删除';
+
+  @override
+  String worldBookExportFailed(String error) {
+    return '导出失败：$error';
+  }
+
+  @override
+  String get worldBookNoEntriesHint => '暂无条目';
+
+  @override
+  String get worldBookUnnamedEntry => '未命名条目';
+
+  @override
+  String worldBookKeywordsLine(String keywords) {
+    return '关键词：$keywords';
+  }
+
+  @override
+  String get worldBookEditEntry => '编辑条目';
+
+  @override
+  String get worldBookDeleteEntry => '删除条目';
+
+  @override
+  String get worldBookNameLabel => '名称';
+
+  @override
+  String get worldBookDescriptionLabel => '简介';
+
+  @override
+  String get worldBookEnabledLabel => '启用';
+
+  @override
+  String get worldBookSave => '保存';
+
+  @override
+  String get worldBookEntryNameLabel => '条目名称';
+
+  @override
+  String get worldBookEntryEnabledLabel => '启用条目';
+
+  @override
+  String get worldBookEntryPriorityLabel => '优先级';
+
+  @override
+  String get worldBookEntryKeywordsLabel => '关键词';
+
+  @override
+  String get worldBookEntryKeywordsHint => '使用逗号或换行分隔';
+
+  @override
+  String get worldBookEntryUseRegexLabel => '使用正则';
+
+  @override
+  String get worldBookEntryCaseSensitiveLabel => '区分大小写';
+
+  @override
+  String get worldBookEntryAlwaysOnLabel => '常驻激活';
+
+  @override
+  String get worldBookEntryAlwaysOnHint => '无需匹配也会注入';
+
+  @override
+  String get worldBookEntryScanDepthLabel => '扫描深度';
+
+  @override
+  String get worldBookEntryContentLabel => '内容';
+
+  @override
+  String get worldBookEntryInjectionPositionLabel => '注入位置';
+
+  @override
+  String get worldBookEntryInjectionRoleLabel => '注入角色';
+
+  @override
+  String get worldBookEntryInjectDepthLabel => '注入深度';
+
+  @override
+  String get worldBookInjectionPositionBeforeSystemPrompt => '系统提示前';
+
+  @override
+  String get worldBookInjectionPositionAfterSystemPrompt => '系统提示后';
+
+  @override
+  String get worldBookInjectionPositionTopOfChat => '对话顶部';
+
+  @override
+  String get worldBookInjectionPositionBottomOfChat => '对话底部';
+
+  @override
+  String get worldBookInjectionPositionAtDepth => '指定深度';
+
+  @override
+  String get worldBookInjectionRoleUser => '用户';
+
+  @override
+  String get worldBookInjectionRoleAssistant => '助手';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -11175,4 +11457,145 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get fileUploadDuplicateUploadNew => '重新上傳';
+
+  @override
+  String get settingsPageWorldBook => '世界書';
+
+  @override
+  String get worldBookTitle => '世界書';
+
+  @override
+  String get worldBookAdd => '新增世界書';
+
+  @override
+  String get worldBookEmptyMessage => '暫無世界書';
+
+  @override
+  String get worldBookUnnamed => '未命名世界書';
+
+  @override
+  String get worldBookDisabledTag => '已停用';
+
+  @override
+  String get worldBookAlwaysOnTag => '常駐';
+
+  @override
+  String get worldBookAddEntry => '新增條目';
+
+  @override
+  String get worldBookExport => '分享/匯出';
+
+  @override
+  String get worldBookConfig => '設定';
+
+  @override
+  String get worldBookDeleteTitle => '刪除世界書';
+
+  @override
+  String worldBookDeleteMessage(String name) {
+    return '確定刪除「$name」？此操作無法復原。';
+  }
+
+  @override
+  String get worldBookCancel => '取消';
+
+  @override
+  String get worldBookDelete => '刪除';
+
+  @override
+  String worldBookExportFailed(String error) {
+    return '匯出失敗：$error';
+  }
+
+  @override
+  String get worldBookNoEntriesHint => '暫無條目';
+
+  @override
+  String get worldBookUnnamedEntry => '未命名條目';
+
+  @override
+  String worldBookKeywordsLine(String keywords) {
+    return '關鍵詞：$keywords';
+  }
+
+  @override
+  String get worldBookEditEntry => '編輯條目';
+
+  @override
+  String get worldBookDeleteEntry => '刪除條目';
+
+  @override
+  String get worldBookNameLabel => '名稱';
+
+  @override
+  String get worldBookDescriptionLabel => '簡介';
+
+  @override
+  String get worldBookEnabledLabel => '啟用';
+
+  @override
+  String get worldBookSave => '儲存';
+
+  @override
+  String get worldBookEntryNameLabel => '條目名稱';
+
+  @override
+  String get worldBookEntryEnabledLabel => '啟用條目';
+
+  @override
+  String get worldBookEntryPriorityLabel => '優先級';
+
+  @override
+  String get worldBookEntryKeywordsLabel => '關鍵詞';
+
+  @override
+  String get worldBookEntryKeywordsHint => '使用逗號或換行分隔';
+
+  @override
+  String get worldBookEntryUseRegexLabel => '使用正則';
+
+  @override
+  String get worldBookEntryCaseSensitiveLabel => '區分大小寫';
+
+  @override
+  String get worldBookEntryAlwaysOnLabel => '常駐啟用';
+
+  @override
+  String get worldBookEntryAlwaysOnHint => '無需匹配也會注入';
+
+  @override
+  String get worldBookEntryScanDepthLabel => '掃描深度';
+
+  @override
+  String get worldBookEntryContentLabel => '內容';
+
+  @override
+  String get worldBookEntryInjectionPositionLabel => '注入位置';
+
+  @override
+  String get worldBookEntryInjectionRoleLabel => '注入角色';
+
+  @override
+  String get worldBookEntryInjectDepthLabel => '注入深度';
+
+  @override
+  String get worldBookInjectionPositionBeforeSystemPrompt => '系統提示前';
+
+  @override
+  String get worldBookInjectionPositionAfterSystemPrompt => '系統提示後';
+
+  @override
+  String get worldBookInjectionPositionTopOfChat => '對話頂部';
+
+  @override
+  String get worldBookInjectionPositionBottomOfChat => '對話底部';
+
+  @override
+  String get worldBookInjectionPositionAtDepth => '指定深度';
+
+  @override
+  String get worldBookInjectionRoleUser => '使用者';
+
+  @override
+  String get worldBookInjectionRoleAssistant => '助手';
 }

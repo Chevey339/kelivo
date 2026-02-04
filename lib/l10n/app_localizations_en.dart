@@ -3878,4 +3878,148 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fileUploadDuplicateUploadNew => 'Upload new';
+
+  @override
+  String get settingsPageWorldBook => 'World Book';
+
+  @override
+  String get worldBookTitle => 'World Book';
+
+  @override
+  String get worldBookAdd => 'Add World Book';
+
+  @override
+  String get worldBookEmptyMessage => 'No world books yet';
+
+  @override
+  String get worldBookUnnamed => 'Unnamed World Book';
+
+  @override
+  String get worldBookDisabledTag => 'Disabled';
+
+  @override
+  String get worldBookAlwaysOnTag => 'Always On';
+
+  @override
+  String get worldBookAddEntry => 'Add Entry';
+
+  @override
+  String get worldBookExport => 'Share / Export';
+
+  @override
+  String get worldBookConfig => 'Configure';
+
+  @override
+  String get worldBookDeleteTitle => 'Delete World Book';
+
+  @override
+  String worldBookDeleteMessage(String name) {
+    return 'Delete “$name”? This cannot be undone.';
+  }
+
+  @override
+  String get worldBookCancel => 'Cancel';
+
+  @override
+  String get worldBookDelete => 'Delete';
+
+  @override
+  String worldBookExportFailed(String error) {
+    return 'Export failed: $error';
+  }
+
+  @override
+  String get worldBookNoEntriesHint => 'No entries';
+
+  @override
+  String get worldBookUnnamedEntry => 'Unnamed Entry';
+
+  @override
+  String worldBookKeywordsLine(String keywords) {
+    return 'Keywords: $keywords';
+  }
+
+  @override
+  String get worldBookEditEntry => 'Edit Entry';
+
+  @override
+  String get worldBookDeleteEntry => 'Delete Entry';
+
+  @override
+  String get worldBookNameLabel => 'Name';
+
+  @override
+  String get worldBookDescriptionLabel => 'Description';
+
+  @override
+  String get worldBookEnabledLabel => 'Enabled';
+
+  @override
+  String get worldBookSave => 'Save';
+
+  @override
+  String get worldBookEntryNameLabel => 'Entry name';
+
+  @override
+  String get worldBookEntryEnabledLabel => 'Entry enabled';
+
+  @override
+  String get worldBookEntryPriorityLabel => 'Priority';
+
+  @override
+  String get worldBookEntryKeywordsLabel => 'Keywords';
+
+  @override
+  String get worldBookEntryKeywordsHint => 'Separate with commas or new lines';
+
+  @override
+  String get worldBookEntryUseRegexLabel => 'Use regex';
+
+  @override
+  String get worldBookEntryCaseSensitiveLabel => 'Case sensitive';
+
+  @override
+  String get worldBookEntryAlwaysOnLabel => 'Always active';
+
+  @override
+  String get worldBookEntryAlwaysOnHint =>
+      'Always inject without keyword matching';
+
+  @override
+  String get worldBookEntryScanDepthLabel => 'Scan depth';
+
+  @override
+  String get worldBookEntryContentLabel => 'Content';
+
+  @override
+  String get worldBookEntryInjectionPositionLabel => 'Injection position';
+
+  @override
+  String get worldBookEntryInjectionRoleLabel => 'Injection role';
+
+  @override
+  String get worldBookEntryInjectDepthLabel => 'Injection depth';
+
+  @override
+  String get worldBookInjectionPositionBeforeSystemPrompt =>
+      'Before system prompt';
+
+  @override
+  String get worldBookInjectionPositionAfterSystemPrompt =>
+      'After system prompt';
+
+  @override
+  String get worldBookInjectionPositionTopOfChat => 'Top of chat';
+
+  @override
+  String get worldBookInjectionPositionBottomOfChat => 'Bottom of chat';
+
+  @override
+  String get worldBookInjectionPositionAtDepth => 'At depth';
+
+  @override
+  String get worldBookInjectionRoleUser => 'User';
+
+  @override
+  String get worldBookInjectionRoleAssistant => 'Assistant';
 }

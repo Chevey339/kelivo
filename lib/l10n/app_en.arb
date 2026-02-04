@@ -1602,5 +1602,71 @@
     }
   },
   "fileUploadDuplicateUseExisting": "Use existing",
-  "fileUploadDuplicateUploadNew": "Upload new"
+  "fileUploadDuplicateUploadNew": "Upload new",
+  "settingsPageWorldBook": "World Book",
+  "worldBookTitle": "World Book",
+  "worldBookAdd": "Add World Book",
+  "worldBookEmptyMessage": "No world books yet",
+  "worldBookUnnamed": "Unnamed World Book",
+  "worldBookDisabledTag": "Disabled",
+  "worldBookAlwaysOnTag": "Always On",
+  "worldBookAddEntry": "Add Entry",
+  "worldBookExport": "Share / Export",
+  "worldBookConfig": "Configure",
+  "worldBookDeleteTitle": "Delete World Book",
+  "worldBookDeleteMessage": "Delete “{name}”? This cannot be undone.",
+  "@worldBookDeleteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "worldBookCancel": "Cancel",
+  "worldBookDelete": "Delete",
+  "worldBookExportFailed": "Export failed: {error}",
+  "@worldBookExportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "worldBookNoEntriesHint": "No entries",
+  "worldBookUnnamedEntry": "Unnamed Entry",
+  "worldBookKeywordsLine": "Keywords: {keywords}",
+  "@worldBookKeywordsLine": {
+    "placeholders": {
+      "keywords": {
+        "type": "String"
+      }
+    }
+  },
+  "worldBookEditEntry": "Edit Entry",
+  "worldBookDeleteEntry": "Delete Entry",
+  "worldBookNameLabel": "Name",
+  "worldBookDescriptionLabel": "Description",
+  "worldBookEnabledLabel": "Enabled",
+  "worldBookSave": "Save",
+  "worldBookEntryNameLabel": "Entry name",
+  "worldBookEntryEnabledLabel": "Entry enabled",
+  "worldBookEntryPriorityLabel": "Priority",
+  "worldBookEntryKeywordsLabel": "Keywords",
+  "worldBookEntryKeywordsHint": "Separate with commas or new lines",
+  "worldBookEntryUseRegexLabel": "Use regex",
+  "worldBookEntryCaseSensitiveLabel": "Case sensitive",
+  "worldBookEntryAlwaysOnLabel": "Always active",
+  "worldBookEntryAlwaysOnHint": "Always inject without keyword matching",
+  "worldBookEntryScanDepthLabel": "Scan depth",
+  "worldBookEntryContentLabel": "Content",
+  "worldBookEntryInjectionPositionLabel": "Injection position",
+  "worldBookEntryInjectionRoleLabel": "Injection role",
+  "worldBookEntryInjectDepthLabel": "Injection depth",
+  "worldBookInjectionPositionBeforeSystemPrompt": "Before system prompt",
+  "worldBookInjectionPositionAfterSystemPrompt": "After system prompt",
+  "worldBookInjectionPositionTopOfChat": "Top of chat",
+  "worldBookInjectionPositionBottomOfChat": "Bottom of chat",
+  "worldBookInjectionPositionAtDepth": "At depth",
+  "worldBookInjectionRoleUser": "User",
+  "worldBookInjectionRoleAssistant": "Assistant"
 }

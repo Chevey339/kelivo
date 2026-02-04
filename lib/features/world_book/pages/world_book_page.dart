@@ -1,0 +1,1682 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../../core/models/world_book.dart';
+import '../../../core/providers/world_book_provider.dart';
+import '../../../core/services/haptics.dart';
+import '../../../icons/lucide_adapter.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/ios_switch.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/snackbar.dart';
+
+class WorldBookPage extends StatefulWidget {
+  const WorldBookPage({super.key});
+
+  @override
+  State<WorldBookPage> createState() => _WorldBookPageState();
+}
+
+class _WorldBookPageState extends State<WorldBookPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await context.read<WorldBookProvider>().initialize();
+    });
+  }
+
+  Future<WorldBook?> _showBookConfigSheet({WorldBook? book}) async {
+    final cs = Theme.of(context).colorScheme;
+    return showModalBottomSheet<WorldBook>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) {
+        final maxHeight = MediaQuery.sizeOf(sheetCtx).height * 0.9;
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: _WorldBookEditSheet(book: book),
+        );
+      },
+    );
+  }
+
+  Future<WorldBookEntry?> _showEntryEditSheet({WorldBookEntry? entry}) async {
+    final cs = Theme.of(context).colorScheme;
+    return showModalBottomSheet<WorldBookEntry>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) {
+        final maxHeight = MediaQuery.sizeOf(sheetCtx).height * 0.9;
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: _WorldBookEntryEditSheet(entry: entry),
+        );
+      },
+    );
+  }
+
+  Future<void> _exportBook(WorldBook book) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final dir = await getTemporaryDirectory();
+      final fileName = _safeFileName(
+        book.name.trim().isEmpty ? 'lorebook' : book.name.trim(),
+      );
+      final file = File('${dir.path}/$fileName.json');
+      await file.writeAsString(jsonEncode(_toRikkaHubExportJson(book)));
+      await Share.shareXFiles([XFile(file.path)], subject: fileName);
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.worldBookExportFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    }
+  }
+
+  Map<String, dynamic> _toRikkaHubExportJson(WorldBook book) {
+    final data = <String, dynamic>{
+      'id': book.id,
+      'name': book.name,
+      'description': book.description,
+      'enabled': book.enabled,
+      'entries': book.entries
+          .map(
+            (e) => <String, dynamic>{
+              'id': e.id,
+              'name': e.name,
+              'enabled': e.enabled,
+              'priority': e.priority,
+              'position': e.position.toJson(),
+              'content': e.content,
+              'injectDepth': e.injectDepth,
+              'role': e.role.toJson(),
+              'keywords': e.keywords,
+              'useRegex': e.useRegex,
+              'caseSensitive': e.caseSensitive,
+              'scanDepth': e.scanDepth,
+              'constantActive': e.constantActive,
+            },
+          )
+          .toList(growable: false),
+    };
+    return <String, dynamic>{'version': 1, 'type': 'lorebook', 'data': data};
+  }
+
+  String _safeFileName(String name) {
+    final cleaned = name
+        .replaceAll(RegExp(r'[\\\\/:*?\"<>|]'), '_')
+        .replaceAll(RegExp(r'\\s+'), ' ')
+        .trim();
+    if (cleaned.isEmpty) return 'lorebook';
+    return cleaned.length > 80 ? cleaned.substring(0, 80) : cleaned;
+  }
+
+  Future<bool> _confirmDeleteBook(WorldBook book) async {
+    final l10n = AppLocalizations.of(context)!;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(l10n.worldBookDeleteTitle),
+          content: Text(
+            l10n.worldBookDeleteMessage(
+              book.name.trim().isEmpty
+                  ? l10n.worldBookUnnamed
+                  : book.name.trim(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.worldBookCancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(
+                l10n.worldBookDelete,
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    return result == true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final provider = context.watch<WorldBookProvider>();
+    final books = provider.books;
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: Tooltip(
+          message: l10n.settingsPageBackButton,
+          child: IosIconButton(
+            icon: Lucide.ArrowLeft,
+            minSize: 44,
+            size: 22,
+            onTap: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        title: Text(l10n.worldBookTitle),
+        actions: [
+          Tooltip(
+            message: l10n.worldBookAdd,
+            child: IosIconButton(
+              icon: Lucide.Plus,
+              minSize: 44,
+              size: 22,
+              onTap: () async {
+                Haptics.light();
+                final result = await _showBookConfigSheet();
+                if (result == null) return;
+                await context.read<WorldBookProvider>().addBook(result);
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: books.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Lucide.BookOpen,
+                    size: 64,
+                    color: cs.onSurface.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    l10n.worldBookEmptyMessage,
+                    style: TextStyle(
+                      color: cs.onSurface.withOpacity(0.6),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              children: [
+                for (final book in books) ...[
+                  _WorldBookSection(
+                    book: book,
+                    onAddEntry: () async {
+                      Haptics.light();
+                      final edited = await _showEntryEditSheet();
+                      if (edited == null) return;
+                      final next = book.copyWith(
+                        entries: [...book.entries, edited],
+                      );
+                      await context.read<WorldBookProvider>().updateBook(next);
+                    },
+                    onExport: () async {
+                      Haptics.light();
+                      await _exportBook(book);
+                    },
+                    onConfig: () async {
+                      Haptics.light();
+                      final updated = await _showBookConfigSheet(book: book);
+                      if (updated == null) return;
+                      await context.read<WorldBookProvider>().updateBook(
+                        updated,
+                      );
+                    },
+                    onDelete: () async {
+                      Haptics.light();
+                      final confirm = await _confirmDeleteBook(book);
+                      if (!confirm) return;
+                      await context.read<WorldBookProvider>().deleteBook(
+                        book.id,
+                      );
+                    },
+                    onEditEntry: (entry) async {
+                      Haptics.light();
+                      final edited = await _showEntryEditSheet(entry: entry);
+                      if (edited == null) return;
+                      final nextEntries = book.entries
+                          .map((e) => e.id == entry.id ? edited : e)
+                          .toList(growable: false);
+                      await context.read<WorldBookProvider>().updateBook(
+                        book.copyWith(entries: nextEntries),
+                      );
+                    },
+                    onDeleteEntry: (entry) async {
+                      Haptics.light();
+                      final nextEntries = book.entries
+                          .where((e) => e.id != entry.id)
+                          .toList(growable: false);
+                      await context.read<WorldBookProvider>().updateBook(
+                        book.copyWith(entries: nextEntries),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                ],
+              ],
+            ),
+      backgroundColor: isDark ? cs.surface : cs.surface,
+    );
+  }
+}
+
+class _WorldBookSection extends StatelessWidget {
+  const _WorldBookSection({
+    required this.book,
+    required this.onAddEntry,
+    required this.onExport,
+    required this.onConfig,
+    required this.onDelete,
+    required this.onEditEntry,
+    required this.onDeleteEntry,
+  });
+
+  final WorldBook book;
+  final VoidCallback onAddEntry;
+  final VoidCallback onExport;
+  final VoidCallback onConfig;
+  final VoidCallback onDelete;
+  final Future<void> Function(WorldBookEntry entry) onEditEntry;
+  final Future<void> Function(WorldBookEntry entry) onDeleteEntry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+
+    final title = book.name.trim().isEmpty
+        ? l10n.worldBookUnnamed
+        : book.name.trim();
+    final subtitle = book.description.trim();
+    final entries = book.entries;
+
+    Future<void> showEntryActions(WorldBookEntry entry) async {
+      final result = await showModalBottomSheet<_EntryAction>(
+        context: context,
+        backgroundColor: cs.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) {
+          final localL10n = AppLocalizations.of(ctx)!;
+          final localCs = Theme.of(ctx).colorScheme;
+
+          Widget actionRow({
+            required IconData icon,
+            required String label,
+            Color? color,
+            required VoidCallback onTap,
+          }) {
+            final c = color ?? localCs.onSurface.withOpacity(0.9);
+            return IosCardPress(
+              baseColor: Colors.transparent,
+              borderRadius: BorderRadius.zero,
+              pressedScale: 1.0,
+              haptics: false,
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(width: 28, child: Icon(icon, size: 20, color: c)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: c,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          Widget divider() => Divider(
+            height: 6,
+            thickness: 0.6,
+            indent: 12,
+            endIndent: 12,
+            color: localCs.outlineVariant.withOpacity(0.18),
+          );
+
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _IosSectionCard(
+                    children: [
+                      actionRow(
+                        icon: Lucide.Settings2,
+                        label: localL10n.worldBookEditEntry,
+                        onTap: () => Navigator.of(ctx).pop(_EntryAction.edit),
+                      ),
+                      divider(),
+                      actionRow(
+                        icon: Lucide.Trash2,
+                        label: localL10n.worldBookDeleteEntry,
+                        color: localCs.error,
+                        onTap: () => Navigator.of(ctx).pop(_EntryAction.delete),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _IosSectionCard(
+                    children: [
+                      actionRow(
+                        icon: Lucide.X,
+                        label: localL10n.worldBookCancel,
+                        onTap: () => Navigator.of(ctx).pop(_EntryAction.cancel),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+
+      if (result == null || result == _EntryAction.cancel) return;
+      if (result == _EntryAction.edit) {
+        await onEditEntry(entry);
+      } else if (result == _EntryAction.delete) {
+        await onDeleteEntry(entry);
+      }
+    }
+
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (!book.enabled) ...[
+                      const SizedBox(width: 8),
+                      _TagPill(
+                        text: l10n.worldBookDisabledTag,
+                        color: cs.error,
+                      ),
+                    ],
+                  ],
+                ),
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: cs.onSurface.withOpacity(0.65),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _HeaderIconButton(
+            icon: Lucide.Plus,
+            tooltip: l10n.worldBookAddEntry,
+            onTap: onAddEntry,
+          ),
+          _HeaderIconButton(
+            icon: Lucide.Share2,
+            tooltip: l10n.worldBookExport,
+            onTap: onExport,
+          ),
+          _HeaderIconButton(
+            icon: Lucide.Settings2,
+            tooltip: l10n.worldBookConfig,
+            onTap: onConfig,
+          ),
+          _HeaderIconButton(
+            icon: Lucide.Trash2,
+            tooltip: l10n.worldBookDelete,
+            onTap: onDelete,
+            color: cs.error,
+          ),
+        ],
+      ),
+    );
+
+    final children = <Widget>[];
+    if (entries.isEmpty) {
+      children.add(
+        _IosListRow(icon: Lucide.ListTree, label: l10n.worldBookNoEntriesHint),
+      );
+    } else {
+      for (int i = 0; i < entries.length; i++) {
+        final entry = entries[i];
+        final entryTitle = entry.name.trim().isEmpty
+            ? l10n.worldBookUnnamedEntry
+            : entry.name.trim();
+        final detail = !entry.enabled
+            ? l10n.worldBookDisabledTag
+            : (entry.constantActive ? l10n.worldBookAlwaysOnTag : null);
+        children.add(
+          _IosListRow(
+            icon: Lucide.Bookmark,
+            label: entryTitle,
+            detailText: detail,
+            enabled: entry.enabled,
+            onTap: () {
+              onEditEntry(entry);
+            },
+            onLongPress: () {
+              showEntryActions(entry);
+            },
+          ),
+        );
+        if (i != entries.length - 1) {
+          children.add(_iosDivider(context));
+        }
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        header,
+        _IosSectionCard(children: children),
+      ],
+    );
+  }
+}
+
+enum _EntryAction { edit, delete, cancel }
+
+class _IosSectionCard extends StatelessWidget {
+  const _IosSectionCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+          width: 0.6,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(children: children),
+      ),
+    );
+  }
+}
+
+Widget _iosDivider(BuildContext context) {
+  final cs = Theme.of(context).colorScheme;
+  return Divider(
+    height: 6,
+    thickness: 0.6,
+    indent: 54,
+    endIndent: 12,
+    color: cs.outlineVariant.withOpacity(0.18),
+  );
+}
+
+class _IosListRow extends StatelessWidget {
+  const _IosListRow({
+    required this.icon,
+    required this.label,
+    this.detailText,
+    this.enabled = true,
+    this.onTap,
+    this.onLongPress,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? detailText;
+  final bool enabled;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final opacity = enabled ? 1.0 : 0.55;
+    final baseColor = cs.onSurface.withOpacity(0.9 * opacity);
+    final interactive = onTap != null || onLongPress != null;
+
+    return IosCardPress(
+      baseColor: Colors.transparent,
+      borderRadius: BorderRadius.zero,
+      pressedScale: 1.0,
+      haptics: interactive,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        child: Row(
+          children: [
+            SizedBox(width: 36, child: Icon(icon, size: 20, color: baseColor)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: baseColor,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (detailText != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Text(
+                  detailText!,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withOpacity(0.6 * opacity),
+                  ),
+                ),
+              ),
+            if (onTap != null)
+              Icon(Lucide.ChevronRight, size: 16, color: baseColor),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.color,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: IosIconButton(
+        icon: icon,
+        size: 18,
+        padding: const EdgeInsets.all(8),
+        color: color ?? cs.onSurface.withOpacity(0.9),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+class _TagPill extends StatelessWidget {
+  const _TagPill({required this.text, required this.color});
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final bg = color.withOpacity(0.14);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
+          color: cs.onSurface,
+        ),
+      ),
+    );
+  }
+}
+
+class _WorldBookEditSheet extends StatefulWidget {
+  const _WorldBookEditSheet({required this.book});
+  final WorldBook? book;
+
+  @override
+  State<_WorldBookEditSheet> createState() => _WorldBookEditSheetState();
+}
+
+class _WorldBookEditSheetState extends State<_WorldBookEditSheet> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _descController;
+  bool _enabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.book?.name ?? '');
+    _descController = TextEditingController(
+      text: widget.book?.description ?? '',
+    );
+    _enabled = widget.book?.enabled ?? true;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final base = widget.book;
+
+    InputDecoration deco({
+      required String label,
+      String? hint,
+      bool alignLabelWithHint = false,
+    }) {
+      return InputDecoration(
+        labelText: label,
+        hintText: hint,
+        alignLabelWithHint: alignLabelWithHint,
+        filled: true,
+        fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+        ),
+      );
+    }
+
+    Widget divider() => Divider(
+      height: 6,
+      thickness: 0.6,
+      indent: 12,
+      endIndent: 12,
+      color: cs.outlineVariant.withOpacity(0.18),
+    );
+
+    Widget switchRow({
+      required String label,
+      String? hint,
+      required bool value,
+      required ValueChanged<bool> onChanged,
+    }) {
+      return IosCardPress(
+        baseColor: Colors.transparent,
+        borderRadius: BorderRadius.zero,
+        pressedScale: 1.0,
+        haptics: false,
+        onTap: () => onChanged(!value),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface.withOpacity(0.9),
+                      ),
+                    ),
+                    if (hint != null && hint.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        hint,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: cs.onSurface.withOpacity(0.6),
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              IosSwitch(value: value, onChanged: onChanged),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 12,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                base == null ? l10n.worldBookAdd : l10n.worldBookConfig,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: _IosSectionCard(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      child: TextField(
+                        controller: _nameController,
+                        autofocus: base == null,
+                        decoration: deco(label: l10n.worldBookNameLabel),
+                      ),
+                    ),
+                    divider(),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      child: TextField(
+                        controller: _descController,
+                        maxLines: 2,
+                        decoration: deco(label: l10n.worldBookDescriptionLabel),
+                      ),
+                    ),
+                    divider(),
+                    switchRow(
+                      label: l10n.worldBookEnabledLabel,
+                      value: _enabled,
+                      onChanged: (v) => setState(() => _enabled = v),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _IosOutlineButton(
+                    label: l10n.worldBookCancel,
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _IosFilledButton(
+                    label: l10n.worldBookSave,
+                    onTap: () {
+                      final result = WorldBook(
+                        id: base?.id ?? const Uuid().v4(),
+                        name: _nameController.text.trim(),
+                        description: _descController.text.trim(),
+                        enabled: _enabled,
+                        entries: base?.entries ?? const <WorldBookEntry>[],
+                      );
+                      Navigator.of(context).pop(result);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WorldBookEntryEditSheet extends StatefulWidget {
+  const _WorldBookEntryEditSheet({required this.entry});
+  final WorldBookEntry? entry;
+
+  @override
+  State<_WorldBookEntryEditSheet> createState() =>
+      _WorldBookEntryEditSheetState();
+}
+
+class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _keywordsController;
+  late final TextEditingController _contentController;
+  late final TextEditingController _priorityController;
+  late final TextEditingController _scanDepthController;
+  late final TextEditingController _injectDepthController;
+
+  bool _enabled = true;
+  bool _useRegex = false;
+  bool _caseSensitive = false;
+  bool _constantActive = false;
+  late WorldBookInjectionPosition _position;
+  late WorldBookInjectionRole _role;
+
+  @override
+  void initState() {
+    super.initState();
+    final entry = widget.entry;
+    _nameController = TextEditingController(text: entry?.name ?? '');
+    _keywordsController = TextEditingController(
+      text: (entry?.keywords ?? const <String>[]).join(', '),
+    );
+    _contentController = TextEditingController(text: entry?.content ?? '');
+    _priorityController = TextEditingController(
+      text: (entry?.priority ?? 0).toString(),
+    );
+    _scanDepthController = TextEditingController(
+      text: (entry?.scanDepth ?? 4).toString(),
+    );
+    _injectDepthController = TextEditingController(
+      text: (entry?.injectDepth ?? 4).toString(),
+    );
+    _enabled = entry?.enabled ?? true;
+    _useRegex = entry?.useRegex ?? false;
+    _caseSensitive = entry?.caseSensitive ?? false;
+    _constantActive = entry?.constantActive ?? false;
+    _position = entry?.position ?? WorldBookInjectionPosition.afterSystemPrompt;
+    _role = entry?.role ?? WorldBookInjectionRole.user;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _keywordsController.dispose();
+    _contentController.dispose();
+    _priorityController.dispose();
+    _scanDepthController.dispose();
+    _injectDepthController.dispose();
+    super.dispose();
+  }
+
+  List<String> _parseKeywords(String raw) {
+    return raw
+        .split(RegExp(r'[\\n,，;；]'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final base = widget.entry;
+
+    final keywords = _parseKeywords(_keywordsController.text);
+    final canSave = _constantActive || keywords.isNotEmpty;
+
+    String positionLabel(WorldBookInjectionPosition p) {
+      return switch (p) {
+        WorldBookInjectionPosition.beforeSystemPrompt =>
+          l10n.worldBookInjectionPositionBeforeSystemPrompt,
+        WorldBookInjectionPosition.afterSystemPrompt =>
+          l10n.worldBookInjectionPositionAfterSystemPrompt,
+        WorldBookInjectionPosition.topOfChat =>
+          l10n.worldBookInjectionPositionTopOfChat,
+        WorldBookInjectionPosition.bottomOfChat =>
+          l10n.worldBookInjectionPositionBottomOfChat,
+        WorldBookInjectionPosition.atDepth =>
+          l10n.worldBookInjectionPositionAtDepth,
+      };
+    }
+
+    String roleLabel(WorldBookInjectionRole r) {
+      return switch (r) {
+        WorldBookInjectionRole.user => l10n.worldBookInjectionRoleUser,
+        WorldBookInjectionRole.assistant =>
+          l10n.worldBookInjectionRoleAssistant,
+      };
+    }
+
+    InputDecoration deco({
+      required String label,
+      String? hint,
+      bool alignLabelWithHint = false,
+    }) {
+      return InputDecoration(
+        labelText: label,
+        hintText: hint,
+        alignLabelWithHint: alignLabelWithHint,
+        filled: true,
+        fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+        ),
+      );
+    }
+
+    Widget divider() => Divider(
+      height: 6,
+      thickness: 0.6,
+      indent: 12,
+      endIndent: 12,
+      color: cs.outlineVariant.withOpacity(0.18),
+    );
+
+    Widget switchRow({
+      required String label,
+      String? hint,
+      required bool value,
+      required ValueChanged<bool> onChanged,
+    }) {
+      return IosCardPress(
+        baseColor: Colors.transparent,
+        borderRadius: BorderRadius.zero,
+        pressedScale: 1.0,
+        haptics: false,
+        onTap: () => onChanged(!value),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface.withOpacity(0.9),
+                      ),
+                    ),
+                    if (hint != null && hint.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        hint,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: cs.onSurface.withOpacity(0.6),
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              IosSwitch(value: value, onChanged: onChanged),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Widget valueRow({
+      required String label,
+      required String valueText,
+      required VoidCallback onTap,
+    }) {
+      return IosCardPress(
+        baseColor: Colors.transparent,
+        borderRadius: BorderRadius.zero,
+        pressedScale: 1.0,
+        haptics: false,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: cs.onSurface.withOpacity(0.9),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                valueText,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: cs.onSurface.withOpacity(0.62),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Lucide.ChevronRight,
+                size: 16,
+                color: cs.onSurface.withOpacity(0.55),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Future<void> pickPosition() async {
+      final selected = await showModalBottomSheet<WorldBookInjectionPosition>(
+        context: context,
+        backgroundColor: cs.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) {
+          final localL10n = AppLocalizations.of(ctx)!;
+          final localCs = Theme.of(ctx).colorScheme;
+
+          Widget option(WorldBookInjectionPosition p) {
+            final selected = _position == p;
+            return IosCardPress(
+              baseColor: Colors.transparent,
+              borderRadius: BorderRadius.zero,
+              pressedScale: 1.0,
+              haptics: false,
+              onTap: () => Navigator.of(ctx).pop(p),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        positionLabel(p),
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: localCs.onSurface.withOpacity(0.9),
+                        ),
+                      ),
+                    ),
+                    if (selected)
+                      Icon(Lucide.Check, size: 18, color: localCs.primary),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          Widget divider() => Divider(
+            height: 6,
+            thickness: 0.6,
+            indent: 12,
+            endIndent: 12,
+            color: localCs.outlineVariant.withOpacity(0.18),
+          );
+
+          final options = <WorldBookInjectionPosition>[
+            WorldBookInjectionPosition.beforeSystemPrompt,
+            WorldBookInjectionPosition.afterSystemPrompt,
+            WorldBookInjectionPosition.topOfChat,
+            WorldBookInjectionPosition.bottomOfChat,
+            WorldBookInjectionPosition.atDepth,
+          ];
+
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Text(
+                      localL10n.worldBookEntryInjectionPositionLabel,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _IosSectionCard(
+                    children: [
+                      for (int i = 0; i < options.length; i++) ...[
+                        option(options[i]),
+                        if (i != options.length - 1) divider(),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      if (selected == null) return;
+      setState(() => _position = selected);
+    }
+
+    Future<void> pickRole() async {
+      final selected = await showModalBottomSheet<WorldBookInjectionRole>(
+        context: context,
+        backgroundColor: cs.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) {
+          final localL10n = AppLocalizations.of(ctx)!;
+          final localCs = Theme.of(ctx).colorScheme;
+
+          Widget option(WorldBookInjectionRole r) {
+            final selected = _role == r;
+            return IosCardPress(
+              baseColor: Colors.transparent,
+              borderRadius: BorderRadius.zero,
+              pressedScale: 1.0,
+              haptics: false,
+              onTap: () => Navigator.of(ctx).pop(r),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        roleLabel(r),
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: localCs.onSurface.withOpacity(0.9),
+                        ),
+                      ),
+                    ),
+                    if (selected)
+                      Icon(Lucide.Check, size: 18, color: localCs.primary),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          Widget divider() => Divider(
+            height: 6,
+            thickness: 0.6,
+            indent: 12,
+            endIndent: 12,
+            color: localCs.outlineVariant.withOpacity(0.18),
+          );
+
+          final options = <WorldBookInjectionRole>[
+            WorldBookInjectionRole.user,
+            WorldBookInjectionRole.assistant,
+          ];
+
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Text(
+                      localL10n.worldBookEntryInjectionRoleLabel,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _IosSectionCard(
+                    children: [
+                      for (int i = 0; i < options.length; i++) ...[
+                        option(options[i]),
+                        if (i != options.length - 1) divider(),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      if (selected == null) return;
+      setState(() => _role = selected);
+    }
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 12,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Center(
+              child: Text(
+                base == null ? l10n.worldBookAddEntry : l10n.worldBookEditEntry,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _IosSectionCard(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                          child: TextField(
+                            controller: _nameController,
+                            autofocus: base == null,
+                            decoration: deco(
+                              label: l10n.worldBookEntryNameLabel,
+                            ),
+                          ),
+                        ),
+                        divider(),
+                        switchRow(
+                          label: l10n.worldBookEntryEnabledLabel,
+                          value: _enabled,
+                          onChanged: (v) => setState(() => _enabled = v),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _IosSectionCard(
+                      children: [
+                        switchRow(
+                          label: l10n.worldBookEntryAlwaysOnLabel,
+                          hint: l10n.worldBookEntryAlwaysOnHint,
+                          value: _constantActive,
+                          onChanged: (v) => setState(() => _constantActive = v),
+                        ),
+                        divider(),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                          child: TextField(
+                            controller: _keywordsController,
+                            maxLines: 2,
+                            onChanged: (_) => setState(() {}),
+                            decoration: deco(
+                              label: l10n.worldBookEntryKeywordsLabel,
+                              hint: l10n.worldBookEntryKeywordsHint,
+                              alignLabelWithHint: true,
+                            ),
+                          ),
+                        ),
+                        divider(),
+                        switchRow(
+                          label: l10n.worldBookEntryUseRegexLabel,
+                          value: _useRegex,
+                          onChanged: (v) => setState(() => _useRegex = v),
+                        ),
+                        divider(),
+                        switchRow(
+                          label: l10n.worldBookEntryCaseSensitiveLabel,
+                          value: _caseSensitive,
+                          onChanged: (v) => setState(() => _caseSensitive = v),
+                        ),
+                        divider(),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                          child: TextField(
+                            controller: _scanDepthController,
+                            keyboardType: TextInputType.number,
+                            decoration: deco(
+                              label: l10n.worldBookEntryScanDepthLabel,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _IosSectionCard(
+                      children: [
+                        valueRow(
+                          label: l10n.worldBookEntryInjectionPositionLabel,
+                          valueText: positionLabel(_position),
+                          onTap: pickPosition,
+                        ),
+                        divider(),
+                        if (_position ==
+                            WorldBookInjectionPosition.atDepth) ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                            child: TextField(
+                              controller: _injectDepthController,
+                              keyboardType: TextInputType.number,
+                              decoration: deco(
+                                label: l10n.worldBookEntryInjectDepthLabel,
+                              ),
+                            ),
+                          ),
+                          divider(),
+                        ],
+                        valueRow(
+                          label: l10n.worldBookEntryInjectionRoleLabel,
+                          valueText: roleLabel(_role),
+                          onTap: pickRole,
+                        ),
+                        divider(),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                          child: TextField(
+                            controller: _priorityController,
+                            keyboardType: TextInputType.number,
+                            decoration: deco(
+                              label: l10n.worldBookEntryPriorityLabel,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _IosSectionCard(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                          child: TextField(
+                            controller: _contentController,
+                            maxLines: 5,
+                            decoration: deco(
+                              label: l10n.worldBookEntryContentLabel,
+                              alignLabelWithHint: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _IosOutlineButton(
+                    label: l10n.worldBookCancel,
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _IosFilledButton(
+                    label: l10n.worldBookSave,
+                    enabled: canSave,
+                    onTap: () {
+                      final id = base?.id ?? const Uuid().v4();
+                      final keywords = _parseKeywords(_keywordsController.text);
+                      final priority =
+                          int.tryParse(_priorityController.text.trim()) ??
+                          (base?.priority ?? 0);
+                      final scanDepth =
+                          int.tryParse(_scanDepthController.text.trim()) ??
+                          (base?.scanDepth ?? 4);
+                      final injectDepth =
+                          int.tryParse(_injectDepthController.text.trim()) ??
+                          (base?.injectDepth ?? 4);
+
+                      final result = WorldBookEntry(
+                        id: id,
+                        name: _nameController.text.trim(),
+                        enabled: _enabled,
+                        priority: priority,
+                        position: _position,
+                        content: _contentController.text,
+                        injectDepth: injectDepth.clamp(1, 200).toInt(),
+                        role: _role,
+                        keywords: keywords,
+                        useRegex: _useRegex,
+                        caseSensitive: _caseSensitive,
+                        scanDepth: scanDepth.clamp(1, 200).toInt(),
+                        constantActive: _constantActive,
+                      );
+                      Navigator.of(context).pop(result);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IosOutlineButton extends StatefulWidget {
+  const _IosOutlineButton({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  State<_IosOutlineButton> createState() => _IosOutlineButtonState();
+}
+
+class _IosOutlineButtonState extends State<_IosOutlineButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final bg = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white10
+        : const Color(0xFFF2F3F5);
+    final overlay = _pressed
+        ? (Theme.of(context).brightness == Brightness.dark
+              ? Colors.white12
+              : Colors.black12)
+        : Colors.transparent;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: () {
+        Haptics.light();
+        widget.onTap();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(overlay, bg),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cs.outlineVariant.withOpacity(0.35)),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          widget.label,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: cs.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IosFilledButton extends StatefulWidget {
+  const _IosFilledButton({
+    required this.label,
+    required this.onTap,
+    this.enabled = true,
+  });
+  final String label;
+  final VoidCallback onTap;
+  final bool enabled;
+
+  @override
+  State<_IosFilledButton> createState() => _IosFilledButtonState();
+}
+
+class _IosFilledButtonState extends State<_IosFilledButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final bg = widget.enabled ? cs.primary : cs.primary.withOpacity(0.4);
+    final overlay = _pressed
+        ? Colors.black.withOpacity(0.12)
+        : Colors.transparent;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: widget.enabled ? (_) => setState(() => _pressed = true) : null,
+      onTapUp: widget.enabled ? (_) => setState(() => _pressed = false) : null,
+      onTapCancel: widget.enabled
+          ? () => setState(() => _pressed = false)
+          : null,
+      onTap: widget.enabled
+          ? () {
+              Haptics.light();
+              widget.onTap();
+            }
+          : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(overlay, bg),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          widget.label,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: cs.onPrimary.withOpacity(widget.enabled ? 1 : 0.6),
+          ),
+        ),
+      ),
+    );
+  }
+}

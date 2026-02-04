@@ -7267,6 +7267,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Upload new'**
   String get fileUploadDuplicateUploadNew;
+
+  /// No description provided for @settingsPageWorldBook.
+  ///
+  /// In en, this message translates to:
+  /// **'World Book'**
+  String get settingsPageWorldBook;
+
+  /// No description provided for @worldBookTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'World Book'**
+  String get worldBookTitle;
+
+  /// No description provided for @worldBookAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add World Book'**
+  String get worldBookAdd;
+
+  /// No description provided for @worldBookEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'No world books yet'**
+  String get worldBookEmptyMessage;
+
+  /// No description provided for @worldBookUnnamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unnamed World Book'**
+  String get worldBookUnnamed;
+
+  /// No description provided for @worldBookDisabledTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get worldBookDisabledTag;
+
+  /// No description provided for @worldBookAlwaysOnTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Always On'**
+  String get worldBookAlwaysOnTag;
+
+  /// No description provided for @worldBookAddEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Entry'**
+  String get worldBookAddEntry;
+
+  /// No description provided for @worldBookExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Share / Export'**
+  String get worldBookExport;
+
+  /// No description provided for @worldBookConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure'**
+  String get worldBookConfig;
+
+  /// No description provided for @worldBookDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete World Book'**
+  String get worldBookDeleteTitle;
+
+  /// No description provided for @worldBookDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete “{name}”? This cannot be undone.'**
+  String worldBookDeleteMessage(String name);
+
+  /// No description provided for @worldBookCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get worldBookCancel;
+
+  /// No description provided for @worldBookDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get worldBookDelete;
+
+  /// No description provided for @worldBookExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: {error}'**
+  String worldBookExportFailed(String error);
+
+  /// No description provided for @worldBookNoEntriesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No entries'**
+  String get worldBookNoEntriesHint;
+
+  /// No description provided for @worldBookUnnamedEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Unnamed Entry'**
+  String get worldBookUnnamedEntry;
+
+  /// No description provided for @worldBookKeywordsLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Keywords: {keywords}'**
+  String worldBookKeywordsLine(String keywords);
+
+  /// No description provided for @worldBookEditEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Entry'**
+  String get worldBookEditEntry;
+
+  /// No description provided for @worldBookDeleteEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Entry'**
+  String get worldBookDeleteEntry;
+
+  /// No description provided for @worldBookNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get worldBookNameLabel;
+
+  /// No description provided for @worldBookDescriptionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get worldBookDescriptionLabel;
+
+  /// No description provided for @worldBookEnabledLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get worldBookEnabledLabel;
+
+  /// No description provided for @worldBookSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get worldBookSave;
+
+  /// No description provided for @worldBookEntryNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry name'**
+  String get worldBookEntryNameLabel;
+
+  /// No description provided for @worldBookEntryEnabledLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry enabled'**
+  String get worldBookEntryEnabledLabel;
+
+  /// No description provided for @worldBookEntryPriorityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority'**
+  String get worldBookEntryPriorityLabel;
+
+  /// No description provided for @worldBookEntryKeywordsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Keywords'**
+  String get worldBookEntryKeywordsLabel;
+
+  /// No description provided for @worldBookEntryKeywordsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate with commas or new lines'**
+  String get worldBookEntryKeywordsHint;
+
+  /// No description provided for @worldBookEntryUseRegexLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Use regex'**
+  String get worldBookEntryUseRegexLabel;
+
+  /// No description provided for @worldBookEntryCaseSensitiveLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Case sensitive'**
+  String get worldBookEntryCaseSensitiveLabel;
+
+  /// No description provided for @worldBookEntryAlwaysOnLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Always active'**
+  String get worldBookEntryAlwaysOnLabel;
+
+  /// No description provided for @worldBookEntryAlwaysOnHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Always inject without keyword matching'**
+  String get worldBookEntryAlwaysOnHint;
+
+  /// No description provided for @worldBookEntryScanDepthLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan depth'**
+  String get worldBookEntryScanDepthLabel;
+
+  /// No description provided for @worldBookEntryContentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Content'**
+  String get worldBookEntryContentLabel;
+
+  /// No description provided for @worldBookEntryInjectionPositionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Injection position'**
+  String get worldBookEntryInjectionPositionLabel;
+
+  /// No description provided for @worldBookEntryInjectionRoleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Injection role'**
+  String get worldBookEntryInjectionRoleLabel;
+
+  /// No description provided for @worldBookEntryInjectDepthLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Injection depth'**
+  String get worldBookEntryInjectDepthLabel;
+
+  /// No description provided for @worldBookInjectionPositionBeforeSystemPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Before system prompt'**
+  String get worldBookInjectionPositionBeforeSystemPrompt;
+
+  /// No description provided for @worldBookInjectionPositionAfterSystemPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'After system prompt'**
+  String get worldBookInjectionPositionAfterSystemPrompt;
+
+  /// No description provided for @worldBookInjectionPositionTopOfChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Top of chat'**
+  String get worldBookInjectionPositionTopOfChat;
+
+  /// No description provided for @worldBookInjectionPositionBottomOfChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom of chat'**
+  String get worldBookInjectionPositionBottomOfChat;
+
+  /// No description provided for @worldBookInjectionPositionAtDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'At depth'**
+  String get worldBookInjectionPositionAtDepth;
+
+  /// No description provided for @worldBookInjectionRoleUser.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get worldBookInjectionRoleUser;
+
+  /// No description provided for @worldBookInjectionRoleAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get worldBookInjectionRoleAssistant;
 }
 
 class _AppLocalizationsDelegate

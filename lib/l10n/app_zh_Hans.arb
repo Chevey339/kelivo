@@ -1260,5 +1260,71 @@
   "logViewerErrorTitle": "错误",
   "logViewerMoreCount": "+{count} 条更多",
   "backupPageDeleteConfirmTitle": "确认删除",
-  "backupPageDeleteConfirmContent": "确定要删除远程备份“{name}”吗？此操作不可撤销。"
+  "backupPageDeleteConfirmContent": "确定要删除远程备份“{name}”吗？此操作不可撤销。",
+  "settingsPageWorldBook": "世界书",
+  "worldBookTitle": "世界书",
+  "worldBookAdd": "添加世界书",
+  "worldBookEmptyMessage": "暂无世界书",
+  "worldBookUnnamed": "未命名世界书",
+  "worldBookDisabledTag": "已停用",
+  "worldBookAlwaysOnTag": "常驻",
+  "worldBookAddEntry": "添加条目",
+  "worldBookExport": "分享/导出",
+  "worldBookConfig": "配置",
+  "worldBookDeleteTitle": "删除世界书",
+  "worldBookDeleteMessage": "确定删除「{name}」？此操作无法撤销。",
+  "@worldBookDeleteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "worldBookCancel": "取消",
+  "worldBookDelete": "删除",
+  "worldBookExportFailed": "导出失败：{error}",
+  "@worldBookExportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "worldBookNoEntriesHint": "暂无条目",
+  "worldBookUnnamedEntry": "未命名条目",
+  "worldBookKeywordsLine": "关键词：{keywords}",
+  "@worldBookKeywordsLine": {
+    "placeholders": {
+      "keywords": {
+        "type": "String"
+      }
+    }
+  },
+  "worldBookEditEntry": "编辑条目",
+  "worldBookDeleteEntry": "删除条目",
+  "worldBookNameLabel": "名称",
+  "worldBookDescriptionLabel": "简介",
+  "worldBookEnabledLabel": "启用",
+  "worldBookSave": "保存",
+  "worldBookEntryNameLabel": "条目名称",
+  "worldBookEntryEnabledLabel": "启用条目",
+  "worldBookEntryPriorityLabel": "优先级",
+  "worldBookEntryKeywordsLabel": "关键词",
+  "worldBookEntryKeywordsHint": "使用逗号或换行分隔",
+  "worldBookEntryUseRegexLabel": "使用正则",
+  "worldBookEntryCaseSensitiveLabel": "区分大小写",
+  "worldBookEntryAlwaysOnLabel": "常驻激活",
+  "worldBookEntryAlwaysOnHint": "无需匹配也会注入",
+  "worldBookEntryScanDepthLabel": "扫描深度",
+  "worldBookEntryContentLabel": "内容",
+  "worldBookEntryInjectionPositionLabel": "注入位置",
+  "worldBookEntryInjectionRoleLabel": "注入角色",
+  "worldBookEntryInjectDepthLabel": "注入深度",
+  "worldBookInjectionPositionBeforeSystemPrompt": "系统提示前",
+  "worldBookInjectionPositionAfterSystemPrompt": "系统提示后",
+  "worldBookInjectionPositionTopOfChat": "对话顶部",
+  "worldBookInjectionPositionBottomOfChat": "对话底部",
+  "worldBookInjectionPositionAtDepth": "指定深度",
+  "worldBookInjectionRoleUser": "用户",
+  "worldBookInjectionRoleAssistant": "助手"
 }
