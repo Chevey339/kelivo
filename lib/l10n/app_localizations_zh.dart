@@ -256,6 +256,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPageDocs => '使用文档';
 
   @override
+  String get settingsPageLogs => '日志';
+
+  @override
   String get settingsPageSponsor => '赞助';
 
   @override
@@ -3991,6 +3994,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get settingsPageDocs => '使用文档';
 
   @override
+  String get settingsPageLogs => '日志';
+
+  @override
   String get settingsPageSponsor => '赞助';
 
   @override
@@ -7686,6 +7692,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsPageDocs => '使用文件';
+
+  @override
+  String get settingsPageLogs => '日誌';
 
   @override
   String get settingsPageSponsor => '贊助';

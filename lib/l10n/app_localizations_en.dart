@@ -259,6 +259,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageDocs => 'Docs';
 
   @override
+  String get settingsPageLogs => 'Logs';
+
+  @override
   String get settingsPageSponsor => 'Sponsor';
 
   @override

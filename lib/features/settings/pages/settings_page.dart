@@ -12,6 +12,7 @@ import '../../assistant/pages/assistant_settings_page.dart';
 import 'about_page.dart';
 import 'tts_services_page.dart';
 import 'sponsor_page.dart';
+import 'log_viewer_page.dart';
 import '../../search/pages/search_services_page.dart';
 import '../../backup/pages/backup_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
@@ -307,6 +308,19 @@ class SettingsPage extends StatelessWidget {
                 }
               },
             ),
+            if (settings.requestLogEnabled || settings.flutterLogEnabled) ...[
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.FileText,
+                label: l10n.settingsPageLogs,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const LogViewerPage()),
+                  );
+                },
+              ),
+            ],
             _iosDivider(context),
             _iosNavRow(
               context,

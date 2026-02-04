@@ -550,6 +550,12 @@ abstract class AppLocalizations {
   /// **'Docs'**
   String get settingsPageDocs;
 
+  /// No description provided for @settingsPageLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Logs'**
+  String get settingsPageLogs;
+
   /// No description provided for @settingsPageSponsor.
   ///
   /// In en, this message translates to:
