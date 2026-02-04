@@ -769,7 +769,7 @@ class _WorldBookEditSheetState extends State<_WorldBookEditSheet> {
         haptics: false,
         onTap: () => onChanged(!value),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
               Expanded(
@@ -809,8 +809,8 @@ class _WorldBookEditSheetState extends State<_WorldBookEditSheet> {
       top: false,
       child: Padding(
         padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
+          left: 10,
+          right: 10,
           top: 12,
           bottom: MediaQuery.of(context).viewInsets.bottom + 16,
         ),
@@ -860,8 +860,9 @@ class _WorldBookEditSheetState extends State<_WorldBookEditSheet> {
                           controller: _descController,
                           maxLines: 2,
                           minLines: 2,
+                          keyboardType: TextInputType.multiline,
                           textAlign: TextAlign.start,
-                          textInputAction: TextInputAction.done,
+                          textInputAction: TextInputAction.newline,
                           inlineLabel: false,
                         ),
                         switchRow(
@@ -1369,8 +1370,8 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
       top: false,
       child: Padding(
         padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
+          left: 12,
+          right: 12,
           top: 12,
           bottom: MediaQuery.of(context).viewInsets.bottom + 16,
         ),
@@ -1467,9 +1468,10 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                             12,
                                           ),
                                         ),
+                                        alignment: Alignment.centerLeft,
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 12,
-                                          vertical: 2,
+                                          vertical: 9,
                                         ),
                                         child: TextField(
                                           controller: _keywordInputController,
@@ -1485,9 +1487,11 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                             color: cs.onSurface.withOpacity(
                                               0.92,
                                             ),
+                                            height: 1.15,
                                           ),
                                           decoration: InputDecoration(
                                             isDense: true,
+                                            isCollapsed: true,
                                             hintText: l10n
                                                 .worldBookEntryKeywordInputHint,
                                             hintStyle: TextStyle(
@@ -1496,8 +1500,10 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                               color: cs.onSurface.withOpacity(
                                                 isDark ? 0.42 : 0.46,
                                               ),
+                                              height: 1.15,
                                             ),
                                             border: InputBorder.none,
+                                            contentPadding: EdgeInsets.zero,
                                           ),
                                         ),
                                       ),

@@ -9,6 +9,7 @@ class IosFormTextField extends StatelessWidget {
     this.maxLines = 1,
     this.minLines,
     this.inlineLabel,
+    this.outerPadding,
     this.fieldWidth,
     this.keyboardType,
     this.textAlign,
@@ -25,6 +26,7 @@ class IosFormTextField extends StatelessWidget {
   final int maxLines;
   final int? minLines;
   final bool? inlineLabel;
+  final EdgeInsetsGeometry? outerPadding;
   final double? fieldWidth;
   final TextInputType? keyboardType;
   final TextAlign? textAlign;
@@ -52,6 +54,9 @@ class IosFormTextField extends StatelessWidget {
     final labelColor = cs.onSurface.withOpacity(0.85);
     final valueColor = cs.onSurface.withOpacity(enabled ? 0.92 : 0.55);
     final hintColor = cs.onSurface.withOpacity(isDark ? 0.42 : 0.46);
+    final resolvedOuterPadding =
+        outerPadding ??
+        const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
 
     final field = TextField(
       controller: controller,
@@ -61,6 +66,9 @@ class IosFormTextField extends StatelessWidget {
       enabled: enabled,
       keyboardType: keyboardType,
       textAlign: textAlign ?? _defaultTextAlign(),
+      textAlignVertical: maxLines == 1
+          ? TextAlignVertical.center
+          : TextAlignVertical.top,
       textInputAction: textInputAction,
       textCapitalization: textCapitalization,
       onChanged: onChanged,
@@ -72,6 +80,7 @@ class IosFormTextField extends StatelessWidget {
       ),
       decoration: InputDecoration(
         isDense: true,
+        isCollapsed: true,
         hintText: hintText,
         hintStyle: TextStyle(
           fontSize: 15,
@@ -95,24 +104,26 @@ class IosFormTextField extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
       );
       final fieldWidget = Container(
+        constraints: const BoxConstraints(minHeight: 40),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: enabled ? fieldBg : fieldBg.withOpacity(0.55),
           borderRadius: BorderRadius.circular(10),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         child: field,
       );
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: resolvedOuterPadding,
         child: Row(
           children: [
             if (fieldWidth == null)
-              Expanded(flex: 5, child: labelWidget)
+              Expanded(flex: 3, child: labelWidget)
             else
               Expanded(child: labelWidget),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             if (fieldWidth == null)
-              Expanded(flex: 6, child: fieldWidget)
+              Expanded(flex: 8, child: fieldWidget)
             else
               SizedBox(width: fieldWidth, child: fieldWidget),
           ],
@@ -121,7 +132,7 @@ class IosFormTextField extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      padding: resolvedOuterPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -135,13 +146,17 @@ class IosFormTextField extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Container(
+            constraints: maxLines == 1
+                ? const BoxConstraints(minHeight: 40)
+                : null,
+            alignment: maxLines == 1 ? Alignment.centerLeft : Alignment.topLeft,
             decoration: BoxDecoration(
               color: enabled ? fieldBg : fieldBg.withOpacity(0.55),
               borderRadius: BorderRadius.circular(12),
             ),
             padding: EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: maxLines > 1 ? 10 : 8,
+              horizontal: 12,
+              vertical: maxLines > 1 ? 12 : 9,
             ),
             child: field,
           ),
