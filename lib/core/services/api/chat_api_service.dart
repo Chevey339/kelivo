@@ -15,6 +15,8 @@ import 'package:Kelivo/secrets/fallback.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../utils/unicode_sanitizer.dart';
 import 'builtin_tools.dart';
+import '../model_override_resolver.dart';
+import '../logging/flutter_logger.dart';
 
 class ChatApiService {
   static const String _aihubmixAppCode = 'ZKRT3588';
@@ -150,27 +152,13 @@ class ChatApiService {
     final upstreamId = _apiModelId(cfg, modelId);
     final base = ModelRegistry.infer(ModelInfo(id: upstreamId, displayName: upstreamId));
     final ov = _modelOverride(cfg, modelId);
-    ModelType? type;
-    final t = (ov['type'] as String?) ?? '';
-    if (t == 'embedding') type = ModelType.embedding; else if (t == 'chat') type = ModelType.chat;
-    List<Modality>? input;
-    if (ov['input'] is List) {
-      input = [for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
+    if (ov.isEmpty) return base;
+    try {
+      return ModelOverrideResolver.applyModelOverride(base, ov);
+    } catch (e, st) {
+      FlutterLogger.log('[ModelOverride] applyModelOverride failed: $e\n$st', tag: 'ModelOverride');
+      return base;
     }
-    List<Modality>? output;
-    if (ov['output'] is List) {
-      output = [for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
-    }
-    List<ModelAbility>? abilities;
-    if (ov['abilities'] is List) {
-      abilities = [for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)];
-    }
-    return base.copyWith(
-      type: type ?? base.type,
-      input: input ?? base.input,
-      output: output ?? base.output,
-      abilities: abilities ?? base.abilities,
-    );
   }
   static String _mimeFromPath(String path) {
     final lower = path.toLowerCase();

@@ -10,7 +10,6 @@ import '../../../core/providers/settings_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../icons/lucide_adapter.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../model/widgets/model_detail_sheet.dart';
@@ -19,12 +18,15 @@ import '../widgets/share_provider_sheet.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../core/services/logging/flutter_logger.dart';
+import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import 'multi_key_manager_page.dart';
 import 'provider_network_page.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/services/model_override_resolver.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../../../utils/model_grouping.dart';
 
@@ -2142,7 +2144,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                                               children: [
                                                                 Text(m.displayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
                                                                 const SizedBox(height: 4),
-                                                                _modelTagWrap(context, m),
+                                                                ModelTagWrap(model: m),
                                                               ],
                                                             ),
                                                           ),
@@ -2186,19 +2188,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           );
         });
       },
-    );
-  }
-
-  Widget _capPill(BuildContext context, IconData icon, String label) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(color: cs.primary.withOpacity(0.10), borderRadius: BorderRadius.circular(999)),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 12, color: cs.primary),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: cs.primary)),
-      ]),
     );
   }
 }
@@ -2253,6 +2242,11 @@ class _ModelCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final resolved = _resolveBaseAndOverride(context);
+    final ov = resolved.ov;
+    final effective = ov == null ? resolved.base : _applyModelOverride(resolved.base, ov, applyDisplayName: true);
+    String displayName = effective.displayName.trim();
+    if (displayName.isEmpty) displayName = modelId;
     return _TactileRow(
       pressedScale: 0.98,
       haptics: false,
@@ -2283,7 +2277,7 @@ class _ModelCard extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(_displayName(context), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                            child: Text(displayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                           ),
                           if (isDetecting) ...[
                             const SizedBox(width: 8),
@@ -2319,7 +2313,7 @@ class _ModelCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      _modelTagWrap(context, _effective(context)),
+                      ModelTagWrap(model: effective),
                     ],
                   ),
                 ),
@@ -2349,63 +2343,36 @@ class _ModelCard extends StatelessWidget {
     return ModelRegistry.infer(ModelInfo(id: id, displayName: id));
   }
 
-  ModelInfo _effective(BuildContext context) {
-    final base = _infer(modelId);
-    final cfg = context.watch<SettingsProvider>().getProviderConfig(providerKey);
-    final ov = cfg.modelOverrides[modelId] as Map?;
-    if (ov == null) return base;
-    ModelType? type;
-    final t = (ov['type'] as String?) ?? '';
-    if (t == 'embedding') type = ModelType.embedding; else if (t == 'chat') type = ModelType.chat;
-    List<Modality>? input;
-    if (ov['input'] is List) {
-      input = [
-        for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-      ];
+  _ResolvedModelOverride _resolveBaseAndOverride(BuildContext context) {
+    final configs = context.watch<SettingsProvider>().providerConfigs;
+    final cfg = configs[providerKey];
+    if (cfg == null) {
+      final base = _infer(modelId);
+      return _ResolvedModelOverride(base: base, ov: null, baseId: modelId);
     }
-    List<Modality>? output;
-    if (ov['output'] is List) {
-      output = [
-        for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-      ];
-    }
-    List<ModelAbility>? abilities;
-    if (ov['abilities'] is List) {
-      abilities = [
-        for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)
-      ];
-    }
-    return base.copyWith(
-      displayName: (ov['name'] as String?)?.isNotEmpty == true ? ov['name'] as String : base.displayName,
-      type: type ?? base.type,
-      input: input ?? base.input,
-      output: output ?? base.output,
-      abilities: abilities ?? base.abilities,
-    );
-  }
-
-  String _displayName(BuildContext context) {
-    final cfg = context.watch<SettingsProvider>().getProviderConfig(providerKey);
-    final ov = cfg.modelOverrides[modelId] as Map?;
+    final rawOv = cfg.modelOverrides[modelId];
+    final Map<String, dynamic>? ov =
+        rawOv is Map ? {for (final e in rawOv.entries) e.key.toString(): e.value} : null;
+    String baseId = modelId;
     if (ov != null) {
-      final n = (ov['name'] as String?)?.trim();
-      if (n != null && n.isNotEmpty) return n;
+      final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+      if (raw != null && raw.isNotEmpty) baseId = raw;
     }
-    return modelId;
+    final base = _infer(baseId);
+    return _ResolvedModelOverride(base: base, ov: ov, baseId: baseId);
   }
+}
 
-  Widget _pill(BuildContext context, IconData icon, String label) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(color: cs.primary.withOpacity(0.10), borderRadius: BorderRadius.circular(999)),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 12, color: cs.primary),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: cs.primary)),
-      ]),
-    );
-  }
+class _ResolvedModelOverride {
+  const _ResolvedModelOverride({
+    required this.base,
+    required this.ov,
+    required this.baseId,
+  });
+
+  final ModelInfo base;
+  final Map<String, dynamic>? ov;
+  final String baseId;
 }
 
 class _ConnectionTestDialog extends StatefulWidget {
@@ -2641,106 +2608,21 @@ Future<String?> showModelPickerForTest(BuildContext context, String providerKey,
   return sel?.modelId;
 }
 
-ModelInfo _effectiveFor(BuildContext context, String providerKey, String providerDisplayName, ModelInfo base) {
-  final cfg = context.read<SettingsProvider>().getProviderConfig(providerKey, defaultName: providerDisplayName);
-  final ov = cfg.modelOverrides[base.id] as Map?;
-  if (ov == null) return base;
-  ModelType? type;
-  final t = (ov['type'] as String?) ?? '';
-  if (t == 'embedding') type = ModelType.embedding; else if (t == 'chat') type = ModelType.chat;
-  List<Modality>? input;
-  if (ov['input'] is List) {
-    input = [
-      for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-    ];
+ModelInfo _applyModelOverride(ModelInfo base, Map<String, dynamic> ov, {bool applyDisplayName = false}) {
+  try {
+    return ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: applyDisplayName);
+  } catch (e, st) {
+    FlutterLogger.log('[ModelOverride] applyModelOverride failed: $e\n$st', tag: 'ModelOverride');
+    assert(() {
+      debugPrint('[ModelOverride] applyModelOverride failed: $e');
+      return true;
+    }());
+    return base;
   }
-  List<Modality>? output;
-  if (ov['output'] is List) {
-    output = [
-      for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-    ];
-  }
-  List<ModelAbility>? abilities;
-  if (ov['abilities'] is List) {
-    abilities = [
-      for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)
-    ];
-  }
-  return base.copyWith(
-    type: type ?? base.type,
-    input: input ?? base.input,
-    output: output ?? base.output,
-    abilities: abilities ?? base.abilities,
-  );
 }
 
 
 // Using flutter_slidable for reliable swipe actions with confirm + undo.
-
-Widget _modelTagWrap(BuildContext context, ModelInfo m) {
-  final cs = Theme.of(context).colorScheme;
-  final l10n = AppLocalizations.of(context)!;
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  List<Widget> chips = [];
-  // type tag
-  chips.add(Container(
-    decoration: BoxDecoration(
-      color: isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15),
-      borderRadius: BorderRadius.circular(999),
-      border: Border.all(color: cs.primary.withOpacity(0.2), width: 0.5),
-    ),
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    child: Text(m.type == ModelType.chat ? l10n.modelSelectSheetChatType : l10n.modelSelectSheetEmbeddingType, style: TextStyle(fontSize: 11, color: isDark ? cs.primary : cs.primary.withOpacity(0.9), fontWeight: FontWeight.w500)),
-  ));
-  // modality tag capsule
-  chips.add(Container(
-    decoration: BoxDecoration(
-      color: isDark ? cs.tertiary.withOpacity(0.25) : cs.tertiary.withOpacity(0.15),
-      borderRadius: BorderRadius.circular(999),
-      border: Border.all(color: cs.tertiary.withOpacity(0.2), width: 0.5),
-    ),
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      for (final mod in m.input)
-        Padding(
-          padding: const EdgeInsets.only(right: 2),
-          child: Icon(mod == Modality.text ? Lucide.Type : Lucide.Image, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-        ),
-      Icon(Lucide.ChevronRight, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-      for (final mod in m.output)
-        Padding(
-          padding: const EdgeInsets.only(left: 2),
-          child: Icon(mod == Modality.text ? Lucide.Type : Lucide.Image, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-        ),
-    ]),
-  ));
-  // abilities capsules (icon-only)
-  for (final ab in m.abilities) {
-    if (ab == ModelAbility.tool) {
-      chips.add(Container(
-        decoration: BoxDecoration(
-          color: isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.primary.withOpacity(0.2), width: 0.5),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        child: Icon(Lucide.Hammer, size: 12, color: isDark ? cs.primary : cs.primary.withOpacity(0.9)),
-      ));
-    } else if (ab == ModelAbility.reasoning) {
-      chips.add(Container(
-        decoration: BoxDecoration(
-          color: isDark ? cs.secondary.withOpacity(0.3) : cs.secondary.withOpacity(0.18),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.secondary.withOpacity(0.25), width: 0.5),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        child: SvgPicture.asset('assets/icons/deepthink.svg', width: 12, height: 12, colorFilter: ColorFilter.mode(isDark ? cs.secondary : cs.secondary.withOpacity(0.9), BlendMode.srcIn)),
-      ));
-    }
-  }
-  return Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: chips);
-}
-
 
 // Legacy page-based implementations removed in favor of swipeable PageView tabs.
 

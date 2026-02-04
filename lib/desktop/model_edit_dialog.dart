@@ -7,8 +7,11 @@ import '../l10n/app_localizations.dart';
 import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
 import '../core/services/api/builtin_tools.dart';
+import '../core/services/model_override_resolver.dart';
+import '../core/services/logging/flutter_logger.dart';
 import '../shared/widgets/ios_switch.dart';
 import '../shared/widgets/snackbar.dart';
+import '../features/model/widgets/model_edit_state_helper.dart';
 
 Future<bool?> showDesktopModelEditDialog(BuildContext context, {required String providerKey, required String modelId}) async {
   return _openDialog(context, providerKey: providerKey, modelId: modelId, isNew: false);
@@ -56,6 +59,12 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
   final Set<Modality> _input = {Modality.text};
   final Set<Modality> _output = {Modality.text};
   final Set<ModelAbility> _abilities = {};
+  // Session-only cache: allow user to flip chat -> embedding -> chat without losing chat settings.
+  Set<Modality>? _cachedChatInput;
+  Set<Modality>? _cachedChatOutput;
+  Set<ModelAbility>? _cachedChatAbilities;
+  // Session-only cache: allow user to flip chat <-> embedding without losing embedding input modes.
+  Set<Modality>? _cachedEmbeddingInput;
   final List<_HeaderKV> _headers = [];
   final List<_BodyKV> _bodies = [];
 
@@ -97,10 +106,10 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
 
     // Resolve display model id from per-model overrides when present (apiModelId),
     // falling back to the logical key for backwards compatibility.
-    Map? _initialOv;
+    Map<String, dynamic>? _initialOv;
     if (!widget.isNew) {
       final raw = cfg.modelOverrides[widget.modelId];
-      if (raw is Map) _initialOv = raw;
+      if (raw is Map) _initialOv = raw.map((k, v) => MapEntry(k.toString(), v));
     }
     String displayModelId = widget.modelId;
     if (_initialOv != null) {
@@ -114,40 +123,87 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
         displayName: displayModelId.isEmpty ? '' : displayModelId,
       ),
     );
-    _nameCtrl = TextEditingController(text: base.displayName);
-    _type = base.type;
-    _input..clear()..addAll(base.input);
-    _output..clear()..addAll(base.output);
-    _abilities..clear()..addAll(base.abilities);
-
-    if (!widget.isNew) {
-      final ov = _initialOv ?? cfg.modelOverrides[widget.modelId] as Map?;
-      if (ov != null) {
-        _nameCtrl.text = (ov['name'] as String?)?.trim().isNotEmpty == true ? (ov['name'] as String) : _nameCtrl.text;
-        final t = (ov['type'] as String?) ?? '';
-        if (t == 'embedding') _type = ModelType.embedding; else if (t == 'chat') _type = ModelType.chat;
-        final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        final outArr = (ov['output'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        final abArr = (ov['abilities'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-        _output..clear()..addAll(outArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-        _abilities..clear()..addAll(abArr.map((e) => e == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool));
-        final hdrs = (ov['headers'] as List?) ?? const [];
-        for (final h in hdrs) { if (h is Map) { final kv = _HeaderKV(); kv.name.text = (h['name'] as String?) ?? ''; kv.value.text = (h['value'] as String?) ?? ''; _headers.add(kv); } }
-        final bds = (ov['body'] as List?) ?? const [];
-        for (final b in bds) { if (b is Map) { final kv = _BodyKV(); kv.keyCtrl.text = (b['key'] as String?) ?? ''; kv.valueCtrl.text = (b['value'] as String?) ?? ''; _bodies.add(kv); } }
-
-        // Read built-in tools from builtInTools array
-        final builtInSet = BuiltInToolNames.parseAndNormalize(ov['builtInTools']);
-        // Google tools
-        _googleUrlContextTool = builtInSet.contains(BuiltInToolNames.urlContext);
-        _googleCodeExecutionTool = builtInSet.contains(BuiltInToolNames.codeExecution);
-        _googleYoutubeTool = builtInSet.contains(BuiltInToolNames.youtube);
-        // OpenAI tools
-        _openaiCodeInterpreterTool = builtInSet.contains(BuiltInToolNames.codeInterpreter);
-        _openaiImageGenerationTool = builtInSet.contains(BuiltInToolNames.imageGeneration);
-      }
+    final ov = _initialOv;
+    final effective = ov == null ? base : ModelOverrideResolver.applyModelOverride(base, ov, applyDisplayName: true);
+    _nameCtrl = TextEditingController(text: effective.displayName);
+    _type = effective.type;
+    _input..clear()..addAll(effective.input);
+    _output..clear()..addAll(effective.output);
+    _abilities..clear()..addAll(effective.abilities);
+    // Normalize embedding invariants on init even when there is no explicit override `type`.
+    if (_type == ModelType.embedding) {
+      if (_input.isEmpty) _input.add(Modality.text);
+      _cachedEmbeddingInput = {..._input};
+    } else if (_type == ModelType.chat) {
+      // Defensive: prevent invalid empty modality sets from being loaded.
+      if (_input.isEmpty) _input.add(Modality.text);
+      if (_output.isEmpty) _output.add(Modality.text);
     }
+
+    if (ov != null) {
+      final rawHdrs = ov['headers'];
+      final hdrs = (rawHdrs is List) ? rawHdrs : const <dynamic>[];
+      for (final h in hdrs) {
+        if (h is Map) {
+          final kv = _HeaderKV();
+          kv.name.text = h['name']?.toString() ?? '';
+          kv.value.text = h['value']?.toString() ?? '';
+          _headers.add(kv);
+        }
+      }
+      final rawBds = ov['body'];
+      final bds = (rawBds is List) ? rawBds : const <dynamic>[];
+      for (final b in bds) {
+        if (b is Map) {
+          final kv = _BodyKV();
+          kv.keyCtrl.text = b['key']?.toString() ?? '';
+          kv.valueCtrl.text = b['value']?.toString() ?? '';
+          _bodies.add(kv);
+        }
+      }
+
+      // Read built-in tools from builtInTools array
+      final builtInSet = BuiltInToolNames.parseAndNormalize(ov['builtInTools']);
+      // Google tools
+      _googleUrlContextTool = builtInSet.contains(BuiltInToolNames.urlContext);
+      _googleCodeExecutionTool = builtInSet.contains(BuiltInToolNames.codeExecution);
+      _googleYoutubeTool = builtInSet.contains(BuiltInToolNames.youtube);
+      // OpenAI tools
+      _openaiCodeInterpreterTool = builtInSet.contains(BuiltInToolNames.codeInterpreter);
+      _openaiImageGenerationTool = builtInSet.contains(BuiltInToolNames.imageGeneration);
+    }
+  }
+
+  void _setType(ModelType next) {
+    final prev = _type;
+    if (prev == next) return;
+
+    _type = next;
+    // Pass state-owned sets; helper mutates in place.
+    final result = ModelEditTypeSwitch.apply(
+      prev: prev,
+      next: next,
+      input: _input,
+      output: _output,
+      abilities: _abilities,
+      cachedChatInput: _cachedChatInput,
+      cachedChatOutput: _cachedChatOutput,
+      cachedChatAbilities: _cachedChatAbilities,
+      cachedEmbeddingInput: _cachedEmbeddingInput,
+    );
+    _input
+      ..clear()
+      ..addAll(result.input);
+    _output
+      ..clear()
+      ..addAll(result.output);
+    _abilities
+      ..clear()
+      ..addAll(result.abilities);
+    _cachedChatInput = result.cachedChatInput;
+    _cachedChatOutput = result.cachedChatOutput;
+    _cachedChatAbilities = result.cachedChatAbilities;
+    _cachedEmbeddingInput = result.cachedEmbeddingInput;
   }
 
   // Desktop input decoration matching provider settings inputs
@@ -165,11 +221,31 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     );
   }
 
+  void _toggleModality(Set<Modality> modalities, int index) {
+    const modalityOrder = <Modality>[Modality.text, Modality.image];
+    if (index < 0 || index >= modalityOrder.length) return;
+    final mod = modalityOrder[index];
+    if (modalities.contains(mod)) {
+      modalities.remove(mod);
+      if (modalities.isEmpty) modalities.add(Modality.text);
+    } else {
+      modalities.add(mod);
+    }
+  }
+
   @override
   void dispose() {
     _tabCtrl.dispose();
     _idCtrl.dispose();
     _nameCtrl.dispose();
+    for (final h in _headers) {
+      h.name.dispose();
+      h.value.dispose();
+    }
+    for (final b in _bodies) {
+      b.keyCtrl.dispose();
+      b.valueCtrl.dispose();
+    }
     super.dispose();
   }
 
@@ -367,32 +443,24 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
             _SegmentedSingle(
               options: [l10n.modelDetailSheetChatType, l10n.modelDetailSheetEmbeddingType],
               value: _type == ModelType.chat ? 0 : 1,
-              onChanged: (i) => setState(() => _type = i == 0 ? ModelType.chat : ModelType.embedding),
+              onChanged: (i) => setState(() => _setType(i == 0 ? ModelType.chat : ModelType.embedding)),
+            ),
+            const SizedBox(height: 12),
+            _label(context, l10n.modelDetailSheetInputModesLabel),
+            const SizedBox(height: 6),
+            _SegmentedMulti(
+              options: [l10n.modelDetailSheetTextMode, l10n.modelDetailSheetImageMode],
+              isSelected: [_input.contains(Modality.text), _input.contains(Modality.image)],
+              onChanged: (idx) => setState(() => _toggleModality(_input, idx)),
             ),
             if (_type == ModelType.chat) ...[
-              const SizedBox(height: 12),
-              _label(context, l10n.modelDetailSheetInputModesLabel),
-              const SizedBox(height: 6),
-              _SegmentedMulti(
-                options: [l10n.modelDetailSheetTextMode, l10n.modelDetailSheetImageMode],
-                isSelected: [_input.contains(Modality.text), _input.contains(Modality.image)],
-                onChanged: (idx) => setState(() {
-                  final mod = idx == 0 ? Modality.text : Modality.image;
-                  if (_input.contains(mod)) _input.remove(mod);
-                  else _input.add(mod);
-                }),
-              ),
               const SizedBox(height: 12),
               _label(context, l10n.modelDetailSheetOutputModesLabel),
               const SizedBox(height: 6),
               _SegmentedMulti(
                 options: [l10n.modelDetailSheetTextMode, l10n.modelDetailSheetImageMode],
                 isSelected: [_output.contains(Modality.text), _output.contains(Modality.image)],
-                onChanged: (idx) => setState(() {
-                  final mod = idx == 0 ? Modality.text : Modality.image;
-                  if (_output.contains(mod)) _output.remove(mod);
-                  else _output.add(mod);
-                }),
+                onChanged: (idx) => setState(() => _toggleModality(_output, idx)),
               ),
               const SizedBox(height: 12),
               _label(context, l10n.modelDetailSheetAbilitiesLabel),
@@ -430,7 +498,11 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
               for (final h in _headers)
                 _HeaderRow(
                   kv: h,
-                  onDelete: () => setState(() => _headers.remove(h)),
+                  onDelete: () => setState(() {
+                    h.name.dispose();
+                    h.value.dispose();
+                    _headers.remove(h);
+                  }),
                 ),
             ],
           ],
@@ -452,7 +524,11 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
               for (final b in _bodies)
                 _BodyRow(
                   kv: b,
-                  onDelete: () => setState(() => _bodies.remove(b)),
+                  onDelete: () => setState(() {
+                    b.keyCtrl.dispose();
+                    b.valueCtrl.dispose();
+                    _bodies.remove(b);
+                  }),
                 ),
             ],
           ],
@@ -465,6 +541,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final cfg = settings.getProviderConfig(widget.providerKey);
+    final bool disableTools = _type == ModelType.embedding;
     final bool hasTiles = _providerKind == ProviderKind.google || _providerKind == ProviderKind.openai;
     return [
       _DeskCard(
@@ -503,45 +580,55 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
           title: l10n.modelDetailSheetUrlContextTool,
           desc: l10n.modelDetailSheetUrlContextToolDescription,
           value: _googleUrlContextTool,
-          // URL Context is disabled when Code Execution is enabled (mutually exclusive)
-          onChanged: _googleCodeExecutionTool
-              ? null
-              : (v) => setState(() => _googleUrlContextTool = v),
+        // Enabling URL Context disables Code Execution (mutually exclusive)
+        onChanged: disableTools
+            ? null
+            : (v) => setState(() {
+                  _googleUrlContextTool = v;
+                  if (v) _googleCodeExecutionTool = false;
+                }),
         ),
         const SizedBox(height: 8),
         _ToolTile(
           title: l10n.modelDetailSheetCodeExecutionTool,
           desc: l10n.modelDetailSheetCodeExecutionToolDescription,
           value: _googleCodeExecutionTool,
-          // Code Execution is disabled when URL Context is enabled (mutually exclusive)
-          onChanged: _googleUrlContextTool
-              ? null
-              : (v) => setState(() => _googleCodeExecutionTool = v),
+        // Enabling Code Execution disables URL Context (mutually exclusive)
+        onChanged: disableTools
+            ? null
+            : (v) => setState(() {
+                  _googleCodeExecutionTool = v;
+                  if (v) _googleUrlContextTool = false;
+                }),
         ),
         const SizedBox(height: 8),
         _ToolTile(
           title: l10n.modelDetailSheetYoutubeTool,
           desc: l10n.modelDetailSheetYoutubeToolDescription,
           value: _googleYoutubeTool,
-          onChanged: (v) => setState(() => _googleYoutubeTool = v),
+          onChanged: disableTools ? null : (v) => setState(() => _googleYoutubeTool = v),
         ),
       ] else if (_providerKind == ProviderKind.openai) ...[
         _ToolTile(
           title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
           desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
           value: _openaiCodeInterpreterTool,
-          onChanged: (cfg.useResponseApi == true)
-              ? (v) => setState(() => _openaiCodeInterpreterTool = v)
-              : null,
+          onChanged: disableTools
+              ? null
+              : ((cfg.useResponseApi == true)
+                  ? (v) => setState(() => _openaiCodeInterpreterTool = v)
+                  : null),
         ),
         const SizedBox(height: 8),
         _ToolTile(
           title: l10n.modelDetailSheetOpenaiImageGenerationTool,
           desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
           value: _openaiImageGenerationTool,
-          onChanged: (cfg.useResponseApi == true)
-              ? (v) => setState(() => _openaiImageGenerationTool = v)
-              : null,
+          onChanged: disableTools
+              ? null
+              : ((cfg.useResponseApi == true)
+                  ? (v) => setState(() => _openaiImageGenerationTool = v)
+                  : null),
         ),
       ],
     ];
@@ -575,36 +662,57 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     final ov = Map<String, dynamic>.from(old.modelOverrides);
     final headers = [for (final h in _headers) if (h.name.text.trim().isNotEmpty) {'name': h.name.text.trim(), 'value': h.value.text}];
     final bodies = [for (final b in _bodies) if (b.keyCtrl.text.trim().isNotEmpty) {'key': b.keyCtrl.text.trim(), 'value': b.valueCtrl.text}];
-
-    // Build builtInTools list based on provider type
-    final builtInTools = <String>[];
+    final prev = (prevKey.isNotEmpty && ov[prevKey] is Map)
+        ? {for (final e in (ov[prevKey] as Map).entries) e.key.toString(): e.value}
+        : const <String, dynamic>{};
+    final builtInSet = BuiltInToolNames.parseAndNormalize(prev['builtInTools']);
     if (_providerKind == ProviderKind.google) {
-      if (_googleUrlContextTool) builtInTools.add('url_context');
-      if (_googleCodeExecutionTool) builtInTools.add('code_execution');
-      if (_googleYoutubeTool) builtInTools.add('youtube');
+      builtInSet.remove(BuiltInToolNames.urlContext);
+      builtInSet.remove(BuiltInToolNames.codeExecution);
+      builtInSet.remove(BuiltInToolNames.youtube);
+      if (_googleUrlContextTool) builtInSet.add(BuiltInToolNames.urlContext);
+      if (_googleCodeExecutionTool) builtInSet.add(BuiltInToolNames.codeExecution);
+      if (_googleYoutubeTool) builtInSet.add(BuiltInToolNames.youtube);
     } else if (_providerKind == ProviderKind.openai) {
-      if (_openaiCodeInterpreterTool) builtInTools.add('code_interpreter');
-      if (_openaiImageGenerationTool) builtInTools.add('image_generation');
+      builtInSet.remove(BuiltInToolNames.codeInterpreter);
+      builtInSet.remove(BuiltInToolNames.imageGeneration);
+      if (_openaiCodeInterpreterTool) builtInSet.add(BuiltInToolNames.codeInterpreter);
+      if (_openaiImageGenerationTool) builtInSet.add(BuiltInToolNames.imageGeneration);
     }
+    final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
 
     final String key = (prevKey.isEmpty || widget.isNew) ? _nextModelKey(old, apiModelId) : prevKey;
+    final bool isEmbedding = _type == ModelType.embedding;
     ov[key] = {
       'apiModelId': apiModelId,
       'name': _nameCtrl.text.trim(),
       'type': _type == ModelType.chat ? 'chat' : 'embedding',
+      // Input modalities are configurable for both chat and embedding.
       'input': _input.map((e) => e == Modality.image ? 'image' : 'text').toList(),
+      if (!isEmbedding)
       'output': _output.map((e) => e == Modality.image ? 'image' : 'text').toList(),
+      if (!isEmbedding)
       'abilities': _abilities.map((e) => e == ModelAbility.reasoning ? 'reasoning' : 'tool').toList(),
       'headers': headers,
       'body': bodies,
-      'builtInTools': builtInTools,
+      if (!isEmbedding && builtInTools.isNotEmpty) 'builtInTools': builtInTools,
     };
 
-    if (prevKey.isEmpty || widget.isNew) {
-      final list = old.models.toList()..add(key);
-      await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov, models: list));
-    } else {
-      await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov));
+    try {
+      if (prevKey.isEmpty || widget.isNew) {
+        final list = old.models.toList()..add(key);
+        await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov, models: list));
+      } else {
+        await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov));
+      }
+    } catch (e, st) {
+      FlutterLogger.log('[ModelEditDialog] save failed: $e\n$st', tag: 'Model');
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.modelDetailSheetSaveFailedMessage), backgroundColor: Theme.of(context).colorScheme.error),
+      );
+      return;
     }
     if (!mounted) return;
     Navigator.of(context).pop(true);

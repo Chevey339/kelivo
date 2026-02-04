@@ -23,10 +23,23 @@ enum DesktopTopicPosition { left, right }
 // Desktop: send message shortcut
 enum DesktopSendShortcut { enter, ctrlEnter }
 
+enum _MigrationResult { noChange, applied, failed }
+
 class SettingsProvider extends ChangeNotifier {
   static const String _providersOrderKey = 'providers_order_v1';
   static const String _themeModeKey = 'theme_mode_v1';
   static const String _providerConfigsKey = 'provider_configs_v1';
+  static const String _providerConfigsBackupKey = 'provider_configs_backup_v1';
+  static const String _migrationsVersionKey = 'migrations_version_v1';
+  static const int _embeddingOverridesMigrationVersion = 3;
+  static const Set<String> _embeddingTypeStrings = {'embedding', 'embeddings'};
+  static const Set<String> _embeddingChatOnlyFields = {
+    'abilities',
+    'output',
+    'builtInTools',
+    'built_in_tools',
+    'tools',
+  };
   static const String _pinnedModelsKey = 'pinned_models_v1';
   static const String _selectedModelKey = 'selected_model_v1';
   static const String _titleModelKey = 'title_model_v1';
@@ -228,6 +241,68 @@ class SettingsProvider extends ChangeNotifier {
     _load();
   }
 
+  Future<_MigrationResult> _migrateEmbeddingModelOverrides(SharedPreferences prefs) async {
+    Map<String, ProviderConfig>? nextProviderConfigs;
+    int providersChanged = 0;
+    int modelsChanged = 0;
+
+    for (final entry in _providerConfigs.entries) {
+      final providerKey = entry.key;
+      final cfg = entry.value;
+
+      Map<String, dynamic>? nextOverrides;
+
+      for (final ovEntry in cfg.modelOverrides.entries) {
+        final modelKey = ovEntry.key;
+        final rawOv = ovEntry.value;
+        if (rawOv is! Map) continue;
+
+        final normalizedRawOv = rawOv.map((k, v) => MapEntry(k.toString(), v));
+        final t = (normalizedRawOv['type'] ?? normalizedRawOv['t'] ?? '').toString().trim().toLowerCase();
+        if (!_embeddingTypeStrings.contains(t)) continue;
+
+        // Migration/cleanup (embedding): remove chat-only fields.
+        // Embeddings may still use explicit input modalities like text/image.
+        final hasChatOnlyKeys = _embeddingChatOnlyFields.any(normalizedRawOv.containsKey);
+        if (!hasChatOnlyKeys) continue;
+
+        nextOverrides ??= Map<String, dynamic>.from(cfg.modelOverrides);
+        final m = Map<String, dynamic>.from(normalizedRawOv);
+        for (final k in _embeddingChatOnlyFields) {
+          m.remove(k);
+        }
+        nextOverrides[modelKey] = m;
+        modelsChanged++;
+      }
+
+      if (nextOverrides == null) continue;
+      nextProviderConfigs ??= Map<String, ProviderConfig>.from(_providerConfigs);
+      nextProviderConfigs[providerKey] = cfg.copyWith(modelOverrides: nextOverrides);
+      providersChanged++;
+    }
+
+    if (nextProviderConfigs == null) return _MigrationResult.noChange;
+    try {
+      final map = nextProviderConfigs.map((k, v) => MapEntry(k, v.toJson()));
+      final encoded = jsonEncode(map);
+      final ok = await prefs.setString(_providerConfigsKey, encoded);
+      if (!ok) return _MigrationResult.failed;
+    } catch (e, st) {
+      assert(() {
+        debugPrint('[SettingsProvider] provider configs migration persist failed: $e');
+        debugPrint('$st');
+        return true;
+      }());
+      return _MigrationResult.failed;
+    }
+    _providerConfigs = nextProviderConfigs;
+    assert(() {
+      debugPrint('[SettingsProvider] embedding overrides migration: providers=$providersChanged, models=$modelsChanged');
+      return true;
+    }());
+    return _MigrationResult.applied;
+  }
+
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     _providersOrder = prefs.getStringList(_providersOrderKey) ?? [];
@@ -244,12 +319,76 @@ class SettingsProvider extends ChangeNotifier {
     }
     _themePaletteId = prefs.getString(_themePaletteKey) ?? 'default';
     _useDynamicColor = prefs.getBool(_useDynamicColorKey) ?? true;
+    var providerConfigsLoaded = false;
     final cfgStr = prefs.getString(_providerConfigsKey);
     if (cfgStr != null && cfgStr.isNotEmpty) {
       try {
         final raw = jsonDecode(cfgStr) as Map<String, dynamic>;
         _providerConfigs = raw.map((k, v) => MapEntry(k, ProviderConfig.fromJson(v as Map<String, dynamic>)));
+        providerConfigsLoaded = true;
+      } catch (e, st) {
+        assert(() {
+          debugPrint('[SettingsProvider] providerConfigs decode failed: $e');
+          debugPrint('$st');
+          return true;
+        }());
+      }
+    }
+
+    // Migration/cleanup: embedding models should not keep chat-only fields (abilities/output/builtInTools).
+    // Embeddings still support explicit input modalities like text/image.
+    // This fixes previously persisted overrides where type was switched from chat -> embedding.
+    try {
+      final migrationVersion = prefs.getInt(_migrationsVersionKey) ?? 0;
+      if (providerConfigsLoaded && migrationVersion < _embeddingOverridesMigrationVersion) {
+        try {
+          FlutterLogger.log('[SettingsProvider] provider modelOverrides migration start', tag: 'Migration');
+        } catch (_) {}
+        var backupOk = true;
+        if (!prefs.containsKey(_providerConfigsBackupKey)) {
+          final backup = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
+          backupOk = await prefs.setString(_providerConfigsBackupKey, jsonEncode(backup));
+          assert(() {
+            debugPrint('[SettingsProvider] provider configs backup saved before migration.');
+            return true;
+          }());
+          if (!backupOk) {
+            assert(() {
+              debugPrint('[SettingsProvider] provider configs backup failed; abort migration.');
+              return true;
+            }());
+          }
+        }
+        if (backupOk) {
+          final result = await _migrateEmbeddingModelOverrides(prefs);
+          // Mark as attempted so we don't keep re-scanning on every startup when no changes are needed.
+          if (result != _MigrationResult.failed) {
+            await prefs.setInt(_migrationsVersionKey, _embeddingOverridesMigrationVersion);
+          }
+          assert(() {
+            if (result == _MigrationResult.applied) {
+              debugPrint('[SettingsProvider] provider modelOverrides migration applied.');
+            }
+            return true;
+          }());
+          try {
+            FlutterLogger.log(
+              '[SettingsProvider] provider modelOverrides migration done (result=$result)',
+              tag: 'Migration',
+            );
+          } catch (_) {}
+        }
+      }
+    } catch (e, st) {
+      // Debug-only visibility for migration failures (no behavior change in release).
+      try {
+        FlutterLogger.log('[SettingsProvider] provider modelOverrides migration failed: $e\n$st', tag: 'Migration');
       } catch (_) {}
+      assert(() {
+        debugPrint('[SettingsProvider] provider modelOverrides migration failed: $e');
+        debugPrint('$st');
+        return true;
+      }());
     }
     // load pinned models
     final pinned = prefs.getStringList(_pinnedModelsKey) ?? const <String>[];

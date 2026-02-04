@@ -5,12 +5,14 @@ import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../core/providers/settings_provider.dart';
+import '../core/services/logging/flutter_logger.dart';
 import '../core/providers/model_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart' as lucide;
 import '../utils/brand_assets.dart';
 import 'package:characters/characters.dart';
 import '../utils/model_grouping.dart';
+import '../shared/widgets/model_tag_wrap.dart';
 
 Future<void> showModelFetchDialog(
   BuildContext context, {
@@ -53,6 +55,7 @@ class _ModelFetchDialogBody extends StatefulWidget {
 class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
   final TextEditingController _searchCtrl = TextEditingController();
   bool _loading = true;
+  bool _actionBusy = false;
   String _error = '';
   List<ModelInfo> _items = const [];
   final Map<String, bool> _collapsed = <String, bool>{};
@@ -67,6 +70,32 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _runGuarded(Future<void> Function() action) async {
+    if (_actionBusy) return;
+    if (!mounted) return;
+    setState(() => _actionBusy = true);
+    try {
+      await action();
+    } catch (e, st) {
+      if (!mounted) return;
+      FlutterLogger.log('Model fetch dialog action failed: $e\n$st', tag: 'ModelFetch');
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      if (messenger == null) {
+        setState(() => _error = 'Operation failed');
+        return;
+      }
+      const message = 'Operation failed';
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
   }
 
   Future<void> _load() async {
@@ -218,7 +247,9 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                                         ),
                                         padding: EdgeInsets.zero,
                                         constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
-                                        onPressed: () async {
+                                        onPressed: _actionBusy
+                                            ? null
+                                            : () => _runGuarded(() async {
                                           final settings = context.read<SettingsProvider>();
                                           final cfg = settings.getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
                                           final q = _searchCtrl.text.trim().toLowerCase();
@@ -239,7 +270,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                                             await settings.setProviderConfig(widget.providerKey, cfg.copyWith(models: setIds.toList()));
                                           }
                                           if (mounted) setState(() {});
-                                        },
+                                        }),
                                       ),
                                     ),
                                   ),
@@ -249,7 +280,9 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                                       icon: Icon(lucide.Lucide.Repeat, size: 18, color: cs.onSurface.withOpacity(0.7)),
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
-                                      onPressed: () async {
+                                      onPressed: _actionBusy
+                                          ? null
+                                      : () => _runGuarded(() async {
                                         final settings = context.read<SettingsProvider>();
                                         final cfg = settings.getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
                                         final q = _searchCtrl.text.trim().toLowerCase();
@@ -268,7 +301,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                                         }
                                         await settings.setProviderConfig(widget.providerKey, cfg.copyWith(models: current.toList()));
                                         if (mounted) setState(() {});
-                                      },
+                                      }),
                                     ),
                                   ),
                                 ],
@@ -369,21 +402,24 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
                           icon: Icon(allAdded ? lucide.Lucide.Minus : lucide.Lucide.Plus, size: 18, color: cs.onSurface.withOpacity(0.75)),
-                          onPressed: () async {
-                            final old = context.read<SettingsProvider>().getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
+                          onPressed: _actionBusy
+                              ? null
+                              : () => _runGuarded(() async {
+                            final settings = context.read<SettingsProvider>();
+                            final old = settings.getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
                             if (allAdded) {
                               final toRemove = grouped[g]!.map((m) => m.id).toSet();
                               final list = old.models.where((id) => !toRemove.contains(id)).toList();
-                              await context.read<SettingsProvider>().setProviderConfig(widget.providerKey, old.copyWith(models: list));
+                              await settings.setProviderConfig(widget.providerKey, old.copyWith(models: list));
                             } else {
                               final toAdd = grouped[g]!.where((m) => !selected.contains(m.id)).map((m) => m.id).toList();
                               if (toAdd.isNotEmpty) {
                                 final set = old.models.toSet()..addAll(toAdd);
-                                await context.read<SettingsProvider>().setProviderConfig(widget.providerKey, old.copyWith(models: set.toList()));
+                                await settings.setProviderConfig(widget.providerKey, old.copyWith(models: set.toList()));
                               }
                             }
                             if (mounted) setState(() {});
-                          },
+                          }),
                         ),
                       ],
                     ),
@@ -414,36 +450,6 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
     final selected = settings.getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName).models.toSet();
     final added = selected.contains(m.id);
 
-    // Build capsules consistent with desktop list: input/output image + abilities
-    final caps = <Widget>[];
-    Widget pillCapsule(Widget icon, Color color) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final bg = isDark ? color.withOpacity(0.20) : color.withOpacity(0.16);
-      final bd = color.withOpacity(0.25);
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: bd, width: 0.5),
-        ),
-        child: icon,
-      );
-    }
-    if (m.input.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(lucide.Lucide.Eye, size: 12, color: cs.secondary), cs.secondary));
-    }
-    if (m.output.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(lucide.Lucide.Image, size: 12, color: cs.tertiary), cs.tertiary));
-    }
-    for (final ab in m.abilities) {
-      if (ab == ModelAbility.tool) {
-        caps.add(pillCapsule(Icon(lucide.Lucide.Hammer, size: 12, color: cs.primary), cs.primary));
-      } else if (ab == ModelAbility.reasoning) {
-        caps.add(pillCapsule(SvgPicture.asset('assets/icons/deepthink.svg', width: 12, height: 12, colorFilter: ColorFilter.mode(cs.secondary, BlendMode.srcIn)), cs.secondary));
-      }
-    }
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
       child: _TactileRow(
@@ -464,22 +470,25 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Row(children: caps.map((w) => Padding(padding: const EdgeInsets.only(left: 4), child: w)).toList()),
+                Flexible(child: ModelCapsulesRow(model: m)),
                 const SizedBox(width: 8),
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
-                  onPressed: () async {
-                    final old = context.read<SettingsProvider>().getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
+                  onPressed: _actionBusy
+                      ? null
+                      : () => _runGuarded(() async {
+                    final settings = context.read<SettingsProvider>();
+                    final old = settings.getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
                     final list = old.models.toList();
                     if (added) {
                       list.removeWhere((e) => e == m.id);
                     } else {
                       list.add(m.id);
                     }
-                    await context.read<SettingsProvider>().setProviderConfig(widget.providerKey, old.copyWith(models: list));
+                    await settings.setProviderConfig(widget.providerKey, old.copyWith(models: list));
                     if (mounted) setState(() {});
-                  },
+                  }),
                   icon: Icon(added ? lucide.Lucide.Minus : lucide.Lucide.Plus, size: 18, color: cs.onSurface.withOpacity(0.75)),
                 ),
               ],
