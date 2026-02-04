@@ -12,6 +12,7 @@ import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -338,6 +339,7 @@ class _WorldBookSection extends StatelessWidget {
             return IosCardPress(
               baseColor: Colors.transparent,
               borderRadius: BorderRadius.zero,
+              pressedBlendStrength: 0,
               pressedScale: 1.0,
               haptics: false,
               onTap: onTap,
@@ -605,6 +607,7 @@ class _IosListRow extends StatelessWidget {
     return IosCardPress(
       baseColor: Colors.transparent,
       borderRadius: BorderRadius.zero,
+      pressedBlendStrength: 0,
       pressedScale: 1.0,
       haptics: interactive,
       onTap: onTap,
@@ -738,43 +741,8 @@ class _WorldBookEditSheetState extends State<_WorldBookEditSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final base = widget.book;
-
-    InputDecoration deco({
-      required String label,
-      String? hint,
-      bool alignLabelWithHint = false,
-    }) {
-      return InputDecoration(
-        labelText: label,
-        hintText: hint,
-        alignLabelWithHint: alignLabelWithHint,
-        filled: true,
-        fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
-        ),
-      );
-    }
-
-    Widget divider() => Divider(
-      height: 6,
-      thickness: 0.6,
-      indent: 12,
-      endIndent: 12,
-      color: cs.outlineVariant.withOpacity(0.18),
-    );
 
     Widget switchRow({
       required String label,
@@ -785,6 +753,7 @@ class _WorldBookEditSheetState extends State<_WorldBookEditSheet> {
       return IosCardPress(
         baseColor: Colors.transparent,
         borderRadius: BorderRadius.zero,
+        pressedBlendStrength: 0,
         pressedScale: 1.0,
         haptics: false,
         onTap: () => onChanged(!value),
@@ -862,30 +831,35 @@ class _WorldBookEditSheetState extends State<_WorldBookEditSheet> {
             Flexible(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                child: _IosSectionCard(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      child: TextField(
-                        controller: _nameController,
-                        autofocus: base == null,
-                        decoration: deco(label: l10n.worldBookNameLabel),
-                      ),
+                    _IosSectionCard(
+                      children: [
+                        IosFormTextField(
+                          label: l10n.worldBookNameLabel,
+                          controller: _nameController,
+                          autofocus: base == null,
+                          textAlign: TextAlign.start,
+                        ),
+                        IosFormTextField(
+                          label: l10n.worldBookDescriptionLabel,
+                          controller: _descController,
+                          maxLines: 2,
+                          inlineLabel: false,
+                          textAlign: TextAlign.start,
+                        ),
+                      ],
                     ),
-                    divider(),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      child: TextField(
-                        controller: _descController,
-                        maxLines: 2,
-                        decoration: deco(label: l10n.worldBookDescriptionLabel),
-                      ),
-                    ),
-                    divider(),
-                    switchRow(
-                      label: l10n.worldBookEnabledLabel,
-                      value: _enabled,
-                      onChanged: (v) => setState(() => _enabled = v),
+                    const SizedBox(height: 12),
+                    _IosSectionCard(
+                      children: [
+                        switchRow(
+                          label: l10n.worldBookEnabledLabel,
+                          value: _enabled,
+                          onChanged: (v) => setState(() => _enabled = v),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -999,7 +973,6 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final base = widget.entry;
 
@@ -1029,40 +1002,6 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
       };
     }
 
-    InputDecoration deco({
-      required String label,
-      String? hint,
-      bool alignLabelWithHint = false,
-    }) {
-      return InputDecoration(
-        labelText: label,
-        hintText: hint,
-        alignLabelWithHint: alignLabelWithHint,
-        filled: true,
-        fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
-        ),
-      );
-    }
-
-    Widget divider() => Divider(
-      height: 6,
-      thickness: 0.6,
-      indent: 12,
-      endIndent: 12,
-      color: cs.outlineVariant.withOpacity(0.18),
-    );
-
     Widget switchRow({
       required String label,
       String? hint,
@@ -1072,6 +1011,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
       return IosCardPress(
         baseColor: Colors.transparent,
         borderRadius: BorderRadius.zero,
+        pressedBlendStrength: 0,
         pressedScale: 1.0,
         haptics: false,
         onTap: () => onChanged(!value),
@@ -1120,6 +1060,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
       return IosCardPress(
         baseColor: Colors.transparent,
         borderRadius: BorderRadius.zero,
+        pressedBlendStrength: 0,
         pressedScale: 1.0,
         haptics: false,
         onTap: onTap,
@@ -1174,6 +1115,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
             return IosCardPress(
               baseColor: Colors.transparent,
               borderRadius: BorderRadius.zero,
+              pressedBlendStrength: 0,
               pressedScale: 1.0,
               haptics: false,
               onTap: () => Navigator.of(ctx).pop(p),
@@ -1268,6 +1210,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
             return IosCardPress(
               baseColor: Colors.transparent,
               borderRadius: BorderRadius.zero,
+              pressedBlendStrength: 0,
               pressedScale: 1.0,
               haptics: false,
               onTap: () => Navigator.of(ctx).pop(r),
@@ -1385,17 +1328,12 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                   children: [
                     _IosSectionCard(
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                          child: TextField(
-                            controller: _nameController,
-                            autofocus: base == null,
-                            decoration: deco(
-                              label: l10n.worldBookEntryNameLabel,
-                            ),
-                          ),
+                        IosFormTextField(
+                          label: l10n.worldBookEntryNameLabel,
+                          controller: _nameController,
+                          autofocus: base == null,
+                          textAlign: TextAlign.start,
                         ),
-                        divider(),
                         switchRow(
                           label: l10n.worldBookEntryEnabledLabel,
                           value: _enabled,
@@ -1412,42 +1350,29 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                           value: _constantActive,
                           onChanged: (v) => setState(() => _constantActive = v),
                         ),
-                        divider(),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                          child: TextField(
-                            controller: _keywordsController,
-                            maxLines: 2,
-                            onChanged: (_) => setState(() {}),
-                            decoration: deco(
-                              label: l10n.worldBookEntryKeywordsLabel,
-                              hint: l10n.worldBookEntryKeywordsHint,
-                              alignLabelWithHint: true,
-                            ),
-                          ),
+                        IosFormTextField(
+                          label: l10n.worldBookEntryKeywordsLabel,
+                          controller: _keywordsController,
+                          maxLines: 2,
+                          inlineLabel: false,
+                          hintText: l10n.worldBookEntryKeywordsHint,
+                          textAlign: TextAlign.start,
+                          onChanged: (_) => setState(() {}),
                         ),
-                        divider(),
                         switchRow(
                           label: l10n.worldBookEntryUseRegexLabel,
                           value: _useRegex,
                           onChanged: (v) => setState(() => _useRegex = v),
                         ),
-                        divider(),
                         switchRow(
                           label: l10n.worldBookEntryCaseSensitiveLabel,
                           value: _caseSensitive,
                           onChanged: (v) => setState(() => _caseSensitive = v),
                         ),
-                        divider(),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                          child: TextField(
-                            controller: _scanDepthController,
-                            keyboardType: TextInputType.number,
-                            decoration: deco(
-                              label: l10n.worldBookEntryScanDepthLabel,
-                            ),
-                          ),
+                        IosFormTextField(
+                          label: l10n.worldBookEntryScanDepthLabel,
+                          controller: _scanDepthController,
+                          keyboardType: TextInputType.number,
                         ),
                       ],
                     ),
@@ -1459,52 +1384,35 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                           valueText: positionLabel(_position),
                           onTap: pickPosition,
                         ),
-                        divider(),
                         if (_position ==
                             WorldBookInjectionPosition.atDepth) ...[
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                            child: TextField(
-                              controller: _injectDepthController,
-                              keyboardType: TextInputType.number,
-                              decoration: deco(
-                                label: l10n.worldBookEntryInjectDepthLabel,
-                              ),
-                            ),
+                          IosFormTextField(
+                            label: l10n.worldBookEntryInjectDepthLabel,
+                            controller: _injectDepthController,
+                            keyboardType: TextInputType.number,
                           ),
-                          divider(),
                         ],
                         valueRow(
                           label: l10n.worldBookEntryInjectionRoleLabel,
                           valueText: roleLabel(_role),
                           onTap: pickRole,
                         ),
-                        divider(),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                          child: TextField(
-                            controller: _priorityController,
-                            keyboardType: TextInputType.number,
-                            decoration: deco(
-                              label: l10n.worldBookEntryPriorityLabel,
-                            ),
-                          ),
+                        IosFormTextField(
+                          label: l10n.worldBookEntryPriorityLabel,
+                          controller: _priorityController,
+                          keyboardType: TextInputType.number,
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     _IosSectionCard(
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                          child: TextField(
-                            controller: _contentController,
-                            maxLines: 5,
-                            decoration: deco(
-                              label: l10n.worldBookEntryContentLabel,
-                              alignLabelWithHint: true,
-                            ),
-                          ),
+                        IosFormTextField(
+                          label: l10n.worldBookEntryContentLabel,
+                          controller: _contentController,
+                          maxLines: 5,
+                          inlineLabel: false,
+                          textAlign: TextAlign.start,
                         ),
                       ],
                     ),
