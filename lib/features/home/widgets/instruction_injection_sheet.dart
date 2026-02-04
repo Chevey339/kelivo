@@ -8,6 +8,7 @@ import '../../../core/providers/instruction_injection_group_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
+import '../../../features/instruction_injection/pages/instruction_injection_page.dart';
 
 /// Bottom sheet for displaying instruction injection items on mobile/tablet.
 ///
@@ -127,6 +128,28 @@ class InstructionInjectionSheet extends StatelessWidget {
                                               grouped[groupName]![i].id,
                                               assistantId: assistantId,
                                             );
+                                          },
+                                          onLongPress: () async {
+                                            Haptics.medium();
+                                            final item = grouped[groupName]![i];
+                                            final result = await showModalBottomSheet<Map<String, String>?>(
+                                              context: ctx,
+                                              isScrollControlled: true,
+                                              backgroundColor: cs.surface,
+                                              shape: const RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                              ),
+                                              builder: (_) => InstructionInjectionEditSheet(item: item),
+                                            );
+                                            if (result != null) {
+                                              final title = result['title']?.trim() ?? '';
+                                              final prompt = result['prompt']?.trim() ?? '';
+                                              final group = result['group']?.trim() ?? '';
+                                              if (title.isEmpty || prompt.isEmpty) return;
+                                              await ctx.read<InstructionInjectionProvider>().update(
+                                                item.copyWith(title: title, prompt: prompt, group: group),
+                                              );
+                                            }
                                           },
                                         ),
                                       ),
@@ -273,11 +296,13 @@ class _InstructionInjectionRow extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.onLongPress,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -291,6 +316,7 @@ class _InstructionInjectionRow extends StatelessWidget {
         baseColor: Theme.of(context).colorScheme.surface,
         duration: const Duration(milliseconds: 260),
         onTap: onTap,
+        onLongPress: onLongPress,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           children: [

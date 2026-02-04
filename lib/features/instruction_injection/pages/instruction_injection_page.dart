@@ -65,7 +65,7 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        return _InstructionInjectionEditSheet(item: item);
+        return InstructionInjectionEditSheet(item: item);
       },
     );
 
@@ -539,18 +539,18 @@ class _GroupHeader extends StatelessWidget {
   }
 }
 
-class _InstructionInjectionEditSheet extends StatefulWidget {
-  const _InstructionInjectionEditSheet({required this.item});
+class InstructionInjectionEditSheet extends StatefulWidget {
+  const InstructionInjectionEditSheet({super.key, required this.item});
 
   final InstructionInjection? item;
 
   @override
-  State<_InstructionInjectionEditSheet> createState() =>
+  State<InstructionInjectionEditSheet> createState() =>
       _InstructionInjectionEditSheetState();
 }
 
 class _InstructionInjectionEditSheetState
-    extends State<_InstructionInjectionEditSheet> {
+    extends State<InstructionInjectionEditSheet> {
   late final TextEditingController _titleController;
   late final TextEditingController _groupController;
   late final TextEditingController _promptController;
