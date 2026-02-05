@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:re_editor/re_editor.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
@@ -12,6 +13,8 @@ import '../../core/models/instruction_injection.dart';
 import '../../core/providers/instruction_injection_group_provider.dart';
 import '../../core/providers/instruction_injection_provider.dart';
 import '../../shared/widgets/snackbar.dart';
+import '../../shared/widgets/plain_text_code_editor.dart';
+import '../../utils/re_editor_utils.dart';
 
 class DesktopInstructionInjectionPane extends StatefulWidget {
   const DesktopInstructionInjectionPane({super.key});
@@ -428,15 +431,52 @@ class _InstructionInjectionEditDialog extends StatefulWidget {
 class _InstructionInjectionEditDialogState
     extends State<_InstructionInjectionEditDialog> {
   late final TextEditingController _titleController;
+  late final CodeLineEditingController _promptController;
   late final TextEditingController _groupController;
-  late final TextEditingController _promptController;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.initTitle);
     _groupController = TextEditingController(text: widget.initGroup);
-    _promptController = TextEditingController(text: widget.initPrompt);
+    _promptController = CodeLineEditingController.fromText(widget.initPrompt);
+  }
+
+  @override
+  void didUpdateWidget(covariant _InstructionInjectionEditDialog oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initTitle != widget.initTitle &&
+        _titleController.text == oldWidget.initTitle) {
+      _syncTitleText(widget.initTitle);
+    }
+    if (oldWidget.initGroup != widget.initGroup &&
+        _groupController.text == oldWidget.initGroup) {
+      _syncGroupText(widget.initGroup);
+    }
+    if (oldWidget.initPrompt != widget.initPrompt &&
+        _promptController.text == oldWidget.initPrompt) {
+      _syncPromptText(widget.initPrompt);
+    }
+  }
+
+  void _syncTitleText(String text) {
+    _titleController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+      composing: TextRange.empty,
+    );
+  }
+
+  void _syncGroupText(String text) {
+    _groupController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+      composing: TextRange.empty,
+    );
+  }
+
+  void _syncPromptText(String text) {
+    _promptController.setTextSafely(text);
   }
 
   @override
@@ -498,12 +538,24 @@ class _InstructionInjectionEditDialogState
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: _promptController,
-                    maxLines: 8,
-                    decoration: _deskInputDecoration(
-                      context,
-                    ).copyWith(hintText: l10n.instructionInjectionPromptLabel),
+                  Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: cs.brightness == Brightness.dark
+                          ? Colors.white10
+                          : const Color(0xFFF2F3F5),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: cs.outlineVariant.withOpacity(0.3)),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: PlainTextCodeEditor(
+                      controller: _promptController,
+                      autofocus: false,
+                      hint: l10n.instructionInjectionPromptLabel,
+                      padding: const EdgeInsets.all(12),
+                      fontSize: 14,
+                      fontHeight: 1.4,
+                    ),
                   ),
                 ],
               ),
@@ -516,6 +568,7 @@ class _InstructionInjectionEditDialogState
                 filled: true,
                 dense: true,
                 onTap: () {
+                  // TODO: Add inline validation/feedback (e.g., disable Save or show error) when title or prompt is empty/invalid instead of failing silently after submit.
                   Navigator.of(context).pop({
                     'title': _titleController.text,
                     'group': _groupController.text,
