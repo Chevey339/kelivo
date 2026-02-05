@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import './app_directories.dart';
 
 class AvatarCache {
