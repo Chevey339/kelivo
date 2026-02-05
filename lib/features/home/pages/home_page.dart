@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:io' show File;
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show TargetPlatform;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:provider/provider.dart';
+import 'package:re_editor/re_editor.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../main.dart';
 import '../../../shared/widgets/interactive_drawer.dart';
@@ -69,7 +69,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   final InteractiveDrawerController _drawerController = InteractiveDrawerController();
   final ValueNotifier<int> _assistantPickerCloseTick = ValueNotifier<int>(0);
   final FocusNode _inputFocus = FocusNode();
-  final TextEditingController _inputController = TextEditingController();
+  final CodeLineEditingController _inputController = CodeLineEditingController();
   final ChatInputBarController _mediaController = ChatInputBarController();
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _inputBarKey = GlobalKey();
@@ -184,20 +184,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     if (!mounted) return;
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
-    final current = _inputController.text;
-    final selection = _inputController.selection;
-    final start = (selection.start >= 0 && selection.start <= current.length)
-        ? selection.start
-        : current.length;
-    final end = (selection.end >= 0 && selection.end <= current.length && selection.end >= start)
-        ? selection.end
-        : start;
-    final next = current.replaceRange(start, end, trimmed);
-    _inputController.value = _inputController.value.copyWith(
-      text: next,
-      selection: TextSelection.collapsed(offset: start + trimmed.length),
-      composing: TextRange.empty,
-    );
+    // Use CodeLineEditingController's replaceSelection to insert text at cursor
+    try {
+      _inputController.replaceSelection(trimmed);
+    } catch (_) {
+      // TODO: Add diagnostics (and/or a graceful fallback insert) when replaceSelection fails to avoid silent drops.
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _controller.forceScrollToBottomSoon(animate: false);
@@ -329,7 +322,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     Widget w = content;
                     if (!isAndroid) {
                       w = w
-                          .animate(key: ValueKey('mob_body_'+(_controller.currentConversation?.id ?? 'none')))
+                          .animate(key: ValueKey('mob_body_${_controller.currentConversation?.id ?? 'none'}'))
                           .fadeIn(duration: 200.ms, curve: Curves.easeOutCubic);
                       w = FadeTransition(opacity: _controller.convoFade, child: w);
                     }
@@ -475,7 +468,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       context,
                       dividerPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                     ),
-                  ).animate(key: ValueKey('tab_body_'+(_controller.currentConversation?.id ?? 'none')))
+                  ).animate(key: ValueKey('tab_body_${_controller.currentConversation?.id ?? 'none'}'))
                    .fadeIn(duration: 200.ms, curve: Curves.easeOutCubic),
                 ),
               ),
@@ -554,7 +547,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     image: DecorationImage(
                       image: provider,
                       fit: BoxFit.cover,
-                      colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.04), BlendMode.srcATop),
+                      colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.04), BlendMode.srcATop),
                     ),
                   ),
                 ),
@@ -570,8 +563,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           final top = (0.20 * maskStrength).clamp(0.0, 1.0);
                           final bottom = (0.50 * maskStrength).clamp(0.0, 1.0);
                           return [
-                            cs.background.withOpacity(top),
-                            cs.background.withOpacity(bottom),
+                            cs.surface.withValues(alpha: top),
+                            cs.surface.withValues(alpha: bottom),
                           ];
                         }(),
                       ),
@@ -608,7 +601,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       child: Stack(
         fit: StackFit.expand,
         children: [
-          ColoredBox(color: cs.background),
+          ColoredBox(color: cs.surface),
           if (bg != null) Opacity(opacity: 0.9, child: bg),
           DecoratedBox(
             decoration: BoxDecoration(
@@ -616,8 +609,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  cs.background.withOpacity(0.08),
-                  cs.background.withOpacity(0.36),
+                  cs.surface.withValues(alpha: 0.08),
+                  cs.surface.withValues(alpha: 0.36),
                 ],
               ),
             ),
@@ -713,6 +706,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             context.read<SettingsProvider>().setThinkingBudget(assistant.thinkingBudget);
           }
           await _openReasoningSettings();
+          if (!context.mounted) return;
           final chosen = context.read<SettingsProvider>().thinkingBudget;
           await context.read<AssistantProvider>().updateAssistant(
             assistant.copyWith(thinkingBudget: chosen),
@@ -720,8 +714,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         }
       },
       onSend: (text) {
+        final trimmed = text.text.trim();
+        if (trimmed.isEmpty && text.imagePaths.isEmpty && text.documents.isEmpty) {
+          return;
+        }
         _controller.sendMessage(text);
-        _inputController.clear();
+        _inputController.value = const CodeLineEditingValue.empty(); // Clear + reset selection/composing
         if (PlatformUtils.isMobile) {
           _controller.dismissKeyboard();
         } else {
@@ -800,14 +798,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           if (_controller.isDragHovering)
             IgnorePointer(
               child: Container(
-                color: Colors.black.withOpacity(0.12),
+                color: Colors.black.withValues(alpha: 0.12),
                 child: Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
+                      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.4), width: 2),
+                      border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4), width: 2),
                     ),
                     child: Text(
                       AppLocalizations.of(context)!.homePageDropToUpload,
@@ -847,6 +845,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final assistantId = context.read<AssistantProvider>().currentAssistantId;
     final provider = context.read<InstructionInjectionProvider>();
     await provider.initialize();
+    if (!mounted) return;
     final items = provider.items;
     if (items.isEmpty) return;
 
