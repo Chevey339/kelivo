@@ -3,6 +3,53 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
 class MarkdownPreviewHtmlBuilder {
+  static const String _fallbackTemplate = '''
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: {{BACKGROUND_COLOR}};
+      color: {{ON_BACKGROUND_COLOR}};
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    pre {
+      margin: 0;
+      font-family: inherit;
+    }
+  </style>
+</head>
+<body>
+  <pre id="content"></pre>
+  <script>
+    (function () {
+      var b64 = '{{MARKDOWN_BASE64}}';
+      function b64ToUtf8(value) {
+        try {
+          return decodeURIComponent(escape(atob(value)));
+        } catch (e) {
+          try { return atob(value); } catch (_) { return ''; }
+        }
+      }
+      var text = b64ToUtf8(b64);
+      var el = document.getElementById('content');
+      if (el) el.textContent = text;
+    })();
+  </script>
+</body>
+</html>
+''';
+
   static Future<String> buildFromMarkdown(
     BuildContext context,
     String markdown,
@@ -17,7 +64,15 @@ class MarkdownPreviewHtmlBuilder {
     ColorScheme cs,
     String markdown,
   ) async {
-    final template = await rootBundle.loadString('assets/html/mark.html');
+    String template;
+    try {
+      template = await rootBundle.loadString('assets/html/mark.html');
+    } catch (e, s) {
+      debugPrint('Failed to load markdown HTML template: $e');
+      debugPrintStack(stackTrace: s);
+      template = _fallbackTemplate;
+    }
+    // TODO: Decide token semantics (BACKGROUND vs SURFACE, and ON_* variants). If undecided, track via a GitHub issue and reference it here.
     return template
         .replaceAll('{{MARKDOWN_BASE64}}', base64Encode(utf8.encode(markdown)))
         .replaceAll('{{BACKGROUND_COLOR}}', _toCssHex(cs.surface))
@@ -38,13 +93,22 @@ class MarkdownPreviewHtmlBuilder {
   }
 
   static String _toCssHex(Color c) {
-    int to255(double v) => (v * 255.0).round().clamp(0, 255);
-    final a = to255(c.a).toRadixString(16).padLeft(2, '0').toUpperCase();
-    final r = to255(c.r).toRadixString(16).padLeft(2, '0').toUpperCase();
-    final g = to255(c.g).toRadixString(16).padLeft(2, '0').toUpperCase();
-    final b = to255(c.b).toRadixString(16).padLeft(2, '0').toUpperCase();
-    return '#$r$g$b$a';
+    final r = _toHex(_to8Bit(c.r));
+    final g = _toHex(_to8Bit(c.g));
+    final b = _toHex(_to8Bit(c.b));
+    final a = _to8Bit(c.a);
+    if (a == 0xFF) {
+      return '#$r$g$b';
+    }
+    final aHex = _toHex(a);
+    return '#$r$g$b$aHex';
   }
+
+  static int _to8Bit(double value) =>
+      (value * 255.0).round().clamp(0, 255).toInt();
+
+  static String _toHex(int value) =>
+      value.toRadixString(16).padLeft(2, '0').toUpperCase();
 }
 
 extension Base64X on String {
