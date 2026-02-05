@@ -8,6 +8,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
+import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../utils/model_display_helper.dart';
 import 'chat_input_bar.dart';
@@ -55,6 +56,7 @@ class ChatInputSection extends StatelessWidget {
     this.onPickPhotos,
     this.onUploadFiles,
     this.onToggleLearningMode,
+    this.onOpenWorldBook, // 新增世界书支持桌面端
     this.onLongPressLearning,
     this.onClearContext,
   });
@@ -89,6 +91,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onPickPhotos;
   final VoidCallback? onUploadFiles;
   final VoidCallback? onToggleLearningMode;
+  final VoidCallback? onOpenWorldBook;
   final VoidCallback? onLongPressLearning;
   final VoidCallback? onClearContext;
 
@@ -111,6 +114,7 @@ class ChatInputSection extends StatelessWidget {
     final builtinSearchActive = _isBuiltinSearchActive(settings, a, pk, mid);
 
     final isDesktop = _isDesktopPlatform(context);
+    final hasWorldBooks = isTablet && context.watch<WorldBookProvider>().books.isNotEmpty;
 
     return ChatInputBar(
       key: inputBarKey,
@@ -162,9 +166,13 @@ class ChatInputSection extends StatelessWidget {
       onPickPhotos: isTablet ? (isDesktop ? null : onPickPhotos) : null,
       onUploadFiles: isTablet ? onUploadFiles : null,
       onToggleLearningMode: isTablet ? onToggleLearningMode : null,
+      onOpenWorldBook: hasWorldBooks ? onOpenWorldBook : null,
       onLongPressLearning: isTablet ? onLongPressLearning : null,
       learningModeActive: isTablet
           ? context.watch<InstructionInjectionProvider>().activeIdsFor(assistantId).isNotEmpty
+          : false,
+      worldBookActive: isTablet
+          ? context.watch<WorldBookProvider>().activeBookIdsFor(assistantId).isNotEmpty
           : false,
       showMoreButton: !isTablet,
       onClearContext: isTablet ? onClearContext : null,

@@ -14,6 +14,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
+import '../../../core/providers/world_book_provider.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/services/android_process_text.dart';
@@ -25,6 +26,7 @@ import '../../../desktop/mcp_servers_popover.dart';
 import '../../../desktop/mini_map_popover.dart';
 import '../../../desktop/quick_phrase_popover.dart';
 import '../../../desktop/instruction_injection_popover.dart';
+import '../../../desktop/world_book_popover.dart';
 import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
 import '../../search/widgets/search_settings_sheet.dart';
@@ -37,6 +39,7 @@ import '../../quick_phrase/widgets/quick_phrase_menu.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/mini_map_sheet.dart';
 import '../widgets/instruction_injection_sheet.dart';
+import '../widgets/world_book_sheet.dart';
 import '../widgets/learning_prompt_sheet.dart';
 import '../widgets/scroll_nav_buttons.dart';
 import '../widgets/message_list_view.dart';
@@ -106,7 +109,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _controller.initChat();
     _initProcessText();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => _controller.measureInputBar());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _controller.measureInputBar();
+      if (!mounted) return;
+      context.read<WorldBookProvider>().initialize();
+    });
   }
 
   @override
@@ -748,6 +755,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       onPickPhotos: _controller.onPickPhotos,
       onUploadFiles: _controller.onPickFiles,
       onToggleLearningMode: _openInstructionInjectionPopover,
+      onOpenWorldBook: _openWorldBookPopover,
       onLongPressLearning: _showLearningPromptSheet,
       onClearContext: _controller.clearContext,
     );
@@ -851,6 +859,26 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       );
     } else {
       await showInstructionInjectionSheet(context, assistantId: assistantId);
+    }
+  }
+
+  Future<void> _openWorldBookPopover() async {
+    final isDesktop = PlatformUtils.isDesktop;
+    final assistantId = context.read<AssistantProvider>().currentAssistantId;
+    final provider = context.read<WorldBookProvider>();
+    await provider.initialize();
+    final books = provider.books;
+    if (books.isEmpty) return;
+
+    if (isDesktop) {
+      await showDesktopWorldBookPopover(
+        context,
+        anchorKey: _inputBarKey,
+        books: books,
+        assistantId: assistantId,
+      );
+    } else {
+      await showWorldBookSheet(context, assistantId: assistantId);
     }
   }
 

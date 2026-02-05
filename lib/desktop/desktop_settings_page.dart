@@ -14,10 +14,12 @@ import '../theme/palettes.dart';
 import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
 import 'model_fetch_dialog.dart' show showModelFetchDialog;
+import 'widgets/desktop_select_dropdown.dart';
 import '../shared/widgets/ios_switch.dart';
 import '../shared/widgets/ios_checkbox.dart';
 // Desktop assistants panel dependencies
-import '../features/assistant/pages/assistant_settings_edit_page.dart' show showAssistantDesktopDialog; // dialog opener only
+import '../features/assistant/pages/assistant_settings_edit_page.dart'
+    show showAssistantDesktopDialog; // dialog opener only
 import '../core/providers/assistant_provider.dart';
 import '../core/models/assistant.dart';
 import '../utils/avatar_cache.dart';
@@ -28,9 +30,11 @@ import 'package:characters/characters.dart';
 import '../features/provider/pages/multi_key_manager_page.dart';
 import '../features/model/widgets/model_detail_sheet.dart';
 import 'add_provider_dialog.dart' show showDesktopAddProviderDialog;
-import 'model_edit_dialog.dart' show showDesktopCreateModelDialog, showDesktopModelEditDialog;
+import 'model_edit_dialog.dart'
+    show showDesktopCreateModelDialog, showDesktopModelEditDialog;
 // Use the unified model selector (desktop dialog on desktop platforms)
-import '../features/model/widgets/model_select_sheet.dart' show showModelSelector;
+import '../features/model/widgets/model_select_sheet.dart'
+    show showModelSelector;
 import '../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:async';
@@ -45,6 +49,7 @@ import 'setting/mcp_pane.dart';
 import 'setting/tts_services_pane.dart';
 import 'setting/quick_phrases_pane.dart';
 import 'setting/instruction_injection_pane.dart';
+import 'setting/world_book_pane.dart';
 import 'setting/backup_pane.dart';
 import 'setting/hotkeys_pane.dart';
 import 'setting/network_proxy_pane.dart';
@@ -55,7 +60,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../features/provider/widgets/provider_avatar.dart';
-import '../features/provider/widgets/share_provider_sheet.dart' show encodeProviderConfig;
+import '../features/provider/widgets/share_provider_sheet.dart'
+    show encodeProviderConfig;
 import '../utils/clipboard_images.dart';
 
 /// Desktop settings layout: left menu + vertical divider + right content.
@@ -79,6 +85,7 @@ enum _SettingsMenuItem {
   mcp,
   quickPhrases,
   instructionInjection,
+  worldBook,
   tts,
   networkProxy,
   backup,
@@ -122,6 +129,8 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
           return l10n.settingsPageQuickPhrase;
         case _SettingsMenuItem.instructionInjection:
           return l10n.settingsPageInstructionInjection;
+        case _SettingsMenuItem.worldBook:
+          return l10n.settingsPageWorldBook;
         case _SettingsMenuItem.tts:
           return l10n.settingsPageTts;
         case _SettingsMenuItem.networkProxy:
@@ -182,29 +191,56 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                     child: () {
                       switch (_selected) {
                         case _SettingsMenuItem.display:
-                          return const _DisplaySettingsBody(key: ValueKey('display'));
+                          return const _DisplaySettingsBody(
+                            key: ValueKey('display'),
+                          );
                         case _SettingsMenuItem.assistant:
-                          return const _DesktopAssistantsBody(key: ValueKey('assistants'));
+                          return const _DesktopAssistantsBody(
+                            key: ValueKey('assistants'),
+                          );
                         case _SettingsMenuItem.providers:
-                          return _DesktopProvidersBody(key: const ValueKey('providers'), initialSelectedKey: widget.initialProviderKey);
+                          return _DesktopProvidersBody(
+                            key: const ValueKey('providers'),
+                            initialSelectedKey: widget.initialProviderKey,
+                          );
                         case _SettingsMenuItem.defaultModel:
-                          return const DesktopDefaultModelPane(key: ValueKey('defaultModel'));
+                          return const DesktopDefaultModelPane(
+                            key: ValueKey('defaultModel'),
+                          );
                         case _SettingsMenuItem.search:
-                          return const DesktopSearchServicesPane(key: ValueKey('search'));
+                          return const DesktopSearchServicesPane(
+                            key: ValueKey('search'),
+                          );
                         case _SettingsMenuItem.mcp:
                           return const DesktopMcpPane(key: ValueKey('mcp'));
                         case _SettingsMenuItem.networkProxy:
-                          return const DesktopNetworkProxyPane(key: ValueKey('networkProxy'));
+                          return const DesktopNetworkProxyPane(
+                            key: ValueKey('networkProxy'),
+                          );
                         case _SettingsMenuItem.backup:
-                          return const DesktopBackupPane(key: ValueKey('backup'));
+                          return const DesktopBackupPane(
+                            key: ValueKey('backup'),
+                          );
                         case _SettingsMenuItem.hotkeys:
-                          return const DesktopHotkeysPane(key: ValueKey('hotkeys'));
+                          return const DesktopHotkeysPane(
+                            key: ValueKey('hotkeys'),
+                          );
                         case _SettingsMenuItem.quickPhrases:
-                          return const DesktopQuickPhrasesPane(key: ValueKey('quickPhrases'));
+                          return const DesktopQuickPhrasesPane(
+                            key: ValueKey('quickPhrases'),
+                          );
                         case _SettingsMenuItem.instructionInjection:
-                          return const DesktopInstructionInjectionPane(key: ValueKey('instructionInjection'));
+                          return const DesktopInstructionInjectionPane(
+                            key: ValueKey('instructionInjection'),
+                          );
+                        case _SettingsMenuItem.worldBook:
+                          return const DesktopWorldBookPane(
+                            key: ValueKey('worldBook'),
+                          );
                         case _SettingsMenuItem.tts:
-                          return const DesktopTtsServicesPane(key: ValueKey('tts'));
+                          return const DesktopTtsServicesPane(
+                            key: ValueKey('tts'),
+                          );
                         case _SettingsMenuItem.about:
                           return const DesktopAboutPane(key: ValueKey('about'));
                         default:
@@ -236,19 +272,64 @@ class _SettingsMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final items = [
-      (_SettingsMenuItem.display, lucide.Lucide.Monitor, l10n.settingsPageDisplay),
-      (_SettingsMenuItem.providers, lucide.Lucide.Boxes, l10n.settingsPageProviders),
-      (_SettingsMenuItem.assistant, lucide.Lucide.Bot, l10n.settingsPageAssistant),
-      (_SettingsMenuItem.defaultModel, lucide.Lucide.Heart, l10n.settingsPageDefaultModel),
+      (
+        _SettingsMenuItem.display,
+        lucide.Lucide.Monitor,
+        l10n.settingsPageDisplay,
+      ),
+      (
+        _SettingsMenuItem.providers,
+        lucide.Lucide.Boxes,
+        l10n.settingsPageProviders,
+      ),
+      (
+        _SettingsMenuItem.assistant,
+        lucide.Lucide.Bot,
+        l10n.settingsPageAssistant,
+      ),
+      (
+        _SettingsMenuItem.defaultModel,
+        lucide.Lucide.Heart,
+        l10n.settingsPageDefaultModel,
+      ),
       (_SettingsMenuItem.search, lucide.Lucide.Earth, l10n.settingsPageSearch),
       (_SettingsMenuItem.mcp, lucide.Lucide.Terminal, l10n.settingsPageMcp),
-      (_SettingsMenuItem.quickPhrases, lucide.Lucide.Zap, l10n.settingsPageQuickPhrase),
-      (_SettingsMenuItem.instructionInjection, lucide.Lucide.Layers, l10n.settingsPageInstructionInjection),
+      (
+        _SettingsMenuItem.quickPhrases,
+        lucide.Lucide.Zap,
+        l10n.settingsPageQuickPhrase,
+      ),
+      (
+        _SettingsMenuItem.instructionInjection,
+        lucide.Lucide.Layers,
+        l10n.settingsPageInstructionInjection,
+      ),
+      (
+        _SettingsMenuItem.worldBook,
+        lucide.Lucide.BookOpen,
+        l10n.settingsPageWorldBook,
+      ),
       (_SettingsMenuItem.tts, lucide.Lucide.Volume2, l10n.settingsPageTts),
-      (_SettingsMenuItem.networkProxy, lucide.Lucide.EthernetPort, l10n.settingsPageNetworkProxy),
-      (_SettingsMenuItem.backup, lucide.Lucide.Database, l10n.settingsPageBackup),
-      (_SettingsMenuItem.hotkeys, lucide.Lucide.Keyboard, l10n.settingsPageHotkeys),
-      (_SettingsMenuItem.about, lucide.Lucide.BadgeInfo, l10n.settingsPageAbout),
+      (
+        _SettingsMenuItem.networkProxy,
+        lucide.Lucide.EthernetPort,
+        l10n.settingsPageNetworkProxy,
+      ),
+      (
+        _SettingsMenuItem.backup,
+        lucide.Lucide.Database,
+        l10n.settingsPageBackup,
+      ),
+      (
+        _SettingsMenuItem.hotkeys,
+        lucide.Lucide.Keyboard,
+        l10n.settingsPageHotkeys,
+      ),
+      (
+        _SettingsMenuItem.about,
+        lucide.Lucide.BadgeInfo,
+        l10n.settingsPageAbout,
+      ),
     ];
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -265,7 +346,9 @@ class _SettingsMenu extends StatelessWidget {
               onTap: () => onSelect(items[i].$1),
               color: cs.onSurface.withOpacity(0.9),
               selectedColor: cs.primary,
-              hoverBg: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04),
+              hoverBg: isDark
+                  ? Colors.white.withOpacity(0.06)
+                  : Colors.black.withOpacity(0.04),
             ),
             if (i != items.length - 1) const SizedBox(height: 8),
           ],
@@ -286,13 +369,13 @@ class _MenuItem extends StatefulWidget {
     required this.hoverBg,
   });
 
-    final IconData icon;
-    final String label;
-    final bool selected;
-    final VoidCallback onTap;
-    final Color color;
-    final Color selectedColor;
-    final Color hoverBg;
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color color;
+  final Color selectedColor;
+  final Color hoverBg;
 
   @override
   State<_MenuItem> createState() => _MenuItemState();
@@ -306,8 +389,8 @@ class _MenuItemState extends State<_MenuItem> {
     final bg = widget.selected
         ? cs.primary.withOpacity(0.10)
         : _hover
-            ? widget.hoverBg
-            : Colors.transparent;
+        ? widget.hoverBg
+        : Colors.transparent;
     final fg = widget.selected ? widget.selectedColor : widget.color;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -333,7 +416,12 @@ class _MenuItemState extends State<_MenuItem> {
                   widget.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w400, color: fg, decoration: TextDecoration.none),
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w400,
+                    color: fg,
+                    decoration: TextDecoration.none,
+                  ),
                 ),
               ),
             ],
@@ -356,11 +444,19 @@ class _ComingSoonBody extends StatelessWidget {
         decoration: BoxDecoration(
           color: cs.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.25)),
+          border: Border.all(
+            color: Theme.of(
+              context,
+            ).colorScheme.outlineVariant.withOpacity(0.25),
+          ),
         ),
         child: Text(
           'Coming soon',
-          style: TextStyle(fontSize: 16, color: cs.onSurface.withOpacity(0.7), fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontSize: 16,
+            color: cs.onSurface.withOpacity(0.7),
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -391,8 +487,14 @@ class _DesktopAssistantsBody extends StatelessWidget {
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          AppLocalizations.of(context)!.desktopAssistantsListTitle,
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: cs.onSurface.withOpacity(0.9)),
+                          AppLocalizations.of(
+                            context,
+                          )!.desktopAssistantsListTitle,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            color: cs.onSurface.withOpacity(0.9),
+                          ),
                         ),
                       ),
                     ),
@@ -412,13 +514,18 @@ class _DesktopAssistantsBody extends StatelessWidget {
                     itemCount: assistants.length,
                     onReorder: (oldIndex, newIndex) async {
                       if (newIndex > oldIndex) newIndex -= 1;
-                      await context.read<AssistantProvider>().reorderAssistants(oldIndex, newIndex);
+                      await context.read<AssistantProvider>().reorderAssistants(
+                        oldIndex,
+                        newIndex,
+                      );
                     },
                     proxyDecorator: (child, index, animation) {
                       return AnimatedBuilder(
                         animation: animation,
                         builder: (context, _) {
-                          final t = Curves.easeOutCubic.transform(animation.value);
+                          final t = Curves.easeOutCubic.transform(
+                            animation.value,
+                          );
                           return Transform.scale(
                             scale: 0.98 + 0.02 * t,
                             child: Material(
@@ -442,7 +549,10 @@ class _DesktopAssistantsBody extends StatelessWidget {
                             index: index,
                             child: _DesktopAssistantCard(
                               item: item,
-                              onTap: () => showAssistantDesktopDialog(context, assistantId: item.id),
+                              onTap: () => showAssistantDesktopDialog(
+                                context,
+                                assistantId: item.id,
+                              ),
                             ),
                           ),
                         ),
@@ -470,7 +580,11 @@ class _AddAssistantButtonState extends State<_AddAssistantButton> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = _hover ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05)) : Colors.transparent;
+    final bg = _hover
+        ? (isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.05))
+        : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -479,11 +593,17 @@ class _AddAssistantButtonState extends State<_AddAssistantButton> {
         onTap: () async {
           final name = await _showAddAssistantDesktopDialog(context);
           if (name == null || name.trim().isEmpty) return;
-          await context.read<AssistantProvider>().addAssistant(name: name.trim(), context: context);
+          await context.read<AssistantProvider>().addAssistant(
+            name: name.trim(),
+            context: context,
+          );
         },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(10),
+          ),
           child: Icon(lucide.Lucide.Plus, size: 16, color: cs.primary),
         ),
       ),
@@ -517,10 +637,18 @@ Future<String?> _showAddAssistantDesktopDialog(BuildContext context) async {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(l10n.assistantSettingsAddSheetTitle, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                        child: Text(
+                          l10n.assistantSettingsAddSheetTitle,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                       IconButton(
-                        tooltip: MaterialLocalizations.of(ctx).closeButtonTooltip,
+                        tooltip: MaterialLocalizations.of(
+                          ctx,
+                        ).closeButtonTooltip,
                         icon: const Icon(lucide.Lucide.X, size: 18),
                         color: cs.onSurface,
                         onPressed: () => Navigator.of(ctx).maybePop(),
@@ -540,14 +668,20 @@ Future<String?> _showAddAssistantDesktopDialog(BuildContext context) async {
                       decoration: InputDecoration(
                         hintText: l10n.assistantSettingsAddSheetHint,
                         filled: true,
-                        fillColor: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF7F7F9),
+                        fillColor: Theme.of(ctx).brightness == Brightness.dark
+                            ? Colors.white10
+                            : const Color(0xFFF7F7F9),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.2)),
+                          borderSide: BorderSide(
+                            color: cs.outlineVariant.withOpacity(0.2),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
+                          borderSide: BorderSide(
+                            color: cs.primary.withOpacity(0.4),
+                          ),
                         ),
                       ),
                       onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
@@ -567,7 +701,8 @@ Future<String?> _showAddAssistantDesktopDialog(BuildContext context) async {
                           label: l10n.assistantSettingsAddSheetSave,
                           filled: true,
                           dense: true,
-                          onTap: () => Navigator.of(ctx).pop(controller.text.trim()),
+                          onTap: () =>
+                              Navigator.of(ctx).pop(controller.text.trim()),
                         ),
                       ],
                     ),
@@ -599,7 +734,9 @@ class _DeleteAssistantIconState extends State<_DeleteAssistantIcon> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = _hover ? (isDark ? cs.error.withOpacity(0.18) : cs.error.withOpacity(0.14)) : Colors.transparent;
+    final bg = _hover
+        ? (isDark ? cs.error.withOpacity(0.18) : cs.error.withOpacity(0.14))
+        : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -632,7 +769,9 @@ class _CopyAssistantIconState extends State<_CopyAssistantIcon> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = _hover ? (isDark ? cs.primary.withOpacity(0.16) : cs.primary.withOpacity(0.12)) : Colors.transparent;
+    final bg = _hover
+        ? (isDark ? cs.primary.withOpacity(0.16) : cs.primary.withOpacity(0.12))
+        : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -694,11 +833,16 @@ Future<bool?> _confirmDeleteDesktop(BuildContext context) async {
                               l10n.assistantSettingsDeleteDialogTitle,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                           IconButton(
-                            tooltip: MaterialLocalizations.of(ctx).closeButtonTooltip,
+                            tooltip: MaterialLocalizations.of(
+                              ctx,
+                            ).closeButtonTooltip,
                             icon: const Icon(lucide.Lucide.X, size: 18),
                             color: cs.onSurface,
                             onPressed: () => Navigator.of(ctx).maybePop(false),
@@ -707,7 +851,11 @@ Future<bool?> _confirmDeleteDesktop(BuildContext context) async {
                       ),
                     ),
                   ),
-                  Divider(height: 1, thickness: 0.5, color: cs.outlineVariant.withOpacity(0.12)),
+                  Divider(
+                    height: 1,
+                    thickness: 0.5,
+                    color: cs.outlineVariant.withOpacity(0.12),
+                  ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
                     child: Column(
@@ -715,7 +863,10 @@ Future<bool?> _confirmDeleteDesktop(BuildContext context) async {
                       children: [
                         Text(
                           l10n.assistantSettingsDeleteDialogContent,
-                          style: TextStyle(color: cs.onSurface.withOpacity(0.9), fontSize: 13.5),
+                          style: TextStyle(
+                            color: cs.onSurface.withOpacity(0.9),
+                            fontSize: 13.5,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         Row(
@@ -762,7 +913,13 @@ Future<bool?> _confirmDeleteDesktop(BuildContext context) async {
 }
 
 class _DeskIosButton extends StatefulWidget {
-  const _DeskIosButton({required this.label, required this.onTap, this.filled = false, this.danger = false, this.dense = false});
+  const _DeskIosButton({
+    required this.label,
+    required this.onTap,
+    this.filled = false,
+    this.danger = false,
+    this.dense = false,
+  });
   final String label;
   final VoidCallback onTap;
   final bool filled;
@@ -780,38 +937,56 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final baseColor = widget.danger ? cs.error : cs.primary;
-    final textColor = widget.filled ? (widget.danger ? cs.onError : cs.onPrimary) : baseColor;
-    final baseBg = widget.filled ? baseColor : (isDark ? Colors.white10 : Colors.transparent);
+    final textColor = widget.filled
+        ? (widget.danger ? cs.onError : cs.onPrimary)
+        : baseColor;
+    final baseBg = widget.filled
+        ? baseColor
+        : (isDark ? Colors.white10 : Colors.transparent);
     final hoverBg = widget.filled
         ? baseColor.withOpacity(0.92)
-        : (isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.04));
+        : (isDark
+              ? Colors.white.withOpacity(0.08)
+              : Colors.black.withOpacity(0.04));
     final bg = _hover ? hoverBg : baseBg;
-    final borderColor = widget.filled ? Colors.transparent : baseColor.withOpacity(isDark ? 0.6 : 0.5);
+    final borderColor = widget.filled
+        ? Colors.transparent
+        : baseColor.withOpacity(isDark ? 0.6 : 0.5);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _pressed ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 110),
-        curve: Curves.easeOutCubic,
-        child: Container(
-          padding: EdgeInsets.symmetric(vertical: widget.dense ? 8 : 12, horizontal: 12),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: borderColor),
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _pressed ? 0.97 : 1.0,
+          duration: const Duration(milliseconds: 110),
+          curve: Curves.easeOutCubic,
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              vertical: widget.dense ? 8 : 12,
+              horizontal: 12,
+            ),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+            ),
+            child: Text(
+              widget.label,
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.w600,
+                fontSize: widget.dense ? 13 : 14,
+              ),
+            ),
           ),
-          child: Text(widget.label, style: TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: widget.dense ? 13 : 14)),
         ),
-      ),
       ),
     );
   }
@@ -832,7 +1007,9 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
-    final borderColor = _hover ? cs.primary.withOpacity(isDark ? 0.35 : 0.45) : cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08);
+    final borderColor = _hover
+        ? cs.primary.withOpacity(isDark ? 0.35 : 0.45)
+        : cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -864,27 +1041,46 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                               widget.item.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                           if (!widget.item.deletable)
                             Container(
                               margin: const EdgeInsets.only(left: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: cs.primary.withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(999),
-                                border: Border.all(color: cs.primary.withOpacity(0.35)),
+                                border: Border.all(
+                                  color: cs.primary.withOpacity(0.35),
+                                ),
                               ),
                               child: Text(
-                                AppLocalizations.of(context)!.assistantSettingsDefaultTag,
-                                style: TextStyle(fontSize: 11, color: cs.primary, fontWeight: FontWeight.w700),
+                                AppLocalizations.of(
+                                  context,
+                                )!.assistantSettingsDefaultTag,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: cs.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           _CopyAssistantIcon(
                             onCopy: () async {
                               final l10n = AppLocalizations.of(context)!;
-                              final newId = await context.read<AssistantProvider>().duplicateAssistant(widget.item.id, l10n: l10n);
+                              final newId = await context
+                                  .read<AssistantProvider>()
+                                  .duplicateAssistant(
+                                    widget.item.id,
+                                    l10n: l10n,
+                                  );
                               if (!mounted) return;
                               if (newId != null) {
                                 showAppSnackBar(
@@ -898,22 +1094,29 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                           _DeleteAssistantIcon(
                             onConfirm: () async {
                               final l10n = AppLocalizations.of(context)!;
-                              final count = context.read<AssistantProvider>().assistants.length;
+                              final count = context
+                                  .read<AssistantProvider>()
+                                  .assistants
+                                  .length;
                               if (count <= 1) {
                                 showAppSnackBar(
                                   context,
-                                  message: l10n.assistantSettingsAtLeastOneAssistantRequired,
+                                  message: l10n
+                                      .assistantSettingsAtLeastOneAssistantRequired,
                                   type: NotificationType.warning,
                                 );
                                 return;
                               }
                               final ok = await _confirmDeleteDesktop(context);
                               if (ok == true) {
-                                final success = await context.read<AssistantProvider>().deleteAssistant(widget.item.id);
+                                final success = await context
+                                    .read<AssistantProvider>()
+                                    .deleteAssistant(widget.item.id);
                                 if (success != true) {
                                   showAppSnackBar(
                                     context,
-                                    message: l10n.assistantSettingsAtLeastOneAssistantRequired,
+                                    message: l10n
+                                        .assistantSettingsAtLeastOneAssistantRequired,
                                     type: NotificationType.warning,
                                   );
                                 }
@@ -925,11 +1128,17 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                       const SizedBox(height: 6),
                       Text(
                         (widget.item.systemPrompt.trim().isEmpty
-                            ? AppLocalizations.of(context)!.assistantSettingsNoPromptPlaceholder
+                            ? AppLocalizations.of(
+                                context,
+                              )!.assistantSettingsNoPromptPlaceholder
                             : widget.item.systemPrompt),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.7), height: 1.25),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurface.withOpacity(0.7),
+                          height: 1.25,
+                        ),
                       ),
                     ],
                   ),
@@ -958,11 +1167,23 @@ class _AssistantAvatarDesktop extends StatelessWidget {
           builder: (ctx, snap) {
             final p = snap.data;
             if (p != null && File(p).existsSync()) {
-              return ClipOval(child: Image(image: FileImage(File(p)), width: size, height: size, fit: BoxFit.cover));
+              return ClipOval(
+                child: Image(
+                  image: FileImage(File(p)),
+                  width: size,
+                  height: size,
+                  fit: BoxFit.cover,
+                ),
+              );
             }
             return ClipOval(
-              child: Image.network(av, width: size, height: size, fit: BoxFit.cover,
-                  errorBuilder: (c, e, s) => _initial(cs)),
+              child: Image.network(
+                av,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (c, e, s) => _initial(cs),
+              ),
             );
           },
         );
@@ -970,7 +1191,14 @@ class _AssistantAvatarDesktop extends StatelessWidget {
         final fixed = SandboxPathResolver.fix(av);
         final f = File(fixed);
         if (f.existsSync()) {
-          return ClipOval(child: Image(image: FileImage(f), width: size, height: size, fit: BoxFit.cover));
+          return ClipOval(
+            child: Image(
+              image: FileImage(f),
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+            ),
+          );
         }
         return _initial(cs);
       } else {
@@ -985,11 +1213,18 @@ class _AssistantAvatarDesktop extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: cs.primary.withOpacity(0.15), shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: cs.primary.withOpacity(0.15),
+        shape: BoxShape.circle,
+      ),
       alignment: Alignment.center,
       child: Text(
         letter,
-        style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700, fontSize: size * 0.42),
+        style: TextStyle(
+          color: cs.primary,
+          fontWeight: FontWeight.w700,
+          fontSize: size * 0.42,
+        ),
       ),
     );
   }
@@ -998,9 +1233,15 @@ class _AssistantAvatarDesktop extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: cs.primary.withOpacity(0.15), shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: cs.primary.withOpacity(0.15),
+        shape: BoxShape.circle,
+      ),
       alignment: Alignment.center,
-      child: Text(emoji.characters.take(1).toString(), style: TextStyle(fontSize: size * 0.5)),
+      child: Text(
+        emoji.characters.take(1).toString(),
+        style: TextStyle(fontSize: size * 0.5),
+      ),
     );
   }
 }
@@ -1016,7 +1257,8 @@ class _DesktopProvidersBody extends StatefulWidget {
 
 class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   String? _selectedKey;
-  final GlobalKey<_DesktopProviderDetailPaneState> _detailKey = GlobalKey<_DesktopProviderDetailPaneState>();
+  final GlobalKey<_DesktopProviderDetailPaneState> _detailKey =
+      GlobalKey<_DesktopProviderDetailPaneState>();
 
   Future<void> _showShareDialog(String providerKey, String displayName) async {
     await showDialog<void>(
@@ -1038,27 +1280,30 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
 
     // Base providers (same as mobile list)
     List<({String name, String key})> base() => [
-          (name: 'OpenAI', key: 'OpenAI'),
-          (name: l10n.providersPageSiliconFlowName, key: 'SiliconFlow'),
-          (name: 'Gemini', key: 'Gemini'),
-          (name: 'OpenRouter', key: 'OpenRouter'),
-          (name: 'KelivoIN', key: 'KelivoIN'),
-          (name: 'Tensdaq', key: 'Tensdaq'),
-          (name: 'DeepSeek', key: 'DeepSeek'),
-          (name: 'AIhubmix', key: 'AIhubmix'),
-          (name: l10n.providersPageAliyunName, key: 'Aliyun'),
-          (name: l10n.providersPageZhipuName, key: 'Zhipu AI'),
-          (name: 'Claude', key: 'Claude'),
-          (name: 'Grok', key: 'Grok'),
-          (name: l10n.providersPageByteDanceName, key: 'ByteDance'),
-        ];
+      (name: 'OpenAI', key: 'OpenAI'),
+      (name: l10n.providersPageSiliconFlowName, key: 'SiliconFlow'),
+      (name: 'Gemini', key: 'Gemini'),
+      (name: 'OpenRouter', key: 'OpenRouter'),
+      (name: 'KelivoIN', key: 'KelivoIN'),
+      (name: 'Tensdaq', key: 'Tensdaq'),
+      (name: 'DeepSeek', key: 'DeepSeek'),
+      (name: 'AIhubmix', key: 'AIhubmix'),
+      (name: l10n.providersPageAliyunName, key: 'Aliyun'),
+      (name: l10n.providersPageZhipuName, key: 'Zhipu AI'),
+      (name: 'Claude', key: 'Claude'),
+      (name: 'Grok', key: 'Grok'),
+      (name: l10n.providersPageByteDanceName, key: 'ByteDance'),
+    ];
 
     final cfgs = settings.providerConfigs;
     final baseKeys = {for (final p in base()) p.key};
     final dynamicItems = <({String name, String key})>[];
     cfgs.forEach((key, cfg) {
       if (!baseKeys.contains(key)) {
-        dynamicItems.add((name: (cfg.name.isNotEmpty ? cfg.name : key), key: key));
+        dynamicItems.add((
+          name: (cfg.name.isNotEmpty ? cfg.name : key),
+          key: key,
+        ));
       }
     });
     // Apply saved order
@@ -1072,13 +1317,19 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
     }
     ordered.addAll(map.values);
 
-    _selectedKey ??= (widget.initialSelectedKey ?? (ordered.isNotEmpty ? ordered.first.key : null));
+    _selectedKey ??=
+        (widget.initialSelectedKey ??
+        (ordered.isNotEmpty ? ordered.first.key : null));
     final selectedKey = _selectedKey;
     final rightPane = selectedKey == null
         ? const SizedBox()
-        : _DesktopProviderDetailPane(key: _detailKey, providerKey: selectedKey, displayName: settings.getProviderConfig(selectedKey).name.isNotEmpty
-            ? settings.getProviderConfig(selectedKey).name
-            : selectedKey);
+        : _DesktopProviderDetailPane(
+            key: _detailKey,
+            providerKey: selectedKey,
+            displayName: settings.getProviderConfig(selectedKey).name.isNotEmpty
+                ? settings.getProviderConfig(selectedKey).name
+                : selectedKey,
+          );
 
     return Container(
       alignment: Alignment.topCenter,
@@ -1100,7 +1351,9 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                         itemCount: ordered.length,
                         onReorder: (oldIndex, newIndex) async {
                           if (newIndex > oldIndex) newIndex -= 1;
-                          final list = List<({String name, String key})>.from(ordered);
+                          final list = List<({String name, String key})>.from(
+                            ordered,
+                          );
                           final item = list.removeAt(oldIndex);
                           list.insert(newIndex, item);
                           final newOrder = [for (final e in list) e.key];
@@ -1119,27 +1372,37 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                         },
                         itemBuilder: (ctx, i) {
                           final item = ordered[i];
-                          final cfg = settings.getProviderConfig(item.key, defaultName: item.name);
+                          final cfg = settings.getProviderConfig(
+                            item.key,
+                            defaultName: item.name,
+                          );
                           final enabled = cfg.enabled;
                           final selected = item.key == _selectedKey;
-                          final bg = selected ? cs.primary.withOpacity(0.08) : Colors.transparent;
+                          final bg = selected
+                              ? cs.primary.withOpacity(0.08)
+                              : Colors.transparent;
                           final row = _ProviderListRow(
                             name: item.name,
                             keyName: item.key,
                             enabled: enabled,
                             selected: selected,
                             background: bg,
-                            onTap: () => setState(() => _selectedKey = item.key),
+                            onTap: () =>
+                                setState(() => _selectedKey = item.key),
                             onEdit: () {
                               setState(() => _selectedKey = item.key);
                               WidgetsBinding.instance.addPostFrameCallback((_) {
-                                _detailKey.currentState?._showProviderSettingsDialog(context);
+                                _detailKey.currentState
+                                    ?._showProviderSettingsDialog(context);
                               });
                             },
                             onShare: () {
                               setState(() => _selectedKey = item.key);
                               WidgetsBinding.instance.addPostFrameCallback((_) {
-                                _showShareDialog(item.key, cfg.name.isNotEmpty ? cfg.name : item.name);
+                                _showShareDialog(
+                                  item.key,
+                                  cfg.name.isNotEmpty ? cfg.name : item.name,
+                                );
                               });
                             },
                             onDelete: baseKeys.contains(item.key)
@@ -1149,30 +1412,57 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                     final ok = await showDialog<bool>(
                                       context: context,
                                       builder: (ctx) => AlertDialog(
-                                        title: Text(l10n.providerDetailPageDeleteProviderTitle),
-                                        content: Text(l10n.providerDetailPageDeleteProviderContent),
+                                        title: Text(
+                                          l10n.providerDetailPageDeleteProviderTitle,
+                                        ),
+                                        content: Text(
+                                          l10n.providerDetailPageDeleteProviderContent,
+                                        ),
                                         actions: [
-                                          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.providerDetailPageCancelButton)),
-                                          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.providerDetailPageDeleteButton, style: const TextStyle(color: Colors.red))),
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.of(ctx).pop(false),
+                                            child: Text(
+                                              l10n.providerDetailPageCancelButton,
+                                            ),
+                                          ),
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.of(ctx).pop(true),
+                                            child: Text(
+                                              l10n.providerDetailPageDeleteButton,
+                                              style: const TextStyle(
+                                                color: Colors.red,
+                                              ),
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     );
                                     if (ok == true) {
                                       // Clear assistant-level model selections referencing this provider
                                       try {
-                                        final ap = context.read<AssistantProvider>();
+                                        final ap = context
+                                            .read<AssistantProvider>();
                                         for (final a in ap.assistants) {
                                           if (a.chatModelProvider == item.key) {
-                                            await ap.updateAssistant(a.copyWith(clearChatModel: true));
+                                            await ap.updateAssistant(
+                                              a.copyWith(clearChatModel: true),
+                                            );
                                           }
                                         }
                                       } catch (_) {}
-                                      await settings.removeProviderConfig(item.key);
-                                      if (mounted) setState(() {
-                                        if (_selectedKey == item.key) {
-                                          _selectedKey = ordered.isNotEmpty ? ordered.first.key : null;
-                                        }
-                                      });
+                                      await settings.removeProviderConfig(
+                                        item.key,
+                                      );
+                                      if (mounted)
+                                        setState(() {
+                                          if (_selectedKey == item.key) {
+                                            _selectedKey = ordered.isNotEmpty
+                                                ? ordered.first.key
+                                                : null;
+                                          }
+                                        });
                                     }
                                   },
                           );
@@ -1180,7 +1470,10 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                             key: ValueKey('desktop-prov-${item.key}'),
                             child: Padding(
                               padding: const EdgeInsets.only(bottom: 8),
-                              child: ReorderableDragStartListener(index: i, child: row),
+                              child: ReorderableDragStartListener(
+                                index: i,
+                                child: row,
+                              ),
                             ),
                           );
                         },
@@ -1188,18 +1481,30 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                     ),
                     const SizedBox(height: 8),
                     // Bottom add button
-                    _AddFullWidthButton(height: 36, label: l10n.addProviderSheetAddButton, onTap: () async {
-                      final created = await showDesktopAddProviderDialog(context);
-                      if (!mounted) return;
-                      if (created != null && created.isNotEmpty) {
-                        setState(() { _selectedKey = created; });
-                      }
-                    }),
+                    _AddFullWidthButton(
+                      height: 36,
+                      label: l10n.addProviderSheetAddButton,
+                      onTap: () async {
+                        final created = await showDesktopAddProviderDialog(
+                          context,
+                        );
+                        if (!mounted) return;
+                        if (created != null && created.isNotEmpty) {
+                          setState(() {
+                            _selectedKey = created;
+                          });
+                        }
+                      },
+                    ),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
-              VerticalDivider(width: 1, thickness: 0.5, color: cs.outlineVariant.withOpacity(0.12)),
+              VerticalDivider(
+                width: 1,
+                thickness: 0.5,
+                color: cs.outlineVariant.withOpacity(0.12),
+              ),
               // Right detail pane
               Expanded(child: rightPane),
             ],
@@ -1211,20 +1516,26 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
 }
 
 class _DesktopProviderDetailPane extends StatefulWidget {
-  const _DesktopProviderDetailPane({super.key, required this.providerKey, required this.displayName});
+  const _DesktopProviderDetailPane({
+    super.key,
+    required this.providerKey,
+    required this.displayName,
+  });
   final String providerKey;
   final String displayName;
   @override
-  State<_DesktopProviderDetailPane> createState() => _DesktopProviderDetailPaneState();
+  State<_DesktopProviderDetailPane> createState() =>
+      _DesktopProviderDetailPaneState();
 }
 
-class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> {
+class _DesktopProviderDetailPaneState
+    extends State<_DesktopProviderDetailPane> {
   bool _showSearch = false;
   final TextEditingController _filterCtrl = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
   bool _showApiKey = false;
   bool _eyeHover = false;
-  
+
   // 批量选择模式相关
   bool _isSelectionMode = false;
   final Set<String> _selectedModels = {};
@@ -1234,10 +1545,9 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
   final Map<String, String> _detectionErrorMessages = {};
   String? _currentDetectingModel;
   final Set<String> _pendingModels = {};
-  
+
   // Connection test state for inline dialog
   // Keep local to this file to avoid cross-file coupling
-  
 
   // Persistent controllers for provider top inputs (desktop)
   // Avoid rebuilding controllers each frame which breaks focus/IME
@@ -1282,7 +1592,11 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
     super.dispose();
   }
 
-  Future<String?> _inputDialog(BuildContext context, {required String title, required String hint}) async {
+  Future<String?> _inputDialog(
+    BuildContext context, {
+    required String title,
+    required String hint,
+  }) async {
     final cs = Theme.of(context).colorScheme;
     final ctrl = TextEditingController();
     String? result;
@@ -1301,10 +1615,23 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(children: [
-                  Expanded(child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
-                  _IconBtn(icon: lucide.Lucide.X, onTap: () => Navigator.of(ctx).maybePop()),
-                ]),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    _IconBtn(
+                      icon: lucide.Lucide.X,
+                      onTap: () => Navigator.of(ctx).maybePop(),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: ctrl,
@@ -1316,7 +1643,14 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                 const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: _DeskIosButton(label: AppLocalizations.of(context)!.assistantEditEmojiDialogSave, filled: true, dense: true, onTap: () => Navigator.of(ctx).pop(ctrl.text.trim())),
+                  child: _DeskIosButton(
+                    label: AppLocalizations.of(
+                      context,
+                    )!.assistantEditEmojiDialogSave,
+                    filled: true,
+                    dense: true,
+                    onTap: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+                  ),
                 ),
               ],
             ),
@@ -1332,13 +1666,20 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
-    final cfg = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
+    final cfg = sp.getProviderConfig(
+      widget.providerKey,
+      defaultName: widget.displayName,
+    );
     // Keep controllers synced without breaking IME composition
     _syncControllersFromConfig(cfg);
-    final kind = ProviderConfig.classify(widget.providerKey, explicitType: cfg.providerType);
+    final kind = ProviderConfig.classify(
+      widget.providerKey,
+      explicitType: cfg.providerType,
+    );
 
     final models = List<String>.from(cfg.models);
-    final allSelected = _selectedModels.length == models.length && models.isNotEmpty;
+    final allSelected =
+        _selectedModels.length == models.length && models.isNotEmpty;
     final filtered = _applyFilter(models, _filterCtrl.text.trim());
     final groups = _groupModels(filtered);
 
@@ -1361,7 +1702,10 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                         cfg.name.isNotEmpty ? cfg.name : widget.providerKey,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1375,8 +1719,14 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                 IosSwitch(
                   value: cfg.enabled,
                   onChanged: (v) async {
-                    final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                    await sp.setProviderConfig(widget.providerKey, old.copyWith(enabled: v));
+                    final old = sp.getProviderConfig(
+                      widget.providerKey,
+                      defaultName: widget.displayName,
+                    );
+                    await sp.setProviderConfig(
+                      widget.providerKey,
+                      old.copyWith(enabled: v),
+                    );
                     // If provider is now disabled, clear model selections referencing it
                     if (!v && old.enabled) {
                       await sp.clearSelectionsForProvider(widget.providerKey);
@@ -1384,7 +1734,9 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                         final ap = context.read<AssistantProvider>();
                         for (final a in ap.assistants) {
                           if (a.chatModelProvider == widget.providerKey) {
-                            await ap.updateAssistant(a.copyWith(clearChatModel: true));
+                            await ap.updateAssistant(
+                              a.copyWith(clearChatModel: true),
+                            );
                           }
                         }
                       } catch (_) {}
@@ -1397,7 +1749,11 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Divider(height: 1, thickness: 0.5, color: cs.outlineVariant.withOpacity(0.12)),
+          child: Divider(
+            height: 1,
+            thickness: 0.5,
+            color: cs.outlineVariant.withOpacity(0.12),
+          ),
         ),
         Expanded(
           child: ListView(
@@ -1406,7 +1762,10 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
               // Partner info banners
               if (widget.providerKey.toLowerCase() == 'tensdaq') ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: cs.primary.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(10),
@@ -1423,16 +1782,26 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                       Text.rich(
                         TextSpan(
                           text: '官网：',
-                          style: TextStyle(color: cs.onSurface.withOpacity(0.8)),
+                          style: TextStyle(
+                            color: cs.onSurface.withOpacity(0.8),
+                          ),
                           children: [
                             TextSpan(
                               text: 'https://dashboard.x-aio.com',
-                              style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                color: cs.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
                               recognizer: TapGestureRecognizer()
                                 ..onTap = () async {
-                                  final uri = Uri.parse('https://dashboard.x-aio.com');
+                                  final uri = Uri.parse(
+                                    'https://dashboard.x-aio.com',
+                                  );
                                   try {
-                                    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                    final ok = await launchUrl(
+                                      uri,
+                                      mode: LaunchMode.externalApplication,
+                                    );
                                     if (!ok) {
                                       await launchUrl(uri);
                                     }
@@ -1452,7 +1821,10 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
 
               if (widget.providerKey.toLowerCase() == 'siliconflow') ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: cs.primary.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(10),
@@ -1469,18 +1841,32 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                       Text.rich(
                         TextSpan(
                           text: '官网：',
-                          style: TextStyle(color: cs.onSurface.withOpacity(0.8)),
+                          style: TextStyle(
+                            color: cs.onSurface.withOpacity(0.8),
+                          ),
                           children: [
                             TextSpan(
                               text: 'https://siliconflow.cn',
-                              style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                color: cs.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
                               recognizer: TapGestureRecognizer()
                                 ..onTap = () async {
-                                  final uri = Uri.parse('https://siliconflow.cn');
+                                  final uri = Uri.parse(
+                                    'https://siliconflow.cn',
+                                  );
                                   try {
-                                    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                    if (!ok) { await launchUrl(uri); }
-                                  } catch (_) { await launchUrl(uri); }
+                                    final ok = await launchUrl(
+                                      uri,
+                                      mode: LaunchMode.externalApplication,
+                                    );
+                                    if (!ok) {
+                                      await launchUrl(uri);
+                                    }
+                                  } catch (_) {
+                                    await launchUrl(uri);
+                                  }
                                 },
                             ),
                           ],
@@ -1494,106 +1880,147 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
 
               // API Key (hidden when Google Vertex)
               if (!(kind == ProviderKind.google && (cfg.vertexAI == true))) ...[
-              Row(
-                children: [
-                  Expanded(child: _sectionLabel(context, AppLocalizations.of(context)!.multiKeyPageKey, bold: true)),
-                  const SizedBox(width: 8),
-                  Tooltip(
-                    message: l10n.providerDetailPageTestButton,
-                    child: _IconTextBtn(
-                      icon: lucide.Lucide.HeartPulse,
-                      label: l10n.providerDetailPageTestButton,
-                      onTap: () => _showTestConnectionDialog(context),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              if (cfg.multiKeyEnabled == true)
                 Row(
                   children: [
                     Expanded(
-                      child: AbsorbPointer(
-                        child: Opacity(
-                          opacity: 0.6,
-                          child: TextField(
-                            controller: TextEditingController(text: '••••••••'),
-                            readOnly: true,
-                            style: const TextStyle(fontSize: 14),
-                            decoration: _inputDecoration(context),
-                          ),
-                        ),
+                      child: _sectionLabel(
+                        context,
+                        AppLocalizations.of(context)!.multiKeyPageKey,
+                        bold: true,
                       ),
                     ),
                     const SizedBox(width: 8),
-                    _DeskIosButton(label: l10n.providerDetailPageManageKeysButton, filled: false, dense: true, onTap: () => _showMultiKeyDialog(context)),
+                    Tooltip(
+                      message: l10n.providerDetailPageTestButton,
+                      child: _IconTextBtn(
+                        icon: lucide.Lucide.HeartPulse,
+                        label: l10n.providerDetailPageTestButton,
+                        onTap: () => _showTestConnectionDialog(context),
+                      ),
+                    ),
                   ],
-                )
-              else
-                TextField(
-                  controller: _apiKeyCtrl,
-                  obscureText: !_showApiKey ? true : false,
+                ),
+                const SizedBox(height: 6),
+                if (cfg.multiKeyEnabled == true)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AbsorbPointer(
+                          child: Opacity(
+                            opacity: 0.6,
+                            child: TextField(
+                              controller: TextEditingController(
+                                text: '••••••••',
+                              ),
+                              readOnly: true,
+                              style: const TextStyle(fontSize: 14),
+                              decoration: _inputDecoration(context),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _DeskIosButton(
+                        label: l10n.providerDetailPageManageKeysButton,
+                        filled: false,
+                        dense: true,
+                        onTap: () => _showMultiKeyDialog(context),
+                      ),
+                    ],
+                  )
+                else
+                  TextField(
+                    controller: _apiKeyCtrl,
+                    obscureText: !_showApiKey ? true : false,
                     onChanged: (v) async {
                       // For API keys, save immediately regardless of IME composition
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(apiKey: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(apiKey: v),
+                      );
                     },
-                  style: const TextStyle(fontSize: 14),
-                  decoration: _inputDecoration(context).copyWith(
-                    hintText: l10n.providerDetailPageApiKeyHint,
-                    suffixIcon: MouseRegion(
-                      onEnter: (_) => setState(() => _eyeHover = true),
-                      onExit: (_) => setState(() => _eyeHover = false),
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        onTap: () => setState(() => _showApiKey = !_showApiKey),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          curve: Curves.easeOutCubic,
-                          margin: const EdgeInsets.only(right: 6),
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: _eyeHover
-                                ? (Theme.of(context).brightness == Brightness.dark
-                                    ? Colors.white.withOpacity(0.06)
-                                    : Colors.black.withOpacity(0.04))
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 180),
-                            transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
-                            child: AnimatedRotation(
-                              key: ValueKey(_showApiKey),
+                    style: const TextStyle(fontSize: 14),
+                    decoration: _inputDecoration(context).copyWith(
+                      hintText: l10n.providerDetailPageApiKeyHint,
+                      suffixIcon: MouseRegion(
+                        onEnter: (_) => setState(() => _eyeHover = true),
+                        onExit: (_) => setState(() => _eyeHover = false),
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          onTap: () =>
+                              setState(() => _showApiKey = !_showApiKey),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            curve: Curves.easeOutCubic,
+                            margin: const EdgeInsets.only(right: 6),
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: _eyeHover
+                                  ? (Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white.withOpacity(0.06)
+                                        : Colors.black.withOpacity(0.04))
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: AnimatedSwitcher(
                               duration: const Duration(milliseconds: 180),
-                              curve: Curves.easeOutCubic,
-                              turns: _showApiKey ? 0.5 : 0.0,
-                              child: Icon(
-                                _showApiKey ? lucide.Lucide.EyeOff : lucide.Lucide.Eye,
-                                size: 18,
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                              transitionBuilder: (child, anim) =>
+                                  FadeTransition(opacity: anim, child: child),
+                              child: AnimatedRotation(
+                                key: ValueKey(_showApiKey),
+                                duration: const Duration(milliseconds: 180),
+                                curve: Curves.easeOutCubic,
+                                turns: _showApiKey ? 0.5 : 0.0,
+                                child: Icon(
+                                  _showApiKey
+                                      ? lucide.Lucide.EyeOff
+                                      : lucide.Lucide.Eye,
+                                  size: 18,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withOpacity(0.8),
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
+                      suffixIconConstraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 20,
+                      ),
                     ),
-                    suffixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 20),
                   ),
-                ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
               ],
 
               // API Base URL or Vertex AI fields
               if (!(kind == ProviderKind.google && (cfg.vertexAI == true))) ...[
-                _sectionLabel(context, AppLocalizations.of(context)!.providerDetailPageApiBaseUrlLabel, bold: true),
+                _sectionLabel(
+                  context,
+                  AppLocalizations.of(
+                    context,
+                  )!.providerDetailPageApiBaseUrlLabel,
+                  bold: true,
+                ),
                 const SizedBox(height: 6),
                 Focus(
                   onFocusChange: (has) async {
                     if (!has) {
                       final v = _baseUrlCtrl.text;
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(baseUrl: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(baseUrl: v),
+                      );
                     }
                   },
                   child: TextField(
@@ -1601,32 +2028,65 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) async {
                       final v = _baseUrlCtrl.text;
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(baseUrl: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(baseUrl: v),
+                      );
                     },
                     onEditingComplete: () async {
                       final v = _baseUrlCtrl.text;
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(baseUrl: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(baseUrl: v),
+                      );
                     },
                     onChanged: (v) async {
                       if (_baseUrlCtrl.value.composing.isValid) return;
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(baseUrl: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(baseUrl: v),
+                      );
                     },
-                  style: const TextStyle(fontSize: 14),
-                  decoration: _inputDecoration(context).copyWith(hintText: ProviderConfig.defaultsFor(widget.providerKey, displayName: widget.displayName).baseUrl),
+                    style: const TextStyle(fontSize: 14),
+                    decoration: _inputDecoration(context).copyWith(
+                      hintText: ProviderConfig.defaultsFor(
+                        widget.providerKey,
+                        displayName: widget.displayName,
+                      ).baseUrl,
+                    ),
                   ),
                 ),
               ] else ...[
-                _sectionLabel(context, l10n.providerDetailPageLocationLabel, bold: true),
+                _sectionLabel(
+                  context,
+                  l10n.providerDetailPageLocationLabel,
+                  bold: true,
+                ),
                 const SizedBox(height: 6),
                 Focus(
                   onFocusChange: (has) async {
                     if (!has) {
                       final v = _locationCtrl.text.trim();
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(location: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(location: v),
+                      );
                     }
                   },
                   child: TextField(
@@ -1634,57 +2094,111 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) async {
                       final v = _locationCtrl.text.trim();
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(location: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(location: v),
+                      );
                     },
                     onEditingComplete: () async {
                       final v = _locationCtrl.text.trim();
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(location: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(location: v),
+                      );
                     },
                     onChanged: (v) async {
                       if (_locationCtrl.value.composing.isValid) return;
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(location: v.trim()));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(location: v.trim()),
+                      );
                     },
-                  style: const TextStyle(fontSize: 14),
-                  decoration: _inputDecoration(context).copyWith(hintText: 'us-central1'),
+                    style: const TextStyle(fontSize: 14),
+                    decoration: _inputDecoration(
+                      context,
+                    ).copyWith(hintText: 'us-central1'),
                   ),
                 ),
                 const SizedBox(height: 14),
-                _sectionLabel(context, l10n.providerDetailPageProjectIdLabel, bold: true),
+                _sectionLabel(
+                  context,
+                  l10n.providerDetailPageProjectIdLabel,
+                  bold: true,
+                ),
                 const SizedBox(height: 6),
                 Focus(
                   onFocusChange: (has) async {
                     if (!has) {
                       final v = _projectIdCtrl.text.trim();
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(projectId: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(projectId: v),
+                      );
                     }
                   },
                   child: TextField(
                     controller: _projectIdCtrl,
                     onChanged: (v) async {
                       if (_projectIdCtrl.value.composing.isValid) return;
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(projectId: v.trim()));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(projectId: v.trim()),
+                      );
                     },
                     onSubmitted: (_) async {
                       final v = _projectIdCtrl.text.trim();
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(projectId: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(projectId: v),
+                      );
                     },
                     onEditingComplete: () async {
                       final v = _projectIdCtrl.text.trim();
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(projectId: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(projectId: v),
+                      );
                     },
                     style: const TextStyle(fontSize: 14),
-                    decoration: _inputDecoration(context).copyWith(hintText: 'my-project-id'),
+                    decoration: _inputDecoration(
+                      context,
+                    ).copyWith(hintText: 'my-project-id'),
                   ),
                 ),
                 const SizedBox(height: 14),
-                _sectionLabel(context, l10n.providerDetailPageServiceAccountJsonLabel, bold: true),
+                _sectionLabel(
+                  context,
+                  l10n.providerDetailPageServiceAccountJsonLabel,
+                  bold: true,
+                ),
                 const SizedBox(height: 6),
                 ConstrainedBox(
                   constraints: const BoxConstraints(minHeight: 120),
@@ -1692,8 +2206,14 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                     onFocusChange: (has) async {
                       if (!has) {
                         final v = _saJsonCtrl.text;
-                        final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                        await sp.setProviderConfig(widget.providerKey, old.copyWith(serviceAccountJson: v));
+                        final old = sp.getProviderConfig(
+                          widget.providerKey,
+                          defaultName: widget.displayName,
+                        );
+                        await sp.setProviderConfig(
+                          widget.providerKey,
+                          old.copyWith(serviceAccountJson: v),
+                        );
                       }
                     },
                     child: TextField(
@@ -1702,11 +2222,19 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                       minLines: 6,
                       onChanged: (v) async {
                         if (_saJsonCtrl.value.composing.isValid) return;
-                        final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                        await sp.setProviderConfig(widget.providerKey, old.copyWith(serviceAccountJson: v));
+                        final old = sp.getProviderConfig(
+                          widget.providerKey,
+                          defaultName: widget.displayName,
+                        );
+                        await sp.setProviderConfig(
+                          widget.providerKey,
+                          old.copyWith(serviceAccountJson: v),
+                        );
                       },
                       style: const TextStyle(fontSize: 14),
-                      decoration: _inputDecoration(context).copyWith(hintText: '{\n  "type": "service_account", ...\n}'),
+                      decoration: _inputDecoration(context).copyWith(
+                        hintText: '{\n  "type": "service_account", ...\n}',
+                      ),
                     ),
                   ),
                 ),
@@ -1736,16 +2264,24 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                         } catch (_) {}
                       }
                       if (content == null || content.trim().isEmpty) {
-                        showAppSnackBar(context, message: 'Failed to read file', type: NotificationType.error);
+                        showAppSnackBar(
+                          context,
+                          message: 'Failed to read file',
+                          type: NotificationType.error,
+                        );
                         return;
                       }
 
                       String projectId = cfg.projectId ?? '';
                       try {
                         final obj = jsonDecode(content);
-                        projectId = (obj['project_id'] as String?)?.trim() ?? projectId;
+                        projectId =
+                            (obj['project_id'] as String?)?.trim() ?? projectId;
                       } catch (_) {}
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
                       final updated = old.copyWith(
                         serviceAccountJson: content,
                         projectId: projectId,
@@ -1758,16 +2294,27 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
               ],
 
               // API Path (OpenAI chat)
-              if (kind == ProviderKind.openai && (cfg.useResponseApi != true)) ...[
+              if (kind == ProviderKind.openai &&
+                  (cfg.useResponseApi != true)) ...[
                 const SizedBox(height: 14),
-                _sectionLabel(context, l10n.providerDetailPageApiPathLabel, bold: true),
+                _sectionLabel(
+                  context,
+                  l10n.providerDetailPageApiPathLabel,
+                  bold: true,
+                ),
                 const SizedBox(height: 6),
                 Focus(
                   onFocusChange: (has) async {
                     if (!has) {
                       final v = _apiPathCtrl.text;
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(chatPath: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(chatPath: v),
+                      );
                     }
                   },
                   child: TextField(
@@ -1775,21 +2322,41 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) async {
                       final v = _apiPathCtrl.text;
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(chatPath: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(chatPath: v),
+                      );
                     },
                     onEditingComplete: () async {
                       final v = _apiPathCtrl.text;
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(chatPath: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(chatPath: v),
+                      );
                     },
                     onChanged: (v) async {
                       if (_apiPathCtrl.value.composing.isValid) return;
-                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                      await sp.setProviderConfig(widget.providerKey, old.copyWith(chatPath: v));
+                      final old = sp.getProviderConfig(
+                        widget.providerKey,
+                        defaultName: widget.displayName,
+                      );
+                      await sp.setProviderConfig(
+                        widget.providerKey,
+                        old.copyWith(chatPath: v),
+                      );
                     },
                     style: const TextStyle(fontSize: 14),
-                    decoration: _inputDecoration(context).copyWith(hintText: '/chat/completions'),
+                    decoration: _inputDecoration(
+                      context,
+                    ).copyWith(hintText: '/chat/completions'),
                   ),
                 ),
               ],
@@ -1802,8 +2369,13 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                     child: Row(
                       children: [
                         Text(
-                          AppLocalizations.of(context)!.providerDetailPageModelsTitle,
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                          AppLocalizations.of(
+                            context,
+                          )!.providerDetailPageModelsTitle,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         _GreyCapsule(label: '${models.length}'),
@@ -1817,7 +2389,8 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                               width: _showSearch ? 180 : 28,
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 140),
-                                transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+                                transitionBuilder: (child, anim) =>
+                                    FadeTransition(opacity: anim, child: child),
                                 child: _showSearch
                                     ? TextField(
                                         key: const ValueKey('search-field'),
@@ -1825,11 +2398,17 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                                         focusNode: _searchFocus,
                                         autofocus: true,
                                         style: const TextStyle(fontSize: 14),
-                                        decoration: _inputDecoration(context).copyWith(
-                                          hintText: l10n.providerDetailPageFilterHint,
-                                          isDense: true,
-                                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                        ),
+                                        decoration: _inputDecoration(context)
+                                            .copyWith(
+                                              hintText: l10n
+                                                  .providerDetailPageFilterHint,
+                                              isDense: true,
+                                              contentPadding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 8,
+                                                  ),
+                                            ),
                                         onChanged: (_) => setState(() {}),
                                       )
                                     : _IconBtn(
@@ -1838,7 +2417,10 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                                         onTap: () => setState(() {
                                           _showSearch = true;
                                           _searchFocus.addListener(() {
-                                            if (!_searchFocus.hasFocus) setState(() => _showSearch = false);
+                                            if (!_searchFocus.hasFocus)
+                                              setState(
+                                                () => _showSearch = false,
+                                              );
                                           });
                                         }),
                                       ),
@@ -1853,17 +2435,25 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                   if (_isSelectionMode) ...[
                     Tooltip(
                       message: l10n.homePageCancel,
-                      child: _IconBtn(icon: lucide.Lucide.X, onTap: _exitSelectionMode),
+                      child: _IconBtn(
+                        icon: lucide.Lucide.X,
+                        onTap: _exitSelectionMode,
+                      ),
                     ),
                     const SizedBox(width: 6),
                     Tooltip(
-                      message: allSelected ? l10n.mcpAssistantSheetClearAll : l10n.mcpAssistantSheetSelectAll,
+                      message: allSelected
+                          ? l10n.mcpAssistantSheetClearAll
+                          : l10n.mcpAssistantSheetSelectAll,
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 160),
-                        transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+                        transitionBuilder: (child, anim) =>
+                            ScaleTransition(scale: anim, child: child),
                         child: _IconBtn(
                           key: ValueKey(allSelected),
-                          icon: allSelected ? lucide.Lucide.Square : lucide.Lucide.CheckSquare,
+                          icon: allSelected
+                              ? lucide.Lucide.Square
+                              : lucide.Lucide.CheckSquare,
                           color: cs.onSurface.withOpacity(0.85),
                           onTap: () {
                             setState(() {
@@ -1882,7 +2472,9 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                     Tooltip(
                       message: l10n.providerDetailPageUseStreamingLabel,
                       child: GestureDetector(
-                        onTap: () => setState(() => _detectUseStream = !_detectUseStream),
+                        onTap: () => setState(
+                          () => _detectUseStream = !_detectUseStream,
+                        ),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
                           curve: Curves.easeOutCubic,
@@ -1895,9 +2487,12 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                           ),
                           child: AnimatedSwitcher(
                             duration: const Duration(milliseconds: 160),
-                            transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+                            transitionBuilder: (child, anim) =>
+                                ScaleTransition(scale: anim, child: child),
                             child: Icon(
-                              _detectUseStream ? lucide.Lucide.AudioWaveform : lucide.Lucide.SquareEqual,
+                              _detectUseStream
+                                  ? lucide.Lucide.AudioWaveform
+                                  : lucide.Lucide.SquareEqual,
                               key: ValueKey(_detectUseStream),
                               size: 18,
                               color: cs.onSurface.withOpacity(0.85),
@@ -1908,11 +2503,19 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                     ),
                     const SizedBox(width: 6),
                     Tooltip(
-                      message: _isDetecting ? l10n.providerDetailPageBatchDetecting : l10n.providerDetailPageBatchDetectStart,
+                      message: _isDetecting
+                          ? l10n.providerDetailPageBatchDetecting
+                          : l10n.providerDetailPageBatchDetectStart,
                       child: _IconTextBtn(
-                        icon: _isDetecting ? lucide.Lucide.Loader : lucide.Lucide.HeartPulse,
-                        label: _isDetecting ? l10n.providerDetailPageBatchDetecting : l10n.providerDetailPageBatchDetectButton,
-                        color: _selectedModels.isEmpty ? cs.onSurface.withOpacity(0.4) : null,
+                        icon: _isDetecting
+                            ? lucide.Lucide.Loader
+                            : lucide.Lucide.HeartPulse,
+                        label: _isDetecting
+                            ? l10n.providerDetailPageBatchDetecting
+                            : l10n.providerDetailPageBatchDetectButton,
+                        color: _selectedModels.isEmpty
+                            ? cs.onSurface.withOpacity(0.4)
+                            : null,
                         onTap: () {
                           if (_selectedModels.isEmpty) return;
                           _startDetection();
@@ -1923,17 +2526,26 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                     if (!_isDetecting)
                       Tooltip(
                         message: l10n.searchServicesPageTestConnectionTooltip,
-                        child: _IconBtn(icon: lucide.Lucide.HeartPulse, onTap: _enterSelectionMode),
+                        child: _IconBtn(
+                          icon: lucide.Lucide.HeartPulse,
+                          onTap: _enterSelectionMode,
+                        ),
                       )
                     else
                       Tooltip(
                         message: l10n.providerDetailPageBatchDetecting,
-                        child: _IconBtn(icon: lucide.Lucide.Loader, onTap: () {}),
+                        child: _IconBtn(
+                          icon: lucide.Lucide.Loader,
+                          onTap: () {},
+                        ),
                       ),
                     const SizedBox(width: 6),
                     Tooltip(
                       message: l10n.providerDetailPageAddNewModelButton,
-                      child: _IconBtn(icon: lucide.Lucide.Plus, onTap: () => _createModel(context)),
+                      child: _IconBtn(
+                        icon: lucide.Lucide.Plus,
+                        onTap: () => _createModel(context),
+                      ),
                     ),
                     if (models.isNotEmpty) ...[
                       const SizedBox(width: 6),
@@ -1989,7 +2601,6 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                     pendingModels: _pendingModels,
                   ),
                 ),
-
             ],
           ),
         ),
@@ -2001,9 +2612,12 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
     final map = <String, List<String>>{};
     for (final m in models) {
       var g = m;
-      if (m.contains('/')) g = m.split('/').first;
-      else if (m.contains(':')) g = m.split(':').first;
-      else if (m.contains('-')) g = m.split('-').first;
+      if (m.contains('/'))
+        g = m.split('/').first;
+      else if (m.contains(':'))
+        g = m.split(':').first;
+      else if (m.contains('-'))
+        g = m.split('-').first;
       (map[g] ??= <String>[])..add(m);
     }
     // Keep stable order by key
@@ -2015,7 +2629,10 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
   List<String> _applyFilter(List<String> src, String q) {
     if (q.isEmpty) return src;
     final k = q.toLowerCase();
-    return [for (final m in src) if (m.toLowerCase().contains(k)) m];
+    return [
+      for (final m in src)
+        if (m.toLowerCase().contains(k)) m,
+    ];
   }
 
   InputDecoration _inputDecoration(BuildContext context) {
@@ -2025,9 +2642,24 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
       isDense: true,
       filled: true,
       fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.12), width: 0.6)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.12), width: 0.6)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(
+          color: cs.outlineVariant.withOpacity(0.12),
+          width: 0.6,
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(
+          color: cs.outlineVariant.withOpacity(0.12),
+          width: 0.6,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8),
+      ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     );
   }
@@ -2036,8 +2668,14 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
     final cs = Theme.of(context).colorScheme;
     final sp = context.read<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
-    ProviderConfig cfg = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-    ProviderKind kind = ProviderConfig.classify(widget.providerKey, explicitType: cfg.providerType);
+    ProviderConfig cfg = sp.getProviderConfig(
+      widget.providerKey,
+      defaultName: widget.displayName,
+    );
+    ProviderKind kind = ProviderConfig.classify(
+      widget.providerKey,
+      explicitType: cfg.providerType,
+    );
     bool multi = cfg.multiKeyEnabled ?? false;
     bool openaiResp = cfg.useResponseApi ?? false;
     bool googleVertex = cfg.vertexAI ?? false;
@@ -2048,368 +2686,709 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
         final GlobalKey _avatarKey = GlobalKey();
         final nameCtrl = TextEditingController(text: cfg.name);
         final proxyHostCtrl = TextEditingController(text: cfg.proxyHost ?? '');
-        final proxyPortCtrl = TextEditingController(text: cfg.proxyPort ?? '8080');
-        final proxyUserCtrl = TextEditingController(text: cfg.proxyUsername ?? '');
-        final proxyPassCtrl = TextEditingController(text: cfg.proxyPassword ?? '');
+        final proxyPortCtrl = TextEditingController(
+          text: cfg.proxyPort ?? '8080',
+        );
+        final proxyUserCtrl = TextEditingController(
+          text: cfg.proxyUsername ?? '',
+        );
+        final proxyPassCtrl = TextEditingController(
+          text: cfg.proxyPassword ?? '',
+        );
         ProviderKind tmpKind = kind;
         bool tmpMulti = multi;
         bool tmpResp = openaiResp;
         bool tmpVertex = googleVertex;
         return Dialog(
           backgroundColor: cs.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
-          child: Consumer<SettingsProvider>(builder: (c, spWatch, _) {
-              final cfgNow = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-              // IME-friendly sync: avoid overwriting while composing
-              void syncCtrl(TextEditingController ctrl, String text) {
-                final v = ctrl.value;
-                if (v.composing.isValid) return;
-                if (ctrl.text != text) {
-                  ctrl.value = TextEditingValue(
-                    text: text,
-                    selection: TextSelection.collapsed(offset: text.length),
-                  );
+            child: Consumer<SettingsProvider>(
+              builder: (c, spWatch, _) {
+                final cfgNow = spWatch.getProviderConfig(
+                  widget.providerKey,
+                  defaultName: widget.displayName,
+                );
+                // IME-friendly sync: avoid overwriting while composing
+                void syncCtrl(TextEditingController ctrl, String text) {
+                  final v = ctrl.value;
+                  if (v.composing.isValid) return;
+                  if (ctrl.text != text) {
+                    ctrl.value = TextEditingValue(
+                      text: text,
+                      selection: TextSelection.collapsed(offset: text.length),
+                    );
+                  }
                 }
-              }
-              syncCtrl(nameCtrl, cfgNow.name);
-              syncCtrl(proxyHostCtrl, cfgNow.proxyHost ?? '');
-              syncCtrl(proxyPortCtrl, cfgNow.proxyPort ?? '8080');
-              syncCtrl(proxyUserCtrl, cfgNow.proxyUsername ?? '');
-              syncCtrl(proxyPassCtrl, cfgNow.proxyPassword ?? '');
-              final kindNow = cfgNow.providerType ?? ProviderConfig.classify(cfgNow.id, explicitType: cfgNow.providerType);
-              final multiNow = cfgNow.multiKeyEnabled ?? false;
-              final respNow = cfgNow.useResponseApi ?? false;
-              final vertexNow = cfgNow.vertexAI ?? false;
-              final proxyEnabledNow = cfgNow.proxyEnabled ?? false;
-              final aihubmixAppCodeEnabled = cfgNow.aihubmixAppCodeEnabled ?? false;
-              Widget row(String label, Widget trailing) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(children: [
-                  Expanded(child: Text(label, style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.9)))),
-                  const SizedBox(width: 10),
-                  SizedBox(width: 260, child: trailing),
-                ]),
-              );
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    height: 44,
-                    child: Padding(
+
+                syncCtrl(nameCtrl, cfgNow.name);
+                syncCtrl(proxyHostCtrl, cfgNow.proxyHost ?? '');
+                syncCtrl(proxyPortCtrl, cfgNow.proxyPort ?? '8080');
+                syncCtrl(proxyUserCtrl, cfgNow.proxyUsername ?? '');
+                syncCtrl(proxyPassCtrl, cfgNow.proxyPassword ?? '');
+                final kindNow =
+                    cfgNow.providerType ??
+                    ProviderConfig.classify(
+                      cfgNow.id,
+                      explicitType: cfgNow.providerType,
+                    );
+                final multiNow = cfgNow.multiKeyEnabled ?? false;
+                final respNow = cfgNow.useResponseApi ?? false;
+                final vertexNow = cfgNow.vertexAI ?? false;
+                final proxyEnabledNow = cfgNow.proxyEnabled ?? false;
+                final aihubmixAppCodeEnabled =
+                    cfgNow.aihubmixAppCodeEnabled ?? false;
+                Widget row(String label, Widget trailing) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: cs.onSurface.withOpacity(0.9),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(width: 260, child: trailing),
+                    ],
+                  ),
+                );
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: 44,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                cfgNow.name.isNotEmpty
+                                    ? cfgNow.name
+                                    : widget.providerKey,
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            _IconBtn(
+                              icon: lucide.Lucide.X,
+                              onTap: () => Navigator.of(ctx).maybePop(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Row(
+                      child: Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: cs.outlineVariant.withOpacity(0.12),
+                      ),
+                    ),
+                    // Centered provider avatar (smaller than user dialog)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 14, bottom: 6),
+                      child: Center(
+                        child: GestureDetector(
+                          key: _avatarKey,
+                          onTapDown: (_) async {
+                            // Open avatar menu (anchored)
+                            final l10n2 = AppLocalizations.of(context)!;
+                            await showDesktopAnchoredMenu(
+                              context,
+                              anchorKey: _avatarKey,
+                              offset: const Offset(0, 8),
+                              items: [
+                                DesktopContextMenuItem(
+                                  icon: lucide.Lucide.Image,
+                                  label: l10n2.sideDrawerChooseImage,
+                                  onTap: () async {
+                                    try {
+                                      final res = await FilePicker.platform
+                                          .pickFiles(
+                                            allowMultiple: false,
+                                            withData: false,
+                                            type: FileType.custom,
+                                            allowedExtensions: const [
+                                              'png',
+                                              'jpg',
+                                              'jpeg',
+                                              'gif',
+                                              'webp',
+                                              'heic',
+                                              'heif',
+                                            ],
+                                          );
+                                      final f =
+                                          (res != null && res.files.isNotEmpty)
+                                          ? res.files.first
+                                          : null;
+                                      final path = f?.path;
+                                      if (path != null && path.isNotEmpty) {
+                                        await context
+                                            .read<SettingsProvider>()
+                                            .setProviderAvatarFilePath(
+                                              widget.providerKey,
+                                              path,
+                                            );
+                                      }
+                                    } catch (_) {}
+                                  },
+                                ),
+                                DesktopContextMenuItem(
+                                  icon: lucide.Lucide.Link,
+                                  label: l10n2.sideDrawerEnterLink,
+                                  onTap: () async {
+                                    await _inputProviderAvatarUrl(
+                                      context,
+                                      widget.providerKey,
+                                    );
+                                  },
+                                ),
+                                DesktopContextMenuItem(
+                                  icon: lucide.Lucide.RotateCw,
+                                  label: l10n2.desktopAvatarMenuReset,
+                                  onTap: () async {
+                                    await context
+                                        .read<SettingsProvider>()
+                                        .resetProviderAvatar(
+                                          widget.providerKey,
+                                        );
+                                  },
+                                ),
+                              ],
+                            );
+                          },
+                          child: ProviderAvatar(
+                            providerKey: widget.providerKey,
+                            displayName: widget.displayName,
+                            size: 64,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(child: Text(cfgNow.name.isNotEmpty ? cfgNow.name : widget.providerKey, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700))),
-                          _IconBtn(icon: lucide.Lucide.X, onTap: () => Navigator.of(ctx).maybePop()),
+                          // 1) Name
+                          row(
+                            l10n.providerDetailPageNameLabel,
+                            Focus(
+                              onFocusChange: (has) async {
+                                if (!has) {
+                                  final v = nameCtrl.text.trim();
+                                  final old = spWatch.getProviderConfig(
+                                    widget.providerKey,
+                                    defaultName: widget.displayName,
+                                  );
+                                  await spWatch.setProviderConfig(
+                                    widget.providerKey,
+                                    old.copyWith(
+                                      name: v.isEmpty ? widget.displayName : v,
+                                    ),
+                                  );
+                                }
+                              },
+                              child: TextField(
+                                controller: nameCtrl,
+                                style: const TextStyle(fontSize: 14),
+                                decoration: _inputDecoration(ctx),
+                                textInputAction: TextInputAction.done,
+                                onSubmitted: (_) async {
+                                  final v = nameCtrl.text.trim();
+                                  final old = spWatch.getProviderConfig(
+                                    widget.providerKey,
+                                    defaultName: widget.displayName,
+                                  );
+                                  await spWatch.setProviderConfig(
+                                    widget.providerKey,
+                                    old.copyWith(
+                                      name: v.isEmpty ? widget.displayName : v,
+                                    ),
+                                  );
+                                },
+                                onEditingComplete: () async {
+                                  final v = nameCtrl.text.trim();
+                                  final old = spWatch.getProviderConfig(
+                                    widget.providerKey,
+                                    defaultName: widget.displayName,
+                                  );
+                                  await spWatch.setProviderConfig(
+                                    widget.providerKey,
+                                    old.copyWith(
+                                      name: v.isEmpty ? widget.displayName : v,
+                                    ),
+                                  );
+                                },
+                                onChanged: (_) async {
+                                  // Avoid saving during IME composing to prevent glitches with Pinyin input
+                                  if (nameCtrl.value.composing.isValid) return;
+                                  final v = nameCtrl.text.trim();
+                                  final old = spWatch.getProviderConfig(
+                                    widget.providerKey,
+                                    defaultName: widget.displayName,
+                                  );
+                                  await spWatch.setProviderConfig(
+                                    widget.providerKey,
+                                    old.copyWith(
+                                      name: v.isEmpty ? widget.displayName : v,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // 2) Provider type
+                          row(
+                            l10n.providerDetailPageProviderTypeTitle,
+                            _ProviderTypeDropdown(
+                              value: kindNow,
+                              onChanged: (k) async {
+                                final old = spWatch.getProviderConfig(
+                                  widget.providerKey,
+                                  defaultName: widget.displayName,
+                                );
+                                await spWatch.setProviderConfig(
+                                  widget.providerKey,
+                                  old.copyWith(providerType: k),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // 3) Multi-Key
+                          row(
+                            l10n.providerDetailPageMultiKeyModeTitle,
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: IosSwitch(
+                                value: multiNow,
+                                onChanged: (v) async {
+                                  final old = spWatch.getProviderConfig(
+                                    widget.providerKey,
+                                    defaultName: widget.displayName,
+                                  );
+                                  await spWatch.setProviderConfig(
+                                    widget.providerKey,
+                                    old.copyWith(multiKeyEnabled: v),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // 4) Response (OpenAI) or Vertex (Google). Hide for Claude, with animation.
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            child: () {
+                              if (kindNow == ProviderKind.openai) {
+                                return KeyedSubtree(
+                                  key: const ValueKey('openai-resp'),
+                                  child: row(
+                                    l10n.providerDetailPageResponseApiTitle,
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: IosSwitch(
+                                        value: respNow,
+                                        onChanged: (v) async {
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                            defaultName: widget.displayName,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(useResponseApi: v),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              if (kindNow == ProviderKind.google) {
+                                return KeyedSubtree(
+                                  key: const ValueKey('google-vertex'),
+                                  child: row(
+                                    l10n.providerDetailPageVertexAiTitle,
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: IosSwitch(
+                                        value: vertexNow,
+                                        onChanged: (v) async {
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                            defaultName: widget.displayName,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(vertexAI: v),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink(
+                                key: ValueKey('none'),
+                              );
+                            }(),
+                          ),
+                          const SizedBox(height: 4),
+                          if (_isAihubmix(cfgNow))
+                            row(
+                              l10n.providerDetailPageAihubmixAppCodeLabel,
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Tooltip(
+                                    message: l10n
+                                        .providerDetailPageAihubmixAppCodeHelp,
+                                    child: Icon(
+                                      Icons.help_outline,
+                                      size: 16,
+                                      color: cs.onSurface.withOpacity(0.6),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IosSwitch(
+                                    value: aihubmixAppCodeEnabled,
+                                    onChanged: (v) async {
+                                      final old = spWatch.getProviderConfig(
+                                        widget.providerKey,
+                                        defaultName: widget.displayName,
+                                      );
+                                      await spWatch.setProviderConfig(
+                                        widget.providerKey,
+                                        old.copyWith(aihubmixAppCodeEnabled: v),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          const SizedBox(height: 4),
+                          // 5) Network proxy inline
+                          row(
+                            l10n.providerDetailPageNetworkTab,
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: IosSwitch(
+                                value: proxyEnabledNow,
+                                onChanged: (v) async {
+                                  final old = spWatch.getProviderConfig(
+                                    widget.providerKey,
+                                    defaultName: widget.displayName,
+                                  );
+                                  await spWatch.setProviderConfig(
+                                    widget.providerKey,
+                                    old.copyWith(proxyEnabled: v),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          AnimatedCrossFade(
+                            firstChild: const SizedBox.shrink(),
+                            secondChild: Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  row(
+                                    l10n.providerDetailPageHostLabel,
+                                    Focus(
+                                      onFocusChange: (has) async {
+                                        if (!has) {
+                                          final v = proxyHostCtrl.text.trim();
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                            defaultName: widget.displayName,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(proxyHost: v),
+                                          );
+                                        }
+                                      },
+                                      child: TextField(
+                                        controller: proxyHostCtrl,
+                                        style: const TextStyle(fontSize: 13),
+                                        decoration: _inputDecoration(
+                                          ctx,
+                                        ).copyWith(hintText: '127.0.0.1'),
+                                        onChanged: (_) async {
+                                          if (proxyHostCtrl
+                                              .value
+                                              .composing
+                                              .isValid)
+                                            return;
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                            defaultName: widget.displayName,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(
+                                              proxyHost: proxyHostCtrl.text
+                                                  .trim(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  row(
+                                    l10n.providerDetailPagePortLabel,
+                                    Focus(
+                                      onFocusChange: (has) async {
+                                        if (!has) {
+                                          final v = proxyPortCtrl.text.trim();
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                            defaultName: widget.displayName,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(proxyPort: v),
+                                          );
+                                        }
+                                      },
+                                      child: TextField(
+                                        controller: proxyPortCtrl,
+                                        style: const TextStyle(fontSize: 13),
+                                        decoration: _inputDecoration(
+                                          ctx,
+                                        ).copyWith(hintText: '8080'),
+                                        onChanged: (_) async {
+                                          if (proxyPortCtrl
+                                              .value
+                                              .composing
+                                              .isValid)
+                                            return;
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                            defaultName: widget.displayName,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(
+                                              proxyPort: proxyPortCtrl.text
+                                                  .trim(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  row(
+                                    l10n.providerDetailPageUsernameOptionalLabel,
+                                    Focus(
+                                      onFocusChange: (has) async {
+                                        if (!has) {
+                                          final v = proxyUserCtrl.text.trim();
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                            defaultName: widget.displayName,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(proxyUsername: v),
+                                          );
+                                        }
+                                      },
+                                      child: TextField(
+                                        controller: proxyUserCtrl,
+                                        style: const TextStyle(fontSize: 13),
+                                        decoration: _inputDecoration(ctx),
+                                        onChanged: (_) async {
+                                          if (proxyUserCtrl
+                                              .value
+                                              .composing
+                                              .isValid)
+                                            return;
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                            defaultName: widget.displayName,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(
+                                              proxyUsername: proxyUserCtrl.text
+                                                  .trim(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  row(
+                                    l10n.providerDetailPagePasswordOptionalLabel,
+                                    Focus(
+                                      onFocusChange: (has) async {
+                                        if (!has) {
+                                          final v = proxyPassCtrl.text.trim();
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                            defaultName: widget.displayName,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(proxyPassword: v),
+                                          );
+                                        }
+                                      },
+                                      child: TextField(
+                                        controller: proxyPassCtrl,
+                                        style: const TextStyle(fontSize: 13),
+                                        obscureText: true,
+                                        decoration: _inputDecoration(ctx),
+                                        onChanged: (_) async {
+                                          if (proxyPassCtrl
+                                              .value
+                                              .composing
+                                              .isValid)
+                                            return;
+                                          final old = spWatch.getProviderConfig(
+                                            widget.providerKey,
+                                            defaultName: widget.displayName,
+                                          );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(
+                                              proxyPassword: proxyPassCtrl.text
+                                                  .trim(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            crossFadeState: proxyEnabledNow
+                                ? CrossFadeState.showSecond
+                                : CrossFadeState.showFirst,
+                            duration: const Duration(milliseconds: 180),
+                            sizeCurve: Curves.easeOutCubic,
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Divider(height: 1, thickness: 0.5, color: cs.outlineVariant.withOpacity(0.12)),
-                  ),
-                  // Centered provider avatar (smaller than user dialog)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 14, bottom: 6),
-                    child: Center(
-                      child: GestureDetector(
-                        key: _avatarKey,
-                        onTapDown: (_) async {
-                          // Open avatar menu (anchored)
-                          final l10n2 = AppLocalizations.of(context)!;
-                          await showDesktopAnchoredMenu(
-                            context,
-                            anchorKey: _avatarKey,
-                            offset: const Offset(0, 8),
-                            items: [
-                              DesktopContextMenuItem(
-                                icon: lucide.Lucide.Image,
-                                label: l10n2.sideDrawerChooseImage,
-                                onTap: () async {
-                                  try {
-                                    final res = await FilePicker.platform.pickFiles(
-                                      allowMultiple: false,
-                                      withData: false,
-                                      type: FileType.custom,
-                                      allowedExtensions: const ['png','jpg','jpeg','gif','webp','heic','heif'],
-                                    );
-                                    final f = (res != null && res.files.isNotEmpty) ? res.files.first : null;
-                                    final path = f?.path;
-                                    if (path != null && path.isNotEmpty) {
-                                      await context.read<SettingsProvider>().setProviderAvatarFilePath(widget.providerKey, path);
-                                    }
-                                  } catch (_) {}
-                                },
-                              ),
-                              DesktopContextMenuItem(
-                                icon: lucide.Lucide.Link,
-                                label: l10n2.sideDrawerEnterLink,
-                                onTap: () async {
-                                  await _inputProviderAvatarUrl(context, widget.providerKey);
-                                },
-                              ),
-                              DesktopContextMenuItem(
-                                icon: lucide.Lucide.RotateCw,
-                                label: l10n2.desktopAvatarMenuReset,
-                                onTap: () async {
-                                  await context.read<SettingsProvider>().resetProviderAvatar(widget.providerKey);
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                        child: ProviderAvatar(
-                          providerKey: widget.providerKey,
-                          displayName: widget.displayName,
-                          size: 64,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      // 1) Name
-                      row(l10n.providerDetailPageNameLabel, Focus(
-                        onFocusChange: (has) async {
-                          if (!has) {
-                            final v = nameCtrl.text.trim();
-                            final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                            await spWatch.setProviderConfig(widget.providerKey, old.copyWith(name: v.isEmpty ? widget.displayName : v));
-                          }
-                        },
-                        child: TextField(
-                          controller: nameCtrl,
-                          style: const TextStyle(fontSize: 14),
-                          decoration: _inputDecoration(ctx),
-                          textInputAction: TextInputAction.done,
-                          onSubmitted: (_) async {
-                            final v = nameCtrl.text.trim();
-                            final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                            await spWatch.setProviderConfig(widget.providerKey, old.copyWith(name: v.isEmpty ? widget.displayName : v));
-                          },
-                          onEditingComplete: () async {
-                            final v = nameCtrl.text.trim();
-                            final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                            await spWatch.setProviderConfig(widget.providerKey, old.copyWith(name: v.isEmpty ? widget.displayName : v));
-                          },
-                          onChanged: (_) async {
-                            // Avoid saving during IME composing to prevent glitches with Pinyin input
-                            if (nameCtrl.value.composing.isValid) return;
-                            final v = nameCtrl.text.trim();
-                            final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                            await spWatch.setProviderConfig(widget.providerKey, old.copyWith(name: v.isEmpty ? widget.displayName : v));
-                          },
-                        ),
-                      )),
-                      const SizedBox(height: 4),
-                      // 2) Provider type
-                      row(l10n.providerDetailPageProviderTypeTitle, _ProviderTypeDropdown(value: kindNow, onChanged: (k) async {
-                        final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                        await spWatch.setProviderConfig(widget.providerKey, old.copyWith(providerType: k));
-                      })),
-                      const SizedBox(height: 4),
-                      // 3) Multi-Key
-                      row(l10n.providerDetailPageMultiKeyModeTitle, Align(alignment: Alignment.centerRight, child: IosSwitch(value: multiNow, onChanged: (v) async {
-                        final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                        await spWatch.setProviderConfig(widget.providerKey, old.copyWith(multiKeyEnabled: v));
-                      }))),
-                      const SizedBox(height: 4),
-                      // 4) Response (OpenAI) or Vertex (Google). Hide for Claude, with animation.
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 180),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        child: () {
-                          if (kindNow == ProviderKind.openai) {
-                            return KeyedSubtree(
-                              key: const ValueKey('openai-resp'),
-                              child: row(l10n.providerDetailPageResponseApiTitle, Align(alignment: Alignment.centerRight, child: IosSwitch(value: respNow, onChanged: (v) async {
-                                final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                await spWatch.setProviderConfig(widget.providerKey, old.copyWith(useResponseApi: v));
-                              }))),
-                            );
-                          }
-                          if (kindNow == ProviderKind.google) {
-                            return KeyedSubtree(
-                              key: const ValueKey('google-vertex'),
-                              child: row(l10n.providerDetailPageVertexAiTitle, Align(alignment: Alignment.centerRight, child: IosSwitch(value: vertexNow, onChanged: (v) async {
-                                final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                await spWatch.setProviderConfig(widget.providerKey, old.copyWith(vertexAI: v));
-                              }))),
-                            );
-                        }
-                          return const SizedBox.shrink(key: ValueKey('none'));
-                        }(),
-                      ),
-                      const SizedBox(height: 4),
-                      if (_isAihubmix(cfgNow))
-                        row(
-                          l10n.providerDetailPageAihubmixAppCodeLabel,
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Tooltip(
-                                message: l10n.providerDetailPageAihubmixAppCodeHelp,
-                                child: Icon(Icons.help_outline, size: 16, color: cs.onSurface.withOpacity(0.6)),
-                              ),
-                              const SizedBox(width: 8),
-                              IosSwitch(
-                                value: aihubmixAppCodeEnabled,
-                                onChanged: (v) async {
-                                  final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                  await spWatch.setProviderConfig(widget.providerKey, old.copyWith(aihubmixAppCodeEnabled: v));
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      const SizedBox(height: 4),
-                      // 5) Network proxy inline
-                      row(l10n.providerDetailPageNetworkTab, Align(alignment: Alignment.centerRight, child: IosSwitch(value: proxyEnabledNow, onChanged: (v) async {
-                        final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                        await spWatch.setProviderConfig(widget.providerKey, old.copyWith(proxyEnabled: v));
-                      }))),
-                      AnimatedCrossFade(
-                        firstChild: const SizedBox.shrink(),
-                        secondChild: Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                            row(l10n.providerDetailPageHostLabel, Focus(
-                              onFocusChange: (has) async {
-                                if (!has) {
-                                  final v = proxyHostCtrl.text.trim();
-                                  final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                  await spWatch.setProviderConfig(widget.providerKey, old.copyWith(proxyHost: v));
-                                }
-                              },
-                              child: TextField(controller: proxyHostCtrl, style: const TextStyle(fontSize: 13), decoration: _inputDecoration(ctx).copyWith(hintText: '127.0.0.1'), onChanged: (_) async {
-                                if (proxyHostCtrl.value.composing.isValid) return;
-                                final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                await spWatch.setProviderConfig(widget.providerKey, old.copyWith(proxyHost: proxyHostCtrl.text.trim()));
-                              }),
-                            )),
-                            const SizedBox(height: 4),
-                            row(l10n.providerDetailPagePortLabel, Focus(
-                              onFocusChange: (has) async {
-                                if (!has) {
-                                  final v = proxyPortCtrl.text.trim();
-                                  final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                  await spWatch.setProviderConfig(widget.providerKey, old.copyWith(proxyPort: v));
-                                }
-                              },
-                              child: TextField(controller: proxyPortCtrl, style: const TextStyle(fontSize: 13), decoration: _inputDecoration(ctx).copyWith(hintText: '8080'), onChanged: (_) async {
-                                if (proxyPortCtrl.value.composing.isValid) return;
-                                final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                await spWatch.setProviderConfig(widget.providerKey, old.copyWith(proxyPort: proxyPortCtrl.text.trim()));
-                              }),
-                            )),
-                            const SizedBox(height: 4),
-                            row(l10n.providerDetailPageUsernameOptionalLabel, Focus(
-                              onFocusChange: (has) async {
-                                if (!has) {
-                                  final v = proxyUserCtrl.text.trim();
-                                  final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                  await spWatch.setProviderConfig(widget.providerKey, old.copyWith(proxyUsername: v));
-                                }
-                              },
-                              child: TextField(controller: proxyUserCtrl, style: const TextStyle(fontSize: 13), decoration: _inputDecoration(ctx), onChanged: (_) async {
-                                if (proxyUserCtrl.value.composing.isValid) return;
-                                final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                await spWatch.setProviderConfig(widget.providerKey, old.copyWith(proxyUsername: proxyUserCtrl.text.trim()));
-                              }),
-                            )),
-                            const SizedBox(height: 4),
-                            row(l10n.providerDetailPagePasswordOptionalLabel, Focus(
-                              onFocusChange: (has) async {
-                                if (!has) {
-                                  final v = proxyPassCtrl.text.trim();
-                                  final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                  await spWatch.setProviderConfig(widget.providerKey, old.copyWith(proxyPassword: v));
-                                }
-                              },
-                              child: TextField(controller: proxyPassCtrl, style: const TextStyle(fontSize: 13), obscureText: true, decoration: _inputDecoration(ctx), onChanged: (_) async {
-                                if (proxyPassCtrl.value.composing.isValid) return;
-                                final old = spWatch.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                await spWatch.setProviderConfig(widget.providerKey, old.copyWith(proxyPassword: proxyPassCtrl.text.trim()));
-                              }),
-                            )),
-                          ]),
-                        ),
-                        crossFadeState: proxyEnabledNow ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                        duration: const Duration(milliseconds: 180),
-                        sizeCurve: Curves.easeOutCubic,
-                      ),
-                    ]),
-                  ),
-                ],
-              );
-            }),
+                  ],
+                );
+              },
+            ),
           ),
         );
       },
     );
   }
 
-  Future<void> _inputProviderAvatarUrl(BuildContext context, String providerKey) async {
+  Future<void> _inputProviderAvatarUrl(
+    BuildContext context,
+    String providerKey,
+  ) async {
     final l10n = AppLocalizations.of(context)!;
     final controller = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         final cs = Theme.of(ctx).colorScheme;
-        bool valid(String s) => s.trim().startsWith('http://') || s.trim().startsWith('https://');
+        bool valid(String s) =>
+            s.trim().startsWith('http://') || s.trim().startsWith('https://');
         String value = '';
-        return StatefulBuilder(builder: (ctx2, setLocal) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            backgroundColor: cs.surface,
-            title: Text(l10n.sideDrawerImageUrlDialogTitle),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: l10n.sideDrawerImageUrlDialogHint,
-                filled: true,
-                fillColor: Theme.of(ctx2).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.transparent),
-                ),
-                enabledBorder: const OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                  borderSide: BorderSide(color: Colors.transparent),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
-                ),
+        return StatefulBuilder(
+          builder: (ctx2, setLocal) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              onChanged: (v) => setLocal(() => value = v),
-              onSubmitted: (_) {
-                if (valid(value)) Navigator.of(ctx2).pop(true);
-              },
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.sideDrawerCancel)),
-              TextButton(
-                onPressed: valid(value) ? () => Navigator.of(ctx).pop(true) : null,
-                child: Text(l10n.sideDrawerSave, style: TextStyle(color: valid(value) ? cs.primary : cs.onSurface.withOpacity(0.38), fontWeight: FontWeight.w600)),
+              backgroundColor: cs.surface,
+              title: Text(l10n.sideDrawerImageUrlDialogTitle),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: l10n.sideDrawerImageUrlDialogHint,
+                  filled: true,
+                  fillColor: Theme.of(ctx2).brightness == Brightness.dark
+                      ? Colors.white10
+                      : const Color(0xFFF2F3F5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.transparent),
+                  ),
+                  enabledBorder: const OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                    borderSide: BorderSide(color: Colors.transparent),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
+                  ),
+                ),
+                onChanged: (v) => setLocal(() => value = v),
+                onSubmitted: (_) {
+                  if (valid(value)) Navigator.of(ctx2).pop(true);
+                },
               ),
-            ],
-          );
-        });
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text(l10n.sideDrawerCancel),
+                ),
+                TextButton(
+                  onPressed: valid(value)
+                      ? () => Navigator.of(ctx).pop(true)
+                      : null,
+                  child: Text(
+                    l10n.sideDrawerSave,
+                    style: TextStyle(
+                      color: valid(value)
+                          ? cs.primary
+                          : cs.onSurface.withOpacity(0.38),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
       },
     );
     if (ok == true) {
       final url = controller.text.trim();
       if (url.isNotEmpty) {
-        await context.read<SettingsProvider>().setProviderAvatarUrl(providerKey, url);
+        await context.read<SettingsProvider>().setProviderAvatarUrl(
+          providerKey,
+          url,
+        );
       }
     }
   }
@@ -2423,7 +3402,10 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
   Future<void> _showNetworkDialog(BuildContext context) async {
     final cs = Theme.of(context).colorScheme;
     final sp = context.read<SettingsProvider>();
-    final cfg = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
+    final cfg = sp.getProviderConfig(
+      widget.providerKey,
+      defaultName: widget.displayName,
+    );
     bool enabled = cfg.proxyEnabled ?? false;
     final host = TextEditingController(text: cfg.proxyHost ?? '');
     final port = TextEditingController(text: cfg.proxyPort ?? '8080');
@@ -2438,110 +3420,250 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
-          child: StatefulBuilder(builder: (ctx, setSt) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  height: 44,
-                  child: Padding(
+          child: StatefulBuilder(
+            builder: (ctx, setSt) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: 44,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              AppLocalizations.of(
+                                ctx,
+                              )!.providerDetailPageNetworkTab,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(lucide.Lucide.X, size: 18),
+                            color: cs.onSurface,
+                            onPressed: () => Navigator.of(ctx).maybePop(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(
+                    child: Divider(
+                      height: 1,
+                      thickness: 0.5,
+                      color: cs.outlineVariant.withOpacity(0.12),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(child: Text(AppLocalizations.of(ctx)!.providerDetailPageNetworkTab, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700))),
-                        IconButton(
-                          icon: const Icon(lucide.Lucide.X, size: 18),
-                          color: cs.onSurface,
-                          onPressed: () => Navigator.of(ctx).maybePop(),
+                        _rowSwitch(
+                          ctx,
+                          label: AppLocalizations.of(
+                            ctx,
+                          )!.providerDetailPageEnableProxyTitle,
+                          value: enabled,
+                          onChanged: (v) async {
+                            setSt(() => enabled = v);
+                            final old = sp.getProviderConfig(
+                              widget.providerKey,
+                              defaultName: widget.displayName,
+                            );
+                            await sp.setProviderConfig(
+                              widget.providerKey,
+                              old.copyWith(proxyEnabled: v),
+                            );
+                          },
+                        ),
+                        AnimatedCrossFade(
+                          firstChild: const SizedBox.shrink(),
+                          secondChild: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const SizedBox(height: 12),
+                              _sectionLabel(
+                                ctx,
+                                AppLocalizations.of(
+                                  ctx,
+                                )!.providerDetailPageHostLabel,
+                              ),
+                              const SizedBox(height: 6),
+                              Focus(
+                                onFocusChange: (has) async {
+                                  if (!has) {
+                                    final v = host.text.trim();
+                                    final old = sp.getProviderConfig(
+                                      widget.providerKey,
+                                      defaultName: widget.displayName,
+                                    );
+                                    await sp.setProviderConfig(
+                                      widget.providerKey,
+                                      old.copyWith(proxyHost: v),
+                                    );
+                                  }
+                                },
+                                child: TextField(
+                                  controller: host,
+                                  style: const TextStyle(fontSize: 13),
+                                  decoration: _inputDecoration(
+                                    ctx,
+                                  ).copyWith(hintText: '127.0.0.1'),
+                                  onChanged: (_) async {
+                                    final old = sp.getProviderConfig(
+                                      widget.providerKey,
+                                      defaultName: widget.displayName,
+                                    );
+                                    await sp.setProviderConfig(
+                                      widget.providerKey,
+                                      old.copyWith(proxyHost: host.text.trim()),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              _sectionLabel(
+                                ctx,
+                                AppLocalizations.of(
+                                  ctx,
+                                )!.providerDetailPagePortLabel,
+                              ),
+                              const SizedBox(height: 6),
+                              Focus(
+                                onFocusChange: (has) async {
+                                  if (!has) {
+                                    final v = port.text.trim();
+                                    final old = sp.getProviderConfig(
+                                      widget.providerKey,
+                                      defaultName: widget.displayName,
+                                    );
+                                    await sp.setProviderConfig(
+                                      widget.providerKey,
+                                      old.copyWith(proxyPort: v),
+                                    );
+                                  }
+                                },
+                                child: TextField(
+                                  controller: port,
+                                  style: const TextStyle(fontSize: 13),
+                                  decoration: _inputDecoration(
+                                    ctx,
+                                  ).copyWith(hintText: '8080'),
+                                  onChanged: (_) async {
+                                    final old = sp.getProviderConfig(
+                                      widget.providerKey,
+                                      defaultName: widget.displayName,
+                                    );
+                                    await sp.setProviderConfig(
+                                      widget.providerKey,
+                                      old.copyWith(proxyPort: port.text.trim()),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              _sectionLabel(
+                                ctx,
+                                AppLocalizations.of(
+                                  ctx,
+                                )!.providerDetailPageUsernameOptionalLabel,
+                              ),
+                              const SizedBox(height: 6),
+                              Focus(
+                                onFocusChange: (has) async {
+                                  if (!has) {
+                                    final v = user.text.trim();
+                                    final old = sp.getProviderConfig(
+                                      widget.providerKey,
+                                      defaultName: widget.displayName,
+                                    );
+                                    await sp.setProviderConfig(
+                                      widget.providerKey,
+                                      old.copyWith(proxyUsername: v),
+                                    );
+                                  }
+                                },
+                                child: TextField(
+                                  controller: user,
+                                  style: const TextStyle(fontSize: 13),
+                                  decoration: _inputDecoration(ctx),
+                                  onChanged: (_) async {
+                                    final old = sp.getProviderConfig(
+                                      widget.providerKey,
+                                      defaultName: widget.displayName,
+                                    );
+                                    await sp.setProviderConfig(
+                                      widget.providerKey,
+                                      old.copyWith(
+                                        proxyUsername: user.text.trim(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              _sectionLabel(
+                                ctx,
+                                AppLocalizations.of(
+                                  ctx,
+                                )!.providerDetailPagePasswordOptionalLabel,
+                              ),
+                              const SizedBox(height: 6),
+                              Focus(
+                                onFocusChange: (has) async {
+                                  if (!has) {
+                                    final v = pass.text.trim();
+                                    final old = sp.getProviderConfig(
+                                      widget.providerKey,
+                                      defaultName: widget.displayName,
+                                    );
+                                    await sp.setProviderConfig(
+                                      widget.providerKey,
+                                      old.copyWith(proxyPassword: v),
+                                    );
+                                  }
+                                },
+                                child: TextField(
+                                  controller: pass,
+                                  style: const TextStyle(fontSize: 13),
+                                  obscureText: true,
+                                  decoration: _inputDecoration(ctx),
+                                  onChanged: (_) async {
+                                    final old = sp.getProviderConfig(
+                                      widget.providerKey,
+                                      defaultName: widget.displayName,
+                                    );
+                                    await sp.setProviderConfig(
+                                      widget.providerKey,
+                                      old.copyWith(
+                                        proxyPassword: pass.text.trim(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          crossFadeState: enabled
+                              ? CrossFadeState.showSecond
+                              : CrossFadeState.showFirst,
+                          duration: const Duration(milliseconds: 180),
+                          sizeCurve: Curves.easeOutCubic,
                         ),
                       ],
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Divider(height: 1, thickness: 0.5, color: cs.outlineVariant.withOpacity(0.12)),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _rowSwitch(ctx, label: AppLocalizations.of(ctx)!.providerDetailPageEnableProxyTitle, value: enabled, onChanged: (v) async {
-                        setSt(() => enabled = v);
-                        final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                        await sp.setProviderConfig(widget.providerKey, old.copyWith(proxyEnabled: v));
-                      }),
-                      AnimatedCrossFade(
-                        firstChild: const SizedBox.shrink(),
-                        secondChild: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const SizedBox(height: 12),
-                            _sectionLabel(ctx, AppLocalizations.of(ctx)!.providerDetailPageHostLabel),
-                            const SizedBox(height: 6),
-                            Focus(
-                              onFocusChange: (has) async {
-                                if (!has) {
-                                  final v = host.text.trim();
-                                  final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                  await sp.setProviderConfig(widget.providerKey, old.copyWith(proxyHost: v));
-                                }
-                              },
-                              child: TextField(controller: host, style: const TextStyle(fontSize: 13), decoration: _inputDecoration(ctx).copyWith(hintText: '127.0.0.1'), onChanged: (_) async { final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName); await sp.setProviderConfig(widget.providerKey, old.copyWith(proxyHost: host.text.trim())); }),
-                            ),
-                            const SizedBox(height: 12),
-                            _sectionLabel(ctx, AppLocalizations.of(ctx)!.providerDetailPagePortLabel),
-                            const SizedBox(height: 6),
-                            Focus(
-                              onFocusChange: (has) async {
-                                if (!has) {
-                                  final v = port.text.trim();
-                                  final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                  await sp.setProviderConfig(widget.providerKey, old.copyWith(proxyPort: v));
-                                }
-                              },
-                              child: TextField(controller: port, style: const TextStyle(fontSize: 13), decoration: _inputDecoration(ctx).copyWith(hintText: '8080'), onChanged: (_) async { final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName); await sp.setProviderConfig(widget.providerKey, old.copyWith(proxyPort: port.text.trim())); }),
-                            ),
-                            const SizedBox(height: 12),
-                            _sectionLabel(ctx, AppLocalizations.of(ctx)!.providerDetailPageUsernameOptionalLabel),
-                            const SizedBox(height: 6),
-                            Focus(
-                              onFocusChange: (has) async {
-                                if (!has) {
-                                  final v = user.text.trim();
-                                  final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                  await sp.setProviderConfig(widget.providerKey, old.copyWith(proxyUsername: v));
-                                }
-                              },
-                              child: TextField(controller: user, style: const TextStyle(fontSize: 13), decoration: _inputDecoration(ctx), onChanged: (_) async { final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName); await sp.setProviderConfig(widget.providerKey, old.copyWith(proxyUsername: user.text.trim())); }),
-                            ),
-                            const SizedBox(height: 12),
-                            _sectionLabel(ctx, AppLocalizations.of(ctx)!.providerDetailPagePasswordOptionalLabel),
-                            const SizedBox(height: 6),
-                            Focus(
-                              onFocusChange: (has) async {
-                                if (!has) {
-                                  final v = pass.text.trim();
-                                  final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                  await sp.setProviderConfig(widget.providerKey, old.copyWith(proxyPassword: v));
-                                }
-                              },
-                              child: TextField(controller: pass, style: const TextStyle(fontSize: 13), obscureText: true, decoration: _inputDecoration(ctx), onChanged: (_) async { final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName); await sp.setProviderConfig(widget.providerKey, old.copyWith(proxyPassword: pass.text.trim())); }),
-                            ),
-                          ],
-                        ),
-                        crossFadeState: enabled ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                        duration: const Duration(milliseconds: 180),
-                        sizeCurve: Curves.easeOutCubic,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          }),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -2555,15 +3677,29 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
-        ProviderConfig cfg = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-        LoadBalanceStrategy strat = cfg.keyManagement?.strategy ?? LoadBalanceStrategy.roundRobin;
-        final keys = List<ApiKeyConfig>.from(cfg.apiKeys ?? const <ApiKeyConfig>[]);
+        ProviderConfig cfg = sp.getProviderConfig(
+          widget.providerKey,
+          defaultName: widget.displayName,
+        );
+        LoadBalanceStrategy strat =
+            cfg.keyManagement?.strategy ?? LoadBalanceStrategy.roundRobin;
+        final keys = List<ApiKeyConfig>.from(
+          cfg.apiKeys ?? const <ApiKeyConfig>[],
+        );
         final listCtrl = ScrollController();
         Future<void> saveStrategy(LoadBalanceStrategy s) async {
-          final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-          final km = (old.keyManagement ?? const KeyManagementConfig()).copyWith(strategy: s);
-          await sp.setProviderConfig(widget.providerKey, old.copyWith(keyManagement: km));
+          final old = sp.getProviderConfig(
+            widget.providerKey,
+            defaultName: widget.displayName,
+          );
+          final km = (old.keyManagement ?? const KeyManagementConfig())
+              .copyWith(strategy: s);
+          await sp.setProviderConfig(
+            widget.providerKey,
+            old.copyWith(keyManagement: km),
+          );
         }
+
         // addKeys defined below after detection helpers
         // Persisted state across inner StatefulBuilder rebuilds
         String? detectModelId;
@@ -2572,78 +3708,127 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
         StateSetter? _setDRef;
 
         Future<void> _pickDetectModel(BuildContext dctx) async {
-          final sel = await showModelSelector(dctx, limitProviderKey: widget.providerKey);
+          final sel = await showModelSelector(
+            dctx,
+            limitProviderKey: widget.providerKey,
+          );
           if (sel != null) {
             detectModelId = sel.modelId;
             _setDRef?.call(() {});
           }
         }
 
-        Future<void> _testSingleKey(ProviderConfig baseCfg, String modelId, ApiKeyConfig key) async {
+        Future<void> _testSingleKey(
+          ProviderConfig baseCfg,
+          String modelId,
+          ApiKeyConfig key,
+        ) async {
           // Force using the specific key by disabling multi-key selection
-          final cfg2 = baseCfg.copyWith(apiKey: key.key, multiKeyEnabled: false, apiKeys: const []);
+          final cfg2 = baseCfg.copyWith(
+            apiKey: key.key,
+            multiKeyEnabled: false,
+            apiKeys: const [],
+          );
           await ProviderManager.testConnection(cfg2, modelId);
         }
 
-        Future<void> _testKeysAndSave(BuildContext dctx, List<ApiKeyConfig> fullList, List<ApiKeyConfig> toTest, String modelId) async {
+        Future<void> _testKeysAndSave(
+          BuildContext dctx,
+          List<ApiKeyConfig> fullList,
+          List<ApiKeyConfig> toTest,
+          String modelId,
+        ) async {
           final settings = dctx.read<SettingsProvider>();
-          final base = settings.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
+          final base = settings.getProviderConfig(
+            widget.providerKey,
+            defaultName: widget.displayName,
+          );
           final out = List<ApiKeyConfig>.from(fullList);
           for (int i = 0; i < toTest.length; i++) {
             final k = toTest[i];
             bool ok = true;
             try {
               await _testSingleKey(base, modelId, k);
-            } catch (_) { ok = false; }
+            } catch (_) {
+              ok = false;
+            }
             final idx = out.indexWhere((e) => e.id == k.id);
-            if (idx >= 0) out[idx] = k.copyWith(
-              status: ok ? ApiKeyStatus.active : ApiKeyStatus.error,
-              usage: k.usage.copyWith(
-                totalRequests: k.usage.totalRequests + 1,
-                successfulRequests: k.usage.successfulRequests + (ok ? 1 : 0),
-                failedRequests: k.usage.failedRequests + (ok ? 0 : 1),
-                consecutiveFailures: ok ? 0 : (k.usage.consecutiveFailures + 1),
-                lastUsed: DateTime.now().millisecondsSinceEpoch,
-              ),
-              lastError: ok ? null : 'Test failed',
-              updatedAt: DateTime.now().millisecondsSinceEpoch,
-            );
+            if (idx >= 0)
+              out[idx] = k.copyWith(
+                status: ok ? ApiKeyStatus.active : ApiKeyStatus.error,
+                usage: k.usage.copyWith(
+                  totalRequests: k.usage.totalRequests + 1,
+                  successfulRequests: k.usage.successfulRequests + (ok ? 1 : 0),
+                  failedRequests: k.usage.failedRequests + (ok ? 0 : 1),
+                  consecutiveFailures: ok
+                      ? 0
+                      : (k.usage.consecutiveFailures + 1),
+                  lastUsed: DateTime.now().millisecondsSinceEpoch,
+                ),
+                lastError: ok ? null : 'Test failed',
+                updatedAt: DateTime.now().millisecondsSinceEpoch,
+              );
             await Future.delayed(const Duration(milliseconds: 120));
           }
-          await settings.setProviderConfig(widget.providerKey, base.copyWith(apiKeys: out));
+          await settings.setProviderConfig(
+            widget.providerKey,
+            base.copyWith(apiKeys: out),
+          );
         }
 
         Future<void> _detectAll(BuildContext dctx) async {
           if (detecting) return;
           final settings = dctx.read<SettingsProvider>();
-          final cfgX = settings.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
+          final cfgX = settings.getProviderConfig(
+            widget.providerKey,
+            defaultName: widget.displayName,
+          );
           final models = cfgX.models;
           if (detectModelId == null) {
             if (models.isEmpty) {
-              showAppSnackBar(dctx, message: AppLocalizations.of(dctx)!.multiKeyPagePleaseAddModel, type: NotificationType.warning);
+              showAppSnackBar(
+                dctx,
+                message: AppLocalizations.of(dctx)!.multiKeyPagePleaseAddModel,
+                type: NotificationType.warning,
+              );
               return;
             }
             detectModelId = models.first;
           }
-          detecting = true; _setDRef?.call(() {});
+          detecting = true;
+          _setDRef?.call(() {});
           try {
-            final list = List<ApiKeyConfig>.from(cfgX.apiKeys ?? const <ApiKeyConfig>[]);
+            final list = List<ApiKeyConfig>.from(
+              cfgX.apiKeys ?? const <ApiKeyConfig>[],
+            );
             await _testKeysAndSave(dctx, list, list, detectModelId!);
-          } finally { detecting = false; _setDRef?.call(() {}); }
+          } finally {
+            detecting = false;
+            _setDRef?.call(() {});
+          }
         }
 
         Future<void> _detectOnly(BuildContext dctx, List<String> keys) async {
           final settings = dctx.read<SettingsProvider>();
-          final cfgX = settings.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
+          final cfgX = settings.getProviderConfig(
+            widget.providerKey,
+            defaultName: widget.displayName,
+          );
           final models = cfgX.models;
           if (detectModelId == null) {
             if (models.isEmpty) {
-              showAppSnackBar(dctx, message: AppLocalizations.of(dctx)!.multiKeyPagePleaseAddModel, type: NotificationType.warning);
+              showAppSnackBar(
+                dctx,
+                message: AppLocalizations.of(dctx)!.multiKeyPagePleaseAddModel,
+                type: NotificationType.warning,
+              );
               return;
             }
             detectModelId = models.first;
           }
-          final list = List<ApiKeyConfig>.from(cfgX.apiKeys ?? const <ApiKeyConfig>[]);
+          final list = List<ApiKeyConfig>.from(
+            cfgX.apiKeys ?? const <ApiKeyConfig>[],
+          );
           final toTest = list.where((e) => keys.contains(e.key)).toList();
           await _testKeysAndSave(dctx, list, toTest, detectModelId!);
         }
@@ -2651,11 +3836,18 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
         Future<void> _detectOne(BuildContext dctx, ApiKeyConfig key) async {
           if (detecting || testingKeyId != null) return;
           final settings = dctx.read<SettingsProvider>();
-          final cfgX = settings.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
+          final cfgX = settings.getProviderConfig(
+            widget.providerKey,
+            defaultName: widget.displayName,
+          );
           final models = cfgX.models;
           if (detectModelId == null) {
             if (models.isEmpty) {
-              showAppSnackBar(dctx, message: AppLocalizations.of(dctx)!.multiKeyPagePleaseAddModel, type: NotificationType.warning);
+              showAppSnackBar(
+                dctx,
+                message: AppLocalizations.of(dctx)!.multiKeyPagePleaseAddModel,
+                type: NotificationType.warning,
+              );
               return;
             }
             detectModelId = models.first;
@@ -2663,7 +3855,9 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
           testingKeyId = key.id;
           _setDRef?.call(() {});
           try {
-            final list = List<ApiKeyConfig>.from(cfgX.apiKeys ?? const <ApiKeyConfig>[]);
+            final list = List<ApiKeyConfig>.from(
+              cfgX.apiKeys ?? const <ApiKeyConfig>[],
+            );
             final toTest = list.where((e) => e.id == key.id).toList();
             await _testKeysAndSave(dctx, list, toTest, detectModelId!);
           } finally {
@@ -2674,9 +3868,16 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
 
         Future<void> _deleteAllErrorKeys(BuildContext dctx) async {
           final settings = dctx.read<SettingsProvider>();
-          final cfgX = settings.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-          final keys = List<ApiKeyConfig>.from(cfgX.apiKeys ?? const <ApiKeyConfig>[]);
-          final errorKeys = keys.where((e) => e.status == ApiKeyStatus.error).toList();
+          final cfgX = settings.getProviderConfig(
+            widget.providerKey,
+            defaultName: widget.displayName,
+          );
+          final keys = List<ApiKeyConfig>.from(
+            cfgX.apiKeys ?? const <ApiKeyConfig>[],
+          );
+          final errorKeys = keys
+              .where((e) => e.status == ApiKeyStatus.error)
+              .toList();
           if (errorKeys.isEmpty) return;
           final l10nX = AppLocalizations.of(dctx)!;
           final csX = Theme.of(dctx).colorScheme;
@@ -2686,19 +3887,38 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
               title: Text(l10nX.multiKeyPageDeleteErrorsConfirmTitle),
               content: Text(l10nX.multiKeyPageDeleteErrorsConfirmContent),
               actions: [
-                TextButton(onPressed: () => Navigator.of(ctx2).pop(false), child: Text(l10nX.multiKeyPageCancel)),
-                TextButton(onPressed: () => Navigator.of(ctx2).pop(true), style: TextButton.styleFrom(foregroundColor: csX.error), child: Text(l10nX.multiKeyPageDelete)),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx2).pop(false),
+                  child: Text(l10nX.multiKeyPageCancel),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx2).pop(true),
+                  style: TextButton.styleFrom(foregroundColor: csX.error),
+                  child: Text(l10nX.multiKeyPageDelete),
+                ),
               ],
             ),
           );
           if (ok != true) return;
-          final remain = keys.where((e) => e.status != ApiKeyStatus.error).toList();
-          await settings.setProviderConfig(widget.providerKey, cfgX.copyWith(apiKeys: remain));
-          showAppSnackBar(dctx, message: l10nX.multiKeyPageDeletedErrorsSnackbar(errorKeys.length), type: NotificationType.success);
+          final remain = keys
+              .where((e) => e.status != ApiKeyStatus.error)
+              .toList();
+          await settings.setProviderConfig(
+            widget.providerKey,
+            cfgX.copyWith(apiKeys: remain),
+          );
+          showAppSnackBar(
+            dctx,
+            message: l10nX.multiKeyPageDeletedErrorsSnackbar(errorKeys.length),
+            type: NotificationType.success,
+          );
           _setDRef?.call(() {});
         }
 
-        Future<ApiKeyConfig?> _showEditKeyDialog(BuildContext dctx, ApiKeyConfig k) async {
+        Future<ApiKeyConfig?> _showEditKeyDialog(
+          BuildContext dctx,
+          ApiKeyConfig k,
+        ) async {
           final cs2 = Theme.of(dctx).colorScheme;
           final l10n2 = AppLocalizations.of(dctx)!;
           final aliasCtrl = TextEditingController(text: k.name ?? '');
@@ -2709,70 +3929,111 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
             barrierDismissible: true,
             builder: (c2) => Dialog(
               backgroundColor: cs2.surface,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 24,
+              ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
-                child: StatefulBuilder(builder: (cc, setCC) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SizedBox(
-                        height: 44,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Row(
+                child: StatefulBuilder(
+                  builder: (cc, setCC) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          height: 44,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    l10n2.multiKeyPageEdit,
+                                    style: const TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                _IconBtn(
+                                  icon: lucide.Lucide.X,
+                                  onTap: () => Navigator.of(c2).maybePop(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Divider(
+                          height: 1,
+                          thickness: 0.5,
+                          color: cs2.outlineVariant.withOpacity(0.12),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Expanded(child: Text(l10n2.multiKeyPageEdit, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700))),
-                              _IconBtn(icon: lucide.Lucide.X, onTap: () => Navigator.of(c2).maybePop()),
+                              _sectionLabel(cc, l10n2.multiKeyPageAlias),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: aliasCtrl,
+                                style: const TextStyle(fontSize: 13),
+                                decoration: _inputDecoration(cc),
+                              ),
+                              const SizedBox(height: 12),
+                              _sectionLabel(cc, l10n2.multiKeyPageKey),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: keyCtrl,
+                                style: const TextStyle(fontSize: 13),
+                                decoration: _inputDecoration(cc),
+                              ),
+                              const SizedBox(height: 12),
+                              _sectionLabel(cc, l10n2.multiKeyPagePriority),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: priCtrl,
+                                style: const TextStyle(fontSize: 13),
+                                decoration: _inputDecoration(
+                                  cc,
+                                ).copyWith(hintText: '1-10'),
+                              ),
+                              const SizedBox(height: 14),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: _DeskIosButton(
+                                  label: l10n2.multiKeyPageEdit,
+                                  filled: true,
+                                  onTap: () {
+                                    final p =
+                                        int.tryParse(priCtrl.text.trim()) ??
+                                        k.priority;
+                                    final clamped = p.clamp(1, 10) as int;
+                                    Navigator.of(c2).pop(
+                                      k.copyWith(
+                                        name: aliasCtrl.text.trim().isEmpty
+                                            ? null
+                                            : aliasCtrl.text.trim(),
+                                        key: keyCtrl.text.trim(),
+                                        priority: clamped,
+                                        updatedAt: DateTime.now()
+                                            .millisecondsSinceEpoch,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
                             ],
                           ),
                         ),
-                      ),
-                      Divider(height: 1, thickness: 0.5, color: cs2.outlineVariant.withOpacity(0.12)),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _sectionLabel(cc, l10n2.multiKeyPageAlias),
-                            const SizedBox(height: 6),
-                            TextField(controller: aliasCtrl, style: const TextStyle(fontSize: 13), decoration: _inputDecoration(cc)),
-                            const SizedBox(height: 12),
-                            _sectionLabel(cc, l10n2.multiKeyPageKey),
-                            const SizedBox(height: 6),
-                            TextField(controller: keyCtrl, style: const TextStyle(fontSize: 13), decoration: _inputDecoration(cc)),
-                            const SizedBox(height: 12),
-                            _sectionLabel(cc, l10n2.multiKeyPagePriority),
-                            const SizedBox(height: 6),
-                            TextField(controller: priCtrl, style: const TextStyle(fontSize: 13), decoration: _inputDecoration(cc).copyWith(hintText: '1-10')),
-                            const SizedBox(height: 14),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: _DeskIosButton(
-                                label: l10n2.multiKeyPageEdit,
-                                filled: true,
-                                onTap: () {
-                                  final p = int.tryParse(priCtrl.text.trim()) ?? k.priority;
-                                  final clamped = p.clamp(1, 10) as int;
-                                  Navigator.of(c2).pop(
-                                    k.copyWith(
-                                      name: aliasCtrl.text.trim().isEmpty ? null : aliasCtrl.text.trim(),
-                                      key: keyCtrl.text.trim(),
-                                      priority: clamped,
-                                      updatedAt: DateTime.now().millisecondsSinceEpoch,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                }),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           );
@@ -2781,11 +4042,26 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
 
         // Define addKeys now that helpers are in scope
         Future<void> addKeys(BuildContext c) async {
-          final text = await _inputDialog(c, title: l10n.multiKeyPageAdd, hint: l10n.multiKeyPageAddHint);
+          final text = await _inputDialog(
+            c,
+            title: l10n.multiKeyPageAdd,
+            hint: l10n.multiKeyPageAddHint,
+          );
           if (text == null || text.trim().isEmpty) return;
-          final parts = text.split(RegExp(r'[\s,]+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+          final parts = text
+              .split(RegExp(r'[\s,]+'))
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList();
           if (parts.isEmpty) return;
-          final existing = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName).apiKeys ?? const <ApiKeyConfig>[];
+          final existing =
+              sp
+                  .getProviderConfig(
+                    widget.providerKey,
+                    defaultName: widget.displayName,
+                  )
+                  .apiKeys ??
+              const <ApiKeyConfig>[];
           final existingSet = existing.map((e) => e.key.trim()).toSet();
           final list = List<ApiKeyConfig>.from(existing);
           final uniqueAdded = <String>[];
@@ -2795,10 +4071,20 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
               uniqueAdded.add(k);
             }
           }
-          final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-          await sp.setProviderConfig(widget.providerKey, old.copyWith(apiKeys: list, multiKeyEnabled: true));
+          final old = sp.getProviderConfig(
+            widget.providerKey,
+            defaultName: widget.displayName,
+          );
+          await sp.setProviderConfig(
+            widget.providerKey,
+            old.copyWith(apiKeys: list, multiKeyEnabled: true),
+          );
           if (uniqueAdded.isNotEmpty) {
-            showAppSnackBar(c, message: l10n.multiKeyPageImportedSnackbar(uniqueAdded.length), type: NotificationType.success);
+            showAppSnackBar(
+              c,
+              message: l10n.multiKeyPageImportedSnackbar(uniqueAdded.length),
+              type: NotificationType.success,
+            );
             await _detectOnly(c, uniqueAdded);
           } else {
             showAppSnackBar(c, message: l10n.multiKeyPageImportedSnackbar(0));
@@ -2807,134 +4093,261 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
 
         return Dialog(
           backgroundColor: cs.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 680, maxHeight: 620),
-            child: StatefulBuilder(builder: (dctx, setD) {
-              _setDRef = setD;
-              ProviderConfig cfg2 = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-              final keyList = List<ApiKeyConfig>.from(cfg2.apiKeys ?? const <ApiKeyConfig>[]);
-              final currentStrat = cfg2.keyManagement?.strategy ?? LoadBalanceStrategy.roundRobin;
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    height: 44,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: StatefulBuilder(
+              builder: (dctx, setD) {
+                _setDRef = setD;
+                ProviderConfig cfg2 = sp.getProviderConfig(
+                  widget.providerKey,
+                  defaultName: widget.displayName,
+                );
+                final keyList = List<ApiKeyConfig>.from(
+                  cfg2.apiKeys ?? const <ApiKeyConfig>[],
+                );
+                final currentStrat =
+                    cfg2.keyManagement?.strategy ??
+                    LoadBalanceStrategy.roundRobin;
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: 44,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                l10n.multiKeyPageTitle,
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            // Delete all error keys
+                            Tooltip(
+                              message: l10n.multiKeyPageDeleteErrorsTooltip,
+                              child: _IconBtn(
+                                icon: lucide.Lucide.Trash2,
+                                onTap: () => _deleteAllErrorKeys(dctx),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            // Detect / test all keys
+                            if (detecting)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: cs.primary,
+                                  ),
+                                ),
+                              )
+                            else
+                              Tooltip(
+                                message: l10n.multiKeyPageDetect,
+                                child: _IconBtn(
+                                  icon: lucide.Lucide.HeartPulse,
+                                  onTap: () => _detectAll(dctx),
+                                  onLongPress: () => _pickDetectModel(dctx),
+                                ),
+                              ),
+                            const SizedBox(width: 6),
+                            _IconBtn(
+                              icon: lucide.Lucide.X,
+                              onTap: () => Navigator.of(ctx).maybePop(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Divider(
+                      height: 1,
+                      thickness: 0.5,
+                      color: cs.outlineVariant.withOpacity(0.12),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                       child: Row(
                         children: [
-                          Expanded(child: Text(l10n.multiKeyPageTitle, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700))),
-                          // Delete all error keys
-                          Tooltip(
-                            message: l10n.multiKeyPageDeleteErrorsTooltip,
-                            child: _IconBtn(icon: lucide.Lucide.Trash2, onTap: () => _deleteAllErrorKeys(dctx)),
-                          ),
-                          const SizedBox(width: 4),
-                          // Detect / test all keys
-                          if (detecting)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                              child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary)),
-                            )
-                          else
-                            Tooltip(
-                              message: l10n.multiKeyPageDetect,
-                              child: _IconBtn(icon: lucide.Lucide.HeartPulse, onTap: () => _detectAll(dctx), onLongPress: () => _pickDetectModel(dctx)),
+                          Expanded(
+                            child: Text(
+                              l10n.multiKeyPageStrategyTitle,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: cs.onSurface.withOpacity(0.9),
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          const SizedBox(width: 6),
-                          _IconBtn(icon: lucide.Lucide.X, onTap: () => Navigator.of(ctx).maybePop()),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Divider(height: 1, thickness: 0.5, color: cs.outlineVariant.withOpacity(0.12)),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(l10n.multiKeyPageStrategyTitle, style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.9), fontWeight: FontWeight.w600))),
-                        SizedBox(width: 220, child: _StrategyDropdown(value: currentStrat, onChanged: (s) async { await saveStrategy(s); setD(() {}); })),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Scrollbar(
-                      thumbVisibility: true,
-                      controller: listCtrl,
-                      child: ListView(
-                        controller: listCtrl,
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        children: [
-                          _DesktopIosSectionCard(
-                            children: [
-                              if (keyList.isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  child: Center(child: Text(AppLocalizations.of(context)!.multiKeyPageNoKeys)),
-                                )
-                              else
-                                for (int i = 0; i < keyList.length; i++)
-                                  _DesktopKeyRow(
-                                    keyConfig: keyList[i],
-                                    showDivider: false,
-                                    onToggle: (v) async {
-                                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                      final list = List<ApiKeyConfig>.from(old.apiKeys ?? const <ApiKeyConfig>[]);
-                                      final idx = list.indexWhere((e) => e.id == keyList[i].id);
-                                      if (idx >= 0) list[idx] = keyList[i].copyWith(isEnabled: v, updatedAt: DateTime.now().millisecondsSinceEpoch);
-                                      await sp.setProviderConfig(widget.providerKey, old.copyWith(apiKeys: list));
-                                      setD(() {});
-                                    },
-                                    onEdit: () async {
-                                      final updated = await _showEditKeyDialog(dctx, keyList[i]);
-                                      if (updated == null) return;
-                                      // Prevent duplicate keys
-                                      final latest = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                      final list = List<ApiKeyConfig>.from(latest.apiKeys ?? const <ApiKeyConfig>[]);
-                                      final dup = list.any((e) => e.id != keyList[i].id && e.key.trim() == updated.key.trim());
-                                      if (dup) {
-                                        showAppSnackBar(dctx, message: AppLocalizations.of(dctx)!.multiKeyPageDuplicateKeyWarning, type: NotificationType.warning);
-                                        return;
-                                      }
-                                      final idx = list.indexWhere((e) => e.id == keyList[i].id);
-                                      if (idx >= 0) list[idx] = updated;
-                                      await sp.setProviderConfig(widget.providerKey, latest.copyWith(apiKeys: list));
-                                      setD(() {});
-                                    },
-                                    onTest: () => _detectOne(dctx, keyList[i]),
-                                    testing: testingKeyId == keyList[i].id,
-                                    onDelete: () async {
-                                      final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-                                      final list = List<ApiKeyConfig>.from(old.apiKeys ?? const <ApiKeyConfig>[]);
-                                      final idx = list.indexWhere((e) => e.id == keyList[i].id);
-                                      if (idx >= 0) {
-                                        list.removeAt(idx);
-                                        await sp.setProviderConfig(widget.providerKey, old.copyWith(apiKeys: list));
-                                        setD(() {});
-                                      }
-                                    },
-                                  ),
-                            ],
+                          ),
+                          SizedBox(
+                            width: 220,
+                            child: _StrategyDropdown(
+                              value: currentStrat,
+                              onChanged: (s) async {
+                                await saveStrategy(s);
+                                setD(() {});
+                              },
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _DeskIosButton(label: l10n.multiKeyPageAdd, filled: false, onTap: () => addKeys(dctx)),
-                      ],
+                    Expanded(
+                      child: Scrollbar(
+                        thumbVisibility: true,
+                        controller: listCtrl,
+                        child: ListView(
+                          controller: listCtrl,
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          children: [
+                            _DesktopIosSectionCard(
+                              children: [
+                                if (keyList.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.multiKeyPageNoKeys,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  for (int i = 0; i < keyList.length; i++)
+                                    _DesktopKeyRow(
+                                      keyConfig: keyList[i],
+                                      showDivider: false,
+                                      onToggle: (v) async {
+                                        final old = sp.getProviderConfig(
+                                          widget.providerKey,
+                                          defaultName: widget.displayName,
+                                        );
+                                        final list = List<ApiKeyConfig>.from(
+                                          old.apiKeys ?? const <ApiKeyConfig>[],
+                                        );
+                                        final idx = list.indexWhere(
+                                          (e) => e.id == keyList[i].id,
+                                        );
+                                        if (idx >= 0)
+                                          list[idx] = keyList[i].copyWith(
+                                            isEnabled: v,
+                                            updatedAt: DateTime.now()
+                                                .millisecondsSinceEpoch,
+                                          );
+                                        await sp.setProviderConfig(
+                                          widget.providerKey,
+                                          old.copyWith(apiKeys: list),
+                                        );
+                                        setD(() {});
+                                      },
+                                      onEdit: () async {
+                                        final updated =
+                                            await _showEditKeyDialog(
+                                              dctx,
+                                              keyList[i],
+                                            );
+                                        if (updated == null) return;
+                                        // Prevent duplicate keys
+                                        final latest = sp.getProviderConfig(
+                                          widget.providerKey,
+                                          defaultName: widget.displayName,
+                                        );
+                                        final list = List<ApiKeyConfig>.from(
+                                          latest.apiKeys ??
+                                              const <ApiKeyConfig>[],
+                                        );
+                                        final dup = list.any(
+                                          (e) =>
+                                              e.id != keyList[i].id &&
+                                              e.key.trim() ==
+                                                  updated.key.trim(),
+                                        );
+                                        if (dup) {
+                                          showAppSnackBar(
+                                            dctx,
+                                            message: AppLocalizations.of(
+                                              dctx,
+                                            )!.multiKeyPageDuplicateKeyWarning,
+                                            type: NotificationType.warning,
+                                          );
+                                          return;
+                                        }
+                                        final idx = list.indexWhere(
+                                          (e) => e.id == keyList[i].id,
+                                        );
+                                        if (idx >= 0) list[idx] = updated;
+                                        await sp.setProviderConfig(
+                                          widget.providerKey,
+                                          latest.copyWith(apiKeys: list),
+                                        );
+                                        setD(() {});
+                                      },
+                                      onTest: () =>
+                                          _detectOne(dctx, keyList[i]),
+                                      testing: testingKeyId == keyList[i].id,
+                                      onDelete: () async {
+                                        final old = sp.getProviderConfig(
+                                          widget.providerKey,
+                                          defaultName: widget.displayName,
+                                        );
+                                        final list = List<ApiKeyConfig>.from(
+                                          old.apiKeys ?? const <ApiKeyConfig>[],
+                                        );
+                                        final idx = list.indexWhere(
+                                          (e) => e.id == keyList[i].id,
+                                        );
+                                        if (idx >= 0) {
+                                          list.removeAt(idx);
+                                          await sp.setProviderConfig(
+                                            widget.providerKey,
+                                            old.copyWith(apiKeys: list),
+                                          );
+                                          setD(() {});
+                                        }
+                                      },
+                                    ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-              );
-            }),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          _DeskIosButton(
+                            label: l10n.multiKeyPageAdd,
+                            filled: false,
+                            onTap: () => addKeys(dctx),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         );
       },
@@ -2949,7 +4362,10 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
   // }
 
   Future<void> _createModel(BuildContext context) async {
-    final res = await showDesktopCreateModelDialog(context, providerKey: widget.providerKey);
+    final res = await showDesktopCreateModelDialog(
+      context,
+      providerKey: widget.providerKey,
+    );
     if (res == true && mounted) setState(() {});
   }
 
@@ -2965,12 +4381,16 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
       builder: (ctx) {
         Future<void> pickModel() async {
           // Use the desktop model selector dialog and limit to current provider
-          final sel = await showModelSelector(ctx, limitProviderKey: widget.providerKey);
+          final sel = await showModelSelector(
+            ctx,
+            limitProviderKey: widget.providerKey,
+          );
           if (sel != null) {
             selectedModelId = sel.modelId;
             (ctx as Element).markNeedsBuild();
           }
         }
+
         Future<void> doTest() async {
           if (selectedModelId == null) return;
           state = _TestState.loading;
@@ -2978,8 +4398,15 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
           (ctx as Element).markNeedsBuild();
           try {
             final sp = context.read<SettingsProvider>();
-            final cfg = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-            await ProviderManager.testConnection(cfg, selectedModelId!, useStream: useStream);
+            final cfg = sp.getProviderConfig(
+              widget.providerKey,
+              defaultName: widget.displayName,
+            );
+            await ProviderManager.testConnection(
+              cfg,
+              selectedModelId!,
+              useStream: useStream,
+            );
             state = _TestState.success;
           } catch (e) {
             state = _TestState.error;
@@ -2987,13 +4414,16 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
           }
           (ctx as Element).markNeedsBuild();
         }
+
         final l10n = AppLocalizations.of(ctx)!;
         final canTest = selectedModelId != null && state != _TestState.loading;
         String message;
         Color color;
         switch (state) {
           case _TestState.idle:
-            message = selectedModelId == null ? l10n.modelSelectSheetSearchHint : l10n.providerDetailPageTestingMessage;
+            message = selectedModelId == null
+                ? l10n.modelSelectSheetSearchHint
+                : l10n.providerDetailPageTestingMessage;
             color = cs.onSurface.withOpacity(0.8);
             break;
           case _TestState.loading:
@@ -3013,8 +4443,13 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
           builder: (ctx, setState) {
             return Dialog(
               backgroundColor: cs.surface,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 24,
+              ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
                 child: Padding(
@@ -3023,28 +4458,49 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Center(child: Text(l10n.providerDetailPageTestConnectionTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+                      Center(
+                        child: Text(
+                          l10n.providerDetailPageTestConnectionTitle,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 14),
                       GestureDetector(
                         onTap: pickModel,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
-                            color: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF7F7F9),
+                            color: Theme.of(ctx).brightness == Brightness.dark
+                                ? Colors.white10
+                                : const Color(0xFFF7F7F9),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: cs.outlineVariant.withOpacity(0.12), width: 0.6),
+                            border: Border.all(
+                              color: cs.outlineVariant.withOpacity(0.12),
+                              width: 0.6,
+                            ),
                           ),
                           child: Row(
                             children: [
-                              if (selectedModelId != null) _BrandCircle(name: selectedModelId!, size: 22),
-                              if (selectedModelId != null) const SizedBox(width: 8),
+                              if (selectedModelId != null)
+                                _BrandCircle(name: selectedModelId!, size: 22),
+                              if (selectedModelId != null)
+                                const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  selectedModelId ?? l10n.providerDetailPageSelectModelButton,
+                                  selectedModelId ??
+                                      l10n.providerDetailPageSelectModelButton,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ],
@@ -3057,7 +4513,10 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                           Expanded(
                             child: Text(
                               l10n.providerDetailPageUseStreamingLabel,
-                              style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.9)),
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: cs.onSurface.withOpacity(0.9),
+                              ),
                             ),
                           ),
                           IosSwitch(
@@ -3068,16 +4527,47 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                       ),
                       const SizedBox(height: 14),
                       if (state == _TestState.loading)
-                        Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary)))
+                        Center(
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: cs.primary,
+                            ),
+                          ),
+                        )
                       else if (state != _TestState.idle)
-                        Center(child: Text(message, textAlign: TextAlign.center, style: TextStyle(color: color, fontSize: 14, fontWeight: state == _TestState.success ? FontWeight.w700 : FontWeight.w600))),
+                        Center(
+                          child: Text(
+                            message,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: color,
+                              fontSize: 14,
+                              fontWeight: state == _TestState.success
+                                  ? FontWeight.w700
+                                  : FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          _DeskIosButton(label: l10n.providerDetailPageCancelButton, filled: false, dense: true, onTap: () => Navigator.of(ctx).maybePop()),
+                          _DeskIosButton(
+                            label: l10n.providerDetailPageCancelButton,
+                            filled: false,
+                            dense: true,
+                            onTap: () => Navigator.of(ctx).maybePop(),
+                          ),
                           const SizedBox(width: 8),
-                          _DeskIosButton(label: l10n.providerDetailPageTestButton, filled: true, dense: true, onTap: canTest ? doTest : () {}),
+                          _DeskIosButton(
+                            label: l10n.providerDetailPageTestButton,
+                            filled: true,
+                            dense: true,
+                            onTap: canTest ? doTest : () {},
+                          ),
                         ],
                       ),
                     ],
@@ -3111,7 +4601,10 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
 
   Future<void> _confirmDeleteAllModels() async {
     final sp = context.read<SettingsProvider>();
-    final cfg = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
+    final cfg = sp.getProviderConfig(
+      widget.providerKey,
+      defaultName: widget.displayName,
+    );
     if (cfg.models.isEmpty) return;
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
@@ -3131,17 +4624,35 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
                 child: Row(
                   children: [
-                    Expanded(child: Text(l10n.providerDetailPageConfirmDeleteTitle, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
-                    _IconBtn(icon: lucide.Lucide.X, onTap: () => Navigator.of(ctx).maybePop(false)),
+                    Expanded(
+                      child: Text(
+                        l10n.providerDetailPageConfirmDeleteTitle,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    _IconBtn(
+                      icon: lucide.Lucide.X,
+                      onTap: () => Navigator.of(ctx).maybePop(false),
+                    ),
                   ],
                 ),
               ),
-              Divider(height: 1, thickness: 0.5, color: cs.outlineVariant.withOpacity(0.12)),
+              Divider(
+                height: 1,
+                thickness: 0.5,
+                color: cs.outlineVariant.withOpacity(0.12),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(l10n.providerDetailPageDeleteAllModelsWarning, style: TextStyle(color: cs.onSurface.withOpacity(0.85))),
+                  child: Text(
+                    l10n.providerDetailPageDeleteAllModelsWarning,
+                    style: TextStyle(color: cs.onSurface.withOpacity(0.85)),
+                  ),
                 ),
               ),
               Padding(
@@ -3149,9 +4660,19 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    _DeskIosButton(label: l10n.providerDetailPageCancelButton, filled: false, dense: true, onTap: () => Navigator.of(ctx).maybePop(false)),
+                    _DeskIosButton(
+                      label: l10n.providerDetailPageCancelButton,
+                      filled: false,
+                      dense: true,
+                      onTap: () => Navigator.of(ctx).maybePop(false),
+                    ),
                     const SizedBox(width: 8),
-                    _DeskIosButton(label: l10n.providerDetailPageDeleteButton, filled: true, dense: true, onTap: () => Navigator.of(ctx).maybePop(true)),
+                    _DeskIosButton(
+                      label: l10n.providerDetailPageDeleteButton,
+                      filled: true,
+                      dense: true,
+                      onTap: () => Navigator.of(ctx).maybePop(true),
+                    ),
                   ],
                 ),
               ),
@@ -3176,9 +4697,9 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
 
   Future<void> _startDetection() async {
     if (_selectedModels.isEmpty || _isDetecting) return;
-    
+
     final modelsToTest = Set<String>.from(_selectedModels);
-    
+
     setState(() {
       _isDetecting = true;
       _detectionResults.clear();
@@ -3191,8 +4712,11 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
     });
 
     final sp = context.read<SettingsProvider>();
-    final cfg = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
-    
+    final cfg = sp.getProviderConfig(
+      widget.providerKey,
+      defaultName: widget.displayName,
+    );
+
     for (final modelId in modelsToTest) {
       if (mounted) {
         setState(() {
@@ -3200,9 +4724,13 @@ class _DesktopProviderDetailPaneState extends State<_DesktopProviderDetailPane> 
           _pendingModels.remove(modelId);
         });
       }
-      
+
       try {
-        await ProviderManager.testConnection(cfg, modelId, useStream: _detectUseStream);
+        await ProviderManager.testConnection(
+          cfg,
+          modelId,
+          useStream: _detectUseStream,
+        );
         if (mounted) {
           setState(() {
             _detectionResults[modelId] = true;
@@ -3256,7 +4784,8 @@ class _ProviderTypeDropdownState extends State<_ProviderTypeDropdown> {
   void _openMenu() {
     if (_entry != null) return;
     final rb = _key.currentContext?.findRenderObject() as RenderBox?;
-    final overlayBox = Overlay.of(context)?.context.findRenderObject() as RenderBox?;
+    final overlayBox =
+        Overlay.of(context)?.context.findRenderObject() as RenderBox?;
     if (rb == null || overlayBox == null) return;
     final size = rb.size;
     final triggerW = size.width;
@@ -3266,50 +4795,79 @@ class _ProviderTypeDropdownState extends State<_ProviderTypeDropdown> {
       (ProviderKind.google, 'Google'),
       (ProviderKind.claude, 'Claude'),
     ];
-    _entry = OverlayEntry(builder: (ctx) {
-      final cs = Theme.of(ctx).colorScheme;
-      final isDark = Theme.of(ctx).brightness == Brightness.dark;
-      final content = Material(
-        color: Colors.transparent,
-        child: Container(
-          decoration: BoxDecoration(
-            color: (Provider.of<SettingsProvider>(ctx, listen: false).usePureBackground)
-                ? (isDark ? Colors.black : Colors.white)
-                : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cs.outlineVariant.withOpacity(0.12), width: 0.5),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 6))],
+    _entry = OverlayEntry(
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final content = Material(
+          color: Colors.transparent,
+          child: Container(
+            decoration: BoxDecoration(
+              color:
+                  (Provider.of<SettingsProvider>(
+                    ctx,
+                    listen: false,
+                  ).usePureBackground)
+                  ? (isDark ? Colors.black : Colors.white)
+                  : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: cs.outlineVariant.withOpacity(0.12),
+                width: 0.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              shrinkWrap: true,
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 2),
+              itemBuilder: (c, i) {
+                final k = items[i].$1;
+                final label = items[i].$2;
+                final selected = widget.value == k;
+                return _OverlayMenuItem(
+                  label: label,
+                  selected: selected,
+                  onTap: () {
+                    widget.onChanged(k);
+                    _close();
+                  },
+                );
+              },
+            ),
           ),
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            shrinkWrap: true,
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 2),
-            itemBuilder: (c, i) {
-              final k = items[i].$1;
-              final label = items[i].$2;
-              final selected = widget.value == k;
-              return _OverlayMenuItem(
-                label: label,
-                selected: selected,
-                onTap: () { widget.onChanged(k); _close(); },
-              );
-            },
-          ),
-        ),
-      );
-      final width = triggerW; // menu width equals trigger width
-      final dx = 0.0; // align left edges
-      return Stack(children: [
-        Positioned.fill(child: GestureDetector(behavior: HitTestBehavior.translucent, onTap: _close, child: const SizedBox.expand())),
-        CompositedTransformFollower(
-          link: _link,
-          showWhenUnlinked: false,
-          offset: Offset(dx, size.height + 6),
-          child: ConstrainedBox(constraints: BoxConstraints(minWidth: width, maxWidth: width), child: content),
-        ),
-      ]);
-    });
+        );
+        final width = triggerW; // menu width equals trigger width
+        final dx = 0.0; // align left edges
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _close,
+                child: const SizedBox.expand(),
+              ),
+            ),
+            CompositedTransformFollower(
+              link: _link,
+              showWhenUnlinked: false,
+              offset: Offset(dx, size.height + 6),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: width, maxWidth: width),
+                child: content,
+              ),
+            ),
+          ],
+        );
+      },
+    );
     Overlay.of(context)?.insert(_entry!);
     setState(() => _open = true);
   }
@@ -3354,57 +4912,98 @@ class _StrategyDropdownState extends State<_StrategyDropdown> {
   final LayerLink _link = LayerLink();
   OverlayEntry? _entry;
 
-  void _close() { _entry?.remove(); _entry = null; if (mounted) setState(() => _open = false); }
+  void _close() {
+    _entry?.remove();
+    _entry = null;
+    if (mounted) setState(() => _open = false);
+  }
+
   void _openMenu() {
     if (_entry != null) return;
     final rb = _key.currentContext?.findRenderObject() as RenderBox?;
     if (rb == null) return;
     final size = rb.size;
     final triggerW = size.width;
-    final labelFor = (LoadBalanceStrategy s) => s == LoadBalanceStrategy.roundRobin
+    final labelFor = (LoadBalanceStrategy s) =>
+        s == LoadBalanceStrategy.roundRobin
         ? AppLocalizations.of(context)!.multiKeyPageStrategyRoundRobin
         : AppLocalizations.of(context)!.multiKeyPageStrategyRandom;
-    final entries = [LoadBalanceStrategy.roundRobin, LoadBalanceStrategy.random];
-    _entry = OverlayEntry(builder: (ctx) {
-      final cs = Theme.of(ctx).colorScheme;
-      final isDark = Theme.of(ctx).brightness == Brightness.dark;
-      return Stack(children: [
-        Positioned.fill(child: GestureDetector(behavior: HitTestBehavior.translucent, onTap: _close, child: const SizedBox.expand())),
-        CompositedTransformFollower(
-          link: _link,
-          showWhenUnlinked: false,
-          offset: Offset(0, size.height + 6),
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              constraints: BoxConstraints(minWidth: triggerW, maxWidth: triggerW),
-              decoration: BoxDecoration(
-                color: (Provider.of<SettingsProvider>(ctx, listen: false).usePureBackground)
-                    ? (isDark ? Colors.black : Colors.white)
-                    : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: cs.outlineVariant.withOpacity(0.12), width: 0.5),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 6))],
-              ),
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                shrinkWrap: true,
-                itemCount: entries.length,
-                itemBuilder: (c, i) {
-                  final s = entries[i];
-                  final selected = widget.value == s;
-              return _OverlayMenuItem(
-                label: labelFor(s),
-                selected: selected,
-                onTap: () { widget.onChanged(s); _close(); },
-              );
-                },
+    final entries = [
+      LoadBalanceStrategy.roundRobin,
+      LoadBalanceStrategy.random,
+    ];
+    _entry = OverlayEntry(
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _close,
+                child: const SizedBox.expand(),
               ),
             ),
-          ),
-        ),
-      ]);
-    });
+            CompositedTransformFollower(
+              link: _link,
+              showWhenUnlinked: false,
+              offset: Offset(0, size.height + 6),
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  constraints: BoxConstraints(
+                    minWidth: triggerW,
+                    maxWidth: triggerW,
+                  ),
+                  decoration: BoxDecoration(
+                    color:
+                        (Provider.of<SettingsProvider>(
+                          ctx,
+                          listen: false,
+                        ).usePureBackground)
+                        ? (isDark ? Colors.black : Colors.white)
+                        : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: cs.outlineVariant.withOpacity(0.12),
+                      width: 0.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    shrinkWrap: true,
+                    itemCount: entries.length,
+                    itemBuilder: (c, i) {
+                      final s = entries[i];
+                      final selected = widget.value == s;
+                      return _OverlayMenuItem(
+                        label: labelFor(s),
+                        selected: selected,
+                        onTap: () {
+                          widget.onChanged(s);
+                          _close();
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
     Overlay.of(context)?.insert(_entry!);
     setState(() => _open = true);
   }
@@ -3432,17 +5031,35 @@ class _StrategyDropdownState extends State<_StrategyDropdown> {
   }
 }
 
-Widget _rowSwitch(BuildContext context, {required String label, required bool value, required ValueChanged<bool> onChanged}) {
+Widget _rowSwitch(
+  BuildContext context, {
+  required String label,
+  required bool value,
+  required ValueChanged<bool> onChanged,
+}) {
   final cs = Theme.of(context).colorScheme;
   return Row(
     children: [
-      Expanded(child: Text(label, style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.9), fontWeight: FontWeight.w600))),
+      Expanded(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: cs.onSurface.withOpacity(0.9),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
       IosSwitch(value: value, onChanged: onChanged),
     ],
   );
 }
 
-Widget _rowButton(BuildContext context, {required String label, required VoidCallback onTap}) {
+Widget _rowButton(
+  BuildContext context, {
+  required String label,
+  required VoidCallback onTap,
+}) {
   final cs = Theme.of(context).colorScheme;
   return GestureDetector(
     behavior: HitTestBehavior.opaque,
@@ -3451,7 +5068,16 @@ Widget _rowButton(BuildContext context, {required String label, required VoidCal
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.9), fontWeight: FontWeight.w600))),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: cs.onSurface.withOpacity(0.9),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
           const Icon(lucide.Lucide.ChevronRight, size: 16),
         ],
       ),
@@ -3478,18 +5104,32 @@ class _GreyCapsule extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF2F3F5);
+    final bg = isDark
+        ? Colors.white.withOpacity(0.06)
+        : const Color(0xFFF2F3F5);
     final fg = Theme.of(context).colorScheme.onSurface.withOpacity(0.85);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
-      child: Text(label, style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.w600)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.w600),
+      ),
     );
   }
 }
 
 class _IconBtn extends StatefulWidget {
-  const _IconBtn({super.key, required this.icon, required this.onTap, this.onLongPress, this.color});
+  const _IconBtn({
+    super.key,
+    required this.icon,
+    required this.onTap,
+    this.onLongPress,
+    this.color,
+  });
   final IconData icon;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
@@ -3504,7 +5144,11 @@ class _IconBtnState extends State<_IconBtn> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = _hover ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05)) : Colors.transparent;
+    final bg = _hover
+        ? (isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.05))
+        : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -3515,9 +5159,16 @@ class _IconBtnState extends State<_IconBtn> {
         child: Container(
           width: 28,
           height: 28,
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(8),
+          ),
           alignment: Alignment.center,
-          child: Icon(widget.icon, size: 18, color: widget.color ?? cs.onSurface),
+          child: Icon(
+            widget.icon,
+            size: 18,
+            color: widget.color ?? cs.onSurface,
+          ),
         ),
       ),
     );
@@ -3525,7 +5176,13 @@ class _IconBtnState extends State<_IconBtn> {
 }
 
 class _IconTextBtn extends StatefulWidget {
-  const _IconTextBtn({super.key, required this.icon, required this.label, required this.onTap, this.color});
+  const _IconTextBtn({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color,
+  });
   final IconData icon;
   final String label;
   final VoidCallback onTap;
@@ -3540,7 +5197,11 @@ class _IconTextBtnState extends State<_IconTextBtn> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = _hover ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05)) : Colors.transparent;
+    final bg = _hover
+        ? (isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.05))
+        : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -3550,7 +5211,10 @@ class _IconTextBtnState extends State<_IconTextBtn> {
         child: Container(
           height: 28,
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(8),
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -3558,7 +5222,10 @@ class _IconTextBtnState extends State<_IconTextBtn> {
               const SizedBox(width: 8),
               Text(
                 widget.label,
-                style: TextStyle(fontSize: 13, color: widget.color ?? cs.onSurface),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: widget.color ?? cs.onSurface,
+                ),
               ),
             ],
           ),
@@ -3569,15 +5236,20 @@ class _IconTextBtnState extends State<_IconTextBtn> {
 }
 
 class _DesktopProviderShareDialog extends StatefulWidget {
-  const _DesktopProviderShareDialog({required this.providerKey, required this.displayName});
+  const _DesktopProviderShareDialog({
+    required this.providerKey,
+    required this.displayName,
+  });
   final String providerKey;
   final String displayName;
 
   @override
-  State<_DesktopProviderShareDialog> createState() => _DesktopProviderShareDialogState();
+  State<_DesktopProviderShareDialog> createState() =>
+      _DesktopProviderShareDialogState();
 }
 
-class _DesktopProviderShareDialogState extends State<_DesktopProviderShareDialog> {
+class _DesktopProviderShareDialogState
+    extends State<_DesktopProviderShareDialog> {
   late final String _code;
   final GlobalKey _qrKey = GlobalKey();
   bool _copyingQr = false;
@@ -3586,8 +5258,12 @@ class _DesktopProviderShareDialogState extends State<_DesktopProviderShareDialog
   void initState() {
     super.initState();
     final settings = context.read<SettingsProvider>();
-    final cfg = settings.providerConfigs[widget.providerKey] ??
-        settings.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
+    final cfg =
+        settings.providerConfigs[widget.providerKey] ??
+        settings.getProviderConfig(
+          widget.providerKey,
+          defaultName: widget.displayName,
+        );
     _code = encodeProviderConfig(cfg);
   }
 
@@ -3603,7 +5279,8 @@ class _DesktopProviderShareDialogState extends State<_DesktopProviderShareDialog
 
   Future<Uint8List?> _captureQrBytes() async {
     try {
-      final boundary = _qrKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      final boundary =
+          _qrKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) return null;
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -3625,7 +5302,9 @@ class _DesktopProviderShareDialogState extends State<_DesktopProviderShareDialog
     } catch (_) {}
 
     try {
-      final file = File(p.join(Directory.systemTemp.path, 'kelivo-provider-qr.png'));
+      final file = File(
+        p.join(Directory.systemTemp.path, 'kelivo-provider-qr.png'),
+      );
       await file.writeAsBytes(bytes, flush: true);
       return await ClipboardImages.setImagePath(file.path);
     } catch (_) {
@@ -3650,7 +5329,9 @@ class _DesktopProviderShareDialogState extends State<_DesktopProviderShareDialog
     final l10n = AppLocalizations.of(context)!;
     showAppSnackBar(
       context,
-      message: ok ? l10n.shareProviderSheetCopiedMessage : l10n.messageExportSheetExportFailed('copy-failed'),
+      message: ok
+          ? l10n.shareProviderSheetCopiedMessage
+          : l10n.messageExportSheetExportFailed('copy-failed'),
       type: ok ? NotificationType.success : NotificationType.error,
     );
   }
@@ -3677,16 +5358,25 @@ class _DesktopProviderShareDialogState extends State<_DesktopProviderShareDialog
                   Expanded(
                     child: Text(
                       l10n.shareProviderSheetTitle,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                  _IconBtn(icon: lucide.Lucide.X, onTap: () => Navigator.of(context).maybePop()),
+                  _IconBtn(
+                    icon: lucide.Lucide.X,
+                    onTap: () => Navigator.of(context).maybePop(),
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
               Text(
                 l10n.shareProviderSheetDescription,
-                style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.85)),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: cs.onSurface.withOpacity(0.85),
+                ),
               ),
               const SizedBox(height: 12),
               Center(
@@ -3697,7 +5387,9 @@ class _DesktopProviderShareDialogState extends State<_DesktopProviderShareDialog
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
+                      border: Border.all(
+                        color: cs.outlineVariant.withOpacity(0.2),
+                      ),
                     ),
                     child: PrettyQr(
                       data: _code,
@@ -3712,16 +5404,24 @@ class _DesktopProviderShareDialogState extends State<_DesktopProviderShareDialog
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+                  color: isDark
+                      ? Colors.white.withOpacity(0.04)
+                      : Colors.black.withOpacity(0.03),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: cs.outlineVariant.withOpacity(0.25)),
+                  border: Border.all(
+                    color: cs.outlineVariant.withOpacity(0.25),
+                  ),
                 ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 160),
                   child: SingleChildScrollView(
                     child: SelectableText(
                       _code,
-                      style: const TextStyle(fontSize: 13.5, height: 1.35, fontFamily: 'monospace'),
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        height: 1.35,
+                        fontFamily: 'monospace',
+                      ),
                     ),
                   ),
                 ),
@@ -3859,16 +5559,36 @@ class _BrandCircle extends StatelessWidget {
     final asset = BrandAssets.assetForName(name);
     Widget inner;
     if (asset == null) {
-      inner = Text(name.isNotEmpty ? name.characters.first.toUpperCase() : '?', style: TextStyle(color: cs.primary, fontWeight: FontWeight.w800, fontSize: size * 0.45));
+      inner = Text(
+        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
+        style: TextStyle(
+          color: cs.primary,
+          fontWeight: FontWeight.w800,
+          fontSize: size * 0.45,
+        ),
+      );
     } else if (asset.endsWith('.svg')) {
-      inner = SvgPicture.asset(asset, width: size * 0.62, height: size * 0.62, fit: BoxFit.contain);
+      inner = SvgPicture.asset(
+        asset,
+        width: size * 0.62,
+        height: size * 0.62,
+        fit: BoxFit.contain,
+      );
     } else {
-      inner = Image.asset(asset, width: size * 0.62, height: size * 0.62, fit: BoxFit.contain);
+      inner = Image.asset(
+        asset,
+        width: size * 0.62,
+        height: size * 0.62,
+        fit: BoxFit.contain,
+      );
     }
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: isDark ? Colors.white10 : cs.primary.withOpacity(0.10), shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white10 : cs.primary.withOpacity(0.10),
+        shape: BoxShape.circle,
+      ),
       alignment: Alignment.center,
       child: inner,
     );
@@ -3905,7 +5625,11 @@ class _ProviderListRowState extends State<_ProviderListRow> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final hoverBg = _hover && !widget.selected ? Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04) : Colors.transparent;
+    final hoverBg = _hover && !widget.selected
+        ? Theme.of(context).brightness == Brightness.dark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.04)
+        : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -3914,36 +5638,83 @@ class _ProviderListRowState extends State<_ProviderListRow> {
         onTap: widget.onTap,
         onSecondaryTapDown: (details) async {
           final items = <DesktopContextMenuItem>[
-            DesktopContextMenuItem(icon: lucide.Lucide.Share2, label: AppLocalizations.of(context)!.desktopProviderContextMenuShare, onTap: widget.onShare),
-            DesktopContextMenuItem(icon: lucide.Lucide.Pencil, label: AppLocalizations.of(context)!.providerDetailPageEditTooltip, onTap: widget.onEdit),
+            DesktopContextMenuItem(
+              icon: lucide.Lucide.Share2,
+              label: AppLocalizations.of(
+                context,
+              )!.desktopProviderContextMenuShare,
+              onTap: widget.onShare,
+            ),
+            DesktopContextMenuItem(
+              icon: lucide.Lucide.Pencil,
+              label: AppLocalizations.of(
+                context,
+              )!.providerDetailPageEditTooltip,
+              onTap: widget.onEdit,
+            ),
             if (widget.onDelete != null)
-              DesktopContextMenuItem(icon: lucide.Lucide.Trash2, label: AppLocalizations.of(context)!.providerDetailPageDeleteProviderTooltip, danger: true, onTap: () => widget.onDelete?.call()),
+              DesktopContextMenuItem(
+                icon: lucide.Lucide.Trash2,
+                label: AppLocalizations.of(
+                  context,
+                )!.providerDetailPageDeleteProviderTooltip,
+                danger: true,
+                onTap: () => widget.onDelete?.call(),
+              ),
           ];
-          await showDesktopContextMenuAt(context, globalPosition: details.globalPosition, items: items);
+          await showDesktopContextMenuAt(
+            context,
+            globalPosition: details.globalPosition,
+            items: items,
+          );
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(color: Color.alphaBlend(hoverBg, widget.background), borderRadius: BorderRadius.circular(10)),
+          decoration: BoxDecoration(
+            color: Color.alphaBlend(hoverBg, widget.background),
+            borderRadius: BorderRadius.circular(10),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Row(
             children: [
-              ProviderAvatar(providerKey: widget.keyName, displayName: widget.name, size: 22),
+              ProviderAvatar(
+                providerKey: widget.keyName,
+                displayName: widget.name,
+                size: 22,
+              ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(widget.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                child: Text(
+                  widget.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: (widget.enabled ? Colors.green : Colors.orange).withOpacity(0.12),
+                  color: (widget.enabled ? Colors.green : Colors.orange)
+                      .withOpacity(0.12),
                   borderRadius: BorderRadius.circular(999),
                   // No border for left list status
                 ),
                 child: Text(
-                  widget.enabled ? AppLocalizations.of(context)!.providersPageEnabledStatus : AppLocalizations.of(context)!.providersPageDisabledStatus,
-                  style: TextStyle(fontSize: 11, color: widget.enabled ? Colors.green : Colors.orange, fontWeight: FontWeight.w700),
+                  widget.enabled
+                      ? AppLocalizations.of(context)!.providersPageEnabledStatus
+                      : AppLocalizations.of(
+                          context,
+                        )!.providersPageDisabledStatus,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: widget.enabled ? Colors.green : Colors.orange,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -3955,7 +5726,11 @@ class _ProviderListRowState extends State<_ProviderListRow> {
 }
 
 class _AddFullWidthButton extends StatefulWidget {
-  const _AddFullWidthButton({required this.label, required this.onTap, this.height = 44});
+  const _AddFullWidthButton({
+    required this.label,
+    required this.onTap,
+    this.height = 44,
+  });
   final String label;
   final VoidCallback onTap;
   final double height;
@@ -3970,39 +5745,53 @@ class _AddFullWidthButtonState extends State<_AddFullWidthButton> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04);
-    final hoverBg = isDark ? Colors.white.withOpacity(0.10) : Colors.black.withOpacity(0.06);
+    final baseBg = isDark
+        ? Colors.white.withOpacity(0.06)
+        : Colors.black.withOpacity(0.04);
+    final hoverBg = isDark
+        ? Colors.white.withOpacity(0.10)
+        : Colors.black.withOpacity(0.06);
     final bg = _hover ? hoverBg : baseBg;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
-      onExit:   (_) => setState(() => _hover = false),
+      onExit: (_) => setState(() => _hover = false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _pressed ? 0.98 : 1.0,
-        duration: const Duration(milliseconds: 110),
-        curve: Curves.easeOutCubic,
-        child: Container(
-          height: widget.height,
-          width: double.infinity,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12), border: Border.all(color: cs.outlineVariant.withOpacity(0.2))),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(lucide.Lucide.Plus, size: 16, color: cs.primary),
-              const SizedBox(width: 6),
-              Text(widget.label, style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700)),
-            ],
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _pressed ? 0.98 : 1.0,
+          duration: const Duration(milliseconds: 110),
+          curve: Curves.easeOutCubic,
+          child: Container(
+            height: widget.height,
+            width: double.infinity,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(lucide.Lucide.Plus, size: 16, color: cs.primary),
+                const SizedBox(width: 6),
+                Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 }
@@ -4023,7 +5812,10 @@ class _DesktopIosSectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06), width: 0.6),
+        border: Border.all(
+          color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+          width: 0.6,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(children: children),
@@ -4057,7 +5849,9 @@ class _DesktopKeyRow extends StatelessWidget {
       label = keyConfig.name!.trim();
     } else {
       final s = keyConfig.key.trim();
-      label = s.length <= 8 ? '••••' : '${s.substring(0, 4)}••••${s.substring(s.length - 4)}';
+      label = s.length <= 8
+          ? '••••'
+          : '${s.substring(0, 4)}••••${s.substring(s.length - 4)}';
     }
     Color statusColor(ApiKeyStatus st) {
       switch (st) {
@@ -4071,6 +5865,7 @@ class _DesktopKeyRow extends StatelessWidget {
           return cs.tertiary;
       }
     }
+
     String statusText(ApiKeyStatus st) {
       switch (st) {
         case ApiKeyStatus.active:
@@ -4083,6 +5878,7 @@ class _DesktopKeyRow extends StatelessWidget {
           return l10n.multiKeyPageStatusRateLimited;
       }
     }
+
     return Column(
       children: [
         Padding(
@@ -4098,25 +5894,62 @@ class _DesktopKeyRow extends StatelessWidget {
                 ),
                 child: Text(
                   statusText(keyConfig.status),
-                  style: TextStyle(color: statusColor(keyConfig.status), fontSize: 11),
+                  style: TextStyle(
+                    color: statusColor(keyConfig.status),
+                    fontSize: 11,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
-              IosSwitch(value: keyConfig.isEnabled, onChanged: onToggle, width: 46, height: 28),
+              IosSwitch(
+                value: keyConfig.isEnabled,
+                onChanged: onToggle,
+                width: 46,
+                height: 28,
+              ),
               const SizedBox(width: 6),
               if (testing)
-                SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary))
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: cs.primary,
+                  ),
+                )
               else
                 Tooltip(
                   message: l10n.multiKeyPageDetect,
-                  child: _IconBtn(icon: lucide.Lucide.HeartPulse, onTap: onTest, color: cs.primary),
+                  child: _IconBtn(
+                    icon: lucide.Lucide.HeartPulse,
+                    onTap: onTest,
+                    color: cs.primary,
+                  ),
                 ),
               const SizedBox(width: 4),
-              _IconBtn(icon: lucide.Lucide.Pencil, onTap: onEdit, color: cs.primary),
+              _IconBtn(
+                icon: lucide.Lucide.Pencil,
+                onTap: onEdit,
+                color: cs.primary,
+              ),
               const SizedBox(width: 4),
-              _IconBtn(icon: lucide.Lucide.Trash2, onTap: onDelete, color: cs.error),
+              _IconBtn(
+                icon: lucide.Lucide.Trash2,
+                onTap: onDelete,
+                color: cs.error,
+              ),
             ],
           ),
         ),
@@ -4170,7 +6003,10 @@ class _ModelGroupAccordionState extends State<_ModelGroupAccordion> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ClipRRect(
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
               child: InkWell(
                 highlightColor: Colors.transparent,
                 splashColor: Colors.transparent,
@@ -4181,8 +6017,13 @@ class _ModelGroupAccordionState extends State<_ModelGroupAccordion> {
                   height: 40,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.02),
-                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white.withOpacity(0.03)
+                        : Colors.black.withOpacity(0.02),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -4190,11 +6031,21 @@ class _ModelGroupAccordionState extends State<_ModelGroupAccordion> {
                         turns: _open ? 0.25 : 0.0, // right (0) -> down (0.25)
                         duration: const Duration(milliseconds: 180),
                         curve: Curves.easeOutCubic,
-                        child: Icon(lucide.Lucide.ChevronRight, size: 16, color: cs.onSurface.withOpacity(0.9)),
+                        child: Icon(
+                          lucide.Lucide.ChevronRight,
+                          size: 16,
+                          color: cs.onSurface.withOpacity(0.9),
+                        ),
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(widget.group, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                        child: Text(
+                          widget.group,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -4203,29 +6054,35 @@ class _ModelGroupAccordionState extends State<_ModelGroupAccordion> {
             ),
             AnimatedCrossFade(
               firstChild: const SizedBox.shrink(),
-              secondChild: Column(children: [
-                for (final id in widget.modelIds)
-                  _ModelRow(
-                    modelId: id,
-                    providerKey: widget.providerKey,
-                    isSelectionMode: widget.isSelectionMode,
-                    isSelected: widget.selectedModels.contains(id),
-                    onSelectionChanged: (selected) {
-                      final newSelection = Set<String>.from(widget.selectedModels);
-                      if (selected) {
-                        newSelection.add(id);
-                      } else {
-                        newSelection.remove(id);
-                      }
-                      widget.onSelectionChanged?.call(newSelection);
-                    },
-                    detectionErrorMessage: widget.detectionErrorMessages[id],
-                    detectionResult: widget.detectionResults[id],
-                    isDetecting: widget.currentDetectingModel == id,
-                    isPending: widget.pendingModels.contains(id),
-                  ),
-              ]),
-              crossFadeState: _open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              secondChild: Column(
+                children: [
+                  for (final id in widget.modelIds)
+                    _ModelRow(
+                      modelId: id,
+                      providerKey: widget.providerKey,
+                      isSelectionMode: widget.isSelectionMode,
+                      isSelected: widget.selectedModels.contains(id),
+                      onSelectionChanged: (selected) {
+                        final newSelection = Set<String>.from(
+                          widget.selectedModels,
+                        );
+                        if (selected) {
+                          newSelection.add(id);
+                        } else {
+                          newSelection.remove(id);
+                        }
+                        widget.onSelectionChanged?.call(newSelection);
+                      },
+                      detectionErrorMessage: widget.detectionErrorMessages[id],
+                      detectionResult: widget.detectionResults[id],
+                      isDetecting: widget.currentDetectingModel == id,
+                      isPending: widget.pendingModels.contains(id),
+                    ),
+                ],
+              ),
+              crossFadeState: _open
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
               duration: const Duration(milliseconds: 180),
               sizeCurve: Curves.easeOutCubic,
             ),
@@ -4263,7 +6120,8 @@ class _ModelRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
     final cfg = sp.getProviderConfig(providerKey);
-    ModelInfo _infer(String id) => ModelRegistry.infer(ModelInfo(id: id, displayName: id));
+    ModelInfo _infer(String id) =>
+        ModelRegistry.infer(ModelInfo(id: id, displayName: id));
     // Resolve upstream/api model id for inference + capsules
     String baseId = modelId;
     final ov = cfg.modelOverrides[modelId] as Map?;
@@ -4279,23 +6137,31 @@ class _ModelRow extends StatelessWidget {
       if (ov == null) return base;
       ModelType? type;
       final t = (ov['type'] as String?) ?? '';
-      if (t == 'embedding') type = ModelType.embedding; else if (t == 'chat') type = ModelType.chat;
+      if (t == 'embedding')
+        type = ModelType.embedding;
+      else if (t == 'chat')
+        type = ModelType.chat;
       List<Modality>? input;
       if (ov['input'] is List) {
         input = [
-          for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
+          for (final e in (ov['input'] as List))
+            (e.toString() == 'image' ? Modality.image : Modality.text),
         ];
       }
       List<Modality>? output;
       if (ov['output'] is List) {
         output = [
-          for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
+          for (final e in (ov['output'] as List))
+            (e.toString() == 'image' ? Modality.image : Modality.text),
         ];
       }
       List<ModelAbility>? abilities;
       if (ov['abilities'] is List) {
         abilities = [
-          for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)
+          for (final e in (ov['abilities'] as List))
+            (e.toString() == 'reasoning'
+                ? ModelAbility.reasoning
+                : ModelAbility.tool),
         ];
       }
       return base.copyWith(
@@ -4305,6 +6171,7 @@ class _ModelRow extends StatelessWidget {
         abilities: abilities ?? base.abilities,
       );
     }
+
     final info = _effective();
     // Display label: prefer override name, then upstream model id, then logical key
     String displayName = modelId;
@@ -4321,11 +6188,16 @@ class _ModelRow extends StatelessWidget {
 
     Widget cap(String text) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      final bg = isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF2F3F5);
+      final bg = isDark
+          ? Colors.white.withOpacity(0.06)
+          : const Color(0xFFF2F3F5);
       final fg = cs.onSurface.withOpacity(0.85);
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+        ),
         child: Text(text, style: TextStyle(fontSize: 11, color: fg)),
       );
     }
@@ -4346,23 +6218,51 @@ class _ModelRow extends StatelessWidget {
         child: icon,
       );
     }
+
     // Build from effective info similar to mobile
     if (info.input.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(lucide.Lucide.Eye, size: 12, color: cs.secondary), cs.secondary));
+      caps.add(
+        pillCapsule(
+          Icon(lucide.Lucide.Eye, size: 12, color: cs.secondary),
+          cs.secondary,
+        ),
+      );
     }
     if (info.output.contains(Modality.image)) {
-      caps.add(pillCapsule(Icon(lucide.Lucide.Image, size: 12, color: cs.tertiary), cs.tertiary));
+      caps.add(
+        pillCapsule(
+          Icon(lucide.Lucide.Image, size: 12, color: cs.tertiary),
+          cs.tertiary,
+        ),
+      );
     }
     for (final ab in info.abilities) {
       if (ab == ModelAbility.tool) {
-        caps.add(pillCapsule(Icon(lucide.Lucide.Hammer, size: 12, color: cs.primary), cs.primary));
+        caps.add(
+          pillCapsule(
+            Icon(lucide.Lucide.Hammer, size: 12, color: cs.primary),
+            cs.primary,
+          ),
+        );
       } else if (ab == ModelAbility.reasoning) {
-        caps.add(pillCapsule(SvgPicture.asset('assets/icons/deepthink.svg', width: 12, height: 12, colorFilter: ColorFilter.mode(cs.secondary, BlendMode.srcIn)), cs.secondary));
+        caps.add(
+          pillCapsule(
+            SvgPicture.asset(
+              'assets/icons/deepthink.svg',
+              width: 12,
+              height: 12,
+              colorFilter: ColorFilter.mode(cs.secondary, BlendMode.srcIn),
+            ),
+            cs.secondary,
+          ),
+        );
       }
     }
 
     return GestureDetector(
-      onTap: isSelectionMode ? () => onSelectionChanged?.call(!isSelected) : null,
+      onTap: isSelectionMode
+          ? () => onSelectionChanged?.call(!isSelected)
+          : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
@@ -4377,14 +6277,22 @@ class _ModelRow extends StatelessWidget {
             _BrandCircle(name: displayName, size: 22),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(displayName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5)),
+              child: Text(
+                displayName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13.5),
+              ),
             ),
             const SizedBox(width: 8),
             if (isDetecting) ...[
               SizedBox(
                 width: 16,
                 height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: cs.primary,
+                ),
               ),
               const SizedBox(width: 8),
             ] else if (isPending) ...[
@@ -4393,7 +6301,10 @@ class _ModelRow extends StatelessWidget {
                 height: 16,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: cs.onSurface.withOpacity(0.3), width: 2),
+                  border: Border.all(
+                    color: cs.onSurface.withOpacity(0.3),
+                    width: 2,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -4401,9 +6312,14 @@ class _ModelRow extends StatelessWidget {
               MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: Tooltip(
-                  message: detectionResult! ? l10n.providerDetailPageDetectSuccess : (detectionErrorMessage ?? l10n.providerDetailPageDetectFailed),
+                  message: detectionResult!
+                      ? l10n.providerDetailPageDetectSuccess
+                      : (detectionErrorMessage ??
+                            l10n.providerDetailPageDetectFailed),
                   child: Icon(
-                    detectionResult! ? lucide.Lucide.CheckCircle : lucide.Lucide.XCircle,
+                    detectionResult!
+                        ? lucide.Lucide.CheckCircle
+                        : lucide.Lucide.XCircle,
                     size: 16,
                     color: detectionResult! ? Colors.green : cs.error,
                   ),
@@ -4412,26 +6328,54 @@ class _ModelRow extends StatelessWidget {
               const SizedBox(width: 8),
             ],
             if (!isSelectionMode) ...[
-              Row(children: caps.map((w) => Padding(padding: const EdgeInsets.only(left: 4), child: w)).toList()),
+              Row(
+                children: caps
+                    .map(
+                      (w) => Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: w,
+                      ),
+                    )
+                    .toList(),
+              ),
               const SizedBox(width: 8),
-              _IconBtn(icon: lucide.Lucide.Settings2, onTap: () async { await showDesktopModelEditDialog(context, providerKey: providerKey, modelId: modelId); }),
+              _IconBtn(
+                icon: lucide.Lucide.Settings2,
+                onTap: () async {
+                  await showDesktopModelEditDialog(
+                    context,
+                    providerKey: providerKey,
+                    modelId: modelId,
+                  );
+                },
+              ),
               const SizedBox(width: 4),
-              _IconBtn(icon: lucide.Lucide.Minus, onTap: () async {
-                final sp = context.read<SettingsProvider>();
-                final old = sp.getProviderConfig(providerKey);
-                final list = List<String>.from(old.models)..removeWhere((e) => e == modelId);
-                await sp.setProviderConfig(providerKey, old.copyWith(models: list));
-                // Clear global and assistant-level model selections that reference the deleted model
-                await sp.clearSelectionsForModel(providerKey, modelId);
-                try {
-                  final ap = context.read<AssistantProvider>();
-                  for (final a in ap.assistants) {
-                    if (a.chatModelProvider == providerKey && a.chatModelId == modelId) {
-                      await ap.updateAssistant(a.copyWith(clearChatModel: true));
+              _IconBtn(
+                icon: lucide.Lucide.Minus,
+                onTap: () async {
+                  final sp = context.read<SettingsProvider>();
+                  final old = sp.getProviderConfig(providerKey);
+                  final list = List<String>.from(old.models)
+                    ..removeWhere((e) => e == modelId);
+                  await sp.setProviderConfig(
+                    providerKey,
+                    old.copyWith(models: list),
+                  );
+                  // Clear global and assistant-level model selections that reference the deleted model
+                  await sp.clearSelectionsForModel(providerKey, modelId);
+                  try {
+                    final ap = context.read<AssistantProvider>();
+                    for (final a in ap.assistants) {
+                      if (a.chatModelProvider == providerKey &&
+                          a.chatModelId == modelId) {
+                        await ap.updateAssistant(
+                          a.copyWith(clearChatModel: true),
+                        );
+                      }
                     }
-                  }
-                } catch (_) {}
-              }),
+                  } catch (_) {}
+                },
+              ),
             ],
           ],
         ),
@@ -4441,7 +6385,11 @@ class _ModelRow extends StatelessWidget {
 }
 
 class _CardPress extends StatefulWidget {
-  const _CardPress({required this.builder, this.onTap, this.pressedScale = 0.98});
+  const _CardPress({
+    required this.builder,
+    this.onTap,
+    this.pressedScale = 0.98,
+  });
   final Widget Function(bool pressed, Color overlay) builder;
   final VoidCallback? onTap;
   final double pressedScale;
@@ -4455,13 +6403,21 @@ class _CardPressState extends State<_CardPress> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final overlay = _pressed
-        ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04))
+        ? (isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.04))
         : Colors.transparent;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
-      onTapUp: widget.onTap == null ? null : (_) => setState(() => _pressed = false),
-      onTapCancel: widget.onTap == null ? null : () => setState(() => _pressed = false),
+      onTapDown: widget.onTap == null
+          ? null
+          : (_) => setState(() => _pressed = true),
+      onTapUp: widget.onTap == null
+          ? null
+          : (_) => setState(() => _pressed = false),
+      onTapCancel: widget.onTap == null
+          ? null
+          : () => setState(() => _pressed = false),
       onTap: widget.onTap,
       child: AnimatedScale(
         scale: _pressed ? widget.pressedScale : 1.0,
@@ -4480,7 +6436,6 @@ class _CardPressState extends State<_CardPress> {
 // Removed embedded default model pane; now in setting/default_model_pane.dart
 
 // Removed default model prompt dialogs; migrated to setting/default_model_pane.dart
-
 
 // Removed embedded default model card; now in setting/default_model_pane.dart
 
@@ -4627,12 +6582,16 @@ class _SettingsCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sp = context.watch<SettingsProvider>();
     return Material(
-      color: sp.usePureBackground ? (isDark ? Colors.black : Colors.white) : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
+      color: sp.usePureBackground
+          ? (isDark ? Colors.black : Colors.white)
+          : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(
           width: 0.5,
-          color: isDark ? Colors.white.withOpacity(0.06) : cs.outlineVariant.withOpacity(0.12),
+          color: isDark
+              ? Colors.white.withOpacity(0.06)
+              : cs.outlineVariant.withOpacity(0.12),
         ),
       ),
       child: Padding(
@@ -4645,7 +6604,11 @@ class _SettingsCard extends StatelessWidget {
               child: Text(
                 title,
                 // Align card title with other panes (15, semi-bold)
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: cs.onSurface),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
               ),
             ),
             ...children,
@@ -4692,7 +6655,12 @@ class _LabeledRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               // Match other settings row labels (14, normal, slightly dimmed)
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: cs.onSurface.withOpacity(0.9), decoration: TextDecoration.none),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: cs.onSurface.withOpacity(0.9),
+                decoration: TextDecoration.none,
+              ),
             ),
           ),
           const SizedBox(width: 6),
@@ -4747,9 +6715,14 @@ class _ThemeModeSegmentedState extends State<_ThemeModeSegmented> {
       (ThemeMode.system, l10n.settingsPageSystemMode, lucide.Lucide.Monitor),
     ];
 
-    final trackBg = isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04);
+    final trackBg = isDark
+        ? Colors.white.withOpacity(0.06)
+        : Colors.black.withOpacity(0.04);
     return Container(
-      decoration: BoxDecoration(color: trackBg, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(
+        color: trackBg,
+        borderRadius: BorderRadius.circular(14),
+      ),
       padding: const EdgeInsets.all(3),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -4760,16 +6733,24 @@ class _ThemeModeSegmentedState extends State<_ThemeModeSegmented> {
               onExit: (_) => setState(() => _hover = -1),
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
-                onTap: () => context.read<SettingsProvider>().setThemeMode(items[i].$1),
+                onTap: () =>
+                    context.read<SettingsProvider>().setThemeMode(items[i].$1),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOutCubic,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: () {
                       final selected = mode == items[i].$1;
-                      if (selected) return cs.primary.withOpacity(isDark ? 0.18 : 0.14);
-                      if (_hover == i) return isDark ? Colors.white.withOpacity(0.10) : Colors.black.withOpacity(0.06);
+                      if (selected)
+                        return cs.primary.withOpacity(isDark ? 0.18 : 0.14);
+                      if (_hover == i)
+                        return isDark
+                            ? Colors.white.withOpacity(0.10)
+                            : Colors.black.withOpacity(0.06);
                       return Colors.transparent;
                     }(),
                     borderRadius: BorderRadius.circular(12),
@@ -4835,8 +6816,10 @@ class _HoverPill extends StatelessWidget {
     final bg = selected
         ? cs.primary.withOpacity(0.12)
         : hovered
-            ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04))
-            : Colors.transparent;
+        ? (isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.04))
+        : Colors.transparent;
     final fg = selected ? cs.primary : cs.onSurface.withOpacity(0.86);
     return MouseRegion(
       onEnter: (_) => onHover(true),
@@ -4851,13 +6834,25 @@ class _HoverPill extends StatelessWidget {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: selected ? cs.primary.withOpacity(0.35) : cs.outlineVariant.withOpacity(0.18)),
+            border: Border.all(
+              color: selected
+                  ? cs.primary.withOpacity(0.35)
+                  : cs.outlineVariant.withOpacity(0.18),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Keep pill text size aligned with row labels
-              Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: fg, decoration: TextDecoration.none)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: fg,
+                  decoration: TextDecoration.none,
+                ),
+              ),
               const SizedBox(width: 8),
               Icon(icon, size: 16, color: fg),
             ],
@@ -4903,7 +6898,11 @@ class _ThemeDots extends StatelessWidget {
 }
 
 class _ThemeDot extends StatefulWidget {
-  const _ThemeDot({required this.color, required this.selected, required this.onTap});
+  const _ThemeDot({
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
   final Color color;
   final bool selected;
   final VoidCallback onTap;
@@ -4931,10 +6930,18 @@ class _ThemeDotState extends State<_ThemeDot> {
             color: widget.color,
             shape: BoxShape.circle,
             boxShadow: _hover
-                ? [BoxShadow(color: widget.color.withOpacity(0.45), blurRadius: 14, spreadRadius: 1)]
+                ? [
+                    BoxShadow(
+                      color: widget.color.withOpacity(0.45),
+                      blurRadius: 14,
+                      spreadRadius: 1,
+                    ),
+                  ]
                 : [],
             border: Border.all(
-              color: widget.selected ? cs.onSurface.withOpacity(0.85) : Colors.white,
+              color: widget.selected
+                  ? cs.onSurface.withOpacity(0.85)
+                  : Colors.white,
               width: widget.selected ? 2 : 2,
             ),
           ),
@@ -4953,7 +6960,8 @@ class _ToggleRowPureBackground extends StatelessWidget {
     return _ToggleRow(
       label: l10n.themeSettingsPageUsePureBackgroundTitle,
       value: sp.usePureBackground,
-      onChanged: (v) => context.read<SettingsProvider>().setUsePureBackground(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setUsePureBackground(v),
     );
   }
 }
@@ -5008,7 +7016,11 @@ class _DesktopTrayMinimizeOnCloseRow extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageTrayMinimizeOnCloseTitle,
       value: enabled && sp.desktopMinimizeToTrayOnClose,
-      onChanged: enabled ? (v) => context.read<SettingsProvider>().setDesktopMinimizeToTrayOnClose(v) : null,
+      onChanged: enabled
+          ? (v) => context
+                .read<SettingsProvider>()
+                .setDesktopMinimizeToTrayOnClose(v)
+          : null,
     );
   }
 }
@@ -5020,228 +7032,26 @@ class _TopicPositionDropdown extends StatefulWidget {
 }
 
 class _TopicPositionDropdownState extends State<_TopicPositionDropdown> {
-  bool _hover = false;
-  bool _open = false;
-  final LayerLink _link = LayerLink();
-  final GlobalKey _triggerKey = GlobalKey();
-  OverlayEntry? _entry;
-
-  void _toggle() {
-    if (_open) {
-      _close();
-    } else {
-      _openMenu();
-    }
-  }
-
-  void _close() {
-    _entry?.remove();
-    _entry = null;
-    if (mounted) setState(() => _open = false);
-  }
-
-  String _labelFor(BuildContext context, DesktopTopicPosition pos) {
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    switch (pos) {
-      case DesktopTopicPosition.right:
-        return l10n.desktopDisplaySettingsTopicPositionRight;
-      case DesktopTopicPosition.left:
-      default:
-        return l10n.desktopDisplaySettingsTopicPositionLeft;
-    }
-  }
-
-  void _openMenu() {
-    if (_entry != null) return;
-    final rb = _triggerKey.currentContext?.findRenderObject() as RenderBox?;
-    if (rb == null) return;
-    final triggerSize = rb.size;
-    final triggerWidth = triggerSize.width;
-
-    _entry = OverlayEntry(builder: (ctx) {
-      final cs = Theme.of(ctx).colorScheme;
-      final isDark = Theme.of(ctx).brightness == Brightness.dark;
-      final usePure = Provider.of<SettingsProvider>(ctx, listen: false).usePureBackground;
-      final bgColor = usePure ? (isDark ? Colors.black : Colors.white) : (isDark ? const Color(0xFF1C1C1E) : Colors.white);
-      final sp = Provider.of<SettingsProvider>(ctx, listen: false);
-
-      return Stack(children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: _close,
-            child: const SizedBox.expand(),
-          ),
-        ),
-        CompositedTransformFollower(
-          link: _link,
-          showWhenUnlinked: false,
-          offset: Offset(0, triggerSize.height + 6),
-          child: _TopicPositionOverlay(
-            width: triggerWidth,
-            backgroundColor: bgColor,
-            selected: sp.desktopTopicPosition,
-            onSelected: (pos) async {
-              await sp.setDesktopTopicPosition(pos);
-              _close();
-            },
-          ),
-        ),
-      ]);
-    });
-    Overlay.of(context)?.insert(_entry!);
-    setState(() => _open = true);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sp = context.watch<SettingsProvider>();
-    final label = _labelFor(context, sp.desktopTopicPosition);
-
-    final baseBorder = cs.outlineVariant.withOpacity(0.18);
-    final hoverBorder = cs.primary;
-    final borderColor = _open || _hover ? hoverBorder : baseBorder;
-
-    return CompositedTransformTarget(
-      link: _link,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
-        child: GestureDetector(
-          onTap: _toggle,
-          child: AnimatedContainer(
-            key: _triggerKey,
-            duration: const Duration(milliseconds: 120),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-            constraints: const BoxConstraints(minWidth: 100, minHeight: 34),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF141414) : Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: borderColor, width: 1),
-              boxShadow: _open
-                  ? [BoxShadow(color: cs.primary.withOpacity(0.10), blurRadius: 0, spreadRadius: 2)]
-                  : null,
-            ),
-            child: Stack(
-              alignment: Alignment.centerLeft,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 240),
-                      child: Text(
-                        label,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.88)),
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                  ],
-                ),
-                Positioned.fill(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: AnimatedRotation(
-                      turns: _open ? 0.5 : 0.0,
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOutCubic,
-                      child: Icon(lucide.Lucide.ChevronDown, size: 16, color: cs.onSurface.withOpacity(0.7)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+    final options = <DesktopSelectOption<DesktopTopicPosition>>[
+      DesktopSelectOption(
+        value: DesktopTopicPosition.left,
+        label: l10n.desktopDisplaySettingsTopicPositionLeft,
       ),
-    );
-  }
-}
-
-class _TopicPositionOverlay extends StatefulWidget {
-  const _TopicPositionOverlay({
-    required this.width,
-    required this.backgroundColor,
-    required this.selected,
-    required this.onSelected,
-  });
-  final double width;
-  final Color backgroundColor;
-  final DesktopTopicPosition selected;
-  final ValueChanged<DesktopTopicPosition> onSelected;
-  @override
-  State<_TopicPositionOverlay> createState() => _TopicPositionOverlayState();
-}
-
-class _TopicPositionOverlayState extends State<_TopicPositionOverlay> with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _opacity;
-  late final Animation<Offset> _slide;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 200));
-    _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
-    _slide = Tween<Offset>(begin: const Offset(0, -0.06), end: Offset.zero).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ctrl.forward());
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderColor = cs.outlineVariant.withOpacity(0.12);
-
-    // Align style with chat message background dropdown: no leading icons,
-    // selected item gets a highlighted background.
-    final items = <(DesktopTopicPosition, String)>[
-      (DesktopTopicPosition.left, AppLocalizations.of(context)!.desktopDisplaySettingsTopicPositionLeft),
-      (DesktopTopicPosition.right, AppLocalizations.of(context)!.desktopDisplaySettingsTopicPositionRight),
+      DesktopSelectOption(
+        value: DesktopTopicPosition.right,
+        label: l10n.desktopDisplaySettingsTopicPositionRight,
+      ),
     ];
 
-    return FadeTransition(
-      opacity: _opacity,
-      child: SlideTransition(
-        position: _slide,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            constraints: BoxConstraints(minWidth: widget.width, maxWidth: widget.width),
-            decoration: BoxDecoration(
-              color: widget.backgroundColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: borderColor, width: 0.5),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(isDark ? 0.32 : 0.08), blurRadius: 16, offset: const Offset(0, 6)),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final it in items)
-                  _SimpleOptionTile(
-                    label: it.$2,
-                    selected: widget.selected == it.$1,
-                    onTap: () => widget.onSelected(it.$1),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return DesktopSelectDropdown<DesktopTopicPosition>(
+      value: sp.desktopTopicPosition,
+      options: options,
+      onSelected: (pos) =>
+          context.read<SettingsProvider>().setDesktopTopicPosition(pos),
     );
   }
 }
@@ -5249,237 +7059,45 @@ class _TopicPositionOverlayState extends State<_TopicPositionOverlay> with Singl
 class _BackgroundStyleDropdown extends StatefulWidget {
   const _BackgroundStyleDropdown();
   @override
-  State<_BackgroundStyleDropdown> createState() => _BackgroundStyleDropdownState();
+  State<_BackgroundStyleDropdown> createState() =>
+      _BackgroundStyleDropdownState();
 }
 
 class _BackgroundStyleDropdownState extends State<_BackgroundStyleDropdown> {
-  bool _hover = false;
-  bool _open = false;
-  final LayerLink _link = LayerLink();
-  final GlobalKey _triggerKey = GlobalKey();
-  OverlayEntry? _entry;
-
-  void _toggle() {
-    if (_open) {
-      _close();
-    } else {
-      _openMenu();
-    }
-  }
-
-  void _close() {
-    _entry?.remove();
-    _entry = null;
-    if (mounted) setState(() => _open = false);
-  }
-
-  String _labelFor(BuildContext context, ChatMessageBackgroundStyle s) {
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    switch (s) {
-      case ChatMessageBackgroundStyle.frosted:
-        return l10n.displaySettingsPageChatMessageBackgroundFrosted;
-      case ChatMessageBackgroundStyle.solid:
-        return l10n.displaySettingsPageChatMessageBackgroundSolid;
-      case ChatMessageBackgroundStyle.defaultStyle:
-      default:
-        return l10n.displaySettingsPageChatMessageBackgroundDefault;
-    }
-  }
-
-  void _openMenu() {
-    if (_entry != null) return;
-    final rb = _triggerKey.currentContext?.findRenderObject() as RenderBox?;
-    if (rb == null) return;
-    final triggerSize = rb.size;
-    final triggerWidth = triggerSize.width;
-
-    _entry = OverlayEntry(builder: (ctx) {
-      final cs = Theme.of(ctx).colorScheme;
-      final isDark = Theme.of(ctx).brightness == Brightness.dark;
-      final usePure = Provider.of<SettingsProvider>(ctx, listen: false).usePureBackground;
-      final bgColor = usePure ? (isDark ? Colors.black : Colors.white) : (isDark ? const Color(0xFF1C1C1E) : Colors.white);
-      final sp = Provider.of<SettingsProvider>(ctx, listen: false);
-
-      return Stack(children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: _close,
-            child: const SizedBox.expand(),
-          ),
-        ),
-        CompositedTransformFollower(
-          link: _link,
-          showWhenUnlinked: false,
-          offset: Offset(0, triggerSize.height + 6),
-          child: _BackgroundStyleOverlay(
-            width: triggerWidth,
-            backgroundColor: bgColor,
-            selected: sp.chatMessageBackgroundStyle,
-            onSelected: (style) async {
-              await sp.setChatMessageBackgroundStyle(style);
-              _close();
-            },
-          ),
-        ),
-      ]);
-    });
-    Overlay.of(context)?.insert(_entry!);
-    setState(() => _open = true);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final sp = context.watch<SettingsProvider>();
-    final label = _labelFor(context, sp.chatMessageBackgroundStyle);
-
-    final baseBorder = cs.outlineVariant.withOpacity(0.18);
-    final hoverBorder = cs.primary;
-    final borderColor = _open || _hover ? hoverBorder : baseBorder;
-
-    return CompositedTransformTarget(
-      link: _link,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
-        child: GestureDetector(
-          onTap: _toggle,
-          child: AnimatedContainer(
-            key: _triggerKey,
-            duration: const Duration(milliseconds: 120),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-            constraints: const BoxConstraints(minWidth: 100, minHeight: 34),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF141414) : Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: borderColor, width: 1),
-              boxShadow: _open
-                  ? [BoxShadow(color: cs.primary.withOpacity(0.10), blurRadius: 0, spreadRadius: 2)]
-                  : null,
-            ),
-            child: Stack(
-              alignment: Alignment.centerLeft,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 240),
-                      child: Text(
-                        label,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.88)),
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                  ],
-                ),
-                Positioned.fill(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: AnimatedRotation(
-                      turns: _open ? 0.5 : 0.0,
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOutCubic,
-                      child: Icon(lucide.Lucide.ChevronDown, size: 16, color: cs.onSurface.withOpacity(0.7)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+    final options = <DesktopSelectOption<ChatMessageBackgroundStyle>>[
+      DesktopSelectOption(
+        value: ChatMessageBackgroundStyle.defaultStyle,
+        label: l10n.displaySettingsPageChatMessageBackgroundDefault,
       ),
-    );
-  }
-}
-
-class _BackgroundStyleOverlay extends StatefulWidget {
-  const _BackgroundStyleOverlay({
-    required this.width,
-    required this.backgroundColor,
-    required this.selected,
-    required this.onSelected,
-  });
-  final double width;
-  final Color backgroundColor;
-  final ChatMessageBackgroundStyle selected;
-  final ValueChanged<ChatMessageBackgroundStyle> onSelected;
-  @override
-  State<_BackgroundStyleOverlay> createState() => _BackgroundStyleOverlayState();
-}
-
-class _BackgroundStyleOverlayState extends State<_BackgroundStyleOverlay> with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _opacity;
-  late final Animation<Offset> _slide;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 200));
-    _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
-    _slide = Tween<Offset>(begin: const Offset(0, -0.06), end: Offset.zero).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ctrl.forward());
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderColor = cs.outlineVariant.withOpacity(0.12);
-
-    final items = <(ChatMessageBackgroundStyle, String)>[
-      (ChatMessageBackgroundStyle.defaultStyle, AppLocalizations.of(context)!.displaySettingsPageChatMessageBackgroundDefault),
-      (ChatMessageBackgroundStyle.frosted, AppLocalizations.of(context)!.displaySettingsPageChatMessageBackgroundFrosted),
-      (ChatMessageBackgroundStyle.solid, AppLocalizations.of(context)!.displaySettingsPageChatMessageBackgroundSolid),
+      DesktopSelectOption(
+        value: ChatMessageBackgroundStyle.frosted,
+        label: l10n.displaySettingsPageChatMessageBackgroundFrosted,
+      ),
+      DesktopSelectOption(
+        value: ChatMessageBackgroundStyle.solid,
+        label: l10n.displaySettingsPageChatMessageBackgroundSolid,
+      ),
     ];
 
-    return FadeTransition(
-      opacity: _opacity,
-      child: SlideTransition(
-        position: _slide,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            constraints: BoxConstraints(minWidth: widget.width, maxWidth: widget.width),
-            decoration: BoxDecoration(
-              color: widget.backgroundColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: borderColor, width: 0.5),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.32 : 0.08), blurRadius: 16, offset: const Offset(0, 6))],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final it in items)
-                  _SimpleOptionTile(
-                    label: it.$2,
-                    selected: widget.selected == it.$1,
-                    onTap: () => widget.onSelected(it.$1),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return DesktopSelectDropdown<ChatMessageBackgroundStyle>(
+      value: sp.chatMessageBackgroundStyle,
+      options: options,
+      onSelected: (style) =>
+          context.read<SettingsProvider>().setChatMessageBackgroundStyle(style),
     );
   }
 }
 
 class _SimpleOptionTile extends StatefulWidget {
-  const _SimpleOptionTile({required this.label, required this.selected, required this.onTap});
+  const _SimpleOptionTile({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -5496,7 +7114,11 @@ class _SimpleOptionTileState extends State<_SimpleOptionTile> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = widget.selected
         ? cs.primary.withOpacity(0.12)
-        : (_hover ? (isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.04)) : Colors.transparent);
+        : (_hover
+              ? (isDark
+                    ? Colors.white.withOpacity(0.08)
+                    : Colors.black.withOpacity(0.04))
+              : Colors.transparent);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -5516,7 +7138,10 @@ class _SimpleOptionTileState extends State<_SimpleOptionTile> {
             curve: Curves.easeOutCubic,
             margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -5524,7 +7149,13 @@ class _SimpleOptionTileState extends State<_SimpleOptionTile> {
                     widget.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.88), fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w400),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: cs.onSurface.withOpacity(0.88),
+                      fontWeight: widget.selected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -5558,59 +7189,69 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
   void _openDropdownOverlay() {
     if (_entry != null) return;
     final rb = _key.currentContext?.findRenderObject() as RenderBox?;
-    final overlayBox = Overlay.of(context)?.context.findRenderObject() as RenderBox?;
+    final overlayBox =
+        Overlay.of(context)?.context.findRenderObject() as RenderBox?;
     if (rb == null || overlayBox == null) return;
     final size = rb.size;
     final triggerW = size.width;
     final maxW = 280.0;
     final minW = triggerW;
-    _entry = OverlayEntry(builder: (ctx) {
-      final cs = Theme.of(ctx).colorScheme;
-      // measure desired content width for centering under trigger
-      double measureContentWidth() {
-        // Keep measurement consistent with dropdown item text (14)
-        final style = const TextStyle(fontSize: 14);
-        final labels = <String>[
-          '🖥️ ${AppLocalizations.of(ctx)!.settingsPageSystemMode}',
-          '🇨🇳 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageChineseLabel}',
-          '🇨🇳 ${AppLocalizations.of(ctx)!.languageDisplayTraditionalChinese}',
-          '🇺🇸 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageEnglishLabel}',
-        ];
-        double maxText = 0;
-        for (final s in labels) {
-          final tp = TextPainter(text: TextSpan(text: s, style: style), textDirection: TextDirection.ltr, maxLines: 1)..layout();
-          if (tp.width > maxText) maxText = tp.width;
+    _entry = OverlayEntry(
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        // measure desired content width for centering under trigger
+        double measureContentWidth() {
+          // Keep measurement consistent with dropdown item text (14)
+          final style = const TextStyle(fontSize: 14);
+          final labels = <String>[
+            '🖥️ ${AppLocalizations.of(ctx)!.settingsPageSystemMode}',
+            '🇨🇳 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageChineseLabel}',
+            '🇨🇳 ${AppLocalizations.of(ctx)!.languageDisplayTraditionalChinese}',
+            '🇺🇸 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageEnglishLabel}',
+          ];
+          double maxText = 0;
+          for (final s in labels) {
+            final tp = TextPainter(
+              text: TextSpan(text: s, style: style),
+              textDirection: TextDirection.ltr,
+              maxLines: 1,
+            )..layout();
+            if (tp.width > maxText) maxText = tp.width;
+          }
+          // item padding (12*2) + check icon (16) + gap to check (10)
+          // + list padding (8*2) + gap between flag and text (8) + small fudge (2)
+          return maxText + 12 * 2 + 16 + 10 + 8 * 2 + 8 + 2;
         }
-        // item padding (12*2) + check icon (16) + gap to check (10)
-        // + list padding (8*2) + gap between flag and text (8) + small fudge (2)
-        return maxText + 12 * 2 + 16 + 10 + 8 * 2 + 8 + 2;
-      }
-      final contentW = measureContentWidth();
-      final width = contentW.clamp(minW, maxW);
-      final dx = (triggerW - width) / 2;
-      return Stack(children: [
-        // tap outside to close
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: _closeDropdownOverlay,
-            child: const SizedBox.expand(),
-          ),
-        ),
-        CompositedTransformFollower(
-          link: _link,
-          showWhenUnlinked: false,
-          offset: Offset(dx, size.height + 6),
-          child: Material(
-            color: Colors.transparent,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: width, maxWidth: width),
-              child: _LanguageDropdown(onClose: _closeDropdownOverlay),
+
+        final contentW = measureContentWidth();
+        final width = contentW.clamp(minW, maxW);
+        final dx = (triggerW - width) / 2;
+        return Stack(
+          children: [
+            // tap outside to close
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _closeDropdownOverlay,
+                child: const SizedBox.expand(),
+              ),
             ),
-          ),
-        ),
-      ]);
-    });
+            CompositedTransformFollower(
+              link: _link,
+              showWhenUnlinked: false,
+              offset: Offset(dx, size.height + 6),
+              child: Material(
+                color: Colors.transparent,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: width, maxWidth: width),
+                  child: _LanguageDropdown(onClose: _closeDropdownOverlay),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
     Overlay.of(context)?.insert(_entry!);
     setState(() => _open = true);
   }
@@ -5627,12 +7268,16 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
     final sp = context.watch<SettingsProvider>();
     String labelFor(Locale l) {
       if (l.languageCode == 'zh') {
-        if ((l.scriptCode ?? '').toLowerCase() == 'hant') return l10n.languageDisplayTraditionalChinese;
+        if ((l.scriptCode ?? '').toLowerCase() == 'hant')
+          return l10n.languageDisplayTraditionalChinese;
         return l10n.displaySettingsPageLanguageChineseLabel;
       }
       return l10n.displaySettingsPageLanguageEnglishLabel;
     }
-    final current = sp.isFollowingSystemLocale ? l10n.settingsPageSystemMode : labelFor(sp.appLocale);
+
+    final current = sp.isFollowingSystemLocale
+        ? l10n.settingsPageSystemMode
+        : labelFor(sp.appLocale);
     return _LabeledRow(
       label: l10n.displaySettingsPageLanguageTitle,
       trailing: CompositedTransformTarget(
@@ -5682,7 +7327,11 @@ class _HoverDropdownButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = hovered || open ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04)) : Colors.transparent;
+    final bg = hovered || open
+        ? (isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.04))
+        : Colors.transparent;
     final angle = open ? 3.1415926 : 0.0;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -5693,36 +7342,66 @@ class _HoverDropdownButton extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           curve: Curves.easeOutCubic,
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: verticalPadding),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: verticalPadding,
+          ),
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(borderRadius),
             // Match input border color and width
-            border: Border.all(color: cs.outlineVariant.withOpacity(0.12), width: 0.6),
+            border: Border.all(
+              color: cs.outlineVariant.withOpacity(0.12),
+              width: 0.6,
+            ),
           ),
           child: rightAlignArrow
               ? Row(
                   children: [
-                    Expanded(child: Text(label, style: TextStyle(fontSize: fontSize, color: cs.onSurface.withOpacity(0.9), fontWeight: FontWeight.w400))),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          color: cs.onSurface.withOpacity(0.9),
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     AnimatedRotation(
                       turns: angle / (2 * 3.1415926),
                       duration: const Duration(milliseconds: 180),
                       curve: Curves.easeOutCubic,
-                      child: Icon(lucide.Lucide.ChevronDown, size: 16, color: cs.onSurface.withOpacity(0.8)),
+                      child: Icon(
+                        lucide.Lucide.ChevronDown,
+                        size: 16,
+                        color: cs.onSurface.withOpacity(0.8),
+                      ),
                     ),
                   ],
                 )
               : Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(label, style: TextStyle(fontSize: fontSize, color: cs.onSurface.withOpacity(0.9), fontWeight: FontWeight.w400)),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        color: cs.onSurface.withOpacity(0.9),
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
                     const SizedBox(width: 6),
                     AnimatedRotation(
                       turns: angle / (2 * 3.1415926),
                       duration: const Duration(milliseconds: 180),
                       curve: Curves.easeOutCubic,
-                      child: Icon(lucide.Lucide.ChevronDown, size: 16, color: cs.onSurface.withOpacity(0.8)),
+                      child: Icon(
+                        lucide.Lucide.ChevronDown,
+                        size: 16,
+                        color: cs.onSurface.withOpacity(0.8),
+                      ),
                     ),
                   ],
                 ),
@@ -5733,7 +7412,11 @@ class _HoverDropdownButton extends StatelessWidget {
 }
 
 class _OverlayMenuItem extends StatefulWidget {
-  const _OverlayMenuItem({required this.label, required this.selected, required this.onTap});
+  const _OverlayMenuItem({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -5749,7 +7432,11 @@ class _OverlayMenuItemState extends State<_OverlayMenuItem> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = widget.selected
         ? cs.primary.withOpacity(0.08)
-        : (_hover ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04)) : Colors.transparent);
+        : (_hover
+              ? (isDark
+                    ? Colors.white.withOpacity(0.06)
+                    : Colors.black.withOpacity(0.04))
+              : Colors.transparent);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -5759,11 +7446,25 @@ class _OverlayMenuItemState extends State<_OverlayMenuItem> {
         onTap: widget.onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
-          child: Row(children: [
-            Expanded(child: Text(widget.label, style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.9)))),
-            if (widget.selected) Icon(lucide.Lucide.Check, size: 16, color: cs.primary),
-          ]),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: cs.onSurface.withOpacity(0.9),
+                  ),
+                ),
+              ),
+              if (widget.selected)
+                Icon(lucide.Lucide.Check, size: 16, color: cs.primary),
+            ],
+          ),
         ),
       ),
     );
@@ -5796,7 +7497,12 @@ class _OverlayItemState extends State<_OverlayItem> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? Color.alphaBlend((isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04)), widget.background)
+        ? Color.alphaBlend(
+            (isDark
+                ? Colors.white.withOpacity(0.06)
+                : Colors.black.withOpacity(0.04)),
+            widget.background,
+          )
         : widget.background;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -5807,20 +7513,31 @@ class _OverlayItemState extends State<_OverlayItem> {
         onTap: widget.onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(8),
+          ),
           child: Row(
             children: [
-              Icon(widget.icon, size: 16, color: cs.onSurface.withOpacity(0.85)),
+              Icon(
+                widget.icon,
+                size: 16,
+                color: cs.onSurface.withOpacity(0.85),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   widget.label,
-                  style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.9)),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: cs.onSurface.withOpacity(0.9),
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (widget.selected) Icon(lucide.Lucide.Check, size: 16, color: cs.primary),
+              if (widget.selected)
+                Icon(lucide.Lucide.Check, size: 16, color: cs.primary),
             ],
           ),
         ),
@@ -5844,7 +7561,10 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      setState(() { _opacity = 1; _slide = Offset.zero; });
+      setState(() {
+        _opacity = 1;
+        _slide = Offset.zero;
+      });
     });
   }
 
@@ -5854,10 +7574,42 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
     final items = <(_LangItem, bool)>[
-      (_LangItem(flag: '🖥️', label: l10n.settingsPageSystemMode, tag: 'system'), sp.isFollowingSystemLocale),
-      (_LangItem(flag: '🇨🇳', label: l10n.displaySettingsPageLanguageChineseLabel, tag: 'zh_CN'), (!sp.isFollowingSystemLocale && sp.appLocale.languageCode == 'zh' && (sp.appLocale.scriptCode ?? '').isEmpty)),
-      (_LangItem(flag: '🇨🇳', label: l10n.languageDisplayTraditionalChinese, tag: 'zh_Hant'), (!sp.isFollowingSystemLocale && sp.appLocale.languageCode == 'zh' && (sp.appLocale.scriptCode ?? '').toLowerCase() == 'hant')),
-      (_LangItem(flag: '🇺🇸', label: l10n.displaySettingsPageLanguageEnglishLabel, tag: 'en_US'), (!sp.isFollowingSystemLocale && sp.appLocale.languageCode == 'en')),
+      (
+        _LangItem(
+          flag: '🖥️',
+          label: l10n.settingsPageSystemMode,
+          tag: 'system',
+        ),
+        sp.isFollowingSystemLocale,
+      ),
+      (
+        _LangItem(
+          flag: '🇨🇳',
+          label: l10n.displaySettingsPageLanguageChineseLabel,
+          tag: 'zh_CN',
+        ),
+        (!sp.isFollowingSystemLocale &&
+            sp.appLocale.languageCode == 'zh' &&
+            (sp.appLocale.scriptCode ?? '').isEmpty),
+      ),
+      (
+        _LangItem(
+          flag: '🇨🇳',
+          label: l10n.languageDisplayTraditionalChinese,
+          tag: 'zh_Hant',
+        ),
+        (!sp.isFollowingSystemLocale &&
+            sp.appLocale.languageCode == 'zh' &&
+            (sp.appLocale.scriptCode ?? '').toLowerCase() == 'hant'),
+      ),
+      (
+        _LangItem(
+          flag: '🇺🇸',
+          label: l10n.displaySettingsPageLanguageEnglishLabel,
+          tag: 'en_US',
+        ),
+        (!sp.isFollowingSystemLocale && sp.appLocale.languageCode == 'en'),
+      ),
     ];
     final maxH = MediaQuery.of(context).size.height * 0.5;
     return AnimatedOpacity(
@@ -5872,11 +7624,20 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
           color: Colors.transparent,
           child: Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1C1C1E) : Colors.white,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF1C1C1E)
+                  : Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: cs.outlineVariant.withOpacity(0.12), width: 0.5),
+              border: Border.all(
+                color: cs.outlineVariant.withOpacity(0.12),
+                width: 0.5,
+              ),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 6)),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
               ],
             ),
             child: ConstrainedBox(
@@ -5893,17 +7654,30 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
                         onTap: () async {
                           switch (ent.$1.tag) {
                             case 'system':
-                              await context.read<SettingsProvider>().setAppLocaleFollowSystem();
+                              await context
+                                  .read<SettingsProvider>()
+                                  .setAppLocaleFollowSystem();
                               break;
                             case 'zh_CN':
-                              await context.read<SettingsProvider>().setAppLocale(const Locale('zh', 'CN'));
+                              await context
+                                  .read<SettingsProvider>()
+                                  .setAppLocale(const Locale('zh', 'CN'));
                               break;
                             case 'zh_Hant':
-                              await context.read<SettingsProvider>().setAppLocale(const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'));
+                              await context
+                                  .read<SettingsProvider>()
+                                  .setAppLocale(
+                                    const Locale.fromSubtags(
+                                      languageCode: 'zh',
+                                      scriptCode: 'Hant',
+                                    ),
+                                  );
                               break;
                             case 'en_US':
                             default:
-                              await context.read<SettingsProvider>().setAppLocale(const Locale('en', 'US'));
+                              await context
+                                  .read<SettingsProvider>()
+                                  .setAppLocale(const Locale('en', 'US'));
                           }
                           if (!mounted) return;
                           widget.onClose();
@@ -5928,7 +7702,11 @@ class _LangItem {
 }
 
 class _LanguageDropdownItem extends StatefulWidget {
-  const _LanguageDropdownItem({required this.item, this.checked = false, required this.onTap});
+  const _LanguageDropdownItem({
+    required this.item,
+    this.checked = false,
+    required this.onTap,
+  });
   final _LangItem item;
   final bool checked;
   final VoidCallback onTap;
@@ -5954,17 +7732,31 @@ class _LanguageDropdownItemState extends State<_LanguageDropdownItem> {
           height: 42,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: _hover ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04)) : Colors.transparent,
+            color: _hover
+                ? (isDark
+                      ? Colors.white.withOpacity(0.06)
+                      : Colors.black.withOpacity(0.04))
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             children: [
-              Text(widget.item.flag, style: const TextStyle(fontSize: 16, decoration: TextDecoration.none)),
+              Text(
+                widget.item.flag,
+                style: const TextStyle(
+                  fontSize: 16,
+                  decoration: TextDecoration.none,
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   widget.item.label,
-                  style: TextStyle(fontSize: 14, color: cs.onSurface, decoration: TextDecoration.none),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: cs.onSurface,
+                    decoration: TextDecoration.none,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   softWrap: false,
@@ -5996,6 +7788,7 @@ class _ChatFontSizeRowState extends State<_ChatFontSizeRow> {
     final scale = context.read<SettingsProvider>().chatFontScale;
     _controller = TextEditingController(text: '${(scale * 100).round()}');
   }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -6031,7 +7824,14 @@ class _ChatFontSizeRowState extends State<_ChatFontSizeRow> {
             ),
           ),
           const SizedBox(width: 8),
-          Text('%', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 14, decoration: TextDecoration.none)),
+          Text(
+            '%',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+              fontSize: 14,
+              decoration: TextDecoration.none,
+            ),
+          ),
         ],
       ),
     );
@@ -6039,7 +7839,11 @@ class _ChatFontSizeRowState extends State<_ChatFontSizeRow> {
 }
 
 class _BorderInput extends StatefulWidget {
-  const _BorderInput({required this.controller, required this.onSubmitted, required this.onFocusLost});
+  const _BorderInput({
+    required this.controller,
+    required this.onSubmitted,
+    required this.onFocusLost,
+  });
   final TextEditingController controller;
   final ValueChanged<String> onSubmitted;
   final ValueChanged<String> onFocusLost;
@@ -6060,11 +7864,13 @@ class _BorderInputState extends State<_BorderInput> {
       if (!_focus.hasFocus) widget.onFocusLost(widget.controller.text);
     });
   }
+
   @override
   void dispose() {
     _focus.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -6073,11 +7879,17 @@ class _BorderInputState extends State<_BorderInput> {
     final active = _focus.hasFocus || _hover;
     final baseBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.28), width: 0.8),
+      borderSide: BorderSide(
+        color: cs.outlineVariant.withOpacity(0.28),
+        width: 0.8,
+      ),
     );
     final hoverBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.38), width: 0.9),
+      borderSide: BorderSide(
+        color: cs.outlineVariant.withOpacity(0.38),
+        width: 0.9,
+      ),
     );
     final focusBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
@@ -6096,9 +7908,14 @@ class _BorderInputState extends State<_BorderInput> {
           isDense: true,
           filled: true,
           fillColor: isDark ? Colors.white10 : Colors.white,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 6,
+            vertical: 8,
+          ),
           border: baseBorder,
-          enabledBorder: _focus.hasFocus ? focusBorder : (_hover ? hoverBorder : baseBorder),
+          enabledBorder: _focus.hasFocus
+              ? focusBorder
+              : (_hover ? hoverBorder : baseBorder),
           focusedBorder: focusBorder,
           hoverColor: Colors.transparent,
         ),
@@ -6137,7 +7954,9 @@ class _DesktopAppFontRow extends StatelessWidget {
               if (fam == '__SYSTEM__') {
                 await context.read<SettingsProvider>().clearAppFont();
               } else {
-                await context.read<SettingsProvider>().setAppFontSystemFamily(fam);
+                await context.read<SettingsProvider>().setAppFontSystemFamily(
+                  fam,
+                );
               }
             },
           ),
@@ -6185,7 +8004,9 @@ class _DesktopCodeFontRow extends StatelessWidget {
               if (fam == '__MONO__') {
                 await context.read<SettingsProvider>().clearCodeFont();
               } else {
-                await context.read<SettingsProvider>().setCodeFontSystemFamily(fam);
+                await context.read<SettingsProvider>().setCodeFontSystemFamily(
+                  fam,
+                );
               }
             },
           ),
@@ -6206,20 +8027,29 @@ class _DesktopCodeFontRow extends StatelessWidget {
 }
 
 class _DesktopFontDropdownButton extends StatefulWidget {
-  const _DesktopFontDropdownButton({required this.display, required this.onTap});
+  const _DesktopFontDropdownButton({
+    required this.display,
+    required this.onTap,
+  });
   final String display;
   final VoidCallback onTap;
   @override
-  State<_DesktopFontDropdownButton> createState() => _DesktopFontDropdownButtonState();
+  State<_DesktopFontDropdownButton> createState() =>
+      _DesktopFontDropdownButtonState();
 }
 
-class _DesktopFontDropdownButtonState extends State<_DesktopFontDropdownButton> {
+class _DesktopFontDropdownButtonState
+    extends State<_DesktopFontDropdownButton> {
   bool _hover = false;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = _hover ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05)) : Colors.transparent;
+    final bg = _hover
+        ? (isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.05))
+        : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -6231,7 +8061,10 @@ class _DesktopFontDropdownButtonState extends State<_DesktopFontDropdownButton> 
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: cs.outlineVariant.withOpacity(0.28), width: 0.8),
+            border: Border.all(
+              color: cs.outlineVariant.withOpacity(0.28),
+              width: 0.8,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -6242,11 +8075,19 @@ class _DesktopFontDropdownButtonState extends State<_DesktopFontDropdownButton> 
                   widget.display,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, color: cs.onSurface, decoration: TextDecoration.none),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface,
+                    decoration: TextDecoration.none,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              Icon(lucide.Lucide.ChevronDown, size: 16, color: cs.onSurface.withOpacity(0.7)),
+              Icon(
+                lucide.Lucide.ChevronDown,
+                size: 16,
+                color: cs.onSurface.withOpacity(0.7),
+              ),
             ],
           ),
         ),
@@ -6275,9 +8116,26 @@ Future<String?> _showDesktopFontChooserDialog(
       final out = List<String>.from(alt ?? const <String>[]);
       out.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
       if (out.isNotEmpty) return out;
-    } catch (_) {/* ignore and fallback */}
+    } catch (_) {
+      /* ignore and fallback */
+    }
     return <String>[
-      'System UI', 'Segoe UI', 'SF Pro Text', 'San Francisco', 'Helvetica Neue', 'Arial', 'Roboto', 'PingFang SC', 'Microsoft YaHei', 'SimHei', 'Noto Sans SC', 'Noto Serif', 'Courier New', 'JetBrains Mono', 'Fira Code', 'monospace'
+      'System UI',
+      'Segoe UI',
+      'SF Pro Text',
+      'San Francisco',
+      'Helvetica Neue',
+      'Arial',
+      'Roboto',
+      'PingFang SC',
+      'Microsoft YaHei',
+      'SimHei',
+      'Noto Sans SC',
+      'Noto Serif',
+      'Courier New',
+      'JetBrains Mono',
+      'Fira Code',
+      'monospace',
     ]..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
   }
 
@@ -6296,7 +8154,9 @@ Future<String?> _showDesktopFontChooserDialog(
         return Dialog(
           elevation: 0,
           backgroundColor: bg,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
             child: Column(
@@ -6307,7 +8167,11 @@ Future<String?> _showDesktopFontChooserDialog(
                 const SizedBox(height: 12),
                 Text(
                   l10n.desktopFontLoading,
-                  style: TextStyle(color: cs2.onSurface, fontSize: 14, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: cs2.onSurface,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -6320,7 +8184,9 @@ Future<String?> _showDesktopFontChooserDialog(
   final fonts = await _fetchSystemFonts();
   if (loadingTimer?.isActive ?? false) loadingTimer?.cancel();
   if (loadingShown) {
-    try { Navigator.of(context, rootNavigator: true).pop(); } catch (_) {}
+    try {
+      Navigator.of(context, rootNavigator: true).pop();
+    } catch (_) {}
   }
   await showDialog<String>(
     context: context,
@@ -6334,67 +8200,105 @@ Future<String?> _showDesktopFontChooserDialog(
           constraints: const BoxConstraints(maxWidth: 520, maxHeight: 520),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-            child: StatefulBuilder(builder: (context, setState) {
-              String q = ctrl.text.trim().toLowerCase();
-              final filtered = q.isEmpty
-                  ? fonts
-                  : fonts.where((f) => f.toLowerCase().contains(q)).toList();
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(children: [
-                    Expanded(child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
-                    _IconBtn(icon: lucide.Lucide.X, onTap: () => Navigator.of(ctx).maybePop()),
-                  ]),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: ctrl,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      filled: true,
-                      hintText: l10n.desktopFontFilterHint,
-                      fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF7F7F9),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.12), width: 0.6),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.12), width: 0.6),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.35), width: 0.8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                String q = ctrl.text.trim().toLowerCase();
+                final filtered = q.isEmpty
+                    ? fonts
+                    : fonts.where((f) => f.toLowerCase().contains(q)).toList();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        _IconBtn(
+                          icon: lucide.Lucide.X,
+                          onTap: () => Navigator.of(ctx).maybePop(),
+                        ),
+                      ],
                     ),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.black.withOpacity(0.03),
-                        borderRadius: BorderRadius.circular(10),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: ctrl,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        filled: true,
+                        hintText: l10n.desktopFontFilterHint,
+                        fillColor:
+                            Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white10
+                            : const Color(0xFFF7F7F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.outlineVariant.withOpacity(0.12),
+                            width: 0.6,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.outlineVariant.withOpacity(0.12),
+                            width: 0.6,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primary.withOpacity(0.35),
+                            width: 0.8,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
                       ),
-                      child: ListView.builder(
-                        itemCount: filtered.length,
-                        itemBuilder: (context, i) {
-                          final fam = filtered[i];
-                          final selected = fam == initial;
-                          return _FontRowItem(
-                            family: fam,
-                            selected: selected,
-                            onTap: () => Navigator.of(ctx).pop(fam),
-                          );
-                        },
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white10
+                              : Colors.black.withOpacity(0.03),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: ListView.builder(
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) {
+                            final fam = filtered[i];
+                            final selected = fam == initial;
+                            return _FontRowItem(
+                              family: fam,
+                              selected: selected,
+                              onTap: () => Navigator.of(ctx).pop(fam),
+                            );
+                          },
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              );
-            }),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       );
@@ -6404,7 +8308,11 @@ Future<String?> _showDesktopFontChooserDialog(
 }
 
 class _FontRowItem extends StatefulWidget {
-  const _FontRowItem({required this.family, required this.onTap, this.selected = false});
+  const _FontRowItem({
+    required this.family,
+    required this.onTap,
+    this.selected = false,
+  });
   final String family;
   final VoidCallback onTap;
   final bool selected;
@@ -6424,7 +8332,9 @@ class _FontRowItemState extends State<_FontRowItem> {
     // Lazy-load this row's font family for preview (only for visible items)
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final fam = widget.family;
-      if (_loadedSystemFontFamilies.contains(fam) || _loadingSystemFontFamilies.contains(fam)) return;
+      if (_loadedSystemFontFamilies.contains(fam) ||
+          _loadingSystemFontFamilies.contains(fam))
+        return;
       _loadingSystemFontFamilies.add(fam);
       try {
         await SystemFonts().loadFont(fam);
@@ -6437,11 +8347,16 @@ class _FontRowItemState extends State<_FontRowItem> {
       }
     });
   }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = _hover ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04)) : Colors.transparent;
+    final bg = _hover
+        ? (isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.04))
+        : Colors.transparent;
     final sample = 'Aa字';
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -6452,7 +8367,10 @@ class _FontRowItemState extends State<_FontRowItem> {
         child: Container(
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(8),
+          ),
           child: Row(
             children: [
               Expanded(
@@ -6463,11 +8381,23 @@ class _FontRowItemState extends State<_FontRowItem> {
                         widget.family,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 13, color: cs.onSurface, decoration: TextDecoration.none),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurface,
+                          decoration: TextDecoration.none,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Text(sample, style: TextStyle(fontFamily: widget.family, fontSize: 16, color: cs.onSurface, decoration: TextDecoration.none)),
+                    Text(
+                      sample,
+                      style: TextStyle(
+                        fontFamily: widget.family,
+                        fontSize: 16,
+                        color: cs.onSurface,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -6507,7 +8437,8 @@ class _ToggleRowShowUserNameTs extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageShowUserNameTimestampTitle,
       value: sp.showUserNameTimestamp,
-      onChanged: (v) => context.read<SettingsProvider>().setShowUserNameTimestamp(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowUserNameTimestamp(v),
     );
   }
 }
@@ -6521,7 +8452,8 @@ class _ToggleRowShowUserMsgActions extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageShowUserMessageActionsTitle,
       value: sp.showUserMessageActions,
-      onChanged: (v) => context.read<SettingsProvider>().setShowUserMessageActions(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowUserMessageActions(v),
     );
   }
 }
@@ -6549,7 +8481,8 @@ class _ToggleRowShowModelNameTs extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageShowModelNameTimestampTitle,
       value: sp.showModelNameTimestamp,
-      onChanged: (v) => context.read<SettingsProvider>().setShowModelNameTimestamp(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowModelNameTimestamp(v),
     );
   }
 }
@@ -6577,7 +8510,8 @@ class _ToggleRowShowProviderInCapsule extends StatelessWidget {
     return _ToggleRow(
       label: l10n.desktopShowProviderInModelCapsule,
       value: sp.showProviderInModelCapsule,
-      onChanged: (v) => context.read<SettingsProvider>().setShowProviderInModelCapsule(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowProviderInModelCapsule(v),
     );
   }
 }
@@ -6591,7 +8525,8 @@ class _ToggleRowDollarLatex extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageEnableDollarLatexTitle,
       value: sp.enableDollarLatex,
-      onChanged: (v) => context.read<SettingsProvider>().setEnableDollarLatex(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setEnableDollarLatex(v),
     );
   }
 }
@@ -6605,7 +8540,8 @@ class _ToggleRowMathRendering extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageEnableMathTitle,
       value: sp.enableMathRendering,
-      onChanged: (v) => context.read<SettingsProvider>().setEnableMathRendering(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setEnableMathRendering(v),
     );
   }
 }
@@ -6619,7 +8555,8 @@ class _ToggleRowUserMarkdown extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageEnableUserMarkdownTitle,
       value: sp.enableUserMarkdown,
-      onChanged: (v) => context.read<SettingsProvider>().setEnableUserMarkdown(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setEnableUserMarkdown(v),
     );
   }
 }
@@ -6633,7 +8570,8 @@ class _ToggleRowReasoningMarkdown extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageEnableReasoningMarkdownTitle,
       value: sp.enableReasoningMarkdown,
-      onChanged: (v) => context.read<SettingsProvider>().setEnableReasoningMarkdown(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setEnableReasoningMarkdown(v),
     );
   }
 }
@@ -6647,7 +8585,8 @@ class _ToggleRowAutoCollapseCodeBlocks extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageAutoCollapseCodeBlockTitle,
       value: sp.autoCollapseCodeBlock,
-      onChanged: (v) => context.read<SettingsProvider>().setAutoCollapseCodeBlock(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setAutoCollapseCodeBlock(v),
     );
   }
 }
@@ -6661,7 +8600,8 @@ class _ToggleRowAutoCollapseThinking extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageAutoCollapseThinkingTitle,
       value: sp.autoCollapseThinking,
-      onChanged: (v) => context.read<SettingsProvider>().setAutoCollapseThinking(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setAutoCollapseThinking(v),
     );
   }
 }
@@ -6675,7 +8615,8 @@ class _ToggleRowAutoScrollEnabled extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageAutoScrollEnableTitle,
       value: sp.autoScrollEnabled,
-      onChanged: (v) => context.read<SettingsProvider>().setAutoScrollEnabled(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setAutoScrollEnabled(v),
     );
   }
 }
@@ -6694,7 +8635,12 @@ class _ToggleRowRequestLogging extends StatelessWidget {
           Expanded(
             child: Text(
               l10n.requestLogSettingTitle,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: cs.onSurface.withOpacity(0.9), decoration: TextDecoration.none),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: cs.onSurface.withOpacity(0.9),
+                decoration: TextDecoration.none,
+              ),
             ),
           ),
           Tooltip(
@@ -6712,12 +8658,20 @@ class _ToggleRowRequestLogging extends StatelessWidget {
               },
               child: Padding(
                 padding: const EdgeInsets.all(6),
-                child: Icon(lucide.Lucide.FolderOpen, size: 18, color: cs.primary),
+                child: Icon(
+                  lucide.Lucide.FolderOpen,
+                  size: 18,
+                  color: cs.primary,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 8),
-          IosSwitch(value: sp.requestLogEnabled, onChanged: (v) => context.read<SettingsProvider>().setRequestLogEnabled(v)),
+          IosSwitch(
+            value: sp.requestLogEnabled,
+            onChanged: (v) =>
+                context.read<SettingsProvider>().setRequestLogEnabled(v),
+          ),
         ],
       ),
     );
@@ -6738,7 +8692,12 @@ class _ToggleRowFlutterLogging extends StatelessWidget {
           Expanded(
             child: Text(
               l10n.flutterLogSettingTitle,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: cs.onSurface.withOpacity(0.9), decoration: TextDecoration.none),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: cs.onSurface.withOpacity(0.9),
+                decoration: TextDecoration.none,
+              ),
             ),
           ),
           Tooltip(
@@ -6756,12 +8715,20 @@ class _ToggleRowFlutterLogging extends StatelessWidget {
               },
               child: Padding(
                 padding: const EdgeInsets.all(6),
-                child: Icon(lucide.Lucide.FolderOpen, size: 18, color: cs.primary),
+                child: Icon(
+                  lucide.Lucide.FolderOpen,
+                  size: 18,
+                  color: cs.primary,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 8),
-          IosSwitch(value: sp.flutterLogEnabled, onChanged: (v) => context.read<SettingsProvider>().setFlutterLogEnabled(v)),
+          IosSwitch(
+            value: sp.flutterLogEnabled,
+            onChanged: (v) =>
+                context.read<SettingsProvider>().setFlutterLogEnabled(v),
+          ),
         ],
       ),
     );
@@ -6791,7 +8758,8 @@ class _ToggleRowAutoSwitchTopicsDesktop extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageAutoSwitchTopicsTitle,
       value: sp.desktopAutoSwitchTopics,
-      onChanged: (v) => context.read<SettingsProvider>().setDesktopAutoSwitchTopics(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setDesktopAutoSwitchTopics(v),
     );
   }
 }
@@ -6805,7 +8773,8 @@ class _ToggleRowMsgNavButtons extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageMessageNavButtonsTitle,
       value: sp.showMessageNavButtons,
-      onChanged: (v) => context.read<SettingsProvider>().setShowMessageNavButtons(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowMessageNavButtons(v),
     );
   }
 }
@@ -6833,7 +8802,8 @@ class _ToggleRowNewChatOnAssistantSwitch extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageNewChatOnAssistantSwitchTitle,
       value: sp.newChatOnAssistantSwitch,
-      onChanged: (v) => context.read<SettingsProvider>().setNewChatOnAssistantSwitch(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setNewChatOnAssistantSwitch(v),
     );
   }
 }
@@ -6847,7 +8817,8 @@ class _ToggleRowNewChatAfterDelete extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageNewChatAfterDeleteTitle,
       value: sp.newChatAfterDelete,
-      onChanged: (v) => context.read<SettingsProvider>().setNewChatAfterDelete(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setNewChatAfterDelete(v),
     );
   }
 }
@@ -6875,7 +8846,8 @@ class _ToggleRowHapticsGlobal extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageHapticsGlobalTitle,
       value: sp.hapticsGlobalEnabled,
-      onChanged: (v) => context.read<SettingsProvider>().setHapticsGlobalEnabled(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setHapticsGlobalEnabled(v),
     );
   }
 }
@@ -6917,7 +8889,8 @@ class _ToggleRowHapticsListItem extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageHapticsOnListItemTapTitle,
       value: sp.hapticsOnListItemTap,
-      onChanged: (v) => context.read<SettingsProvider>().setHapticsOnListItemTap(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setHapticsOnListItemTap(v),
     );
   }
 }
@@ -6945,13 +8918,18 @@ class _ToggleRowHapticsGenerate extends StatelessWidget {
     return _ToggleRow(
       label: l10n.displaySettingsPageHapticsOnGenerateTitle,
       value: sp.hapticsOnGenerate,
-      onChanged: (v) => context.read<SettingsProvider>().setHapticsOnGenerate(v),
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setHapticsOnGenerate(v),
     );
   }
 }
 
 class _ToggleRow extends StatelessWidget {
-  const _ToggleRow({required this.label, required this.value, required this.onChanged});
+  const _ToggleRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
   final String label;
   final bool value;
   final ValueChanged<bool>? onChanged;
@@ -6960,13 +8938,18 @@ class _ToggleRow extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Row(
-            children: [
+      child: Row(
+        children: [
           Expanded(
             child: Text(
               label,
               // Reduce toggle row label size to 14 to match other panes
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: cs.onSurface.withOpacity(0.9), decoration: TextDecoration.none),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: cs.onSurface.withOpacity(0.9),
+                decoration: TextDecoration.none,
+              ),
             ),
           ),
           IosSwitch(value: value, onChanged: onChanged),
@@ -7009,8 +8992,12 @@ class _AutoScrollDelayRowState extends State<_AutoScrollDelayRow> {
     final seconds = context.read<SettingsProvider>().autoScrollIdleSeconds;
     _controller = TextEditingController(text: '${seconds.round()}');
   }
+
   @override
-  void dispose() { _controller.dispose(); super.dispose(); }
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   void _commit(String text) {
     final v = text.trim();
@@ -7038,7 +9025,11 @@ class _AutoScrollDelayRowState extends State<_AutoScrollDelayRow> {
                 ignoring: !enabled,
                 child: Opacity(
                   opacity: enabled ? 1.0 : 0.5,
-                  child: _BorderInput(controller: _controller, onSubmitted: _commit, onFocusLost: _commit),
+                  child: _BorderInput(
+                    controller: _controller,
+                    onSubmitted: _commit,
+                    onFocusLost: _commit,
+                  ),
                 ),
               ),
             ),
@@ -7047,7 +9038,9 @@ class _AutoScrollDelayRowState extends State<_AutoScrollDelayRow> {
           Text(
             's',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(enabled ? 0.7 : 0.35),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withOpacity(enabled ? 0.7 : 0.35),
               fontSize: 14,
               decoration: TextDecoration.none,
             ),
@@ -7061,10 +9054,12 @@ class _AutoScrollDelayRowState extends State<_AutoScrollDelayRow> {
 class _AutoCollapseCodeBlockLinesRow extends StatefulWidget {
   const _AutoCollapseCodeBlockLinesRow();
   @override
-  State<_AutoCollapseCodeBlockLinesRow> createState() => _AutoCollapseCodeBlockLinesRowState();
+  State<_AutoCollapseCodeBlockLinesRow> createState() =>
+      _AutoCollapseCodeBlockLinesRowState();
 }
 
-class _AutoCollapseCodeBlockLinesRowState extends State<_AutoCollapseCodeBlockLinesRow> {
+class _AutoCollapseCodeBlockLinesRowState
+    extends State<_AutoCollapseCodeBlockLinesRow> {
   late final TextEditingController _controller;
   @override
   void initState() {
@@ -7072,8 +9067,12 @@ class _AutoCollapseCodeBlockLinesRowState extends State<_AutoCollapseCodeBlockLi
     final v = context.read<SettingsProvider>().autoCollapseCodeBlockLines;
     _controller = TextEditingController(text: '${v.round()}');
   }
+
   @override
-  void dispose() { _controller.dispose(); super.dispose(); }
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   void _commit(String text) {
     final v = text.trim();
@@ -7095,7 +9094,11 @@ class _AutoCollapseCodeBlockLinesRowState extends State<_AutoCollapseCodeBlockLi
           IntrinsicWidth(
             child: ConstrainedBox(
               constraints: const BoxConstraints(minWidth: 36, maxWidth: 72),
-              child: _BorderInput(controller: _controller, onSubmitted: _commit, onFocusLost: _commit),
+              child: _BorderInput(
+                controller: _controller,
+                onSubmitted: _commit,
+                onFocusLost: _commit,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -7127,8 +9130,12 @@ class _BackgroundMaskRowState extends State<_BackgroundMaskRow> {
     final v = context.read<SettingsProvider>().chatBackgroundMaskStrength;
     _controller = TextEditingController(text: '${(v * 100).round()}');
   }
+
   @override
-  void dispose() { _controller.dispose(); super.dispose(); }
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   void _commit(String text) {
     final v = text.trim();
@@ -7150,11 +9157,22 @@ class _BackgroundMaskRowState extends State<_BackgroundMaskRow> {
           IntrinsicWidth(
             child: ConstrainedBox(
               constraints: const BoxConstraints(minWidth: 36, maxWidth: 72),
-              child: _BorderInput(controller: _controller, onSubmitted: _commit, onFocusLost: _commit),
+              child: _BorderInput(
+                controller: _controller,
+                onSubmitted: _commit,
+                onFocusLost: _commit,
+              ),
             ),
           ),
           const SizedBox(width: 8),
-          Text('%', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 14, decoration: TextDecoration.none)),
+          Text(
+            '%',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+              fontSize: 14,
+              decoration: TextDecoration.none,
+            ),
+          ),
         ],
       ),
     );
@@ -7220,37 +9238,46 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
     final triggerSize = rb.size;
     final triggerWidth = triggerSize.width;
 
-    _entry = OverlayEntry(builder: (ctx) {
-      final cs = Theme.of(ctx).colorScheme;
-      final isDark = Theme.of(ctx).brightness == Brightness.dark;
-      final usePure = Provider.of<SettingsProvider>(ctx, listen: false).usePureBackground;
-      final bgColor = usePure ? (isDark ? Colors.black : Colors.white) : (isDark ? const Color(0xFF1C1C1E) : Colors.white);
-      final sp = Provider.of<SettingsProvider>(ctx, listen: false);
+    _entry = OverlayEntry(
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final usePure = Provider.of<SettingsProvider>(
+          ctx,
+          listen: false,
+        ).usePureBackground;
+        final bgColor = usePure
+            ? (isDark ? Colors.black : Colors.white)
+            : (isDark ? const Color(0xFF1C1C1E) : Colors.white);
+        final sp = Provider.of<SettingsProvider>(ctx, listen: false);
 
-      return Stack(children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: _close,
-            child: const SizedBox.expand(),
-          ),
-        ),
-        CompositedTransformFollower(
-          link: _link,
-          showWhenUnlinked: false,
-          offset: Offset(0, triggerSize.height + 6),
-          child: _SendShortcutOverlay(
-            width: triggerWidth,
-            backgroundColor: bgColor,
-            selected: sp.desktopSendShortcut,
-            onSelected: (shortcut) async {
-              await sp.setDesktopSendShortcut(shortcut);
-              _close();
-            },
-          ),
-        ),
-      ]);
-    });
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _close,
+                child: const SizedBox.expand(),
+              ),
+            ),
+            CompositedTransformFollower(
+              link: _link,
+              showWhenUnlinked: false,
+              offset: Offset(0, triggerSize.height + 6),
+              child: _SendShortcutOverlay(
+                width: triggerWidth,
+                backgroundColor: bgColor,
+                selected: sp.desktopSendShortcut,
+                onSelected: (shortcut) async {
+                  await sp.setDesktopSendShortcut(shortcut);
+                  _close();
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
     Overlay.of(context)?.insert(_entry!);
     setState(() => _open = true);
   }
@@ -7285,7 +9312,13 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: borderColor, width: 1),
               boxShadow: _open
-                  ? [BoxShadow(color: cs.primary.withOpacity(0.10), blurRadius: 0, spreadRadius: 2)]
+                  ? [
+                      BoxShadow(
+                        color: cs.primary.withOpacity(0.10),
+                        blurRadius: 0,
+                        spreadRadius: 2,
+                      ),
+                    ]
                   : null,
             ),
             child: Row(
@@ -7295,14 +9328,21 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
                 Text(
                   label,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.88)),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: cs.onSurface.withOpacity(0.88),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 AnimatedRotation(
                   turns: _open ? 0.5 : 0,
                   duration: const Duration(milliseconds: 200),
                   curve: Curves.easeOutCubic,
-                  child: Icon(lucide.Lucide.ChevronDown, size: 14, color: cs.onSurface.withOpacity(0.5)),
+                  child: Icon(
+                    lucide.Lucide.ChevronDown,
+                    size: 14,
+                    color: cs.onSurface.withOpacity(0.5),
+                  ),
                 ),
               ],
             ),
@@ -7328,7 +9368,8 @@ class _SendShortcutOverlay extends StatefulWidget {
   State<_SendShortcutOverlay> createState() => _SendShortcutOverlayState();
 }
 
-class _SendShortcutOverlayState extends State<_SendShortcutOverlay> with SingleTickerProviderStateMixin {
+class _SendShortcutOverlayState extends State<_SendShortcutOverlay>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _opacity;
   late final Animation<Offset> _slide;
@@ -7336,9 +9377,15 @@ class _SendShortcutOverlayState extends State<_SendShortcutOverlay> with SingleT
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 200));
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
     _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic);
-    _slide = Tween<Offset>(begin: const Offset(0, -0.06), end: Offset.zero).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
+    _slide = Tween<Offset>(
+      begin: const Offset(0, -0.06),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
     WidgetsBinding.instance.addPostFrameCallback((_) => _ctrl.forward());
   }
 
@@ -7357,7 +9404,10 @@ class _SendShortcutOverlayState extends State<_SendShortcutOverlay> with SingleT
     // Platform-specific modifier key
     final modifier = Platform.isMacOS ? '⌘' : 'Ctrl';
     final items = <(DesktopSendShortcut, String)>[
-      (DesktopSendShortcut.enter, AppLocalizations.of(context)!.displaySettingsPageSendShortcutEnter),
+      (
+        DesktopSendShortcut.enter,
+        AppLocalizations.of(context)!.displaySettingsPageSendShortcutEnter,
+      ),
       (DesktopSendShortcut.ctrlEnter, '$modifier + Enter'),
     ];
 
@@ -7373,7 +9423,13 @@ class _SendShortcutOverlayState extends State<_SendShortcutOverlay> with SingleT
               color: widget.backgroundColor,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: borderColor, width: 0.5),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.32 : 0.08), blurRadius: 16, offset: const Offset(0, 6))],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.32 : 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             clipBehavior: Clip.antiAlias,
             child: Column(
