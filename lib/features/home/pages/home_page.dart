@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:provider/provider.dart';
+import 'package:re_editor/re_editor.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../main.dart';
 import '../../../shared/widgets/interactive_drawer.dart';
@@ -370,7 +371,8 @@ class _HomePageState extends State<HomePage>
       InteractiveDrawerController();
   final ValueNotifier<int> _assistantPickerCloseTick = ValueNotifier<int>(0);
   final FocusNode _inputFocus = FocusNode();
-  final TextEditingController _inputController = TextEditingController();
+  final CodeLineEditingController _inputController =
+      CodeLineEditingController();
   final ChatInputBarController _mediaController = ChatInputBarController();
   final scroll_ctrl.ChatAutoFollowScrollController _scrollController =
       scroll_ctrl.ChatAutoFollowScrollController();
@@ -492,23 +494,13 @@ class _HomePageState extends State<HomePage>
     if (!mounted) return;
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
-    final current = _inputController.text;
-    final selection = _inputController.selection;
-    final start = (selection.start >= 0 && selection.start <= current.length)
-        ? selection.start
-        : current.length;
-    final end =
-        (selection.end >= 0 &&
-            selection.end <= current.length &&
-            selection.end >= start)
-        ? selection.end
-        : start;
-    final next = current.replaceRange(start, end, trimmed);
-    _inputController.value = _inputController.value.copyWith(
-      text: next,
-      selection: TextSelection.collapsed(offset: start + trimmed.length),
-      composing: TextRange.empty,
-    );
+    // Use CodeLineEditingController's replaceSelection to insert text at cursor
+    try {
+      _inputController.replaceSelection(trimmed);
+    } catch (_) {
+      // TODO: Add diagnostics (and/or a graceful fallback insert) when replaceSelection fails to avoid silent drops.
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _controller.forceScrollToBottomSoon(animate: false);
@@ -1135,14 +1127,19 @@ class _HomePageState extends State<HomePage>
           );
         }
       },
-      onSend: (text) async {
-        final result = await _controller.sendMessage(text);
-        if (!mounted) return result;
-        if (PlatformUtils.isMobile &&
-            result == ChatInputSubmissionResult.sent) {
+      onSend: (text) {
+        final trimmed = text.text.trim();
+        if (trimmed.isEmpty &&
+            text.imagePaths.isEmpty &&
+            text.documents.isEmpty) {
+          return;
+        }
+        _controller.sendMessage(text);
+        _inputController.value =
+            const CodeLineEditingValue.empty(); // Clear + reset selection/composing
+        if (PlatformUtils.isMobile) {
           _controller.dismissKeyboard();
         }
-        return result;
       },
       onStop: _controller.cancelStreaming,
       hasQueuedInput: _controller.currentQueuedInput != null,
