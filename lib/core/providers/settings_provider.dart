@@ -1266,8 +1266,59 @@ class SettingsProvider extends ChangeNotifier {
     if (target == null) {
       _providerGroupMap.remove(providerKey);
     } else {
-    _providerGroupMap[providerKey] = target;
+      _providerGroupMap[providerKey] = target;
     }
+    _cleanupProviderOrderAndGrouping();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await _persistProviderGrouping(prefs);
+  }
+
+  Future<void> moveProvidersToGroup(Iterable<String> providerKeys, String? targetGroupId) async {
+    final known = _knownProviderKeys();
+    final validGroupIds = {for (final g in _providerGroups) g.id};
+    final normalizedTargetGroupId = (targetGroupId != null && validGroupIds.contains(targetGroupId)) ? targetGroupId : null;
+
+    final keysSet = providerKeys.where(known.contains).toSet();
+    if (keysSet.isEmpty) return;
+
+    // Preserve current visible order when appending into the target group.
+    final orderedKeys = <String>[];
+    for (final k in _providersOrder) {
+      if (keysSet.remove(k)) orderedKeys.add(k);
+    }
+    orderedKeys.addAll(keysSet);
+
+    List<String> order = _providersOrder;
+    Map<String, String> groupMap = _providerGroupMap;
+
+    String? groupIdFor(String key) {
+      final gid = groupMap[key];
+      return (gid != null && validGroupIds.contains(gid)) ? gid : null;
+    }
+
+    bool changed = false;
+    for (final key in orderedKeys) {
+      final current = groupIdFor(key);
+      if (current == normalizedTargetGroupId) continue;
+
+      final res = moveProviderInGroupedOrder(
+        providersOrder: order,
+        providerGroupMap: groupMap,
+        knownProviderKeys: known,
+        validGroupIds: validGroupIds,
+        providerKey: key,
+        targetGroupId: normalizedTargetGroupId,
+        targetPos: 1 << 30, // append
+      );
+      order = res.providersOrder;
+      groupMap = res.providerGroupMap;
+      changed = true;
+    }
+
+    if (!changed) return;
+    _providersOrder = order;
+    _providerGroupMap = Map<String, String>.from(groupMap);
     _cleanupProviderOrderAndGrouping();
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();

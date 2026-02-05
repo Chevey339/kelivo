@@ -21,6 +21,7 @@ import 'dart:ui' as ui show ImageFilter;
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../widgets/provider_avatar.dart';
+import '../widgets/provider_group_select_sheet.dart';
 import '../../../utils/provider_grouping_logic.dart';
 
 class ProvidersPage extends StatefulWidget {
@@ -244,6 +245,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
               total: items.length,
               onExport: _onExportSelected,
               onDelete: _onDeleteSelected,
+              onMoveToGroup: _onMoveSelectedToGroup,
               onSelectAll: () {
                 setState(() {
                   // Select all deletable (non-built-in) providers
@@ -354,6 +356,17 @@ class _ProvidersPageState extends State<ProvidersPage> {
       return;
     }
     await _showMultiExportSheet(context, keys);
+  }
+
+  Future<void> _onMoveSelectedToGroup() async {
+    if (_selected.isEmpty) return;
+    final picked = await showProviderGroupSelectSheet(context, rootContext: context);
+    if (!mounted) return;
+    if (picked == null) return;
+    final targetGroupId = picked == SettingsProvider.providerUngroupedGroupKey ? null : picked;
+    await context.read<SettingsProvider>().moveProvidersToGroup(_selected, targetGroupId);
+    if (!mounted) return;
+    setState(() => _selected.clear());
   }
 
   Future<void> _onDeleteSelected() async {
@@ -873,6 +886,7 @@ class _SelectionBar extends StatelessWidget {
     required this.total,
     required this.onExport,
     required this.onDelete,
+    required this.onMoveToGroup,
     required this.onSelectAll,
   });
   final bool visible;
@@ -880,6 +894,7 @@ class _SelectionBar extends StatelessWidget {
   final int total;
   final VoidCallback onExport;
   final VoidCallback onDelete;
+  final VoidCallback onMoveToGroup;
   final VoidCallback onSelectAll;
   @override
   Widget build(BuildContext context) {
@@ -915,6 +930,13 @@ class _SelectionBar extends StatelessWidget {
                       color: cs.primary,
                       semanticLabel: null,
                       onTap: onSelectAll,
+                    ),
+                    const SizedBox(width: 14),
+                    _GlassCircleButton(
+                      icon: Lucide.Folder,
+                      color: cs.primary,
+                      semanticLabel: l10n.providerGroupsPickerTitle,
+                      onTap: onMoveToGroup,
                     ),
                     const SizedBox(width: 14),
                     _GlassCircleButton(
