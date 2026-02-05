@@ -620,7 +620,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       parsed.text,
       assistant: assistant,
       scope: AssistantRegexScope.user,
-      visual: true,
+      target: AssistantRegexTransformTarget.visual,
     );
     final showUserActions = settings.showUserMessageActions;
     final showVersionSwitcher = (widget.versionCount ?? 1) > 1;
@@ -1127,14 +1127,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       contentWithoutThink,
       assistant: assistant,
       scope: AssistantRegexScope.assistant,
-      visual: true,
+      target: AssistantRegexTransformTarget.visual,
     );
     final visualTranslation = widget.message.translation != null
         ? applyAssistantRegexes(
             widget.message.translation!,
             assistant: assistant,
             scope: AssistantRegexScope.assistant,
-            visual: true,
+            target: AssistantRegexTransformTarget.visual,
           )
         : null;
     final translationText = visualTranslation ?? widget.message.translation;

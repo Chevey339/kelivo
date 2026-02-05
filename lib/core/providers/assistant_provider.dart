@@ -246,6 +246,7 @@ class AssistantProvider extends ChangeNotifier {
               replacement: r.replacement,
               scopes: List<AssistantRegexScope>.of(r.scopes),
               visualOnly: r.visualOnly,
+              replaceOnly: r.replaceOnly,
               enabled: r.enabled,
             ),
           )

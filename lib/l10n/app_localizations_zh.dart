@@ -563,6 +563,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantRegexScopeVisualOnly => '仅视觉';
 
   @override
+  String get assistantRegexScopeReplaceOnly => '仅替换';
+
+  @override
   String get assistantRegexAddAction => '添加';
 
   @override
@@ -4505,6 +4508,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantRegexScopeVisualOnly => '仅视觉';
 
   @override
+  String get assistantRegexScopeReplaceOnly => '仅替换';
+
+  @override
   String get assistantRegexAddAction => '添加';
 
   @override
@@ -8407,6 +8413,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantRegexScopeVisualOnly => '僅視覺';
+
+  @override
+  String get assistantRegexScopeReplaceOnly => '僅替換';
 
   @override
   String get assistantRegexAddAction => '新增';

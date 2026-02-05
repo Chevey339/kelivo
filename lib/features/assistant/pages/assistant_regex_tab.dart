@@ -72,6 +72,7 @@ class _AssistantRegexTabState extends State<AssistantRegexTab> {
       replacement: data.replacement,
       scopes: _normalizeScopes(data.scopes),
       visualOnly: data.visualOnly,
+      replaceOnly: data.replaceOnly,
       enabled: rule?.enabled ?? true,
     );
     if (rule == null) {
@@ -254,6 +255,7 @@ class _AssistantRegexDesktopPaneState extends State<AssistantRegexDesktopPane> {
       replacement: data.replacement,
       scopes: _normalizeScopes(data.scopes),
       visualOnly: data.visualOnly,
+      replaceOnly: data.replaceOnly,
       enabled: rule?.enabled ?? true,
     );
     if (rule == null) {
@@ -405,7 +407,6 @@ class _RegexRuleCardState extends State<_RegexRuleCard> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     final bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
-    final overlay = isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05);
     final borderBase = cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06);
     final borderColor = widget.desktop && _hovered ? cs.primary.withOpacity(0.55) : borderBase;
 
@@ -497,6 +498,9 @@ class _RegexRuleCardState extends State<_RegexRuleCard> {
     }
     if (rule.visualOnly) {
       pills.add(l10n.assistantRegexScopeVisualOnly);
+    }
+    if (rule.replaceOnly) {
+      pills.add(l10n.assistantRegexScopeReplaceOnly);
     }
     return pills
         .map(
@@ -592,12 +596,14 @@ class _RegexFormData {
     required this.replacement,
     required this.scopes,
     required this.visualOnly,
+    required this.replaceOnly,
   });
   final String name;
   final String pattern;
   final String replacement;
   final List<AssistantRegexScope> scopes;
   final bool visualOnly;
+  final bool replaceOnly;
 }
 
 Future<_RegexFormData?> _showRegexEditor(BuildContext context, {AssistantRegex? rule}) async {
@@ -616,6 +622,7 @@ Future<_RegexFormData?> _showRegexBottomSheet(BuildContext context, {AssistantRe
   final replacementCtrl = TextEditingController(text: rule?.replacement ?? '');
   final Set<AssistantRegexScope> scopes = {...(rule?.scopes ?? <AssistantRegexScope>[AssistantRegexScope.user])};
   bool visualOnly = rule?.visualOnly ?? false;
+  bool replaceOnly = rule?.replaceOnly ?? false;
 
   final result = await showModalBottomSheet<_RegexFormData>(
     context: context,
@@ -644,6 +651,7 @@ Future<_RegexFormData?> _showRegexBottomSheet(BuildContext context, {AssistantRe
               replacement: replacementCtrl.text,
               scopes: scopes.toList(),
               visualOnly: visualOnly,
+              replaceOnly: replaceOnly,
             ));
           }
 
@@ -751,7 +759,23 @@ Future<_RegexFormData?> _showRegexBottomSheet(BuildContext context, {AssistantRe
                                 _ScopeChoiceCard(
                                   label: l10n.assistantRegexScopeVisualOnly,
                                   selected: visualOnly,
-                                  onTap: () => setState(() => visualOnly = !visualOnly),
+                                  onTap: () {
+                                    setState(() {
+                                      visualOnly = !visualOnly;
+                                      if (visualOnly) replaceOnly = false;
+                                    });
+                                  },
+                                  desktop: false,
+                                ),
+                                _ScopeChoiceCard(
+                                  label: l10n.assistantRegexScopeReplaceOnly,
+                                  selected: replaceOnly,
+                                  onTap: () {
+                                    setState(() {
+                                      replaceOnly = !replaceOnly;
+                                      if (replaceOnly) visualOnly = false;
+                                    });
+                                  },
                                   desktop: false,
                                 ),
                               ],
@@ -780,6 +804,7 @@ Future<_RegexFormData?> _showRegexDialog(BuildContext context, {AssistantRegex? 
   final replacementCtrl = TextEditingController(text: rule?.replacement ?? '');
   final Set<AssistantRegexScope> scopes = {...(rule?.scopes ?? <AssistantRegexScope>[AssistantRegexScope.user])};
   bool visualOnly = rule?.visualOnly ?? false;
+  bool replaceOnly = rule?.replaceOnly ?? false;
 
   final result = await showDialog<_RegexFormData>(
     context: context,
@@ -810,6 +835,7 @@ Future<_RegexFormData?> _showRegexDialog(BuildContext context, {AssistantRegex? 
                 replacement: replacementCtrl.text,
                 scopes: scopes.toList(),
                 visualOnly: visualOnly,
+                replaceOnly: replaceOnly,
               ));
             }
 
@@ -897,7 +923,23 @@ Future<_RegexFormData?> _showRegexDialog(BuildContext context, {AssistantRegex? 
                                 _ScopeChoiceCard(
                                   label: l10n.assistantRegexScopeVisualOnly,
                                   selected: visualOnly,
-                                  onTap: () => setState(() => visualOnly = !visualOnly),
+                                  onTap: () {
+                                    setState(() {
+                                      visualOnly = !visualOnly;
+                                      if (visualOnly) replaceOnly = false;
+                                    });
+                                  },
+                                  desktop: true,
+                                ),
+                                _ScopeChoiceCard(
+                                  label: l10n.assistantRegexScopeReplaceOnly,
+                                  selected: replaceOnly,
+                                  onTap: () {
+                                    setState(() {
+                                      replaceOnly = !replaceOnly;
+                                      if (replaceOnly) visualOnly = false;
+                                    });
+                                  },
                                   desktop: true,
                                 ),
                               ],

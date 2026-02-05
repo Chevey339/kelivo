@@ -1,11 +1,22 @@
 import '../core/models/assistant.dart';
 import '../core/models/assistant_regex.dart';
 
+enum AssistantRegexTransformTarget {
+  /// Persist-time transform. Changes stored content.
+  persist,
+
+  /// Visual-only transform. Only affects what is rendered.
+  visual,
+
+  /// Send-time transform. Only affects content sent to the model.
+  send,
+}
+
 String applyAssistantRegexes(
   String input, {
   required Assistant? assistant,
   required AssistantRegexScope scope,
-  required bool visual,
+  required AssistantRegexTransformTarget target,
 }) {
   if (input.isEmpty) return input;
   if (assistant == null) return input;
@@ -14,8 +25,14 @@ String applyAssistantRegexes(
   String out = input;
   for (final rule in assistant.regexRules) {
     if (!rule.enabled) continue;
-    if (rule.visualOnly != visual) continue;
     if (!rule.scopes.contains(scope)) continue;
+    if (rule.visualOnly) {
+      if (target != AssistantRegexTransformTarget.visual) continue;
+    } else if (rule.replaceOnly) {
+      if (target != AssistantRegexTransformTarget.send) continue;
+    } else {
+      if (target != AssistantRegexTransformTarget.persist) continue;
+    }
     final pattern = rule.pattern.trim();
     if (pattern.isEmpty) continue;
     try {

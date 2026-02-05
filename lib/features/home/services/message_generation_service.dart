@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
@@ -112,6 +111,22 @@ class MessageGenerationService {
       includeOpenAIToolMessages: includeOpenAIToolMessages,
     );
 
+    // Apply assistant replace-only regexes at send-time (visual stays unchanged).
+    if (assistant != null && assistant.regexRules.isNotEmpty) {
+      for (int i = 0; i < apiMessages.length; i++) {
+        final role = (apiMessages[i]['role'] ?? '').toString();
+        if (role != 'assistant') continue;
+        final raw = (apiMessages[i]['content'] ?? '').toString();
+        if (raw.isEmpty) continue;
+        apiMessages[i]['content'] = applyAssistantRegexes(
+          raw,
+          assistant: assistant,
+          scope: AssistantRegexScope.assistant,
+          target: AssistantRegexTransformTarget.send,
+        );
+      }
+    }
+
     // Process user messages (documents, OCR, templates)
     final lastUserImagePaths = await messageBuilderService
         .processUserMessagesForApi(apiMessages, settings, assistant);
@@ -187,7 +202,7 @@ class MessageGenerationService {
       content,
       assistant: assistant,
       scope: AssistantRegexScope.user,
-      visual: false,
+      target: AssistantRegexTransformTarget.persist,
     );
 
     return chatService.addMessage(

@@ -139,7 +139,7 @@ class ChatActions {
       raw ?? state.fullContentRaw,
       assistant: state.ctx.assistant,
       scope: AssistantRegexScope.assistant,
-      visual: false,
+      target: AssistantRegexTransformTarget.persist,
     );
   }
 

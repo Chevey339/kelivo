@@ -20,6 +20,8 @@ import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
+import '../../../core/models/assistant_regex.dart';
+import '../../../utils/assistant_regex.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 
 /// Service for building API messages from conversation state.
@@ -310,12 +312,23 @@ class MessageBuilderService {
           if (d.mime.toLowerCase().startsWith('video/')) d.path.trim(),
       }..removeWhere((p) => p.isEmpty);
 
-      String cleanedUser = rawUser
-          .replaceAll(RegExp(r"\[file:.*?\]"), '')
-          .trim();
-      if (ocrActive) {
-        cleanedUser = cleanedUser.replaceAll(RegExp(r"\[image:.*?\]"), '');
-      }
+      final inlineImagePaths = parsedUser.imagePaths
+          .map((p) => p.trim())
+          .where((p) => p.isNotEmpty && !videoPaths.contains(p))
+          .toList(growable: false);
+
+      // Apply replace-only regexes at send-time on user text (exclude markers).
+      final replacedUserText = applyAssistantRegexes(
+        parsedUser.text,
+        assistant: assistant,
+        scope: AssistantRegexScope.user,
+        target: AssistantRegexTransformTarget.send,
+      );
+
+      final imageMarkers = (!ocrActive && inlineImagePaths.isNotEmpty)
+          ? inlineImagePaths.map((p) => '\n[image:$p]').join()
+          : '';
+      final cleanedUser = (replacedUserText + imageMarkers).trim();
 
       final filePrompts = StringBuffer();
       for (final d in parsedUser.documents) {

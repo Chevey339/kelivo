@@ -291,6 +291,7 @@
   "assistantRegexScopeUser": "User",
   "assistantRegexScopeAssistant": "Assistant",
   "assistantRegexScopeVisualOnly": "Visual Only",
+  "assistantRegexScopeReplaceOnly": "Replace Only",
   "assistantRegexAddAction": "Add",
   "assistantRegexSaveAction": "Save",
   "assistantRegexDeleteButton": "Delete",

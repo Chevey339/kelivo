@@ -120,6 +120,7 @@
   "assistantRegexScopeUser": "用户",
   "assistantRegexScopeAssistant": "助手",
   "assistantRegexScopeVisualOnly": "仅视觉",
+  "assistantRegexScopeReplaceOnly": "仅替换",
   "assistantRegexAddAction": "添加",
   "assistantRegexSaveAction": "保存",
   "assistantRegexDeleteButton": "删除",

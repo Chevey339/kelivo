@@ -573,6 +573,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantRegexScopeVisualOnly => 'Visual Only';
 
   @override
+  String get assistantRegexScopeReplaceOnly => 'Replace Only';
+
+  @override
   String get assistantRegexAddAction => 'Add';
 
   @override

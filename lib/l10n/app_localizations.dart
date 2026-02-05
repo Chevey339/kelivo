@@ -1145,6 +1145,12 @@ abstract class AppLocalizations {
   /// **'Visual Only'**
   String get assistantRegexScopeVisualOnly;
 
+  /// No description provided for @assistantRegexScopeReplaceOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace Only'**
+  String get assistantRegexScopeReplaceOnly;
+
   /// No description provided for @assistantRegexAddAction.
   ///
   /// In en, this message translates to:

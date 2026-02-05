@@ -6,8 +6,9 @@ class AssistantRegex {
     required this.replacement,
     this.scopes = const <AssistantRegexScope>[],
     this.visualOnly = false,
+    this.replaceOnly = false,
     this.enabled = true,
-  });
+  }) : assert(!(visualOnly && replaceOnly), 'visualOnly and replaceOnly cannot both be true');
 
   final String id;
   final String name;
@@ -15,6 +16,7 @@ class AssistantRegex {
   final String replacement;
   final List<AssistantRegexScope> scopes;
   final bool visualOnly;
+  final bool replaceOnly;
   final bool enabled;
 
   AssistantRegex copyWith({
@@ -24,6 +26,7 @@ class AssistantRegex {
     String? replacement,
     List<AssistantRegexScope>? scopes,
     bool? visualOnly,
+    bool? replaceOnly,
     bool? enabled,
   }) {
     return AssistantRegex(
@@ -33,6 +36,7 @@ class AssistantRegex {
       replacement: replacement ?? this.replacement,
       scopes: scopes ?? this.scopes,
       visualOnly: visualOnly ?? this.visualOnly,
+      replaceOnly: replaceOnly ?? this.replaceOnly,
       enabled: enabled ?? this.enabled,
     );
   }
@@ -44,6 +48,7 @@ class AssistantRegex {
         'replacement': replacement,
         'scopes': scopes.map((e) => e.name).toList(),
         'visualOnly': visualOnly,
+        'replaceOnly': replaceOnly,
         'enabled': enabled,
       };
 
@@ -59,13 +64,18 @@ class AssistantRegex {
       scopes = <AssistantRegexScope>[AssistantRegexScopeX.fromName(rawScopes) ?? AssistantRegexScope.user];
     }
 
+    final visualOnly = json['visualOnly'] as bool? ?? false;
+    final replaceOnly = json['replaceOnly'] as bool? ?? false;
+    final normalizedReplaceOnly = (visualOnly && replaceOnly) ? false : replaceOnly;
+
     return AssistantRegex(
       id: (json['id'] as String?) ?? '',
       name: (json['name'] as String?) ?? '',
       pattern: (json['pattern'] as String?) ?? '',
       replacement: (json['replacement'] as String?) ?? '',
       scopes: scopes,
-      visualOnly: json['visualOnly'] as bool? ?? false,
+      visualOnly: visualOnly,
+      replaceOnly: normalizedReplaceOnly,
       enabled: json['enabled'] as bool? ?? true,
     );
   }

@@ -174,7 +174,7 @@ class GenerationController {
       raw,
       assistant: assistant,
       scope: AssistantRegexScope.assistant,
-      visual: false,
+      target: AssistantRegexTransformTarget.persist,
     );
   }
 
