@@ -63,6 +63,7 @@ import '../features/provider/widgets/provider_avatar.dart';
 import '../features/provider/widgets/share_provider_sheet.dart'
     show encodeProviderConfig;
 import '../utils/clipboard_images.dart';
+import '../utils/provider_grouping_logic.dart';
 
 /// Desktop settings layout: left menu + vertical divider + right content.
 /// For now, only the left menu and the Display Settings content are implemented.
@@ -1260,6 +1261,66 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   final GlobalKey<_DesktopProviderDetailPaneState> _detailKey =
       GlobalKey<_DesktopProviderDetailPaneState>();
 
+  List<_DesktopProviderGroupingRowVM> _buildProviderGroupingRows({
+    required AppLocalizations l10n,
+    required SettingsProvider settings,
+    required List<({String name, String key})> items,
+  }) {
+    final ungroupedKey = SettingsProvider.providerUngroupedGroupKey;
+    final groups = settings.providerGroups;
+    final groupById = {for (final g in groups) g.id: g};
+    final providersByGroupKey = <String, List<({String name, String key})>>{
+      for (final g in groups) g.id: <({String name, String key})>[],
+      ungroupedKey: <({String name, String key})>[],
+    };
+
+    for (final p in items) {
+      final gid = settings.groupIdForProvider(p.key);
+      final groupKey = (gid != null && groupById.containsKey(gid))
+          ? gid
+          : ungroupedKey;
+      (providersByGroupKey[groupKey] ??= <({String name, String key})>[])
+          .add(p);
+    }
+
+    final rows = <_DesktopProviderGroupingRowVM>[];
+    for (final g in groups) {
+      final list = providersByGroupKey[g.id] ?? const <({String name, String key})>[];
+      if (list.isEmpty) continue;
+      final collapsed = settings.isGroupCollapsed(g.id);
+      rows.add(
+        _DesktopProviderGroupingHeaderVM(
+          groupKey: g.id,
+          title: g.name,
+          count: list.length,
+          collapsed: collapsed,
+        ),
+      );
+      for (final p in list) {
+        rows.add(_DesktopProviderGroupingProviderVM(item: p, groupKey: g.id));
+      }
+    }
+
+    final ungrouped = providersByGroupKey[ungroupedKey] ?? const <({String name, String key})>[];
+    if (ungrouped.isNotEmpty) {
+      final collapsed = settings.isGroupCollapsed(ungroupedKey);
+      rows.add(
+        _DesktopProviderGroupingHeaderVM(
+          groupKey: ungroupedKey,
+          title: l10n.providerGroupsOther,
+          count: ungrouped.length,
+          collapsed: collapsed,
+        ),
+      );
+      for (final p in ungrouped) {
+        rows.add(
+          _DesktopProviderGroupingProviderVM(item: p, groupKey: ungroupedKey),
+        );
+      }
+    }
+    return rows;
+  }
+
   Future<void> _showShareDialog(String providerKey, String displayName) async {
     await showDialog<void>(
       context: context,
@@ -1316,6 +1377,14 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       if (v != null) ordered.add(v);
     }
     ordered.addAll(map.values);
+    final groupingActive = settings.providerGroupingActive;
+    final groupingRows = groupingActive
+        ? _buildProviderGroupingRows(
+            l10n: l10n,
+            settings: settings,
+            items: ordered,
+          )
+        : const <_DesktopProviderGroupingRowVM>[];
 
     _selectedKey ??=
         (widget.initialSelectedKey ??
@@ -1345,139 +1414,425 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                 child: Column(
                   children: [
                     Expanded(
-                      child: ReorderableListView.builder(
-                        buildDefaultDragHandles: false,
-                        padding: EdgeInsets.zero,
-                        itemCount: ordered.length,
-                        onReorder: (oldIndex, newIndex) async {
-                          if (newIndex > oldIndex) newIndex -= 1;
-                          final list = List<({String name, String key})>.from(
-                            ordered,
-                          );
-                          final item = list.removeAt(oldIndex);
-                          list.insert(newIndex, item);
-                          final newOrder = [for (final e in list) e.key];
-                          await settings.setProvidersOrder(newOrder);
-                          if (mounted) setState(() {});
-                        },
-                        proxyDecorator: (child, index, animation) {
-                          // No shadow; clip to rounded corners to avoid white outside of the grey card
-                          return AnimatedBuilder(
-                            animation: animation,
-                            builder: (context, _) => ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: child,
-                            ),
-                          );
-                        },
-                        itemBuilder: (ctx, i) {
-                          final item = ordered[i];
-                          final cfg = settings.getProviderConfig(
-                            item.key,
-                            defaultName: item.name,
-                          );
-                          final enabled = cfg.enabled;
-                          final selected = item.key == _selectedKey;
-                          final bg = selected
-                              ? cs.primary.withOpacity(0.08)
-                              : Colors.transparent;
-                          final row = _ProviderListRow(
-                            name: item.name,
-                            keyName: item.key,
-                            enabled: enabled,
-                            selected: selected,
-                            background: bg,
-                            onTap: () =>
-                                setState(() => _selectedKey = item.key),
-                            onEdit: () {
-                              setState(() => _selectedKey = item.key);
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                _detailKey.currentState
-                                    ?._showProviderSettingsDialog(context);
-                              });
-                            },
-                            onShare: () {
-                              setState(() => _selectedKey = item.key);
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                _showShareDialog(
-                                  item.key,
-                                  cfg.name.isNotEmpty ? cfg.name : item.name,
+                      child: groupingActive
+                          ? ReorderableListView.builder(
+                              buildDefaultDragHandles: false,
+                              padding: EdgeInsets.zero,
+                              itemCount: groupingRows.length,
+                              onReorder: (oldIndex, newIndex) async {
+                                if (groupingRows.isEmpty) return;
+                                final sp = context.read<SettingsProvider>();
+
+                                final logicRows = <ProviderGroupingRowVM>[
+                                  for (final r in groupingRows)
+                                    if (r is _DesktopProviderGroupingHeaderVM)
+                                      ProviderGroupingHeaderVM(
+                                        groupKey: r.groupKey,
+                                      )
+                                    else if (r is _DesktopProviderGroupingProviderVM)
+                                      ProviderGroupingProviderVM(
+                                        providerKey: r.item.key,
+                                        groupKey: r.groupKey,
+                                      ),
+                                ];
+
+                                final analysis = analyzeProviderGroupingReorder(
+                                  rows: logicRows,
+                                  oldIndex: oldIndex,
+                                  newIndex: newIndex,
+                                  isGroupCollapsed: sp.isGroupCollapsed,
                                 );
-                              });
-                            },
-                            onDelete: baseKeys.contains(item.key)
-                                ? null
-                                : () async {
-                                    final l10n = AppLocalizations.of(context)!;
-                                    final ok = await showDialog<bool>(
-                                      context: context,
-                                      builder: (ctx) => AlertDialog(
-                                        title: Text(
-                                          l10n.providerDetailPageDeleteProviderTitle,
+
+                                if (analysis.blockedReason ==
+                                    ProviderGroupingReorderBlockedReason
+                                        .targetGroupCollapsed) {
+                                  showAppSnackBar(
+                                    context,
+                                    message:
+                                        l10n.providerGroupsExpandToMoveToast,
+                                    type: NotificationType.info,
+                                  );
+                                  if (mounted) setState(() {});
+                                  return;
+                                }
+
+                                final intent = analysis.intent;
+                                if (intent == null) return;
+                                final targetGroupId = intent.targetGroupKey ==
+                                        SettingsProvider
+                                            .providerUngroupedGroupKey
+                                    ? null
+                                    : intent.targetGroupKey;
+                                await sp.moveProvider(
+                                  intent.providerKey,
+                                  targetGroupId,
+                                  intent.targetPos,
+                                );
+                              },
+                              proxyDecorator: (child, index, animation) {
+                                return AnimatedBuilder(
+                                  animation: animation,
+                                  builder: (context, _) => ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              itemBuilder: (ctx, i) {
+                                final row = groupingRows[i];
+                                if (row is _DesktopProviderGroupingHeaderVM) {
+                                  return KeyedSubtree(
+                                    key: ValueKey(
+                                      'desktop-provider-group-header-${row.groupKey}',
+                                    ),
+                                    child: Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: 6,
+                                        top: i == 0 ? 0 : 6,
+                                      ),
+                                      child: _DesktopProviderGroupHeaderRow(
+                                        title: row.title,
+                                        count: row.count,
+                                        collapsed: row.collapsed,
+                                        onToggle: () => unawaited(
+                                          context
+                                              .read<SettingsProvider>()
+                                              .toggleGroupCollapsed(row.groupKey),
                                         ),
-                                        content: Text(
-                                          l10n.providerDetailPageDeleteProviderContent,
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.of(ctx).pop(false),
-                                            child: Text(
-                                              l10n.providerDetailPageCancelButton,
-                                            ),
-                                          ),
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.of(ctx).pop(true),
-                                            child: Text(
-                                              l10n.providerDetailPageDeleteButton,
-                                              style: const TextStyle(
-                                                color: Colors.red,
+                                      ),
+                                    ),
+                                  );
+                                }
+                                if (row is _DesktopProviderGroupingProviderVM) {
+                                  final collapsed = settings.isGroupCollapsed(
+                                    row.groupKey,
+                                  );
+                                  return KeyedSubtree(
+                                    key: ValueKey('desktop-prov-${row.item.key}'),
+                                    child: AnimatedSize(
+                                      duration:
+                                          const Duration(milliseconds: 260),
+                                      curve: Curves.easeInOutCubic,
+                                      alignment: Alignment.topCenter,
+                                      child: collapsed
+                                          ? const SizedBox.shrink()
+                                          : Padding(
+                                              padding: const EdgeInsets.only(
+                                                bottom: 8,
+                                              ),
+                                              child:
+                                                  ReorderableDragStartListener(
+                                                index: i,
+                                                child: () {
+                                                  final item = row.item;
+                                                  final cfg =
+                                                      settings.getProviderConfig(
+                                                    item.key,
+                                                    defaultName: item.name,
+                                                  );
+                                                  final enabled = cfg.enabled;
+                                                  final selected =
+                                                      item.key == _selectedKey;
+                                                  final bg = selected
+                                                      ? cs.primary
+                                                          .withOpacity(0.08)
+                                                      : Colors.transparent;
+                                                  return _ProviderListRow(
+                                                    name: item.name,
+                                                    keyName: item.key,
+                                                    enabled: enabled,
+                                                    selected: selected,
+                                                    background: bg,
+                                                    onTap: () => setState(
+                                                      () =>
+                                                          _selectedKey = item.key,
+                                                    ),
+                                                    onEdit: () {
+                                                      setState(
+                                                        () => _selectedKey =
+                                                            item.key,
+                                                      );
+                                                      WidgetsBinding.instance
+                                                          .addPostFrameCallback(
+                                                        (_) {
+                                                          _detailKey
+                                                              .currentState
+                                                              ?._showProviderSettingsDialog(
+                                                                context,
+                                                              );
+                                                        },
+                                                      );
+                                                    },
+                                                    onShare: () {
+                                                      setState(
+                                                        () => _selectedKey =
+                                                            item.key,
+                                                      );
+                                                      WidgetsBinding.instance
+                                                          .addPostFrameCallback(
+                                                        (_) {
+                                                          _showShareDialog(
+                                                            item.key,
+                                                            cfg.name.isNotEmpty
+                                                                ? cfg.name
+                                                                : item.name,
+                                                          );
+                                                        },
+                                                      );
+                                                    },
+                                                    onDelete:
+                                                        baseKeys.contains(item.key)
+                                                            ? null
+                                                            : () async {
+                                                                final l10n =
+                                                                    AppLocalizations.of(
+                                                                      context,
+                                                                    )!;
+                                                                final ok =
+                                                                    await showDialog<
+                                                                      bool
+                                                                    >(
+                                                                  context:
+                                                                      context,
+                                                                  builder:
+                                                                      (ctx) =>
+                                                                          AlertDialog(
+                                                                    title: Text(
+                                                                      l10n
+                                                                          .providerDetailPageDeleteProviderTitle,
+                                                                    ),
+                                                                    content: Text(
+                                                                      l10n
+                                                                          .providerDetailPageDeleteProviderContent,
+                                                                    ),
+                                                                    actions: [
+                                                                      TextButton(
+                                                                        onPressed: () =>
+                                                                            Navigator.of(ctx).pop(false),
+                                                                        child:
+                                                                            Text(
+                                                                          l10n
+                                                                              .providerDetailPageCancelButton,
+                                                                        ),
+                                                                      ),
+                                                                      TextButton(
+                                                                        onPressed: () =>
+                                                                            Navigator.of(ctx).pop(true),
+                                                                        child:
+                                                                            Text(
+                                                                          l10n
+                                                                              .providerDetailPageDeleteButton,
+                                                                          style:
+                                                                              const TextStyle(
+                                                                            color:
+                                                                                Colors.red,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                );
+                                                                if (ok == true) {
+                                                                  try {
+                                                                    final ap =
+                                                                        context
+                                                                            .read<
+                                                                              AssistantProvider
+                                                                            >();
+                                                                    for (final a
+                                                                        in ap.assistants) {
+                                                                      if (a.chatModelProvider ==
+                                                                          item.key) {
+                                                                        await ap
+                                                                            .updateAssistant(
+                                                                          a.copyWith(
+                                                                            clearChatModel:
+                                                                                true,
+                                                                          ),
+                                                                        );
+                                                                      }
+                                                                    }
+                                                                  } catch (_) {}
+                                                                  await settings
+                                                                      .removeProviderConfig(
+                                                                    item.key,
+                                                                  );
+                                                                  if (mounted) {
+                                                                    setState(() {
+                                                                      if (_selectedKey ==
+                                                                          item.key) {
+                                                                        _selectedKey =
+                                                                            ordered.isNotEmpty
+                                                                                ? ordered.first.key
+                                                                                : null;
+                                                                      }
+                                                                    });
+                                                                  }
+                                                                }
+                                                              },
+                                                  );
+                                                }(),
                                               ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                    if (ok == true) {
-                                      // Clear assistant-level model selections referencing this provider
-                                      try {
-                                        final ap = context
-                                            .read<AssistantProvider>();
-                                        for (final a in ap.assistants) {
-                                          if (a.chatModelProvider == item.key) {
-                                            await ap.updateAssistant(
-                                              a.copyWith(clearChatModel: true),
-                                            );
-                                          }
-                                        }
-                                      } catch (_) {}
-                                      await settings.removeProviderConfig(
-                                        item.key,
-                                      );
-                                      if (mounted)
-                                        setState(() {
-                                          if (_selectedKey == item.key) {
-                                            _selectedKey = ordered.isNotEmpty
-                                                ? ordered.first.key
-                                                : null;
-                                          }
-                                        });
-                                    }
+                                    ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            )
+                          : ReorderableListView.builder(
+                              buildDefaultDragHandles: false,
+                              padding: EdgeInsets.zero,
+                              itemCount: ordered.length,
+                              onReorder: (oldIndex, newIndex) async {
+                                if (newIndex > oldIndex) newIndex -= 1;
+                                final list =
+                                    List<({String name, String key})>.from(
+                                  ordered,
+                                );
+                                final item = list.removeAt(oldIndex);
+                                list.insert(newIndex, item);
+                                final newOrder = [for (final e in list) e.key];
+                                await settings.setProvidersOrder(newOrder);
+                                if (mounted) setState(() {});
+                              },
+                              proxyDecorator: (child, index, animation) {
+                                // No shadow; clip to rounded corners to avoid white outside of the grey card
+                                return AnimatedBuilder(
+                                  animation: animation,
+                                  builder: (context, _) => ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              itemBuilder: (ctx, i) {
+                                final item = ordered[i];
+                                final cfg = settings.getProviderConfig(
+                                  item.key,
+                                  defaultName: item.name,
+                                );
+                                final enabled = cfg.enabled;
+                                final selected = item.key == _selectedKey;
+                                final bg = selected
+                                    ? cs.primary.withOpacity(0.08)
+                                    : Colors.transparent;
+                                final row = _ProviderListRow(
+                                  name: item.name,
+                                  keyName: item.key,
+                                  enabled: enabled,
+                                  selected: selected,
+                                  background: bg,
+                                  onTap: () =>
+                                      setState(() => _selectedKey = item.key),
+                                  onEdit: () {
+                                    setState(() => _selectedKey = item.key);
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                      _detailKey.currentState
+                                          ?._showProviderSettingsDialog(
+                                            context,
+                                          );
+                                    });
                                   },
-                          );
-                          return KeyedSubtree(
-                            key: ValueKey('desktop-prov-${item.key}'),
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: ReorderableDragStartListener(
-                                index: i,
-                                child: row,
-                              ),
+                                  onShare: () {
+                                    setState(() => _selectedKey = item.key);
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                      _showShareDialog(
+                                        item.key,
+                                        cfg.name.isNotEmpty
+                                            ? cfg.name
+                                            : item.name,
+                                      );
+                                    });
+                                  },
+                                  onDelete: baseKeys.contains(item.key)
+                                      ? null
+                                      : () async {
+                                          final l10n =
+                                              AppLocalizations.of(context)!;
+                                          final ok = await showDialog<bool>(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              title: Text(
+                                                l10n
+                                                    .providerDetailPageDeleteProviderTitle,
+                                              ),
+                                              content: Text(
+                                                l10n
+                                                    .providerDetailPageDeleteProviderContent,
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.of(ctx)
+                                                          .pop(false),
+                                                  child: Text(
+                                                    l10n
+                                                        .providerDetailPageCancelButton,
+                                                  ),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.of(ctx)
+                                                          .pop(true),
+                                                  child: Text(
+                                                    l10n
+                                                        .providerDetailPageDeleteButton,
+                                                    style: const TextStyle(
+                                                      color: Colors.red,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          if (ok == true) {
+                                            // Clear assistant-level model selections referencing this provider
+                                            try {
+                                              final ap =
+                                                  context.read<
+                                                    AssistantProvider
+                                                  >();
+                                              for (final a in ap.assistants) {
+                                                if (a.chatModelProvider ==
+                                                    item.key) {
+                                                  await ap.updateAssistant(
+                                                    a.copyWith(
+                                                      clearChatModel: true,
+                                                    ),
+                                                  );
+                                                }
+                                              }
+                                            } catch (_) {}
+                                            await settings.removeProviderConfig(
+                                              item.key,
+                                            );
+                                            if (mounted)
+                                              setState(() {
+                                                if (_selectedKey == item.key) {
+                                                  _selectedKey =
+                                                      ordered.isNotEmpty
+                                                          ? ordered.first.key
+                                                          : null;
+                                                }
+                                              });
+                                          }
+                                        },
+                                );
+                                return KeyedSubtree(
+                                  key: ValueKey('desktop-prov-${item.key}'),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: ReorderableDragStartListener(
+                                      index: i,
+                                      child: row,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
                     ),
                     const SizedBox(height: 8),
                     // Bottom add button
@@ -1507,6 +1862,114 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
               ),
               // Right detail pane
               Expanded(child: rightPane),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+sealed class _DesktopProviderGroupingRowVM {
+  const _DesktopProviderGroupingRowVM();
+}
+
+class _DesktopProviderGroupingHeaderVM extends _DesktopProviderGroupingRowVM {
+  const _DesktopProviderGroupingHeaderVM({
+    required this.groupKey,
+    required this.title,
+    required this.count,
+    required this.collapsed,
+  });
+
+  final String groupKey;
+  final String title;
+  final int count;
+  final bool collapsed;
+}
+
+class _DesktopProviderGroupingProviderVM extends _DesktopProviderGroupingRowVM {
+  const _DesktopProviderGroupingProviderVM({
+    required this.item,
+    required this.groupKey,
+  });
+
+  final ({String name, String key}) item;
+  final String groupKey;
+}
+
+class _DesktopProviderGroupHeaderRow extends StatefulWidget {
+  const _DesktopProviderGroupHeaderRow({
+    required this.title,
+    required this.count,
+    required this.collapsed,
+    required this.onToggle,
+  });
+
+  final String title;
+  final int count;
+  final bool collapsed;
+  final VoidCallback onToggle;
+
+  @override
+  State<_DesktopProviderGroupHeaderRow> createState() =>
+      _DesktopProviderGroupHeaderRowState();
+}
+
+class _DesktopProviderGroupHeaderRowState
+    extends State<_DesktopProviderGroupHeaderRow> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = _hover
+        ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04))
+        : Colors.transparent;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onToggle,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          child: Row(
+            children: [
+              AnimatedRotation(
+                turns: widget.collapsed ? 0.0 : 0.25, // right -> down
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                child: Icon(
+                  lucide.Lucide.ChevronRight,
+                  size: 16,
+                  color: cs.onSurface.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface.withOpacity(0.9),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _GreyCapsule(label: '${widget.count}'),
             ],
           ),
         ),
@@ -2745,6 +3208,18 @@ class _DesktopProviderDetailPaneState
                 final proxyEnabledNow = cfgNow.proxyEnabled ?? false;
                 final aihubmixAppCodeEnabled =
                     cfgNow.aihubmixAppCodeEnabled ?? false;
+                final groupsNow = spWatch.providerGroups;
+                final groupValue =
+                    spWatch.groupIdForProvider(widget.providerKey) ??
+                    SettingsProvider.providerUngroupedGroupKey;
+                final groupOptions = <DesktopSelectOption<String>>[
+                  DesktopSelectOption(
+                    value: SettingsProvider.providerUngroupedGroupKey,
+                    label: l10n.providerGroupsOtherUngroupedOption,
+                  ),
+                  for (final g in groupsNow)
+                    DesktopSelectOption(value: g.id, label: g.name),
+                ];
                 Widget row(String label, Widget trailing) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Row(
@@ -2953,6 +3428,108 @@ class _DesktopProviderDetailPaneState
                                   );
                                 },
                               ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // 1.5) Group
+                          row(
+                            l10n.providerGroupsGroupLabel,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DesktopSelectDropdown<String>(
+                                    value: groupValue,
+                                    options: groupOptions,
+                                    maxLabelWidth: 150,
+                                    triggerFillColor:
+                                        Theme.of(ctx).brightness ==
+                                                Brightness.dark
+                                            ? Colors.white10
+                                            : const Color(0xFFF7F7F9),
+                                    onSelected: (v) async {
+                                      if (v ==
+                                          SettingsProvider
+                                              .providerUngroupedGroupKey) {
+                                        await spWatch.setProviderGroup(
+                                          widget.providerKey,
+                                          null,
+                                        );
+                                      } else {
+                                        await spWatch.setProviderGroup(
+                                          widget.providerKey,
+                                          v,
+                                        );
+                                      }
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                _IconBtn(
+                                  icon: lucide.Lucide.Plus,
+                                  color: cs.primary,
+                                  onTap: () => unawaited(() async {
+                                    final controller = TextEditingController();
+                                    final ok = await showDialog<bool>(
+                                      context: ctx,
+                                      barrierColor:
+                                          Colors.black.withOpacity(0.12),
+                                      builder: (dctx) => AlertDialog(
+                                        title: Text(
+                                          l10n.providerGroupsCreateDialogTitle,
+                                        ),
+                                        content: TextField(
+                                          controller: controller,
+                                          autofocus: true,
+                                          decoration: InputDecoration(
+                                            hintText:
+                                                l10n.providerGroupsNameHint,
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.of(dctx).pop(false),
+                                            child: Text(
+                                              l10n
+                                                  .providerGroupsCreateDialogCancel,
+                                            ),
+                                          ),
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.of(dctx).pop(true),
+                                            child: Text(
+                                              l10n.providerGroupsCreateDialogOk,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (ok != true) return;
+                                    final name = controller.text.trim();
+                                    if (name.isEmpty) return;
+                                    final id = await spWatch.createGroup(name);
+                                    if (id.isEmpty) return;
+                                    await spWatch.setProviderGroup(
+                                      widget.providerKey,
+                                      id,
+                                    );
+                                  }()),
+                                ),
+                                const SizedBox(width: 4),
+                                _IconBtn(
+                                  icon: lucide.Lucide.Settings,
+                                  onTap: () => unawaited(
+                                    showDialog<void>(
+                                      context: ctx,
+                                      barrierDismissible: true,
+                                      barrierColor:
+                                          Colors.black.withOpacity(0.12),
+                                      builder: (_) =>
+                                          const _DesktopProviderGroupsDialog(),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -5229,6 +5806,355 @@ class _IconTextBtnState extends State<_IconTextBtn> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopProviderGroupsDialog extends StatefulWidget {
+  const _DesktopProviderGroupsDialog();
+
+  @override
+  State<_DesktopProviderGroupsDialog> createState() =>
+      _DesktopProviderGroupsDialogState();
+}
+
+class _DesktopProviderGroupsDialogState extends State<_DesktopProviderGroupsDialog> {
+  Future<String?> _promptName(
+    BuildContext context, {
+    required String title,
+    String initialText = '',
+    required String okText,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    final controller = TextEditingController(text: initialText);
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.12),
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(hintText: l10n.providerGroupsNameHint),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.providerGroupsCreateDialogCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(okText),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return null;
+    final name = controller.text.trim();
+    if (name.isEmpty) return null;
+    return name;
+  }
+
+  Future<void> _createGroup(BuildContext context) async {
+    final sp = context.read<SettingsProvider>();
+    final l10n = AppLocalizations.of(context)!;
+    final name = await _promptName(
+      context,
+      title: l10n.providerGroupsCreateDialogTitle,
+      okText: l10n.providerGroupsCreateDialogOk,
+    );
+    if (name == null) return;
+    final id = await sp.createGroup(name);
+    if (id.isEmpty && context.mounted) {
+      showAppSnackBar(
+        context,
+        message: l10n.providerGroupsCreateFailedToast,
+        type: NotificationType.error,
+      );
+    }
+  }
+
+  Future<void> _renameGroup(
+    BuildContext context, {
+    required String groupId,
+    required String oldName,
+  }) async {
+    final sp = context.read<SettingsProvider>();
+    final l10n = AppLocalizations.of(context)!;
+    final name = await _promptName(
+      context,
+      title: l10n.providerDetailPageEditTooltip,
+      initialText: oldName,
+      okText: l10n.sideDrawerSave,
+    );
+    if (name == null) return;
+    await sp.renameGroup(groupId, name);
+  }
+
+  Future<void> _deleteGroup(BuildContext context, String groupId) async {
+    final sp = context.read<SettingsProvider>();
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.12),
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.providerGroupsDeleteConfirmTitle),
+        content: Text(l10n.providerGroupsDeleteConfirmContent),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.providerGroupsDeleteConfirmCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.providerGroupsDeleteConfirmOk,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await sp.deleteGroup(groupId);
+    if (!context.mounted) return;
+    showAppSnackBar(
+      context,
+      message: l10n.providerGroupsDeletedToast,
+      type: NotificationType.success,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sp = context.watch<SettingsProvider>();
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final groups = sp.providerGroups;
+
+    final counts = <String, int>{};
+    for (final k in sp.providersOrder) {
+      final gid = sp.groupIdForProvider(k);
+      if (gid != null) counts[gid] = (counts[gid] ?? 0) + 1;
+    }
+
+    return Dialog(
+      backgroundColor: cs.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 560),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: 48,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.providerGroupsManageTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    _IconBtn(
+                      icon: lucide.Lucide.Plus,
+                      color: cs.primary,
+                      onTap: () => unawaited(_createGroup(context)),
+                    ),
+                    const SizedBox(width: 6),
+                    _IconBtn(
+                      icon: lucide.Lucide.X,
+                      onTap: () => Navigator.of(context).maybePop(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: groups.isEmpty
+                  ? Center(
+                      child: Text(
+                        l10n.providerGroupsEmptyState,
+                        style: TextStyle(
+                          color: cs.onSurface.withOpacity(0.7),
+                          fontSize: 13,
+                        ),
+                      ),
+                    )
+                  : ReorderableListView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                      itemCount: groups.length,
+                      buildDefaultDragHandles: false,
+                      proxyDecorator: (child, index, animation) {
+                        return ScaleTransition(
+                          scale: Tween<double>(begin: 1.0, end: 1.02).animate(
+                            animation,
+                          ),
+                          child: child,
+                        );
+                      },
+                      onReorder: (oldIndex, newIndex) async {
+                        if (newIndex > oldIndex) newIndex -= 1;
+                        await context
+                            .read<SettingsProvider>()
+                            .reorderProviderGroups(oldIndex, newIndex);
+                      },
+                      itemBuilder: (ctx, i) {
+                        final g = groups[i];
+                        final count = counts[g.id] ?? 0;
+                        return KeyedSubtree(
+                          key: ValueKey('desktop-provider-group-${g.id}'),
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _DesktopProviderGroupCard(
+                              title: g.name,
+                              count: count,
+                              onEdit: () => unawaited(
+                                _renameGroup(
+                                  context,
+                                  groupId: g.id,
+                                  oldName: g.name,
+                                ),
+                              ),
+                              onDelete: () => unawaited(_deleteGroup(context, g.id)),
+                              dragHandle: ReorderableDragStartListener(
+                                index: i,
+                                child: const _DesktopDragHandle(),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopProviderGroupCard extends StatelessWidget {
+  const _DesktopProviderGroupCard({
+    required this.title,
+    required this.count,
+    required this.onEdit,
+    required this.onDelete,
+    required this.dragHandle,
+  });
+
+  final String title;
+  final int count;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final Widget dragHandle;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
+    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.10);
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor, width: 1.0),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+          _DesktopCountPill(count: count),
+          const SizedBox(width: 10),
+          _IconBtn(
+            icon: lucide.Lucide.Pencil,
+            onTap: onEdit,
+          ),
+          const SizedBox(width: 4),
+          _IconBtn(
+            icon: lucide.Lucide.Trash2,
+            color: cs.error,
+            onTap: onDelete,
+          ),
+          const SizedBox(width: 4),
+          dragHandle,
+        ],
+      ),
+    );
+  }
+}
+
+class _DesktopCountPill extends StatelessWidget {
+  const _DesktopCountPill({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final bg = cs.primary.withOpacity(0.12);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      child: Text(
+        '$count',
+        style: TextStyle(
+          fontSize: 12,
+          color: cs.primary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _DesktopDragHandle extends StatefulWidget {
+  const _DesktopDragHandle();
+
+  @override
+  State<_DesktopDragHandle> createState() => _DesktopDragHandleState();
+}
+
+class _DesktopDragHandleState extends State<_DesktopDragHandle> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = _hover
+        ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05))
+        : Colors.transparent;
+    return MouseRegion(
+      cursor: SystemMouseCursors.grab,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+        alignment: Alignment.center,
+        child: Icon(
+          lucide.Lucide.GripVertical,
+          size: 18,
+          color: cs.onSurface.withOpacity(0.7),
         ),
       ),
     );
