@@ -2437,6 +2437,10 @@ class ProviderConfig {
   final String name;
   final String apiKey;
   final String baseUrl;
+  /// Provider grouping/channel id (e.g. official/self_hosted/local/public).
+  ///
+  /// When null, UI may use an auto-classified group.
+  final String? group;
   final ProviderKind? providerType; // Explicit provider type to avoid misclassification
   final String? chatPath; // openai only
   final bool? useResponseApi; // openai only
@@ -2473,6 +2477,7 @@ class ProviderConfig {
     required this.name,
     required this.apiKey,
     required this.baseUrl,
+    this.group,
     this.providerType,
     this.chatPath,
     this.useResponseApi,
@@ -2504,6 +2509,7 @@ class ProviderConfig {
     String? name,
     String? apiKey,
     String? baseUrl,
+    Object? group = _sentinel,
     ProviderKind? providerType,
     String? chatPath,
     bool? useResponseApi,
@@ -2530,6 +2536,7 @@ class ProviderConfig {
         name: name ?? this.name,
         apiKey: apiKey ?? this.apiKey,
         baseUrl: baseUrl ?? this.baseUrl,
+        group: (identical(group, _sentinel)) ? this.group : (group as String?),
         providerType: providerType ?? this.providerType,
         chatPath: chatPath ?? this.chatPath,
         useResponseApi: useResponseApi ?? this.useResponseApi,
@@ -2558,6 +2565,7 @@ class ProviderConfig {
         'name': name,
         'apiKey': apiKey,
         'baseUrl': baseUrl,
+        'group': group,
         'providerType': providerType?.name,
         'chatPath': chatPath,
         'useResponseApi': useResponseApi,
@@ -2586,6 +2594,7 @@ class ProviderConfig {
         name: json['name'] as String? ?? '',
         apiKey: json['apiKey'] as String? ?? '',
         baseUrl: json['baseUrl'] as String? ?? '',
+        group: json['group'] as String?,
         providerType: json['providerType'] != null 
             ? ProviderKind.values.firstWhere(
                 (e) => e.name == json['providerType'],
