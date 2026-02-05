@@ -3466,7 +3466,6 @@ class _DesktopProviderDetailPaneState
                                 const SizedBox(width: 8),
                                 _IconBtn(
                                   icon: lucide.Lucide.Plus,
-                                  color: cs.primary,
                                   onTap: () => unawaited(() async {
                                     final controller = TextEditingController();
                                     final ok = await showDialog<bool>(
@@ -5968,7 +5967,6 @@ class _DesktopProviderGroupsDialogState extends State<_DesktopProviderGroupsDial
                     ),
                     _IconBtn(
                       icon: lucide.Lucide.Plus,
-                      color: cs.primary,
                       onTap: () => unawaited(_createGroup(context)),
                     ),
                     const SizedBox(width: 6),
