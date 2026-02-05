@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:re_editor/re_editor.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
@@ -64,7 +65,7 @@ class HomePageController extends ChangeNotifier {
     required GlobalKey<ScaffoldState> scaffoldKey,
     required GlobalKey inputBarKey,
     required FocusNode inputFocus,
-    required TextEditingController inputController,
+    required CodeLineEditingController inputController,
     required ChatInputBarController mediaController,
     required ScrollController scrollController,
   })  : _context = context,
@@ -87,7 +88,7 @@ class HomePageController extends ChangeNotifier {
   final GlobalKey<ScaffoldState> _scaffoldKey;
   final GlobalKey _inputBarKey;
   final FocusNode _inputFocus;
-  final TextEditingController _inputController;
+  final CodeLineEditingController _inputController;
   final ChatInputBarController _mediaController;
   final ScrollController _scrollController;
 
@@ -165,7 +166,7 @@ class HomePageController extends ChangeNotifier {
   GlobalKey<ScaffoldState> get scaffoldKey => _scaffoldKey;
   GlobalKey get inputBarKey => _inputBarKey;
   FocusNode get inputFocus => _inputFocus;
-  TextEditingController get inputController => _inputController;
+  CodeLineEditingController get inputController => _inputController;
   ChatInputBarController get mediaController => _mediaController;
   ScrollController get scrollController => _scrollController;
   Animation<double> get convoFade => _convoFade;
@@ -1068,22 +1069,14 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> handleQuickPhraseSelection(QuickPhrase? selected) async {
     if (selected == null) return;
-    final text = _inputController.text;
-    final selection = _inputController.selection;
-    final start = (selection.start >= 0 && selection.start <= text.length)
-        ? selection.start
-        : text.length;
-    final end = (selection.end >= 0 && selection.end <= text.length && selection.end >= start)
-        ? selection.end
-        : start;
-
-    final newText = text.replaceRange(start, end, selected.content);
-    _inputController.value = _inputController.value.copyWith(
-      text: newText,
-      selection: TextSelection.collapsed(offset: start + selected.content.length),
-      composing: TextRange.empty,
-    );
-    notifyListeners();
+    // Use CodeLineEditingController's replaceSelection to insert quick phrase
+    try {
+      _inputController.replaceSelection(selected.content);
+      notifyListeners();
+    } catch (_) {
+      // TODO: Add diagnostics (e.g., debug log + stack trace) when replaceSelection fails to avoid silent drops.
+      return;
+    }
   }
 
   // ============================================================================
