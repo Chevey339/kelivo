@@ -2535,6 +2535,65 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providersPageProviderAddedSnackbar => 'Provider added';
 
   @override
+  String get providerGroupsGroupLabel => 'Group';
+
+  @override
+  String get providerGroupsOther => 'Other';
+
+  @override
+  String get providerGroupsOtherUngroupedOption => 'Other (Ungrouped)';
+
+  @override
+  String get providerGroupsPickerTitle => 'Select group';
+
+  @override
+  String get providerGroupsManageTitle => 'Manage groups';
+
+  @override
+  String get providerGroupsManageAction => 'Manage groups';
+
+  @override
+  String get providerGroupsCreateNewGroupAction => 'New group…';
+
+  @override
+  String get providerGroupsCreateDialogTitle => 'New group';
+
+  @override
+  String get providerGroupsNameHint => 'Group name';
+
+  @override
+  String get providerGroupsCreateDialogCancel => 'Cancel';
+
+  @override
+  String get providerGroupsCreateDialogOk => 'Create';
+
+  @override
+  String get providerGroupsCreateFailedToast => 'Failed to create group';
+
+  @override
+  String get providerGroupsDeleteConfirmTitle => 'Delete group?';
+
+  @override
+  String get providerGroupsDeleteConfirmContent =>
+      'Providers in this group will be moved to “Other”.';
+
+  @override
+  String get providerGroupsDeleteConfirmCancel => 'Cancel';
+
+  @override
+  String get providerGroupsDeleteConfirmOk => 'Delete';
+
+  @override
+  String get providerGroupsDeletedToast => 'Group deleted';
+
+  @override
+  String get providerGroupsEmptyState => 'No groups yet.';
+
+  @override
+  String get providerGroupsExpandToMoveToast =>
+      'Please expand the group first.';
+
+  @override
   String get providersPageSiliconFlowName => 'SiliconFlow';
 
   @override

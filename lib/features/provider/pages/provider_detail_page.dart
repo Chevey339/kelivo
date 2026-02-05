@@ -10,12 +10,12 @@ import '../../../core/providers/settings_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../icons/lucide_adapter.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../model/widgets/model_detail_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../widgets/share_provider_sheet.dart';
+import '../widgets/provider_group_picker_sheet.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -414,6 +414,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   }
 
   Widget _buildConfigTab(BuildContext context, ColorScheme cs, AppLocalizations l10n) {
+    final sp = context.watch<SettingsProvider>();
+    final gid = sp.groupIdForProvider(widget.keyName);
+    final groupName = gid == null ? l10n.providerGroupsOther : (sp.groupById(gid)?.name ?? l10n.providerGroupsOther);
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       children: [
@@ -553,6 +557,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         // Top iOS-style section card for key settings
         _iosSectionCard(children: [
           if (widget.keyName.toLowerCase() != 'kelivoin') _providerKindRow(context),
+          _providerGroupRow(context, groupName: groupName),
           _iosRow(
             context,
             label: l10n.providerDetailPageEnabledTitle,
@@ -1261,7 +1266,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           builder: (context, color, _) {
             final c = color ?? base;
             return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
               child: Row(
                 children: [
                   Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: c))),
@@ -1295,7 +1300,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           builder: (context, color, _) {
             final c = color ?? base;
             return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
               child: Row(
                 children: [
                   Expanded(
@@ -1362,6 +1367,56 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   const SizedBox(width: 6),
                   Icon(Lucide.ChevronRight, size: 16, color: c),
                 ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _providerGroupRow(BuildContext context, {required String groupName}) {
+    final l10n = AppLocalizations.of(context)!;
+    return _TactileRow(
+      onTap: () async {
+        await showProviderGroupPickerSheet(context, providerKey: widget.keyName);
+      },
+      pressedScale: 1.00,
+      haptics: false,
+      builder: (pressed) {
+        final cs = Theme.of(context).colorScheme;
+        final base = cs.onSurface;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final target = pressed ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base) : base;
+        return TweenAnimationBuilder<Color?>(
+          tween: ColorTween(end: target),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          builder: (context, color, _) {
+            final c = color ?? base;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final maxTrailingW = constraints.maxWidth * 0.55;
+                  return Row(
+                    children: [
+                      Expanded(child: Text(l10n.providerGroupsGroupLabel, style: TextStyle(fontSize: 15, color: c))),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: maxTrailingW),
+                        child: Text(
+                          groupName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: TextStyle(fontSize: 15, color: c),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(Lucide.ChevronRight, size: 16, color: c),
+                    ],
+                  );
+                },
               ),
             );
           },

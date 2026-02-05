@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../utils/brand_assets.dart';
@@ -7,7 +8,6 @@ import '../widgets/import_provider_sheet.dart';
 import '../widgets/add_provider_sheet.dart';
 // grid reorder removed in favor of iOS-style list reordering
 import 'package:provider/provider.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -21,6 +21,7 @@ import 'dart:ui' as ui show ImageFilter;
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../widgets/provider_avatar.dart';
+import '../../../utils/provider_grouping_logic.dart';
 
 class ProvidersPage extends StatefulWidget {
   const ProvidersPage({super.key});
@@ -71,6 +72,9 @@ class _ProvidersPageState extends State<ProvidersPage> {
     // Append any remaining providers not recorded in order
     tmp.addAll(map.values);
     final items = tmp;
+
+    final groupingActive = settings.providerGroupingActive;
+    final groupingRows = groupingActive ? _buildProviderGroupingRows(l10n: l10n, settings: settings, items: items) : const <_ProviderGroupingRowVM>[];
 
     return Scaffold(
       appBar: AppBar(
@@ -140,37 +144,96 @@ class _ProvidersPageState extends State<ProvidersPage> {
       ),
       body: Stack(
         children: [
-          _ProvidersList(
-            items: items,
-            selectMode: _selectMode,
-            selectedKeys: _selected,
-            onToggleSelect: (key) {
-              setState(() {
-                if (_selected.contains(key)) {
-                  _selected.remove(key);
-                } else {
-                  _selected.add(key);
+          if (!groupingActive)
+            _ProvidersList(
+              items: items,
+              selectMode: _selectMode,
+              selectedKeys: _selected,
+              onToggleSelect: (key) {
+                setState(() {
+                  if (_selected.contains(key)) {
+                    _selected.remove(key);
+                  } else {
+                    _selected.add(key);
+                  }
+                });
+              },
+              onReorder: (oldIndex, newIndex) async {
+                // Normalize newIndex because Flutter passes the index after removal
+                if (newIndex > oldIndex) newIndex -= 1;
+                final moved = items[oldIndex];
+                final mut = List<_Provider>.of(items);
+                final item = mut.removeAt(oldIndex);
+                mut.insert(newIndex, item);
+                setState(() => _settleKeys.add(moved.keyName));
+                await context.read<SettingsProvider>().setProvidersOrder([
+                  for (final p in mut) p.keyName
+                ]);
+                Future.delayed(const Duration(milliseconds: 220), () {
+                  if (!mounted) return;
+                  setState(() => _settleKeys.remove(moved.keyName));
+                });
+              },
+              settlingKeys: _settleKeys,
+            )
+          else
+            _GroupedProvidersList(
+              rows: groupingRows,
+              selectMode: _selectMode,
+              selectedKeys: _selected,
+              onToggleSelect: (key) {
+                setState(() {
+                  if (_selected.contains(key)) {
+                    _selected.remove(key);
+                  } else {
+                    _selected.add(key);
+                  }
+                });
+              },
+              onReorder: (oldIndex, newIndex) async {
+                if (_selectMode) return;
+                if (groupingRows.isEmpty) return;
+                final sp = context.read<SettingsProvider>();
+
+                final logicRows = <ProviderGroupingRowVM>[
+                  for (final r in groupingRows)
+                    if (r is _ProviderGroupingHeaderVM)
+                      ProviderGroupingHeaderVM(groupKey: r.groupKey)
+                    else if (r is _ProviderGroupingProviderVM)
+                      ProviderGroupingProviderVM(providerKey: r.provider.keyName, groupKey: r.groupKey),
+                ];
+
+                final analysis = analyzeProviderGroupingReorder(
+                  rows: logicRows,
+                  oldIndex: oldIndex,
+                  newIndex: newIndex,
+                  isGroupCollapsed: sp.isGroupCollapsed,
+                );
+
+                if (analysis.blockedReason == ProviderGroupingReorderBlockedReason.targetGroupCollapsed) {
+                  showAppSnackBar(
+                    context,
+                    message: l10n.providerGroupsExpandToMoveToast,
+                    type: NotificationType.info,
+                  );
+                  if (mounted) setState(() {});
+                  return;
                 }
-              });
-            },
-            onReorder: (oldIndex, newIndex) async {
-              // Normalize newIndex because Flutter passes the index after removal
-              if (newIndex > oldIndex) newIndex -= 1;
-              final moved = items[oldIndex];
-              final mut = List<_Provider>.of(items);
-              final item = mut.removeAt(oldIndex);
-              mut.insert(newIndex, item);
-              setState(() => _settleKeys.add(moved.keyName));
-              await context.read<SettingsProvider>().setProvidersOrder([
-                for (final p in mut) p.keyName
-              ]);
-              Future.delayed(const Duration(milliseconds: 220), () {
-                if (!mounted) return;
-                setState(() => _settleKeys.remove(moved.keyName));
-              });
-            },
-            settlingKeys: _settleKeys,
-          ),
+
+                final intent = analysis.intent;
+                if (intent == null) return;
+
+                final targetGroupId = intent.targetGroupKey == SettingsProvider.providerUngroupedGroupKey ? null : intent.targetGroupKey;
+
+                setState(() => _settleKeys.add(intent.providerKey));
+                await sp.moveProvider(intent.providerKey, targetGroupId, intent.targetPos);
+                Future.delayed(const Duration(milliseconds: 220), () {
+                  if (!mounted) return;
+                  setState(() => _settleKeys.remove(intent.providerKey));
+                });
+              },
+              settlingKeys: _settleKeys,
+            ),
           Positioned(
             left: 0,
             right: 0,
@@ -239,6 +302,47 @@ class _ProvidersPageState extends State<ProvidersPage> {
         // _p('GitHub', 'GitHub', enabled: false, models: 0),
       ];
 
+  List<_ProviderGroupingRowVM> _buildProviderGroupingRows({
+    required AppLocalizations l10n,
+    required SettingsProvider settings,
+    required List<_Provider> items,
+  }) {
+    final ungroupedKey = SettingsProvider.providerUngroupedGroupKey;
+    final groups = settings.providerGroups;
+    final groupById = {for (final g in groups) g.id: g};
+    final providersByGroupKey = <String, List<_Provider>>{
+      for (final g in groups) g.id: <_Provider>[],
+      ungroupedKey: <_Provider>[],
+    };
+
+    for (final p in items) {
+      final gid = settings.groupIdForProvider(p.keyName);
+      final groupKey = (gid != null && groupById.containsKey(gid)) ? gid : ungroupedKey;
+      (providersByGroupKey[groupKey] ??= <_Provider>[]).add(p);
+    }
+
+    final rows = <_ProviderGroupingRowVM>[];
+    for (final g in groups) {
+      final list = providersByGroupKey[g.id] ?? const <_Provider>[];
+      if (list.isEmpty) continue; // hide empty groups on list page
+      final collapsed = settings.isGroupCollapsed(g.id);
+      rows.add(_ProviderGroupingHeaderVM(groupKey: g.id, title: g.name, count: list.length, collapsed: collapsed));
+      for (final p in list) {
+        rows.add(_ProviderGroupingProviderVM(provider: p, groupKey: g.id));
+      }
+    }
+
+    final ungrouped = providersByGroupKey[ungroupedKey] ?? const <_Provider>[];
+    if (ungrouped.isNotEmpty) {
+      final collapsed = settings.isGroupCollapsed(ungroupedKey);
+      rows.add(_ProviderGroupingHeaderVM(groupKey: ungroupedKey, title: l10n.providerGroupsOther, count: ungrouped.length, collapsed: collapsed));
+      for (final p in ungrouped) {
+        rows.add(_ProviderGroupingProviderVM(provider: p, groupKey: ungroupedKey));
+      }
+    }
+    return rows;
+  }
+
   _Provider _p(String name, String key, {required bool enabled, required int models}) =>
       _Provider(name: name, keyName: key, enabled: enabled, modelCount: models);
 
@@ -298,6 +402,36 @@ class _ProvidersPageState extends State<ProvidersPage> {
       showAppSnackBar(context, message: l10n.providersPageDeleteSelectedSnackbar, type: NotificationType.success);
     } catch (_) {}
   }
+}
+
+sealed class _ProviderGroupingRowVM {
+  const _ProviderGroupingRowVM();
+}
+
+class _ProviderGroupingHeaderVM extends _ProviderGroupingRowVM {
+  const _ProviderGroupingHeaderVM({
+    required this.groupKey,
+    required this.title,
+    required this.count,
+    required this.collapsed,
+  });
+
+  /// groupId or `__ungrouped__`
+  final String groupKey;
+  final String title;
+  final int count;
+  final bool collapsed;
+}
+
+class _ProviderGroupingProviderVM extends _ProviderGroupingRowVM {
+  const _ProviderGroupingProviderVM({
+    required this.provider,
+    required this.groupKey,
+  });
+
+  final _Provider provider;
+  /// groupId or `__ungrouped__`
+  final String groupKey;
 }
 
 // iOS-style providers list (reorderable by long-press)
@@ -379,10 +513,10 @@ class _ProvidersList extends StatelessWidget {
                     child: _ProviderRow(
                       provider: p,
                       index: index,
-                      total: items.length,
                       selectMode: selectMode,
                       selected: selectedKeys.contains(p.keyName),
                       onToggleSelect: onToggleSelect,
+                      showDivider: index != items.length - 1,
                     ),
                   ),
                 );
@@ -395,21 +529,216 @@ class _ProvidersList extends StatelessWidget {
   }
 }
 
+// iOS-style grouped providers list (flattened: header + provider rows)
+class _GroupedProvidersList extends StatelessWidget {
+  const _GroupedProvidersList({
+    required this.rows,
+    required this.onReorder,
+    required this.settlingKeys,
+    required this.selectMode,
+    required this.selectedKeys,
+    required this.onToggleSelect,
+  });
+
+  final List<_ProviderGroupingRowVM> rows;
+  final void Function(int oldIndex, int newIndex) onReorder;
+  final Set<String> settlingKeys;
+  final bool selectMode;
+  final Set<String> selectedKeys;
+  final void Function(String key) onToggleSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06);
+
+    // Adapt height: wrap to content if short; flush to bottom if long
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final media = MediaQuery.of(context);
+          final safeBottom = media.padding.bottom;
+          final bottomGapIfFlush = safeBottom + 16.0; // leave room above system bar
+
+          final maxH = constraints.hasBoundedHeight ? constraints.maxHeight : double.infinity;
+          // Estimate row height: keep close to _ProvidersList.
+          const double rowH = 44.0;
+          const double dividerH = 6.0; // _iosDivider height (provider rows)
+          const double listPadV = 8.0; // ReorderableListView vertical padding
+
+          final collapsedByGroupKey = <String, bool>{};
+          for (final r in rows) {
+            if (r is _ProviderGroupingHeaderVM) collapsedByGroupKey[r.groupKey] = r.collapsed;
+          }
+
+          double baseContentH = 0.0;
+          if (rows.isNotEmpty) {
+            baseContentH += listPadV;
+            for (int i = 0; i < rows.length; i++) {
+              final r = rows[i];
+              if (r is _ProviderGroupingHeaderVM) {
+                baseContentH += rowH;
+                continue;
+              }
+              if (r is _ProviderGroupingProviderVM) {
+                final collapsed = collapsedByGroupKey[r.groupKey] ?? false;
+                if (collapsed) continue;
+                baseContentH += rowH;
+                final next = (i + 1 < rows.length) ? rows[i + 1] : null;
+                final showDivider = next is _ProviderGroupingProviderVM && next.groupKey == r.groupKey;
+                if (showDivider) baseContentH += dividerH;
+              }
+            }
+          }
+
+          final bool reachesBottom = maxH.isFinite &&
+              (baseContentH >= maxH - 0.5 || (baseContentH + bottomGapIfFlush) >= maxH - 0.5);
+          final double effectiveContentH = baseContentH + (reachesBottom ? bottomGapIfFlush : 0.0);
+          final double containerH = maxH.isFinite ? (effectiveContentH.clamp(0.0, maxH)).toDouble() : effectiveContentH;
+
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeInOutCubic,
+            height: containerH.isFinite ? containerH : null,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(12),
+                topRight: const Radius.circular(12),
+                bottomLeft: Radius.circular(reachesBottom ? 0 : 12),
+                bottomRight: Radius.circular(reachesBottom ? 0 : 12),
+              ),
+              border: Border.all(color: borderColor, width: 0.6),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: ReorderableListView.builder(
+              padding: EdgeInsets.only(top: 4, bottom: reachesBottom ? bottomGapIfFlush : 4),
+              itemCount: rows.length,
+              onReorder: onReorder,
+              buildDefaultDragHandles: false,
+              proxyDecorator: (child, index, animation) => Opacity(
+                opacity: 0.95,
+                child: Transform.scale(scale: 0.98, child: child),
+              ),
+              itemBuilder: (context, index) {
+                final row = rows[index];
+                if (row is _ProviderGroupingHeaderVM) {
+                  return KeyedSubtree(
+                    key: ValueKey('provider-group-header-${row.groupKey}'),
+                    child: _ProviderGroupHeaderRow(
+                      groupKey: row.groupKey,
+                      title: row.title,
+                      count: row.count,
+                      collapsed: row.collapsed,
+                    ),
+                  );
+                }
+                if (row is _ProviderGroupingProviderVM) {
+                  final p = row.provider;
+                  final collapsed = collapsedByGroupKey[row.groupKey] ?? false;
+                  final next = (index + 1 < rows.length) ? rows[index + 1] : null;
+                  final showDivider = !collapsed && next is _ProviderGroupingProviderVM && next.groupKey == row.groupKey;
+                  return KeyedSubtree(
+                    key: ValueKey(p.keyName),
+                    child: _SettleAnim(
+                      active: settlingKeys.contains(p.keyName),
+                      child: AnimatedSize(
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeInOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: collapsed
+                            ? const SizedBox.shrink()
+                            : _ProviderRow(
+                                provider: p,
+                                index: index,
+                                selectMode: selectMode,
+                                selected: selectedKeys.contains(p.keyName),
+                                onToggleSelect: onToggleSelect,
+                                showDivider: showDivider,
+                              ),
+                      ),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ProviderGroupHeaderRow extends StatelessWidget {
+  const _ProviderGroupHeaderRow({
+    required this.groupKey,
+    required this.title,
+    required this.count,
+    required this.collapsed,
+  });
+
+  final String groupKey;
+  final String title;
+  final int count;
+  final bool collapsed;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final base = cs.onSurface.withOpacity(0.8);
+    final pillBg = cs.primary.withOpacity(0.12);
+    final pillFg = cs.primary;
+
+    return _TactileRow(
+      pressedScale: 1.00,
+      onTap: () {
+        unawaited(context.read<SettingsProvider>().toggleGroupCollapsed(groupKey));
+      },
+      builder: (pressed) => _AnimatedPressColor(
+        pressed: pressed,
+        base: base,
+        builder: (color) => Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Row(
+            children: [
+              AnimatedRotation(
+                turns: collapsed ? 0.0 : 0.25,
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                child: Icon(Lucide.ChevronRight, size: 16, color: color.withOpacity(0.75)),
+              ),
+              const SizedBox(width: 6),
+              Expanded(child: Text(title, style: TextStyle(fontSize: 13.5, color: color, fontWeight: FontWeight.w700))),
+              const SizedBox(width: 8),
+              _Pill(text: '$count', bg: pillBg, fg: pillFg),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ProviderRow extends StatelessWidget {
   const _ProviderRow({
     required this.provider,
     required this.index,
-    required this.total,
     required this.selectMode,
     required this.selected,
     required this.onToggleSelect,
+    required this.showDivider,
   });
   final _Provider provider;
   final int index;
-  final int total;
   final bool selectMode;
   final bool selected;
   final void Function(String key) onToggleSelect;
+  final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
@@ -421,9 +750,6 @@ class _ProviderRow extends StatelessWidget {
 
     final statusBg = enabled ? Colors.green.withOpacity(0.12) : Colors.orange.withOpacity(0.15);
     final statusFg = enabled ? Colors.green : Colors.orange;
-
-    final isFirst = index == 0;
-    final isLast = index == total - 1;
 
     final row = _TactileRow(
       onTap: () {
@@ -528,7 +854,7 @@ class _ProviderRow extends StatelessWidget {
             if (!selectMode) {
               line = ReorderableDelayedDragStartListener(index: index, child: line);
             }
-            return Column(children: [line, if (!isLast) _iosDivider(context)]);
+            return Column(children: [line, if (showDivider) _iosDivider(context)]);
           },
         );
       },

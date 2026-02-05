@@ -2453,6 +2453,63 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providersPageProviderAddedSnackbar => '已添加供应商';
 
   @override
+  String get providerGroupsGroupLabel => '分组';
+
+  @override
+  String get providerGroupsOther => '其他';
+
+  @override
+  String get providerGroupsOtherUngroupedOption => '其他（未分组）';
+
+  @override
+  String get providerGroupsPickerTitle => '选择分组';
+
+  @override
+  String get providerGroupsManageTitle => '分组管理';
+
+  @override
+  String get providerGroupsManageAction => '管理分组';
+
+  @override
+  String get providerGroupsCreateNewGroupAction => '新建分组…';
+
+  @override
+  String get providerGroupsCreateDialogTitle => '新建分组';
+
+  @override
+  String get providerGroupsNameHint => '输入分组名称';
+
+  @override
+  String get providerGroupsCreateDialogCancel => '取消';
+
+  @override
+  String get providerGroupsCreateDialogOk => '创建';
+
+  @override
+  String get providerGroupsCreateFailedToast => '创建分组失败';
+
+  @override
+  String get providerGroupsDeleteConfirmTitle => '删除分组';
+
+  @override
+  String get providerGroupsDeleteConfirmContent => '该组内供应商将移动到「其他」';
+
+  @override
+  String get providerGroupsDeleteConfirmCancel => '取消';
+
+  @override
+  String get providerGroupsDeleteConfirmOk => '删除';
+
+  @override
+  String get providerGroupsDeletedToast => '已删除分组';
+
+  @override
+  String get providerGroupsEmptyState => '暂无分组';
+
+  @override
+  String get providerGroupsExpandToMoveToast => '请先展开分组';
+
+  @override
   String get providersPageSiliconFlowName => '硅基流动';
 
   @override
@@ -6321,6 +6378,63 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providersPageProviderAddedSnackbar => '已添加供应商';
 
   @override
+  String get providerGroupsGroupLabel => '分组';
+
+  @override
+  String get providerGroupsOther => '其他';
+
+  @override
+  String get providerGroupsOtherUngroupedOption => '其他（未分组）';
+
+  @override
+  String get providerGroupsPickerTitle => '选择分组';
+
+  @override
+  String get providerGroupsManageTitle => '分组管理';
+
+  @override
+  String get providerGroupsManageAction => '管理分组';
+
+  @override
+  String get providerGroupsCreateNewGroupAction => '新建分组…';
+
+  @override
+  String get providerGroupsCreateDialogTitle => '新建分组';
+
+  @override
+  String get providerGroupsNameHint => '输入分组名称';
+
+  @override
+  String get providerGroupsCreateDialogCancel => '取消';
+
+  @override
+  String get providerGroupsCreateDialogOk => '创建';
+
+  @override
+  String get providerGroupsCreateFailedToast => '创建分组失败';
+
+  @override
+  String get providerGroupsDeleteConfirmTitle => '删除分组';
+
+  @override
+  String get providerGroupsDeleteConfirmContent => '该组内供应商将移动到「其他」';
+
+  @override
+  String get providerGroupsDeleteConfirmCancel => '取消';
+
+  @override
+  String get providerGroupsDeleteConfirmOk => '删除';
+
+  @override
+  String get providerGroupsDeletedToast => '已删除分组';
+
+  @override
+  String get providerGroupsEmptyState => '暂无分组';
+
+  @override
+  String get providerGroupsExpandToMoveToast => '请先展开分组';
+
+  @override
   String get providersPageSiliconFlowName => '硅基流动';
 
   @override
@@ -10182,6 +10296,63 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providersPageProviderAddedSnackbar => '已新增供應商';
+
+  @override
+  String get providerGroupsGroupLabel => '分組';
+
+  @override
+  String get providerGroupsOther => '其他';
+
+  @override
+  String get providerGroupsOtherUngroupedOption => '其他（未分組）';
+
+  @override
+  String get providerGroupsPickerTitle => '選擇分組';
+
+  @override
+  String get providerGroupsManageTitle => '分組管理';
+
+  @override
+  String get providerGroupsManageAction => '管理分組';
+
+  @override
+  String get providerGroupsCreateNewGroupAction => '新增分組…';
+
+  @override
+  String get providerGroupsCreateDialogTitle => '新增分組';
+
+  @override
+  String get providerGroupsNameHint => '輸入分組名稱';
+
+  @override
+  String get providerGroupsCreateDialogCancel => '取消';
+
+  @override
+  String get providerGroupsCreateDialogOk => '建立';
+
+  @override
+  String get providerGroupsCreateFailedToast => '建立分組失敗';
+
+  @override
+  String get providerGroupsDeleteConfirmTitle => '刪除分組';
+
+  @override
+  String get providerGroupsDeleteConfirmContent => '該組內供應商將移動到「其他」';
+
+  @override
+  String get providerGroupsDeleteConfirmCancel => '取消';
+
+  @override
+  String get providerGroupsDeleteConfirmOk => '刪除';
+
+  @override
+  String get providerGroupsDeletedToast => '已刪除分組';
+
+  @override
+  String get providerGroupsEmptyState => '暫無分組';
+
+  @override
+  String get providerGroupsExpandToMoveToast => '請先展開分組';
 
   @override
   String get providersPageSiliconFlowName => '矽基流動';

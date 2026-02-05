@@ -4784,6 +4784,120 @@ abstract class AppLocalizations {
   /// **'Provider added'**
   String get providersPageProviderAddedSnackbar;
 
+  /// No description provided for @providerGroupsGroupLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get providerGroupsGroupLabel;
+
+  /// No description provided for @providerGroupsOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get providerGroupsOther;
+
+  /// No description provided for @providerGroupsOtherUngroupedOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Other (Ungrouped)'**
+  String get providerGroupsOtherUngroupedOption;
+
+  /// No description provided for @providerGroupsPickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select group'**
+  String get providerGroupsPickerTitle;
+
+  /// No description provided for @providerGroupsManageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage groups'**
+  String get providerGroupsManageTitle;
+
+  /// No description provided for @providerGroupsManageAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage groups'**
+  String get providerGroupsManageAction;
+
+  /// No description provided for @providerGroupsCreateNewGroupAction.
+  ///
+  /// In en, this message translates to:
+  /// **'New group…'**
+  String get providerGroupsCreateNewGroupAction;
+
+  /// No description provided for @providerGroupsCreateDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New group'**
+  String get providerGroupsCreateDialogTitle;
+
+  /// No description provided for @providerGroupsNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Group name'**
+  String get providerGroupsNameHint;
+
+  /// No description provided for @providerGroupsCreateDialogCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get providerGroupsCreateDialogCancel;
+
+  /// No description provided for @providerGroupsCreateDialogOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get providerGroupsCreateDialogOk;
+
+  /// No description provided for @providerGroupsCreateFailedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create group'**
+  String get providerGroupsCreateFailedToast;
+
+  /// No description provided for @providerGroupsDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete group?'**
+  String get providerGroupsDeleteConfirmTitle;
+
+  /// No description provided for @providerGroupsDeleteConfirmContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Providers in this group will be moved to “Other”.'**
+  String get providerGroupsDeleteConfirmContent;
+
+  /// No description provided for @providerGroupsDeleteConfirmCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get providerGroupsDeleteConfirmCancel;
+
+  /// No description provided for @providerGroupsDeleteConfirmOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get providerGroupsDeleteConfirmOk;
+
+  /// No description provided for @providerGroupsDeletedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Group deleted'**
+  String get providerGroupsDeletedToast;
+
+  /// No description provided for @providerGroupsEmptyState.
+  ///
+  /// In en, this message translates to:
+  /// **'No groups yet.'**
+  String get providerGroupsEmptyState;
+
+  /// No description provided for @providerGroupsExpandToMoveToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Please expand the group first.'**
+  String get providerGroupsExpandToMoveToast;
+
   /// No description provided for @providersPageSiliconFlowName.
   ///
   /// In en, this message translates to:

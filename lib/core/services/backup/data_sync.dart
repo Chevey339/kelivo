@@ -406,6 +406,9 @@ class DataSync {
             'provider_configs_v1', // Provider configurations
             'pinned_models_v1',    // Pinned models list
             'providers_order_v1',  // Provider order list
+            'provider_groups_v1', // Provider group list [{id,name,createdAt}]
+            'provider_group_map_v1', // providerKey -> groupId
+            'provider_group_collapsed_v1', // groupId|__ungrouped__ -> bool
             'search_services_v1',  // Search services configuration
             'assistant_tags_v1',         // Ordered tag list [{id,name}]
             'assistant_tag_map_v1',      // assistantId -> tagId
@@ -567,6 +570,55 @@ class DataSync {
                   await prefs.restoreSingle(key, jsonEncode(merged));
                 } catch (_) {}
               } else if (key == 'assistant_tag_collapsed_v1') {
+                // Merge collapse states; prefer existing on conflicts
+                try {
+                  final existingStr = (existing[key] ?? '') as String?;
+                  final newStr = (newValue ?? '') as String?;
+                  final existingMap = (existingStr == null || existingStr.isEmpty) ? <String, dynamic>{} : (jsonDecode(existingStr) as Map<String, dynamic>);
+                  final newMap = (newStr == null || newStr.isEmpty) ? <String, dynamic>{} : (jsonDecode(newStr) as Map<String, dynamic>);
+                  final merged = <String, dynamic>{...newMap, ...existingMap};
+                  await prefs.restoreSingle(key, jsonEncode(merged));
+                } catch (_) {}
+              } else if (key == 'provider_groups_v1') {
+                // Merge provider groups by id; keep existing order, append new groups at end (incoming order)
+                try {
+                  final existingStr = (existing[key] ?? '') as String?;
+                  final newStr = (newValue ?? '') as String?;
+                  final existingList = (existingStr == null || existingStr.isEmpty) ? <dynamic>[] : (jsonDecode(existingStr) as List);
+                  final newList = (newStr == null || newStr.isEmpty) ? <dynamic>[] : (jsonDecode(newStr) as List);
+
+                  final existingOrder = <String>[];
+                  final groupById = <String, Map<String, dynamic>>{};
+                  for (final e in existingList) {
+                    if (e is Map && e['id'] != null) {
+                      final id = e['id'].toString();
+                      existingOrder.add(id);
+                      groupById[id] = Map<String, dynamic>.from(e as Map);
+                    }
+                  }
+                  for (final e in newList) {
+                    if (e is Map && e['id'] != null) {
+                      final id = e['id'].toString();
+                      if (!groupById.containsKey(id)) {
+                        groupById[id] = Map<String, dynamic>.from(e as Map);
+                        existingOrder.add(id);
+                      }
+                    }
+                  }
+                  final merged = [for (final id in existingOrder) groupById[id]].whereType<Map<String, dynamic>>().toList();
+                  await prefs.restoreSingle(key, jsonEncode(merged));
+                } catch (_) {}
+              } else if (key == 'provider_group_map_v1') {
+                // Merge provider->group mapping; prefer existing on conflicts
+                try {
+                  final existingStr = (existing[key] ?? '') as String?;
+                  final newStr = (newValue ?? '') as String?;
+                  final existingMap = (existingStr == null || existingStr.isEmpty) ? <String, dynamic>{} : (jsonDecode(existingStr) as Map<String, dynamic>);
+                  final newMap = (newStr == null || newStr.isEmpty) ? <String, dynamic>{} : (jsonDecode(newStr) as Map<String, dynamic>);
+                  final merged = <String, dynamic>{...newMap, ...existingMap};
+                  await prefs.restoreSingle(key, jsonEncode(merged));
+                } catch (_) {}
+              } else if (key == 'provider_group_collapsed_v1') {
                 // Merge collapse states; prefer existing on conflicts
                 try {
                   final existingStr = (existing[key] ?? '') as String?;

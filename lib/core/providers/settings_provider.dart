@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:socks5_proxy/socks_client.dart' as socks;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import 'dart:async';
 import 'dart:convert';
 import '../services/search/search_service.dart';
@@ -12,10 +13,12 @@ import '../services/network/request_logger.dart';
 import '../services/logging/flutter_logger.dart';
 import '../models/api_keys.dart';
 import '../models/backup.dart';
+import '../models/provider_group.dart';
 import '../services/haptics.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
+import '../../utils/provider_grouping_logic.dart';
 
 // Desktop: topic list position
 enum DesktopTopicPosition { left, right }
@@ -25,6 +28,26 @@ enum DesktopSendShortcut { enter, ctrlEnter }
 
 class SettingsProvider extends ChangeNotifier {
   static const String _providersOrderKey = 'providers_order_v1';
+  static const String _providerGroupsKey = 'provider_groups_v1'; // [{id,name,createdAt}]
+  static const String _providerGroupMapKey = 'provider_group_map_v1'; // providerKey -> groupId
+  static const String _providerGroupCollapsedKey = 'provider_group_collapsed_v1'; // groupId|__ungrouped__ -> bool
+  static const String providerUngroupedGroupKey = '__ungrouped__';
+  static const List<String> _builtInProviderKeysInOrder = [
+    'OpenAI',
+    'SiliconFlow',
+    'Gemini',
+    'OpenRouter',
+    'KelivoIN',
+    'Tensdaq',
+    'DeepSeek',
+    'AIhubmix',
+    'Aliyun',
+    'Zhipu AI',
+    'Claude',
+    'Grok',
+    'ByteDance',
+  ];
+  static const Set<String> _builtInProviderKeys = {..._builtInProviderKeysInOrder};
   static const String _themeModeKey = 'theme_mode_v1';
   static const String _providerConfigsKey = 'provider_configs_v1';
   static const String _pinnedModelsKey = 'pinned_models_v1';
@@ -141,6 +164,36 @@ class SettingsProvider extends ChangeNotifier {
   List<String> _providersOrder = const [];
   List<String> get providersOrder => _providersOrder;
 
+  // ===== Provider grouping =====
+  List<ProviderGroup> _providerGroups = const <ProviderGroup>[];
+  Map<String, String> _providerGroupMap = <String, String>{}; // providerKey -> groupId
+  final Map<String, bool> _providerGroupCollapsed = <String, bool>{}; // groupId|__ungrouped__ -> bool
+
+  List<ProviderGroup> get providerGroups => List.unmodifiable(_providerGroups);
+
+  ProviderGroup? groupById(String id) {
+    for (final g in _providerGroups) {
+      if (g.id == id) return g;
+    }
+    return null;
+  }
+
+  String? groupIdForProvider(String providerKey) {
+    final gid = _providerGroupMap[providerKey];
+    if (gid == null) return null;
+    return groupById(gid) == null ? null : gid;
+  }
+
+  bool get providerGroupingActive {
+    for (final entry in _providerGroupMap.entries) {
+      final gid = entry.value;
+      if (groupById(gid) != null) return true;
+    }
+    return false;
+  }
+
+  bool isGroupCollapsed(String groupIdOrUngrouped) => _providerGroupCollapsed[groupIdOrUngrouped] ?? false;
+
   ThemeMode _themeMode = ThemeMode.system;
   ThemeMode get themeMode => _themeMode;
   // Theme palette & dynamic color
@@ -250,6 +303,38 @@ class SettingsProvider extends ChangeNotifier {
         final raw = jsonDecode(cfgStr) as Map<String, dynamic>;
         _providerConfigs = raw.map((k, v) => MapEntry(k, ProviderConfig.fromJson(v as Map<String, dynamic>)));
       } catch (_) {}
+    }
+
+    // load provider grouping
+    try {
+      final groupsStr = prefs.getString(_providerGroupsKey) ?? '';
+      _providerGroups = groupsStr.isEmpty ? const <ProviderGroup>[] : ProviderGroup.decodeList(groupsStr);
+    } catch (_) {
+      _providerGroups = const <ProviderGroup>[];
+    }
+    try {
+      final mapStr = prefs.getString(_providerGroupMapKey) ?? '';
+      if (mapStr.isNotEmpty) {
+        final raw = jsonDecode(mapStr) as Map<String, dynamic>;
+        _providerGroupMap = raw.map((k, v) => MapEntry(k, v.toString()));
+      } else {
+        _providerGroupMap = <String, String>{};
+      }
+    } catch (_) {
+      _providerGroupMap = <String, String>{};
+    }
+    try {
+      final collapsedStr = prefs.getString(_providerGroupCollapsedKey) ?? '';
+      if (collapsedStr.isNotEmpty) {
+        final raw = jsonDecode(collapsedStr) as Map<String, dynamic>;
+        _providerGroupCollapsed
+          ..clear()
+          ..addAll(raw.map((k, v) => MapEntry(k, (v is bool) ? v : (v.toString() == 'true'))));
+      } else {
+        _providerGroupCollapsed.clear();
+      }
+    } catch (_) {
+      _providerGroupCollapsed.clear();
     }
     // load pinned models
     final pinned = prefs.getStringList(_pinnedModelsKey) ?? const <String>[];
@@ -553,6 +638,15 @@ class SettingsProvider extends ChangeNotifier {
 
     // Attempt to reload any user-installed local fonts (mobile platforms)
     await _reloadLocalFontsIfAny();
+
+    // Final cleanup pass for provider order + grouping state (best-effort).
+    if (_cleanupProviderOrderAndGrouping()) {
+      try {
+        await prefs.setStringList(_providersOrderKey, _providersOrder);
+        await prefs.setString(_providerGroupMapKey, jsonEncode(_providerGroupMap));
+        await prefs.setString(_providerGroupCollapsedKey, jsonEncode(_providerGroupCollapsed));
+      } catch (_) {}
+    }
 
     notifyListeners();
   }
@@ -995,9 +1089,184 @@ class SettingsProvider extends ChangeNotifier {
 
   Future<void> setProvidersOrder(List<String> order) async {
     _providersOrder = List.unmodifiable(order);
+    _cleanupProviderOrderAndGrouping();
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_providersOrderKey, _providersOrder);
+  }
+
+  Set<String> _knownProviderKeys() => <String>{
+        ..._builtInProviderKeys,
+        ..._providerConfigs.keys,
+      };
+
+  bool _cleanupProviderOrderAndGrouping() {
+    bool changed = false;
+    final knownKeys = _knownProviderKeys();
+
+    // Clean providers order: remove non-existing and dedupe, append new at end.
+    final nextOrder = <String>[];
+    final seen = <String>{};
+    for (final k in _providersOrder) {
+      if (!knownKeys.contains(k)) {
+        changed = true;
+        continue;
+      }
+      if (!seen.add(k)) {
+        changed = true;
+        continue;
+      }
+      nextOrder.add(k);
+    }
+    final mergedDefault = <String>[
+      ..._builtInProviderKeysInOrder,
+      ..._providerConfigs.keys.where((k) => !_builtInProviderKeys.contains(k)),
+    ];
+    for (final k in mergedDefault) {
+      if (knownKeys.contains(k) && seen.add(k)) {
+        nextOrder.add(k);
+        changed = true;
+      }
+    }
+    if (!listEquals(_providersOrder, nextOrder)) {
+      _providersOrder = List.unmodifiable(nextOrder);
+      changed = true;
+    }
+
+    // Clean group map: remove invalid groupIds or non-existing provider keys.
+    final validGroupIds = {for (final g in _providerGroups) g.id};
+    final nextMap = <String, String>{};
+    for (final entry in _providerGroupMap.entries) {
+      final providerKey = entry.key;
+      final groupId = entry.value;
+      if (!knownKeys.contains(providerKey)) {
+        changed = true;
+        continue;
+      }
+      if (!validGroupIds.contains(groupId)) {
+        changed = true;
+        continue;
+      }
+      nextMap[providerKey] = groupId;
+    }
+    if (!mapEquals(_providerGroupMap, nextMap)) {
+      _providerGroupMap = nextMap;
+      changed = true;
+    }
+
+    // Clean collapsed state: remove unknown group ids (except ungrouped).
+    final nextCollapsed = <String, bool>{};
+    for (final entry in _providerGroupCollapsed.entries) {
+      final key = entry.key;
+      if (key == providerUngroupedGroupKey || validGroupIds.contains(key)) {
+        nextCollapsed[key] = entry.value;
+      } else {
+        changed = true;
+      }
+    }
+    if (!mapEquals(_providerGroupCollapsed, nextCollapsed)) {
+      _providerGroupCollapsed
+        ..clear()
+        ..addAll(nextCollapsed);
+      changed = true;
+    }
+
+    return changed;
+  }
+
+  Future<void> _persistProviderGrouping(SharedPreferences prefs) async {
+    await prefs.setString(_providerGroupsKey, ProviderGroup.encodeList(_providerGroups));
+    await prefs.setString(_providerGroupMapKey, jsonEncode(_providerGroupMap));
+    await prefs.setString(_providerGroupCollapsedKey, jsonEncode(_providerGroupCollapsed));
+    await prefs.setStringList(_providersOrderKey, _providersOrder);
+  }
+
+  Future<String> createGroup(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return '';
+    final key = trimmed.toLowerCase();
+    for (final g in _providerGroups) {
+      if (g.name.trim().toLowerCase() == key) return g.id;
+    }
+    final id = const Uuid().v4();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    _providerGroups = List.unmodifiable(<ProviderGroup>[..._providerGroups, ProviderGroup(id: id, name: trimmed, createdAt: now)]);
+    _cleanupProviderOrderAndGrouping();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await _persistProviderGrouping(prefs);
+    return id;
+  }
+
+  Future<void> deleteGroup(String groupId) async {
+    if (groupById(groupId) == null) return;
+    final res = deleteProviderGroup(
+      groups: _providerGroups,
+      providerGroupMap: _providerGroupMap,
+      collapsed: _providerGroupCollapsed,
+      groupId: groupId,
+    );
+    _providerGroups = res.groups;
+    _providerGroupMap = Map<String, String>.from(res.providerGroupMap);
+    _providerGroupCollapsed
+      ..clear()
+      ..addAll(res.collapsed);
+    _cleanupProviderOrderAndGrouping();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await _persistProviderGrouping(prefs);
+  }
+
+  Future<void> setProviderGroup(String providerKey, String? groupId) async {
+    final known = _knownProviderKeys();
+    if (!known.contains(providerKey)) return;
+    final target = (groupId != null && groupById(groupId) != null) ? groupId : null;
+    final current = groupIdForProvider(providerKey);
+    if (current == target) return;
+
+    if (target == null) {
+      _providerGroupMap.remove(providerKey);
+    } else {
+    _providerGroupMap[providerKey] = target;
+    }
+    _cleanupProviderOrderAndGrouping();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await _persistProviderGrouping(prefs);
+  }
+
+  Future<void> setGroupCollapsed(String groupIdOrUngrouped, bool value) async {
+    if (groupIdOrUngrouped != providerUngroupedGroupKey && groupById(groupIdOrUngrouped) == null) return;
+    _providerGroupCollapsed[groupIdOrUngrouped] = value;
+    _cleanupProviderOrderAndGrouping();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await _persistProviderGrouping(prefs);
+  }
+
+  Future<void> toggleGroupCollapsed(String groupIdOrUngrouped) async =>
+      setGroupCollapsed(groupIdOrUngrouped, !isGroupCollapsed(groupIdOrUngrouped));
+
+  Future<void> moveProvider(String providerKey, String? targetGroupId, int targetPos) async {
+    final known = _knownProviderKeys();
+    if (!known.contains(providerKey)) return;
+
+    final validGroupIds = {for (final g in _providerGroups) g.id};
+    final res = moveProviderInGroupedOrder(
+      providersOrder: _providersOrder,
+      providerGroupMap: _providerGroupMap,
+      knownProviderKeys: known,
+      validGroupIds: validGroupIds,
+      providerKey: providerKey,
+      targetGroupId: targetGroupId,
+      targetPos: targetPos,
+    );
+    _providersOrder = res.providersOrder;
+    _providerGroupMap = Map<String, String>.from(res.providerGroupMap);
+    _cleanupProviderOrderAndGrouping();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await _persistProviderGrouping(prefs);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -1267,6 +1536,9 @@ class SettingsProvider extends ChangeNotifier {
     _providerConfigs.remove(key);
     // Remove from order
     _providersOrder = List<String>.from(_providersOrder.where((k) => k != key));
+    // Also remove from grouping map
+    _providerGroupMap.remove(key);
+    _cleanupProviderOrderAndGrouping();
 
     // Clear selections referencing this provider to avoid re-creating defaults
     final prefs = await SharedPreferences.getInstance();
@@ -1309,6 +1581,7 @@ class SettingsProvider extends ChangeNotifier {
     final map = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
     await prefs.setString(_providerConfigsKey, jsonEncode(map));
     await prefs.setStringList(_providersOrderKey, _providersOrder);
+    await prefs.setString(_providerGroupMapKey, jsonEncode(_providerGroupMap));
     notifyListeners();
   }
 
