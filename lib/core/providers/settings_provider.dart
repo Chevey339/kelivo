@@ -1198,6 +1198,45 @@ class SettingsProvider extends ChangeNotifier {
     return id;
   }
 
+  Future<void> renameGroup(String groupId, String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    final idx = _providerGroups.indexWhere((g) => g.id == groupId);
+    if (idx < 0) return;
+
+    final key = trimmed.toLowerCase();
+    for (final g in _providerGroups) {
+      if (g.id != groupId && g.name.trim().toLowerCase() == key) return;
+    }
+
+    final current = _providerGroups[idx];
+    if (current.name == trimmed) return;
+    final mut = List<ProviderGroup>.of(_providerGroups);
+    mut[idx] = current.copyWith(name: trimmed);
+    _providerGroups = List.unmodifiable(mut);
+    _cleanupProviderOrderAndGrouping();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await _persistProviderGrouping(prefs);
+  }
+
+  Future<void> reorderProviderGroups(int oldIndex, int newIndex) async {
+    if (_providerGroups.isEmpty) return;
+    if (oldIndex < 0 || oldIndex >= _providerGroups.length) return;
+    if (newIndex < 0 || newIndex > _providerGroups.length) return;
+    if (oldIndex == newIndex) return;
+
+    final mut = List<ProviderGroup>.of(_providerGroups);
+    final item = mut.removeAt(oldIndex);
+    final insertIndex = newIndex.clamp(0, mut.length);
+    mut.insert(insertIndex, item);
+    _providerGroups = List.unmodifiable(mut);
+    _cleanupProviderOrderAndGrouping();
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await _persistProviderGrouping(prefs);
+  }
+
   Future<void> deleteGroup(String groupId) async {
     if (groupById(groupId) == null) return;
     final res = deleteProviderGroup(
