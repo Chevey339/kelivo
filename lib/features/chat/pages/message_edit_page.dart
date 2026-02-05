@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:re_editor/re_editor.dart';
 import '../../../core/models/chat_message.dart';
-import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/plain_text_code_editor.dart';
 
 class MessageEditPage extends StatefulWidget {
   const MessageEditPage({super.key, required this.message});
@@ -12,12 +13,12 @@ class MessageEditPage extends StatefulWidget {
 }
 
 class _MessageEditPageState extends State<MessageEditPage> {
-  late final TextEditingController _controller;
+  late final CodeLineEditingController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.message.content);
+    _controller = CodeLineEditingController.fromText(widget.message.content);
   }
 
   @override
@@ -49,28 +50,19 @@ class _MessageEditPageState extends State<MessageEditPage> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: TextField(
-            controller: _controller,
-            autofocus: true,
-            keyboardType: TextInputType.multiline,
-            minLines: 8,
-            maxLines: null,
-            decoration: InputDecoration(
-              hintText: l10n.messageEditPageHint,
-              filled: true,
-              fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.transparent),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.transparent),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: cs.primary.withOpacity(0.45)),
-              ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: PlainTextCodeEditor(
+              controller: _controller,
+              autofocus: true,
+              hint: l10n.messageEditPageHint,
+              padding: const EdgeInsets.all(16),
+              fontSize: 15,
+              fontHeight: 1.5,
             ),
           ),
         ),
@@ -78,4 +70,3 @@ class _MessageEditPageState extends State<MessageEditPage> {
     );
   }
 }
-
