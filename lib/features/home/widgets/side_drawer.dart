@@ -1302,6 +1302,22 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
 }
 
 extension on _SideDrawerState {
+  Future<void> _duplicateAssistantFromMenu(Assistant assistant) async {
+    final l10n = AppLocalizations.of(context)!;
+    final newId = await context.read<AssistantProvider>().duplicateAssistant(
+          assistant.id,
+          l10n: l10n,
+        );
+    if (!mounted) return;
+    if (newId != null) {
+      showAppSnackBar(
+        context,
+        message: l10n.assistantSettingsCopySuccess,
+        type: NotificationType.success,
+      );
+    }
+  }
+
   Future<void> _showAssistantItemMenuDesktop(Assistant a, Offset globalPosition) async {
     if (!_isDesktop) return;
     final l10n = AppLocalizations.of(context)!;
@@ -1315,6 +1331,13 @@ extension on _SideDrawerState {
           icon: Lucide.Pencil,
           label: l10n.assistantTagsContextMenuEditAssistant,
           onTap: () => _openAssistantSettings(a.id),
+        ),
+        DesktopContextMenuItem(
+          icon: Lucide.Copy,
+          label: l10n.assistantSettingsCopyButton,
+          onTap: () async {
+            await _duplicateAssistantFromMenu(a);
+          },
         ),
         if (hasTag)
           DesktopContextMenuItem(
@@ -1406,6 +1429,9 @@ extension on _SideDrawerState {
               mainAxisSize: MainAxisSize.min,
               children: [
                 row(l10n.assistantTagsContextMenuEditAssistant, Lucide.Pencil, () => _openAssistantSettings(a.id)),
+                row(l10n.assistantSettingsCopyButton, Lucide.Copy, () async {
+                  await _duplicateAssistantFromMenu(a);
+                }),
                 if (hasTag)
                   row(l10n.assistantTagsClearTag, Lucide.Eraser, () async {
                     await context.read<TagProvider>().unassignAssistant(a.id);
