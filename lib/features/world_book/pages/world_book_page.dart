@@ -397,61 +397,74 @@ class _WorldBookPageState extends State<WorldBookPage> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
               children: [
-                for (final book in books) ...[
-                  _WorldBookSection(
-                    book: book,
-                    onAddEntry: () async {
-                      Haptics.light();
-                      final edited = await _showEntryEditSheet();
-                      if (edited == null) return;
-                      final next = book.copyWith(
-                        entries: [...book.entries, edited],
-                      );
-                      await context.read<WorldBookProvider>().updateBook(next);
-                    },
-                    onExport: () async {
-                      Haptics.light();
-                      await _exportBook(book);
-                    },
-                    onConfig: () async {
-                      Haptics.light();
-                      final updated = await _showBookConfigSheet(book: book);
-                      if (updated == null) return;
-                      await context.read<WorldBookProvider>().updateBook(
-                        updated,
-                      );
-                    },
-                    onDelete: () async {
-                      Haptics.light();
-                      final confirm = await _confirmDeleteBook(book);
-                      if (!confirm) return;
-                      await context.read<WorldBookProvider>().deleteBook(
-                        book.id,
-                      );
-                    },
-                    onEditEntry: (entry) async {
-                      Haptics.light();
-                      final edited = await _showEntryEditSheet(entry: entry);
-                      if (edited == null) return;
-                      final nextEntries = book.entries
-                          .map((e) => e.id == entry.id ? edited : e)
-                          .toList(growable: false);
-                      await context.read<WorldBookProvider>().updateBook(
-                        book.copyWith(entries: nextEntries),
-                      );
-                    },
-                    onDeleteEntry: (entry) async {
-                      Haptics.light();
-                      final nextEntries = book.entries
-                          .where((e) => e.id != entry.id)
-                          .toList(growable: false);
-                      await context.read<WorldBookProvider>().updateBook(
-                        book.copyWith(entries: nextEntries),
-                      );
-                    },
+                for (int index = 0; index < books.length; index++)
+                  Padding(
+                    key: ValueKey('mobile-world-book-${books[index].id}'),
+                    padding: EdgeInsets.only(
+                      bottom: index == books.length - 1 ? 0 : 14,
+                    ),
+                    child: _WorldBookSection(
+                      book: books[index],
+                      collapsed: provider.isBookCollapsed(books[index].id),
+                      onToggleCollapsed: () {
+                        Haptics.light();
+                        context.read<WorldBookProvider>().toggleBookCollapsed(
+                          books[index].id,
+                        );
+                      },
+                      onAddEntry: () async {
+                        Haptics.light();
+                        final edited = await _showEntryEditSheet();
+                        if (edited == null) return;
+                        final next = books[index].copyWith(
+                          entries: [...books[index].entries, edited],
+                        );
+                        await context.read<WorldBookProvider>().updateBook(next);
+                      },
+                      onExport: () async {
+                        Haptics.light();
+                        await _exportBook(books[index]);
+                      },
+                      onConfig: () async {
+                        Haptics.light();
+                        final updated = await _showBookConfigSheet(
+                          book: books[index],
+                        );
+                        if (updated == null) return;
+                        await context.read<WorldBookProvider>().updateBook(
+                          updated,
+                        );
+                      },
+                      onDelete: () async {
+                        Haptics.light();
+                        final confirm = await _confirmDeleteBook(books[index]);
+                        if (!confirm) return;
+                        await context.read<WorldBookProvider>().deleteBook(
+                          books[index].id,
+                        );
+                      },
+                      onEditEntry: (entry) async {
+                        Haptics.light();
+                        final edited = await _showEntryEditSheet(entry: entry);
+                        if (edited == null) return;
+                        final nextEntries = books[index].entries
+                            .map((e) => e.id == entry.id ? edited : e)
+                            .toList(growable: false);
+                        await context.read<WorldBookProvider>().updateBook(
+                          books[index].copyWith(entries: nextEntries),
+                        );
+                      },
+                      onDeleteEntry: (entry) async {
+                        Haptics.light();
+                        final nextEntries = books[index].entries
+                            .where((e) => e.id != entry.id)
+                            .toList(growable: false);
+                        await context.read<WorldBookProvider>().updateBook(
+                          books[index].copyWith(entries: nextEntries),
+                        );
+                      },
+                    ),
                   ),
-                  const SizedBox(height: 14),
-                ],
               ],
             ),
       backgroundColor: isDark ? cs.surface : cs.surface,
@@ -462,6 +475,8 @@ class _WorldBookPageState extends State<WorldBookPage> {
 class _WorldBookSection extends StatelessWidget {
   const _WorldBookSection({
     required this.book,
+    required this.collapsed,
+    required this.onToggleCollapsed,
     required this.onAddEntry,
     required this.onExport,
     required this.onConfig,
@@ -471,6 +486,8 @@ class _WorldBookSection extends StatelessWidget {
   });
 
   final WorldBook book;
+  final bool collapsed;
+  final VoidCallback onToggleCollapsed;
   final VoidCallback onAddEntry;
   final VoidCallback onExport;
   final VoidCallback onConfig;
@@ -610,47 +627,77 @@ class _WorldBookSection extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            child: IosCardPress(
+              baseColor: Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              pressedBlendStrength: 0.04,
+              pressedScale: 1.0,
+              haptics: false,
+              onTap: onToggleCollapsed,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 4,
+                ),
+                child: Row(
                   children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
+                    AnimatedRotation(
+                      turns: collapsed ? 0.0 : 0.25,
+                      duration: const Duration(milliseconds: 240),
+                      curve: Curves.easeOutCubic,
+                      child: Icon(
+                        Lucide.ChevronRight,
+                        size: 16,
+                        color: cs.onSurface.withOpacity(0.62),
                       ),
                     ),
-                    if (!book.enabled) ...[
-                      const SizedBox(width: 8),
-                      _TagPill(
-                        text: l10n.worldBookDisabledTag,
-                        color: cs.error,
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              if (!book.enabled) ...[
+                                const SizedBox(width: 8),
+                                _TagPill(
+                                  text: l10n.worldBookDisabledTag,
+                                  color: cs.error,
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (subtitle.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: cs.onSurface.withOpacity(0.65),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    ],
+                    ),
                   ],
                 ),
-                if (subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: cs.onSurface.withOpacity(0.65),
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
-          const SizedBox(width: 8),
           _HeaderIconButton(
             icon: Lucide.Plus,
             tooltip: l10n.worldBookAddEntry,
@@ -714,7 +761,17 @@ class _WorldBookSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         header,
-        _IosSectionCard(children: children),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeInOutCubic,
+          alignment: Alignment.topCenter,
+          child: collapsed
+              ? const SizedBox(width: double.infinity, height: 0)
+              : SizedBox(
+                  width: double.infinity,
+                  child: _IosSectionCard(children: children),
+                ),
+        ),
       ],
     );
   }
@@ -1595,6 +1652,20 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                     const SizedBox(height: 12),
                     _IosSectionCard(
                       children: [
+                        IosFormTextField(
+                          label: l10n.worldBookEntryContentLabel,
+                          controller: _contentController,
+                          maxLines: 12,
+                          minLines: 8,
+                          inlineLabel: false,
+                          textAlign: TextAlign.start,
+                          textInputAction: TextInputAction.newline,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _IosSectionCard(
+                      children: [
                         switchRow(
                           label: l10n.worldBookEntryAlwaysOnLabel,
                           hint: l10n.worldBookEntryAlwaysOnHint,
@@ -1778,18 +1849,6 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                           controller: _priorityController,
                           keyboardType: TextInputType.number,
                           fieldWidth: 64,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _IosSectionCard(
-                      children: [
-                        IosFormTextField(
-                          label: l10n.worldBookEntryContentLabel,
-                          controller: _contentController,
-                          maxLines: 5,
-                          inlineLabel: false,
-                          textAlign: TextAlign.start,
                         ),
                       ],
                     ),

@@ -8,6 +8,7 @@ class WorldBookProvider with ChangeNotifier {
   bool _initialized = false;
   Map<String, List<String>> _activeIdsByAssistant =
       const <String, List<String>>{};
+  Map<String, bool> _collapsedBooks = const <String, bool>{};
 
   List<WorldBook> get books => List<WorldBook>.unmodifiable(_books);
 
@@ -33,6 +34,8 @@ class WorldBookProvider with ChangeNotifier {
   bool isBookActive(String id, {String? assistantId}) =>
       activeBookIdsFor(assistantId).contains(id);
 
+  bool isBookCollapsed(String id) => _collapsedBooks[id] ?? false;
+
   Future<void> initialize() async {
     if (_initialized) return;
     await loadAll();
@@ -43,11 +46,24 @@ class WorldBookProvider with ChangeNotifier {
     try {
       _books = await WorldBookStore.getAll();
       _activeIdsByAssistant = await WorldBookStore.getActiveIdsByAssistant();
+      final collapsed = await WorldBookStore.getCollapsedBooksMap();
+      final knownIds = _books.map((e) => e.id).toSet();
+      final cleanedCollapsed = <String, bool>{
+        for (final entry in collapsed.entries)
+          if (knownIds.contains(entry.key)) entry.key: entry.value,
+      };
+      _collapsedBooks = cleanedCollapsed;
+
+      if (cleanedCollapsed.length != collapsed.length) {
+        await WorldBookStore.setCollapsedMap(cleanedCollapsed);
+      }
+
       notifyListeners();
     } catch (e) {
       debugPrint('Failed to load world books: $e');
       _books = const <WorldBook>[];
       _activeIdsByAssistant = const <String, List<String>>{};
+      _collapsedBooks = const <String, bool>{};
       notifyListeners();
     }
   }
@@ -88,6 +104,7 @@ class WorldBookProvider with ChangeNotifier {
     await WorldBookStore.clear();
     _books = const <WorldBook>[];
     _activeIdsByAssistant = const <String, List<String>>{};
+    _collapsedBooks = const <String, bool>{};
     notifyListeners();
   }
 
@@ -104,6 +121,21 @@ class WorldBookProvider with ChangeNotifier {
     _books = list;
     notifyListeners();
     await WorldBookStore.save(_books);
+  }
+
+  Future<void> setBookCollapsed(String id, bool collapsed) async {
+    final key = id.trim();
+    if (key.isEmpty) return;
+
+    final next = Map<String, bool>.from(_collapsedBooks);
+    next[key] = collapsed;
+    _collapsedBooks = next;
+    notifyListeners();
+    await WorldBookStore.setCollapsed(key, collapsed);
+  }
+
+  Future<void> toggleBookCollapsed(String id) async {
+    await setBookCollapsed(id, !isBookCollapsed(id));
   }
 
   Future<void> setActiveBookIds(List<String> ids, {String? assistantId}) async {

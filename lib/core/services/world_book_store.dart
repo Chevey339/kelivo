@@ -8,10 +8,12 @@ class WorldBookStore {
   static const String _itemsKey = 'world_books_v1';
   static const String _activeIdsByAssistantKey =
       'world_books_active_ids_by_assistant_v1';
+  static const String _collapsedBooksKey = 'world_books_collapsed_v1';
   static const String _defaultAssistantKey = '__global__';
 
   static List<WorldBook>? _cache;
   static Map<String, List<String>>? _activeIdsByAssistantCache;
+  static Map<String, bool>? _collapsedBooksCache;
 
   static String assistantKey(String? assistantId) {
     final id = (assistantId ?? '').trim();
@@ -30,6 +32,10 @@ class WorldBookStore {
     Map<String, List<String>> src,
   ) {
     return {for (final e in src.entries) e.key: List<String>.from(e.value)};
+  }
+
+  static Map<String, bool> _cloneCollapsedBooksMap(Map<String, bool> src) {
+    return {for (final e in src.entries) e.key: e.value};
   }
 
   static Future<List<WorldBook>> getAll() async {
@@ -96,14 +102,23 @@ class WorldBookStore {
       }
       if (removed) await _persistActiveIdsMap(next);
     } catch (_) {}
+
+    try {
+      final collapsed = await _loadCollapsedBooksMap();
+      if (collapsed.remove(id) != null) {
+        await _persistCollapsedBooksMap(collapsed);
+      }
+    } catch (_) {}
   }
 
   static Future<void> clear() async {
     _cache = const <WorldBook>[];
     _activeIdsByAssistantCache = const <String, List<String>>{};
+    _collapsedBooksCache = const <String, bool>{};
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_itemsKey);
     await prefs.remove(_activeIdsByAssistantKey);
+    await prefs.remove(_collapsedBooksKey);
   }
 
   static Future<void> reorder({
@@ -154,6 +169,29 @@ class WorldBookStore {
     await _persistActiveIdsMap(next);
   }
 
+  static Future<Map<String, bool>> getCollapsedBooksMap() async {
+    final map = await _loadCollapsedBooksMap();
+    return _cloneCollapsedBooksMap(map);
+  }
+
+  static Future<void> setCollapsed(String bookId, bool collapsed) async {
+    final id = bookId.trim();
+    if (id.isEmpty) return;
+    final map = await _loadCollapsedBooksMap();
+    map[id] = collapsed;
+    await _persistCollapsedBooksMap(map);
+  }
+
+  static Future<void> setCollapsedMap(Map<String, bool> map) async {
+    final next = <String, bool>{};
+    map.forEach((key, value) {
+      final id = key.trim();
+      if (id.isEmpty) return;
+      next[id] = value;
+    });
+    await _persistCollapsedBooksMap(next);
+  }
+
   static Future<Map<String, List<String>>> _loadActiveIdsMap() async {
     if (_activeIdsByAssistantCache != null) {
       return _cloneActiveIdsMap(_activeIdsByAssistantCache!);
@@ -176,6 +214,30 @@ class WorldBookStore {
     return _cloneActiveIdsMap(map);
   }
 
+  static Future<Map<String, bool>> _loadCollapsedBooksMap() async {
+    if (_collapsedBooksCache != null) {
+      return _cloneCollapsedBooksMap(_collapsedBooksCache!);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_collapsedBooksKey);
+    Map<String, bool> map = <String, bool>{};
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw) as Map;
+        decoded.forEach((key, value) {
+          final id = key.toString().trim();
+          if (id.isEmpty) return;
+          final collapsed = value is bool ? value : value.toString() == 'true';
+          map[id] = collapsed;
+        });
+      } catch (_) {
+        map = <String, bool>{};
+      }
+    }
+    _collapsedBooksCache = map;
+    return _cloneCollapsedBooksMap(map);
+  }
+
   static Future<void> _persistActiveIdsMap(
     Map<String, List<String>> map,
   ) async {
@@ -183,6 +245,16 @@ class WorldBookStore {
     final prefs = await SharedPreferences.getInstance();
     try {
       await prefs.setString(_activeIdsByAssistantKey, jsonEncode(map));
+    } catch (_) {}
+  }
+
+  static Future<void> _persistCollapsedBooksMap(
+    Map<String, bool> map,
+  ) async {
+    _collapsedBooksCache = _cloneCollapsedBooksMap(map);
+    final prefs = await SharedPreferences.getInstance();
+    try {
+      await prefs.setString(_collapsedBooksKey, jsonEncode(map));
     } catch (_) {}
   }
 }

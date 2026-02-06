@@ -363,9 +363,18 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
                     final book = books[index];
                     final wbProvider = context.read<WorldBookProvider>();
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
+                      key: ValueKey('desktop-world-book-${book.id}'),
+                      padding: EdgeInsets.only(
+                        bottom: index == books.length - 1 ? 0 : 12,
+                      ),
                       child: _WorldBookCard(
                         book: book,
+                        collapsed: provider.isBookCollapsed(book.id),
+                        onToggleCollapsed: () {
+                          context.read<WorldBookProvider>().toggleBookCollapsed(
+                            book.id,
+                          );
+                        },
                         onAddEntry: () async {
                           final entry = await _showEntryEditDialog();
                           if (!mounted) return;
@@ -424,6 +433,8 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
 class _WorldBookCard extends StatefulWidget {
   const _WorldBookCard({
     required this.book,
+    required this.collapsed,
+    required this.onToggleCollapsed,
     required this.onAddEntry,
     required this.onExport,
     required this.onConfig,
@@ -433,6 +444,8 @@ class _WorldBookCard extends StatefulWidget {
   });
 
   final WorldBook book;
+  final bool collapsed;
+  final VoidCallback onToggleCollapsed;
   final VoidCallback onAddEntry;
   final VoidCallback onExport;
   final VoidCallback onConfig;
@@ -477,6 +490,29 @@ class _WorldBookCardState extends State<_WorldBookCard> {
           children: [
             Row(
               children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    widget.onToggleCollapsed();
+                  },
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: Center(
+                      child: AnimatedRotation(
+                        turns: widget.collapsed ? 0.0 : 0.25,
+                        duration: const Duration(milliseconds: 240),
+                        curve: Curves.easeOutCubic,
+                        child: Icon(
+                          lucide.Lucide.ChevronRight,
+                          size: 16,
+                          color: cs.onSurface.withOpacity(0.62),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Icon(lucide.Lucide.BookOpen, size: 20, color: cs.primary),
                 const SizedBox(width: 10),
                 Expanded(
@@ -547,11 +583,23 @@ class _WorldBookCardState extends State<_WorldBookCard> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            _EntriesPanel(
-              entries: widget.book.entries,
-              onEdit: widget.onEditEntry,
-              onDelete: widget.onDeleteEntry,
+            AnimatedSize(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeInOutCubic,
+              alignment: Alignment.topCenter,
+              child: widget.collapsed
+                  ? const SizedBox(width: double.infinity, height: 0)
+                  : SizedBox(
+                      width: double.infinity,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: _EntriesPanel(
+                          entries: widget.book.entries,
+                          onEdit: widget.onEditEntry,
+                          onDelete: widget.onDeleteEntry,
+                        ),
+                      ),
+                    ),
             ),
           ],
         ),
@@ -1305,6 +1353,25 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
                             ),
                           );
 
+                          final contentSection = _section(
+                            cs: cs,
+                            isDark: isDark,
+                            child: _labeledField(
+                              cs: cs,
+                              label: l10n.worldBookEntryContentLabel,
+                              child: TextField(
+                                controller: _contentController,
+                                minLines: 12,
+                                maxLines: 18,
+                                keyboardType: TextInputType.multiline,
+                                decoration: _deskInputDecoration(context)
+                                    .copyWith(
+                                      hintText: l10n.worldBookEntryContentLabel,
+                                    ),
+                              ),
+                            ),
+                          );
+
                           final injectionSection = _section(
                             cs: cs,
                             isDark: isDark,
@@ -1378,29 +1445,22 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
                             ),
                           );
 
-                          final contentSection = _section(
-                            cs: cs,
-                            isDark: isDark,
-                            child: _labeledField(
-                              cs: cs,
-                              label: l10n.worldBookEntryContentLabel,
-                              child: TextField(
-                                controller: _contentController,
-                                maxLines: 12,
-                                decoration: _deskInputDecoration(context)
-                                    .copyWith(
-                                      hintText: l10n.worldBookEntryContentLabel,
-                                    ),
-                              ),
-                            ),
-                          );
-
                           Widget top;
                           if (wide) {
                             top = Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(child: matchSection),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      matchSection,
+                                      const SizedBox(height: gap),
+                                      contentSection,
+                                    ],
+                                  ),
+                                ),
                                 const SizedBox(width: gap),
                                 Expanded(child: injectionSection),
                               ],
@@ -1411,6 +1471,8 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
                               children: [
                                 matchSection,
                                 const SizedBox(height: gap),
+                                contentSection,
+                                const SizedBox(height: gap),
                                 injectionSection,
                               ],
                             );
@@ -1418,11 +1480,7 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
 
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              top,
-                              const SizedBox(height: gap),
-                              contentSection,
-                            ],
+                            children: [top],
                           );
                         },
                       ),
