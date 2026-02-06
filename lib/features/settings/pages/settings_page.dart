@@ -185,17 +185,6 @@ class SettingsPage extends StatelessWidget {
                   );
                 },
               ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.BookOpen,
-                label: l10n.settingsPageWorldBook,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const WorldBookPage()),
-                  );
-                },
-              ),
             ],
           ),
 
@@ -257,6 +246,17 @@ class SettingsPage extends StatelessWidget {
                   Navigator.of(
                     context,
                   ).push(MaterialPageRoute(builder: (_) => const McpPage()));
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.BookOpen,
+                label: l10n.settingsPageWorldBook,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const WorldBookPage()),
+                  );
                 },
               ),
               _iosDivider(context),
