@@ -64,6 +64,8 @@ dependencies:
   path_provider: ^2.1.4
   file_picker: ^10.3.2
   archive: ^4.0.2
+  sqlite3: ^2.4.0
+  sqlite3_flutter_libs: ^0.5.0
   xml: ^6.5.0
   open_filex: ^4.5.0
   easy_image_viewer: ^1.4.6
