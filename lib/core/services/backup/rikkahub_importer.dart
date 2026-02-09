@@ -1726,6 +1726,12 @@ class RikkaHubImporter {
 
       final convRows = _resultToMaps(db.select('SELECT * FROM "$convTable"'));
       final nodeRows = _resultToMaps(db.select('SELECT * FROM "$nodeTable"'));
+      final fallbackAssistantId = _resolveConversationFallbackAssistantId(
+        db: db,
+        convTable: convTable,
+        assistantIdMap: assistantIdMap,
+        validAssistantIds: validAssistantIds,
+      );
 
       final nodesByConvId = <String, List<_NodeRecord>>{};
       for (var i = 0; i < nodeRows.length; i++) {
@@ -1843,7 +1849,15 @@ class RikkaHubImporter {
             (mappedAssistantId != null &&
                 validAssistantIds.contains(mappedAssistantId))
             ? mappedAssistantId
-            : null;
+            : (oldAssistantId.isNotEmpty ? fallbackAssistantId : null);
+        if (assistantId == fallbackAssistantId &&
+            oldAssistantId.isNotEmpty &&
+            (mappedAssistantId == null ||
+                !validAssistantIds.contains(mappedAssistantId))) {
+          addWarning(
+            'Conversation "${title.isEmpty ? oldConvId : title}" references missing assistant "$oldAssistantId", fallback to "$assistantId".',
+          );
+        }
         var truncateIndex =
             _asInt(
               _pickValue(convRow, <String>['truncateIndex', 'truncate_index']),
@@ -2300,6 +2314,38 @@ class RikkaHubImporter {
       if (m != null) return m;
     }
     return null;
+  }
+
+  static String? _resolveConversationFallbackAssistantId({
+    required Database db,
+    required String convTable,
+    required Map<String, String> assistantIdMap,
+    required Set<String> validAssistantIds,
+  }) {
+    if (validAssistantIds.isEmpty) return null;
+    try {
+      final pragma = db.select('PRAGMA table_info("$convTable")');
+      for (final row in pragma) {
+        final name = (row['name'] ?? '').toString().trim().toLowerCase();
+        if (name != 'assistant_id' && name != 'assistantid') continue;
+        final raw = row['dflt_value'];
+        if (raw == null) break;
+        var value = raw.toString().trim();
+        if (value.isEmpty) break;
+        if ((value.startsWith("'") && value.endsWith("'")) ||
+            (value.startsWith('"') && value.endsWith('"'))) {
+          value = value.substring(1, value.length - 1).trim();
+        }
+        if (value.isEmpty) break;
+        final mapped =
+            assistantIdMap[value] ??
+            assistantIdMap[value.toLowerCase()] ??
+            value;
+        if (validAssistantIds.contains(mapped)) return mapped;
+        break;
+      }
+    } catch (_) {}
+    return validAssistantIds.first;
   }
 
   static List<Map<String, dynamic>> _resultToMaps(ResultSet result) {
