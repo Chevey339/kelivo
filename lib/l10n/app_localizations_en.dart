@@ -2535,6 +2535,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providersPageAddTooltip => 'Add';
 
   @override
+  String get providersPageSearchHint => 'Search providers or groups';
+
+  @override
   String get providersPageProviderAddedSnackbar => 'Provider added';
 
   @override

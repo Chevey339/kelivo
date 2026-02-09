@@ -829,6 +829,7 @@
   "providersPageTitle": "供应商",
   "providersPageImportTooltip": "导入",
   "providersPageAddTooltip": "新增",
+  "providersPageSearchHint": "搜索供应商或分组",
   "providersPageProviderAddedSnackbar": "已添加供应商",
   "providerGroupsGroupLabel": "分组",
   "providerGroupsOther": "其他",

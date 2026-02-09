@@ -1100,6 +1100,7 @@
   "providersPageTitle": "Providers",
   "providersPageImportTooltip": "Import",
   "providersPageAddTooltip": "Add",
+  "providersPageSearchHint": "Search providers or groups",
   "providersPageProviderAddedSnackbar": "Provider added",
   "providerGroupsGroupLabel": "Group",
   "providerGroupsOther": "Other",

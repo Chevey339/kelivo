@@ -2453,6 +2453,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providersPageAddTooltip => '新增';
 
   @override
+  String get providersPageSearchHint => '搜索供应商或分组';
+
+  @override
   String get providersPageProviderAddedSnackbar => '已添加供应商';
 
   @override
@@ -6379,6 +6382,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get providersPageAddTooltip => '新增';
+
+  @override
+  String get providersPageSearchHint => '搜索供应商或分组';
 
   @override
   String get providersPageProviderAddedSnackbar => '已添加供应商';

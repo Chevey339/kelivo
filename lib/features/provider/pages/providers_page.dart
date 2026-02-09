@@ -36,6 +36,14 @@ class _ProvidersPageState extends State<ProvidersPage> {
   final Set<String> _settleKeys = {};
   bool _selectMode = false;
   final Set<String> _selected = {};
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,12 +60,14 @@ class _ProvidersPageState extends State<ProvidersPage> {
     final dynamicItems = <_Provider>[];
     cfgs.forEach((key, cfg) {
       if (!baseKeys.contains(key)) {
-        dynamicItems.add(_Provider(
-          name: (cfg.name.isNotEmpty ? cfg.name : key),
-          keyName: key,
-          enabled: cfg.enabled,
-          modelCount: cfg.models.length,
-        ));
+        dynamicItems.add(
+          _Provider(
+            name: (cfg.name.isNotEmpty ? cfg.name : key),
+            keyName: key,
+            enabled: cfg.enabled,
+            modelCount: cfg.models.length,
+          ),
+        );
       }
     });
 
@@ -73,9 +83,27 @@ class _ProvidersPageState extends State<ProvidersPage> {
     // Append any remaining providers not recorded in order
     tmp.addAll(map.values);
     final items = tmp;
+    final filteredItems = _applySearchToProviders(
+      items: items,
+      settings: settings,
+      normalizedQuery: _searchQuery,
+    );
 
     final groupingActive = settings.providerGroupingActive;
-    final groupingRows = groupingActive ? _buildProviderGroupingRows(l10n: l10n, settings: settings, items: items) : const <_ProviderGroupingRowVM>[];
+    final groupingRows = groupingActive
+        ? _buildProviderGroupingRows(
+            l10n: l10n,
+            settings: settings,
+            items: items,
+            normalizedQuery: _searchQuery,
+          )
+        : const <_ProviderGroupingRowVM>[];
+    final visibleProviderKeys = groupingActive
+        ? {
+            for (final row in groupingRows)
+              if (row is _ProviderGroupingProviderVM) row.provider.keyName,
+          }
+        : {for (final p in filteredItems) p.keyName};
 
     return Scaffold(
       appBar: AppBar(
@@ -91,7 +119,9 @@ class _ProvidersPageState extends State<ProvidersPage> {
         title: Text(l10n.providersPageTitle),
         actions: [
           Tooltip(
-            message: _selectMode ? l10n.searchServicesPageDone : l10n.providersPageMultiSelectTooltip,
+            message: _selectMode
+                ? l10n.searchServicesPageDone
+                : l10n.providersPageMultiSelectTooltip,
             child: _TactileIconButton(
               icon: _selectMode ? Lucide.Check : Lucide.circleDot,
               color: cs.onSurface,
@@ -145,96 +175,135 @@ class _ProvidersPageState extends State<ProvidersPage> {
       ),
       body: Stack(
         children: [
-          if (!groupingActive)
-            _ProvidersList(
-              items: items,
-              selectMode: _selectMode,
-              selectedKeys: _selected,
-              onToggleSelect: (key) {
-                setState(() {
-                  if (_selected.contains(key)) {
-                    _selected.remove(key);
-                  } else {
-                    _selected.add(key);
-                  }
-                });
-              },
-              onReorder: (oldIndex, newIndex) async {
-                // Normalize newIndex because Flutter passes the index after removal
-                if (newIndex > oldIndex) newIndex -= 1;
-                final moved = items[oldIndex];
-                final mut = List<_Provider>.of(items);
-                final item = mut.removeAt(oldIndex);
-                mut.insert(newIndex, item);
-                setState(() => _settleKeys.add(moved.keyName));
-                await context.read<SettingsProvider>().setProvidersOrder([
-                  for (final p in mut) p.keyName
-                ]);
-                Future.delayed(const Duration(milliseconds: 220), () {
-                  if (!mounted) return;
-                  setState(() => _settleKeys.remove(moved.keyName));
-                });
-              },
-              settlingKeys: _settleKeys,
-            )
-          else
-            _GroupedProvidersList(
-              rows: groupingRows,
-              selectMode: _selectMode,
-              selectedKeys: _selected,
-              onToggleSelect: (key) {
-                setState(() {
-                  if (_selected.contains(key)) {
-                    _selected.remove(key);
-                  } else {
-                    _selected.add(key);
-                  }
-                });
-              },
-              onReorder: (oldIndex, newIndex) async {
-                if (_selectMode) return;
-                if (groupingRows.isEmpty) return;
-                final sp = context.read<SettingsProvider>();
+          Column(
+            children: [
+              _ProvidersSearchField(
+                controller: _searchController,
+                hintText: l10n.providersPageSearchHint,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = _normalizeSearchQuery(value);
+                  });
+                },
+                onClear: () {
+                  if (_searchController.text.isEmpty) return;
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
+              ),
+              Expanded(
+                child: !groupingActive
+                    ? _ProvidersList(
+                        items: filteredItems,
+                        selectMode: _selectMode,
+                        selectedKeys: _selected,
+                        reorderEnabled: !_selectMode && _searchQuery.isEmpty,
+                        onToggleSelect: (key) {
+                          setState(() {
+                            if (_selected.contains(key)) {
+                              _selected.remove(key);
+                            } else {
+                              _selected.add(key);
+                            }
+                          });
+                        },
+                        onReorder: (oldIndex, newIndex) async {
+                          if (_searchQuery.isNotEmpty || _selectMode) return;
+                          if (newIndex > oldIndex) newIndex -= 1;
+                          final moved = items[oldIndex];
+                          final mut = List<_Provider>.of(items);
+                          final item = mut.removeAt(oldIndex);
+                          mut.insert(newIndex, item);
+                          setState(() => _settleKeys.add(moved.keyName));
+                          await context
+                              .read<SettingsProvider>()
+                              .setProvidersOrder([
+                                for (final p in mut) p.keyName,
+                              ]);
+                          Future.delayed(const Duration(milliseconds: 220), () {
+                            if (!mounted) return;
+                            setState(() => _settleKeys.remove(moved.keyName));
+                          });
+                        },
+                        settlingKeys: _settleKeys,
+                      )
+                    : _GroupedProvidersList(
+                        rows: groupingRows,
+                        selectMode: _selectMode,
+                        searchActive: _searchQuery.isNotEmpty,
+                        selectedKeys: _selected,
+                        reorderEnabled: !_selectMode && _searchQuery.isEmpty,
+                        onToggleSelect: (key) {
+                          setState(() {
+                            if (_selected.contains(key)) {
+                              _selected.remove(key);
+                            } else {
+                              _selected.add(key);
+                            }
+                          });
+                        },
+                        onReorder: (oldIndex, newIndex) async {
+                          if (_selectMode || _searchQuery.isNotEmpty) return;
+                          if (groupingRows.isEmpty) return;
+                          final sp = context.read<SettingsProvider>();
 
-                final logicRows = <ProviderGroupingRowVM>[
-                  for (final r in groupingRows)
-                    if (r is _ProviderGroupingHeaderVM)
-                      ProviderGroupingHeaderVM(groupKey: r.groupKey)
-                    else if (r is _ProviderGroupingProviderVM)
-                      ProviderGroupingProviderVM(providerKey: r.provider.keyName, groupKey: r.groupKey),
-                ];
+                          final logicRows = <ProviderGroupingRowVM>[
+                            for (final r in groupingRows)
+                              if (r is _ProviderGroupingHeaderVM)
+                                ProviderGroupingHeaderVM(groupKey: r.groupKey)
+                              else if (r is _ProviderGroupingProviderVM)
+                                ProviderGroupingProviderVM(
+                                  providerKey: r.provider.keyName,
+                                  groupKey: r.groupKey,
+                                ),
+                          ];
 
-                final analysis = analyzeProviderGroupingReorder(
-                  rows: logicRows,
-                  oldIndex: oldIndex,
-                  newIndex: newIndex,
-                  isGroupCollapsed: sp.isGroupCollapsed,
-                );
+                          final analysis = analyzeProviderGroupingReorder(
+                            rows: logicRows,
+                            oldIndex: oldIndex,
+                            newIndex: newIndex,
+                            isGroupCollapsed: sp.isGroupCollapsed,
+                          );
 
-                if (analysis.blockedReason == ProviderGroupingReorderBlockedReason.targetGroupCollapsed) {
-                  showAppSnackBar(
-                    context,
-                    message: l10n.providerGroupsExpandToMoveToast,
-                    type: NotificationType.info,
-                  );
-                  if (mounted) setState(() {});
-                  return;
-                }
+                          if (analysis.blockedReason ==
+                              ProviderGroupingReorderBlockedReason
+                                  .targetGroupCollapsed) {
+                            showAppSnackBar(
+                              context,
+                              message: l10n.providerGroupsExpandToMoveToast,
+                              type: NotificationType.info,
+                            );
+                            if (mounted) setState(() {});
+                            return;
+                          }
 
-                final intent = analysis.intent;
-                if (intent == null) return;
+                          final intent = analysis.intent;
+                          if (intent == null) return;
 
-                final targetGroupId = intent.targetGroupKey == SettingsProvider.providerUngroupedGroupKey ? null : intent.targetGroupKey;
+                          final targetGroupId =
+                              intent.targetGroupKey ==
+                                  SettingsProvider.providerUngroupedGroupKey
+                              ? null
+                              : intent.targetGroupKey;
 
-                setState(() => _settleKeys.add(intent.providerKey));
-                await sp.moveProvider(intent.providerKey, targetGroupId, intent.targetPos);
-                Future.delayed(const Duration(milliseconds: 220), () {
-                  if (!mounted) return;
-                  setState(() => _settleKeys.remove(intent.providerKey));
-                });
-              },
-              settlingKeys: _settleKeys,
-            ),
+                          setState(() => _settleKeys.add(intent.providerKey));
+                          await sp.moveProvider(
+                            intent.providerKey,
+                            targetGroupId,
+                            intent.targetPos,
+                          );
+                          Future.delayed(const Duration(milliseconds: 220), () {
+                            if (!mounted) return;
+                            setState(
+                              () => _settleKeys.remove(intent.providerKey),
+                            );
+                          });
+                        },
+                        settlingKeys: _settleKeys,
+                      ),
+              ),
+            ],
+          ),
           Positioned(
             left: 0,
             right: 0,
@@ -242,7 +311,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
             child: _SelectionBar(
               visible: _selectMode,
               count: _selected.length,
-              total: items.length,
+              total: visibleProviderKeys.length,
               onExport: _onExportSelected,
               onDelete: _onDeleteSelected,
               onMoveToGroup: _onMoveSelectedToGroup,
@@ -250,12 +319,20 @@ class _ProvidersPageState extends State<ProvidersPage> {
                 setState(() {
                   // Select all deletable (non-built-in) providers
                   final baseKeys = {for (final p in base) p.keyName};
-                  final deletable = [for (final p in items) if (!baseKeys.contains(p.keyName)) p.keyName];
-                  final allSelected = deletable.isNotEmpty && deletable.every(_selected.contains) && _selected.length == deletable.length;
+                  final deletable = [
+                    for (final key in visibleProviderKeys)
+                      if (!baseKeys.contains(key)) key,
+                  ];
+                  final allSelected =
+                      deletable.isNotEmpty &&
+                      deletable.every(_selected.contains) &&
+                      _selected.length == deletable.length;
                   _selected.removeWhere((k) => !deletable.contains(k));
                   if (allSelected) {
                     // Unselect all deletable
-                    for (final k in deletable) { _selected.remove(k); }
+                    for (final k in deletable) {
+                      _selected.remove(k);
+                    }
                   } else {
                     // Select all deletable
                     _selected
@@ -272,42 +349,48 @@ class _ProvidersPageState extends State<ProvidersPage> {
   }
 
   List<_Provider> _providers({required AppLocalizations l10n}) => [
-        _p('OpenAI', 'OpenAI', enabled: true, models: 0),
-        _p(l10n.providersPageSiliconFlowName, 'SiliconFlow', enabled: true, models: 0),
-        _p('Gemini', 'Gemini', enabled: true, models: 0),
-        _p('OpenRouter', 'OpenRouter', enabled: true, models: 0),
-        _p('KelivoIN', 'KelivoIN', enabled: true, models: 0),
-        _p('Tensdaq', 'Tensdaq', enabled: false, models: 0),
-        _p('DeepSeek', 'DeepSeek', enabled: false, models: 0),
-        _p('AIhubmix', 'AIhubmix', enabled: false, models: 0),
-        _p(l10n.providersPageAliyunName, 'Aliyun', enabled: false, models: 0),
-        _p(l10n.providersPageZhipuName, 'Zhipu AI', enabled: false, models: 0),
-        _p('Claude', 'Claude', enabled: false, models: 0),
-        // _p(zh ? '腾讯混元' : 'Hunyuan', 'Hunyuan', enabled: false, models: 0),
-        // _p('InternLM', 'InternLM', enabled: true, models: 0),
-        // _p('Kimi', 'Kimi', enabled: false, models: 0),
-        _p('Grok', 'Grok', enabled: false, models: 0),
-        // _p('302.AI', '302.AI', enabled: false, models: 0),
-        // _p(zh ? '阶跃星辰' : 'StepFun', 'StepFun', enabled: false, models: 0),
-        // _p('MiniMax', 'MiniMax', enabled: true, models: 0),
-        _p(l10n.providersPageByteDanceName, 'ByteDance', enabled: false, models: 0),
-        // _p(zh ? '豆包' : 'Doubao', 'Doubao', enabled: true, models: 0),
-        // _p(zh ? '阿里云' : 'Alibaba Cloud', 'Alibaba Cloud', enabled: true, models: 0),
-        // _p('Meta', 'Meta', enabled: false, models: 0),
-        // _p('Mistral', 'Mistral', enabled: true, models: 0),
-        // _p('Perplexity', 'Perplexity', enabled: true, models: 0),
-        // _p('Cohere', 'Cohere', enabled: true, models: 0),
-        // _p('Gemma', 'Gemma', enabled: true, models: 0),
-        // _p('Cloudflare', 'Cloudflare', enabled: true, models: 0),
-        //  _p('AIHubMix', 'AIHubMix', enabled: false, models: 0),
-        // _p('Ollama', 'Ollama', enabled: true, models: 0),
-        // _p('GitHub', 'GitHub', enabled: false, models: 0),
-      ];
+    _p('OpenAI', 'OpenAI', enabled: true, models: 0),
+    _p(
+      l10n.providersPageSiliconFlowName,
+      'SiliconFlow',
+      enabled: true,
+      models: 0,
+    ),
+    _p('Gemini', 'Gemini', enabled: true, models: 0),
+    _p('OpenRouter', 'OpenRouter', enabled: true, models: 0),
+    _p('KelivoIN', 'KelivoIN', enabled: true, models: 0),
+    _p('Tensdaq', 'Tensdaq', enabled: false, models: 0),
+    _p('DeepSeek', 'DeepSeek', enabled: false, models: 0),
+    _p('AIhubmix', 'AIhubmix', enabled: false, models: 0),
+    _p(l10n.providersPageAliyunName, 'Aliyun', enabled: false, models: 0),
+    _p(l10n.providersPageZhipuName, 'Zhipu AI', enabled: false, models: 0),
+    _p('Claude', 'Claude', enabled: false, models: 0),
+    // _p(zh ? '腾讯混元' : 'Hunyuan', 'Hunyuan', enabled: false, models: 0),
+    // _p('InternLM', 'InternLM', enabled: true, models: 0),
+    // _p('Kimi', 'Kimi', enabled: false, models: 0),
+    _p('Grok', 'Grok', enabled: false, models: 0),
+    // _p('302.AI', '302.AI', enabled: false, models: 0),
+    // _p(zh ? '阶跃星辰' : 'StepFun', 'StepFun', enabled: false, models: 0),
+    // _p('MiniMax', 'MiniMax', enabled: true, models: 0),
+    _p(l10n.providersPageByteDanceName, 'ByteDance', enabled: false, models: 0),
+    // _p(zh ? '豆包' : 'Doubao', 'Doubao', enabled: true, models: 0),
+    // _p(zh ? '阿里云' : 'Alibaba Cloud', 'Alibaba Cloud', enabled: true, models: 0),
+    // _p('Meta', 'Meta', enabled: false, models: 0),
+    // _p('Mistral', 'Mistral', enabled: true, models: 0),
+    // _p('Perplexity', 'Perplexity', enabled: true, models: 0),
+    // _p('Cohere', 'Cohere', enabled: true, models: 0),
+    // _p('Gemma', 'Gemma', enabled: true, models: 0),
+    // _p('Cloudflare', 'Cloudflare', enabled: true, models: 0),
+    //  _p('AIHubMix', 'AIHubMix', enabled: false, models: 0),
+    // _p('Ollama', 'Ollama', enabled: true, models: 0),
+    // _p('GitHub', 'GitHub', enabled: false, models: 0),
+  ];
 
   List<_ProviderGroupingRowVM> _buildProviderGroupingRows({
     required AppLocalizations l10n,
     required SettingsProvider settings,
     required List<_Provider> items,
+    String normalizedQuery = '',
   }) {
     final ungroupedKey = SettingsProvider.providerUngroupedGroupKey;
     final groups = settings.providerGroups;
@@ -319,34 +402,105 @@ class _ProvidersPageState extends State<ProvidersPage> {
 
     for (final p in items) {
       final gid = settings.groupIdForProvider(p.keyName);
-      final groupKey = (gid != null && groupById.containsKey(gid)) ? gid : ungroupedKey;
+      final groupKey = (gid != null && groupById.containsKey(gid))
+          ? gid
+          : ungroupedKey;
       (providersByGroupKey[groupKey] ??= <_Provider>[]).add(p);
     }
 
     final rows = <_ProviderGroupingRowVM>[];
+    final searching = normalizedQuery.isNotEmpty;
+
+    List<_Provider> providersForGroup(String groupKey, String title) {
+      final list = providersByGroupKey[groupKey] ?? const <_Provider>[];
+      if (!searching) return list;
+      final groupMatched = _matchesQuery(title, normalizedQuery);
+      if (groupMatched) return list;
+      return [
+        for (final provider in list)
+          if (_providerMatches(provider, settings, normalizedQuery)) provider,
+      ];
+    }
+
     for (final g in groups) {
-      final list = providersByGroupKey[g.id] ?? const <_Provider>[];
+      final list = providersForGroup(g.id, g.name);
       if (list.isEmpty) continue; // hide empty groups on list page
-      final collapsed = settings.isGroupCollapsed(g.id);
-      rows.add(_ProviderGroupingHeaderVM(groupKey: g.id, title: g.name, count: list.length, collapsed: collapsed));
+      final collapsed = searching ? false : settings.isGroupCollapsed(g.id);
+      rows.add(
+        _ProviderGroupingHeaderVM(
+          groupKey: g.id,
+          title: g.name,
+          count: list.length,
+          collapsed: collapsed,
+        ),
+      );
       for (final p in list) {
         rows.add(_ProviderGroupingProviderVM(provider: p, groupKey: g.id));
       }
     }
 
-    final ungrouped = providersByGroupKey[ungroupedKey] ?? const <_Provider>[];
+    final ungrouped = providersForGroup(ungroupedKey, l10n.providerGroupsOther);
     if (ungrouped.isNotEmpty) {
-      final collapsed = settings.isGroupCollapsed(ungroupedKey);
-      rows.add(_ProviderGroupingHeaderVM(groupKey: ungroupedKey, title: l10n.providerGroupsOther, count: ungrouped.length, collapsed: collapsed));
+      final collapsed = searching
+          ? false
+          : settings.isGroupCollapsed(ungroupedKey);
+      rows.add(
+        _ProviderGroupingHeaderVM(
+          groupKey: ungroupedKey,
+          title: l10n.providerGroupsOther,
+          count: ungrouped.length,
+          collapsed: collapsed,
+        ),
+      );
       for (final p in ungrouped) {
-        rows.add(_ProviderGroupingProviderVM(provider: p, groupKey: ungroupedKey));
+        rows.add(
+          _ProviderGroupingProviderVM(provider: p, groupKey: ungroupedKey),
+        );
       }
     }
     return rows;
   }
 
-  _Provider _p(String name, String key, {required bool enabled, required int models}) =>
+  _Provider _p(
+    String name,
+    String key, {
+    required bool enabled,
+    required int models,
+  }) =>
       _Provider(name: name, keyName: key, enabled: enabled, modelCount: models);
+
+  List<_Provider> _applySearchToProviders({
+    required List<_Provider> items,
+    required SettingsProvider settings,
+    required String normalizedQuery,
+  }) {
+    if (normalizedQuery.isEmpty) return items;
+    return [
+      for (final provider in items)
+        if (_providerMatches(provider, settings, normalizedQuery)) provider,
+    ];
+  }
+
+  bool _providerMatches(
+    _Provider provider,
+    SettingsProvider settings,
+    String normalizedQuery,
+  ) {
+    if (normalizedQuery.isEmpty) return true;
+    final cfg = settings.getProviderConfig(
+      provider.keyName,
+      defaultName: provider.name,
+    );
+    final displayName = (cfg.name.isNotEmpty ? cfg.name : provider.name);
+    return _matchesQuery(displayName, normalizedQuery);
+  }
+
+  bool _matchesQuery(String value, String normalizedQuery) {
+    if (normalizedQuery.isEmpty) return true;
+    return value.toLowerCase().contains(normalizedQuery);
+  }
+
+  String _normalizeSearchQuery(String value) => value.trim().toLowerCase();
 
   Future<void> _onExportSelected() async {
     if (_selected.isEmpty) return;
@@ -360,11 +514,19 @@ class _ProvidersPageState extends State<ProvidersPage> {
 
   Future<void> _onMoveSelectedToGroup() async {
     if (_selected.isEmpty) return;
-    final picked = await showProviderGroupSelectSheet(context, rootContext: context);
+    final picked = await showProviderGroupSelectSheet(
+      context,
+      rootContext: context,
+    );
     if (!mounted) return;
     if (picked == null) return;
-    final targetGroupId = picked == SettingsProvider.providerUngroupedGroupKey ? null : picked;
-    await context.read<SettingsProvider>().moveProvidersToGroup(_selected, targetGroupId);
+    final targetGroupId = picked == SettingsProvider.providerUngroupedGroupKey
+        ? null
+        : picked;
+    await context.read<SettingsProvider>().moveProvidersToGroup(
+      _selected,
+      targetGroupId,
+    );
     if (!mounted) return;
     setState(() => _selected.clear());
   }
@@ -374,7 +536,9 @@ class _ProvidersPageState extends State<ProvidersPage> {
     final l10n = AppLocalizations.of(context)!;
     // Skip built-in providers (default ones)
     final builtInKeys = {for (final p in _providers(l10n: l10n)) p.keyName};
-    final keysToDelete = _selected.where((k) => !builtInKeys.contains(k)).toList(growable: false);
+    final keysToDelete = _selected
+        .where((k) => !builtInKeys.contains(k))
+        .toList(growable: false);
 
     if (keysToDelete.isEmpty) {
       // Nothing deletable selected
@@ -384,11 +548,22 @@ class _ProvidersPageState extends State<ProvidersPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('${l10n.providerDetailPageDeleteProviderTitle} (${keysToDelete.length})'),
+        title: Text(
+          '${l10n.providerDetailPageDeleteProviderTitle} (${keysToDelete.length})',
+        ),
         content: Text(l10n.providersPageDeleteSelectedConfirmContent),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.providerDetailPageCancelButton)),
-          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.providerDetailPageDeleteButton, style: const TextStyle(color: Colors.red))),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.providerDetailPageCancelButton),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.providerDetailPageDeleteButton,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
         ],
       ),
     );
@@ -412,7 +587,11 @@ class _ProvidersPageState extends State<ProvidersPage> {
         _selected.clear();
         _selectMode = false;
       });
-      showAppSnackBar(context, message: l10n.providersPageDeleteSelectedSnackbar, type: NotificationType.success);
+      showAppSnackBar(
+        context,
+        message: l10n.providersPageDeleteSelectedSnackbar,
+        type: NotificationType.success,
+      );
     } catch (_) {}
   }
 }
@@ -443,6 +622,7 @@ class _ProviderGroupingProviderVM extends _ProviderGroupingRowVM {
   });
 
   final _Provider provider;
+
   /// groupId or `__ungrouped__`
   final String groupKey;
 }
@@ -454,6 +634,7 @@ class _ProvidersList extends StatelessWidget {
     required this.onReorder,
     required this.settlingKeys,
     required this.selectMode,
+    required this.reorderEnabled,
     required this.selectedKeys,
     required this.onToggleSelect,
   });
@@ -461,6 +642,7 @@ class _ProvidersList extends StatelessWidget {
   final void Function(int oldIndex, int newIndex) onReorder;
   final Set<String> settlingKeys;
   final bool selectMode;
+  final bool reorderEnabled;
   final Set<String> selectedKeys;
   final void Function(String key) onToggleSelect;
 
@@ -479,20 +661,30 @@ class _ProvidersList extends StatelessWidget {
         builder: (context, constraints) {
           final media = MediaQuery.of(context);
           final safeBottom = media.padding.bottom;
-          final bottomGapIfFlush = safeBottom + 16.0; // leave room above system bar
+          final bottomGapIfFlush =
+              safeBottom + 16.0; // leave room above system bar
 
-          final maxH = constraints.hasBoundedHeight ? constraints.maxHeight : double.infinity;
+          final maxH = constraints.hasBoundedHeight
+              ? constraints.maxHeight
+              : double.infinity;
           // Estimate row height: avatar(22) + vertical paddings(11*2) ~= 44
           const double rowH = 44.0;
           const double dividerH = 6.0; // _iosDivider height
           const double listPadV = 8.0; // ReorderableListView vertical padding
           final int n = items.length;
-          final double baseContentH = n == 0 ? 0.0 : (n * rowH + (n - 1) * dividerH + listPadV);
+          final double baseContentH = n == 0
+              ? 0.0
+              : (n * rowH + (n - 1) * dividerH + listPadV);
           // Decide if we should treat it as reaching bottom (considering the bottom gap we will add)
-          final bool reachesBottom = maxH.isFinite &&
-              (baseContentH >= maxH - 0.5 || (baseContentH + bottomGapIfFlush) >= maxH - 0.5);
-          final double effectiveContentH = baseContentH + (reachesBottom ? bottomGapIfFlush : 0.0);
-          final double containerH = maxH.isFinite ? (effectiveContentH.clamp(0.0, maxH)).toDouble() : effectiveContentH;
+          final bool reachesBottom =
+              maxH.isFinite &&
+              (baseContentH >= maxH - 0.5 ||
+                  (baseContentH + bottomGapIfFlush) >= maxH - 0.5);
+          final double effectiveContentH =
+              baseContentH + (reachesBottom ? bottomGapIfFlush : 0.0);
+          final double containerH = maxH.isFinite
+              ? (effectiveContentH.clamp(0.0, maxH)).toDouble()
+              : effectiveContentH;
 
           return Container(
             height: containerH.isFinite ? containerH : null,
@@ -509,9 +701,12 @@ class _ProvidersList extends StatelessWidget {
             ),
             clipBehavior: Clip.antiAlias,
             child: ReorderableListView.builder(
-              padding: EdgeInsets.only(top: 4, bottom: reachesBottom ? bottomGapIfFlush : 4),
+              padding: EdgeInsets.only(
+                top: 4,
+                bottom: reachesBottom ? bottomGapIfFlush : 4,
+              ),
               itemCount: items.length,
-              onReorder: onReorder,
+              onReorder: reorderEnabled ? onReorder : (_, __) {},
               buildDefaultDragHandles: false,
               proxyDecorator: (child, index, animation) => Opacity(
                 opacity: 0.95,
@@ -527,6 +722,7 @@ class _ProvidersList extends StatelessWidget {
                       provider: p,
                       index: index,
                       selectMode: selectMode,
+                      reorderEnabled: reorderEnabled,
                       selected: selectedKeys.contains(p.keyName),
                       onToggleSelect: onToggleSelect,
                       showDivider: index != items.length - 1,
@@ -549,6 +745,8 @@ class _GroupedProvidersList extends StatelessWidget {
     required this.onReorder,
     required this.settlingKeys,
     required this.selectMode,
+    required this.searchActive,
+    required this.reorderEnabled,
     required this.selectedKeys,
     required this.onToggleSelect,
   });
@@ -557,6 +755,8 @@ class _GroupedProvidersList extends StatelessWidget {
   final void Function(int oldIndex, int newIndex) onReorder;
   final Set<String> settlingKeys;
   final bool selectMode;
+  final bool searchActive;
+  final bool reorderEnabled;
   final Set<String> selectedKeys;
   final void Function(String key) onToggleSelect;
 
@@ -575,9 +775,12 @@ class _GroupedProvidersList extends StatelessWidget {
         builder: (context, constraints) {
           final media = MediaQuery.of(context);
           final safeBottom = media.padding.bottom;
-          final bottomGapIfFlush = safeBottom + 16.0; // leave room above system bar
+          final bottomGapIfFlush =
+              safeBottom + 16.0; // leave room above system bar
 
-          final maxH = constraints.hasBoundedHeight ? constraints.maxHeight : double.infinity;
+          final maxH = constraints.hasBoundedHeight
+              ? constraints.maxHeight
+              : double.infinity;
           // Estimate row height: keep close to _ProvidersList.
           const double rowH = 44.0;
           const double dividerH = 6.0; // _iosDivider height (provider rows)
@@ -585,7 +788,8 @@ class _GroupedProvidersList extends StatelessWidget {
 
           final collapsedByGroupKey = <String, bool>{};
           for (final r in rows) {
-            if (r is _ProviderGroupingHeaderVM) collapsedByGroupKey[r.groupKey] = r.collapsed;
+            if (r is _ProviderGroupingHeaderVM)
+              collapsedByGroupKey[r.groupKey] = r.collapsed;
           }
 
           double baseContentH = 0.0;
@@ -602,16 +806,23 @@ class _GroupedProvidersList extends StatelessWidget {
                 if (collapsed) continue;
                 baseContentH += rowH;
                 final next = (i + 1 < rows.length) ? rows[i + 1] : null;
-                final showDivider = next is _ProviderGroupingProviderVM && next.groupKey == r.groupKey;
+                final showDivider =
+                    next is _ProviderGroupingProviderVM &&
+                    next.groupKey == r.groupKey;
                 if (showDivider) baseContentH += dividerH;
               }
             }
           }
 
-          final bool reachesBottom = maxH.isFinite &&
-              (baseContentH >= maxH - 0.5 || (baseContentH + bottomGapIfFlush) >= maxH - 0.5);
-          final double effectiveContentH = baseContentH + (reachesBottom ? bottomGapIfFlush : 0.0);
-          final double containerH = maxH.isFinite ? (effectiveContentH.clamp(0.0, maxH)).toDouble() : effectiveContentH;
+          final bool reachesBottom =
+              maxH.isFinite &&
+              (baseContentH >= maxH - 0.5 ||
+                  (baseContentH + bottomGapIfFlush) >= maxH - 0.5);
+          final double effectiveContentH =
+              baseContentH + (reachesBottom ? bottomGapIfFlush : 0.0);
+          final double containerH = maxH.isFinite
+              ? (effectiveContentH.clamp(0.0, maxH)).toDouble()
+              : effectiveContentH;
 
           return AnimatedContainer(
             duration: const Duration(milliseconds: 260),
@@ -629,9 +840,12 @@ class _GroupedProvidersList extends StatelessWidget {
             ),
             clipBehavior: Clip.antiAlias,
             child: ReorderableListView.builder(
-              padding: EdgeInsets.only(top: 4, bottom: reachesBottom ? bottomGapIfFlush : 4),
+              padding: EdgeInsets.only(
+                top: 4,
+                bottom: reachesBottom ? bottomGapIfFlush : 4,
+              ),
               itemCount: rows.length,
-              onReorder: onReorder,
+              onReorder: reorderEnabled ? onReorder : (_, __) {},
               buildDefaultDragHandles: false,
               proxyDecorator: (child, index, animation) => Opacity(
                 opacity: 0.95,
@@ -647,14 +861,20 @@ class _GroupedProvidersList extends StatelessWidget {
                       title: row.title,
                       count: row.count,
                       collapsed: row.collapsed,
+                      canToggleCollapse: !searchActive,
                     ),
                   );
                 }
                 if (row is _ProviderGroupingProviderVM) {
                   final p = row.provider;
                   final collapsed = collapsedByGroupKey[row.groupKey] ?? false;
-                  final next = (index + 1 < rows.length) ? rows[index + 1] : null;
-                  final showDivider = !collapsed && next is _ProviderGroupingProviderVM && next.groupKey == row.groupKey;
+                  final next = (index + 1 < rows.length)
+                      ? rows[index + 1]
+                      : null;
+                  final showDivider =
+                      !collapsed &&
+                      next is _ProviderGroupingProviderVM &&
+                      next.groupKey == row.groupKey;
                   return KeyedSubtree(
                     key: ValueKey(p.keyName),
                     child: _SettleAnim(
@@ -669,6 +889,7 @@ class _GroupedProvidersList extends StatelessWidget {
                                 provider: p,
                                 index: index,
                                 selectMode: selectMode,
+                                reorderEnabled: reorderEnabled,
                                 selected: selectedKeys.contains(p.keyName),
                                 onToggleSelect: onToggleSelect,
                                 showDivider: showDivider,
@@ -687,18 +908,110 @@ class _GroupedProvidersList extends StatelessWidget {
   }
 }
 
+class _ProvidersSearchField extends StatelessWidget {
+  const _ProvidersSearchField({
+    required this.controller,
+    required this.hintText,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final hasText = controller.text.trim().isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        style: TextStyle(
+          color: isDark ? Colors.white : Colors.black87,
+          fontSize: 14,
+        ),
+        cursorColor: cs.primary,
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: TextStyle(
+            color: cs.onSurface.withOpacity(0.5),
+            fontSize: 13.5,
+          ),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
+          prefixIcon: Icon(
+            Lucide.Search,
+            size: 16,
+            color: cs.onSurface.withOpacity(0.5),
+          ),
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 34,
+            minHeight: 34,
+          ),
+          suffixIcon: hasText
+              ? IconButton(
+                  onPressed: onClear,
+                  icon: Icon(
+                    Lucide.X,
+                    size: 14,
+                    color: cs.onSurface.withOpacity(0.48),
+                  ),
+                  tooltip: hintText,
+                  splashColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                  hoverColor: Colors.transparent,
+                )
+              : null,
+          suffixIconConstraints: const BoxConstraints(
+            minWidth: 34,
+            minHeight: 34,
+          ),
+          filled: true,
+          fillColor: isDark
+              ? Colors.white.withOpacity(0.12)
+              : const Color(0xFFEBEBEB),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ProviderGroupHeaderRow extends StatelessWidget {
   const _ProviderGroupHeaderRow({
     required this.groupKey,
     required this.title,
     required this.count,
     required this.collapsed,
+    required this.canToggleCollapse,
   });
 
   final String groupKey;
   final String title;
   final int count;
   final bool collapsed;
+  final bool canToggleCollapse;
 
   @override
   Widget build(BuildContext context) {
@@ -710,7 +1023,10 @@ class _ProviderGroupHeaderRow extends StatelessWidget {
     return _TactileRow(
       pressedScale: 1.00,
       onTap: () {
-        unawaited(context.read<SettingsProvider>().toggleGroupCollapsed(groupKey));
+        if (!canToggleCollapse) return;
+        unawaited(
+          context.read<SettingsProvider>().toggleGroupCollapsed(groupKey),
+        );
       },
       builder: (pressed) => _AnimatedPressColor(
         pressed: pressed,
@@ -723,10 +1039,23 @@ class _ProviderGroupHeaderRow extends StatelessWidget {
                 turns: collapsed ? 0.0 : 0.25,
                 duration: const Duration(milliseconds: 260),
                 curve: Curves.easeOutCubic,
-                child: Icon(Lucide.ChevronRight, size: 16, color: color.withOpacity(0.75)),
+                child: Icon(
+                  Lucide.ChevronRight,
+                  size: 16,
+                  color: color.withOpacity(0.75),
+                ),
               ),
               const SizedBox(width: 6),
-              Expanded(child: Text(title, style: TextStyle(fontSize: 13.5, color: color, fontWeight: FontWeight.w700))),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
               _Pill(text: '$count', bg: pillBg, fg: pillFg),
             ],
@@ -742,6 +1071,7 @@ class _ProviderRow extends StatelessWidget {
     required this.provider,
     required this.index,
     required this.selectMode,
+    required this.reorderEnabled,
     required this.selected,
     required this.onToggleSelect,
     required this.showDivider,
@@ -749,6 +1079,7 @@ class _ProviderRow extends StatelessWidget {
   final _Provider provider;
   final int index;
   final bool selectMode;
+  final bool reorderEnabled;
   final bool selected;
   final void Function(String key) onToggleSelect;
   final bool showDivider;
@@ -757,11 +1088,16 @@ class _ProviderRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
-    final cfg = settings.getProviderConfig(provider.keyName, defaultName: provider.name);
+    final cfg = settings.getProviderConfig(
+      provider.keyName,
+      defaultName: provider.name,
+    );
     final enabled = cfg.enabled;
     final l10n = AppLocalizations.of(context)!;
 
-    final statusBg = enabled ? Colors.green.withOpacity(0.12) : Colors.orange.withOpacity(0.15);
+    final statusBg = enabled
+        ? Colors.green.withOpacity(0.12)
+        : Colors.orange.withOpacity(0.15);
     final statusFg = enabled ? Colors.green : Colors.orange;
 
     final row = _TactileRow(
@@ -795,79 +1131,107 @@ class _ProviderRow extends StatelessWidget {
                 curve: Curves.easeOutCubic,
                 child: Row(
                   children: [
-                  // Animated appear of select dot area with width transition
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    width: selectMode ? 28 : 0,
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 150),
-                      opacity: selectMode ? 1.0 : 0.0,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: IosCheckbox(
-                          value: selected,
-                          size: 20,
-                          hitTestSize: 22,
-                          borderWidth: 1.6,
-                          activeColor: cs.primary,
-                          borderColor: cs.onSurface.withOpacity(0.35),
-                          onChanged: (_) => onToggleSelect(provider.keyName),
+                    // Animated appear of select dot area with width transition
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      width: selectMode ? 28 : 0,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 150),
+                        opacity: selectMode ? 1.0 : 0.0,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: IosCheckbox(
+                            value: selected,
+                            size: 20,
+                            hitTestSize: 22,
+                            borderWidth: 1.6,
+                            activeColor: cs.primary,
+                            borderColor: cs.onSurface.withOpacity(0.35),
+                            onChanged: (_) => onToggleSelect(provider.keyName),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  if (selectMode) const SizedBox(width: 4),
-                  SizedBox(
-                    width: 36,
-                    child: Center(
-                      child: ProviderAvatar(
-                        providerKey: provider.keyName,
-                        displayName: (cfg.name.isNotEmpty ? cfg.name : provider.keyName),
-                        size: 22,
+                    if (selectMode) const SizedBox(width: 4),
+                    SizedBox(
+                      width: 36,
+                      child: Center(
+                        child: ProviderAvatar(
+                          providerKey: provider.keyName,
+                          displayName: (cfg.name.isNotEmpty
+                              ? cfg.name
+                              : provider.keyName),
+                          size: 22,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      (cfg.name.isNotEmpty ? cfg.name : provider.name),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 15, color: color, fontWeight: FontWeight.w600),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        (cfg.name.isNotEmpty ? cfg.name : provider.name),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: statusBg,
-                      borderRadius: BorderRadius.circular(999),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusBg,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        enabled
+                            ? l10n.providersPageEnabledStatus
+                            : l10n.providersPageDisabledStatus,
+                        style: TextStyle(fontSize: 11, color: statusFg),
+                      ),
                     ),
-                    child: Text(
-                      enabled ? l10n.providersPageEnabledStatus : l10n.providersPageDisabledStatus,
-                      style: TextStyle(fontSize: 11, color: statusFg),
+                    const SizedBox(width: 8),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 150),
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeOut,
+                      transitionBuilder: (child, anim) => FadeTransition(
+                        opacity: anim,
+                        child: ScaleTransition(scale: anim, child: child),
+                      ),
+                      child: selectMode
+                          ? const SizedBox.shrink(key: ValueKey('none'))
+                          : Icon(
+                              Lucide.ChevronRight,
+                              size: 16,
+                              color: color,
+                              key: const ValueKey('chev'),
+                            ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 150),
-                    switchInCurve: Curves.easeOut,
-                    switchOutCurve: Curves.easeOut,
-                    transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: ScaleTransition(scale: anim, child: child)),
-                    child: selectMode
-                        ? const SizedBox.shrink(key: ValueKey('none'))
-                        : Icon(Lucide.ChevronRight, size: 16, color: color, key: const ValueKey('chev')),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              ));
+            );
 
-            Widget line = KeyedSubtree(key: ValueKey('row-$index'), child: rowContent);
-            if (!selectMode) {
-              line = ReorderableDelayedDragStartListener(index: index, child: line);
+            Widget line = KeyedSubtree(
+              key: ValueKey('row-$index'),
+              child: rowContent,
+            );
+            if (!selectMode && reorderEnabled) {
+              line = ReorderableDelayedDragStartListener(
+                index: index,
+                child: line,
+              );
             }
-            return Column(children: [line, if (showDivider) _iosDivider(context)]);
+            return Column(
+              children: [line, if (showDivider) _iosDivider(context)],
+            );
           },
         );
       },
@@ -957,7 +1321,13 @@ class _SelectionBar extends StatelessWidget {
 }
 
 class _CapsuleButton extends StatefulWidget {
-  const _CapsuleButton({required this.label, required this.icon, required this.color, required this.onTap, this.outlined = false});
+  const _CapsuleButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    this.outlined = false,
+  });
   final String label;
   final IconData icon;
   final Color color;
@@ -975,10 +1345,18 @@ class _CapsuleButtonState extends State<_CapsuleButton> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     // iOS glass style: grey border + frosted background; keep icon/label tinted by provided color
-    final glassBase = isDark ? Colors.black.withOpacity(0.06) : Colors.white.withOpacity(0.65);
-    final overlay = isDark ? Colors.black.withOpacity(0.06) : Colors.black.withOpacity(0.05);
-    final tileColor = _pressed ? Color.alphaBlend(overlay, glassBase) : glassBase;
-    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.35 : 0.40); // subtle grey border
+    final glassBase = isDark
+        ? Colors.black.withOpacity(0.06)
+        : Colors.white.withOpacity(0.65);
+    final overlay = isDark
+        ? Colors.black.withOpacity(0.06)
+        : Colors.black.withOpacity(0.05);
+    final tileColor = _pressed
+        ? Color.alphaBlend(overlay, glassBase)
+        : glassBase;
+    final borderColor = cs.outlineVariant.withOpacity(
+      isDark ? 0.35 : 0.40,
+    ); // subtle grey border
     final fg = widget.color; // use provided color for content only
 
     return GestureDetector(
@@ -1012,7 +1390,14 @@ class _CapsuleButtonState extends State<_CapsuleButton> {
                 children: [
                   Icon(widget.icon, size: 16, color: fg),
                   const SizedBox(width: 6),
-                  Text(widget.label, style: TextStyle(color: fg, fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text(
+                    widget.label,
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1041,7 +1426,6 @@ class _GlassCircleButton extends StatefulWidget {
   State<_GlassCircleButton> createState() => _GlassCircleButtonState();
 }
 
-
 class _GlassCircleButtonState extends State<_GlassCircleButton> {
   bool _pressed = false;
   @override
@@ -1049,9 +1433,15 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final glassBase = isDark ? Colors.black.withOpacity(0.06) : Colors.white.withOpacity(0.06);
-    final overlay = isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05);
-    final tileColor = _pressed ? Color.alphaBlend(overlay, glassBase) : glassBase;
+    final glassBase = isDark
+        ? Colors.black.withOpacity(0.06)
+        : Colors.white.withOpacity(0.06);
+    final overlay = isDark
+        ? Colors.white.withOpacity(0.06)
+        : Colors.black.withOpacity(0.05);
+    final tileColor = _pressed
+        ? Color.alphaBlend(overlay, glassBase)
+        : glassBase;
     final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.10 : 0.10);
 
     final child = SizedBox(
@@ -1095,49 +1485,85 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
   }
 }
 
-Future<void> _showMultiExportSheet(BuildContext context, List<String> keys) async {
+Future<void> _showMultiExportSheet(
+  BuildContext context,
+  List<String> keys,
+) async {
   final cs = Theme.of(context).colorScheme;
   final settings = context.read<SettingsProvider>();
   final l10n = AppLocalizations.of(context)!;
   final entries = [
     for (final k in keys)
       () {
-        final cfg = settings.providerConfigs[k] ?? settings.getProviderConfig(k);
+        final cfg =
+            settings.providerConfigs[k] ?? settings.getProviderConfig(k);
         final name = (cfg.name.isNotEmpty ? cfg.name : k);
         final code = encodeProviderConfig(cfg);
         return {'name': name, 'code': code};
-      }()
+      }(),
   ];
   final text = entries.map((e) => e['code']).join('\n');
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: cs.surface,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
     builder: (ctx) {
       final bool showQr = keys.length <= 4;
       Rect shareAnchorRect(BuildContext bctx) {
         try {
           final ro = bctx.findRenderObject();
-          if (ro is RenderBox && ro.hasSize && ro.size.width > 0 && ro.size.height > 0) {
+          if (ro is RenderBox &&
+              ro.hasSize &&
+              ro.size.width > 0 &&
+              ro.size.height > 0) {
             final origin = ro.localToGlobal(Offset.zero);
             return origin & ro.size;
           }
         } catch (_) {}
         final size = MediaQuery.of(bctx).size;
-        return Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: 1, height: 1);
+        return Rect.fromCenter(
+          center: Offset(size.width / 2, size.height / 2),
+          width: 1,
+          height: 1,
+        );
       }
+
       return SafeArea(
         top: false,
         child: Padding(
-          padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + MediaQuery.of(ctx).viewInsets.bottom),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            10,
+            16,
+            16 + MediaQuery.of(ctx).viewInsets.bottom,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(999)))),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
               const SizedBox(height: 12),
-              Center(child: Text(l10n.providersPageExportSelectedTitle(keys.length), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600))),
+              Center(
+                child: Text(
+                  l10n.providersPageExportSelectedTitle(keys.length),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
               const SizedBox(height: 12),
               // Show QR only when selection is small to avoid overlong input
               if (showQr) ...[
@@ -1147,7 +1573,9 @@ Future<void> _showMultiExportSheet(BuildContext context, List<String> keys) asyn
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
+                      border: Border.all(
+                        color: cs.outlineVariant.withOpacity(0.2),
+                      ),
                     ),
                     child: PrettyQr(
                       data: text,
@@ -1180,7 +1608,11 @@ Future<void> _showMultiExportSheet(BuildContext context, List<String> keys) asyn
                       label: l10n.providersPageExportCopyButton,
                       onTap: () {
                         Clipboard.setData(ClipboardData(text: text));
-                        showAppSnackBar(context, message: l10n.providersPageExportCopiedSnackbar, type: NotificationType.success);
+                        showAppSnackBar(
+                          context,
+                          message: l10n.providersPageExportCopiedSnackbar,
+                          type: NotificationType.success,
+                        );
                       },
                     ),
                   ),
@@ -1191,7 +1623,11 @@ Future<void> _showMultiExportSheet(BuildContext context, List<String> keys) asyn
                       label: l10n.providersPageExportShareButton,
                       onTap: () async {
                         final rect = shareAnchorRect(ctx);
-                        await Share.share(text, subject: 'AI Providers', sharePositionOrigin: rect);
+                        await Share.share(
+                          text,
+                          subject: 'AI Providers',
+                          sharePositionOrigin: rect,
+                        );
                       },
                     ),
                   ),
@@ -1256,7 +1692,6 @@ class _BrandAvatar extends StatelessWidget {
   final String name;
   final double size;
 
-
   bool _preferMonochromeWhite(String n) {
     final k = n.toLowerCase();
     if (RegExp(r'openai|gpt|o\d').hasMatch(k)) return true;
@@ -1284,8 +1719,14 @@ class _BrandAvatar extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: asset == null
-          ? Text(name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-              style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700, fontSize: size * 0.42))
+          ? Text(
+              name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
+              style: TextStyle(
+                color: cs.primary,
+                fontWeight: FontWeight.w700,
+                fontSize: size * 0.42,
+              ),
+            )
           : _IconAsset(
               asset: asset,
               size: size * 0.62,
@@ -1297,7 +1738,11 @@ class _BrandAvatar extends StatelessWidget {
 }
 
 class _IconAsset extends StatelessWidget {
-  const _IconAsset({required this.asset, required this.size, this.monochromeWhite = false});
+  const _IconAsset({
+    required this.asset,
+    required this.size,
+    this.monochromeWhite = false,
+  });
   final String asset;
   final double size;
   final bool monochromeWhite;
@@ -1330,11 +1775,21 @@ class _Provider {
   final String keyName;
   final bool enabled;
   final int modelCount;
-  _Provider({required this.name, required this.keyName, required this.enabled, required this.modelCount});
+  _Provider({
+    required this.name,
+    required this.keyName,
+    required this.enabled,
+    required this.modelCount,
+  });
 }
 
 class _DragHandle extends StatelessWidget {
-  const _DragHandle({required this.onDragStarted, required this.onDragEnd, required this.feedback, required this.data});
+  const _DragHandle({
+    required this.onDragStarted,
+    required this.onDragEnd,
+    required this.feedback,
+    required this.data,
+  });
   final VoidCallback onDragStarted;
   final VoidCallback onDragEnd;
   final Widget feedback;
@@ -1359,7 +1814,11 @@ class _DragHandle extends StatelessWidget {
         width: 40,
         height: 40,
         alignment: Alignment.center,
-        child: Icon(Lucide.GripHorizontal, size: 24, color: cs.onSurface.withOpacity(0.7)),
+        child: Icon(
+          Lucide.GripHorizontal,
+          size: 24,
+          color: cs.onSurface.withOpacity(0.7),
+        ),
       ),
       childWhenDragging: const SizedBox(width: 40, height: 40),
     );
@@ -1412,8 +1871,16 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
-        onTap: () { if (widget.haptics) Haptics.light(); widget.onTap(); },
-        onLongPress: widget.onLongPress == null ? null : () { if (widget.haptics) Haptics.light(); widget.onLongPress!.call(); },
+        onTap: () {
+          if (widget.haptics) Haptics.light();
+          widget.onTap();
+        },
+        onLongPress: widget.onLongPress == null
+            ? null
+            : () {
+                if (widget.haptics) Haptics.light();
+                widget.onLongPress!.call();
+              },
         child: AnimatedScale(
           scale: _pressed ? 0.95 : 1.0,
           duration: const Duration(milliseconds: 100),
@@ -1430,7 +1897,12 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
 
 // Row tactile wrapper for iOS-style lists: no ripple, optional haptics, color-only press feedback
 class _TactileRow extends StatefulWidget {
-  const _TactileRow({required this.builder, this.onTap, this.pressedScale = 1.00, this.haptics = true});
+  const _TactileRow({
+    required this.builder,
+    this.onTap,
+    this.pressedScale = 1.00,
+    this.haptics = true,
+  });
   final Widget Function(bool pressed) builder;
   final VoidCallback? onTap;
   final double pressedScale;
@@ -1441,7 +1913,10 @@ class _TactileRow extends StatefulWidget {
 
 class _TactileRowState extends State<_TactileRow> {
   bool _pressed = false;
-  void _setPressed(bool v) { if (_pressed != v) setState(() => _pressed = v); }
+  void _setPressed(bool v) {
+    if (_pressed != v) setState(() => _pressed = v);
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1449,24 +1924,34 @@ class _TactileRowState extends State<_TactileRow> {
       onTapDown: widget.onTap == null ? null : (_) => _setPressed(true),
       onTapUp: widget.onTap == null ? null : (_) => _setPressed(false),
       onTapCancel: widget.onTap == null ? null : () => _setPressed(false),
-      onTap: widget.onTap == null ? null : () {
-        if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
-        widget.onTap!.call();
-      },
+      onTap: widget.onTap == null
+          ? null
+          : () {
+              if (widget.haptics &&
+                  context.read<SettingsProvider>().hapticsOnListItemTap)
+                Haptics.soft();
+              widget.onTap!.call();
+            },
       child: widget.builder(_pressed),
     );
   }
 }
 
 class _AnimatedPressColor extends StatelessWidget {
-  const _AnimatedPressColor({required this.pressed, required this.base, required this.builder});
+  const _AnimatedPressColor({
+    required this.pressed,
+    required this.base,
+    required this.builder,
+  });
   final bool pressed;
   final Color base;
   final Widget Function(Color color) builder;
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final target = pressed ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base) : base;
+    final target = pressed
+        ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base)
+        : base;
     return TweenAnimationBuilder<Color?>(
       tween: ColorTween(end: target),
       duration: const Duration(milliseconds: 220),
@@ -1478,5 +1963,11 @@ class _AnimatedPressColor extends StatelessWidget {
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
-  return Divider(height: 6, thickness: 0.6, indent: 54, endIndent: 12, color: cs.outlineVariant.withOpacity(0.18));
+  return Divider(
+    height: 6,
+    thickness: 0.6,
+    indent: 54,
+    endIndent: 12,
+    color: cs.outlineVariant.withOpacity(0.18),
+  );
 }

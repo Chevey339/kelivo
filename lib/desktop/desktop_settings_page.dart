@@ -1260,11 +1260,55 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   String? _selectedKey;
   final GlobalKey<_DesktopProviderDetailPaneState> _detailKey =
       GlobalKey<_DesktopProviderDetailPaneState>();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  String _normalizeSearchQuery(String value) => value.trim().toLowerCase();
+
+  bool _matchesQuery(String value, String normalizedQuery) {
+    if (normalizedQuery.isEmpty) return true;
+    return value.toLowerCase().contains(normalizedQuery);
+  }
+
+  bool _providerMatches({
+    required ({String name, String key}) item,
+    required SettingsProvider settings,
+    required String normalizedQuery,
+  }) {
+    if (normalizedQuery.isEmpty) return true;
+    final cfg = settings.getProviderConfig(item.key, defaultName: item.name);
+    final displayName = cfg.name.isNotEmpty ? cfg.name : item.name;
+    return _matchesQuery(displayName, normalizedQuery);
+  }
+
+  List<({String name, String key})> _applySearchToProviders({
+    required List<({String name, String key})> items,
+    required SettingsProvider settings,
+    required String normalizedQuery,
+  }) {
+    if (normalizedQuery.isEmpty) return items;
+    return [
+      for (final item in items)
+        if (_providerMatches(
+          item: item,
+          settings: settings,
+          normalizedQuery: normalizedQuery,
+        ))
+          item,
+    ];
+  }
 
   List<_DesktopProviderGroupingRowVM> _buildProviderGroupingRows({
     required AppLocalizations l10n,
     required SettingsProvider settings,
     required List<({String name, String key})> items,
+    String normalizedQuery = '',
   }) {
     final ungroupedKey = SettingsProvider.providerUngroupedGroupKey;
     final groups = settings.providerGroups;
@@ -1279,15 +1323,39 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       final groupKey = (gid != null && groupById.containsKey(gid))
           ? gid
           : ungroupedKey;
-      (providersByGroupKey[groupKey] ??= <({String name, String key})>[])
-          .add(p);
+      (providersByGroupKey[groupKey] ??= <({String name, String key})>[]).add(
+        p,
+      );
     }
 
     final rows = <_DesktopProviderGroupingRowVM>[];
+    final searching = normalizedQuery.isNotEmpty;
+
+    List<({String name, String key})> providersForGroup(
+      String groupKey,
+      String title,
+    ) {
+      final list =
+          providersByGroupKey[groupKey] ??
+          const <({String name, String key})>[];
+      if (!searching) return list;
+      final groupMatched = _matchesQuery(title, normalizedQuery);
+      if (groupMatched) return list;
+      return [
+        for (final item in list)
+          if (_providerMatches(
+            item: item,
+            settings: settings,
+            normalizedQuery: normalizedQuery,
+          ))
+            item,
+      ];
+    }
+
     for (final g in groups) {
-      final list = providersByGroupKey[g.id] ?? const <({String name, String key})>[];
+      final list = providersForGroup(g.id, g.name);
       if (list.isEmpty) continue;
-      final collapsed = settings.isGroupCollapsed(g.id);
+      final collapsed = searching ? false : settings.isGroupCollapsed(g.id);
       rows.add(
         _DesktopProviderGroupingHeaderVM(
           groupKey: g.id,
@@ -1301,9 +1369,11 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       }
     }
 
-    final ungrouped = providersByGroupKey[ungroupedKey] ?? const <({String name, String key})>[];
+    final ungrouped = providersForGroup(ungroupedKey, l10n.providerGroupsOther);
     if (ungrouped.isNotEmpty) {
-      final collapsed = settings.isGroupCollapsed(ungroupedKey);
+      final collapsed = searching
+          ? false
+          : settings.isGroupCollapsed(ungroupedKey);
       rows.add(
         _DesktopProviderGroupingHeaderVM(
           groupKey: ungroupedKey,
@@ -1332,10 +1402,90 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
     );
   }
 
+  Widget _buildDesktopProviderRow({
+    required ({String name, String key}) item,
+    required SettingsProvider settings,
+    required List<({String name, String key})> ordered,
+    required Set<String> baseKeys,
+    required ColorScheme colorScheme,
+  }) {
+    final cfg = settings.getProviderConfig(item.key, defaultName: item.name);
+    final enabled = cfg.enabled;
+    final selected = item.key == _selectedKey;
+    final bg = selected
+        ? colorScheme.primary.withOpacity(0.08)
+        : Colors.transparent;
+    return _ProviderListRow(
+      name: item.name,
+      keyName: item.key,
+      enabled: enabled,
+      selected: selected,
+      background: bg,
+      onTap: () => setState(() => _selectedKey = item.key),
+      onEdit: () {
+        setState(() => _selectedKey = item.key);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _detailKey.currentState?._showProviderSettingsDialog(context);
+        });
+      },
+      onShare: () {
+        setState(() => _selectedKey = item.key);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showShareDialog(
+            item.key,
+            cfg.name.isNotEmpty ? cfg.name : item.name,
+          );
+        });
+      },
+      onDelete: baseKeys.contains(item.key)
+          ? null
+          : () async {
+              final l10n = AppLocalizations.of(context)!;
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text(l10n.providerDetailPageDeleteProviderTitle),
+                  content: Text(l10n.providerDetailPageDeleteProviderContent),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: Text(l10n.providerDetailPageCancelButton),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: Text(
+                        l10n.providerDetailPageDeleteButton,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+              if (ok != true) return;
+              try {
+                final ap = context.read<AssistantProvider>();
+                for (final assistant in ap.assistants) {
+                  if (assistant.chatModelProvider == item.key) {
+                    await ap.updateAssistant(
+                      assistant.copyWith(clearChatModel: true),
+                    );
+                  }
+                }
+              } catch (_) {}
+              await settings.removeProviderConfig(item.key);
+              if (!mounted) return;
+              setState(() {
+                if (_selectedKey == item.key) {
+                  _selectedKey = ordered.isNotEmpty ? ordered.first.key : null;
+                }
+              });
+            },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
 
@@ -1377,12 +1527,18 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       if (v != null) ordered.add(v);
     }
     ordered.addAll(map.values);
+    final filteredOrdered = _applySearchToProviders(
+      items: ordered,
+      settings: settings,
+      normalizedQuery: _searchQuery,
+    );
     final groupingActive = settings.providerGroupingActive;
     final groupingRows = groupingActive
         ? _buildProviderGroupingRows(
             l10n: l10n,
             settings: settings,
             items: ordered,
+            normalizedQuery: _searchQuery,
           )
         : const <_DesktopProviderGroupingRowVM>[];
 
@@ -1413,6 +1569,23 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                 width: 256,
                 child: Column(
                   children: [
+                    _DesktopProvidersSearchField(
+                      controller: _searchController,
+                      hintText: l10n.providersPageSearchHint,
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = _normalizeSearchQuery(value);
+                        });
+                      },
+                      onClear: () {
+                        if (_searchController.text.isEmpty) return;
+                        _searchController.clear();
+                        setState(() {
+                          _searchQuery = '';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
                     Expanded(
                       child: groupingActive
                           ? ReorderableListView.builder(
@@ -1420,6 +1593,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                               padding: EdgeInsets.zero,
                               itemCount: groupingRows.length,
                               onReorder: (oldIndex, newIndex) async {
+                                if (_searchQuery.isNotEmpty) return;
                                 if (groupingRows.isEmpty) return;
                                 final sp = context.read<SettingsProvider>();
 
@@ -1429,7 +1603,8 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                       ProviderGroupingHeaderVM(
                                         groupKey: r.groupKey,
                                       )
-                                    else if (r is _DesktopProviderGroupingProviderVM)
+                                    else if (r
+                                        is _DesktopProviderGroupingProviderVM)
                                       ProviderGroupingProviderVM(
                                         providerKey: r.item.key,
                                         groupKey: r.groupKey,
@@ -1458,7 +1633,8 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
 
                                 final intent = analysis.intent;
                                 if (intent == null) return;
-                                final targetGroupId = intent.targetGroupKey ==
+                                final targetGroupId =
+                                    intent.targetGroupKey ==
                                         SettingsProvider
                                             .providerUngroupedGroupKey
                                     ? null
@@ -1494,24 +1670,31 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                         title: row.title,
                                         count: row.count,
                                         collapsed: row.collapsed,
-                                        onToggle: () => unawaited(
-                                          context
-                                              .read<SettingsProvider>()
-                                              .toggleGroupCollapsed(row.groupKey),
-                                        ),
+                                        onToggle: _searchQuery.isNotEmpty
+                                            ? null
+                                            : () => unawaited(
+                                                context
+                                                    .read<SettingsProvider>()
+                                                    .toggleGroupCollapsed(
+                                                      row.groupKey,
+                                                    ),
+                                              ),
                                       ),
                                     ),
                                   );
                                 }
                                 if (row is _DesktopProviderGroupingProviderVM) {
-                                  final collapsed = settings.isGroupCollapsed(
-                                    row.groupKey,
-                                  );
+                                  final collapsed = _searchQuery.isNotEmpty
+                                      ? false
+                                      : settings.isGroupCollapsed(row.groupKey);
                                   return KeyedSubtree(
-                                    key: ValueKey('desktop-prov-${row.item.key}'),
+                                    key: ValueKey(
+                                      'desktop-prov-${row.item.key}',
+                                    ),
                                     child: AnimatedSize(
-                                      duration:
-                                          const Duration(milliseconds: 260),
+                                      duration: const Duration(
+                                        milliseconds: 260,
+                                      ),
                                       curve: Curves.easeInOutCubic,
                                       alignment: Alignment.topCenter,
                                       child: collapsed
@@ -1520,159 +1703,25 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                               padding: const EdgeInsets.only(
                                                 bottom: 8,
                                               ),
-                                              child:
-                                                  ReorderableDragStartListener(
-                                                index: i,
-                                                child: () {
-                                                  final item = row.item;
-                                                  final cfg =
-                                                      settings.getProviderConfig(
-                                                    item.key,
-                                                    defaultName: item.name,
-                                                  );
-                                                  final enabled = cfg.enabled;
-                                                  final selected =
-                                                      item.key == _selectedKey;
-                                                  final bg = selected
-                                                      ? cs.primary
-                                                          .withOpacity(0.08)
-                                                      : Colors.transparent;
-                                                  return _ProviderListRow(
-                                                    name: item.name,
-                                                    keyName: item.key,
-                                                    enabled: enabled,
-                                                    selected: selected,
-                                                    background: bg,
-                                                    onTap: () => setState(
-                                                      () =>
-                                                          _selectedKey = item.key,
+                                              child: _searchQuery.isNotEmpty
+                                                  ? _buildDesktopProviderRow(
+                                                      item: row.item,
+                                                      settings: settings,
+                                                      ordered: ordered,
+                                                      baseKeys: baseKeys,
+                                                      colorScheme: cs,
+                                                    )
+                                                  : ReorderableDragStartListener(
+                                                      index: i,
+                                                      child:
+                                                          _buildDesktopProviderRow(
+                                                            item: row.item,
+                                                            settings: settings,
+                                                            ordered: ordered,
+                                                            baseKeys: baseKeys,
+                                                            colorScheme: cs,
+                                                          ),
                                                     ),
-                                                    onEdit: () {
-                                                      setState(
-                                                        () => _selectedKey =
-                                                            item.key,
-                                                      );
-                                                      WidgetsBinding.instance
-                                                          .addPostFrameCallback(
-                                                        (_) {
-                                                          _detailKey
-                                                              .currentState
-                                                              ?._showProviderSettingsDialog(
-                                                                context,
-                                                              );
-                                                        },
-                                                      );
-                                                    },
-                                                    onShare: () {
-                                                      setState(
-                                                        () => _selectedKey =
-                                                            item.key,
-                                                      );
-                                                      WidgetsBinding.instance
-                                                          .addPostFrameCallback(
-                                                        (_) {
-                                                          _showShareDialog(
-                                                            item.key,
-                                                            cfg.name.isNotEmpty
-                                                                ? cfg.name
-                                                                : item.name,
-                                                          );
-                                                        },
-                                                      );
-                                                    },
-                                                    onDelete:
-                                                        baseKeys.contains(item.key)
-                                                            ? null
-                                                            : () async {
-                                                                final l10n =
-                                                                    AppLocalizations.of(
-                                                                      context,
-                                                                    )!;
-                                                                final ok =
-                                                                    await showDialog<
-                                                                      bool
-                                                                    >(
-                                                                  context:
-                                                                      context,
-                                                                  builder:
-                                                                      (ctx) =>
-                                                                          AlertDialog(
-                                                                    title: Text(
-                                                                      l10n
-                                                                          .providerDetailPageDeleteProviderTitle,
-                                                                    ),
-                                                                    content: Text(
-                                                                      l10n
-                                                                          .providerDetailPageDeleteProviderContent,
-                                                                    ),
-                                                                    actions: [
-                                                                      TextButton(
-                                                                        onPressed: () =>
-                                                                            Navigator.of(ctx).pop(false),
-                                                                        child:
-                                                                            Text(
-                                                                          l10n
-                                                                              .providerDetailPageCancelButton,
-                                                                        ),
-                                                                      ),
-                                                                      TextButton(
-                                                                        onPressed: () =>
-                                                                            Navigator.of(ctx).pop(true),
-                                                                        child:
-                                                                            Text(
-                                                                          l10n
-                                                                              .providerDetailPageDeleteButton,
-                                                                          style:
-                                                                              const TextStyle(
-                                                                            color:
-                                                                                Colors.red,
-                                                                          ),
-                                                                        ),
-                                                                      ),
-                                                                    ],
-                                                                  ),
-                                                                );
-                                                                if (ok == true) {
-                                                                  try {
-                                                                    final ap =
-                                                                        context
-                                                                            .read<
-                                                                              AssistantProvider
-                                                                            >();
-                                                                    for (final a
-                                                                        in ap.assistants) {
-                                                                      if (a.chatModelProvider ==
-                                                                          item.key) {
-                                                                        await ap
-                                                                            .updateAssistant(
-                                                                          a.copyWith(
-                                                                            clearChatModel:
-                                                                                true,
-                                                                          ),
-                                                                        );
-                                                                      }
-                                                                    }
-                                                                  } catch (_) {}
-                                                                  await settings
-                                                                      .removeProviderConfig(
-                                                                    item.key,
-                                                                  );
-                                                                  if (mounted) {
-                                                                    setState(() {
-                                                                      if (_selectedKey ==
-                                                                          item.key) {
-                                                                        _selectedKey =
-                                                                            ordered.isNotEmpty
-                                                                                ? ordered.first.key
-                                                                                : null;
-                                                                      }
-                                                                    });
-                                                                  }
-                                                                }
-                                                              },
-                                                  );
-                                                }(),
-                                              ),
                                             ),
                                     ),
                                   );
@@ -1683,13 +1732,14 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                           : ReorderableListView.builder(
                               buildDefaultDragHandles: false,
                               padding: EdgeInsets.zero,
-                              itemCount: ordered.length,
+                              itemCount: filteredOrdered.length,
                               onReorder: (oldIndex, newIndex) async {
+                                if (_searchQuery.isNotEmpty) return;
                                 if (newIndex > oldIndex) newIndex -= 1;
                                 final list =
                                     List<({String name, String key})>.from(
-                                  ordered,
-                                );
+                                      ordered,
+                                    );
                                 final item = list.removeAt(oldIndex);
                                 list.insert(newIndex, item);
                                 final newOrder = [for (final e in list) e.key];
@@ -1707,128 +1757,24 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                 );
                               },
                               itemBuilder: (ctx, i) {
-                                final item = ordered[i];
-                                final cfg = settings.getProviderConfig(
-                                  item.key,
-                                  defaultName: item.name,
-                                );
-                                final enabled = cfg.enabled;
-                                final selected = item.key == _selectedKey;
-                                final bg = selected
-                                    ? cs.primary.withOpacity(0.08)
-                                    : Colors.transparent;
-                                final row = _ProviderListRow(
-                                  name: item.name,
-                                  keyName: item.key,
-                                  enabled: enabled,
-                                  selected: selected,
-                                  background: bg,
-                                  onTap: () =>
-                                      setState(() => _selectedKey = item.key),
-                                  onEdit: () {
-                                    setState(() => _selectedKey = item.key);
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                      _detailKey.currentState
-                                          ?._showProviderSettingsDialog(
-                                            context,
-                                          );
-                                    });
-                                  },
-                                  onShare: () {
-                                    setState(() => _selectedKey = item.key);
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                      _showShareDialog(
-                                        item.key,
-                                        cfg.name.isNotEmpty
-                                            ? cfg.name
-                                            : item.name,
-                                      );
-                                    });
-                                  },
-                                  onDelete: baseKeys.contains(item.key)
-                                      ? null
-                                      : () async {
-                                          final l10n =
-                                              AppLocalizations.of(context)!;
-                                          final ok = await showDialog<bool>(
-                                            context: context,
-                                            builder: (ctx) => AlertDialog(
-                                              title: Text(
-                                                l10n
-                                                    .providerDetailPageDeleteProviderTitle,
-                                              ),
-                                              content: Text(
-                                                l10n
-                                                    .providerDetailPageDeleteProviderContent,
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.of(ctx)
-                                                          .pop(false),
-                                                  child: Text(
-                                                    l10n
-                                                        .providerDetailPageCancelButton,
-                                                  ),
-                                                ),
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Navigator.of(ctx)
-                                                          .pop(true),
-                                                  child: Text(
-                                                    l10n
-                                                        .providerDetailPageDeleteButton,
-                                                    style: const TextStyle(
-                                                      color: Colors.red,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                          if (ok == true) {
-                                            // Clear assistant-level model selections referencing this provider
-                                            try {
-                                              final ap =
-                                                  context.read<
-                                                    AssistantProvider
-                                                  >();
-                                              for (final a in ap.assistants) {
-                                                if (a.chatModelProvider ==
-                                                    item.key) {
-                                                  await ap.updateAssistant(
-                                                    a.copyWith(
-                                                      clearChatModel: true,
-                                                    ),
-                                                  );
-                                                }
-                                              }
-                                            } catch (_) {}
-                                            await settings.removeProviderConfig(
-                                              item.key,
-                                            );
-                                            if (mounted)
-                                              setState(() {
-                                                if (_selectedKey == item.key) {
-                                                  _selectedKey =
-                                                      ordered.isNotEmpty
-                                                          ? ordered.first.key
-                                                          : null;
-                                                }
-                                              });
-                                          }
-                                        },
+                                final item = filteredOrdered[i];
+                                final row = _buildDesktopProviderRow(
+                                  item: item,
+                                  settings: settings,
+                                  ordered: ordered,
+                                  baseKeys: baseKeys,
+                                  colorScheme: cs,
                                 );
                                 return KeyedSubtree(
                                   key: ValueKey('desktop-prov-${item.key}'),
                                   child: Padding(
                                     padding: const EdgeInsets.only(bottom: 8),
-                                    child: ReorderableDragStartListener(
-                                      index: i,
-                                      child: row,
-                                    ),
+                                    child: _searchQuery.isNotEmpty
+                                        ? row
+                                        : ReorderableDragStartListener(
+                                            index: i,
+                                            child: row,
+                                          ),
                                   ),
                                 );
                               },
@@ -1898,18 +1844,105 @@ class _DesktopProviderGroupingProviderVM extends _DesktopProviderGroupingRowVM {
   final String groupKey;
 }
 
+class _DesktopProvidersSearchField extends StatelessWidget {
+  const _DesktopProvidersSearchField({
+    required this.controller,
+    required this.hintText,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final hasText = controller.text.trim().isNotEmpty;
+
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      style: TextStyle(
+        color: isDark ? Colors.white : Colors.black87,
+        fontSize: 14,
+      ),
+      cursorColor: cs.primary,
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: TextStyle(
+          color: cs.onSurface.withOpacity(0.5),
+          fontSize: 13.5,
+        ),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
+        ),
+        prefixIcon: Icon(
+          lucide.Lucide.Search,
+          size: 16,
+          color: cs.onSurface.withOpacity(0.5),
+        ),
+        prefixIconConstraints: const BoxConstraints(
+          minWidth: 34,
+          minHeight: 34,
+        ),
+        suffixIcon: hasText
+            ? IconButton(
+                onPressed: onClear,
+                icon: Icon(
+                  lucide.Lucide.X,
+                  size: 14,
+                  color: cs.onSurface.withOpacity(0.48),
+                ),
+                tooltip: hintText,
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                hoverColor: Colors.transparent,
+              )
+            : null,
+        suffixIconConstraints: const BoxConstraints(
+          minWidth: 34,
+          minHeight: 34,
+        ),
+        filled: true,
+        fillColor: isDark
+            ? Colors.white.withOpacity(0.12)
+            : const Color(0xFFEBEBEB),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+}
+
 class _DesktopProviderGroupHeaderRow extends StatefulWidget {
   const _DesktopProviderGroupHeaderRow({
     required this.title,
     required this.count,
     required this.collapsed,
-    required this.onToggle,
+    this.onToggle,
   });
 
   final String title;
   final int count;
   final bool collapsed;
-  final VoidCallback onToggle;
+  final VoidCallback? onToggle;
 
   @override
   State<_DesktopProviderGroupHeaderRow> createState() =>
@@ -1925,11 +1958,15 @@ class _DesktopProviderGroupHeaderRowState
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04))
+        ? (isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.04))
         : Colors.transparent;
 
     return MouseRegion(
-      cursor: SystemMouseCursors.click,
+      cursor: widget.onToggle == null
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
@@ -3443,9 +3480,9 @@ class _DesktopProviderDetailPaneState
                                     maxLabelWidth: 150,
                                     triggerFillColor:
                                         Theme.of(ctx).brightness ==
-                                                Brightness.dark
-                                            ? Colors.white10
-                                            : const Color(0xFFF7F7F9),
+                                            Brightness.dark
+                                        ? Colors.white10
+                                        : const Color(0xFFF7F7F9),
                                     onSelected: (v) async {
                                       if (v ==
                                           SettingsProvider
@@ -3470,8 +3507,9 @@ class _DesktopProviderDetailPaneState
                                     final controller = TextEditingController();
                                     final ok = await showDialog<bool>(
                                       context: ctx,
-                                      barrierColor:
-                                          Colors.black.withOpacity(0.12),
+                                      barrierColor: Colors.black.withOpacity(
+                                        0.12,
+                                      ),
                                       builder: (dctx) => AlertDialog(
                                         title: Text(
                                           l10n.providerGroupsCreateDialogTitle,
@@ -3489,8 +3527,7 @@ class _DesktopProviderDetailPaneState
                                             onPressed: () =>
                                                 Navigator.of(dctx).pop(false),
                                             child: Text(
-                                              l10n
-                                                  .providerGroupsCreateDialogCancel,
+                                              l10n.providerGroupsCreateDialogCancel,
                                             ),
                                           ),
                                           TextButton(
@@ -3521,8 +3558,9 @@ class _DesktopProviderDetailPaneState
                                     showDialog<void>(
                                       context: ctx,
                                       barrierDismissible: true,
-                                      barrierColor:
-                                          Colors.black.withOpacity(0.12),
+                                      barrierColor: Colors.black.withOpacity(
+                                        0.12,
+                                      ),
                                       builder: (_) =>
                                           const _DesktopProviderGroupsDialog(),
                                     ),
@@ -5819,7 +5857,8 @@ class _DesktopProviderGroupsDialog extends StatefulWidget {
       _DesktopProviderGroupsDialogState();
 }
 
-class _DesktopProviderGroupsDialogState extends State<_DesktopProviderGroupsDialog> {
+class _DesktopProviderGroupsDialogState
+    extends State<_DesktopProviderGroupsDialog> {
   Future<String?> _promptName(
     BuildContext context, {
     required String title,
@@ -5995,9 +6034,10 @@ class _DesktopProviderGroupsDialogState extends State<_DesktopProviderGroupsDial
                       buildDefaultDragHandles: false,
                       proxyDecorator: (child, index, animation) {
                         return ScaleTransition(
-                          scale: Tween<double>(begin: 1.0, end: 1.02).animate(
-                            animation,
-                          ),
+                          scale: Tween<double>(
+                            begin: 1.0,
+                            end: 1.02,
+                          ).animate(animation),
                           child: child,
                         );
                       },
@@ -6024,7 +6064,8 @@ class _DesktopProviderGroupsDialogState extends State<_DesktopProviderGroupsDial
                                   oldName: g.name,
                                 ),
                               ),
-                              onDelete: () => unawaited(_deleteGroup(context, g.id)),
+                              onDelete: () =>
+                                  unawaited(_deleteGroup(context, g.id)),
                               dragHandle: ReorderableDragStartListener(
                                 index: i,
                                 child: const _DesktopDragHandle(),
@@ -6082,10 +6123,7 @@ class _DesktopProviderGroupCard extends StatelessWidget {
           ),
           _DesktopCountPill(count: count),
           const SizedBox(width: 10),
-          _IconBtn(
-            icon: lucide.Lucide.Pencil,
-            onTap: onEdit,
-          ),
+          _IconBtn(icon: lucide.Lucide.Pencil, onTap: onEdit),
           const SizedBox(width: 4),
           _IconBtn(
             icon: lucide.Lucide.Trash2,
@@ -6110,7 +6148,10 @@ class _DesktopCountPill extends StatelessWidget {
     final bg = cs.primary.withOpacity(0.12);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
       child: Text(
         '$count',
         style: TextStyle(
@@ -6138,7 +6179,9 @@ class _DesktopDragHandleState extends State<_DesktopDragHandle> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05))
+        ? (isDark
+              ? Colors.white.withOpacity(0.06)
+              : Colors.black.withOpacity(0.05))
         : Colors.transparent;
     return MouseRegion(
       cursor: SystemMouseCursors.grab,
@@ -6147,7 +6190,10 @@ class _DesktopDragHandleState extends State<_DesktopDragHandle> {
       child: Container(
         width: 28,
         height: 28,
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
+        ),
         alignment: Alignment.center,
         child: Icon(
           lucide.Lucide.GripVertical,

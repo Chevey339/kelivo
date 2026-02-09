@@ -4784,6 +4784,12 @@ abstract class AppLocalizations {
   /// **'Add'**
   String get providersPageAddTooltip;
 
+  /// No description provided for @providersPageSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search providers or groups'**
+  String get providersPageSearchHint;
+
   /// No description provided for @providersPageProviderAddedSnackbar.
   ///
   /// In en, this message translates to:
