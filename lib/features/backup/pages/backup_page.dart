@@ -17,6 +17,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
+import '../../../core/services/backup/rikkahub_importer.dart';
 import '../../../utils/platform_utils.dart';
 
 // File size formatter (B, KB, MB, GB)
@@ -130,7 +131,6 @@ class _BackupPageState extends State<BackupPage> {
 
   Future<RestoreMode?> _chooseImportModeDialog(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
 
@@ -164,6 +164,53 @@ class _BackupPageState extends State<BackupPage> {
             child: Text(l10n.backupPageCancel),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<RikkaMergeConflictPolicy?> _chooseRikkaMergePolicyDialog(
+    BuildContext context,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
+    final locale = Localizations.localeOf(context);
+    final isZh = locale.languageCode.startsWith('zh');
+    final title = isZh ? '选择冲突处理策略' : 'Choose Conflict Policy';
+    final mergeTitle = isZh ? '合并同类项（默认）' : 'Merge Same Item (Default)';
+    final mergeDesc = isZh
+        ? '按类型和名称匹配，保留本地配置并补全缺失字段'
+        : 'Match by type/name, keep local values, and fill missing imported fields';
+    final duplicateTitle = isZh ? '新增副本' : 'Create Duplicate';
+    final duplicateDesc = isZh
+        ? '冲突时创建带 RikkaHub 后缀的新副本'
+        : 'Create a new copy with a RikkaHub suffix on conflict';
+
+    return showDialog<RikkaMergeConflictPolicy>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ActionCard(
+              color: cardColor,
+              icon: Lucide.GitFork,
+              title: mergeTitle,
+              subtitle: mergeDesc,
+              onTap: () =>
+                  Navigator.of(ctx).pop(RikkaMergeConflictPolicy.mergeSameItem),
+            ),
+            const SizedBox(height: 10),
+            _ActionCard(
+              color: cardColor,
+              icon: Lucide.Box,
+              title: duplicateTitle,
+              subtitle: duplicateDesc,
+              onTap: () => Navigator.of(ctx)
+                  .pop(RikkaMergeConflictPolicy.duplicateOnConflict),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -585,6 +632,84 @@ class _BackupPageState extends State<BackupPage> {
                   icon: Lucide.Import2,
                   label: l10n.backupPageImportBackupFile,
                   onTap: () => _doImportLocal(context, vm),
+                ),
+                _iosDivider(context),
+                _iosNavRow(
+                  context,
+                  icon: Lucide.Box,
+                  label: l10n.backupPageImportFromRikkaHub,
+                  onTap: () async {
+                    final result = await FilePicker.platform.pickFiles(
+                      type: FileType.custom,
+                      allowedExtensions: ['zip'],
+                    );
+                    final path = result?.files.single.path;
+                    if (path == null) return;
+
+                    final mode = await _chooseImportModeDialog(context);
+                    if (mode == null) return;
+
+                    var conflictPolicy = RikkaMergeConflictPolicy.mergeSameItem;
+                    if (mode == RestoreMode.merge) {
+                      final picked = await _chooseRikkaMergePolicyDialog(context);
+                      if (picked == null) return;
+                      conflictPolicy = picked;
+                    }
+
+                    await _runWithImportingOverlay(context, () async {
+                      try {
+                        final settings = context.read<SettingsProvider>();
+                        final chatService = context.read<ChatService>();
+                        final file = File(path);
+                        final res = await RikkaHubImporter.importFromRikkaHub(
+                          file: file,
+                          mode: mode,
+                          settings: settings,
+                          chatService: chatService,
+                          mergeConflictPolicy: conflictPolicy,
+                        );
+                        if (!mounted) return;
+                        final warningPreview = res.warnings.take(4).join('\n');
+                        final warningText = res.warnings.isEmpty
+                            ? ''
+                            : '\nWarnings: ${res.warnings.length}'
+                                '${warningPreview.isEmpty ? '' : '\n$warningPreview'}';
+                        await showDialog(
+                          context: context,
+                          builder: (dctx) => AlertDialog(
+                            title: Text(l10n.backupPageRestartRequired),
+                            content: Text(
+                              '${l10n.backupPageImportFromRikkaHub}:\n'
+                              ' • Providers: ${res.providers}\n'
+                              ' • Assistants: ${res.assistants}\n'
+                              ' • Mode Injections: ${res.modeInjections}\n'
+                              ' • Lorebooks: ${res.lorebooks}\n'
+                              ' • Conversations: ${res.conversations}\n'
+                              ' • Messages: ${res.messages}\n'
+                              ' • Files: ${res.files}$warningText\n\n'
+                              '${l10n.backupPageRestartContent}',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () async {
+                                  Navigator.of(dctx).pop();
+                                  PlatformUtils.restartApp();
+                                },
+                                child: Text(l10n.backupPageOK),
+                              ),
+                            ],
+                          ),
+                        );
+                      } catch (e) {
+                        if (!mounted) return;
+                        showAppSnackBar(
+                          context,
+                          message: e.toString(),
+                          type: NotificationType.error,
+                        );
+                      }
+                    });
+                  },
                 ),
                 _iosDivider(context),
                 _iosNavRow(

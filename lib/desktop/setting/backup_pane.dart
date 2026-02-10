@@ -12,6 +12,7 @@ import '../../core/providers/settings_provider.dart';
 import '../../core/services/chat/chat_service.dart';
 import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
+import '../../core/services/backup/rikkahub_importer.dart';
 import '../../utils/platform_utils.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/snackbar.dart';
@@ -126,13 +127,19 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     );
   }
 
+  Future<RikkaMergeConflictPolicy?> _chooseRikkaMergePolicy() async {
+    return showDialog<RikkaMergeConflictPolicy>(
+      context: context,
+      builder: (_) => const _RikkaConflictPolicyDialog(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     final busy = context.watch<BackupProvider>().busy;
-    final message = context.watch<BackupProvider>().message;
 
     return Container(
       alignment: Alignment.topCenter,
@@ -346,6 +353,64 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                       await _chooseRestoreModeAndRun((mode) async {
                         await context.read<BackupProvider>().restoreFromLocalFile(f, mode: mode);
                       });
+                    }),
+                    _DeskIosButton(label: l10n.backupPageImportFromRikkaHub, filled: false, dense: true, onTap: () async {
+                      final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip'], allowMultiple: false);
+                      final path = result?.files.single.path;
+                      if (path == null) return;
+                      final f = File(path);
+                      final mode = await showDialog<RestoreMode>(context: context, builder: (_) => _RestoreModeDialog());
+                      if (mode == null) return;
+                      var conflictPolicy = RikkaMergeConflictPolicy.mergeSameItem;
+                      if (mode == RestoreMode.merge) {
+                        final picked = await _chooseRikkaMergePolicy();
+                        if (picked == null) return;
+                        conflictPolicy = picked;
+                      }
+                      final settings = context.read<SettingsProvider>();
+                      final chat = context.read<ChatService>();
+                      try {
+                        final res = await RikkaHubImporter.importFromRikkaHub(
+                          file: f,
+                          mode: mode,
+                          settings: settings,
+                          chatService: chat,
+                          mergeConflictPolicy: conflictPolicy,
+                        );
+                        final warningPreview = res.warnings.take(4).join('\n');
+                        final warningText = res.warnings.isEmpty
+                            ? ''
+                            : '\nWarnings: ${res.warnings.length}'
+                                '${warningPreview.isEmpty ? '' : '\n$warningPreview'}';
+                        await showDialog(context: context, builder: (_) => AlertDialog(
+                          backgroundColor: cs.surface,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          title: Text(l10n.backupPageRestartRequired),
+                          content: Text(
+                            '${l10n.backupPageImportFromRikkaHub}:\n'
+                            ' • Providers: ${res.providers}\n'
+                            ' • Assistants: ${res.assistants}\n'
+                            ' • Mode Injections: ${res.modeInjections}\n'
+                            ' • Lorebooks: ${res.lorebooks}\n'
+                            ' • Conversations: ${res.conversations}\n'
+                            ' • Messages: ${res.messages}\n'
+                            ' • Files: ${res.files}$warningText\n\n'
+                            '${l10n.backupPageRestartContent}',
+                          ),
+                          actions: [TextButton(onPressed: () async {
+                            Navigator.of(context).pop();
+                            PlatformUtils.restartApp();
+                          }, child: Text(l10n.backupPageOK))],
+                        ));
+                      } catch (e) {
+                        await showDialog(context: context, builder: (_) => AlertDialog(
+                          backgroundColor: cs.surface,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          title: Text('Error'),
+                          content: Text(e.toString()),
+                          actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.backupPageOK))],
+                        ));
+                      }
                     }),
                     _DeskIosButton(label: l10n.backupPageImportFromCherryStudio, filled: false, dense: true, onTap: () async {
                       final result = await FilePicker.platform.pickFiles(type: FileType.any, allowMultiple: false);
@@ -733,6 +798,74 @@ class _RestoreModeDialog extends StatelessWidget {
             const SizedBox(height: 12),
             Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.backupPageCancel))),
           ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RikkaConflictPolicyDialog extends StatelessWidget {
+  const _RikkaConflictPolicyDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final locale = Localizations.localeOf(context);
+    final isZh = locale.languageCode.startsWith('zh');
+    final title = isZh ? '选择冲突处理策略' : 'Choose Conflict Policy';
+    final mergeTitle = isZh ? '合并同类项（默认）' : 'Merge Same Item (Default)';
+    final mergeSubtitle = isZh
+        ? '按类型和名称匹配，保留本地配置并补全缺失字段。'
+        : 'Match by type/name, keep local values, and fill missing imported fields.';
+    final duplicateTitle = isZh ? '新增副本' : 'Create Duplicate';
+    final duplicateSubtitle = isZh
+        ? '冲突时创建带 RikkaHub 后缀的新副本。'
+        : 'Create a new copy with a RikkaHub suffix on conflict.';
+    return Dialog(
+      backgroundColor: cs.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                l10n.backupPageMergeModeDescription,
+                style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.8)),
+              ),
+              const SizedBox(height: 12),
+              _RestoreModeTile(
+                title: mergeTitle,
+                subtitle: mergeSubtitle,
+                onTap: () => Navigator.of(context)
+                    .pop(RikkaMergeConflictPolicy.mergeSameItem),
+              ),
+              const SizedBox(height: 8),
+              _RestoreModeTile(
+                title: duplicateTitle,
+                subtitle: duplicateSubtitle,
+                onTap: () => Navigator.of(context)
+                    .pop(RikkaMergeConflictPolicy.duplicateOnConflict),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(l10n.backupPageCancel),
+                ),
+              ),
+            ],
           ),
         ),
       ),
