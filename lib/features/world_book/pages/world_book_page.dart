@@ -283,7 +283,7 @@ class _WorldBookPageState extends State<WorldBookPage> {
   String _safeFileName(String name) {
     final cleaned = name
         .replaceAll(RegExp(r'[\\\\/:*?\"<>|]'), '_')
-        .replaceAll(RegExp(r'\\s+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
     if (cleaned.isEmpty) return 'lorebook';
     return cleaned.length > 80 ? cleaned.substring(0, 80) : cleaned;
@@ -1211,7 +1211,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
   }
 
   List<String> _parseKeywordInput(String raw) {
-    final parts = raw.split(RegExp(r'[\\n,，;；]'));
+    final parts = raw.split(RegExp(r'[\n,，;；]'));
     final seen = <String>{};
     final out = <String>[];
     for (final p in parts) {
