@@ -47,7 +47,7 @@
 - 🎙️ **语音服务** - 内置系统 TTS，同时支持 OpenAI / Google Gemini / ElevenLabs 语音服务器
 - 🛠️ **MCP 支持** - Model Context Protocol 工具集成
 - 🧰 **内置 MCP 工具** - 内置 fetch MCP 工具
-- 🔍 **网络搜索** - 集成多种搜索引擎（Exa、Tavily、知谱、LinkUp、Brave、Bing、Metaso、SearXNG、Ollama、Jina, Perplexity, Bocha）
+- 🔍 **网络搜索** - 集成多种搜索引擎（Exa、Tavily、智谱、LinkUp、Brave、Bing、Metaso、SearXNG、Ollama、Jina, Perplexity, Bocha）
 - 🧩 **提示词变量** - 支持模型名称、时间等动态变量
 - 📤 **二维码分享** - 通过二维码导出和导入供应商配置
 - 💾 **数据备份** - 支持聊天记录备份和恢复
