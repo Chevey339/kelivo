@@ -305,6 +305,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
             label: l10n.sideDrawerMenuDelete,
             danger: true,
             onTap: () async {
+              final confirmed = await _confirmDeleteConversation(context, chat);
+              if (!confirmed) return;
               final deletingCurrent = chatService.currentConversationId == chat.id;
               final nextId = _nextRecentConversation(chatService, chat.id);
               await chatService.deleteConversation(chat.id);
@@ -443,6 +445,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       label: l10n.sideDrawerMenuDelete,
                       color: Colors.redAccent,
                       action: () async {
+                        final confirmed = await _confirmDeleteConversation(context, chat);
+                        if (!confirmed) return;
                         final deletingCurrent = chatService.currentConversationId == chat.id;
                         final nextId = _nextRecentConversation(chatService, chat.id);
                         await chatService.deleteConversation(chat.id);
@@ -465,6 +469,33 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         );
       },
     );
+  }
+
+  Future<bool> _confirmDeleteConversation(BuildContext context, ChatItem chat) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(l10n.sideDrawerMenuDelete),
+          content: Text('${l10n.sideDrawerMenuDelete} "${chat.title}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.sideDrawerCancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(
+                l10n.sideDrawerMenuDelete,
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    return confirmed == true;
   }
 
   String? _nextRecentConversation(ChatService chatService, String excludeId) {
