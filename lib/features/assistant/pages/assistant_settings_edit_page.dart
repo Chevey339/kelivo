@@ -373,80 +373,94 @@ class _MemoryTab extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        final bottom = MediaQuery.of(ctx).viewInsets.bottom;
+        final media = MediaQuery.of(ctx);
+        final bottom = media.viewInsets.bottom;
+        final maxSheetHeight =
+            (media.size.height - media.padding.top - media.viewInsets.bottom - 24)
+                .clamp(0.0, 560.0)
+                .toDouble();
         return SafeArea(
-          child: Padding(
+          top: false,
+          child: AnimatedPadding(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
             padding: EdgeInsets.fromLTRB(16, 16, 16, bottom + 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Lucide.Library, size: 18, color: cs.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l10n.assistantEditMemoryDialogTitle,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxSheetHeight),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Lucide.Library, size: 18, color: cs.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          l10n.assistantEditMemoryDialogTitle,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: controller,
-                  minLines: 1,
-                  maxLines: 16,
-                  decoration: InputDecoration(
-                    hintText: l10n.assistantEditMemoryDialogHint,
-                    filled: true,
-                    fillColor: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF7F7F9),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.2)),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
-                      borderRadius: BorderRadius.circular(10),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: TextField(
+                      controller: controller,
+                      minLines: 1,
+                      maxLines: 16,
+                      decoration: InputDecoration(
+                        hintText: l10n.assistantEditMemoryDialogHint,
+                        filled: true,
+                        fillColor: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF7F7F9),
+                        border: OutlineInputBorder(
+                          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.2)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _IosButton(
-                        label: l10n.assistantEditEmojiDialogCancel,
-                        icon: Lucide.X,
-                        onTap: () => Navigator.of(ctx).pop(),
-                        filled: false,
-                        neutral: true,
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _IosButton(
+                          label: l10n.assistantEditEmojiDialogCancel,
+                          icon: Lucide.X,
+                          onTap: () => Navigator.of(ctx).pop(),
+                          filled: false,
+                          neutral: true,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _IosButton(
-                        label: l10n.assistantEditEmojiDialogSave,
-                        icon: Lucide.Check,
-                        onTap: () async {
-                          final text = controller.text.trim();
-                          if (text.isEmpty) return;
-                          final mp = context.read<MemoryProvider>();
-                          if (id == null) {
-                            await mp.add(assistantId: assistantId, content: text);
-                          } else {
-                            await mp.update(id: id, content: text);
-                          }
-                          if (context.mounted) Navigator.of(ctx).pop();
-                        },
-                        filled: true,
-                        neutral: false,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _IosButton(
+                          label: l10n.assistantEditEmojiDialogSave,
+                          icon: Lucide.Check,
+                          onTap: () async {
+                            final text = controller.text.trim();
+                            if (text.isEmpty) return;
+                            final mp = context.read<MemoryProvider>();
+                            if (id == null) {
+                              await mp.add(assistantId: assistantId, content: text);
+                            } else {
+                              await mp.update(id: id, content: text);
+                            }
+                            if (context.mounted) Navigator.of(ctx).pop();
+                          },
+                          filled: true,
+                          neutral: false,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
