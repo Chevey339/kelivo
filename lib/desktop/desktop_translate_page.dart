@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:re_editor/re_editor.dart';
 
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
@@ -11,8 +12,10 @@ import '../core/providers/settings_provider.dart';
 import '../core/providers/assistant_provider.dart';
 import '../core/services/api/chat_api_service.dart';
 import '../shared/widgets/snackbar.dart';
-import '../features/model/widgets/model_select_sheet.dart' show showModelSelector, ModelSelection;
+import '../shared/widgets/plain_text_code_editor.dart';
+import '../features/model/widgets/model_select_sheet.dart' show showModelSelector;
 import '../features/settings/widgets/language_select_sheet.dart' show LanguageOption, supportedLanguages;
+import '../utils/re_editor_utils.dart';
 
 class DesktopTranslatePage extends StatefulWidget {
   const DesktopTranslatePage({super.key});
@@ -22,8 +25,8 @@ class DesktopTranslatePage extends StatefulWidget {
 }
 
 class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
-  final TextEditingController _source = TextEditingController();
-  final TextEditingController _output = TextEditingController();
+  final CodeLineEditingController _source = CodeLineEditingController();
+  final CodeLineEditingController _output = CodeLineEditingController();
 
   LanguageOption? _targetLang;
   String? _modelProviderKey;
@@ -31,6 +34,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
   StreamSubscription? _subscription;
   bool _translating = false;
+  int _translateRunId = 0;
 
   @override
   void initState() {
@@ -110,6 +114,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   Future<void> _pickModel() async {
     if (_translating) return; // avoid switching mid-stream
     final sel = await showModelSelector(context);
+    if (!mounted) return;
     if (sel != null) {
       setState(() {
         _modelProviderKey = sel.providerKey;
@@ -121,11 +126,15 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   }
 
   Future<void> _startTranslate() async {
+    if (_translating) return;
     final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
 
     final text = _source.text.trim();
     if (text.isEmpty) return;
+    await _subscription?.cancel();
+    _subscription = null;
+    if (!mounted) return;
 
     final providerKey = _modelProviderKey;
     final modelId = _modelId;
@@ -143,8 +152,24 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
     setState(() {
       _translating = true;
-      _output.text = '';
+      _output.value = const CodeLineEditingValue.empty();
     });
+
+    final runId = ++_translateRunId;
+    final buffer = StringBuffer();
+    Timer? flushTimer;
+    void flushNow() {
+      if (!mounted || runId != _translateRunId) return;
+      _setOutputText(buffer.toString());
+    }
+
+    void scheduleFlush() {
+      if (flushTimer?.isActive ?? false) return;
+      flushTimer = Timer(const Duration(milliseconds: 80), () {
+        flushTimer = null;
+        flushNow();
+      });
+    }
 
     try {
       final stream = ChatApiService.sendMessageStream(
@@ -158,25 +183,35 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
       _subscription = stream.listen(
         (chunk) {
           // live update; remove leading whitespace on first chunk to avoid top gap
+          if (runId != _translateRunId) return;
           final s = chunk.content;
-          if (_output.text.isEmpty) {
-            _output.text = s.replaceFirst(RegExp(r'^\s+'), '');
+          if (buffer.isEmpty) {
+            buffer.write(s.replaceFirst(RegExp(r'^\s+'), ''));
           } else {
-            _output.text += s;
+            buffer.write(s);
           }
+          scheduleFlush();
         },
         onDone: () {
-          if (!mounted) return;
+          if (!mounted || runId != _translateRunId) return;
+          flushTimer?.cancel();
+          flushNow();
+          _subscription = null;
           setState(() => _translating = false);
         },
         onError: (e) {
-          if (!mounted) return;
+          if (!mounted || runId != _translateRunId) return;
+          flushTimer?.cancel();
+          flushNow();
+          _subscription = null;
           setState(() => _translating = false);
           showAppSnackBar(context, message: l10n.homePageTranslateFailed(e.toString()), type: NotificationType.error);
         },
         cancelOnError: true,
       );
     } catch (e) {
+      _subscription = null;
+      if (!mounted) return;
       setState(() => _translating = false);
       showAppSnackBar(context, message: l10n.homePageTranslateFailed(e.toString()), type: NotificationType.error);
     }
@@ -186,7 +221,13 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     try {
       await _subscription?.cancel();
     } catch (_) {}
+    _subscription = null;
+    _translateRunId++;
     if (mounted) setState(() => _translating = false);
+  }
+
+  void _setOutputText(String text) {
+    _output.setTextSafely(text);
   }
 
   @override
@@ -267,23 +308,23 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                 overlay: _PaneActionButton(
                                   icon: lucide.Lucide.Eraser,
                                   label: '清空',
-                                  onTap: () {
-                                    _source.clear();
-                                    _output.clear();
+                                  onTap: () async {
+                                    // TODO: Replace hard-coded label with AppLocalizations (i18n).
+                                    // TODO: Confirm before clearing when either source or output is non-empty to prevent accidental data loss.
+                                    if (_translating || _subscription != null) {
+                                      await _stopTranslate();
+                                    }
+                                    _source.value = const CodeLineEditingValue.empty();
+                                    _output.value = const CodeLineEditingValue.empty();
                                   },
                                 ),
-                                child: TextField(
+                                child: PlainTextCodeEditor(
                                   controller: _source,
-                                  keyboardType: TextInputType.multiline,
-                                  maxLines: null,
-                                  expands: true,
-                                  decoration: InputDecoration(
-                                    hintText: l10n.translatePageInputHint,
-                                    border: InputBorder.none,
-                                    isCollapsed: true,
-                                    contentPadding: const EdgeInsets.all(14),
-                                  ),
-                                  style: const TextStyle(fontSize: 14.5, height: 1.4),
+                                  autofocus: false,
+                                  hint: l10n.translatePageInputHint,
+                                  padding: const EdgeInsets.all(14),
+                                  fontSize: 14.5,
+                                  fontHeight: 1.4,
                                 ),
                               ),
                             ),
@@ -294,8 +335,10 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                   icon: lucide.Lucide.Copy,
                                   label: '复制',
                                   onTap: () async {
+                                    // TODO: Replace hard-coded label with AppLocalizations (i18n).
+                                    // TODO: Handle Clipboard.setData failures and provide user feedback when copying fails.
                                     await Clipboard.setData(ClipboardData(text: _output.text));
-                                    if (!mounted) return;
+                                    if (!context.mounted) return;
                                     showAppSnackBar(
                                       context,
                                       message: AppLocalizations.of(context)!.chatMessageWidgetCopiedToClipboard,
@@ -303,19 +346,14 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                     );
                                   },
                                 ),
-                                child: TextField(
+                                child: PlainTextCodeEditor(
                                   controller: _output,
                                   readOnly: true,
-                                  keyboardType: TextInputType.multiline,
-                                  maxLines: null,
-                                  expands: true,
-                                  decoration: InputDecoration(
-                                    hintText: l10n.translatePageOutputHint,
-                                    border: InputBorder.none,
-                                    isCollapsed: true,
-                                    contentPadding: const EdgeInsets.all(14),
-                                  ),
-                                  style: const TextStyle(fontSize: 14.5, height: 1.4),
+                                  autofocus: false,
+                                  hint: l10n.translatePageOutputHint,
+                                  padding: const EdgeInsets.all(14),
+                                  fontSize: 14.5,
+                                  fontHeight: 1.4,
                                 ),
                               ),
                             ),
@@ -347,7 +385,7 @@ class _PaneContainer extends StatelessWidget {
           decoration: BoxDecoration(
             color: cs.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.18)),
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.18)),
           ),
           clipBehavior: Clip.antiAlias,
           child: child,
@@ -401,7 +439,6 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
     final triggerWidth = triggerSize.width;
 
     _entry = OverlayEntry(builder: (ctx) {
-      final cs = Theme.of(ctx).colorScheme;
       final isDark = Theme.of(ctx).brightness == Brightness.dark;
       final usePure = Provider.of<SettingsProvider>(ctx, listen: false).usePureBackground;
       final bgColor = usePure
@@ -433,8 +470,15 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
         ),
       ]);
     });
-    Overlay.of(context)?.insert(_entry!);
-    setState(() => _open = true);
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) {
+      _entry = null;
+      return;
+    }
+    overlay.insert(_entry!);
+    if (mounted) {
+      setState(() => _open = true);
+    }
   }
 
   @override
@@ -443,7 +487,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final baseBorder = cs.outlineVariant.withOpacity(0.18);
+    final baseBorder = cs.outlineVariant.withValues(alpha: 0.18);
     final hoverBorder = cs.primary; // hover/focus border
     final borderColor = _open || _hover ? hoverBorder : baseBorder;
 
@@ -471,7 +515,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
               boxShadow: _open
                   ? [
                       BoxShadow(
-                        color: cs.primary.withOpacity(0.10),
+                        color: cs.primary.withValues(alpha: 0.10),
                         blurRadius: 0,
                         spreadRadius: 2,
                       ),
@@ -493,7 +537,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 14,
-                          color: cs.onSurface.withOpacity(0.88),
+                          color: cs.onSurface.withValues(alpha: 0.88),
                         ),
                       ),
                     ),
@@ -510,7 +554,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
                       child: Icon(
                         lucide.Lucide.ChevronDown,
                         size: 14,
-                        color: cs.onSurface.withOpacity(0.45),
+                        color: cs.onSurface.withValues(alpha: 0.45),
                       ),
                     ),
                   ),
@@ -591,10 +635,9 @@ class _LangDropdownOverlayState extends State<_LangDropdownOverlay> with SingleT
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final borderColor = cs.outlineVariant.withOpacity(0.12);
+    final borderColor = cs.outlineVariant.withValues(alpha: 0.12);
     // divider removed
 
     final filtered = supportedLanguages;
@@ -612,7 +655,7 @@ class _LangDropdownOverlayState extends State<_LangDropdownOverlay> with SingleT
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: borderColor, width: 0.5),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(isDark ? 0.32 : 0.08), blurRadius: 16, offset: const Offset(0, 6)),
+                BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.32 : 0.08), blurRadius: 16, offset: const Offset(0, 6)),
               ],
             ),
             clipBehavior: Clip.antiAlias,
@@ -671,8 +714,8 @@ class _LangOptionTileState extends State<_LangOptionTile> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = widget.selected
-        ? cs.primary.withOpacity(0.12)
-        : (_hover ? (isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.04)) : Colors.transparent);
+        ? cs.primary.withValues(alpha: 0.12)
+        : (_hover ? (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.04)) : Colors.transparent);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -703,7 +746,7 @@ class _LangOptionTileState extends State<_LangOptionTile> {
                     _localizedLabel(AppLocalizations.of(context)!, widget.option.code),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.88), fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w400),
+                    style: TextStyle(fontSize: 14, color: cs.onSurface.withValues(alpha: 0.88), fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w400),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -764,7 +807,7 @@ class _TranslateButtonState extends State<_TranslateButton> {
     final cs = Theme.of(context).colorScheme;
     final fg = isDark ? Colors.black : Colors.white;
     final base = cs.primary;
-    final bg = _hover ? base.withOpacity(0.92) : base;
+    final bg = _hover ? base.withValues(alpha: 0.92) : base;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -787,6 +830,7 @@ class _TranslateButtonState extends State<_TranslateButton> {
                     children: [
                       SvgPicture.asset('assets/icons/stop.svg', width: 16, height: 16, colorFilter: ColorFilter.mode(fg, BlendMode.srcIn)),
                       const SizedBox(width: 6),
+                      // TODO: Replace hard-coded label with AppLocalizations (i18n).
                       Text('终止', style: TextStyle(color: fg, fontSize: 13.5, fontWeight: FontWeight.w600)),
                     ],
                   )
@@ -796,6 +840,7 @@ class _TranslateButtonState extends State<_TranslateButton> {
                     children: [
                       Icon(lucide.Lucide.Languages, size: 16, color: fg),
                       const SizedBox(width: 6),
+                      // TODO: Replace hard-coded label with AppLocalizations (i18n).
                       Text('翻译', style: TextStyle(color: fg, fontSize: 13.5, fontWeight: FontWeight.w600)),
                     ],
                   ),
@@ -817,7 +862,7 @@ class _ModelPickerButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = enabled ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05)) : Colors.transparent;
+    final bg = enabled ? (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05)) : Colors.transparent;
     return MouseRegion(
       cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
       child: GestureDetector(
@@ -836,12 +881,12 @@ class _ModelPickerButton extends StatelessWidget {
                   return Image.asset(asset!, width: 18, height: 18);
                 }()
               else
-                Icon(lucide.Lucide.Bot, size: 18, color: cs.onSurface.withOpacity(0.9)),
+                Icon(lucide.Lucide.Bot, size: 18, color: cs.onSurface.withValues(alpha: 0.9)),
               if (modelId != null) ...[
                 const SizedBox(width: 8),
                 Text(
                   modelId!,
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: cs.onSurface.withOpacity(0.85)),
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: cs.onSurface.withValues(alpha: 0.85)),
                 ),
               ],
             ],
@@ -869,9 +914,9 @@ class _PaneActionButtonState extends State<_PaneActionButton> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.06))
+        ? (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06))
         : Colors.transparent;
-    final fg = cs.onSurface.withOpacity(0.9);
+    final fg = cs.onSurface.withValues(alpha: 0.9);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),

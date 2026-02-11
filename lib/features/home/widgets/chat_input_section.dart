@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:re_editor/re_editor.dart';
 
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
@@ -63,7 +64,7 @@ class ChatInputSection extends StatelessWidget {
 
   final GlobalKey inputBarKey;
   final FocusNode inputFocus;
-  final TextEditingController inputController;
+  final CodeLineEditingController inputController;
   final ChatInputBarController mediaController;
   final bool isTablet;
   final bool isLoading;
