@@ -7052,6 +7052,9 @@ class ChatApiService {
   static int _getMaxOutputTokensForClaudeModel(String modelId) {
     // Limits based on Google Vertex AI documentation
     switch (modelId) {
+      case 'claude-opus-4-6':
+      case 'claude-sonnet-4-6':
+        return 128000;
       case 'claude-opus-4-5@20251101':
       case 'claude-sonnet-4-5@20250929':
       case 'claude-haiku-4-5@20251001':

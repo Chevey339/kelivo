@@ -255,9 +255,11 @@ class GoogleProvider extends BaseProvider {
       // we manually inject known supported Claude models for convenience.
       if (cfg.vertexAI == true) {
         final knownClaude = [
+          'claude-opus-4-6',
           'claude-opus-4-5@20251101',
           'claude-opus-4-1@20250805',
           'claude-opus-4@20250514',
+          'claude-sonnet-4-6',
           'claude-sonnet-4-5@20250929',
           'claude-sonnet-4@20250514',
           'claude-3-7-sonnet@20250219',
