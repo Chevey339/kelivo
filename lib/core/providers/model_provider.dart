@@ -492,13 +492,15 @@ class ProviderManager {
         final endpoint = useStream
             ? 'streamGenerateContent'
             : 'generateContent';
-        if (cfg.vertexAI == true &&
+        final bool isVertex = cfg.vertexAI == true &&
             (cfg.location?.isNotEmpty == true) &&
-            (cfg.projectId?.isNotEmpty == true)) {
+            (cfg.projectId?.isNotEmpty == true);
+        final bool isVertexClaude =
+            isVertex && upstreamId.toLowerCase().startsWith('claude-');
+        if (isVertex) {
           final loc = cfg.location!;
           final proj = cfg.projectId!;
-          // Special path for Anthropic models on Vertex AI
-          if (upstreamId.toLowerCase().startsWith('claude-')) {
+          if (isVertexClaude) {
             final ep = useStream ? 'streamRawPredict' : 'rawPredict';
             url =
                 'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$ep';
@@ -524,20 +526,32 @@ class ProviderManager {
             ModelInfo(id: upstreamId, displayName: upstreamId),
           ).output.contains(Modality.image);
         }
-        final body = {
-          'contents': [
-            {
-              'role': 'user',
-              'parts': [
-                {'text': 'hello'},
-              ],
-            },
-          ],
-          if (wantsImageOutput)
-            'generationConfig': {
-              'responseModalities': ['TEXT', 'IMAGE'],
-            },
-        };
+        final body = isVertexClaude
+            ? {
+                'anthropic_version': 'vertex-2023-10-16',
+                'messages': [
+                  {
+                    'role': 'user',
+                    'content': 'hello',
+                  },
+                ],
+                'max_tokens': 32,
+                if (useStream) 'stream': true,
+              }
+            : {
+                'contents': [
+                  {
+                    'role': 'user',
+                    'parts': [
+                      {'text': 'hello'},
+                    ],
+                  },
+                ],
+                if (wantsImageOutput)
+                  'generationConfig': {
+                    'responseModalities': ['TEXT', 'IMAGE'],
+                  },
+              };
         final headers = <String, String>{'Content-Type': 'application/json'};
         final effectiveKey = _effectiveApiKey(cfg);
         if (cfg.vertexAI == true) {
