@@ -7092,7 +7092,8 @@ class ChatApiService {
     final proj = (config.projectId ?? '').trim();
     final endpoint = stream ? 'streamRawPredict' : 'rawPredict';
     // Vertex AI Anthropic URL
-    final url = Uri.parse('https://$loc-aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$endpoint');
+    final host = (loc.toLowerCase() == 'global') ? 'aiplatform.googleapis.com' : '$loc-aiplatform.googleapis.com';
+    final url = Uri.parse('https://$host/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$endpoint');
 
     final isReasoning = _effectiveModelInfo(config, modelId)
         .abilities
