@@ -198,11 +198,13 @@ class _SearchContent extends StatelessWidget {
     if (isGrok) return true; // All Grok models assumed to support search
     if (isClaude) {
       const supported = <String>{
+        'claude-opus-4-6',
         'claude-sonnet-4-5-20250929',
         'claude-sonnet-4-20250514',
         'claude-3-7-sonnet-20250219',
         'claude-haiku-4-5-20251001',
         'claude-3-5-haiku-latest',
+        'claude-sonnet-4-6',
         'claude-opus-4-1-20250805',
         'claude-opus-4-20250514',
       };
