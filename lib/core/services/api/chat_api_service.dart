@@ -7091,6 +7091,25 @@ class ChatApiService {
     bool stream = true,
   }) async* {
     final upstreamId = _apiModelId(config, modelId);
+    bool _supportsAdaptiveThinking(String id) {
+      final lower = id.toLowerCase();
+      if (!lower.contains('claude-')) return false;
+      final m = RegExp(r'claude-(opus|sonnet)-(\d+)-(\d+)', caseSensitive: false).firstMatch(lower);
+      if (m != null) {
+        final major = int.tryParse(m.group(2) ?? '');
+        final minor = int.tryParse(m.group(3) ?? '');
+        if (major != null && minor != null) {
+          return major > 4 || (major == 4 && minor >= 6);
+        }
+      }
+      return lower.contains('4-6') || lower.contains('4.6');
+    }
+
+    String _adaptiveEffort(int? budget) {
+      final effort = _effortForBudget(budget);
+      if (effort == 'auto') return 'medium';
+      return effort;
+    }
     final loc = (config.location ?? 'us-central1').trim();
     final proj = (config.projectId ?? '').trim();
     final endpoint = stream ? 'streamRawPredict' : 'rawPredict';
@@ -7256,10 +7275,19 @@ class ChatApiService {
         if (allTools.isNotEmpty) 'tools': allTools,
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
         if (isReasoning)
-          'thinking': {
-            'type': (effectiveThinkingBudget == 0) ? 'disabled' : 'enabled',
-            if (effectiveThinkingBudget != null && effectiveThinkingBudget > 0)
-              'budget_tokens': effectiveThinkingBudget,
+          if (_supportsAdaptiveThinking(upstreamId))
+            'thinking': {
+              'type': (effectiveThinkingBudget == 0) ? 'disabled' : 'adaptive',
+            }
+          else
+            'thinking': {
+              'type': (effectiveThinkingBudget == 0) ? 'disabled' : 'enabled',
+              if (effectiveThinkingBudget != null && effectiveThinkingBudget > 0)
+                'budget_tokens': effectiveThinkingBudget,
+            },
+        if (isReasoning && _supportsAdaptiveThinking(upstreamId) && effectiveThinkingBudget != 0)
+          'output_config': {
+            'effort': _adaptiveEffort(effectiveThinkingBudget),
           },
       };
       if (extraBody != null) {
