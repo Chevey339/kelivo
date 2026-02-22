@@ -5,6 +5,12 @@ import '../services/memory_store.dart';
 class MemoryProvider extends ChangeNotifier {
   List<AssistantMemory> _memories = <AssistantMemory>[];
   bool _initialized = false;
+  bool _loading = false;
+
+  MemoryProvider() {
+    // Start loading memories asynchronously on creation
+    _loadAllSilent();
+  }
 
   List<AssistantMemory> get memories => List.unmodifiable(_memories);
 
@@ -13,21 +19,30 @@ class MemoryProvider extends ChangeNotifier {
 
   Future<void> initialize() async {
     if (_initialized) return;
-    await loadAll();
-    _initialized = true;
+    await _loadAllSilent();
   }
 
-  Future<void> loadAll() async {
+  Future<void> _loadAllSilent() async {
+    if (_loading) return;
+    _loading = true;
     try {
       _memories = await MemoryStore.getAll();
+      _initialized = true;
       notifyListeners();
     } catch (e) {
       debugPrint('Failed to load memories: $e');
       _memories = <AssistantMemory>[];
+      _initialized = true; // Still mark as initialized to prevent infinite retries
       notifyListeners();
+    } finally {
+      _loading = false;
     }
   }
 
+  Future<void> loadAll() async {
+    await _loadAllSilent();
+    if (_loading) return;
+  }
   Future<AssistantMemory> add({
     required String assistantId,
     required String content,

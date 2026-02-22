@@ -352,6 +352,7 @@ class ToolHandlerService {
 
     try {
       final mp = contextProvider.read<MemoryProvider>();
+      await mp.initialize();
 
       if (name == 'create_memory') {
         final content = (args['content'] ?? '').toString();
