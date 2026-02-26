@@ -15,6 +15,7 @@ import 'package:Kelivo/secrets/fallback.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../utils/unicode_sanitizer.dart';
 import 'builtin_tools.dart';
+import 'gemini_tool_config.dart';
 
 class ChatApiService {
   static const String _aihubmixAppCode = 'ZKRT3588';
@@ -4471,6 +4472,7 @@ class ChatApiService {
       } else if (geminiTools != null) {
         toolsArr.addAll(geminiTools);
       }
+      final shouldAttachToolConfig = shouldAttachGeminiFunctionCallingConfig(toolsArr);
 
       Map<String, dynamic> baseBody = {
         'contents': contents,
@@ -4478,7 +4480,7 @@ class ChatApiService {
         if (topP != null) 'topP': topP,
         if (maxTokens != null) 'generationConfig': {'maxOutputTokens': maxTokens},
         if (toolsArr.isNotEmpty) 'tools': toolsArr,
-        if (toolsArr.isNotEmpty) 'toolConfig': {'function_calling_config': {'mode': 'AUTO'}},
+        if (shouldAttachToolConfig) 'toolConfig': {'function_calling_config': {'mode': 'AUTO'}},
       };
       final extraG = _customBody(config, modelId);
       if (extraG.isNotEmpty) baseBody.addAll(extraG);
@@ -4706,6 +4708,7 @@ class ChatApiService {
     } else if (geminiTools != null) {
       toolsArr.addAll(geminiTools);
     }
+    final shouldAttachToolConfig = shouldAttachGeminiFunctionCallingConfig(toolsArr);
 
     // Maintain a rolling conversation for multi-round tool calls
     List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(contents);
@@ -4804,7 +4807,7 @@ class ChatApiService {
         'contents': convo,
         if (gen.isNotEmpty) 'generationConfig': gen,
         if (toolsArr.isNotEmpty) 'tools': toolsArr,
-        if (toolsArr.isNotEmpty) 'toolConfig': {'function_calling_config': {'mode': 'AUTO'}},
+        if (shouldAttachToolConfig) 'toolConfig': {'function_calling_config': {'mode': 'AUTO'}},
       };
 
       final request = http.Request('POST', uri);
