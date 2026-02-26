@@ -1673,7 +1673,7 @@
   "worldBookEntryEnabledLabel": "Entry enabled",
   "worldBookEntryPriorityLabel": "Priority",
   "worldBookEntryKeywordsLabel": "Keywords",
-  "worldBookEntryKeywordsHint": "Type a keyword and tap +. You can paste multiple, separated by commas or new lines.",
+  "worldBookEntryKeywordsHint": "Type a keyword and tap + to add.",
   "worldBookEntryKeywordInputHint": "Type a keyword",
   "worldBookEntryKeywordAddTooltip": "Add keyword",
   "worldBookEntryUseRegexLabel": "Use regex",

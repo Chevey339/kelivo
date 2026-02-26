@@ -1211,15 +1211,9 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
   }
 
   List<String> _parseKeywordInput(String raw) {
-    final parts = raw.split(RegExp(r'[\\n,，;；]'));
-    final seen = <String>{};
-    final out = <String>[];
-    for (final p in parts) {
-      final k = p.trim();
-      if (k.isEmpty) continue;
-      if (seen.add(k)) out.add(k);
-    }
-    return out;
+    final k = raw.trim();
+    if (k.isEmpty) return const <String>[];
+    return <String>[k];
   }
 
   @override

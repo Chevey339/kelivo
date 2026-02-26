@@ -3895,7 +3895,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get worldBookEntryKeywordsLabel => '关键词';
 
   @override
-  String get worldBookEntryKeywordsHint => '输入关键词后点 + 添加；也可粘贴多个，用逗号/换行分隔。';
+  String get worldBookEntryKeywordsHint => '输入关键词后点 + 添加。';
 
   @override
   String get worldBookEntryKeywordInputHint => '输入关键词';
@@ -7805,7 +7805,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get worldBookEntryKeywordsLabel => '关键词';
 
   @override
-  String get worldBookEntryKeywordsHint => '输入关键词后点 + 添加；也可粘贴多个，用逗号/换行分隔。';
+  String get worldBookEntryKeywordsHint => '输入关键词后点 + 添加。';
 
   @override
   String get worldBookEntryKeywordInputHint => '输入关键词';
@@ -11747,7 +11747,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get worldBookEntryKeywordsLabel => '關鍵詞';
 
   @override
-  String get worldBookEntryKeywordsHint => '輸入關鍵詞後點 + 新增；也可貼上多個，用逗號/換行分隔。';
+  String get worldBookEntryKeywordsHint => '輸入關鍵詞後點 + 新增。';
 
   @override
   String get worldBookEntryKeywordInputHint => '輸入關鍵詞';

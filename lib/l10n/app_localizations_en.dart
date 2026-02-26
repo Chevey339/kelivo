@@ -4035,8 +4035,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get worldBookEntryKeywordsLabel => 'Keywords';
 
   @override
-  String get worldBookEntryKeywordsHint =>
-      'Type a keyword and tap +. You can paste multiple, separated by commas or new lines.';
+  String get worldBookEntryKeywordsHint => 'Type a keyword and tap + to add.';
 
   @override
   String get worldBookEntryKeywordInputHint => 'Type a keyword';
