@@ -309,12 +309,17 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
         ],
         const SizedBox(height: 8),
         _row(
-          icon: Lucide.Eraser,
-          label: widget.clearLabel ?? l10n.bottomToolsSheetClearContext,
+          icon: Lucide.Layers,
+          label: l10n.contextManagement,
           onTap: () {
             Haptics.light();
             widget.onClear?.call();
           },
+          trailing: Icon(
+            Lucide.ChevronRight,
+            size: 18,
+            color: cs.onSurface.withOpacity(0.55),
+          ),
         ),
       ],
     );

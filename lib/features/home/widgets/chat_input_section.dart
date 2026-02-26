@@ -59,6 +59,7 @@ class ChatInputSection extends StatelessWidget {
     this.onOpenWorldBook, // 新增世界书支持桌面端
     this.onLongPressLearning,
     this.onClearContext,
+    this.onCompressContext,
   });
 
   final GlobalKey inputBarKey;
@@ -94,6 +95,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onOpenWorldBook;
   final VoidCallback? onLongPressLearning;
   final VoidCallback? onClearContext;
+  final VoidCallback? onCompressContext;
 
   @override
   Widget build(BuildContext context) {
@@ -176,6 +178,7 @@ class ChatInputSection extends StatelessWidget {
           : false,
       showMoreButton: !isTablet,
       onClearContext: isTablet ? onClearContext : null,
+      onCompressContext: isTablet ? onCompressContext : null,
     );
   }
 

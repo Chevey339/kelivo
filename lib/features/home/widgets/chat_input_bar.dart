@@ -73,6 +73,7 @@ class ChatInputBar extends StatefulWidget {
     this.onToggleLearningMode,
     this.onOpenWorldBook,
     this.onClearContext,
+    this.onCompressContext,
     this.onLongPressLearning,
     this.learningModeActive = false,
     this.worldBookActive = false,
@@ -114,6 +115,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onToggleLearningMode;
   final VoidCallback? onOpenWorldBook;
   final VoidCallback? onClearContext;
+  final VoidCallback? onCompressContext;
   final VoidCallback? onLongPressLearning;
   final bool learningModeActive;
   final bool worldBookActive;
@@ -140,6 +142,7 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
   static const Duration _repeatPeriod = Duration(milliseconds: 35);
   // Anchor for the responsive overflow menu on the left action bar
   final GlobalKey _leftOverflowAnchorKey = GlobalKey(debugLabel: 'left-overflow-anchor');
+  final GlobalKey _contextMgmtAnchorKey = GlobalKey(debugLabel: 'context-mgmt-anchor');
   // Suppress context menu briefly after app resume to avoid flickering
   bool _suppressContextMenu = false;
 
@@ -951,14 +954,40 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
         }
 
         if (widget.onClearContext != null) {
+          void showContextMenu() {
+            showDesktopAnchoredMenu(
+              context,
+              anchorKey: _contextMgmtAnchorKey,
+              items: [
+                if (widget.onCompressContext != null)
+                  DesktopContextMenuItem(
+                    icon: Lucide.FoldVertical,
+                    label: l10n.compressContext,
+                    onTap: widget.onCompressContext,
+                  ),
+                DesktopContextMenuItem(
+                  icon: Lucide.Eraser,
+                  label: l10n.bottomToolsSheetClearContext,
+                  onTap: widget.onClearContext,
+                ),
+              ],
+            );
+          }
           actions.add(_OverflowAction(
             width: normalButtonW,
-            builder: () => _CompactIconButton(
-              tooltip: l10n.bottomToolsSheetClearContext,
-              icon: Lucide.Eraser,
-              onTap: widget.onClearContext,
+            builder: () => Container(
+              key: _contextMgmtAnchorKey,
+              child: _CompactIconButton(
+                tooltip: l10n.contextManagement,
+                icon: Lucide.Eraser,
+                onTap: showContextMenu,
+              ),
             ),
-            menu: DesktopContextMenuItem(icon: Lucide.Eraser, label: l10n.bottomToolsSheetClearContext, onTap: widget.onClearContext),
+            menu: DesktopContextMenuItem(
+              icon: Lucide.Eraser,
+              label: l10n.contextManagement,
+              onTap: showContextMenu,
+            ),
           ));
         }
 

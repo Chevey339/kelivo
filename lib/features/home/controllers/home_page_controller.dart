@@ -538,6 +538,19 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Compress context: summarize via LLM, create new conversation.
+  /// Returns null on success, or an error string on failure.
+  Future<String?> compressContext() async {
+    final result = await _viewModel.compressContext();
+    if (result == null) {
+      // Success - switched to new conversation
+      _translations.clear();
+      notifyListeners();
+      _scrollToBottomSoon(animate: false);
+    }
+    return result;
+  }
+
   // ============================================================================
   // Public Methods - Message Operations
   // ============================================================================

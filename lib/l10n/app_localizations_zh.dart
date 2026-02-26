@@ -1352,6 +1352,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bottomToolsSheetClearContext => '清空上下文';
 
   @override
+  String get compressContext => '压缩上下文';
+
+  @override
+  String get compressContextDesc => '总结对话并开始新聊天';
+
+  @override
+  String get clearContextDesc => '标记上下文分界点';
+
+  @override
+  String get contextManagement => '上下文管理';
+
+  @override
+  String get compressingContext => '正在压缩上下文...';
+
+  @override
+  String get compressContextFailed => '压缩上下文失败';
+
+  @override
+  String get compressContextNoMessages => '没有可压缩的消息';
+
+  @override
   String get bottomToolsSheetLearningMode => '学习模式';
 
   @override
@@ -5339,6 +5360,27 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get bottomToolsSheetClearContext => '清空上下文';
 
   @override
+  String get compressContext => '压缩上下文';
+
+  @override
+  String get compressContextDesc => '总结对话并开始新聊天';
+
+  @override
+  String get clearContextDesc => '标记上下文分界点';
+
+  @override
+  String get contextManagement => '上下文管理';
+
+  @override
+  String get compressingContext => '正在压缩上下文...';
+
+  @override
+  String get compressContextFailed => '压缩上下文失败';
+
+  @override
+  String get compressContextNoMessages => '没有可压缩的消息';
+
+  @override
   String get bottomToolsSheetLearningMode => '学习模式';
 
   @override
@@ -9285,6 +9327,27 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get bottomToolsSheetClearContext => '清空上下文';
+
+  @override
+  String get compressContext => '壓縮上下文';
+
+  @override
+  String get compressContextDesc => '總結對話並開始新聊天';
+
+  @override
+  String get clearContextDesc => '標記上下文分界點';
+
+  @override
+  String get contextManagement => '上下文管理';
+
+  @override
+  String get compressingContext => '正在壓縮上下文...';
+
+  @override
+  String get compressContextFailed => '壓縮上下文失敗';
+
+  @override
+  String get compressContextNoMessages => '沒有可壓縮的訊息';
 
   @override
   String get bottomToolsSheetLearningMode => '學習模式';

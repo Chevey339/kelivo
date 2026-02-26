@@ -7,6 +7,7 @@ import '../../../core/models/conversation.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../services/message_builder_service.dart';
@@ -447,6 +448,100 @@ class HomeViewModel extends ChangeNotifier {
     if (updated != null) {
       _chatController.updateCurrentConversation(updated);
       notifyListeners();
+    }
+  }
+
+  /// Compress context: summarize messages via LLM, create new conversation with summary.
+  /// Returns null on success, or an error key string on failure.
+  Future<String?> compressContext() async {
+    final convo = currentConversation;
+    if (convo == null) return 'no_conversation';
+
+    // Get messages and collapse to selected versions
+    final allMsgs = _chatController.messages;
+    final collapsed = collapseVersions(allMsgs);
+    if (collapsed.isEmpty) return 'no_messages';
+
+    // Build conversation text for compression
+    final joined = collapsed
+        .where((m) => m.content.trim().isNotEmpty)
+        .map((m) => '${m.role == "assistant" ? "Assistant" : "User"}: ${m.content}')
+        .join('\n\n');
+    if (joined.trim().isEmpty) return 'no_messages';
+
+    // Truncate to reasonable length
+    final content = joined.length > 6000 ? joined.substring(0, 6000) : joined;
+    final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
+
+    // Resolve model: summary model → title model → assistant model → global default
+    final settings = _contextProvider.read<SettingsProvider>();
+    final ap = _contextProvider.read<AssistantProvider>();
+    final assistant = convo.assistantId != null
+        ? ap.getById(convo.assistantId!)
+        : ap.currentAssistant;
+
+    final provKey = settings.summaryModelProvider ??
+        settings.titleModelProvider ??
+        assistant?.chatModelProvider ??
+        settings.currentModelProvider;
+    final mdlId = settings.summaryModelId ??
+        settings.titleModelId ??
+        assistant?.chatModelId ??
+        settings.currentModelId;
+    if (provKey == null || mdlId == null) return 'no_model';
+
+    final cfg = settings.getProviderConfig(provKey);
+
+    // Build compression prompt
+    final prompt = '''
+You are a conversation compression assistant. Compress the following conversation into a concise summary.
+
+Requirements:
+1. Preserve key facts, decisions, and important context needed to continue the conversation
+2. Keep the summary in the same language as the original conversation
+3. Output the summary directly without any explanations or meta-commentary
+4. Format the summary as context information that can be used to continue the conversation
+5. Use $locale language
+6. Start with a clear indicator that this is a summary (e.g., "[Summary of previous conversation]" or equivalent in the target language)
+
+<conversation>
+$content
+</conversation>''';
+
+    try {
+      final summary = (await ChatApiService.generateText(
+        config: cfg,
+        modelId: mdlId,
+        prompt: prompt,
+      )).trim();
+
+      if (summary.isEmpty) return 'empty_summary';
+
+      // Create new conversation with the summary as first user message
+      final newConvo = await _chatService.createDraftConversation(
+        title: convo.title,
+        assistantId: convo.assistantId,
+      );
+
+      await _chatService.addMessage(
+        conversationId: newConvo.id,
+        role: 'user',
+        content: summary,
+      );
+
+      // Switch to the new conversation
+      _chatService.setCurrentConversation(newConvo.id);
+      _chatController.setCurrentConversation(
+        _chatService.getConversation(newConvo.id) ?? newConvo,
+      );
+      _streamController.clearAllState();
+      notifyListeners();
+      onConversationSwitched?.call();
+      onScrollToBottom?.call();
+
+      return null; // success
+    } catch (e) {
+      return e.toString();
     }
   }
 

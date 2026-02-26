@@ -2699,6 +2699,48 @@ abstract class AppLocalizations {
   /// **'Clear Context'**
   String get bottomToolsSheetClearContext;
 
+  /// No description provided for @compressContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Compress Context'**
+  String get compressContext;
+
+  /// No description provided for @compressContextDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Summarize and start a new chat'**
+  String get compressContextDesc;
+
+  /// No description provided for @clearContextDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark a context boundary'**
+  String get clearContextDesc;
+
+  /// No description provided for @contextManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Context Management'**
+  String get contextManagement;
+
+  /// No description provided for @compressingContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Compressing context...'**
+  String get compressingContext;
+
+  /// No description provided for @compressContextFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to compress context'**
+  String get compressContextFailed;
+
+  /// No description provided for @compressContextNoMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages to compress'**
+  String get compressContextNoMessages;
+
   /// No description provided for @bottomToolsSheetLearningMode.
   ///
   /// In en, this message translates to:

@@ -1388,6 +1388,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bottomToolsSheetClearContext => 'Clear Context';
 
   @override
+  String get compressContext => 'Compress Context';
+
+  @override
+  String get compressContextDesc => 'Summarize and start a new chat';
+
+  @override
+  String get clearContextDesc => 'Mark a context boundary';
+
+  @override
+  String get contextManagement => 'Context Management';
+
+  @override
+  String get compressingContext => 'Compressing context...';
+
+  @override
+  String get compressContextFailed => 'Failed to compress context';
+
+  @override
+  String get compressContextNoMessages => 'No messages to compress';
+
+  @override
   String get bottomToolsSheetLearningMode => 'Learning Mode';
 
   @override

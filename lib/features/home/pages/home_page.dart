@@ -28,6 +28,7 @@ import '../../../desktop/quick_phrase_popover.dart';
 import '../../../desktop/instruction_injection_popover.dart';
 import '../../../desktop/world_book_popover.dart';
 import '../../chat/widgets/bottom_tools_sheet.dart';
+import '../../chat/widgets/context_management_sheet.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
 import '../../search/widgets/search_settings_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
@@ -758,6 +759,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       onOpenWorldBook: _openWorldBookPopover,
       onLongPressLearning: _showLearningPromptSheet,
       onClearContext: _controller.clearContext,
+      onCompressContext: _handleDesktopCompressContext,
     );
   }
 
@@ -913,16 +915,92 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               Navigator.of(ctx).maybePop();
               _controller.onPickFiles();
             },
-            onClear: () async {
+            onClear: () {
               Navigator.of(ctx).maybePop();
-              await _controller.clearContext();
+              _showContextManagementSheet();
             },
-            clearLabel: _controller.clearContextLabel(),
             assistantId: assistantId,
           ),
         );
       },
     );
+  }
+
+  void _showContextManagementSheet() async {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          top: false,
+          child: ContextManagementSheet(
+            clearLabel: _controller.clearContextLabel(),
+            onCompress: () async {
+              Navigator.of(ctx).maybePop();
+              // Show loading indicator
+              final messenger = ScaffoldMessenger.of(context);
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(l10n.compressingContext),
+                  duration: const Duration(seconds: 30),
+                ),
+              );
+              final error = await _controller.compressContext();
+              messenger.hideCurrentSnackBar();
+              if (error != null && mounted) {
+                if (error == 'no_messages') {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text(l10n.compressContextNoMessages)),
+                  );
+                } else if (error == 'no_model') {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text(l10n.compressContextFailed)),
+                  );
+                } else {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text(l10n.compressContextFailed)),
+                  );
+                }
+              }
+            },
+            onClear: () async {
+              Navigator.of(ctx).maybePop();
+              await _controller.clearContext();
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void _handleDesktopCompressContext() async {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(l10n.compressingContext),
+        duration: const Duration(seconds: 30),
+      ),
+    );
+    final error = await _controller.compressContext();
+    messenger.hideCurrentSnackBar();
+    if (error != null && mounted) {
+      if (error == 'no_messages') {
+        messenger.showSnackBar(
+          SnackBar(content: Text(l10n.compressContextNoMessages)),
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(content: Text(l10n.compressContextFailed)),
+        );
+      }
+    }
   }
 
   Future<void> _showQuickPhraseMenu() async {
