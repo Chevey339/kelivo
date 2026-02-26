@@ -12,6 +12,7 @@ class MarkdownMediaSanitizer {
   );
 
   static Future<String> replaceInlineBase64Images(String markdown) async {
+    // TODO: Harden base64 image caching (limits, atomic write, IO errors, defensive regex groups).
     // // Fast path: only proceed when it's clearly a base64 data image
     // if (!(markdown.contains('data:image/') && markdown.contains(';base64,'))) {
     //   return markdown;
@@ -29,10 +30,14 @@ class MarkdownMediaSanitizer {
 
     final sb = StringBuffer();
     int last = 0;
-    int idx = 0;
     for (final m in matches) {
       sb.write(markdown.substring(last, m.start));
-      final dataUrl = m.group(1)!;
+      final dataUrl = m.group(1);
+      if (dataUrl == null || dataUrl.isEmpty) {
+        sb.write(markdown.substring(m.start, m.end));
+        last = m.end;
+        continue;
+      }
       String ext = AppDirectories.extFromMime(_mimeOf(dataUrl));
 
       // Extract base64 payload
@@ -65,9 +70,11 @@ class MarkdownMediaSanitizer {
 
       // Deterministic filename by content hash to prevent duplicates
       // Same base64 -> same filename across runs
-      final digest = _uuid.v5(Uuid.NAMESPACE_URL, normalized);
+      final digest = _uuid.v5(Namespace.url.value, normalized);
       final file = File('${dir.path}/img_$digest.$ext');
       if (!await file.exists()) {
+        // TODO: Make file creation atomic/locked to avoid race conditions when multiple isolates write the same digest path concurrently.
+        // TODO: Handle IO errors (permission denied / disk full) and decide whether to fall back to original markdown or log.
         await file.writeAsBytes(bytes, flush: true);
       }
 
@@ -75,7 +82,6 @@ class MarkdownMediaSanitizer {
       final replaced = markdown.substring(m.start, m.end).replaceFirst(dataUrl, file.path);
       sb.write(replaced);
       last = m.end;
-      idx++;
     }
     sb.write(markdown.substring(last));
     return sb.toString();

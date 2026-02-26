@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:re_editor/re_editor.dart';
 import '../../../core/models/chat_message.dart';
 import '../models/message_edit_result.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/plain_text_code_editor.dart';
 import '../../../core/services/haptics.dart';
+import '../../../utils/re_editor_utils.dart';
 
 Future<MessageEditResult?> showMessageEditSheet(BuildContext context, {required ChatMessage message}) async {
   final cs = Theme.of(context).colorScheme;
@@ -24,12 +27,26 @@ class _MessageEditSheet extends StatefulWidget {
 }
 
 class _MessageEditSheetState extends State<_MessageEditSheet> {
-  late final TextEditingController _controller;
+  late final CodeLineEditingController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.message.content);
+    _controller = CodeLineEditingController();
+    _syncControllerText(widget.message.content);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MessageEditSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message.content != widget.message.content &&
+        _controller.text == oldWidget.message.content) {
+      _syncControllerText(widget.message.content);
+    }
+  }
+
+  void _syncControllerText(String text) {
+    _controller.setTextSafely(text);
   }
 
   @override
@@ -55,7 +72,7 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
           child: Column(
             children: [
               Center(
-                child: Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(999))),
+              child: Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurface.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(999))),
               ),
               const SizedBox(height: 10),
               SizedBox(
@@ -69,6 +86,8 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                         onTap: () {
                           Haptics.light();
                           final text = _controller.text.trim();
+                          // TODO: Provide user feedback (disable button or show snackbar) when content is empty.
+                          if (text.isEmpty) return;
                           Navigator.of(context).pop<MessageEditResult>(
                             MessageEditResult(content: text, shouldSend: true),
                           );
@@ -93,6 +112,8 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                         onTap: () {
                           Haptics.light();
                           final text = _controller.text.trim();
+                          // TODO: Provide user feedback (disable button or show snackbar) when content is empty.
+                          if (text.isEmpty) return;
                           Navigator.of(context).pop<MessageEditResult>(
                             MessageEditResult(content: text, shouldSend: false),
                           );
@@ -109,31 +130,19 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
               ),
               const SizedBox(height: 12),
               Expanded(
-                child: SingleChildScrollView(
-                  controller: sc,
-                  child: TextField(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: PlainTextCodeEditor(
                     controller: _controller,
                     autofocus: false,
-                    keyboardType: TextInputType.multiline,
-                    minLines: 8,
-                    maxLines: null,
-                    decoration: InputDecoration(
-                      hintText: l10n.messageEditPageHint,
-                      filled: true,
-                      fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Colors.transparent),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Colors.transparent),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide(color: cs.primary.withOpacity(0.45)),
-                      ),
-                    ),
+                    hint: l10n.messageEditPageHint,
+                    padding: const EdgeInsets.all(16),
+                    fontSize: 15,
+                    fontHeight: 1.5,
                   ),
                 ),
               ),

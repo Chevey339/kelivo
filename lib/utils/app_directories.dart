@@ -54,10 +54,11 @@ class AppDirectories {
 
   /// Gets the platform-provided application cache directory.
   ///
-  /// - Android: /data/user/0/<package>/cache
+  /// - Android: /data/user/0/`<package>`/cache
   /// - iOS/macOS: Caches directory
   /// - Windows/Linux: platform cache directory (app-specific on Linux via XDG)
   static Future<Directory> getSystemCacheDirectory() async {
+    // TODO: Add error handling for getApplicationCacheDirectory; fallback to getCacheDirectory.
     return await getApplicationCacheDirectory();
   }
 

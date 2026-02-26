@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:re_editor/re_editor.dart';
 import 'dart:math' as math;
 import 'dart:convert';
 import 'dart:typed_data';
@@ -17,6 +18,8 @@ import 'model_fetch_dialog.dart' show showModelFetchDialog;
 import 'widgets/desktop_select_dropdown.dart';
 import '../shared/widgets/ios_switch.dart';
 import '../shared/widgets/ios_checkbox.dart';
+import '../shared/widgets/input_height_constraints.dart';
+import '../shared/widgets/plain_text_code_editor.dart';
 // Desktop assistants panel dependencies
 import '../features/assistant/pages/assistant_settings_edit_page.dart'
     show showAssistantDesktopDialog; // dialog opener only
@@ -27,6 +30,7 @@ import '../utils/sandbox_path_resolver.dart';
 import 'dart:io' show Directory, File, Platform;
 import '../utils/app_directories.dart';
 import 'package:characters/characters.dart';
+import '../utils/re_editor_utils.dart';
 import '../features/provider/pages/multi_key_manager_page.dart';
 import '../features/model/widgets/model_detail_sheet.dart';
 import 'add_provider_dialog.dart' show showDesktopAddProviderDialog;
@@ -2055,8 +2059,10 @@ class _DesktopProviderDetailPaneState
   final TextEditingController _baseUrlCtrl = TextEditingController();
   final TextEditingController _locationCtrl = TextEditingController();
   final TextEditingController _projectIdCtrl = TextEditingController();
-  final TextEditingController _saJsonCtrl = TextEditingController();
+  final CodeLineEditingController _saJsonCtrl = CodeLineEditingController();
   final TextEditingController _apiPathCtrl = TextEditingController();
+  Timer? _saJsonSaveTimer;
+  String _lastSavedSaJson = '';
 
   void _syncCtrl(TextEditingController c, String newText) {
     final v = c.value;
@@ -2070,17 +2076,50 @@ class _DesktopProviderDetailPaneState
     }
   }
 
+  void _syncCodeCtrl(CodeLineEditingController c, String newText) {
+    c.setTextSafely(newText);
+  }
+
   void _syncControllersFromConfig(ProviderConfig cfg) {
     _syncCtrl(_apiKeyCtrl, cfg.apiKey);
     _syncCtrl(_baseUrlCtrl, cfg.baseUrl);
     _syncCtrl(_apiPathCtrl, cfg.chatPath ?? '/chat/completions');
     _syncCtrl(_locationCtrl, cfg.location ?? '');
     _syncCtrl(_projectIdCtrl, cfg.projectId ?? '');
-    _syncCtrl(_saJsonCtrl, cfg.serviceAccountJson ?? '');
+    _syncCodeCtrl(_saJsonCtrl, cfg.serviceAccountJson ?? '');
+    _lastSavedSaJson = cfg.serviceAccountJson ?? '';
+  }
+
+  Future<void> _saveSaJsonNow(SettingsProvider sp) async {
+    final text = _saJsonCtrl.text;
+    if (text == _lastSavedSaJson) return;
+    _lastSavedSaJson = text;
+    final old = sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName);
+    await sp.setProviderConfig(widget.providerKey, old.copyWith(serviceAccountJson: text));
+  }
+
+  void _scheduleSaJsonSave(SettingsProvider sp) {
+    _saJsonSaveTimer?.cancel();
+    _saJsonSaveTimer = Timer(const Duration(milliseconds: 400), () {
+      _saJsonSaveTimer = null;
+      if (!mounted) return;
+      _saveSaJsonNow(sp);
+    });
+  }
+
+  void _flushSaJsonSave(SettingsProvider sp) {
+    _saJsonSaveTimer?.cancel();
+    _saJsonSaveTimer = null;
+    _saveSaJsonNow(sp);
   }
 
   @override
   void dispose() {
+    try {
+      final sp = context.read<SettingsProvider>();
+      _flushSaJsonSave(sp);
+    } catch (_) {}
+    _saJsonSaveTimer?.cancel();
     _filterCtrl.dispose();
     _searchFocus.dispose();
     _apiKeyCtrl.dispose();
@@ -2700,43 +2739,47 @@ class _DesktopProviderDetailPaneState
                   bold: true,
                 ),
                 const SizedBox(height: 6),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 120),
-                  child: Focus(
-                    onFocusChange: (has) async {
-                      if (!has) {
-                        final v = _saJsonCtrl.text;
-                        final old = sp.getProviderConfig(
-                          widget.providerKey,
-                          defaultName: widget.displayName,
-                        );
-                        await sp.setProviderConfig(
-                          widget.providerKey,
-                          old.copyWith(serviceAccountJson: v),
-                        );
-                      }
-                    },
-                    child: TextField(
-                      controller: _saJsonCtrl,
-                      maxLines: null,
-                      minLines: 6,
-                      onChanged: (v) async {
-                        if (_saJsonCtrl.value.composing.isValid) return;
-                        final old = sp.getProviderConfig(
-                          widget.providerKey,
-                          defaultName: widget.displayName,
-                        );
-                        await sp.setProviderConfig(
-                          widget.providerKey,
-                          old.copyWith(serviceAccountJson: v),
-                        );
-                      },
-                      style: const TextStyle(fontSize: 14),
-                      decoration: _inputDecoration(context).copyWith(
-                        hintText: '{\n  "type": "service_account", ...\n}',
+                Builder(
+                  builder: (innerCtx) {
+                    final rawMaxSaJsonHeight = computeInputMaxHeight(
+                      context: innerCtx,
+                      reservedHeight: 260,
+                      softCapFraction: 0.6,
+                      minHeight: 120,
+                    );
+                    // TODO: computeInputMaxHeight already enforces minHeight; remove this redundant clamp (can be simplified to math.max) and keep the height logic consistent.
+                    final maxSaJsonHeight = rawMaxSaJsonHeight < 120 ? 120.0 : rawMaxSaJsonHeight;
+                    return ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: 120, maxHeight: maxSaJsonHeight),
+                      child: Focus(
+                        onFocusChange: (has) async {
+                          if (!has) {
+                            await _saveSaJsonNow(sp);
+                          }
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF7F7F9),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: cs.outlineVariant.withOpacity(0.12), width: 0.6),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: PlainTextCodeEditor(
+                            controller: _saJsonCtrl,
+                            autofocus: false,
+                            hint: '{\n  "type": "service_account", ...\n}',
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            fontSize: 14,
+                            fontHeight: 1.4,
+                            onChanged: (value) async {
+                              if (_saJsonCtrl.isComposing) return;
+                              _scheduleSaJsonSave(sp);
+                            },
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 Align(
