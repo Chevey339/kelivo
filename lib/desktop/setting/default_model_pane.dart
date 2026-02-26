@@ -96,10 +96,15 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     subtitle: l10n.defaultModelPageSummaryModelSubtitle,
                     modelProvider: settings.summaryModelProvider,
                     modelId: settings.summaryModelId,
-                    fallbackProvider: settings.titleModelProvider ?? settings.currentModelProvider,
-                    fallbackModelId: settings.titleModelId ?? settings.currentModelId,
+                    fallbackProvider:
+                        settings.titleModelProvider ??
+                        settings.currentModelProvider,
+                    fallbackModelId:
+                        settings.titleModelId ?? settings.currentModelId,
                     onReset: () async {
-                      await context.read<SettingsProvider>().resetSummaryModel();
+                      await context
+                          .read<SettingsProvider>()
+                          .resetSummaryModel();
                     },
                     onPick: () async {
                       final sel = await showModelSelector(context);
@@ -213,17 +218,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 160),
-                    child: TextField(
-                      controller: ctrl,
-                      maxLines: null,
-                      minLines: 8,
-                      style: const TextStyle(fontSize: 14),
-                      decoration: _deskInputDecoration(ctx).copyWith(
-                        hintText: l10n.defaultModelPageTitlePromptHint,
-                      ),
-                    ),
+                  _promptEditor(
+                    ctx,
+                    controller: ctrl,
+                    hintText: l10n.defaultModelPageTitlePromptHint,
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -310,17 +308,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 160),
-                    child: TextField(
-                      controller: ctrl,
-                      maxLines: null,
-                      minLines: 8,
-                      style: const TextStyle(fontSize: 14),
-                      decoration: _deskInputDecoration(ctx).copyWith(
-                        hintText: l10n.defaultModelPageTranslatePromptHint,
-                      ),
-                    ),
+                  _promptEditor(
+                    ctx,
+                    controller: ctrl,
+                    hintText: l10n.defaultModelPageTranslatePromptHint,
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -410,17 +401,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 160),
-                    child: TextField(
-                      controller: ctrl,
-                      maxLines: null,
-                      minLines: 8,
-                      style: const TextStyle(fontSize: 14),
-                      decoration: _deskInputDecoration(
-                        ctx,
-                      ).copyWith(hintText: l10n.defaultModelPageOcrPromptHint),
-                    ),
+                  _promptEditor(
+                    ctx,
+                    controller: ctrl,
+                    hintText: l10n.defaultModelPageOcrPromptHint,
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -499,17 +483,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 160),
-                    child: TextField(
-                      controller: ctrl,
-                      maxLines: null,
-                      minLines: 8,
-                      style: const TextStyle(fontSize: 14),
-                      decoration: _deskInputDecoration(ctx).copyWith(
-                        hintText: l10n.defaultModelPageSummaryPromptHint,
-                      ),
-                    ),
+                  _promptEditor(
+                    ctx,
+                    controller: ctrl,
+                    hintText: l10n.defaultModelPageSummaryPromptHint,
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -893,6 +870,29 @@ class _BrandCircle extends StatelessWidget {
       child: inner,
     );
   }
+}
+
+Widget _promptEditor(
+  BuildContext context, {
+  required TextEditingController controller,
+  required String hintText,
+}) {
+  final editorHeight = (MediaQuery.of(context).size.height * 0.45).clamp(
+    180.0,
+    420.0,
+  );
+  return SizedBox(
+    height: editorHeight.toDouble(),
+    child: TextField(
+      controller: controller,
+      maxLines: null,
+      minLines: null,
+      expands: true,
+      textAlignVertical: TextAlignVertical.top,
+      style: const TextStyle(fontSize: 14),
+      decoration: _deskInputDecoration(context).copyWith(hintText: hintText),
+    ),
+  );
 }
 
 InputDecoration _deskInputDecoration(BuildContext context) {
