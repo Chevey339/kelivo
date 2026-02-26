@@ -11,6 +11,8 @@ class RequestLogger {
   static bool get enabled => _enabled;
   static bool _writeErrorReported = false;
 
+  static bool saveOutput = true;
+
   static int _nextRequestId = 0;
   static int nextRequestId() => ++_nextRequestId;
 
@@ -137,5 +139,63 @@ class RequestLogger {
         .replaceAll('\r', r'\r')
         .replaceAll('\n', r'\n')
         .replaceAll('\t', r'\t');
+  }
+
+  static Future<void> cleanupLogs({
+    required int autoDeleteDays,
+    required int maxSizeMB,
+  }) async {
+    try {
+      final dir = await AppDirectories.getAppDataDirectory();
+      final logsDir = Directory('${dir.path}/logs');
+      if (!await logsDir.exists()) return;
+
+      final files = await logsDir
+          .list()
+          .where((e) => e is File && e.path.toLowerCase().endsWith('.txt'))
+          .cast<File>()
+          .toList();
+      if (files.isEmpty) return;
+
+      // Auto-delete old files
+      if (autoDeleteDays > 0) {
+        final cutoff = DateTime.now().subtract(Duration(days: autoDeleteDays));
+        for (final f in List<File>.from(files)) {
+          try {
+            final stat = await f.stat();
+            if (stat.modified.isBefore(cutoff)) {
+              await f.delete();
+              files.remove(f);
+            }
+          } catch (_) {}
+        }
+      }
+
+      // Enforce max size
+      if (maxSizeMB > 0 && files.isNotEmpty) {
+        final maxBytes = maxSizeMB * 1024 * 1024;
+        final statMap = <File, FileStat>{};
+        int totalSize = 0;
+        for (final f in files) {
+          try {
+            final s = await f.stat();
+            statMap[f] = s;
+            totalSize += s.size;
+          } catch (_) {}
+        }
+        if (totalSize > maxBytes) {
+          // Sort oldest first
+          final sorted = statMap.entries.toList()
+            ..sort((a, b) => a.value.modified.compareTo(b.value.modified));
+          for (final entry in sorted) {
+            if (totalSize <= maxBytes) break;
+            try {
+              totalSize -= entry.value.size;
+              await entry.key.delete();
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
   }
 }

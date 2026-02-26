@@ -1606,6 +1606,23 @@
       }
     }
   },
+  "logSettingsTitle": "Log Settings",
+  "logSettingsSaveOutput": "Save Response Output",
+  "logSettingsSaveOutputSubtitle": "Log response body content (may use significant storage)",
+  "logSettingsAutoDelete": "Auto-delete",
+  "logSettingsAutoDeleteSubtitle": "Delete logs older than specified days",
+  "logSettingsAutoDeleteDisabled": "Disabled",
+  "logSettingsAutoDeleteDays": "{count} days",
+  "@logSettingsAutoDeleteDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "logSettingsMaxSize": "Max Log Size",
+  "logSettingsMaxSizeSubtitle": "Oldest logs deleted when exceeded",
+  "logSettingsMaxSizeUnlimited": "Unlimited",
   "assistantEditManageSummariesTitle": "Manage Summaries",
   "assistantEditSummaryEmpty": "No summaries yet",
   "assistantEditSummaryDialogTitle": "Edit Summary",

@@ -151,7 +151,7 @@ class DioHttpClient extends http.BaseClient {
         sub = body.stream.listen(
           (chunk) {
             controller.add(chunk);
-            if (RequestLogger.enabled) {
+            if (RequestLogger.enabled && RequestLogger.saveOutput) {
               final s = RequestLogger.safeDecodeUtf8(chunk);
               if (s.isNotEmpty) {
                 RequestLogger.logLine('[RES $reqId] chunk=${RequestLogger.escape(s)}');

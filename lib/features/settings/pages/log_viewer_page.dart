@@ -4,13 +4,16 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../logs/request_log_parser.dart';
 
 /// Mobile log viewer - shows list of log files and allows viewing/exporting
@@ -124,6 +127,19 @@ class _LogViewerPageState extends State<LogViewerPage>
         '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
+  void _showLogSettings(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _LogSettingsSheet(onChanged: _loadLogFiles),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -148,6 +164,11 @@ class _LogViewerPageState extends State<LogViewerPage>
           IconButton(
             icon: Icon(Lucide.RefreshCw, color: cs.onSurface, size: 20),
             onPressed: _loadLogFiles,
+          ),
+          IconButton(
+            icon: Icon(Lucide.Settings, color: cs.onSurface, size: 20),
+            tooltip: l10n.logSettingsTitle,
+            onPressed: () => _showLogSettings(context),
           ),
         ],
       ),
@@ -1691,6 +1712,258 @@ class _TactileRowState extends State<_TactileRow> {
       onTapCancel: widget.onTap == null ? null : () => _set(false),
       onTap: widget.onTap,
       child: widget.builder(_pressed),
+    );
+  }
+}
+
+class _LogSettingsSheet extends StatelessWidget {
+  const _LogSettingsSheet({required this.onChanged});
+  final VoidCallback onChanged;
+
+  static const List<int> _autoDeleteOptions = [0, 3, 7, 14, 30];
+  static const List<int> _maxSizeOptions = [0, 50, 100, 200, 500];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+
+    final Color tileBg = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.white;
+    final Color border = cs.outlineVariant.withValues(
+      alpha: isDark ? 0.26 : 0.38,
+    );
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: cs.onSurface.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              l10n.logSettingsTitle,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Save output toggle
+            Container(
+              decoration: BoxDecoration(
+                color: tileBg,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: border),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.logSettingsSaveOutput,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface.withValues(alpha: 0.92),
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          l10n.logSettingsSaveOutputSubtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurface.withValues(alpha: 0.55),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  IosSwitch(
+                    value: settings.logSaveOutput,
+                    onChanged: (v) => settings.setLogSaveOutput(v),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Auto-delete
+            _SettingTile(
+              tileBg: tileBg,
+              border: border,
+              title: l10n.logSettingsAutoDelete,
+              subtitle: l10n.logSettingsAutoDeleteSubtitle,
+              value: settings.logAutoDeleteDays == 0
+                  ? l10n.logSettingsAutoDeleteDisabled
+                  : l10n.logSettingsAutoDeleteDays(settings.logAutoDeleteDays),
+              options: _autoDeleteOptions
+                  .map((d) => d == 0
+                      ? l10n.logSettingsAutoDeleteDisabled
+                      : l10n.logSettingsAutoDeleteDays(d))
+                  .toList(),
+              selectedIndex: _autoDeleteOptions.indexOf(settings.logAutoDeleteDays).clamp(0, _autoDeleteOptions.length - 1),
+              onSelected: (i) {
+                settings.setLogAutoDeleteDays(_autoDeleteOptions[i]);
+                onChanged();
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Max size
+            _SettingTile(
+              tileBg: tileBg,
+              border: border,
+              title: l10n.logSettingsMaxSize,
+              subtitle: l10n.logSettingsMaxSizeSubtitle,
+              value: settings.logMaxSizeMB == 0
+                  ? l10n.logSettingsMaxSizeUnlimited
+                  : '${settings.logMaxSizeMB} MB',
+              options: _maxSizeOptions
+                  .map((s) =>
+                      s == 0 ? l10n.logSettingsMaxSizeUnlimited : '$s MB')
+                  .toList(),
+              selectedIndex: _maxSizeOptions.indexOf(settings.logMaxSizeMB).clamp(0, _maxSizeOptions.length - 1),
+              onSelected: (i) {
+                settings.setLogMaxSizeMB(_maxSizeOptions[i]);
+                onChanged();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingTile extends StatelessWidget {
+  const _SettingTile({
+    required this.tileBg,
+    required this.border,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.options,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  final Color tileBg;
+  final Color border;
+  final String title;
+  final String subtitle;
+  final String value;
+  final List<String> options;
+  final int selectedIndex;
+  final void Function(int index) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: tileBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+          title: Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface.withValues(alpha: 0.92),
+              fontSize: 14,
+            ),
+          ),
+          subtitle: Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.10),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: cs.primary,
+              ),
+            ),
+          ),
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: List.generate(options.length, (i) {
+                final bool selected = i == selectedIndex;
+                return GestureDetector(
+                  onTap: () => onSelected(i),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? cs.primary.withValues(alpha: isDark ? 0.22 : 0.14)
+                          : cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.05),
+                      borderRadius: BorderRadius.circular(10),
+                      border: selected
+                          ? Border.all(
+                              color: cs.primary.withValues(alpha: 0.5),
+                            )
+                          : null,
+                    ),
+                    child: Text(
+                      options[i],
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w500,
+                        color: selected
+                            ? cs.primary
+                            : cs.onSurface.withValues(alpha: 0.72),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

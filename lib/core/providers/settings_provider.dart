@@ -106,6 +106,10 @@ class SettingsProvider extends ChangeNotifier {
   static const String _requestLogEnabledKey = 'request_log_enabled_v1';
   // Flutter runtime logging (debug)
   static const String _flutterLogEnabledKey = 'flutter_log_enabled_v1';
+  // Log settings: save response output, auto-delete, max size
+  static const String _logSaveOutputKey = 'log_save_output_v1';
+  static const String _logAutoDeleteDaysKey = 'log_auto_delete_days_v1';
+  static const String _logMaxSizeMBKey = 'log_max_size_mb_v1';
   // Desktop topic panel placement + right sidebar open state
   static const String _desktopTopicPositionKey = 'desktop_topic_position_v1';
   static const String _desktopRightSidebarOpenKey = 'desktop_right_sidebar_open_v1';
@@ -442,6 +446,15 @@ class SettingsProvider extends ChangeNotifier {
     await RequestLogger.setEnabled(_requestLogEnabled);
     _flutterLogEnabled = prefs.getBool(_flutterLogEnabledKey) ?? false;
     await FlutterLogger.setEnabled(_flutterLogEnabled);
+    _logSaveOutput = prefs.getBool(_logSaveOutputKey) ?? true;
+    RequestLogger.saveOutput = _logSaveOutput;
+    _logAutoDeleteDays = prefs.getInt(_logAutoDeleteDaysKey) ?? 0;
+    _logMaxSizeMB = prefs.getInt(_logMaxSizeMBKey) ?? 0;
+    // Run log cleanup based on current settings
+    RequestLogger.cleanupLogs(
+      autoDeleteDays: _logAutoDeleteDays,
+      maxSizeMB: _logMaxSizeMB,
+    );
     _newChatOnLaunch = prefs.getBool(_displayNewChatOnLaunchKey) ?? true;
     _newChatOnAssistantSwitch = prefs.getBool(_displayNewChatOnAssistantSwitchKey) ?? false;
     _newChatAfterDelete = prefs.getBool(_displayNewChatAfterDeleteKey) ?? false;
@@ -2486,6 +2499,42 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await FlutterLogger.setEnabled(v);
   }
 
+  // Log settings: save output
+  bool _logSaveOutput = true;
+  bool get logSaveOutput => _logSaveOutput;
+  Future<void> setLogSaveOutput(bool v) async {
+    if (_logSaveOutput == v) return;
+    _logSaveOutput = v;
+    RequestLogger.saveOutput = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_logSaveOutputKey, v);
+  }
+
+  // Log settings: auto-delete (days)
+  int _logAutoDeleteDays = 0;
+  int get logAutoDeleteDays => _logAutoDeleteDays;
+  Future<void> setLogAutoDeleteDays(int v) async {
+    if (_logAutoDeleteDays == v) return;
+    _logAutoDeleteDays = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_logAutoDeleteDaysKey, v);
+    RequestLogger.cleanupLogs(autoDeleteDays: v, maxSizeMB: _logMaxSizeMB);
+  }
+
+  // Log settings: max log size (MB)
+  int _logMaxSizeMB = 0;
+  int get logMaxSizeMB => _logMaxSizeMB;
+  Future<void> setLogMaxSizeMB(int v) async {
+    if (_logMaxSizeMB == v) return;
+    _logMaxSizeMB = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_logMaxSizeMBKey, v);
+    RequestLogger.cleanupLogs(autoDeleteDays: _logAutoDeleteDays, maxSizeMB: v);
+  }
+
   // Search service settings
   Future<void> setSearchServices(List<SearchServiceOptions> services) async {
     _searchServices = List.from(services);
@@ -2598,6 +2647,9 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._keepAssistantListExpandedOnSidebarClose = _keepAssistantListExpandedOnSidebarClose;
     copy._requestLogEnabled = _requestLogEnabled;
     copy._flutterLogEnabled = _flutterLogEnabled;
+    copy._logSaveOutput = _logSaveOutput;
+    copy._logAutoDeleteDays = _logAutoDeleteDays;
+    copy._logMaxSizeMB = _logMaxSizeMB;
     copy._newChatOnLaunch = _newChatOnLaunch;
     copy._newChatOnAssistantSwitch = _newChatOnAssistantSwitch;
     copy._newChatAfterDelete = _newChatAfterDelete;
