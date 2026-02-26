@@ -2009,15 +2009,22 @@ Generate or update a brief summary of the user's questions and intentions.
           : null;
 
   static const String defaultCompressPrompt =
-      '''You are a conversation compression assistant. Compress the following conversation into a concise summary.
+      '''Provide a detailed summary of the following conversation for continuing in a new session.
+
+The new session will not have access to the original conversation history, so preserve all context needed to continue seamlessly.
+
+Focus on:
+- Key topics discussed and why they matter
+- Important decisions made and their reasoning
+- Current work in progress and its state
+- Next steps or open questions to address
+- Any relevant technical details, code snippets, or configurations mentioned
 
 Requirements:
-1. Preserve key facts, decisions, and important context needed to continue the conversation
-2. Keep the summary in the same language as the original conversation
-3. Output the summary directly without any explanations or meta-commentary
-4. Format the summary as context information that can be used to continue the conversation
-5. Use {locale} language
-6. Start with a clear indicator that this is a summary (e.g., "[Summary of previous conversation]" or equivalent in the target language)
+1. Write in {locale} language, matching the original conversation language
+2. Be concise but complete — do not omit important context
+3. Output the summary directly without prefaces or meta-commentary
+4. Start with a clear indicator (e.g., "[Summary of previous conversation]" or equivalent)
 
 <conversation>
 {content}

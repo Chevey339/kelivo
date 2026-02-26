@@ -916,8 +916,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               Navigator.of(ctx).maybePop();
               _controller.onPickFiles();
             },
-            onClear: () {
-              Navigator.of(ctx).maybePop();
+            onClear: () async {
+              await Navigator.of(ctx).maybePop();
               _showContextManagementSheet();
             },
             assistantId: assistantId,
