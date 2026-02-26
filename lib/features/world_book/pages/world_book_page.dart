@@ -1372,19 +1372,22 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(
-                left: 10,
-                right: 6,
-                top: 6,
-                bottom: 6,
-              ),
-              child: Text(
-                keyword,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurface.withOpacity(0.9),
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.only(
+                  left: 10,
+                  right: 6,
+                  top: 6,
+                  bottom: 6,
+                ),
+                child: Text(
+                  keyword,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface.withOpacity(0.9),
+                  ),
                 ),
               ),
             ),
