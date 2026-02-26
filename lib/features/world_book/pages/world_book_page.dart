@@ -282,8 +282,8 @@ class _WorldBookPageState extends State<WorldBookPage> {
 
   String _safeFileName(String name) {
     final cleaned = name
-        .replaceAll(RegExp(r'[\\\\/:*?\"<>|]'), '_')
-        .replaceAll(RegExp(r'\\s+'), ' ')
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+        .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
     if (cleaned.isEmpty) return 'lorebook';
     return cleaned.length > 80 ? cleaned.substring(0, 80) : cleaned;
