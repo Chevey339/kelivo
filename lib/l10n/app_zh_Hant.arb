@@ -922,6 +922,8 @@
   "displaySettingsPageShowUserMessageActionsSubtitle": "在使用者訊息下方顯示複製、重傳與更多按鈕",
   "displaySettingsPageShowModelNameTimestampTitle": "顯示模型名稱與時間戳",
   "displaySettingsPageShowModelNameTimestampSubtitle": "是否在聊天訊息中顯示模型名稱及時間戳",
+  "displaySettingsPageShowProviderInChatMessageTitle": "模型名稱後顯示供應商",
+  "displaySettingsPageShowProviderInChatMessageSubtitle": "在聊天訊息的模型名稱後面顯示供應商名稱（如 模型 | 供應商）",
   "displaySettingsPageChatModelIconTitle": "聊天列表模型圖示",
   "displaySettingsPageChatModelIconSubtitle": "是否在聊天訊息中顯示模型圖示",
   "displaySettingsPageShowTokenStatsTitle": "顯示Token和上下文統計",

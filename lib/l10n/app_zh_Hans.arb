@@ -965,6 +965,8 @@
   "displaySettingsPageShowUserMessageActionsSubtitle": "在用户消息下方显示复制、重发与更多按钮",
   "displaySettingsPageShowModelNameTimestampTitle": "显示模型名称和时间戳",
   "displaySettingsPageShowModelNameTimestampSubtitle": "是否在聊天消息中显示模型名称和时间戳",
+  "displaySettingsPageShowProviderInChatMessageTitle": "模型名称后显示供应商",
+  "displaySettingsPageShowProviderInChatMessageSubtitle": "在聊天消息的模型名称后面显示供应商名称（如 模型 | 供应商）",
   "displaySettingsPageChatModelIconTitle": "聊天列表模型图标",
   "displaySettingsPageChatModelIconSubtitle": "是否在聊天消息中显示模型图标",
   "displaySettingsPageShowTokenStatsTitle": "显示Token和上下文统计",

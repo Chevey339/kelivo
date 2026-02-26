@@ -2876,6 +2876,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '是否在聊天消息中显示模型名称和时间戳';
 
   @override
+  String get displaySettingsPageShowProviderInChatMessageTitle => '模型名称后显示供应商';
+
+  @override
+  String get displaySettingsPageShowProviderInChatMessageSubtitle =>
+      '在聊天消息的模型名称后面显示供应商名称（如 模型 | 供应商）';
+
+  @override
   String get displaySettingsPageChatModelIconTitle => '聊天列表模型图标';
 
   @override
@@ -6839,6 +6846,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '是否在聊天消息中显示模型名称和时间戳';
 
   @override
+  String get displaySettingsPageShowProviderInChatMessageTitle => '模型名称后显示供应商';
+
+  @override
+  String get displaySettingsPageShowProviderInChatMessageSubtitle =>
+      '在聊天消息的模型名称后面显示供应商名称（如 模型 | 供应商）';
+
+  @override
   String get displaySettingsPageChatModelIconTitle => '聊天列表模型图标';
 
   @override
@@ -10791,6 +10805,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageShowModelNameTimestampSubtitle =>
       '是否在聊天訊息中顯示模型名稱及時間戳';
+
+  @override
+  String get displaySettingsPageShowProviderInChatMessageTitle => '模型名稱後顯示供應商';
+
+  @override
+  String get displaySettingsPageShowProviderInChatMessageSubtitle =>
+      '在聊天訊息的模型名稱後面顯示供應商名稱（如 模型 | 供應商）';
 
   @override
   String get displaySettingsPageChatModelIconTitle => '聊天列表模型圖示';

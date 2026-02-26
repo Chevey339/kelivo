@@ -1252,6 +1252,8 @@
   "displaySettingsPageShowUserMessageActionsSubtitle": "Display copy, resend, and more buttons below your messages",
   "displaySettingsPageShowModelNameTimestampTitle": "Show Model Name & Timestamp",
   "displaySettingsPageShowModelNameTimestampSubtitle": "Show model name and the timestamp below it in chat messages",
+  "displaySettingsPageShowProviderInChatMessageTitle": "Show Provider After Model Name",
+  "displaySettingsPageShowProviderInChatMessageSubtitle": "Display provider name after the model ID in chat messages (e.g. model | provider)",
   "displaySettingsPageChatModelIconTitle": "Chat Model Icon",
   "displaySettingsPageChatModelIconSubtitle": "Show model icon in chat messages",
   "displaySettingsPageShowTokenStatsTitle": "Show Token & Context Stats",

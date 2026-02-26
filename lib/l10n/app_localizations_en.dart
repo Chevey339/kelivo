@@ -2974,6 +2974,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Show model name and the timestamp below it in chat messages';
 
   @override
+  String get displaySettingsPageShowProviderInChatMessageTitle =>
+      'Show Provider After Model Name';
+
+  @override
+  String get displaySettingsPageShowProviderInChatMessageSubtitle =>
+      'Display provider name after the model ID in chat messages (e.g. model | provider)';
+
+  @override
   String get displaySettingsPageChatModelIconTitle => 'Chat Model Icon';
 
   @override

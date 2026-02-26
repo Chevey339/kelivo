@@ -5612,6 +5612,18 @@ abstract class AppLocalizations {
   /// **'Show model name and the timestamp below it in chat messages'**
   String get displaySettingsPageShowModelNameTimestampSubtitle;
 
+  /// No description provided for @displaySettingsPageShowProviderInChatMessageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Provider After Model Name'**
+  String get displaySettingsPageShowProviderInChatMessageTitle;
+
+  /// No description provided for @displaySettingsPageShowProviderInChatMessageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Display provider name after the model ID in chat messages (e.g. model | provider)'**
+  String get displaySettingsPageShowProviderInChatMessageSubtitle;
+
   /// No description provided for @displaySettingsPageChatModelIconTitle.
   ///
   /// In en, this message translates to:

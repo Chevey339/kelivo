@@ -302,13 +302,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
     final providerId = widget.message.providerId;
      String baseId = modelId;
+    String? providerName;
     if (providerId != null && providerId.isNotEmpty) {
       try {
         final cfg = settings.getProviderConfig(providerId);
+        providerName = cfg.name.trim();
         final ov = cfg.modelOverrides[modelId] as Map?;
         if (ov != null) {
           final name = (ov['name'] as String?)?.trim();
           if (name != null && name.isNotEmpty) {
+            if (settings.showProviderInChatMessage && providerName.isNotEmpty) {
+              return '$name | $providerName';
+            }
             return name;
           }
           final apiId = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
@@ -323,7 +328,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
     final inferred = ModelRegistry.infer(ModelInfo(id: baseId, displayName: baseId));
     final fallback = inferred.displayName.trim();
-    return fallback.isNotEmpty ? fallback : baseId;
+    final displayName = fallback.isNotEmpty ? fallback : baseId;
+    if (settings.showProviderInChatMessage && providerName != null && providerName.isNotEmpty) {
+      return '$displayName | $providerName';
+    }
+    return displayName;
   }
 
   @override
@@ -1164,7 +1173,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 ),
                 const SizedBox(width: 8),
               ],
-              Column(
+              Flexible(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (settings.showModelNameTimestamp)
@@ -1172,6 +1181,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       widget.useAssistantAvatar
                           ? (widget.assistantName?.trim().isNotEmpty == true ? widget.assistantName!.trim() : 'Assistant')
                           : _resolveModelDisplayName(settings),
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -1204,7 +1214,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         : const SizedBox.shrink();
                   }),
                 ],
-              ),
+              )),
             ],
           ),
           const SizedBox(height: 8),
