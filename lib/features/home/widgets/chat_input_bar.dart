@@ -961,7 +961,7 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
               items: [
                 if (widget.onCompressContext != null)
                   DesktopContextMenuItem(
-                    icon: Lucide.FoldVertical,
+                    icon: Lucide.package2,
                     label: l10n.compressContext,
                     onTap: widget.onCompressContext,
                   ),

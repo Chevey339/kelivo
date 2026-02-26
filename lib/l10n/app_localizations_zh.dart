@@ -2098,6 +2098,20 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get defaultModelPageCompressModelTitle => '压缩模型';
+
+  @override
+  String get defaultModelPageCompressModelSubtitle => '用于压缩对话上下文的模型，推荐使用快速模型';
+
+  @override
+  String get defaultModelPageCompressPromptHint => '输入用于上下文压缩的提示词模板';
+
+  @override
+  String defaultModelPageCompressVars(String contentVar, String localeVar) {
+    return '变量：对话内容：$contentVar，语言：$localeVar';
+  }
+
+  @override
   String defaultModelPageTranslateVars(String sourceVar, String targetVar) {
     return '变量：原始文本：$sourceVar，目标语言：$targetVar';
   }
@@ -10072,6 +10086,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
     String userMessagesVar,
   ) {
     return '變數：舊摘要：$previousSummaryVar，新訊息：$userMessagesVar';
+  }
+
+  @override
+  String get defaultModelPageCompressModelTitle => '壓縮模型';
+
+  @override
+  String get defaultModelPageCompressModelSubtitle => '用於壓縮對話上下文的模型，建議使用快速模型';
+
+  @override
+  String get defaultModelPageCompressPromptHint => '輸入用於上下文壓縮的提示詞範本';
+
+  @override
+  String defaultModelPageCompressVars(String contentVar, String localeVar) {
+    return '變數：對話內容：$contentVar，語言：$localeVar';
   }
 
   @override

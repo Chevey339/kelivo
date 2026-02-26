@@ -120,6 +120,38 @@ class DesktopDefaultModelPane extends StatelessWidget {
 
                   const SizedBox(height: 16),
                   _ModelCard(
+                    icon: lucide.Lucide.package2,
+                    title: l10n.defaultModelPageCompressModelTitle,
+                    subtitle: l10n.defaultModelPageCompressModelSubtitle,
+                    modelProvider: settings.compressModelProvider,
+                    modelId: settings.compressModelId,
+                    fallbackProvider:
+                        settings.summaryModelProvider ??
+                        settings.titleModelProvider ??
+                        settings.currentModelProvider,
+                    fallbackModelId:
+                        settings.summaryModelId ??
+                        settings.titleModelId ??
+                        settings.currentModelId,
+                    onReset: () async {
+                      await context
+                          .read<SettingsProvider>()
+                          .resetCompressModel();
+                    },
+                    onPick: () async {
+                      final sel = await showModelSelector(context);
+                      if (sel != null) {
+                        await context.read<SettingsProvider>().setCompressModel(
+                          sel.providerKey,
+                          sel.modelId,
+                        );
+                      }
+                    },
+                    configAction: () => _showCompressPromptDialog(context),
+                  ),
+
+                  const SizedBox(height: 16),
+                  _ModelCard(
                     icon: lucide.Lucide.Languages,
                     title: l10n.defaultModelPageTranslateModelTitle,
                     subtitle: l10n.defaultModelPageTranslateModelSubtitle,
@@ -517,6 +549,99 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     l10n.defaultModelPageSummaryVars(
                       '{previous_summary}',
                       '{user_messages}',
+                    ),
+                    style: TextStyle(
+                      color: cs.onSurface.withOpacity(0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showCompressPromptDialog(BuildContext context) async {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.read<SettingsProvider>();
+    final ctrl = TextEditingController(text: sp.compressPrompt);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: cs.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.defaultModelPagePromptLabel,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      _SmallIconBtn(
+                        icon: lucide.Lucide.X,
+                        onTap: () => Navigator.of(ctx).maybePop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _promptEditor(
+                    ctx,
+                    controller: ctrl,
+                    hintText: l10n.defaultModelPageCompressPromptHint,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _DeskIosButton(
+                        label: l10n.defaultModelPageResetDefault,
+                        filled: false,
+                        dense: true,
+                        onTap: () async {
+                          await sp.resetCompressPrompt();
+                          ctrl.text = sp.compressPrompt;
+                        },
+                      ),
+                      const Spacer(),
+                      _DeskIosButton(
+                        label: l10n.defaultModelPageSave,
+                        filled: true,
+                        dense: true,
+                        onTap: () async {
+                          await sp.setCompressPrompt(ctrl.text.trim());
+                          if (ctx.mounted) Navigator.of(ctx).maybePop();
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    l10n.defaultModelPageCompressVars(
+                      '{content}',
+                      '{locale}',
                     ),
                     style: TextStyle(
                       color: cs.onSurface.withOpacity(0.6),

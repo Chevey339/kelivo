@@ -968,6 +968,20 @@
       }
     }
   },
+  "defaultModelPageCompressModelTitle": "Compress Model",
+  "defaultModelPageCompressModelSubtitle": "Used for compressing conversation context; prefer fast models",
+  "defaultModelPageCompressPromptHint": "Enter prompt template for context compression",
+  "defaultModelPageCompressVars": "Variables: conversation: {contentVar}, language: {localeVar}",
+  "@defaultModelPageCompressVars": {
+    "placeholders": {
+      "contentVar": {
+        "type": "String"
+      },
+      "localeVar": {
+        "type": "String"
+      }
+    }
+  },
   "defaultModelPageTranslateVars": "Variables: source text: {sourceVar}, target language: {targetVar}",
   "@defaultModelPageTranslateVars": {
     "placeholders": {

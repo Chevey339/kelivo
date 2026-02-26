@@ -2168,6 +2168,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get defaultModelPageCompressModelTitle => 'Compress Model';
+
+  @override
+  String get defaultModelPageCompressModelSubtitle =>
+      'Used for compressing conversation context; prefer fast models';
+
+  @override
+  String get defaultModelPageCompressPromptHint =>
+      'Enter prompt template for context compression';
+
+  @override
+  String defaultModelPageCompressVars(String contentVar, String localeVar) {
+    return 'Variables: conversation: $contentVar, language: $localeVar';
+  }
+
+  @override
   String defaultModelPageTranslateVars(String sourceVar, String targetVar) {
     return 'Variables: source text: $sourceVar, target language: $targetVar';
   }

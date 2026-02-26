@@ -58,6 +58,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _ocrPromptKey = 'ocr_prompt_v1';
   static const String _summaryModelKey = 'summary_model_v1';
   static const String _summaryPromptKey = 'summary_prompt_v1';
+  static const String _compressModelKey = 'compress_model_v1';
+  static const String _compressPromptKey = 'compress_prompt_v1';
   static const String _themePaletteKey = 'theme_palette_v1';
   static const String _useDynamicColorKey = 'use_dynamic_color_v1';
   static const String _thinkingBudgetKey = 'thinking_budget_v1';
@@ -414,6 +416,19 @@ class SettingsProvider extends ChangeNotifier {
     final summaryp = prefs.getString(_summaryPromptKey);
     _summaryPrompt =
         (summaryp == null || summaryp.trim().isEmpty) ? defaultSummaryPrompt : summaryp;
+    // load compress model
+    final compressSel = prefs.getString(_compressModelKey);
+    if (compressSel != null && compressSel.contains('::')) {
+      final parts = compressSel.split('::');
+      if (parts.length >= 2) {
+        _compressModelProvider = parts[0];
+        _compressModelId = parts.sublist(1).join('::');
+      }
+    }
+    // load compress prompt
+    final compressp = prefs.getString(_compressPromptKey);
+    _compressPrompt =
+        (compressp == null || compressp.trim().isEmpty) ? defaultCompressPrompt : compressp;
     // learning mode
     _learningModeEnabled = prefs.getBool(_learningModeEnabledKey) ?? false;
     final lmp = prefs.getString(_learningModePromptKey);
@@ -1586,6 +1601,12 @@ class SettingsProvider extends ChangeNotifier {
       await prefs.remove(_summaryModelKey);
       changed = true;
     }
+    if (_compressModelProvider == providerKey) {
+      _compressModelProvider = null;
+      _compressModelId = null;
+      await prefs.remove(_compressModelKey);
+      changed = true;
+    }
     if (changed) notifyListeners();
   }
 
@@ -1624,6 +1645,12 @@ class SettingsProvider extends ChangeNotifier {
       _summaryModelProvider = null;
       _summaryModelId = null;
       await prefs.remove(_summaryModelKey);
+      changed = true;
+    }
+    if (_compressModelProvider == providerKey && _compressModelId == modelId) {
+      _compressModelProvider = null;
+      _compressModelId = null;
+      await prefs.remove(_compressModelKey);
       changed = true;
     }
     // Also remove from pinned if applicable
@@ -1673,6 +1700,11 @@ class SettingsProvider extends ChangeNotifier {
       _summaryModelProvider = null;
       _summaryModelId = null;
       await prefs.remove(_summaryModelKey);
+    }
+    if (_compressModelProvider == key) {
+      _compressModelProvider = null;
+      _compressModelId = null;
+      await prefs.remove(_compressModelKey);
     }
 
     // Remove pinned models for this provider
@@ -1965,6 +1997,60 @@ Generate or update a brief summary of the user's questions and intentions.
 
   Future<void> resetSummaryPrompt() async =>
       setSummaryPrompt(defaultSummaryPrompt);
+
+  // Compress model and prompt
+  String? _compressModelProvider;
+  String? _compressModelId;
+  String? get compressModelProvider => _compressModelProvider;
+  String? get compressModelId => _compressModelId;
+  String? get compressModelKey =>
+      (_compressModelProvider != null && _compressModelId != null)
+          ? '${_compressModelProvider!}::${_compressModelId!}'
+          : null;
+
+  static const String defaultCompressPrompt =
+      '''You are a conversation compression assistant. Compress the following conversation into a concise summary.
+
+Requirements:
+1. Preserve key facts, decisions, and important context needed to continue the conversation
+2. Keep the summary in the same language as the original conversation
+3. Output the summary directly without any explanations or meta-commentary
+4. Format the summary as context information that can be used to continue the conversation
+5. Use {locale} language
+6. Start with a clear indicator that this is a summary (e.g., "[Summary of previous conversation]" or equivalent in the target language)
+
+<conversation>
+{content}
+</conversation>''';
+
+  String _compressPrompt = defaultCompressPrompt;
+  String get compressPrompt => _compressPrompt;
+
+  Future<void> setCompressModel(String providerKey, String modelId) async {
+    _compressModelProvider = providerKey;
+    _compressModelId = modelId;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_compressModelKey, '$providerKey::$modelId');
+  }
+
+  Future<void> resetCompressModel() async {
+    _compressModelProvider = null;
+    _compressModelId = null;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_compressModelKey);
+  }
+
+  Future<void> setCompressPrompt(String prompt) async {
+    _compressPrompt = prompt.trim().isEmpty ? defaultCompressPrompt : prompt;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_compressPromptKey, _compressPrompt);
+  }
+
+  Future<void> resetCompressPrompt() async =>
+      setCompressPrompt(defaultCompressPrompt);
 
   // Learning Mode
   bool _learningModeEnabled = false;

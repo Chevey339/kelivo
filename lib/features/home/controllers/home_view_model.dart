@@ -473,18 +473,20 @@ class HomeViewModel extends ChangeNotifier {
     final content = joined.length > 6000 ? joined.substring(0, 6000) : joined;
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
 
-    // Resolve model: summary model → title model → assistant model → global default
+    // Resolve model: compress model → summary model → title model → assistant model → global default
     final settings = _contextProvider.read<SettingsProvider>();
     final ap = _contextProvider.read<AssistantProvider>();
     final assistant = convo.assistantId != null
         ? ap.getById(convo.assistantId!)
         : ap.currentAssistant;
 
-    final provKey = settings.summaryModelProvider ??
+    final provKey = settings.compressModelProvider ??
+        settings.summaryModelProvider ??
         settings.titleModelProvider ??
         assistant?.chatModelProvider ??
         settings.currentModelProvider;
-    final mdlId = settings.summaryModelId ??
+    final mdlId = settings.compressModelId ??
+        settings.summaryModelId ??
         settings.titleModelId ??
         assistant?.chatModelId ??
         settings.currentModelId;
@@ -492,21 +494,10 @@ class HomeViewModel extends ChangeNotifier {
 
     final cfg = settings.getProviderConfig(provKey);
 
-    // Build compression prompt
-    final prompt = '''
-You are a conversation compression assistant. Compress the following conversation into a concise summary.
-
-Requirements:
-1. Preserve key facts, decisions, and important context needed to continue the conversation
-2. Keep the summary in the same language as the original conversation
-3. Output the summary directly without any explanations or meta-commentary
-4. Format the summary as context information that can be used to continue the conversation
-5. Use $locale language
-6. Start with a clear indicator that this is a summary (e.g., "[Summary of previous conversation]" or equivalent in the target language)
-
-<conversation>
-$content
-</conversation>''';
+    // Build compression prompt from settings template
+    final prompt = settings.compressPrompt
+        .replaceAll('{content}', content)
+        .replaceAll('{locale}', locale);
 
     try {
       final summary = (await ChatApiService.generateText(

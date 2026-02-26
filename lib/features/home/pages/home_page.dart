@@ -9,6 +9,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../main.dart';
 import '../../../shared/widgets/interactive_drawer.dart';
 import '../../../shared/responsive/breakpoints.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -943,30 +944,21 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             clearLabel: _controller.clearContextLabel(),
             onCompress: () async {
               Navigator.of(ctx).maybePop();
-              // Show loading indicator
-              final messenger = ScaffoldMessenger.of(context);
-              messenger.showSnackBar(
-                SnackBar(
-                  content: Text(l10n.compressingContext),
-                  duration: const Duration(seconds: 30),
-                ),
+              showAppSnackBar(
+                context,
+                message: l10n.compressingContext,
+                duration: const Duration(seconds: 30),
               );
               final error = await _controller.compressContext();
-              messenger.hideCurrentSnackBar();
+              AppSnackBarManager().dismissAll();
               if (error != null && mounted) {
-                if (error == 'no_messages') {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text(l10n.compressContextNoMessages)),
-                  );
-                } else if (error == 'no_model') {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text(l10n.compressContextFailed)),
-                  );
-                } else {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text(l10n.compressContextFailed)),
-                  );
-                }
+                showAppSnackBar(
+                  context,
+                  message: error == 'no_messages'
+                      ? l10n.compressContextNoMessages
+                      : l10n.compressContextFailed,
+                  type: NotificationType.error,
+                );
               }
             },
             onClear: () async {
@@ -981,25 +973,21 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   void _handleDesktopCompressContext() async {
     final l10n = AppLocalizations.of(context)!;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(l10n.compressingContext),
-        duration: const Duration(seconds: 30),
-      ),
+    showAppSnackBar(
+      context,
+      message: l10n.compressingContext,
+      duration: const Duration(seconds: 30),
     );
     final error = await _controller.compressContext();
-    messenger.hideCurrentSnackBar();
+    AppSnackBarManager().dismissAll();
     if (error != null && mounted) {
-      if (error == 'no_messages') {
-        messenger.showSnackBar(
-          SnackBar(content: Text(l10n.compressContextNoMessages)),
-        );
-      } else {
-        messenger.showSnackBar(
-          SnackBar(content: Text(l10n.compressContextFailed)),
-        );
-      }
+      showAppSnackBar(
+        context,
+        message: error == 'no_messages'
+            ? l10n.compressContextNoMessages
+            : l10n.compressContextFailed,
+        type: NotificationType.error,
+      );
     }
   }
 

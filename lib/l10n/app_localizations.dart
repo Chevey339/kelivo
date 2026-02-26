@@ -4094,6 +4094,30 @@ abstract class AppLocalizations {
     String userMessagesVar,
   );
 
+  /// No description provided for @defaultModelPageCompressModelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Compress Model'**
+  String get defaultModelPageCompressModelTitle;
+
+  /// No description provided for @defaultModelPageCompressModelSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Used for compressing conversation context; prefer fast models'**
+  String get defaultModelPageCompressModelSubtitle;
+
+  /// No description provided for @defaultModelPageCompressPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter prompt template for context compression'**
+  String get defaultModelPageCompressPromptHint;
+
+  /// No description provided for @defaultModelPageCompressVars.
+  ///
+  /// In en, this message translates to:
+  /// **'Variables: conversation: {contentVar}, language: {localeVar}'**
+  String defaultModelPageCompressVars(String contentVar, String localeVar);
+
   /// No description provided for @defaultModelPageTranslateVars.
   ///
   /// In en, this message translates to:

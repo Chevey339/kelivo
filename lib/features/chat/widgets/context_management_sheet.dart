@@ -54,7 +54,7 @@ class ContextManagementSheet extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _OptionRow(
-            icon: Lucide.FoldVertical,
+            icon: Lucide.package2,
             label: l10n.compressContext,
             description: l10n.compressContextDesc,
             onTap: () {
