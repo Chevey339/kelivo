@@ -19,7 +19,8 @@ import 'gemini_tool_config.dart';
 
 class ChatApiService {
   static const String _aihubmixAppCode = 'ZKRT3588';
-  static final Map<String, CancelToken> _activeCancelTokens = <String, CancelToken>{};
+  static final Map<String, CancelToken> _activeCancelTokens =
+      <String, CancelToken>{};
 
   static void cancelRequest(String requestId) {
     final key = requestId.trim();
@@ -61,6 +62,7 @@ class ChatApiService {
     }
     return orig;
   }
+
   static String _effectiveApiKey(ProviderConfig cfg) {
     try {
       if (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) {
@@ -70,6 +72,7 @@ class ChatApiService {
     } catch (_) {}
     return cfg.apiKey;
   }
+
   // Read built-in tools configured per model (e.g., ['search', 'url_context']).
   // Stored under ProviderConfig.modelOverrides[modelId].builtInTools.
   static Set<String> _builtInTools(ProviderConfig cfg, String modelId) {
@@ -84,14 +87,21 @@ class ChatApiService {
     } catch (_) {}
     return const <String>{};
   }
+
   // Helpers to read per-model overrides (headers/body) from ProviderConfig
-  static Map<String, dynamic> _modelOverride(ProviderConfig cfg, String modelId) {
+  static Map<String, dynamic> _modelOverride(
+    ProviderConfig cfg,
+    String modelId,
+  ) {
     final ov = cfg.modelOverrides[modelId];
     if (ov is Map<String, dynamic>) return ov;
     return const <String, dynamic>{};
   }
 
-  static Map<String, String> _customHeaders(ProviderConfig cfg, String modelId) {
+  static Map<String, String> _customHeaders(
+    ProviderConfig cfg,
+    String modelId,
+  ) {
     final ov = _modelOverride(cfg, modelId);
     final list = (ov['headers'] as List?) ?? const <dynamic>[];
     final out = <String, String>{};
@@ -119,7 +129,8 @@ class ChatApiService {
     if (i != null) return i;
     final d = double.tryParse(s);
     if (d != null) return d;
-    if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
+    if ((s.startsWith('{') && s.endsWith('}')) ||
+        (s.startsWith('[') && s.endsWith(']'))) {
       try {
         return jsonDecode(s);
       } catch (_) {}
@@ -149,22 +160,38 @@ class ChatApiService {
   // Resolve effective model info by respecting per-model overrides; fallback to inference
   static ModelInfo _effectiveModelInfo(ProviderConfig cfg, String modelId) {
     final upstreamId = _apiModelId(cfg, modelId);
-    final base = ModelRegistry.infer(ModelInfo(id: upstreamId, displayName: upstreamId));
+    final base = ModelRegistry.infer(
+      ModelInfo(id: upstreamId, displayName: upstreamId),
+    );
     final ov = _modelOverride(cfg, modelId);
     ModelType? type;
     final t = (ov['type'] as String?) ?? '';
-    if (t == 'embedding') type = ModelType.embedding; else if (t == 'chat') type = ModelType.chat;
+    if (t == 'embedding')
+      type = ModelType.embedding;
+    else if (t == 'chat')
+      type = ModelType.chat;
     List<Modality>? input;
     if (ov['input'] is List) {
-      input = [for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
+      input = [
+        for (final e in (ov['input'] as List))
+          (e.toString() == 'image' ? Modality.image : Modality.text),
+      ];
     }
     List<Modality>? output;
     if (ov['output'] is List) {
-      output = [for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)];
+      output = [
+        for (final e in (ov['output'] as List))
+          (e.toString() == 'image' ? Modality.image : Modality.text),
+      ];
     }
     List<ModelAbility>? abilities;
     if (ov['abilities'] is List) {
-      abilities = [for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)];
+      abilities = [
+        for (final e in (ov['abilities'] as List))
+          (e.toString() == 'reasoning'
+              ? ModelAbility.reasoning
+              : ModelAbility.tool),
+      ];
     }
     return base.copyWith(
       type: type ?? base.type,
@@ -173,6 +200,7 @@ class ChatApiService {
       abilities: abilities ?? base.abilities,
     );
   }
+
   static String _mimeFromPath(String path) {
     final lower = path.toLowerCase();
     // Images
@@ -263,7 +291,12 @@ class ChatApiService {
         }
       }
       final cleaned = raw.replaceRange(m.start, m.end, '').trimRight();
-      return _GeminiSignatureMeta(cleanedText: cleaned, textKey: textKey, textValue: textVal, images: images);
+      return _GeminiSignatureMeta(
+        cleanedText: cleaned,
+        textKey: textKey,
+        textValue: textVal,
+        images: images,
+      );
     } catch (_) {
       return _GeminiSignatureMeta(cleanedText: raw);
     }
@@ -274,7 +307,11 @@ class ChatApiService {
     dynamic textValue,
     List<Map<String, dynamic>> imageSigs = const <Map<String, dynamic>>[],
   }) {
-    final imgs = imageSigs.where((e) => (e['k'] ?? '').toString().isNotEmpty && e.containsKey('v')).toList();
+    final imgs = imageSigs
+        .where(
+          (e) => (e['k'] ?? '').toString().isNotEmpty && e.containsKey('v'),
+        )
+        .toList();
     final hasText = (textKey ?? '').isNotEmpty && textValue != null;
     if (!hasText && imgs.isEmpty) return '';
     final payload = <String, dynamic>{};
@@ -283,7 +320,11 @@ class ChatApiService {
     return '\n<!-- $_geminiThoughtSigTag:${jsonEncode(payload)} -->';
   }
 
-  static void _applyGeminiThoughtSignatures(_GeminiSignatureMeta meta, List<Map<String, dynamic>> parts, {bool attachDummyWhenMissing = false}) {
+  static void _applyGeminiThoughtSignatures(
+    _GeminiSignatureMeta meta,
+    List<Map<String, dynamic>> parts, {
+    bool attachDummyWhenMissing = false,
+  }) {
     if (meta.hasAny) {
       if (meta.hasText) {
         for (final part in parts) {
@@ -297,7 +338,8 @@ class ChatApiService {
         int idx = 0;
         for (final part in parts) {
           if (idx >= meta.images.length) break;
-          if (part.containsKey('inline_data') || part.containsKey('inlineData')) {
+          if (part.containsKey('inline_data') ||
+              part.containsKey('inlineData')) {
             final sig = meta.images[idx];
             final k = (sig['k'] ?? '').toString();
             final v = sig['v'];
@@ -314,7 +356,8 @@ class ChatApiService {
       bool textTagged = false;
       for (final part in parts) {
         final hasText = part.containsKey('text');
-        final hasInline = part.containsKey('inline_data') || part.containsKey('inlineData');
+        final hasInline =
+            part.containsKey('inline_data') || part.containsKey('inlineData');
         if (hasInline) {
           inlineFound = true;
           part.putIfAbsent('thoughtSignature', () => dummy);
@@ -351,7 +394,11 @@ class ChatApiService {
         sigVal = p['thought_signature'];
       }
       final hasText = ((p['text'] ?? '') as String? ?? '').isNotEmpty;
-      final hasInline = p['inlineData'] is Map || p['inline_data'] is Map || p['fileData'] is Map || p['file_data'] is Map;
+      final hasInline =
+          p['inlineData'] is Map ||
+          p['inline_data'] is Map ||
+          p['fileData'] is Map ||
+          p['file_data'] is Map;
       if (hasText && sigKey != null && textKey == null) {
         textKey = sigKey;
         textVal = sigVal;
@@ -360,14 +407,19 @@ class ChatApiService {
         images.add({'k': sigKey, 'v': sigVal});
       }
     }
-    return _buildGeminiThoughtSigComment(textKey: textKey, textValue: textVal, imageSigs: images);
+    return _buildGeminiThoughtSigComment(
+      textKey: textKey,
+      textValue: textVal,
+      imageSigs: images,
+    );
   }
 
   // Simple container for parsed text + image refs
   static Future<bool> _isValidRemoteImageUrl(String url) async {
     try {
       final uri = Uri.tryParse(url);
-      if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) return false;
+      if (uri == null || !(uri.isScheme('http') || uri.isScheme('https')))
+        return false;
       final client = http.Client();
       try {
         final resp = await client.head(uri).timeout(const Duration(seconds: 5));
@@ -481,7 +533,10 @@ class ChatApiService {
     return _ParsedTextAndImages(buf.toString().trim(), images);
   }
 
-  static Future<String> _encodeBase64File(String path, {bool withPrefix = false}) async {
+  static Future<String> _encodeBase64File(
+    String path, {
+    bool withPrefix = false,
+  }) async {
     final fixed = SandboxPathResolver.fix(path);
     final file = File(fixed);
     final bytes = await file.readAsBytes();
@@ -492,6 +547,7 @@ class ChatApiService {
     }
     return b64;
   }
+
   static http.Client _clientFor(ProviderConfig cfg, CancelToken cancelToken) {
     final enabled = cfg.proxyEnabled == true;
     final host = (cfg.proxyHost ?? '').trim();
@@ -530,12 +586,17 @@ class ChatApiService {
     bool stream = true,
     String? requestId,
   }) async* {
-    final kind = ProviderConfig.classify(config.id, explicitType: config.providerType);
+    final kind = ProviderConfig.classify(
+      config.id,
+      explicitType: config.providerType,
+    );
     final cancelToken = CancelToken();
     final rid = (requestId ?? '').trim();
     if (rid.isNotEmpty) {
       final prev = _activeCancelTokens.remove(rid);
-      try { prev?.cancel('replaced'); } catch (_) {}
+      try {
+        prev?.cancel('replaced');
+      } catch (_) {}
       _activeCancelTokens[rid] = cancelToken;
     }
     final safeMessages = _sanitizeMessages(messages);
@@ -614,7 +675,10 @@ class ChatApiService {
     Map<String, dynamic>? extraBody,
     int? thinkingBudget,
   }) async {
-    final kind = ProviderConfig.classify(config.id, explicitType: config.providerType);
+    final kind = ProviderConfig.classify(
+      config.id,
+      explicitType: config.providerType,
+    );
     final client = _clientFor(config, CancelToken());
     final upstreamModelId = _apiModelId(config, modelId);
     final safePrompt = UnicodeSanitizer.sanitize(prompt);
@@ -623,15 +687,22 @@ class ChatApiService {
         final base = config.baseUrl.endsWith('/')
             ? config.baseUrl.substring(0, config.baseUrl.length - 1)
             : config.baseUrl;
-        final path = (config.useResponseApi == true) ? '/responses' : (config.chatPath ?? '/chat/completions');
+        final path = (config.useResponseApi == true)
+            ? '/responses'
+            : (config.chatPath ?? '/chat/completions');
         final url = Uri.parse('$base$path');
         Map<String, dynamic> body;
         final effectiveInfo = _effectiveModelInfo(config, modelId);
-        final isReasoning = effectiveInfo.abilities.contains(ModelAbility.reasoning);
+        final isReasoning = effectiveInfo.abilities.contains(
+          ModelAbility.reasoning,
+        );
         final effort = _effortForBudget(thinkingBudget);
         final host = Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '';
         final modelLower = upstreamModelId.toLowerCase();
-        final bool isMimo = host.contains('xiaomimimo') || modelLower.startsWith('mimo-') || modelLower.contains('/mimo-');
+        final bool isMimo =
+            host.contains('xiaomimimo') ||
+            modelLower.startsWith('mimo-') ||
+            modelLower.contains('/mimo-');
         if (config.useResponseApi == true) {
           // Inject built-in web_search tool when enabled and supported
           final toolsList = <Map<String, dynamic>>[];
@@ -644,30 +715,45 @@ class ChatApiService {
             if (m.startsWith('gpt-5')) return true;
             return false;
           }
+
           if (_isResponsesWebSearchSupported(upstreamModelId)) {
             final builtIns = _builtInTools(config, modelId);
             if (builtIns.contains(BuiltInToolNames.search)) {
               Map<String, dynamic> ws = const <String, dynamic>{};
               try {
                 final ov = config.modelOverrides[modelId];
-                if (ov is Map && ov['webSearch'] is Map) ws = (ov['webSearch'] as Map).cast<String, dynamic>();
+                if (ov is Map && ov['webSearch'] is Map)
+                  ws = (ov['webSearch'] as Map).cast<String, dynamic>();
               } catch (_) {}
-              final usePreview = (ws['preview'] == true) || ((ws['tool'] ?? '').toString() == 'preview');
-              final entry = <String, dynamic>{'type': usePreview ? 'web_search_preview' : 'web_search'};
-              if (ws['allowed_domains'] is List && (ws['allowed_domains'] as List).isNotEmpty) {
-                entry['filters'] = {'allowed_domains': List<String>.from((ws['allowed_domains'] as List).map((e) => e.toString()))};
+              final usePreview =
+                  (ws['preview'] == true) ||
+                  ((ws['tool'] ?? '').toString() == 'preview');
+              final entry = <String, dynamic>{
+                'type': usePreview ? 'web_search_preview' : 'web_search',
+              };
+              if (ws['allowed_domains'] is List &&
+                  (ws['allowed_domains'] as List).isNotEmpty) {
+                entry['filters'] = {
+                  'allowed_domains': List<String>.from(
+                    (ws['allowed_domains'] as List).map((e) => e.toString()),
+                  ),
+                };
               }
-              if (ws['user_location'] is Map) entry['user_location'] = (ws['user_location'] as Map).cast<String, dynamic>();
-              if (usePreview && ws['search_context_size'] is String) entry['search_context_size'] = ws['search_context_size'];
+              if (ws['user_location'] is Map)
+                entry['user_location'] = (ws['user_location'] as Map)
+                    .cast<String, dynamic>();
+              if (usePreview && ws['search_context_size'] is String)
+                entry['search_context_size'] = ws['search_context_size'];
               toolsList.add(entry);
             }
           }
           body = {
             'model': upstreamModelId,
             'input': [
-              {'role': 'user', 'content': safePrompt}
+              {'role': 'user', 'content': safePrompt},
             ],
-            if (toolsList.isNotEmpty) 'tools': _toResponsesToolsFormat(toolsList),
+            if (toolsList.isNotEmpty)
+              'tools': _toResponsesToolsFormat(toolsList),
             if (toolsList.isNotEmpty) 'tool_choice': 'auto',
             if (isReasoning && effort != 'off')
               'reasoning': {
@@ -679,10 +765,11 @@ class ChatApiService {
           body = {
             'model': upstreamModelId,
             'messages': [
-              {'role': 'user', 'content': safePrompt}
+              {'role': 'user', 'content': safePrompt},
             ],
             'temperature': 0.3,
-            if (isReasoning && effort != 'off' && effort != 'auto') 'reasoning_effort': effort,
+            if (isReasoning && effort != 'off' && effort != 'auto')
+              'reasoning_effort': effort,
           };
         }
         final headers = <String, String>{
@@ -690,21 +777,28 @@ class ChatApiService {
           'Content-Type': 'application/json',
         };
         headers.addAll(_customHeaders(config, modelId));
-        if (extraHeaders != null && extraHeaders.isNotEmpty) headers.addAll(extraHeaders);
+        if (extraHeaders != null && extraHeaders.isNotEmpty)
+          headers.addAll(extraHeaders);
         final extra = _customBody(config, modelId);
         if (extra.isNotEmpty) (body as Map<String, dynamic>).addAll(extra);
         if (extraBody != null && extraBody.isNotEmpty) {
           (extraBody).forEach((k, v) {
-            (body as Map<String, dynamic>)[k] = (v is String) ? _parseOverrideValue(v) : v;
+            (body as Map<String, dynamic>)[k] = (v is String)
+                ? _parseOverrideValue(v)
+                : v;
           });
         }
         // Vendor-specific reasoning knobs for chat-completions compatible hosts (non-streaming)
         if (config.useResponseApi != true) {
           final off = _isOff(thinkingBudget);
-          if (host.contains('open.bigmodel.cn') || host.contains('bigmodel') || isMimo) {
+          if (host.contains('open.bigmodel.cn') ||
+              host.contains('bigmodel') ||
+              isMimo) {
             // Zhipu BigModel / Xiaomi MiMo: thinking: { type: enabled|disabled }
             if (isReasoning) {
-              (body as Map<String, dynamic>)['thinking'] = {'type': off ? 'disabled' : 'enabled'};
+              (body as Map<String, dynamic>)['thinking'] = {
+                'type': off ? 'disabled' : 'enabled',
+              };
             } else {
               (body as Map<String, dynamic>).remove('thinking');
             }
@@ -713,14 +807,20 @@ class ChatApiService {
         }
         // Ensure Responses tools use the flattened schema even if supplied via overrides
         try {
-          if (config.useResponseApi == true && (body as Map<String, dynamic>)['tools'] is List) {
-            final raw = ((body as Map<String, dynamic>)['tools'] as List).cast<dynamic>();
+          if (config.useResponseApi == true &&
+              (body as Map<String, dynamic>)['tools'] is List) {
+            final raw = ((body as Map<String, dynamic>)['tools'] as List)
+                .cast<dynamic>();
             (body as Map<String, dynamic>)['tools'] = _toResponsesToolsFormat(
               raw.map((e) => (e as Map).cast<String, dynamic>()).toList(),
             );
           }
         } catch (_) {}
-        final resp = await client.post(url, headers: headers, body: jsonEncode(body));
+        final resp = await client.post(
+          url,
+          headers: headers,
+          body: jsonEncode(body),
+        );
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
           throw HttpException('HTTP ${resp.statusCode}: ${resp.body}');
         }
@@ -738,7 +838,9 @@ class ChatApiService {
               final content = item['content'];
               if (content is List) {
                 for (final c in content) {
-                  if (c is Map && (c['type'] == 'output_text') && (c['text'] is String)) {
+                  if (c is Map &&
+                      (c['type'] == 'output_text') &&
+                      (c['text'] is String)) {
                     buf.write(c['text']);
                   }
                 }
@@ -766,7 +868,7 @@ class ChatApiService {
           'max_tokens': 512,
           'temperature': 0.3,
           'messages': [
-            {'role': 'user', 'content': safePrompt}
+            {'role': 'user', 'content': safePrompt},
           ],
         };
         final headers = <String, String>{
@@ -775,15 +877,22 @@ class ChatApiService {
           'Content-Type': 'application/json',
         };
         headers.addAll(_customHeaders(config, modelId));
-        if (extraHeaders != null && extraHeaders.isNotEmpty) headers.addAll(extraHeaders);
+        if (extraHeaders != null && extraHeaders.isNotEmpty)
+          headers.addAll(extraHeaders);
         final extra = _customBody(config, modelId);
         if (extra.isNotEmpty) (body as Map<String, dynamic>).addAll(extra);
         if (extraBody != null && extraBody.isNotEmpty) {
           (extraBody).forEach((k, v) {
-            (body as Map<String, dynamic>)[k] = (v is String) ? _parseOverrideValue(v) : v;
+            (body as Map<String, dynamic>)[k] = (v is String)
+                ? _parseOverrideValue(v)
+                : v;
           });
         }
-        final resp = await client.post(url, headers: headers, body: jsonEncode(body));
+        final resp = await client.post(
+          url,
+          headers: headers,
+          body: jsonEncode(body),
+        );
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
           throw HttpException('HTTP ${resp.statusCode}: ${resp.body}');
         }
@@ -797,10 +906,13 @@ class ChatApiService {
       } else {
         // Google
         String url;
-        if (config.vertexAI == true && (config.location?.isNotEmpty == true) && (config.projectId?.isNotEmpty == true)) {
+        if (config.vertexAI == true &&
+            (config.location?.isNotEmpty == true) &&
+            (config.projectId?.isNotEmpty == true)) {
           final loc = config.location!;
           final proj = config.projectId!;
-          url = 'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$upstreamModelId:generateContent';
+          url =
+              'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$upstreamModelId:generateContent';
         } else {
           final base = config.baseUrl.endsWith('/')
               ? config.baseUrl.substring(0, config.baseUrl.length - 1)
@@ -812,9 +924,9 @@ class ChatApiService {
             {
               'role': 'user',
               'parts': [
-                {'text': safePrompt}
-              ]
-            }
+                {'text': safePrompt},
+              ],
+            },
           ],
           'generationConfig': {'temperature': 0.3},
         };
@@ -856,15 +968,22 @@ class ChatApiService {
           if (proj.isNotEmpty) headers['X-Goog-User-Project'] = proj;
         }
         headers.addAll(_customHeaders(config, modelId));
-        if (extraHeaders != null && extraHeaders.isNotEmpty) headers.addAll(extraHeaders);
+        if (extraHeaders != null && extraHeaders.isNotEmpty)
+          headers.addAll(extraHeaders);
         final extra = _customBody(config, modelId);
         if (extra.isNotEmpty) (body as Map<String, dynamic>).addAll(extra);
         if (extraBody != null && extraBody.isNotEmpty) {
           (extraBody).forEach((k, v) {
-            (body as Map<String, dynamic>)[k] = (v is String) ? _parseOverrideValue(v) : v;
+            (body as Map<String, dynamic>)[k] = (v is String)
+                ? _parseOverrideValue(v)
+                : v;
           });
         }
-        final resp = await client.post(Uri.parse(url), headers: headers, body: jsonEncode(body));
+        final resp = await client.post(
+          Uri.parse(url),
+          headers: headers,
+          body: jsonEncode(body),
+        );
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
           throw HttpException('HTTP ${resp.statusCode}: ${resp.body}');
         }
@@ -883,7 +1002,9 @@ class ChatApiService {
     }
   }
 
-  static List<Map<String, dynamic>> _sanitizeMessages(List<Map<String, dynamic>> messages) {
+  static List<Map<String, dynamic>> _sanitizeMessages(
+    List<Map<String, dynamic>> messages,
+  ) {
     List<Map<String, dynamic>>? out;
     for (int i = 0; i < messages.length; i++) {
       final m = messages[i];
@@ -910,7 +1031,9 @@ class ChatApiService {
   // Important: tool messages must preserve `tool_call_id`, and assistant messages must
   // preserve `tool_calls`, otherwise OpenRouter->Anthropic translation will fail with
   // `tool_result.tool_use_id: Field required` on subsequent tool rounds.
-  static Map<String, dynamic> _copyChatCompletionMessage(Map<String, dynamic> m) {
+  static Map<String, dynamic> _copyChatCompletionMessage(
+    Map<String, dynamic> m,
+  ) {
     final role = (m['role'] ?? 'user').toString();
     final out = <String, dynamic>{
       'role': role,
@@ -955,7 +1078,8 @@ class ChatApiService {
     return out;
   }
 
-  static bool _isOff(int? budget) => (budget != null && budget != -1 && budget < 1024);
+  static bool _isOff(int? budget) =>
+      (budget != null && budget != -1 && budget < 1024);
   static String _effortForBudget(int? budget) {
     if (budget == null || budget == -1) return 'auto';
     if (_isOff(budget)) return 'off';
@@ -966,7 +1090,9 @@ class ChatApiService {
 
   // Clean JSON Schema for Google Gemini API strict validation
   // Google requires array types to have 'items' field
-  static Map<String, dynamic> _cleanSchemaForGemini(Map<String, dynamic> schema) {
+  static Map<String, dynamic> _cleanSchemaForGemini(
+    Map<String, dynamic> schema,
+  ) {
     final result = Map<String, dynamic>.from(schema);
 
     // Recursively fix 'properties' if present
@@ -988,8 +1114,11 @@ class ChatApiService {
             propMap['items'] = {'type': 'string'}; // Default to string array
           }
           // Recursively clean nested objects
-          if (propMap['type'] == 'object' && propMap.containsKey('properties')) {
-            propMap['properties'] = _cleanSchemaForGemini({'properties': propMap['properties']})['properties'];
+          if (propMap['type'] == 'object' &&
+              propMap.containsKey('properties')) {
+            propMap['properties'] = _cleanSchemaForGemini({
+              'properties': propMap['properties'],
+            })['properties'];
           }
           props[key] = propMap;
         }
@@ -1001,7 +1130,9 @@ class ChatApiService {
         for (final r in req) {
           final name = r.toString();
           if (!props.containsKey(name)) {
-            props[name] = {'type': 'string'}; // Fallback to a simple string field
+            props[name] = {
+              'type': 'string',
+            }; // Fallback to a simple string field
           }
         }
       }
@@ -1010,14 +1141,18 @@ class ChatApiService {
 
     // Handle array items recursively
     if (result['items'] is Map) {
-      result['items'] = _cleanSchemaForGemini(result['items'] as Map<String, dynamic>);
+      result['items'] = _cleanSchemaForGemini(
+        result['items'] as Map<String, dynamic>,
+      );
     }
 
     return result;
   }
 
   // Clean OpenAI-format tools for compatibility with strict backends (like Gemini via NewAPI)
-  static List<Map<String, dynamic>> _cleanToolsForCompatibility(List<Map<String, dynamic>> tools) {
+  static List<Map<String, dynamic>> _cleanToolsForCompatibility(
+    List<Map<String, dynamic>> tools,
+  ) {
     final cleaned = tools.map((tool) {
       final result = Map<String, dynamic>.from(tool);
       final fn = result['function'];
@@ -1025,7 +1160,9 @@ class ChatApiService {
         final fnMap = Map<String, dynamic>.from(fn as Map);
         final params = fnMap['parameters'];
         if (params is Map) {
-          fnMap['parameters'] = _cleanSchemaForGemini(params as Map<String, dynamic>);
+          fnMap['parameters'] = _cleanSchemaForGemini(
+            params as Map<String, dynamic>,
+          );
         }
         result['function'] = fnMap;
       }
@@ -1037,7 +1174,9 @@ class ChatApiService {
 
   // Convert Chat Completions style tools to Responses API style
   // { type: 'function', name, description?, parameters?, strict? }
-  static List<Map<String, dynamic>> _toResponsesToolsFormat(List<Map<String, dynamic>> tools) {
+  static List<Map<String, dynamic>> _toResponsesToolsFormat(
+    List<Map<String, dynamic>> tools,
+  ) {
     return tools.map((tool) {
       // Keep non-function tools (e.g., web_search) unchanged
       if ((tool['type'] ?? '').toString() != 'function') {
@@ -1070,12 +1209,21 @@ class ChatApiService {
   }
 
   static Stream<ChatStreamChunk> _sendOpenAIStream(
-      http.Client client,
-      ProviderConfig config,
-      String modelId,
-      List<Map<String, dynamic>> messages,
-      {List<String>? userImagePaths, int? thinkingBudget, double? temperature, double? topP, int? maxTokens, List<Map<String, dynamic>>? tools, Future<String> Function(String, Map<String, dynamic>)? onToolCall, Map<String, String>? extraHeaders, Map<String, dynamic>? extraBody, bool stream = true}
-      ) async* {
+    http.Client client,
+    ProviderConfig config,
+    String modelId,
+    List<Map<String, dynamic>> messages, {
+    List<String>? userImagePaths,
+    int? thinkingBudget,
+    double? temperature,
+    double? topP,
+    int? maxTokens,
+    List<Map<String, dynamic>>? tools,
+    Future<String> Function(String, Map<String, dynamic>)? onToolCall,
+    Map<String, String>? extraHeaders,
+    Map<String, dynamic>? extraBody,
+    bool stream = true,
+  }) async* {
     final upstreamModelId = _apiModelId(config, modelId);
     final base = config.baseUrl.endsWith('/')
         ? config.baseUrl.substring(0, config.baseUrl.length - 1)
@@ -1086,7 +1234,9 @@ class ChatApiService {
     final url = Uri.parse('$base$path');
 
     final effectiveInfo = _effectiveModelInfo(config, modelId);
-    final isReasoning = effectiveInfo.abilities.contains(ModelAbility.reasoning);
+    final isReasoning = effectiveInfo.abilities.contains(
+      ModelAbility.reasoning,
+    );
     final wantsImageOutput = effectiveInfo.output.contains(Modality.image);
     final bool canImageInput = effectiveInfo.input.contains(Modality.image);
 
@@ -1095,19 +1245,30 @@ class ChatApiService {
     final modelLower = upstreamModelId.toLowerCase();
     final bool isAzureOpenAI = host.contains('openai.azure.com');
     final bool isMimoHost = host.contains('xiaomimimo');
-    final bool isMimoModel = modelLower.startsWith('mimo-') || modelLower.contains('/mimo-');
+    final bool isMimoModel =
+        modelLower.startsWith('mimo-') || modelLower.contains('/mimo-');
     final bool isMimo = isMimoHost || isMimoModel;
-    final bool needsReasoningEcho = (host.contains('deepseek') || modelLower.contains('deepseek') || isMimo) && isReasoning;
+    final bool needsReasoningEcho =
+        (host.contains('deepseek') ||
+            modelLower.contains('deepseek') ||
+            isMimo) &&
+        isReasoning;
     // OpenRouter reasoning models require preserving `reasoning_details` across tool-calling turns.
-    final bool preserveReasoningDetails = host.contains('openrouter.ai') && isReasoning;
-    final String completionTokensKey = (isAzureOpenAI || isMimo) ? 'max_completion_tokens' : 'max_tokens';
+    final bool preserveReasoningDetails =
+        host.contains('openrouter.ai') && isReasoning;
+    final String completionTokensKey = (isAzureOpenAI || isMimo)
+        ? 'max_completion_tokens'
+        : 'max_tokens';
     void _setMaxTokens(Map<String, dynamic> map) {
       if (maxTokens != null) map[completionTokensKey] = maxTokens;
     }
+
     Map<String, dynamic> body;
     // Keep initial Responses request context so we can perform follow-up requests when tools are called
-    List<Map<String, dynamic>> responsesInitialInput = const <Map<String, dynamic>>[];
-    List<Map<String, dynamic>> responsesToolsSpec = const <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> responsesInitialInput =
+        const <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> responsesToolsSpec =
+        const <Map<String, dynamic>>[];
     String responsesInstructions = '';
     List<dynamic>? responsesIncludeParam;
     if (config.useResponseApi == true) {
@@ -1118,7 +1279,8 @@ class ChatApiService {
       final List<Map<String, dynamic>> toolList = [];
       if (tools != null && tools.isNotEmpty) {
         for (final t in tools) {
-          if (t is Map<String, dynamic>) toolList.add(Map<String, dynamic>.from(t));
+          if (t is Map<String, dynamic>)
+            toolList.add(Map<String, dynamic>.from(t));
         }
       }
 
@@ -1126,7 +1288,9 @@ class ChatApiService {
       void addResponsesBuiltInTool(Map<String, dynamic> entry) {
         final type = (entry['type'] ?? '').toString();
         if (type.isEmpty) return;
-        final exists = toolList.any((e) => (e['type'] ?? '').toString() == type);
+        final exists = toolList.any(
+          (e) => (e['type'] ?? '').toString() == type,
+        );
         if (!exists) toolList.add(entry);
       }
 
@@ -1162,17 +1326,25 @@ class ChatApiService {
               ws = (ov['webSearch'] as Map).cast<String, dynamic>();
             }
           } catch (_) {}
-          final usePreview = (ws['preview'] == true) || ((ws['tool'] ?? '').toString() == 'preview');
-          final entry = <String, dynamic>{'type': usePreview ? 'web_search_preview' : 'web_search'};
+          final usePreview =
+              (ws['preview'] == true) ||
+              ((ws['tool'] ?? '').toString() == 'preview');
+          final entry = <String, dynamic>{
+            'type': usePreview ? 'web_search_preview' : 'web_search',
+          };
           // Domain filters
-          if (ws['allowed_domains'] is List && (ws['allowed_domains'] as List).isNotEmpty) {
+          if (ws['allowed_domains'] is List &&
+              (ws['allowed_domains'] as List).isNotEmpty) {
             entry['filters'] = {
-              'allowed_domains': List<String>.from((ws['allowed_domains'] as List).map((e) => e.toString())),
+              'allowed_domains': List<String>.from(
+                (ws['allowed_domains'] as List).map((e) => e.toString()),
+              ),
             };
           }
           // User location
           if (ws['user_location'] is Map) {
-            entry['user_location'] = (ws['user_location'] as Map).cast<String, dynamic>();
+            entry['user_location'] = (ws['user_location'] as Map)
+                .cast<String, dynamic>();
           }
           // Search context size (preview tool only)
           if (usePreview && ws['search_context_size'] is String) {
@@ -1197,7 +1369,9 @@ class ChatApiService {
         // Responses API supports a top-level `instructions` field that has higher priority
         if (roleRaw == 'system') {
           if (raw.isNotEmpty) {
-            instructions = instructions.isEmpty ? raw : (instructions + '\n\n' + raw);
+            instructions = instructions.isEmpty
+                ? raw
+                : (instructions + '\n\n' + raw);
           }
           continue;
         }
@@ -1244,11 +1418,18 @@ class ChatApiService {
         // Only parse images if there are images to process
         final hasMarkdownImages = raw.contains('![') && raw.contains('](');
         final hasCustomImages = raw.contains('[image:');
-        final hasAttachedImages = isLast && (userImagePaths?.isNotEmpty == true) && (m['role'] == 'user');
+        final hasAttachedImages =
+            isLast &&
+            (userImagePaths?.isNotEmpty == true) &&
+            (m['role'] == 'user');
         // For the last user message, also attach the last assistant image if available
-        final shouldAttachAssistantImage = isLast && (m['role'] == 'user') && lastAssistantImageUrl != null;
+        final shouldAttachAssistantImage =
+            isLast && (m['role'] == 'user') && lastAssistantImageUrl != null;
 
-        if (hasMarkdownImages || hasCustomImages || hasAttachedImages || shouldAttachAssistantImage) {
+        if (hasMarkdownImages ||
+            hasCustomImages ||
+            hasAttachedImages ||
+            shouldAttachAssistantImage) {
           final parsed = await _parseTextAndImages(
             raw,
             allowRemoteImages: canImageInput,
@@ -1266,15 +1447,20 @@ class ChatApiService {
               return src;
             }
           }
+
           void addImage(String url) {
             if (url.isEmpty) return;
             if (seenImageUrls.add(url)) {
               parts.add({'type': 'input_image', 'image_url': url});
             }
           }
+
           if (parsed.text.isNotEmpty) {
             // Use output_text for assistant, input_text for user
-            parts.add({'type': isAssistant ? 'output_text' : 'input_text', 'text': parsed.text});
+            parts.add({
+              'type': isAssistant ? 'output_text' : 'input_text',
+              'text': parsed.text,
+            });
           }
           // Images extracted from this message's text
           for (final ref in parsed.images) {
@@ -1300,7 +1486,9 @@ class ChatApiService {
             for (final p in userImagePaths!) {
               final normalized = normalizeSrc(p);
               if (!seenImageSources.add(normalized)) continue;
-              final dataUrl = (p.startsWith('http') || p.startsWith('data:')) ? p : await _encodeBase64File(p, withPrefix: true);
+              final dataUrl = (p.startsWith('http') || p.startsWith('data:'))
+                  ? p
+                  : await _encodeBase64File(p, withPrefix: true);
               addImage(dataUrl);
             }
           }
@@ -1310,7 +1498,12 @@ class ChatApiService {
           }
           // Use proper message object format for assistant messages
           if (isAssistant) {
-            input.add({'type': 'message', 'role': 'assistant', 'status': 'completed', 'content': parts});
+            input.add({
+              'type': 'message',
+              'role': 'assistant',
+              'status': 'completed',
+              'content': parts,
+            });
           } else {
             input.add({'role': roleRaw, 'content': parts});
           }
@@ -1322,7 +1515,9 @@ class ChatApiService {
               'type': 'message',
               'role': 'assistant',
               'status': 'completed',
-              'content': [{'type': 'output_text', 'text': raw}]
+              'content': [
+                {'type': 'output_text', 'text': raw},
+              ],
             });
           } else {
             input.add({'role': roleRaw, 'content': raw});
@@ -1350,29 +1545,41 @@ class ChatApiService {
         final ov = config.modelOverrides[modelId];
         final ws = (ov is Map ? ov['webSearch'] : null);
         if (ws is Map && ws['include_sources'] == true) {
-          (body as Map<String, dynamic>)['include'] = ['web_search_call.action.sources'];
+          (body as Map<String, dynamic>)['include'] = [
+            'web_search_call.action.sources',
+          ];
         }
       } catch (_) {}
       // Save initial Responses context
       try {
-        responsesInitialInput = List<Map<String, dynamic>>.from(((body as Map<String, dynamic>)['input'] as List).map((e) => (e as Map).cast<String, dynamic>()));
+        responsesInitialInput = List<Map<String, dynamic>>.from(
+          ((body as Map<String, dynamic>)['input'] as List).map(
+            (e) => (e as Map).cast<String, dynamic>(),
+          ),
+        );
       } catch (_) {
         responsesInitialInput = const <Map<String, dynamic>>[];
       }
       try {
         if ((body as Map<String, dynamic>)['tools'] is List) {
-          responsesToolsSpec = List<Map<String, dynamic>>.from(((body as Map<String, dynamic>)['tools'] as List).map((e) => (e as Map).cast<String, dynamic>()));
+          responsesToolsSpec = List<Map<String, dynamic>>.from(
+            ((body as Map<String, dynamic>)['tools'] as List).map(
+              (e) => (e as Map).cast<String, dynamic>(),
+            ),
+          );
         }
       } catch (_) {
         responsesToolsSpec = const <Map<String, dynamic>>[];
       }
       try {
-        responsesInstructions = ((body as Map<String, dynamic>)['instructions'] ?? '').toString();
+        responsesInstructions =
+            ((body as Map<String, dynamic>)['instructions'] ?? '').toString();
       } catch (_) {
         responsesInstructions = '';
       }
       try {
-        responsesIncludeParam = (body as Map<String, dynamic>)['include'] as List?;
+        responsesIncludeParam =
+            (body as Map<String, dynamic>)['include'] as List?;
       } catch (_) {
         responsesIncludeParam = null;
       }
@@ -1395,7 +1602,10 @@ class ChatApiService {
 
         // Tool / tool_calls messages must preserve tool-specific fields (tool_call_id / tool_calls / name).
         // Also do not convert tool output to multimodal parts, as many OpenAI-compatible backends require tool content to be a string.
-        if (role == 'tool' || (role == 'assistant' && outMsg['tool_calls'] is List && (outMsg['tool_calls'] as List).isNotEmpty)) {
+        if (role == 'tool' ||
+            (role == 'assistant' &&
+                outMsg['tool_calls'] is List &&
+                (outMsg['tool_calls'] as List).isNotEmpty)) {
           outMsg['content'] = raw;
           mm.add(outMsg);
           continue;
@@ -1404,7 +1614,8 @@ class ChatApiService {
         // Only parse images if there are images to process
         final hasMarkdownImages = raw.contains('![') && raw.contains('](');
         final hasCustomImages = raw.contains('[image:');
-        final hasAttachedImages = isLast && (userImagePaths?.isNotEmpty == true) && (role == 'user');
+        final hasAttachedImages =
+            isLast && (userImagePaths?.isNotEmpty == true) && (role == 'user');
 
         if (hasMarkdownImages || hasCustomImages || hasAttachedImages) {
           final parsed = await _parseTextAndImages(
@@ -1425,18 +1636,27 @@ class ChatApiService {
               return src;
             }
           }
+
           void addImageUrl(String url) {
             if (url.isEmpty) return;
             if (seenImageUrls.add(url)) {
-              parts.add({'type': 'image_url', 'image_url': {'url': url}});
+              parts.add({
+                'type': 'image_url',
+                'image_url': {'url': url},
+              });
             }
           }
+
           void addVideoUrl(String url) {
             if (url.isEmpty) return;
             if (seenVideoUrls.add(url)) {
-              parts.add({'type': 'video_url', 'video_url': {'url': url}});
+              parts.add({
+                'type': 'video_url',
+                'video_url': {'url': url},
+              });
             }
           }
+
           if (parsed.text.isNotEmpty) {
             parts.add({'type': 'text', 'text': parsed.text});
           }
@@ -1457,10 +1677,15 @@ class ChatApiService {
             for (final p in userImagePaths!) {
               final normalized = normalizeSrc(p);
               if (!seenSources.add(normalized)) continue;
-              final bool isInlineUrl = p.startsWith('http') || p.startsWith('data:');
-              final String mime = isInlineUrl ? _mimeFromDataUrl(p) : _mimeFromPath(p);
+              final bool isInlineUrl =
+                  p.startsWith('http') || p.startsWith('data:');
+              final String mime = isInlineUrl
+                  ? _mimeFromDataUrl(p)
+                  : _mimeFromPath(p);
               final bool isVideo = mime.toLowerCase().startsWith('video/');
-              final String dataUrl = isInlineUrl ? p : await _encodeBase64File(p, withPrefix: true);
+              final String dataUrl = isInlineUrl
+                  ? p
+                  : await _encodeBase64File(p, withPrefix: true);
               if (isVideo) {
                 addVideoUrl(dataUrl);
               } else {
@@ -1482,8 +1707,10 @@ class ChatApiService {
         'stream': stream,
         if (temperature != null) 'temperature': temperature,
         if (topP != null) 'top_p': topP,
-        if (isReasoning && effort != 'off' && effort != 'auto') 'reasoning_effort': effort,
-        if (tools != null && tools.isNotEmpty) 'tools': _cleanToolsForCompatibility(tools),
+        if (isReasoning && effort != 'off' && effort != 'auto')
+          'reasoning_effort': effort,
+        if (tools != null && tools.isNotEmpty)
+          'tools': _cleanToolsForCompatibility(tools),
         if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
       };
       _setMaxTokens(body);
@@ -1499,7 +1726,8 @@ class ChatApiService {
             (body as Map<String, dynamic>)['reasoning'] = {'enabled': false};
           } else {
             final obj = <String, dynamic>{'enabled': true};
-            if (thinkingBudget != null && thinkingBudget > 0) obj['max_tokens'] = thinkingBudget;
+            if (thinkingBudget != null && thinkingBudget > 0)
+              obj['max_tokens'] = thinkingBudget;
             (body as Map<String, dynamic>)['reasoning'] = obj;
           }
           (body as Map<String, dynamic>).remove('reasoning_effort');
@@ -1521,23 +1749,33 @@ class ChatApiService {
           (body as Map<String, dynamic>).remove('thinking_budget');
         }
         (body as Map<String, dynamic>).remove('reasoning_effort');
-      } else if (host.contains('open.bigmodel.cn') || host.contains('bigmodel') || isMimo) {
+      } else if (host.contains('open.bigmodel.cn') ||
+          host.contains('bigmodel') ||
+          isMimo) {
         // Zhipu (BigModel) / Xiaomi MiMo: thinking.type enabled/disabled
         if (isReasoning) {
-          (body as Map<String, dynamic>)['thinking'] = {'type': off ? 'disabled' : 'enabled'};
+          (body as Map<String, dynamic>)['thinking'] = {
+            'type': off ? 'disabled' : 'enabled',
+          };
         } else {
           (body as Map<String, dynamic>).remove('thinking');
         }
         (body as Map<String, dynamic>).remove('reasoning_effort');
-      } else if (host.contains('ark.cn-beijing.volces.com') || host.contains('volc') || host.contains('ark')) {
+      } else if (host.contains('ark.cn-beijing.volces.com') ||
+          host.contains('volc') ||
+          host.contains('ark')) {
         // Volc Ark: thinking: { type: enabled|disabled }
         if (isReasoning) {
-          (body as Map<String, dynamic>)['thinking'] = {'type': off ? 'disabled' : 'enabled'};
+          (body as Map<String, dynamic>)['thinking'] = {
+            'type': off ? 'disabled' : 'enabled',
+          };
         } else {
           (body as Map<String, dynamic>).remove('thinking');
         }
         (body as Map<String, dynamic>).remove('reasoning_effort');
-      } else if (host.contains('intern-ai') || host.contains('intern') || host.contains('chat.intern-ai.org.cn')) {
+      } else if (host.contains('intern-ai') ||
+          host.contains('intern') ||
+          host.contains('chat.intern-ai.org.cn')) {
         // InternLM (InternAI): thinking_mode boolean switch
         if (isReasoning) {
           (body as Map<String, dynamic>)['thinking_mode'] = !off;
@@ -1557,7 +1795,8 @@ class ChatApiService {
           (body as Map<String, dynamic>).remove('enable_thinking');
         }
         (body as Map<String, dynamic>).remove('reasoning_effort');
-      } else if (host.contains('deepseek') || upstreamModelId.toLowerCase().contains('deepseek')) {
+      } else if (host.contains('deepseek') ||
+          upstreamModelId.toLowerCase().contains('deepseek')) {
         if (isReasoning) {
           if (off) {
             (body as Map<String, dynamic>)['reasoning_content'] = false;
@@ -1565,7 +1804,8 @@ class ChatApiService {
           } else {
             (body as Map<String, dynamic>)['reasoning_content'] = true;
             if (thinkingBudget != null && thinkingBudget > 0) {
-              (body as Map<String, dynamic>)['reasoning_budget'] = thinkingBudget;
+              (body as Map<String, dynamic>)['reasoning_budget'] =
+                  thinkingBudget;
             } else {
               (body as Map<String, dynamic>).remove('reasoning_budget');
             }
@@ -1585,13 +1825,16 @@ class ChatApiService {
     };
     // Merge custom headers (override takes precedence)
     headers.addAll(_customHeaders(config, modelId));
-    if (extraHeaders != null && extraHeaders.isNotEmpty) headers.addAll(extraHeaders);
+    if (extraHeaders != null && extraHeaders.isNotEmpty)
+      headers.addAll(extraHeaders);
     request.headers.addAll(headers);
     // Ask for usage in streaming for chat-completions compatible hosts (when supported)
     if (stream && config.useResponseApi != true) {
       final h = Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '';
       if (!h.contains('mistral.ai') && !h.contains('openrouter')) {
-        (body as Map<String, dynamic>)['stream_options'] = {'include_usage': true};
+        (body as Map<String, dynamic>)['stream_options'] = {
+          'include_usage': true,
+        };
       }
     }
     // Inject Grok built-in search if configured
@@ -1612,7 +1855,9 @@ class ChatApiService {
     }
     if (extraBody != null && extraBody.isNotEmpty) {
       extraBody.forEach((k, v) {
-        (body as Map<String, dynamic>)[k] = (v is String) ? _parseOverrideValue(v) : v;
+        (body as Map<String, dynamic>)[k] = (v is String)
+            ? _parseOverrideValue(v)
+            : v;
       });
     }
     request.body = jsonEncode(body);
@@ -1631,9 +1876,13 @@ class ChatApiService {
         // Responses API non-stream
         if (config.useResponseApi == true) {
           String outText = '';
-          try { outText = (obj['output_text'] ?? '').toString(); } catch (_) {}
+          try {
+            outText = (obj['output_text'] ?? '').toString();
+          } catch (_) {}
           if (outText.isEmpty) {
-            try { outText = (obj['response']?['output_text'] ?? '').toString(); } catch (_) {}
+            try {
+              outText = (obj['response']?['output_text'] ?? '').toString();
+            } catch (_) {}
           }
           if (outText.isEmpty) {
             try {
@@ -1648,8 +1897,11 @@ class ChatApiService {
                     final content = it['content'] as List?;
                     if (content != null) {
                       for (final part in content) {
-                        if (part is Map && (part['type'] == 'output_text' || part['type'] == 'text')) {
-                          final t = (part['text'] ?? part['content'] ?? '').toString();
+                        if (part is Map &&
+                            (part['type'] == 'output_text' ||
+                                part['type'] == 'text')) {
+                          final t = (part['text'] ?? part['content'] ?? '')
+                              .toString();
                           if (t.isNotEmpty) buf.write(t);
                         }
                       }
@@ -1664,18 +1916,39 @@ class ChatApiService {
           try {
             final u = (obj['usage'] ?? obj['response']?['usage']) as Map?;
             if (u != null) {
-              final prompt = (u['prompt_tokens'] ?? u['input_tokens'] ?? 0) as int? ?? 0;
-              final completion = (u['completion_tokens'] ?? u['output_tokens'] ?? 0) as int? ?? 0;
-              final cached = (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ?? 0;
-              usage = TokenUsage(promptTokens: prompt, completionTokens: completion, cachedTokens: cached, totalTokens: prompt + completion);
+              final prompt =
+                  (u['prompt_tokens'] ?? u['input_tokens'] ?? 0) as int? ?? 0;
+              final completion =
+                  (u['completion_tokens'] ?? u['output_tokens'] ?? 0) as int? ??
+                  0;
+              final cached =
+                  (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ??
+                  0;
+              usage = TokenUsage(
+                promptTokens: prompt,
+                completionTokens: completion,
+                cachedTokens: cached,
+                totalTokens: prompt + completion,
+              );
             }
           } catch (_) {}
-          yield ChatStreamChunk(content: outText, isDone: true, totalTokens: usage?.totalTokens ?? 0, usage: usage);
+          yield ChatStreamChunk(
+            content: outText,
+            isDone: true,
+            totalTokens: usage?.totalTokens ?? 0,
+            usage: usage,
+          );
           return;
         }
 
         // Chat Completions non-stream with tool-calls follow-ups
-        List<Map<String, dynamic>> currentMessages = List<Map<String, dynamic>>.from((body['messages'] as List?)?.map((e) => (e as Map).cast<String, dynamic>()) ?? const <Map<String, dynamic>>[]);
+        List<Map<String, dynamic>> currentMessages =
+            List<Map<String, dynamic>>.from(
+              (body['messages'] as List?)?.map(
+                    (e) => (e as Map).cast<String, dynamic>(),
+                  ) ??
+                  const <Map<String, dynamic>>[],
+            );
         TokenUsage? aggUsage;
         Map<String, dynamic> lastObj = (obj is Map)
             ? (obj as Map).cast<String, dynamic>()
@@ -1684,11 +1957,17 @@ class ChatApiService {
           Map<String, dynamic>? c0;
           try {
             final choices = lastObj['choices'] as List?;
-            if (choices != null && choices.isNotEmpty) c0 = (choices.first as Map).cast<String, dynamic>();
+            if (choices != null && choices.isNotEmpty)
+              c0 = (choices.first as Map).cast<String, dynamic>();
           } catch (_) {}
           if (c0 == null) {
             final s = (lastObj['output_text'] ?? '').toString();
-            yield ChatStreamChunk(content: s, isDone: true, totalTokens: aggUsage?.totalTokens ?? 0, usage: aggUsage);
+            yield ChatStreamChunk(
+              content: s,
+              isDone: true,
+              totalTokens: aggUsage?.totalTokens ?? 0,
+              usage: aggUsage,
+            );
             return;
           }
           // usage
@@ -1697,14 +1976,24 @@ class ChatApiService {
             if (u is Map) {
               final prompt = (u['prompt_tokens'] ?? 0) as int? ?? 0;
               final completion = (u['completion_tokens'] ?? 0) as int? ?? 0;
-              final cached = (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ?? 0;
-              final round = TokenUsage(promptTokens: prompt, completionTokens: completion, cachedTokens: cached, totalTokens: prompt + completion);
+              final cached =
+                  (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ??
+                  0;
+              final round = TokenUsage(
+                promptTokens: prompt,
+                completionTokens: completion,
+                cachedTokens: cached,
+                totalTokens: prompt + completion,
+              );
               aggUsage = (aggUsage ?? const TokenUsage()).merge(round);
             }
           } catch (_) {}
 
-          final msg = (c0['message'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
-          final reasoningForTools = (msg['reasoning_content'] ?? msg['reasoning'])?.toString() ?? '';
+          final msg =
+              (c0['message'] as Map?)?.cast<String, dynamic>() ??
+              const <String, dynamic>{};
+          final reasoningForTools =
+              (msg['reasoning_content'] ?? msg['reasoning'])?.toString() ?? '';
           final reasoningDetailsForTools = msg['reasoning_details'];
           final tcs = (msg['tool_calls'] as List?) ?? const <dynamic>[];
           if (tcs.isNotEmpty && onToolCall != null) {
@@ -1713,25 +2002,55 @@ class ChatApiService {
             for (int i = 0; i < tcs.length; i++) {
               final t = (tcs[i] as Map).cast<String, dynamic>();
               final id = (t['id'] ?? 'call_$i').toString();
-              final f = (t['function'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+              final f =
+                  (t['function'] as Map?)?.cast<String, dynamic>() ??
+                  const <String, dynamic>{};
               final name = (f['name'] ?? '').toString();
               Map<String, dynamic> args;
-              try { args = (jsonDecode((f['arguments'] ?? '{}').toString()) as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+              try {
+                args = (jsonDecode((f['arguments'] ?? '{}').toString()) as Map)
+                    .cast<String, dynamic>();
+              } catch (_) {
+                args = <String, dynamic>{};
+              }
               callInfos.add(ToolCallInfo(id: id, name: name, arguments: args));
-              calls.add({'id': id, 'type': 'function', 'function': {'name': name, 'arguments': jsonEncode(args)}});
+              calls.add({
+                'id': id,
+                'type': 'function',
+                'function': {'name': name, 'arguments': jsonEncode(args)},
+              });
             }
             if (callInfos.isNotEmpty) {
-              yield ChatStreamChunk(content: '', isDone: false, totalTokens: aggUsage?.totalTokens ?? 0, usage: aggUsage, toolCalls: callInfos);
+              yield ChatStreamChunk(
+                content: '',
+                isDone: false,
+                totalTokens: aggUsage?.totalTokens ?? 0,
+                usage: aggUsage,
+                toolCalls: callInfos,
+              );
             }
             final results = <Map<String, dynamic>>[];
             final resultsInfo = <ToolResultInfo>[];
             for (final c in callInfos) {
               final res = await onToolCall(c.name, c.arguments) ?? '';
               results.add({'tool_call_id': c.id, 'content': res});
-              resultsInfo.add(ToolResultInfo(id: c.id, name: c.name, arguments: c.arguments, content: res));
+              resultsInfo.add(
+                ToolResultInfo(
+                  id: c.id,
+                  name: c.name,
+                  arguments: c.arguments,
+                  content: res,
+                ),
+              );
             }
             if (resultsInfo.isNotEmpty) {
-              yield ChatStreamChunk(content: '', isDone: false, totalTokens: aggUsage?.totalTokens ?? 0, usage: aggUsage, toolResults: resultsInfo);
+              yield ChatStreamChunk(
+                content: '',
+                isDone: false,
+                totalTokens: aggUsage?.totalTokens ?? 0,
+                usage: aggUsage,
+                toolResults: resultsInfo,
+              );
             }
             // Follow-up request
             final req = http.Request('POST', url);
@@ -1741,24 +2060,42 @@ class ChatApiService {
               'Accept': 'application/json',
             };
             headers2.addAll(_customHeaders(config, modelId));
-            if (extraHeaders != null && extraHeaders.isNotEmpty) headers2.addAll(extraHeaders);
+            if (extraHeaders != null && extraHeaders.isNotEmpty)
+              headers2.addAll(extraHeaders);
             req.headers.addAll(headers2);
             final next = <Map<String, dynamic>>[];
             for (final m in messages) {
               next.add(_copyChatCompletionMessage(m));
             }
-            final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
+            final assistantToolCallMsg = <String, dynamic>{
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': calls,
+            };
             if (needsReasoningEcho) {
               assistantToolCallMsg['reasoning_content'] = reasoningForTools;
             }
-            if (preserveReasoningDetails && reasoningDetailsForTools is List && reasoningDetailsForTools.isNotEmpty) {
-              assistantToolCallMsg['reasoning_details'] = reasoningDetailsForTools;
+            if (preserveReasoningDetails &&
+                reasoningDetailsForTools is List &&
+                reasoningDetailsForTools.isNotEmpty) {
+              assistantToolCallMsg['reasoning_details'] =
+                  reasoningDetailsForTools;
             }
             next.add(assistantToolCallMsg);
             for (final r in results) {
               final id = r['tool_call_id'];
-              final name = calls.firstWhere((c) => c['id'] == id, orElse: () => const {'function': {'name': ''}})['function']['name'];
-              next.add({'role': 'tool', 'tool_call_id': id, 'name': name, 'content': r['content']});
+              final name = calls.firstWhere(
+                (c) => c['id'] == id,
+                orElse: () => const {
+                  'function': {'name': ''},
+                },
+              )['function']['name'];
+              next.add({
+                'role': 'tool',
+                'tool_call_id': id,
+                'name': name,
+                'content': r['content'],
+              });
             }
             final reqBody = Map<String, dynamic>.from(body);
             reqBody['messages'] = next;
@@ -1788,17 +2125,29 @@ class ChatApiService {
                 if (it is Map && (it['type'] == 'text')) {
                   final t = (it['text'] ?? '').toString();
                   if (t.isNotEmpty) buf.write(t);
-                } else if (it is Map && (it['type'] == 'image_url' || it['type'] == 'image')) {
+                } else if (it is Map &&
+                    (it['type'] == 'image_url' || it['type'] == 'image')) {
                   dynamic iu = it['image_url'];
                   String? url;
-                  if (iu is String) { url = iu; } else if (iu is Map) { final u2 = iu['url']; if (u2 is String) url = u2; }
-                  if (url != null && url.isNotEmpty) buf.write('\n\n![image](' + url + ')');
+                  if (iu is String) {
+                    url = iu;
+                  } else if (iu is Map) {
+                    final u2 = iu['url'];
+                    if (u2 is String) url = u2;
+                  }
+                  if (url != null && url.isNotEmpty)
+                    buf.write('\n\n![image](' + url + ')');
                 }
               }
               content = buf.toString();
             }
           }
-          yield ChatStreamChunk(content: content, isDone: true, totalTokens: aggUsage?.totalTokens ?? 0, usage: aggUsage);
+          yield ChatStreamChunk(
+            content: content,
+            isDone: true,
+            totalTokens: aggUsage?.totalTokens ?? 0,
+            usage: aggUsage,
+          );
           return;
         }
       } catch (e) {
@@ -1813,19 +2162,26 @@ class ChatApiService {
     TokenUsage? usage;
     // Fallback approx token calculation when provider doesn't include usage
     int _approxTokensFromChars(int chars) => (chars / 4).round();
-    final int approxPromptChars = messages.fold<int>(0, (acc, m) => acc + ((m['content'] ?? '').toString().length));
+    final int approxPromptChars = messages.fold<int>(
+      0,
+      (acc, m) => acc + ((m['content'] ?? '').toString().length),
+    );
     final int approxPromptTokens = _approxTokensFromChars(approxPromptChars);
     int approxCompletionChars = 0;
     String reasoningBuffer = '';
     dynamic reasoningDetailsBuffer;
 
     // Track potential tool calls (OpenAI Chat Completions)
-    final Map<int, Map<String, String>> toolAcc = <int, Map<String, String>>{}; // index -> {id,name,args}
+    final Map<int, Map<String, String>> toolAcc =
+        <int, Map<String, String>>{}; // index -> {id,name,args}
     // Track potential tool calls (OpenAI Responses API)
-    final Map<String, Map<String, String>> toolAccResp = <String, Map<String, String>>{}; // id/name -> {name,args}
+    final Map<String, Map<String, String>> toolAccResp =
+        <String, Map<String, String>>{}; // id/name -> {name,args}
     // Responses API: track by output_index to capture call_id reliably
-    final Map<int, Map<String, String>> respToolCallsByIndex = <int, Map<String, String>>{}; // index -> {call_id,name,args}
-    List<Map<String, dynamic>> lastResponseOutputItems = const <Map<String, dynamic>>[];
+    final Map<int, Map<String, String>> respToolCallsByIndex =
+        <int, Map<String, String>>{}; // index -> {call_id,name,args}
+    List<Map<String, dynamic>> lastResponseOutputItems =
+        const <Map<String, dynamic>>[];
     String? finishReason;
 
     await for (final chunk in sse) {
@@ -1849,22 +2205,32 @@ class ChatApiService {
               final id = (m['id'] ?? 'call_$idx');
               final name = (m['name'] ?? '');
               Map<String, dynamic> args;
-              try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+              try {
+                args = (jsonDecode(m['args'] ?? '{}') as Map)
+                    .cast<String, dynamic>();
+              } catch (_) {
+                args = <String, dynamic>{};
+              }
               callInfos.add(ToolCallInfo(id: id, name: name, arguments: args));
               calls.add({
                 'id': id,
                 'type': 'function',
-                'function': {
-                  'name': name,
-                  'arguments': jsonEncode(args),
-                },
+                'function': {'name': name, 'arguments': jsonEncode(args)},
               });
               toolMsgs.add({'__name': name, '__id': id, '__args': args});
             });
 
             if (callInfos.isNotEmpty) {
-              final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
-              yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? approxTotal, usage: usage, toolCalls: callInfos);
+              final approxTotal =
+                  approxPromptTokens +
+                  _approxTokensFromChars(approxCompletionChars);
+              yield ChatStreamChunk(
+                content: '',
+                isDone: false,
+                totalTokens: usage?.totalTokens ?? approxTotal,
+                usage: usage,
+                toolCalls: callInfos,
+              );
             }
 
             // Execute tools and emit results
@@ -1876,10 +2242,23 @@ class ChatApiService {
               final args = (m['__args'] as Map<String, dynamic>);
               final res = await onToolCall(name, args) ?? '';
               results.add({'tool_call_id': id, 'content': res});
-              resultsInfo.add(ToolResultInfo(id: id, name: name, arguments: args, content: res));
+              resultsInfo.add(
+                ToolResultInfo(
+                  id: id,
+                  name: name,
+                  arguments: args,
+                  content: res,
+                ),
+              );
             }
             if (resultsInfo.isNotEmpty) {
-              yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolResults: resultsInfo);
+              yield ChatStreamChunk(
+                content: '',
+                isDone: false,
+                totalTokens: usage?.totalTokens ?? 0,
+                usage: usage,
+                toolResults: resultsInfo,
+              );
             }
 
             // Build follow-up messages
@@ -1887,18 +2266,35 @@ class ChatApiService {
             for (final m in messages) {
               mm2.add(_copyChatCompletionMessage(m));
             }
-            final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
+            final assistantToolCallMsg = <String, dynamic>{
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': calls,
+            };
             if (needsReasoningEcho) {
               assistantToolCallMsg['reasoning_content'] = reasoningBuffer;
             }
-            if (preserveReasoningDetails && reasoningDetailsBuffer is List && reasoningDetailsBuffer.isNotEmpty) {
-              assistantToolCallMsg['reasoning_details'] = reasoningDetailsBuffer;
+            if (preserveReasoningDetails &&
+                reasoningDetailsBuffer is List &&
+                reasoningDetailsBuffer.isNotEmpty) {
+              assistantToolCallMsg['reasoning_details'] =
+                  reasoningDetailsBuffer;
             }
             mm2.add(assistantToolCallMsg);
             for (final r in results) {
               final id = r['tool_call_id'];
-              final name = calls.firstWhere((c) => c['id'] == id, orElse: () => const {'function': {'name': ''}})['function']['name'];
-              mm2.add({'role': 'tool', 'tool_call_id': id, 'name': name, 'content': r['content']});
+              final name = calls.firstWhere(
+                (c) => c['id'] == id,
+                orElse: () => const {
+                  'function': {'name': ''},
+                },
+              )['function']['name'];
+              mm2.add({
+                'role': 'tool',
+                'tool_call_id': id,
+                'name': name,
+                'content': r['content'],
+              });
             }
 
             // Follow-up request(s) with multi-round tool calls
@@ -1910,8 +2306,10 @@ class ChatApiService {
                 'stream': true,
                 if (temperature != null) 'temperature': temperature,
                 if (topP != null) 'top_p': topP,
-                if (isReasoning && effort != 'off' && effort != 'auto') 'reasoning_effort': effort,
-                if (tools != null && tools.isNotEmpty) 'tools': _cleanToolsForCompatibility(tools),
+                if (isReasoning && effort != 'off' && effort != 'auto')
+                  'reasoning_effort': effort,
+                if (tools != null && tools.isNotEmpty)
+                  'tools': _cleanToolsForCompatibility(tools),
                 if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
               };
               _setMaxTokens(body2);
@@ -1924,7 +2322,8 @@ class ChatApiService {
                     body2['reasoning'] = {'enabled': false};
                   } else {
                     final obj = <String, dynamic>{'enabled': true};
-                    if (thinkingBudget != null && thinkingBudget > 0) obj['max_tokens'] = thinkingBudget;
+                    if (thinkingBudget != null && thinkingBudget > 0)
+                      obj['max_tokens'] = thinkingBudget;
                     body2['reasoning'] = obj;
                   }
                   body2.remove('reasoning_effort');
@@ -1932,7 +2331,8 @@ class ChatApiService {
                   body2.remove('reasoning');
                   body2.remove('reasoning_effort');
                 }
-              } else if (host.contains('dashscope') || host.contains('aliyun')) {
+              } else if (host.contains('dashscope') ||
+                  host.contains('aliyun')) {
                 if (isReasoning) {
                   body2['enable_thinking'] = !off;
                   if (!off && thinkingBudget != null && thinkingBudget > 0) {
@@ -1945,21 +2345,27 @@ class ChatApiService {
                   body2.remove('thinking_budget');
                 }
                 body2.remove('reasoning_effort');
-              } else if (host.contains('open.bigmodel.cn') || host.contains('bigmodel') || isMimo) {
+              } else if (host.contains('open.bigmodel.cn') ||
+                  host.contains('bigmodel') ||
+                  isMimo) {
                 if (isReasoning) {
                   body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
                 } else {
                   body2.remove('thinking');
                 }
                 body2.remove('reasoning_effort');
-              } else if (host.contains('ark.cn-beijing.volces.com') || host.contains('volc') || host.contains('ark')) {
+              } else if (host.contains('ark.cn-beijing.volces.com') ||
+                  host.contains('volc') ||
+                  host.contains('ark')) {
                 if (isReasoning) {
                   body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
                 } else {
                   body2.remove('thinking');
                 }
                 body2.remove('reasoning_effort');
-              } else if (host.contains('intern-ai') || host.contains('intern') || host.contains('chat.intern-ai.org.cn')) {
+              } else if (host.contains('intern-ai') ||
+                  host.contains('intern') ||
+                  host.contains('chat.intern-ai.org.cn')) {
                 if (isReasoning) {
                   body2['thinking_mode'] = !off;
                 } else {
@@ -1977,7 +2383,8 @@ class ChatApiService {
                   body2.remove('enable_thinking');
                 }
                 body2.remove('reasoning_effort');
-              } else if (host.contains('deepseek') || upstreamModelId.toLowerCase().contains('deepseek')) {
+              } else if (host.contains('deepseek') ||
+                  upstreamModelId.toLowerCase().contains('deepseek')) {
                 if (isReasoning) {
                   if (off) {
                     body2['reasoning_content'] = false;
@@ -1997,7 +2404,8 @@ class ChatApiService {
               }
 
               // Ask for usage in streaming (when supported)
-              if (!host.contains('mistral.ai') && !host.contains('openrouter')) {
+              if (!host.contains('mistral.ai') &&
+                  !host.contains('openrouter')) {
                 body2['stream_options'] = {'include_usage': true};
               }
 
@@ -2019,7 +2427,8 @@ class ChatApiService {
               };
               // Apply custom headers
               headers2.addAll(_customHeaders(config, modelId));
-              if (extraHeaders != null && extraHeaders.isNotEmpty) headers2.addAll(extraHeaders);
+              if (extraHeaders != null && extraHeaders.isNotEmpty)
+                headers2.addAll(extraHeaders);
               req2.headers.addAll(headers2);
               req2.body = jsonEncode(body2);
               final resp2 = await client.send(req2);
@@ -2030,7 +2439,8 @@ class ChatApiService {
               final s2 = resp2.stream.transform(utf8.decoder);
               String buf2 = '';
               // Track potential subsequent tool calls
-              final Map<int, Map<String, String>> toolAcc2 = <int, Map<String, String>>{};
+              final Map<int, Map<String, String>> toolAcc2 =
+                  <int, Map<String, String>>{};
               String? finishReason2;
               String contentAccum = ''; // Accumulate content for this round
               String reasoningAccum = '';
@@ -2049,19 +2459,31 @@ class ChatApiService {
                   }
                   try {
                     final o = jsonDecode(d);
-                    if (o is Map && o['choices'] is List && (o['choices'] as List).isNotEmpty) {
+                    if (o is Map &&
+                        o['choices'] is List &&
+                        (o['choices'] as List).isNotEmpty) {
                       final c0 = (o['choices'] as List).first;
                       finishReason2 = c0['finish_reason'] as String?;
                       final delta = c0['delta'] as Map?;
                       final message = c0['message'] as Map?;
                       final txt = delta?['content'];
-                      final rc = delta?['reasoning_content'] ?? delta?['reasoning'];
+                      final rc =
+                          delta?['reasoning_content'] ?? delta?['reasoning'];
                       final u = o['usage'];
                       if (u != null) {
                         final prompt = (u['prompt_tokens'] ?? 0) as int;
                         final completion = (u['completion_tokens'] ?? 0) as int;
-                        final cached = (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ?? 0;
-                        usage = (usage ?? const TokenUsage()).merge(TokenUsage(promptTokens: prompt, completionTokens: completion, cachedTokens: cached));
+                        final cached =
+                            (u['prompt_tokens_details']?['cached_tokens'] ?? 0)
+                                as int? ??
+                            0;
+                        usage = (usage ?? const TokenUsage()).merge(
+                          TokenUsage(
+                            promptTokens: prompt,
+                            completionTokens: completion,
+                            cachedTokens: cached,
+                          ),
+                        );
                         totalTokens = usage!.totalTokens;
                       }
                       // Capture Grok citations
@@ -2079,37 +2501,66 @@ class ChatApiService {
                             isDone: false,
                             totalTokens: usage?.totalTokens ?? 0,
                             usage: usage,
-                            toolResults: [ToolResultInfo(id: 'builtin_search', name: 'search_web', arguments: const <String, dynamic>{}, content: payload)],
+                            toolResults: [
+                              ToolResultInfo(
+                                id: 'builtin_search',
+                                name: 'search_web',
+                                arguments: const <String, dynamic>{},
+                                content: payload,
+                              ),
+                            ],
                           );
                         }
                       }
                       if (rc is String && rc.isNotEmpty) {
                         if (needsReasoningEcho) reasoningAccum += rc;
-                        yield ChatStreamChunk(content: '', reasoning: rc, isDone: false, totalTokens: 0, usage: usage);
+                        yield ChatStreamChunk(
+                          content: '',
+                          reasoning: rc,
+                          isDone: false,
+                          totalTokens: 0,
+                          usage: usage,
+                        );
                       }
                       if (txt is String && txt.isNotEmpty) {
                         contentAccum += txt; // Accumulate content
-                        yield ChatStreamChunk(content: txt, isDone: false, totalTokens: 0, usage: usage);
+                        yield ChatStreamChunk(
+                          content: txt,
+                          isDone: false,
+                          totalTokens: 0,
+                          usage: usage,
+                        );
                       }
                       // Fallback/merge: message.content in same chunk (if any)
                       if (message != null && message['content'] != null) {
                         final mc = message['content'];
                         if (mc is String && mc.isNotEmpty) {
                           contentAccum += mc;
-                          yield ChatStreamChunk(content: mc, isDone: false, totalTokens: 0, usage: usage);
+                          yield ChatStreamChunk(
+                            content: mc,
+                            isDone: false,
+                            totalTokens: 0,
+                            usage: usage,
+                          );
                         }
                       }
                       if (message != null) {
-                        final rcMsg = message['reasoning_content'] ?? message['reasoning'];
-                        if (rcMsg is String && rcMsg.isNotEmpty && needsReasoningEcho) {
+                        final rcMsg =
+                            message['reasoning_content'] ??
+                            message['reasoning'];
+                        if (rcMsg is String &&
+                            rcMsg.isNotEmpty &&
+                            needsReasoningEcho) {
                           reasoningAccum += rcMsg;
                         }
                       }
                       if (preserveReasoningDetails) {
                         final rd = delta?['reasoning_details'];
-                        if (rd is List && rd.isNotEmpty) reasoningDetailsAccum = rd;
+                        if (rd is List && rd.isNotEmpty)
+                          reasoningDetailsAccum = rd;
                         final rdMsg = message?['reasoning_details'];
-                        if (rdMsg is List && rdMsg.isNotEmpty) reasoningDetailsAccum = rdMsg;
+                        if (rdMsg is List && rdMsg.isNotEmpty)
+                          reasoningDetailsAccum = rdMsg;
                       }
                       // Handle image outputs from OpenRouter-style deltas
                       // Possible shapes:
@@ -2120,17 +2571,24 @@ class ChatApiService {
                         final List<dynamic> imageItems = <dynamic>[];
                         final imgs = delta?['images'];
                         if (imgs is List) imageItems.addAll(imgs);
-                        final contentArr = (txt is List) ? txt : (delta?['content'] as List?);
+                        final contentArr = (txt is List)
+                            ? txt
+                            : (delta?['content'] as List?);
                         if (contentArr is List) {
                           for (final it in contentArr) {
-                            if (it is Map && (it['type'] == 'image_url' || it['type'] == 'image')) {
+                            if (it is Map &&
+                                (it['type'] == 'image_url' ||
+                                    it['type'] == 'image')) {
                               imageItems.add(it);
                             }
                           }
                         }
                         final singleImage = delta?['image_url'];
                         if (singleImage is Map || singleImage is String) {
-                          imageItems.add({'type': 'image_url', 'image_url': singleImage});
+                          imageItems.add({
+                            'type': 'image_url',
+                            'image_url': singleImage,
+                          });
                         }
                         if (imageItems.isNotEmpty) {
                           final buf = StringBuffer();
@@ -2152,7 +2610,12 @@ class ChatApiService {
                           }
                           final out = buf.toString();
                           if (out.isNotEmpty) {
-                            yield ChatStreamChunk(content: out, isDone: false, totalTokens: 0, usage: usage);
+                            yield ChatStreamChunk(
+                              content: out,
+                              isDone: false,
+                              totalTokens: 0,
+                              usage: usage,
+                            );
                           }
                         }
                       }
@@ -2164,10 +2627,15 @@ class ChatApiService {
                           final func = t['function'] as Map<String, dynamic>?;
                           final name = func?['name'] as String?;
                           final argsDelta = func?['arguments'] as String?;
-                          final entry = toolAcc2.putIfAbsent(idx, () => {'id': '', 'name': '', 'args': ''});
+                          final entry = toolAcc2.putIfAbsent(
+                            idx,
+                            () => {'id': '', 'name': '', 'args': ''},
+                          );
                           if (id != null) entry['id'] = id;
-                          if (name != null && name.isNotEmpty) entry['name'] = name;
-                          if (argsDelta != null && argsDelta.isNotEmpty) entry['args'] = (entry['args'] ?? '') + argsDelta;
+                          if (name != null && name.isNotEmpty)
+                            entry['name'] = name;
+                          if (argsDelta != null && argsDelta.isNotEmpty)
+                            entry['args'] = (entry['args'] ?? '') + argsDelta;
                         }
                       }
                     }
@@ -2176,7 +2644,8 @@ class ChatApiService {
               }
 
               // After this follow-up round finishes: if tool calls again, execute and loop
-              if ((finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) && onToolCall != null) {
+              if ((finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) &&
+                  onToolCall != null) {
                 final calls2 = <Map<String, dynamic>>[];
                 final callInfos2 = <ToolCallInfo>[];
                 final toolMsgs2 = <Map<String, dynamic>>[];
@@ -2184,13 +2653,30 @@ class ChatApiService {
                   final id = (m['id'] ?? 'call_$idx');
                   final name = (m['name'] ?? '');
                   Map<String, dynamic> args;
-                  try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
-                  callInfos2.add(ToolCallInfo(id: id, name: name, arguments: args));
-                  calls2.add({'id': id, 'type': 'function', 'function': {'name': name, 'arguments': jsonEncode(args)}});
+                  try {
+                    args = (jsonDecode(m['args'] ?? '{}') as Map)
+                        .cast<String, dynamic>();
+                  } catch (_) {
+                    args = <String, dynamic>{};
+                  }
+                  callInfos2.add(
+                    ToolCallInfo(id: id, name: name, arguments: args),
+                  );
+                  calls2.add({
+                    'id': id,
+                    'type': 'function',
+                    'function': {'name': name, 'arguments': jsonEncode(args)},
+                  });
                   toolMsgs2.add({'__name': name, '__id': id, '__args': args});
                 });
                 if (callInfos2.isNotEmpty) {
-                  yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolCalls: callInfos2);
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: false,
+                    totalTokens: usage?.totalTokens ?? 0,
+                    usage: usage,
+                    toolCalls: callInfos2,
+                  );
                 }
                 final results2 = <Map<String, dynamic>>[];
                 final resultsInfo2 = <ToolResultInfo>[];
@@ -2200,28 +2686,54 @@ class ChatApiService {
                   final args = (m['__args'] as Map<String, dynamic>);
                   final res = await onToolCall(name, args) ?? '';
                   results2.add({'tool_call_id': id, 'content': res});
-                  resultsInfo2.add(ToolResultInfo(id: id, name: name, arguments: args, content: res));
+                  resultsInfo2.add(
+                    ToolResultInfo(
+                      id: id,
+                      name: name,
+                      arguments: args,
+                      content: res,
+                    ),
+                  );
                 }
                 if (resultsInfo2.isNotEmpty) {
-                  yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolResults: resultsInfo2);
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: false,
+                    totalTokens: usage?.totalTokens ?? 0,
+                    usage: usage,
+                    toolResults: resultsInfo2,
+                  );
                 }
                 // Append for next loop - including any content accumulated in this round
-                final nextAssistantToolCall = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls2};
+                final nextAssistantToolCall = <String, dynamic>{
+                  'role': 'assistant',
+                  'content': '\n\n',
+                  'tool_calls': calls2,
+                };
                 if (needsReasoningEcho) {
                   nextAssistantToolCall['reasoning_content'] = reasoningAccum;
                 }
-                if (preserveReasoningDetails && reasoningDetailsAccum is List && reasoningDetailsAccum.isNotEmpty) {
-                  nextAssistantToolCall['reasoning_details'] = reasoningDetailsAccum;
+                if (preserveReasoningDetails &&
+                    reasoningDetailsAccum is List &&
+                    reasoningDetailsAccum.isNotEmpty) {
+                  nextAssistantToolCall['reasoning_details'] =
+                      reasoningDetailsAccum;
                 }
                 currentMessages = [
                   ...currentMessages,
-                  if (contentAccum.isNotEmpty) {'role': 'assistant', 'content': contentAccum},
+                  if (contentAccum.isNotEmpty)
+                    {'role': 'assistant', 'content': contentAccum},
                   nextAssistantToolCall,
                   for (final r in results2)
                     {
                       'role': 'tool',
                       'tool_call_id': r['tool_call_id'],
-                      'name': calls2.firstWhere((c) => c['id'] == r['tool_call_id'], orElse: () => const {'function': {'name': ''}})['function']['name'],
+                      'name': calls2.firstWhere(
+                        (c) => c['id'] == r['tool_call_id'],
+                        orElse: () => const {
+                          'function': {'name': ''},
+                        },
+                      )['function']['name'],
                       'content': r['content'],
                     },
                 ];
@@ -2229,8 +2741,15 @@ class ChatApiService {
                 continue;
               } else {
                 // No further tool calls; finish
-                final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
-                yield ChatStreamChunk(content: '', isDone: true, totalTokens: usage?.totalTokens ?? approxTotal, usage: usage);
+                final approxTotal =
+                    approxPromptTokens +
+                    _approxTokensFromChars(approxCompletionChars);
+                yield ChatStreamChunk(
+                  content: '',
+                  isDone: true,
+                  totalTokens: usage?.totalTokens ?? approxTotal,
+                  usage: usage,
+                );
                 return;
               }
             }
@@ -2238,7 +2757,9 @@ class ChatApiService {
             return;
           }
 
-          final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
+          final approxTotal =
+              approxPromptTokens +
+              _approxTokensFromChars(approxCompletionChars);
           yield ChatStreamChunk(
             content: '',
             isDone: true,
@@ -2283,8 +2804,12 @@ class ChatApiService {
               try {
                 final idx = (json['output_index'] ?? 0) as int;
                 final delta = (json['delta'] ?? '').toString();
-                final entry = respToolCallsByIndex.putIfAbsent(idx, () => {'call_id': '', 'name': '', 'args': ''});
-                if (delta.isNotEmpty) entry['args'] = (entry['args'] ?? '') + delta;
+                final entry = respToolCallsByIndex.putIfAbsent(
+                  idx,
+                  () => {'call_id': '', 'name': '', 'args': ''},
+                );
+                if (delta.isNotEmpty)
+                  entry['args'] = (entry['args'] ?? '') + delta;
               } catch (_) {}
             } else if (type == 'response.output_item.done') {
               try {
@@ -2292,31 +2817,46 @@ class ChatApiService {
                 final idx = (json['output_index'] ?? 0) as int;
                 if (item is Map && (item['type'] ?? '') == 'function_call') {
                   final args = (item['arguments'] ?? '').toString();
-                  final entry = respToolCallsByIndex.putIfAbsent(idx, () => {
-                        'call_id': (item['call_id'] ?? '').toString(),
-                        'name': (item['name'] ?? '').toString(),
-                        'args': ''
-                      });
+                  final entry = respToolCallsByIndex.putIfAbsent(
+                    idx,
+                    () => {
+                      'call_id': (item['call_id'] ?? '').toString(),
+                      'name': (item['name'] ?? '').toString(),
+                      'args': '',
+                    },
+                  );
                   if (args.isNotEmpty) entry['args'] = args;
                 }
               } catch (_) {}
             } else if (type is String && type.contains('function_call')) {
               // Accumulate function call args for Responses API
               final id = (json['id'] ?? json['call_id'] ?? '').toString();
-              final name = (json['name'] ?? json['function']?['name'] ?? '').toString();
-              final argsDelta = (json['arguments'] ?? json['arguments_delta'] ?? json['delta'] ?? '').toString();
+              final name = (json['name'] ?? json['function']?['name'] ?? '')
+                  .toString();
+              final argsDelta =
+                  (json['arguments'] ??
+                          json['arguments_delta'] ??
+                          json['delta'] ??
+                          '')
+                      .toString();
               if (id.isNotEmpty || name.isNotEmpty) {
                 final key = id.isNotEmpty ? id : name;
-                final entry = toolAccResp.putIfAbsent(key, () => {'name': name, 'args': ''});
+                final entry = toolAccResp.putIfAbsent(
+                  key,
+                  () => {'name': name, 'args': ''},
+                );
                 if (name.isNotEmpty) entry['name'] = name;
-                if (argsDelta.isNotEmpty) entry['args'] = (entry['args'] ?? '') + argsDelta;
+                if (argsDelta.isNotEmpty)
+                  entry['args'] = (entry['args'] ?? '') + argsDelta;
               }
             } else if (type == 'response.completed') {
               final u = json['response']?['usage'];
               if (u != null) {
                 final inTok = (u['input_tokens'] ?? 0) as int;
                 final outTok = (u['output_tokens'] ?? 0) as int;
-                usage = (usage ?? const TokenUsage()).merge(TokenUsage(promptTokens: inTok, completionTokens: outTok));
+                usage = (usage ?? const TokenUsage()).merge(
+                  TokenUsage(promptTokens: inTok, completionTokens: outTok),
+                );
                 totalTokens = usage!.totalTokens;
               }
               // Extract web search citations from final output (Responses API)
@@ -2328,7 +2868,7 @@ class ChatApiService {
                 if (output is List) {
                   lastResponseOutputItems = [
                     for (final it in output)
-                      if (it is Map) (it.cast<String, dynamic>())
+                      if (it is Map) (it.cast<String, dynamic>()),
                   ];
                 }
                 if (output is List) {
@@ -2337,17 +2877,23 @@ class ChatApiService {
                   for (final it in output) {
                     if (it is! Map) continue;
                     if (it['type'] == 'message') {
-                      final content = it['content'] as List? ?? const <dynamic>[];
+                      final content =
+                          it['content'] as List? ?? const <dynamic>[];
                       for (final block in content) {
                         if (block is! Map) continue;
-                        final anns = block['annotations'] as List? ?? const <dynamic>[];
+                        final anns =
+                            block['annotations'] as List? ?? const <dynamic>[];
                         for (final an in anns) {
                           if (an is! Map) continue;
                           if ((an['type'] ?? '') == 'url_citation') {
                             final url = (an['url'] ?? '').toString();
                             if (url.isEmpty || seen.contains(url)) continue;
                             final title = (an['title'] ?? '').toString();
-                            items.add({'index': idx, 'url': url, if (title.isNotEmpty) 'title': title});
+                            items.add({
+                              'index': idx,
+                              'url': url,
+                              if (title.isNotEmpty) 'title': title,
+                            });
                             seen.add(url);
                             idx += 1;
                           }
@@ -2358,7 +2904,10 @@ class ChatApiService {
                       // it['result'] is directly the base64 image data
                       final b64 = (it['result'] ?? '').toString();
                       if (b64.isNotEmpty) {
-                        final savedPath = await AppDirectories.saveBase64Image('image/png', b64);
+                        final savedPath = await AppDirectories.saveBase64Image(
+                          'image/png',
+                          b64,
+                        );
                         if (savedPath != null && savedPath.isNotEmpty) {
                           final mdImg = '\n![Generated Image]($savedPath)\n';
                           yield ChatStreamChunk(
@@ -2379,12 +2928,20 @@ class ChatApiService {
                     isDone: false,
                     totalTokens: totalTokens,
                     usage: usage,
-                    toolResults: [ToolResultInfo(id: 'builtin_search', name: 'search_web', arguments: const <String, dynamic>{}, content: payload)],
+                    toolResults: [
+                      ToolResultInfo(
+                        id: 'builtin_search',
+                        name: 'search_web',
+                        arguments: const <String, dynamic>{},
+                        content: payload,
+                      ),
+                    ],
                   );
                 }
               } catch (_) {}
               // Responses tool calling follow-up handling
-              final bool hasRespCalls = respToolCallsByIndex.isNotEmpty || toolAccResp.isNotEmpty;
+              final bool hasRespCalls =
+                  respToolCallsByIndex.isNotEmpty || toolAccResp.isNotEmpty;
               if (onToolCall != null && hasRespCalls) {
                 // Prefer the indexed calls (with call_id); fallback to toolAccResp
                 final calls = <Map<String, dynamic>>[];
@@ -2397,24 +2954,62 @@ class ChatApiService {
                     final callId = (m['call_id'] ?? '').toString();
                     final name = (m['name'] ?? '').toString();
                     Map<String, dynamic> args;
-                    try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
-                    callInfos.add(ToolCallInfo(id: callId.isNotEmpty ? callId : 'call_$idx', name: name, arguments: args));
-                    msgs.add({'__id': callId.isNotEmpty ? callId : 'call_$idx', '__name': name, '__args': args});
+                    try {
+                      args = (jsonDecode(m['args'] ?? '{}') as Map)
+                          .cast<String, dynamic>();
+                    } catch (_) {
+                      args = <String, dynamic>{};
+                    }
+                    callInfos.add(
+                      ToolCallInfo(
+                        id: callId.isNotEmpty ? callId : 'call_$idx',
+                        name: name,
+                        arguments: args,
+                      ),
+                    );
+                    msgs.add({
+                      '__id': callId.isNotEmpty ? callId : 'call_$idx',
+                      '__name': name,
+                      '__args': args,
+                    });
                   }
                 } else {
                   int idx = 0;
                   toolAccResp.forEach((key, m) {
                     Map<String, dynamic> args;
-                    try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+                    try {
+                      args = (jsonDecode(m['args'] ?? '{}') as Map)
+                          .cast<String, dynamic>();
+                    } catch (_) {
+                      args = <String, dynamic>{};
+                    }
                     final id2 = key.isNotEmpty ? key : 'call_$idx';
-                    callInfos.add(ToolCallInfo(id: id2, name: (m['name'] ?? ''), arguments: args));
-                    msgs.add({'__id': id2, '__name': (m['name'] ?? ''), '__args': args});
+                    callInfos.add(
+                      ToolCallInfo(
+                        id: id2,
+                        name: (m['name'] ?? ''),
+                        arguments: args,
+                      ),
+                    );
+                    msgs.add({
+                      '__id': id2,
+                      '__name': (m['name'] ?? ''),
+                      '__args': args,
+                    });
                     idx += 1;
                   });
                 }
                 if (callInfos.isNotEmpty) {
-                  final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
-                  yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? approxTotal, usage: usage, toolCalls: callInfos);
+                  final approxTotal =
+                      approxPromptTokens +
+                      _approxTokensFromChars(approxCompletionChars);
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: false,
+                    totalTokens: usage?.totalTokens ?? approxTotal,
+                    usage: usage,
+                    toolCalls: callInfos,
+                  );
                 }
                 final resultsInfo = <ToolResultInfo>[];
                 final followUpOutputs = <Map<String, dynamic>>[];
@@ -2423,16 +3018,35 @@ class ChatApiService {
                   final id2 = m['__id'] as String;
                   final args = (m['__args'] as Map<String, dynamic>);
                   final res = await onToolCall(nm, args) ?? '';
-                  resultsInfo.add(ToolResultInfo(id: id2, name: nm, arguments: args, content: res));
-                  followUpOutputs.add({'type': 'function_call_output', 'call_id': id2, 'output': res});
+                  resultsInfo.add(
+                    ToolResultInfo(
+                      id: id2,
+                      name: nm,
+                      arguments: args,
+                      content: res,
+                    ),
+                  );
+                  followUpOutputs.add({
+                    'type': 'function_call_output',
+                    'call_id': id2,
+                    'output': res,
+                  });
                 }
                 if (resultsInfo.isNotEmpty) {
-                  yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolResults: resultsInfo);
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: false,
+                    totalTokens: usage?.totalTokens ?? 0,
+                    usage: usage,
+                    toolResults: resultsInfo,
+                  );
                 }
 
                 // Build follow-up Responses request input
-                List<Map<String, dynamic>> currentInput = <Map<String, dynamic>>[...responsesInitialInput];
-                if (lastResponseOutputItems.isNotEmpty) currentInput.addAll(lastResponseOutputItems);
+                List<Map<String, dynamic>> currentInput =
+                    <Map<String, dynamic>>[...responsesInitialInput];
+                if (lastResponseOutputItems.isNotEmpty)
+                  currentInput.addAll(lastResponseOutputItems);
                 currentInput.addAll(followUpOutputs);
 
                 // Iteratively request until no more tool calls
@@ -2441,9 +3055,11 @@ class ChatApiService {
                     'model': upstreamModelId,
                     'input': currentInput,
                     'stream': true,
-                    if (responsesToolsSpec.isNotEmpty) 'tools': responsesToolsSpec,
+                    if (responsesToolsSpec.isNotEmpty)
+                      'tools': responsesToolsSpec,
                     if (responsesToolsSpec.isNotEmpty) 'tool_choice': 'auto',
-                    if (responsesInstructions.isNotEmpty) 'instructions': responsesInstructions,
+                    if (responsesInstructions.isNotEmpty)
+                      'instructions': responsesInstructions,
                     if (temperature != null) 'temperature': temperature,
                     if (topP != null) 'top_p': topP,
                     if (maxTokens != null) 'max_output_tokens': maxTokens,
@@ -2452,7 +3068,8 @@ class ChatApiService {
                         'summary': 'auto',
                         if (effort != 'auto') 'effort': effort,
                       },
-                    if (responsesIncludeParam != null) 'include': responsesIncludeParam,
+                    if (responsesIncludeParam != null)
+                      'include': responsesIncludeParam,
                   };
 
                   // Apply overrides
@@ -2467,18 +3084,24 @@ class ChatApiService {
                   try {
                     if (body2['tools'] is List) {
                       final raw = (body2['tools'] as List).cast<dynamic>();
-                      body2['tools'] = _toResponsesToolsFormat(raw.map((e) => (e as Map).cast<String, dynamic>()).toList());
+                      body2['tools'] = _toResponsesToolsFormat(
+                        raw
+                            .map((e) => (e as Map).cast<String, dynamic>())
+                            .toList(),
+                      );
                     }
                   } catch (_) {}
 
                   final req2 = http.Request('POST', url);
                   final headers2 = <String, String>{
-                    'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
+                    'Authorization':
+                        'Bearer ${_apiKeyForRequest(config, modelId)}',
                     'Content-Type': 'application/json',
                     'Accept': 'text/event-stream',
                   };
                   headers2.addAll(_customHeaders(config, modelId));
-                  if (extraHeaders != null && extraHeaders.isNotEmpty) headers2.addAll(extraHeaders);
+                  if (extraHeaders != null && extraHeaders.isNotEmpty)
+                    headers2.addAll(extraHeaders);
                   req2.headers.addAll(headers2);
                   req2.body = jsonEncode(body2);
                   final resp2 = await client.send(req2);
@@ -2488,8 +3111,10 @@ class ChatApiService {
                   }
                   final s2 = resp2.stream.transform(utf8.decoder);
                   String buf2 = '';
-                  final Map<int, Map<String, String>> respCalls2 = <int, Map<String, String>>{};
-                  List<Map<String, dynamic>> outItems2 = const <Map<String, dynamic>>[];
+                  final Map<int, Map<String, String>> respCalls2 =
+                      <int, Map<String, String>>{};
+                  List<Map<String, dynamic>> outItems2 =
+                      const <Map<String, dynamic>>[];
                   await for (final ch in s2) {
                     buf2 += ch;
                     final lines2 = buf2.split('\n');
@@ -2501,46 +3126,71 @@ class ChatApiService {
                       if (d == '[DONE]') continue;
                       try {
                         final o = jsonDecode(d);
-                        if (o is Map && (o['type'] ?? '') == 'response.output_text.delta') {
+                        if (o is Map &&
+                            (o['type'] ?? '') == 'response.output_text.delta') {
                           final delta = (o['delta'] ?? '').toString();
                           if (delta.isNotEmpty) {
                             approxCompletionChars += delta.length;
-                            yield ChatStreamChunk(content: delta, isDone: false, totalTokens: 0, usage: usage);
+                            yield ChatStreamChunk(
+                              content: delta,
+                              isDone: false,
+                              totalTokens: 0,
+                              usage: usage,
+                            );
                           }
-                        } else if (o is Map && (o['type'] ?? '') == 'response.output_item.added') {
+                        } else if (o is Map &&
+                            (o['type'] ?? '') == 'response.output_item.added') {
                           final item = o['item'];
                           final idx2 = (o['output_index'] ?? 0) as int;
-                          if (item is Map && (item['type'] ?? '') == 'function_call') {
+                          if (item is Map &&
+                              (item['type'] ?? '') == 'function_call') {
                             respCalls2[idx2] = {
                               'call_id': (item['call_id'] ?? '').toString(),
                               'name': (item['name'] ?? '').toString(),
-                              'args': ''
+                              'args': '',
                             };
                           }
-                        } else if (o is Map && (o['type'] ?? '') == 'response.function_call_arguments.delta') {
+                        } else if (o is Map &&
+                            (o['type'] ?? '') ==
+                                'response.function_call_arguments.delta') {
                           final idx2 = (o['output_index'] ?? 0) as int;
                           final delta = (o['delta'] ?? '').toString();
-                          final entry = respCalls2.putIfAbsent(idx2, () => {'call_id': '', 'name': '', 'args': ''});
-                          if (delta.isNotEmpty) entry['args'] = (entry['args'] ?? '') + delta;
-                        } else if (o is Map && (o['type'] ?? '') == 'response.output_item.done') {
+                          final entry = respCalls2.putIfAbsent(
+                            idx2,
+                            () => {'call_id': '', 'name': '', 'args': ''},
+                          );
+                          if (delta.isNotEmpty)
+                            entry['args'] = (entry['args'] ?? '') + delta;
+                        } else if (o is Map &&
+                            (o['type'] ?? '') == 'response.output_item.done') {
                           final item = o['item'];
                           final idx2 = (o['output_index'] ?? 0) as int;
-                          if (item is Map && (item['type'] ?? '') == 'function_call') {
+                          if (item is Map &&
+                              (item['type'] ?? '') == 'function_call') {
                             final args = (item['arguments'] ?? '').toString();
-                            final entry = respCalls2.putIfAbsent(idx2, () => {
-                                  'call_id': (item['call_id'] ?? '').toString(),
-                                  'name': (item['name'] ?? '').toString(),
-                                  'args': ''
-                                });
+                            final entry = respCalls2.putIfAbsent(
+                              idx2,
+                              () => {
+                                'call_id': (item['call_id'] ?? '').toString(),
+                                'name': (item['name'] ?? '').toString(),
+                                'args': '',
+                              },
+                            );
                             if (args.isNotEmpty) entry['args'] = args;
                           }
-                        } else if (o is Map && (o['type'] ?? '') == 'response.completed') {
+                        } else if (o is Map &&
+                            (o['type'] ?? '') == 'response.completed') {
                           // usage
                           final u2 = o['response']?['usage'];
                           if (u2 != null) {
                             final inTok = (u2['input_tokens'] ?? 0) as int;
                             final outTok = (u2['output_tokens'] ?? 0) as int;
-                            usage = (usage ?? const TokenUsage()).merge(TokenUsage(promptTokens: inTok, completionTokens: outTok));
+                            usage = (usage ?? const TokenUsage()).merge(
+                              TokenUsage(
+                                promptTokens: inTok,
+                                completionTokens: outTok,
+                              ),
+                            );
                             totalTokens = usage!.totalTokens;
                           }
                           // capture output items
@@ -2548,7 +3198,7 @@ class ChatApiService {
                           if (out2 is List) {
                             outItems2 = [
                               for (final it in out2)
-                                if (it is Map) (it.cast<String, dynamic>())
+                                if (it is Map) (it.cast<String, dynamic>()),
                             ];
                           }
                         }
@@ -2558,8 +3208,16 @@ class ChatApiService {
 
                   if (respCalls2.isEmpty) {
                     // No further tool calls; finalize
-                    final approxTotal2 = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
-                    yield ChatStreamChunk(content: '', reasoning: null, isDone: true, totalTokens: usage?.totalTokens ?? approxTotal2, usage: usage);
+                    final approxTotal2 =
+                        approxPromptTokens +
+                        _approxTokensFromChars(approxCompletionChars);
+                    yield ChatStreamChunk(
+                      content: '',
+                      reasoning: null,
+                      isDone: true,
+                      totalTokens: usage?.totalTokens ?? approxTotal2,
+                      usage: usage,
+                    );
                     return;
                   }
 
@@ -2572,13 +3230,36 @@ class ChatApiService {
                     final callId2 = (m2['call_id'] ?? '').toString();
                     final name2 = (m2['name'] ?? '').toString();
                     Map<String, dynamic> args2;
-                    try { args2 = (jsonDecode(m2['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args2 = <String, dynamic>{}; }
-                    callInfos2.add(ToolCallInfo(id: callId2.isNotEmpty ? callId2 : 'call_$idx2', name: name2, arguments: args2));
-                    msgs2.add({'__id': callId2.isNotEmpty ? callId2 : 'call_$idx2', '__name': name2, '__args': args2});
+                    try {
+                      args2 = (jsonDecode(m2['args'] ?? '{}') as Map)
+                          .cast<String, dynamic>();
+                    } catch (_) {
+                      args2 = <String, dynamic>{};
+                    }
+                    callInfos2.add(
+                      ToolCallInfo(
+                        id: callId2.isNotEmpty ? callId2 : 'call_$idx2',
+                        name: name2,
+                        arguments: args2,
+                      ),
+                    );
+                    msgs2.add({
+                      '__id': callId2.isNotEmpty ? callId2 : 'call_$idx2',
+                      '__name': name2,
+                      '__args': args2,
+                    });
                   }
                   if (callInfos2.isNotEmpty) {
-                    final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
-                    yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? approxTotal, usage: usage, toolCalls: callInfos2);
+                    final approxTotal =
+                        approxPromptTokens +
+                        _approxTokensFromChars(approxCompletionChars);
+                    yield ChatStreamChunk(
+                      content: '',
+                      isDone: false,
+                      totalTokens: usage?.totalTokens ?? approxTotal,
+                      usage: usage,
+                      toolCalls: callInfos2,
+                    );
                   }
                   final resultsInfo2 = <ToolResultInfo>[];
                   final followUpOutputs2 = <Map<String, dynamic>>[];
@@ -2587,11 +3268,28 @@ class ChatApiService {
                     final id2 = m['__id'] as String;
                     final args2 = (m['__args'] as Map<String, dynamic>);
                     final res2 = await onToolCall(nm, args2) ?? '';
-                    resultsInfo2.add(ToolResultInfo(id: id2, name: nm, arguments: args2, content: res2));
-                    followUpOutputs2.add({'type': 'function_call_output', 'call_id': id2, 'output': res2});
+                    resultsInfo2.add(
+                      ToolResultInfo(
+                        id: id2,
+                        name: nm,
+                        arguments: args2,
+                        content: res2,
+                      ),
+                    );
+                    followUpOutputs2.add({
+                      'type': 'function_call_output',
+                      'call_id': id2,
+                      'output': res2,
+                    });
                   }
                   if (resultsInfo2.isNotEmpty) {
-                    yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolResults: resultsInfo2);
+                    yield ChatStreamChunk(
+                      content: '',
+                      isDone: false,
+                      totalTokens: usage?.totalTokens ?? 0,
+                      usage: usage,
+                      toolResults: resultsInfo2,
+                    );
                   }
                   // Extend current input with this round's model output and our outputs
                   if (outItems2.isNotEmpty) currentInput.addAll(outItems2);
@@ -2599,12 +3297,22 @@ class ChatApiService {
                 }
 
                 // Safety
-                final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
-                yield ChatStreamChunk(content: '', reasoning: null, isDone: true, totalTokens: usage?.totalTokens ?? approxTotal, usage: usage);
+                final approxTotal =
+                    approxPromptTokens +
+                    _approxTokensFromChars(approxCompletionChars);
+                yield ChatStreamChunk(
+                  content: '',
+                  reasoning: null,
+                  isDone: true,
+                  totalTokens: usage?.totalTokens ?? approxTotal,
+                  usage: usage,
+                );
                 return;
               }
 
-              final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
+              final approxTotal =
+                  approxPromptTokens +
+                  _approxTokensFromChars(approxCompletionChars);
               yield ChatStreamChunk(
                 content: '',
                 reasoning: null,
@@ -2623,7 +3331,9 @@ class ChatApiService {
                 if (u != null) {
                   final inTok = (u['input_tokens'] ?? 0) as int;
                   final outTok = (u['output_tokens'] ?? 0) as int;
-                  usage = (usage ?? const TokenUsage()).merge(TokenUsage(promptTokens: inTok, completionTokens: outTok));
+                  usage = (usage ?? const TokenUsage()).merge(
+                    TokenUsage(promptTokens: inTok, completionTokens: outTok),
+                  );
                   totalTokens = usage!.totalTokens;
                 }
               }
@@ -2654,8 +3364,11 @@ class ChatApiService {
                   final sb = StringBuffer();
                   for (final it in dc) {
                     if (it is Map) {
-                      final t = (it['text'] ?? it['delta'] ?? '') as String? ?? '';
-                      if (t.isNotEmpty && (it['type'] == null || it['type'] == 'text')) sb.write(t);
+                      final t =
+                          (it['text'] ?? it['delta'] ?? '') as String? ?? '';
+                      if (t.isNotEmpty &&
+                          (it['type'] == null || it['type'] == 'text'))
+                        sb.write(t);
                     }
                   }
                   deltaContent = sb.toString();
@@ -2668,7 +3381,9 @@ class ChatApiService {
                 }
 
                 // reasoning_content handling (unchanged)
-                final rc = (delta['reasoning_content'] ?? delta['reasoning']) as String?;
+                final rc =
+                    (delta['reasoning_content'] ?? delta['reasoning'])
+                        as String?;
                 if (rc != null && rc.isNotEmpty) {
                   reasoning = rc;
                   if (needsReasoningEcho) reasoningBuffer += rc;
@@ -2685,12 +3400,17 @@ class ChatApiService {
                   if (imgs is List) imageItems.addAll(imgs);
                   if (dc is List) {
                     for (final it in dc) {
-                      if (it is Map && (it['type'] == 'image_url' || it['type'] == 'image')) imageItems.add(it);
+                      if (it is Map &&
+                          (it['type'] == 'image_url' || it['type'] == 'image'))
+                        imageItems.add(it);
                     }
                   }
                   final singleImage = delta['image_url'];
                   if (singleImage is Map || singleImage is String) {
-                    imageItems.add({'type': 'image_url', 'image_url': singleImage});
+                    imageItems.add({
+                      'type': 'image_url',
+                      'image_url': singleImage,
+                    });
                   }
                   if (imageItems.isNotEmpty) {
                     final buf = StringBuffer();
@@ -2704,7 +3424,8 @@ class ChatApiService {
                         final u2 = iu['url'];
                         if (u2 is String) url = u2;
                       }
-                      if (url != null && url.isNotEmpty) buf.write('\n\n![image](' + url + ')');
+                      if (url != null && url.isNotEmpty)
+                        buf.write('\n\n![image](' + url + ')');
                     }
                     if (buf.isNotEmpty) content = content + buf.toString();
                   }
@@ -2719,17 +3440,22 @@ class ChatApiService {
                     final func = t['function'] as Map<String, dynamic>?;
                     final name = func?['name'] as String?;
                     final argsDelta = func?['arguments'] as String?;
-                    final entry = toolAcc.putIfAbsent(idx, () => {'id': '', 'name': '', 'args': ''});
+                    final entry = toolAcc.putIfAbsent(
+                      idx,
+                      () => {'id': '', 'name': '', 'args': ''},
+                    );
                     if (id != null) entry['id'] = id;
                     if (name != null && name.isNotEmpty) entry['name'] = name;
-                    if (argsDelta != null && argsDelta.isNotEmpty) entry['args'] = (entry['args'] ?? '') + argsDelta;
+                    if (argsDelta != null && argsDelta.isNotEmpty)
+                      entry['args'] = (entry['args'] ?? '') + argsDelta;
                   }
                 }
               }
 
               if (preserveReasoningDetails && message != null) {
                 final rdMsg = message['reasoning_details'];
-                if (rdMsg is List && rdMsg.isNotEmpty) reasoningDetailsBuffer = rdMsg;
+                if (rdMsg is List && rdMsg.isNotEmpty)
+                  reasoningDetailsBuffer = rdMsg;
               }
 
               // 2) Fallback and merge: parse choices[0].message.content
@@ -2743,7 +3469,9 @@ class ChatApiService {
                   for (final it in mc) {
                     if (it is Map) {
                       final t = (it['text'] ?? '') as String? ?? '';
-                      if (t.isNotEmpty && (it['type'] == null || it['type'] == 'text')) sb.write(t);
+                      if (t.isNotEmpty &&
+                          (it['type'] == null || it['type'] == 'text'))
+                        sb.write(t);
                     }
                   }
                   messageContent = sb.toString();
@@ -2757,7 +3485,8 @@ class ChatApiService {
 
                 // Capture reasoning_content if only present on the message object
                 if (message != null) {
-                  final rcMsg = message['reasoning_content'] ?? message['reasoning'];
+                  final rcMsg =
+                      message['reasoning_content'] ?? message['reasoning'];
                   if (rcMsg is String && rcMsg.isNotEmpty) {
                     if (needsReasoningEcho) reasoningBuffer += rcMsg;
                     reasoning ??= rcMsg;
@@ -2768,7 +3497,9 @@ class ChatApiService {
                 if (wantsImageOutput && mc is List) {
                   final List<dynamic> imageItems = <dynamic>[];
                   for (final it in mc) {
-                    if (it is Map && (it['type'] == 'image_url' || it['type'] == 'image')) imageItems.add(it);
+                    if (it is Map &&
+                        (it['type'] == 'image_url' || it['type'] == 'image'))
+                      imageItems.add(it);
                   }
                   if (imageItems.isNotEmpty) {
                     final buf = StringBuffer();
@@ -2782,7 +3513,8 @@ class ChatApiService {
                         final u2 = iu['url'];
                         if (u2 is String) url = u2;
                       }
-                      if (url != null && url.isNotEmpty) buf.write('\n\n![image](' + url + ')');
+                      if (url != null && url.isNotEmpty)
+                        buf.write('\n\n![image](' + url + ')');
                     }
                     if (buf.isNotEmpty) content = content + buf.toString();
                   }
@@ -2807,7 +3539,14 @@ class ChatApiService {
                 if (name.isEmpty) continue;
                 // print('[ChatApi/XinLiu] Tool call: id=$id, name=$name, args=${argsStr.length} chars');
                 final idx = toolAcc.length;
-                final entry = toolAcc.putIfAbsent(idx, () => {'id': id.isEmpty ? 'call_$idx' : id, 'name': name, 'args': argsStr});
+                final entry = toolAcc.putIfAbsent(
+                  idx,
+                  () => {
+                    'id': id.isEmpty ? 'call_$idx' : id,
+                    'name': name,
+                    'args': argsStr,
+                  },
+                );
                 if (id.isNotEmpty) entry['id'] = id;
                 entry['name'] = name;
                 entry['args'] = argsStr;
@@ -2823,14 +3562,25 @@ class ChatApiService {
             if (u != null) {
               final prompt = (u['prompt_tokens'] ?? 0) as int;
               final completion = (u['completion_tokens'] ?? 0) as int;
-              final cached = (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ?? 0;
-              usage = (usage ?? const TokenUsage()).merge(TokenUsage(promptTokens: prompt, completionTokens: completion, cachedTokens: cached));
+              final cached =
+                  (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ??
+                  0;
+              usage = (usage ?? const TokenUsage()).merge(
+                TokenUsage(
+                  promptTokens: prompt,
+                  completionTokens: completion,
+                  cachedTokens: cached,
+                ),
+              );
               totalTokens = usage!.totalTokens;
             }
           }
 
-          if (content.isNotEmpty || (reasoning != null && reasoning!.isNotEmpty)) {
-            final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
+          if (content.isNotEmpty ||
+              (reasoning != null && reasoning!.isNotEmpty)) {
+            final approxTotal =
+                approxPromptTokens +
+                _approxTokensFromChars(approxCompletionChars);
             yield ChatStreamChunk(
               content: content,
               reasoning: reasoning,
@@ -2845,7 +3595,10 @@ class ChatApiService {
           // definitive finish that's not tool_calls, end the stream now so
           // the UI can persist the message.
           // XinLiu compatibility: Execute tools immediately if we have finish_reason='tool_calls' and accumulated calls
-          if (config.useResponseApi != true && finishReason == 'tool_calls' && toolAcc.isNotEmpty && onToolCall != null) {
+          if (config.useResponseApi != true &&
+              finishReason == 'tool_calls' &&
+              toolAcc.isNotEmpty &&
+              onToolCall != null) {
             // print('[ChatApi/XinLiu] Executing tools immediately (finishReason=tool_calls, toolAcc.size=${toolAcc.length})');
             // Some providers (like XinLiu) return tool_calls with finish_reason='tool_calls' but no [DONE]
             // Execute tools immediately in this case
@@ -2856,21 +3609,31 @@ class ChatApiService {
               final id = (m['id'] ?? 'call_$idx');
               final name = (m['name'] ?? '');
               Map<String, dynamic> args;
-              try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+              try {
+                args = (jsonDecode(m['args'] ?? '{}') as Map)
+                    .cast<String, dynamic>();
+              } catch (_) {
+                args = <String, dynamic>{};
+              }
               callInfos.add(ToolCallInfo(id: id, name: name, arguments: args));
               calls.add({
                 'id': id,
                 'type': 'function',
-                'function': {
-                  'name': name,
-                  'arguments': jsonEncode(args),
-                },
+                'function': {'name': name, 'arguments': jsonEncode(args)},
               });
               toolMsgs.add({'__name': name, '__id': id, '__args': args});
             });
             if (callInfos.isNotEmpty) {
-              final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
-              yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? approxTotal, usage: usage, toolCalls: callInfos);
+              final approxTotal =
+                  approxPromptTokens +
+                  _approxTokensFromChars(approxCompletionChars);
+              yield ChatStreamChunk(
+                content: '',
+                isDone: false,
+                totalTokens: usage?.totalTokens ?? approxTotal,
+                usage: usage,
+                toolCalls: callInfos,
+              );
             }
             // Execute tools and emit results
             final results = <Map<String, dynamic>>[];
@@ -2881,28 +3644,58 @@ class ChatApiService {
               final args = (m['__args'] as Map<String, dynamic>);
               final res = await onToolCall(name, args) ?? '';
               results.add({'tool_call_id': id, 'content': res});
-              resultsInfo.add(ToolResultInfo(id: id, name: name, arguments: args, content: res));
+              resultsInfo.add(
+                ToolResultInfo(
+                  id: id,
+                  name: name,
+                  arguments: args,
+                  content: res,
+                ),
+              );
             }
             if (resultsInfo.isNotEmpty) {
-              yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolResults: resultsInfo);
+              yield ChatStreamChunk(
+                content: '',
+                isDone: false,
+                totalTokens: usage?.totalTokens ?? 0,
+                usage: usage,
+                toolResults: resultsInfo,
+              );
             }
             // Build follow-up messages
             final mm2 = <Map<String, dynamic>>[];
             for (final m in messages) {
               mm2.add(_copyChatCompletionMessage(m));
             }
-            final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
+            final assistantToolCallMsg = <String, dynamic>{
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': calls,
+            };
             if (needsReasoningEcho) {
               assistantToolCallMsg['reasoning_content'] = reasoningBuffer;
             }
-            if (preserveReasoningDetails && reasoningDetailsBuffer is List && reasoningDetailsBuffer.isNotEmpty) {
-              assistantToolCallMsg['reasoning_details'] = reasoningDetailsBuffer;
+            if (preserveReasoningDetails &&
+                reasoningDetailsBuffer is List &&
+                reasoningDetailsBuffer.isNotEmpty) {
+              assistantToolCallMsg['reasoning_details'] =
+                  reasoningDetailsBuffer;
             }
             mm2.add(assistantToolCallMsg);
             for (final r in results) {
               final id = r['tool_call_id'];
-              final name = calls.firstWhere((c) => c['id'] == id, orElse: () => const {'function': {'name': ''}})['function']['name'];
-              mm2.add({'role': 'tool', 'tool_call_id': id, 'name': name, 'content': r['content']});
+              final name = calls.firstWhere(
+                (c) => c['id'] == id,
+                orElse: () => const {
+                  'function': {'name': ''},
+                },
+              )['function']['name'];
+              mm2.add({
+                'role': 'tool',
+                'tool_call_id': id,
+                'name': name,
+                'content': r['content'],
+              });
             }
             // Continue streaming with follow-up request
             var currentMessages = mm2;
@@ -2913,8 +3706,10 @@ class ChatApiService {
                 'stream': true,
                 if (temperature != null) 'temperature': temperature,
                 if (topP != null) 'top_p': topP,
-                if (isReasoning && effort != 'off' && effort != 'auto') 'reasoning_effort': effort,
-                if (tools != null && tools.isNotEmpty) 'tools': _cleanToolsForCompatibility(tools),
+                if (isReasoning && effort != 'off' && effort != 'auto')
+                  'reasoning_effort': effort,
+                if (tools != null && tools.isNotEmpty)
+                  'tools': _cleanToolsForCompatibility(tools),
                 if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
               };
               _setMaxTokens(body2);
@@ -2925,7 +3720,8 @@ class ChatApiService {
                     body2['reasoning'] = {'enabled': false};
                   } else {
                     final obj = <String, dynamic>{'enabled': true};
-                    if (thinkingBudget != null && thinkingBudget > 0) obj['max_tokens'] = thinkingBudget;
+                    if (thinkingBudget != null && thinkingBudget > 0)
+                      obj['max_tokens'] = thinkingBudget;
                     body2['reasoning'] = obj;
                   }
                   body2.remove('reasoning_effort');
@@ -2933,7 +3729,8 @@ class ChatApiService {
                   body2.remove('reasoning');
                   body2.remove('reasoning_effort');
                 }
-              } else if (host.contains('dashscope') || host.contains('aliyun')) {
+              } else if (host.contains('dashscope') ||
+                  host.contains('aliyun')) {
                 if (isReasoning) {
                   body2['enable_thinking'] = !off;
                   if (!off && thinkingBudget != null && thinkingBudget > 0) {
@@ -2946,21 +3743,27 @@ class ChatApiService {
                   body2.remove('thinking_budget');
                 }
                 body2.remove('reasoning_effort');
-              } else if (host.contains('open.bigmodel.cn') || host.contains('bigmodel') || isMimo) {
+              } else if (host.contains('open.bigmodel.cn') ||
+                  host.contains('bigmodel') ||
+                  isMimo) {
                 if (isReasoning) {
                   body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
                 } else {
                   body2.remove('thinking');
                 }
                 body2.remove('reasoning_effort');
-              } else if (host.contains('ark.cn-beijing.volces.com') || host.contains('volc') || host.contains('ark')) {
+              } else if (host.contains('ark.cn-beijing.volces.com') ||
+                  host.contains('volc') ||
+                  host.contains('ark')) {
                 if (isReasoning) {
                   body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
                 } else {
                   body2.remove('thinking');
                 }
                 body2.remove('reasoning_effort');
-              } else if (host.contains('intern-ai') || host.contains('intern') || host.contains('chat.intern-ai.org.cn')) {
+              } else if (host.contains('intern-ai') ||
+                  host.contains('intern') ||
+                  host.contains('chat.intern-ai.org.cn')) {
                 if (isReasoning) {
                   body2['thinking_mode'] = !off;
                 } else {
@@ -2978,7 +3781,8 @@ class ChatApiService {
                   body2.remove('enable_thinking');
                 }
                 body2.remove('reasoning_effort');
-              } else if (host.contains('deepseek') || upstreamModelId.toLowerCase().contains('deepseek')) {
+              } else if (host.contains('deepseek') ||
+                  upstreamModelId.toLowerCase().contains('deepseek')) {
                 if (isReasoning) {
                   if (off) {
                     body2['reasoning_content'] = false;
@@ -2996,7 +3800,8 @@ class ChatApiService {
                   body2.remove('reasoning_budget');
                 }
               }
-              if (!host.contains('mistral.ai') && !host.contains('openrouter')) {
+              if (!host.contains('mistral.ai') &&
+                  !host.contains('openrouter')) {
                 body2['stream_options'] = {'include_usage': true};
               }
               if (extraBodyCfg.isNotEmpty) {
@@ -3014,7 +3819,8 @@ class ChatApiService {
                 'Accept': 'text/event-stream',
               };
               headers2.addAll(_customHeaders(config, modelId));
-              if (extraHeaders != null && extraHeaders.isNotEmpty) headers2.addAll(extraHeaders);
+              if (extraHeaders != null && extraHeaders.isNotEmpty)
+                headers2.addAll(extraHeaders);
               req2.headers.addAll(headers2);
               req2.body = jsonEncode(body2);
               final resp2 = await client.send(req2);
@@ -3024,7 +3830,8 @@ class ChatApiService {
               }
               final s2 = resp2.stream.transform(utf8.decoder);
               String buf2 = '';
-              final Map<int, Map<String, String>> toolAcc2 = <int, Map<String, String>>{};
+              final Map<int, Map<String, String>> toolAcc2 =
+                  <int, Map<String, String>>{};
               String? finishReason2;
               String contentAccum = '';
               String reasoningAccum = '';
@@ -3042,18 +3849,30 @@ class ChatApiService {
                   }
                   try {
                     final o = jsonDecode(d);
-                    if (o is Map && o['choices'] is List && (o['choices'] as List).isNotEmpty) {
+                    if (o is Map &&
+                        o['choices'] is List &&
+                        (o['choices'] as List).isNotEmpty) {
                       final c0 = (o['choices'] as List).first;
                       finishReason2 = c0['finish_reason'] as String?;
                       final delta = c0['delta'] as Map?;
                       final txt = delta?['content'];
-                      final rc = delta?['reasoning_content'] ?? delta?['reasoning'];
+                      final rc =
+                          delta?['reasoning_content'] ?? delta?['reasoning'];
                       final u = o['usage'];
                       if (u != null) {
                         final prompt = (u['prompt_tokens'] ?? 0) as int;
                         final completion = (u['completion_tokens'] ?? 0) as int;
-                        final cached = (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ?? 0;
-                        usage = (usage ?? const TokenUsage()).merge(TokenUsage(promptTokens: prompt, completionTokens: completion, cachedTokens: cached));
+                        final cached =
+                            (u['prompt_tokens_details']?['cached_tokens'] ?? 0)
+                                as int? ??
+                            0;
+                        usage = (usage ?? const TokenUsage()).merge(
+                          TokenUsage(
+                            promptTokens: prompt,
+                            completionTokens: completion,
+                            cachedTokens: cached,
+                          ),
+                        );
                         totalTokens = usage!.totalTokens;
                       }
                       // Capture Grok citations
@@ -3071,33 +3890,58 @@ class ChatApiService {
                             isDone: false,
                             totalTokens: usage?.totalTokens ?? 0,
                             usage: usage,
-                            toolResults: [ToolResultInfo(id: 'builtin_search', name: 'search_web', arguments: const <String, dynamic>{}, content: payload)],
+                            toolResults: [
+                              ToolResultInfo(
+                                id: 'builtin_search',
+                                name: 'search_web',
+                                arguments: const <String, dynamic>{},
+                                content: payload,
+                              ),
+                            ],
                           );
                         }
                       }
                       if (rc is String && rc.isNotEmpty) {
                         if (needsReasoningEcho) reasoningAccum += rc;
-                        yield ChatStreamChunk(content: '', reasoning: rc, isDone: false, totalTokens: 0, usage: usage);
+                        yield ChatStreamChunk(
+                          content: '',
+                          reasoning: rc,
+                          isDone: false,
+                          totalTokens: 0,
+                          usage: usage,
+                        );
                       }
                       if (txt is String && txt.isNotEmpty) {
                         contentAccum += txt;
-                        yield ChatStreamChunk(content: txt, isDone: false, totalTokens: 0, usage: usage);
+                        yield ChatStreamChunk(
+                          content: txt,
+                          isDone: false,
+                          totalTokens: 0,
+                          usage: usage,
+                        );
                       }
                       if (wantsImageOutput) {
                         final List<dynamic> imageItems = <dynamic>[];
                         final imgs = delta?['images'];
                         if (imgs is List) imageItems.addAll(imgs);
-                        final contentArr = (txt is List) ? txt : (delta?['content'] as List?);
+                        final contentArr = (txt is List)
+                            ? txt
+                            : (delta?['content'] as List?);
                         if (contentArr is List) {
                           for (final it in contentArr) {
-                            if (it is Map && (it['type'] == 'image_url' || it['type'] == 'image')) {
+                            if (it is Map &&
+                                (it['type'] == 'image_url' ||
+                                    it['type'] == 'image')) {
                               imageItems.add(it);
                             }
                           }
                         }
                         final singleImage = delta?['image_url'];
                         if (singleImage is Map || singleImage is String) {
-                          imageItems.add({'type': 'image_url', 'image_url': singleImage});
+                          imageItems.add({
+                            'type': 'image_url',
+                            'image_url': singleImage,
+                          });
                         }
                         if (imageItems.isNotEmpty) {
                           final buf = StringBuffer();
@@ -3119,7 +3963,12 @@ class ChatApiService {
                           }
                           final out = buf.toString();
                           if (out.isNotEmpty) {
-                            yield ChatStreamChunk(content: out, isDone: false, totalTokens: 0, usage: usage);
+                            yield ChatStreamChunk(
+                              content: out,
+                              isDone: false,
+                              totalTokens: 0,
+                              usage: usage,
+                            );
                           }
                         }
                       }
@@ -3131,10 +3980,15 @@ class ChatApiService {
                           final func = t['function'] as Map<String, dynamic>?;
                           final name = func?['name'] as String?;
                           final argsDelta = func?['arguments'] as String?;
-                          final entry = toolAcc2.putIfAbsent(idx, () => {'id': '', 'name': '', 'args': ''});
+                          final entry = toolAcc2.putIfAbsent(
+                            idx,
+                            () => {'id': '', 'name': '', 'args': ''},
+                          );
                           if (id != null) entry['id'] = id;
-                          if (name != null && name.isNotEmpty) entry['name'] = name;
-                          if (argsDelta != null && argsDelta.isNotEmpty) entry['args'] = (entry['args'] ?? '') + argsDelta;
+                          if (name != null && name.isNotEmpty)
+                            entry['name'] = name;
+                          if (argsDelta != null && argsDelta.isNotEmpty)
+                            entry['args'] = (entry['args'] ?? '') + argsDelta;
                         }
                       }
 
@@ -3144,20 +3998,31 @@ class ChatApiService {
                         final mc = message['content'];
                         if (mc is String && mc.isNotEmpty) {
                           contentAccum += mc;
-                          yield ChatStreamChunk(content: mc, isDone: false, totalTokens: 0, usage: usage);
+                          yield ChatStreamChunk(
+                            content: mc,
+                            isDone: false,
+                            totalTokens: 0,
+                            usage: usage,
+                          );
                         }
                       }
                       if (message != null) {
-                        final rcMsg = message['reasoning_content'] ?? message['reasoning'];
-                        if (rcMsg is String && rcMsg.isNotEmpty && needsReasoningEcho) {
+                        final rcMsg =
+                            message['reasoning_content'] ??
+                            message['reasoning'];
+                        if (rcMsg is String &&
+                            rcMsg.isNotEmpty &&
+                            needsReasoningEcho) {
                           reasoningAccum += rcMsg;
                         }
                       }
                       if (preserveReasoningDetails) {
                         final rd = delta?['reasoning_details'];
-                        if (rd is List && rd.isNotEmpty) reasoningDetailsAccum = rd;
+                        if (rd is List && rd.isNotEmpty)
+                          reasoningDetailsAccum = rd;
                         final rdMsg = message?['reasoning_details'];
-                        if (rdMsg is List && rdMsg.isNotEmpty) reasoningDetailsAccum = rdMsg;
+                        if (rdMsg is List && rdMsg.isNotEmpty)
+                          reasoningDetailsAccum = rdMsg;
                       }
                     }
                     // XinLiu compatibility for follow-up requests too
@@ -3174,7 +4039,14 @@ class ChatApiService {
                         final argsStr = (func['arguments'] ?? '').toString();
                         if (name.isEmpty) continue;
                         final idx = toolAcc2.length;
-                        final entry = toolAcc2.putIfAbsent(idx, () => {'id': id.isEmpty ? 'call_$idx' : id, 'name': name, 'args': argsStr});
+                        final entry = toolAcc2.putIfAbsent(
+                          idx,
+                          () => {
+                            'id': id.isEmpty ? 'call_$idx' : id,
+                            'name': name,
+                            'args': argsStr,
+                          },
+                        );
                         if (id.isNotEmpty) entry['id'] = id;
                         entry['name'] = name;
                         entry['args'] = argsStr;
@@ -3186,7 +4058,8 @@ class ChatApiService {
                   } catch (_) {}
                 }
               }
-              if ((finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) && onToolCall != null) {
+              if ((finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) &&
+                  onToolCall != null) {
                 final calls2 = <Map<String, dynamic>>[];
                 final callInfos2 = <ToolCallInfo>[];
                 final toolMsgs2 = <Map<String, dynamic>>[];
@@ -3194,13 +4067,30 @@ class ChatApiService {
                   final id = (m['id'] ?? 'call_$idx');
                   final name = (m['name'] ?? '');
                   Map<String, dynamic> args;
-                  try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
-                  callInfos2.add(ToolCallInfo(id: id, name: name, arguments: args));
-                  calls2.add({'id': id, 'type': 'function', 'function': {'name': name, 'arguments': jsonEncode(args)}});
+                  try {
+                    args = (jsonDecode(m['args'] ?? '{}') as Map)
+                        .cast<String, dynamic>();
+                  } catch (_) {
+                    args = <String, dynamic>{};
+                  }
+                  callInfos2.add(
+                    ToolCallInfo(id: id, name: name, arguments: args),
+                  );
+                  calls2.add({
+                    'id': id,
+                    'type': 'function',
+                    'function': {'name': name, 'arguments': jsonEncode(args)},
+                  });
                   toolMsgs2.add({'__name': name, '__id': id, '__args': args});
                 });
                 if (callInfos2.isNotEmpty) {
-                  yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolCalls: callInfos2);
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: false,
+                    totalTokens: usage?.totalTokens ?? 0,
+                    usage: usage,
+                    toolCalls: callInfos2,
+                  );
                 }
                 final results2 = <Map<String, dynamic>>[];
                 final resultsInfo2 = <ToolResultInfo>[];
@@ -3210,41 +4100,77 @@ class ChatApiService {
                   final args = (m['__args'] as Map<String, dynamic>);
                   final res = await onToolCall(name, args) ?? '';
                   results2.add({'tool_call_id': id, 'content': res});
-                  resultsInfo2.add(ToolResultInfo(id: id, name: name, arguments: args, content: res));
+                  resultsInfo2.add(
+                    ToolResultInfo(
+                      id: id,
+                      name: name,
+                      arguments: args,
+                      content: res,
+                    ),
+                  );
                 }
                 if (resultsInfo2.isNotEmpty) {
-                  yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolResults: resultsInfo2);
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: false,
+                    totalTokens: usage?.totalTokens ?? 0,
+                    usage: usage,
+                    toolResults: resultsInfo2,
+                  );
                 }
-                final nextAssistantToolCall = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls2};
+                final nextAssistantToolCall = <String, dynamic>{
+                  'role': 'assistant',
+                  'content': '\n\n',
+                  'tool_calls': calls2,
+                };
                 if (needsReasoningEcho) {
                   nextAssistantToolCall['reasoning_content'] = reasoningAccum;
                 }
-                if (preserveReasoningDetails && reasoningDetailsAccum is List && reasoningDetailsAccum.isNotEmpty) {
-                  nextAssistantToolCall['reasoning_details'] = reasoningDetailsAccum;
+                if (preserveReasoningDetails &&
+                    reasoningDetailsAccum is List &&
+                    reasoningDetailsAccum.isNotEmpty) {
+                  nextAssistantToolCall['reasoning_details'] =
+                      reasoningDetailsAccum;
                 }
                 currentMessages = [
                   ...currentMessages,
-                  if (contentAccum.isNotEmpty) {'role': 'assistant', 'content': contentAccum},
+                  if (contentAccum.isNotEmpty)
+                    {'role': 'assistant', 'content': contentAccum},
                   nextAssistantToolCall,
                   for (final r in results2)
                     {
                       'role': 'tool',
                       'tool_call_id': r['tool_call_id'],
-                      'name': calls2.firstWhere((c) => c['id'] == r['tool_call_id'], orElse: () => const {'function': {'name': ''}})['function']['name'],
+                      'name': calls2.firstWhere(
+                        (c) => c['id'] == r['tool_call_id'],
+                        orElse: () => const {
+                          'function': {'name': ''},
+                        },
+                      )['function']['name'],
                       'content': r['content'],
                     },
                 ];
                 continue;
               } else {
-                final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
-                yield ChatStreamChunk(content: '', isDone: true, totalTokens: usage?.totalTokens ?? approxTotal, usage: usage);
+                final approxTotal =
+                    approxPromptTokens +
+                    _approxTokensFromChars(approxCompletionChars);
+                yield ChatStreamChunk(
+                  content: '',
+                  isDone: true,
+                  totalTokens: usage?.totalTokens ?? approxTotal,
+                  usage: usage,
+                );
                 return;
               }
             }
           }
           // XinLiu compatibility: Don't end early if we have accumulated tool calls
-          if (config.useResponseApi != true && finishReason != null && finishReason != 'tool_calls') {
-            final bool hasPendingToolCalls = toolAcc.isNotEmpty || toolAccResp.isNotEmpty;
+          if (config.useResponseApi != true &&
+              finishReason != null &&
+              finishReason != 'tool_calls') {
+            final bool hasPendingToolCalls =
+                toolAcc.isNotEmpty || toolAccResp.isNotEmpty;
             if (hasPendingToolCalls) {
               // Some providers (like XinLiu/iflow.cn) may return tool_calls with finish_reason='stop'
               // and may not send a [DONE] marker. Execute tools immediately in this case.
@@ -3256,21 +4182,33 @@ class ChatApiService {
                   final id = (m['id'] ?? 'call_$idx');
                   final name = (m['name'] ?? '');
                   Map<String, dynamic> args;
-                  try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
-                  callInfos.add(ToolCallInfo(id: id, name: name, arguments: args));
+                  try {
+                    args = (jsonDecode(m['args'] ?? '{}') as Map)
+                        .cast<String, dynamic>();
+                  } catch (_) {
+                    args = <String, dynamic>{};
+                  }
+                  callInfos.add(
+                    ToolCallInfo(id: id, name: name, arguments: args),
+                  );
                   calls.add({
                     'id': id,
                     'type': 'function',
-                    'function': {
-                      'name': name,
-                      'arguments': jsonEncode(args),
-                    },
+                    'function': {'name': name, 'arguments': jsonEncode(args)},
                   });
                   toolMsgs.add({'__name': name, '__id': id, '__args': args});
                 });
                 if (callInfos.isNotEmpty) {
-                  final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
-                  yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? approxTotal, usage: usage, toolCalls: callInfos);
+                  final approxTotal =
+                      approxPromptTokens +
+                      _approxTokensFromChars(approxCompletionChars);
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: false,
+                    totalTokens: usage?.totalTokens ?? approxTotal,
+                    usage: usage,
+                    toolCalls: callInfos,
+                  );
                 }
                 // Execute tools and emit results
                 final results = <Map<String, dynamic>>[];
@@ -3281,28 +4219,58 @@ class ChatApiService {
                   final args = (m['__args'] as Map<String, dynamic>);
                   final res = await onToolCall(name, args) ?? '';
                   results.add({'tool_call_id': id, 'content': res});
-                  resultsInfo.add(ToolResultInfo(id: id, name: name, arguments: args, content: res));
+                  resultsInfo.add(
+                    ToolResultInfo(
+                      id: id,
+                      name: name,
+                      arguments: args,
+                      content: res,
+                    ),
+                  );
                 }
                 if (resultsInfo.isNotEmpty) {
-                  yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolResults: resultsInfo);
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: false,
+                    totalTokens: usage?.totalTokens ?? 0,
+                    usage: usage,
+                    toolResults: resultsInfo,
+                  );
                 }
                 // Build follow-up messages
                 final mm2 = <Map<String, dynamic>>[];
                 for (final m in messages) {
                   mm2.add(_copyChatCompletionMessage(m));
                 }
-                final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
+                final assistantToolCallMsg = <String, dynamic>{
+                  'role': 'assistant',
+                  'content': '\n\n',
+                  'tool_calls': calls,
+                };
                 if (needsReasoningEcho) {
                   assistantToolCallMsg['reasoning_content'] = reasoningBuffer;
                 }
-                if (preserveReasoningDetails && reasoningDetailsBuffer is List && reasoningDetailsBuffer.isNotEmpty) {
-                  assistantToolCallMsg['reasoning_details'] = reasoningDetailsBuffer;
+                if (preserveReasoningDetails &&
+                    reasoningDetailsBuffer is List &&
+                    reasoningDetailsBuffer.isNotEmpty) {
+                  assistantToolCallMsg['reasoning_details'] =
+                      reasoningDetailsBuffer;
                 }
                 mm2.add(assistantToolCallMsg);
                 for (final r in results) {
                   final id = r['tool_call_id'];
-                  final name = calls.firstWhere((c) => c['id'] == id, orElse: () => const {'function': {'name': ''}})['function']['name'];
-                  mm2.add({'role': 'tool', 'tool_call_id': id, 'name': name, 'content': r['content']});
+                  final name = calls.firstWhere(
+                    (c) => c['id'] == id,
+                    orElse: () => const {
+                      'function': {'name': ''},
+                    },
+                  )['function']['name'];
+                  mm2.add({
+                    'role': 'tool',
+                    'tool_call_id': id,
+                    'name': name,
+                    'content': r['content'],
+                  });
                 }
                 // Continue streaming with follow-up request - reuse existing multi-round logic from [DONE] handler
                 var currentMessages = mm2;
@@ -3313,9 +4281,12 @@ class ChatApiService {
                     'stream': true,
                     if (temperature != null) 'temperature': temperature,
                     if (topP != null) 'top_p': topP,
-                    if (isReasoning && effort != 'off' && effort != 'auto') 'reasoning_effort': effort,
-                    if (tools != null && tools.isNotEmpty) 'tools': _cleanToolsForCompatibility(tools),
-                    if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
+                    if (isReasoning && effort != 'off' && effort != 'auto')
+                      'reasoning_effort': effort,
+                    if (tools != null && tools.isNotEmpty)
+                      'tools': _cleanToolsForCompatibility(tools),
+                    if (tools != null && tools.isNotEmpty)
+                      'tool_choice': 'auto',
                   };
                   _setMaxTokens(body2);
                   final off = _isOff(thinkingBudget);
@@ -3325,7 +4296,8 @@ class ChatApiService {
                         body2['reasoning'] = {'enabled': false};
                       } else {
                         final obj = <String, dynamic>{'enabled': true};
-                        if (thinkingBudget != null && thinkingBudget > 0) obj['max_tokens'] = thinkingBudget;
+                        if (thinkingBudget != null && thinkingBudget > 0)
+                          obj['max_tokens'] = thinkingBudget;
                         body2['reasoning'] = obj;
                       }
                       body2.remove('reasoning_effort');
@@ -3333,10 +4305,13 @@ class ChatApiService {
                       body2.remove('reasoning');
                       body2.remove('reasoning_effort');
                     }
-                  } else if (host.contains('dashscope') || host.contains('aliyun')) {
+                  } else if (host.contains('dashscope') ||
+                      host.contains('aliyun')) {
                     if (isReasoning) {
                       body2['enable_thinking'] = !off;
-                      if (!off && thinkingBudget != null && thinkingBudget > 0) {
+                      if (!off &&
+                          thinkingBudget != null &&
+                          thinkingBudget > 0) {
                         body2['thinking_budget'] = thinkingBudget;
                       } else {
                         body2.remove('thinking_budget');
@@ -3346,14 +4321,21 @@ class ChatApiService {
                       body2.remove('thinking_budget');
                     }
                     body2.remove('reasoning_effort');
-                  } else if (host.contains('ark.cn-beijing.volces.com') || host.contains('volc') || host.contains('ark') || isMimo) {
+                  } else if (host.contains('ark.cn-beijing.volces.com') ||
+                      host.contains('volc') ||
+                      host.contains('ark') ||
+                      isMimo) {
                     if (isReasoning) {
-                      body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
+                      body2['thinking'] = {
+                        'type': off ? 'disabled' : 'enabled',
+                      };
                     } else {
                       body2.remove('thinking');
                     }
                     body2.remove('reasoning_effort');
-                  } else if (host.contains('intern-ai') || host.contains('intern') || host.contains('chat.intern-ai.org.cn')) {
+                  } else if (host.contains('intern-ai') ||
+                      host.contains('intern') ||
+                      host.contains('chat.intern-ai.org.cn')) {
                     if (isReasoning) {
                       body2['thinking_mode'] = !off;
                     } else {
@@ -3371,7 +4353,8 @@ class ChatApiService {
                       body2.remove('enable_thinking');
                     }
                     body2.remove('reasoning_effort');
-                  } else if (host.contains('deepseek') || upstreamModelId.toLowerCase().contains('deepseek')) {
+                  } else if (host.contains('deepseek') ||
+                      upstreamModelId.toLowerCase().contains('deepseek')) {
                     if (isReasoning) {
                       if (off) {
                         body2['reasoning_content'] = false;
@@ -3389,7 +4372,8 @@ class ChatApiService {
                       body2.remove('reasoning_budget');
                     }
                   }
-                  if (!host.contains('mistral.ai') && !host.contains('openrouter')) {
+                  if (!host.contains('mistral.ai') &&
+                      !host.contains('openrouter')) {
                     body2['stream_options'] = {'include_usage': true};
                   }
                   if (extraBodyCfg.isNotEmpty) {
@@ -3407,7 +4391,8 @@ class ChatApiService {
                     'Accept': 'text/event-stream',
                   };
                   headers2.addAll(_customHeaders(config, modelId));
-                  if (extraHeaders != null && extraHeaders.isNotEmpty) headers2.addAll(extraHeaders);
+                  if (extraHeaders != null && extraHeaders.isNotEmpty)
+                    headers2.addAll(extraHeaders);
                   req2.headers.addAll(headers2);
                   req2.body = jsonEncode(body2);
                   final resp2 = await client.send(req2);
@@ -3417,7 +4402,8 @@ class ChatApiService {
                   }
                   final s2 = resp2.stream.transform(utf8.decoder);
                   String buf2 = '';
-                  final Map<int, Map<String, String>> toolAcc2 = <int, Map<String, String>>{};
+                  final Map<int, Map<String, String>> toolAcc2 =
+                      <int, Map<String, String>>{};
                   String? finishReason2;
                   String contentAccum = '';
                   String reasoningAccum = '';
@@ -3435,43 +4421,76 @@ class ChatApiService {
                       }
                       try {
                         final o = jsonDecode(d);
-                        if (o is Map && o['choices'] is List && (o['choices'] as List).isNotEmpty) {
+                        if (o is Map &&
+                            o['choices'] is List &&
+                            (o['choices'] as List).isNotEmpty) {
                           final c0 = (o['choices'] as List).first;
                           finishReason2 = c0['finish_reason'] as String?;
                           final delta = c0['delta'] as Map?;
                           final txt = delta?['content'];
-                          final rc = delta?['reasoning_content'] ?? delta?['reasoning'];
+                          final rc =
+                              delta?['reasoning_content'] ??
+                              delta?['reasoning'];
                           final u = o['usage'];
                           if (u != null) {
                             final prompt = (u['prompt_tokens'] ?? 0) as int;
-                            final completion = (u['completion_tokens'] ?? 0) as int;
-                            final cached = (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ?? 0;
-                            usage = (usage ?? const TokenUsage()).merge(TokenUsage(promptTokens: prompt, completionTokens: completion, cachedTokens: cached));
+                            final completion =
+                                (u['completion_tokens'] ?? 0) as int;
+                            final cached =
+                                (u['prompt_tokens_details']?['cached_tokens'] ??
+                                        0)
+                                    as int? ??
+                                0;
+                            usage = (usage ?? const TokenUsage()).merge(
+                              TokenUsage(
+                                promptTokens: prompt,
+                                completionTokens: completion,
+                                cachedTokens: cached,
+                              ),
+                            );
                             totalTokens = usage!.totalTokens;
                           }
                           if (rc is String && rc.isNotEmpty) {
                             if (needsReasoningEcho) reasoningAccum += rc;
-                            yield ChatStreamChunk(content: '', reasoning: rc, isDone: false, totalTokens: 0, usage: usage);
+                            yield ChatStreamChunk(
+                              content: '',
+                              reasoning: rc,
+                              isDone: false,
+                              totalTokens: 0,
+                              usage: usage,
+                            );
                           }
                           if (txt is String && txt.isNotEmpty) {
                             contentAccum += txt;
-                            yield ChatStreamChunk(content: txt, isDone: false, totalTokens: 0, usage: usage);
+                            yield ChatStreamChunk(
+                              content: txt,
+                              isDone: false,
+                              totalTokens: 0,
+                              usage: usage,
+                            );
                           }
                           if (wantsImageOutput) {
                             final List<dynamic> imageItems = <dynamic>[];
                             final imgs = delta?['images'];
                             if (imgs is List) imageItems.addAll(imgs);
-                            final contentArr = (txt is List) ? txt : (delta?['content'] as List?);
+                            final contentArr = (txt is List)
+                                ? txt
+                                : (delta?['content'] as List?);
                             if (contentArr is List) {
                               for (final it in contentArr) {
-                                if (it is Map && (it['type'] == 'image_url' || it['type'] == 'image')) {
+                                if (it is Map &&
+                                    (it['type'] == 'image_url' ||
+                                        it['type'] == 'image')) {
                                   imageItems.add(it);
                                 }
                               }
                             }
                             final singleImage = delta?['image_url'];
                             if (singleImage is Map || singleImage is String) {
-                              imageItems.add({'type': 'image_url', 'image_url': singleImage});
+                              imageItems.add({
+                                'type': 'image_url',
+                                'image_url': singleImage,
+                              });
                             }
                             if (imageItems.isNotEmpty) {
                               final buf = StringBuffer();
@@ -3493,7 +4512,12 @@ class ChatApiService {
                               }
                               final out = buf.toString();
                               if (out.isNotEmpty) {
-                                yield ChatStreamChunk(content: out, isDone: false, totalTokens: 0, usage: usage);
+                                yield ChatStreamChunk(
+                                  content: out,
+                                  isDone: false,
+                                  totalTokens: 0,
+                                  usage: usage,
+                                );
                               }
                             }
                           }
@@ -3502,13 +4526,20 @@ class ChatApiService {
                             for (final t in tcs) {
                               final idx = (t['index'] as int?) ?? 0;
                               final id = t['id'] as String?;
-                              final func = t['function'] as Map<String, dynamic>?;
+                              final func =
+                                  t['function'] as Map<String, dynamic>?;
                               final name = func?['name'] as String?;
                               final argsDelta = func?['arguments'] as String?;
-                              final entry = toolAcc2.putIfAbsent(idx, () => {'id': '', 'name': '', 'args': ''});
+                              final entry = toolAcc2.putIfAbsent(
+                                idx,
+                                () => {'id': '', 'name': '', 'args': ''},
+                              );
                               if (id != null) entry['id'] = id;
-                              if (name != null && name.isNotEmpty) entry['name'] = name;
-                              if (argsDelta != null && argsDelta.isNotEmpty) entry['args'] = (entry['args'] ?? '') + argsDelta;
+                              if (name != null && name.isNotEmpty)
+                                entry['name'] = name;
+                              if (argsDelta != null && argsDelta.isNotEmpty)
+                                entry['args'] =
+                                    (entry['args'] ?? '') + argsDelta;
                             }
                           }
 
@@ -3518,20 +4549,31 @@ class ChatApiService {
                             final mc = message['content'];
                             if (mc is String && mc.isNotEmpty) {
                               contentAccum += mc;
-                              yield ChatStreamChunk(content: mc, isDone: false, totalTokens: 0, usage: usage);
+                              yield ChatStreamChunk(
+                                content: mc,
+                                isDone: false,
+                                totalTokens: 0,
+                                usage: usage,
+                              );
                             }
                           }
                           if (message != null) {
-                            final rcMsg = message['reasoning_content'] ?? message['reasoning'];
-                            if (rcMsg is String && rcMsg.isNotEmpty && needsReasoningEcho) {
+                            final rcMsg =
+                                message['reasoning_content'] ??
+                                message['reasoning'];
+                            if (rcMsg is String &&
+                                rcMsg.isNotEmpty &&
+                                needsReasoningEcho) {
                               reasoningAccum += rcMsg;
                             }
                           }
                           if (preserveReasoningDetails) {
                             final rd = delta?['reasoning_details'];
-                            if (rd is List && rd.isNotEmpty) reasoningDetailsAccum = rd;
+                            if (rd is List && rd.isNotEmpty)
+                              reasoningDetailsAccum = rd;
                             final rdMsg = message?['reasoning_details'];
-                            if (rdMsg is List && rdMsg.isNotEmpty) reasoningDetailsAccum = rdMsg;
+                            if (rdMsg is List && rdMsg.isNotEmpty)
+                              reasoningDetailsAccum = rdMsg;
                           }
                         }
                         // XinLiu compatibility for follow-up requests too
@@ -3545,22 +4587,32 @@ class ChatApiService {
                             final func = t['function'] as Map<String, dynamic>?;
                             if (func == null) continue;
                             final name = (func['name'] ?? '').toString();
-                            final argsStr = (func['arguments'] ?? '').toString();
+                            final argsStr = (func['arguments'] ?? '')
+                                .toString();
                             if (name.isEmpty) continue;
                             final idx = toolAcc2.length;
-                            final entry = toolAcc2.putIfAbsent(idx, () => {'id': id.isEmpty ? 'call_$idx' : id, 'name': name, 'args': argsStr});
+                            final entry = toolAcc2.putIfAbsent(
+                              idx,
+                              () => {
+                                'id': id.isEmpty ? 'call_$idx' : id,
+                                'name': name,
+                                'args': argsStr,
+                              },
+                            );
                             if (id.isNotEmpty) entry['id'] = id;
                             entry['name'] = name;
                             entry['args'] = argsStr;
                           }
-                          if (rootToolCalls2.isNotEmpty && finishReason2 == null) {
+                          if (rootToolCalls2.isNotEmpty &&
+                              finishReason2 == null) {
                             finishReason2 = 'tool_calls';
                           }
                         }
                       } catch (_) {}
                     }
                   }
-                  if ((finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) && onToolCall != null) {
+                  if ((finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) &&
+                      onToolCall != null) {
                     final calls2 = <Map<String, dynamic>>[];
                     final callInfos2 = <ToolCallInfo>[];
                     final toolMsgs2 = <Map<String, dynamic>>[];
@@ -3568,13 +4620,37 @@ class ChatApiService {
                       final id = (m['id'] ?? 'call_$idx');
                       final name = (m['name'] ?? '');
                       Map<String, dynamic> args;
-                      try { args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
-                      callInfos2.add(ToolCallInfo(id: id, name: name, arguments: args));
-                      calls2.add({'id': id, 'type': 'function', 'function': {'name': name, 'arguments': jsonEncode(args)}});
-                      toolMsgs2.add({'__name': name, '__id': id, '__args': args});
+                      try {
+                        args = (jsonDecode(m['args'] ?? '{}') as Map)
+                            .cast<String, dynamic>();
+                      } catch (_) {
+                        args = <String, dynamic>{};
+                      }
+                      callInfos2.add(
+                        ToolCallInfo(id: id, name: name, arguments: args),
+                      );
+                      calls2.add({
+                        'id': id,
+                        'type': 'function',
+                        'function': {
+                          'name': name,
+                          'arguments': jsonEncode(args),
+                        },
+                      });
+                      toolMsgs2.add({
+                        '__name': name,
+                        '__id': id,
+                        '__args': args,
+                      });
                     });
                     if (callInfos2.isNotEmpty) {
-                      yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolCalls: callInfos2);
+                      yield ChatStreamChunk(
+                        content: '',
+                        isDone: false,
+                        totalTokens: usage?.totalTokens ?? 0,
+                        usage: usage,
+                        toolCalls: callInfos2,
+                      );
                     }
                     final results2 = <Map<String, dynamic>>[];
                     final resultsInfo2 = <ToolResultInfo>[];
@@ -3584,34 +4660,68 @@ class ChatApiService {
                       final args = (m['__args'] as Map<String, dynamic>);
                       final res = await onToolCall(name, args) ?? '';
                       results2.add({'tool_call_id': id, 'content': res});
-                      resultsInfo2.add(ToolResultInfo(id: id, name: name, arguments: args, content: res));
+                      resultsInfo2.add(
+                        ToolResultInfo(
+                          id: id,
+                          name: name,
+                          arguments: args,
+                          content: res,
+                        ),
+                      );
                     }
                     if (resultsInfo2.isNotEmpty) {
-                      yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolResults: resultsInfo2);
+                      yield ChatStreamChunk(
+                        content: '',
+                        isDone: false,
+                        totalTokens: usage?.totalTokens ?? 0,
+                        usage: usage,
+                        toolResults: resultsInfo2,
+                      );
                     }
-                    final nextAssistantToolCall = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls2};
+                    final nextAssistantToolCall = <String, dynamic>{
+                      'role': 'assistant',
+                      'content': '\n\n',
+                      'tool_calls': calls2,
+                    };
                     if (needsReasoningEcho) {
-                      nextAssistantToolCall['reasoning_content'] = reasoningAccum;
+                      nextAssistantToolCall['reasoning_content'] =
+                          reasoningAccum;
                     }
-                    if (preserveReasoningDetails && reasoningDetailsAccum is List && reasoningDetailsAccum.isNotEmpty) {
-                      nextAssistantToolCall['reasoning_details'] = reasoningDetailsAccum;
+                    if (preserveReasoningDetails &&
+                        reasoningDetailsAccum is List &&
+                        reasoningDetailsAccum.isNotEmpty) {
+                      nextAssistantToolCall['reasoning_details'] =
+                          reasoningDetailsAccum;
                     }
                     currentMessages = [
                       ...currentMessages,
-                      if (contentAccum.isNotEmpty) {'role': 'assistant', 'content': contentAccum},
+                      if (contentAccum.isNotEmpty)
+                        {'role': 'assistant', 'content': contentAccum},
                       nextAssistantToolCall,
                       for (final r in results2)
                         {
                           'role': 'tool',
                           'tool_call_id': r['tool_call_id'],
-                          'name': calls2.firstWhere((c) => c['id'] == r['tool_call_id'], orElse: () => const {'function': {'name': ''}})['function']['name'],
+                          'name': calls2.firstWhere(
+                            (c) => c['id'] == r['tool_call_id'],
+                            orElse: () => const {
+                              'function': {'name': ''},
+                            },
+                          )['function']['name'],
                           'content': r['content'],
                         },
                     ];
                     continue;
                   } else {
-                    final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
-                    yield ChatStreamChunk(content: '', isDone: true, totalTokens: usage?.totalTokens ?? approxTotal, usage: usage);
+                    final approxTotal =
+                        approxPromptTokens +
+                        _approxTokensFromChars(approxCompletionChars);
+                    yield ChatStreamChunk(
+                      content: '',
+                      isDone: true,
+                      totalTokens: usage?.totalTokens ?? approxTotal,
+                      usage: usage,
+                    );
                     return;
                   }
                 }
@@ -3630,7 +4740,10 @@ class ChatApiService {
           }
 
           // If model finished with tool_calls, execute them and follow-up
-          if (false && config.useResponseApi != true && finishReason == 'tool_calls' && onToolCall != null) {
+          if (false &&
+              config.useResponseApi != true &&
+              finishReason == 'tool_calls' &&
+              onToolCall != null) {
             // Build messages for follow-up
             final calls = <Map<String, dynamic>>[];
             // Emit UI tool call placeholders
@@ -3641,7 +4754,8 @@ class ChatApiService {
               final name = (m['name'] ?? '');
               Map<String, dynamic> args;
               try {
-                args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>();
+                args = (jsonDecode(m['args'] ?? '{}') as Map)
+                    .cast<String, dynamic>();
               } catch (_) {
                 args = <String, dynamic>{};
               }
@@ -3649,16 +4763,19 @@ class ChatApiService {
               calls.add({
                 'id': id,
                 'type': 'function',
-                'function': {
-                  'name': name,
-                  'arguments': jsonEncode(args),
-                },
+                'function': {'name': name, 'arguments': jsonEncode(args)},
               });
               toolMsgs.add({'__name': name, '__id': id, '__args': args});
             });
 
             if (callInfos.isNotEmpty) {
-              yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolCalls: callInfos);
+              yield ChatStreamChunk(
+                content: '',
+                isDone: false,
+                totalTokens: usage?.totalTokens ?? 0,
+                usage: usage,
+                toolCalls: callInfos,
+              );
             }
 
             // Execute tools
@@ -3670,11 +4787,24 @@ class ChatApiService {
               final args = (m['__args'] as Map<String, dynamic>);
               final res = await onToolCall(name, args) ?? '';
               results.add({'tool_call_id': id, 'content': res});
-              resultsInfo.add(ToolResultInfo(id: id, name: name, arguments: args, content: res));
+              resultsInfo.add(
+                ToolResultInfo(
+                  id: id,
+                  name: name,
+                  arguments: args,
+                  content: res,
+                ),
+              );
             }
 
             if (resultsInfo.isNotEmpty) {
-              yield ChatStreamChunk(content: '', isDone: false, totalTokens: usage?.totalTokens ?? 0, usage: usage, toolResults: resultsInfo);
+              yield ChatStreamChunk(
+                content: '',
+                isDone: false,
+                totalTokens: usage?.totalTokens ?? 0,
+                usage: usage,
+                toolResults: resultsInfo,
+              );
             }
 
             // Follow-up request with assistant tool_calls + tool messages
@@ -3682,22 +4812,37 @@ class ChatApiService {
             for (final m in messages) {
               mm2.add(_copyChatCompletionMessage(m));
             }
-            final assistantToolCallMsg = <String, dynamic>{'role': 'assistant', 'content': '\n\n', 'tool_calls': calls};
+            final assistantToolCallMsg = <String, dynamic>{
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': calls,
+            };
             if (needsReasoningEcho) {
               assistantToolCallMsg['reasoning_content'] = reasoningBuffer;
             }
             mm2.add(assistantToolCallMsg);
             for (final r in results) {
               final id = r['tool_call_id'];
-              final name = calls.firstWhere((c) => c['id'] == id, orElse: () => const {'function': {'name': ''}})['function']['name'];
-              mm2.add({'role': 'tool', 'tool_call_id': id, 'name': name, 'content': r['content']});
+              final name = calls.firstWhere(
+                (c) => c['id'] == id,
+                orElse: () => const {
+                  'function': {'name': ''},
+                },
+              )['function']['name'];
+              mm2.add({
+                'role': 'tool',
+                'tool_call_id': id,
+                'name': name,
+                'content': r['content'],
+              });
             }
 
             final Map<String, dynamic> body2 = {
               'model': upstreamModelId,
               'messages': mm2,
               'stream': true,
-              if (tools != null && tools.isNotEmpty) 'tools': _cleanToolsForCompatibility(tools),
+              if (tools != null && tools.isNotEmpty)
+                'tools': _cleanToolsForCompatibility(tools),
               if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
             };
 
@@ -3724,25 +4869,51 @@ class ChatApiService {
                 if (l.isEmpty || !l.startsWith('data:')) continue;
                 final d = l.substring(5).trimLeft();
                 if (d == '[DONE]') {
-                  yield ChatStreamChunk(content: '', isDone: true, totalTokens: usage?.totalTokens ?? 0, usage: usage);
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: true,
+                    totalTokens: usage?.totalTokens ?? 0,
+                    usage: usage,
+                  );
                   return;
                 }
                 try {
                   final o = jsonDecode(d);
-                  if (o is Map && o['choices'] is List && (o['choices'] as List).isNotEmpty) {
+                  if (o is Map &&
+                      o['choices'] is List &&
+                      (o['choices'] as List).isNotEmpty) {
                     final first = (o['choices'] as List).first as Map?;
                     final delta = first?['delta'] as Map?;
                     final message = first?['message'] as Map?;
                     final txt = delta?['content'];
-                    final rc = delta?['reasoning_content'] ?? delta?['reasoning'];
+                    final rc =
+                        delta?['reasoning_content'] ?? delta?['reasoning'];
                     if (rc is String && rc.isNotEmpty) {
-                      yield ChatStreamChunk(content: '', reasoning: rc, isDone: false, totalTokens: 0, usage: usage);
+                      yield ChatStreamChunk(
+                        content: '',
+                        reasoning: rc,
+                        isDone: false,
+                        totalTokens: 0,
+                        usage: usage,
+                      );
                     }
                     if (txt is String && txt.isNotEmpty) {
-                      yield ChatStreamChunk(content: txt, isDone: false, totalTokens: 0, usage: usage);
+                      yield ChatStreamChunk(
+                        content: txt,
+                        isDone: false,
+                        totalTokens: 0,
+                        usage: usage,
+                      );
                     }
-                    if (message != null && message['content'] is String && (message['content'] as String).isNotEmpty) {
-                      yield ChatStreamChunk(content: message['content'] as String, isDone: false, totalTokens: 0, usage: usage);
+                    if (message != null &&
+                        message['content'] is String &&
+                        (message['content'] as String).isNotEmpty) {
+                      yield ChatStreamChunk(
+                        content: message['content'] as String,
+                        isDone: false,
+                        totalTokens: 0,
+                        usage: usage,
+                      );
                     }
                   }
                 } catch (_) {}
@@ -3757,17 +4928,33 @@ class ChatApiService {
     }
 
     // Fallback: provider closed SSE without sending [DONE]
-    final approxTotal = usage?.totalTokens ?? (approxPromptTokens + _approxTokensFromChars(approxCompletionChars));
-    yield ChatStreamChunk(content: '', isDone: true, totalTokens: approxTotal, usage: usage);
+    final approxTotal =
+        usage?.totalTokens ??
+        (approxPromptTokens + _approxTokensFromChars(approxCompletionChars));
+    yield ChatStreamChunk(
+      content: '',
+      isDone: true,
+      totalTokens: approxTotal,
+      usage: usage,
+    );
   }
 
   static Stream<ChatStreamChunk> _sendClaudeStream(
-      http.Client client,
-      ProviderConfig config,
-      String modelId,
-      List<Map<String, dynamic>> messages,
-      {List<String>? userImagePaths, int? thinkingBudget, double? temperature, double? topP, int? maxTokens, List<Map<String, dynamic>>? tools, Future<String> Function(String, Map<String, dynamic>)? onToolCall, Map<String, String>? extraHeaders, Map<String, dynamic>? extraBody, bool stream = true}
-      ) async* {
+    http.Client client,
+    ProviderConfig config,
+    String modelId,
+    List<Map<String, dynamic>> messages, {
+    List<String>? userImagePaths,
+    int? thinkingBudget,
+    double? temperature,
+    double? topP,
+    int? maxTokens,
+    List<Map<String, dynamic>>? tools,
+    Future<String> Function(String, Map<String, dynamic>)? onToolCall,
+    Map<String, String>? extraHeaders,
+    Map<String, dynamic>? extraBody,
+    bool stream = true,
+  }) async* {
     final upstreamModelId = _apiModelId(config, modelId);
     // Endpoint and headers (constant across rounds)
     final base = config.baseUrl.endsWith('/')
@@ -3775,9 +4962,10 @@ class ChatApiService {
         : config.baseUrl;
     final url = Uri.parse('$base/messages');
 
-    final isReasoning = _effectiveModelInfo(config, modelId)
-        .abilities
-        .contains(ModelAbility.reasoning);
+    final isReasoning = _effectiveModelInfo(
+      config,
+      modelId,
+    ).abilities.contains(ModelAbility.reasoning);
 
     // Extract system prompt (Anthropic uses top-level `system`)
     String systemPrompt = '';
@@ -3791,7 +4979,10 @@ class ChatApiService {
         }
         continue;
       }
-      nonSystemMessages.add({'role': role.isEmpty ? 'user' : role, 'content': m['content'] ?? ''});
+      nonSystemMessages.add({
+        'role': role.isEmpty ? 'user' : role,
+        'content': m['content'] ?? '',
+      });
     }
 
     // Transform last user message to include images per Anthropic schema
@@ -3799,7 +4990,9 @@ class ChatApiService {
     for (int i = 0; i < nonSystemMessages.length; i++) {
       final m = nonSystemMessages[i];
       final isLast = i == nonSystemMessages.length - 1;
-      if (isLast && (userImagePaths?.isNotEmpty == true) && (m['role'] == 'user')) {
+      if (isLast &&
+          (userImagePaths?.isNotEmpty == true) &&
+          (m['role'] == 'user')) {
         final parts = <Map<String, dynamic>>[];
         final text = (m['content'] ?? '').toString();
         if (text.isNotEmpty) parts.add({'type': 'text', 'text': text});
@@ -3811,17 +5004,16 @@ class ChatApiService {
             final b64 = await _encodeBase64File(p, withPrefix: false);
             parts.add({
               'type': 'image',
-              'source': {
-                'type': 'base64',
-                'media_type': mime,
-                'data': b64,
-              }
+              'source': {'type': 'base64', 'media_type': mime, 'data': b64},
             });
           }
         }
         initialMessages.add({'role': 'user', 'content': parts});
       } else {
-        initialMessages.add({'role': m['role'] ?? 'user', 'content': m['content'] ?? ''});
+        initialMessages.add({
+          'role': m['role'] ?? 'user',
+          'content': m['content'] ?? '',
+        });
       }
     }
 
@@ -3835,7 +5027,9 @@ class ChatApiService {
         final name = (fn['name'] ?? '').toString();
         if (name.isEmpty) continue;
         final desc = (fn['description'] ?? '').toString();
-        final params = (fn['parameters'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{'type': 'object'};
+        final params =
+            (fn['parameters'] as Map?)?.cast<String, dynamic>() ??
+            <String, dynamic>{'type': 'object'};
         anthropicTools.add({
           'name': name,
           if (desc.isNotEmpty) 'description': desc,
@@ -3846,10 +5040,13 @@ class ChatApiService {
 
     // Collect final tools list: client + server + built-in web_search
     final List<Map<String, dynamic>> allTools = [];
-    if (anthropicTools != null && anthropicTools.isNotEmpty) allTools.addAll(anthropicTools);
+    if (anthropicTools != null && anthropicTools.isNotEmpty)
+      allTools.addAll(anthropicTools);
     if (tools != null && tools.isNotEmpty) {
       for (final t in tools) {
-        if (t is Map && t['type'] is String && (t['type'] as String).startsWith('web_search_')) {
+        if (t is Map &&
+            t['type'] is String &&
+            (t['type'] as String).startsWith('web_search_')) {
           allTools.add(t);
         }
       }
@@ -3867,10 +5064,19 @@ class ChatApiService {
         'type': 'web_search_20250305',
         'name': 'web_search',
       };
-      if (ws['max_uses'] is int && (ws['max_uses'] as int) > 0) entry['max_uses'] = ws['max_uses'];
-      if (ws['allowed_domains'] is List) entry['allowed_domains'] = List<String>.from((ws['allowed_domains'] as List).map((e) => e.toString()));
-      if (ws['blocked_domains'] is List) entry['blocked_domains'] = List<String>.from((ws['blocked_domains'] as List).map((e) => e.toString()));
-      if (ws['user_location'] is Map) entry['user_location'] = (ws['user_location'] as Map).cast<String, dynamic>();
+      if (ws['max_uses'] is int && (ws['max_uses'] as int) > 0)
+        entry['max_uses'] = ws['max_uses'];
+      if (ws['allowed_domains'] is List)
+        entry['allowed_domains'] = List<String>.from(
+          (ws['allowed_domains'] as List).map((e) => e.toString()),
+        );
+      if (ws['blocked_domains'] is List)
+        entry['blocked_domains'] = List<String>.from(
+          (ws['blocked_domains'] as List).map((e) => e.toString()),
+        );
+      if (ws['user_location'] is Map)
+        entry['user_location'] = (ws['user_location'] as Map)
+            .cast<String, dynamic>();
       allTools.add(entry);
     }
 
@@ -3882,10 +5088,13 @@ class ChatApiService {
       'Accept': stream ? 'text/event-stream' : 'application/json',
     };
     baseHeaders.addAll(_customHeaders(config, modelId));
-    if (extraHeaders != null && extraHeaders.isNotEmpty) baseHeaders.addAll(extraHeaders);
+    if (extraHeaders != null && extraHeaders.isNotEmpty)
+      baseHeaders.addAll(extraHeaders);
 
     // Running conversation across rounds
-    List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(initialMessages);
+    List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(
+      initialMessages,
+    );
     TokenUsage? totalUsage;
 
     while (true) {
@@ -3908,10 +5117,13 @@ class ChatApiService {
           },
       };
       final extraClaude = _customBody(config, modelId);
-      if (extraClaude.isNotEmpty) (body as Map<String, dynamic>).addAll(extraClaude);
+      if (extraClaude.isNotEmpty)
+        (body as Map<String, dynamic>).addAll(extraClaude);
       if (extraBody != null && extraBody.isNotEmpty) {
         extraBody.forEach((k, v) {
-          (body as Map<String, dynamic>)[k] = (v is String) ? _parseOverrideValue(v) : v;
+          (body as Map<String, dynamic>)[k] = (v is String)
+              ? _parseOverrideValue(v)
+              : v;
         });
       }
 
@@ -3935,63 +5147,119 @@ class ChatApiService {
           if (u != null) {
             final inTok = (u['input_tokens'] ?? 0) as int? ?? 0;
             final outTok = (u['output_tokens'] ?? 0) as int? ?? 0;
-            final round = TokenUsage(promptTokens: inTok, completionTokens: outTok, cachedTokens: 0, totalTokens: inTok + outTok);
+            final round = TokenUsage(
+              promptTokens: inTok,
+              completionTokens: outTok,
+              cachedTokens: 0,
+              totalTokens: inTok + outTok,
+            );
             totalUsage = (totalUsage ?? const TokenUsage()).merge(round);
           }
         } catch (_) {}
         final content = (obj['content'] as List?) ?? const <dynamic>[];
-        final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
-        final Map<String, Map<String, dynamic>> toolUses = <String, Map<String, dynamic>>{}; // id -> {name,args}
+        final List<Map<String, dynamic>> assistantBlocks =
+            <Map<String, dynamic>>[];
+        final Map<String, Map<String, dynamic>> toolUses =
+            <String, Map<String, dynamic>>{}; // id -> {name,args}
         final buf = StringBuffer();
         for (final it in content) {
           if (it is! Map) continue;
           final type = (it['type'] ?? '').toString();
           if (type == 'text') {
             final t = (it['text'] ?? '').toString();
-            if (t.isNotEmpty) { assistantBlocks.add({'type': 'text', 'text': t}); buf.write(t); }
+            if (t.isNotEmpty) {
+              assistantBlocks.add({'type': 'text', 'text': t});
+              buf.write(t);
+            }
           } else if (type == 'thinking' || type == 'redacted_thinking') {
             // Preserve thinking blocks unmodified for tool-use continuation.
             // When thinking is enabled, the next request must include the last assistant
             // message starting with a thinking/redacted_thinking block.
             try {
-              assistantBlocks.add(Map<String, dynamic>.from(it.cast<String, dynamic>()));
+              assistantBlocks.add(
+                Map<String, dynamic>.from(it.cast<String, dynamic>()),
+              );
             } catch (_) {}
           } else if (type == 'tool_use') {
             final id = (it['id'] ?? '').toString();
             final name = (it['name'] ?? '').toString();
-            final args = (it['input'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+            final args =
+                (it['input'] as Map?)?.cast<String, dynamic>() ??
+                const <String, dynamic>{};
             if (id.isNotEmpty) {
               toolUses[id] = {'name': name, 'args': args};
-              assistantBlocks.add({'type': 'tool_use', 'id': id, 'name': name, 'input': args});
+              assistantBlocks.add({
+                'type': 'tool_use',
+                'id': id,
+                'name': name,
+                'input': args,
+              });
             }
           }
         }
         if (toolUses.isNotEmpty && onToolCall != null) {
           final callInfos = <ToolCallInfo>[];
           for (final e in toolUses.entries) {
-            callInfos.add(ToolCallInfo(id: e.key, name: (e.value['name'] ?? '').toString(), arguments: (e.value['args'] as Map<String, dynamic>)));
+            callInfos.add(
+              ToolCallInfo(
+                id: e.key,
+                name: (e.value['name'] ?? '').toString(),
+                arguments: (e.value['args'] as Map<String, dynamic>),
+              ),
+            );
           }
-          yield ChatStreamChunk(content: '', isDone: false, totalTokens: (totalUsage?.totalTokens ?? 0), usage: totalUsage, toolCalls: callInfos);
+          yield ChatStreamChunk(
+            content: '',
+            isDone: false,
+            totalTokens: (totalUsage?.totalTokens ?? 0),
+            usage: totalUsage,
+            toolCalls: callInfos,
+          );
           final results = <Map<String, dynamic>>[];
           final resultsInfo = <ToolResultInfo>[];
           for (final e in toolUses.entries) {
             final name = (e.value['name'] ?? '').toString();
             final args = (e.value['args'] as Map<String, dynamic>);
             final res = await onToolCall(name, args) ?? '';
-            results.add({'type': 'tool_result', 'tool_use_id': e.key, 'content': res});
-            resultsInfo.add(ToolResultInfo(id: e.key, name: name, arguments: args, content: res));
+            results.add({
+              'type': 'tool_result',
+              'tool_use_id': e.key,
+              'content': res,
+            });
+            resultsInfo.add(
+              ToolResultInfo(
+                id: e.key,
+                name: name,
+                arguments: args,
+                content: res,
+              ),
+            );
           }
           if (resultsInfo.isNotEmpty) {
-            yield ChatStreamChunk(content: '', isDone: false, totalTokens: (totalUsage?.totalTokens ?? 0), usage: totalUsage, toolResults: resultsInfo);
+            yield ChatStreamChunk(
+              content: '',
+              isDone: false,
+              totalTokens: (totalUsage?.totalTokens ?? 0),
+              usage: totalUsage,
+              toolResults: resultsInfo,
+            );
           }
           // Extend convo: assistant + user tool_result, loop
-          final assistantMsg = {'role': 'assistant', 'content': assistantBlocks};
+          final assistantMsg = {
+            'role': 'assistant',
+            'content': assistantBlocks,
+          };
           final userToolMsg = {'role': 'user', 'content': results};
           convo = [...convo, assistantMsg, userToolMsg];
           continue; // next round
         }
         // No tool use -> return final text
-        yield ChatStreamChunk(content: buf.toString(), isDone: true, totalTokens: (totalUsage?.totalTokens ?? 0), usage: totalUsage);
+        yield ChatStreamChunk(
+          content: buf.toString(),
+          isDone: true,
+          totalTokens: (totalUsage?.totalTokens ?? 0),
+          usage: totalUsage,
+        );
         return;
       }
 
@@ -4002,10 +5270,14 @@ class ChatApiService {
       String? _lastStopReason;
 
       // Per-round accumulation
-      final Map<String, Map<String, dynamic>> _anthToolUse = <String, Map<String, dynamic>>{}; // id -> {name, args}
-      final Map<int, String> _cliIndexToId = <int, String>{}; // client tool: index -> id
-      final Map<String, String> _toolResultsContent = <String, String>{}; // id -> result text
-      final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
+      final Map<String, Map<String, dynamic>> _anthToolUse =
+          <String, Map<String, dynamic>>{}; // id -> {name, args}
+      final Map<int, String> _cliIndexToId =
+          <int, String>{}; // client tool: index -> id
+      final Map<String, String> _toolResultsContent =
+          <String, String>{}; // id -> result text
+      final List<Map<String, dynamic>> assistantBlocks =
+          <Map<String, dynamic>>[];
       final StringBuffer textBuf = StringBuffer();
 
       // Track thinking blocks so they can be sent back for tool-use continuation.
@@ -4013,7 +5285,8 @@ class ChatApiService {
       final Map<int, StringBuffer> _thinkingText = <int, StringBuffer>{};
       final Map<int, StringBuffer> _thinkingSig = <int, StringBuffer>{};
       final Map<int, int> _redactedThinkingIndexToAssistantBlock = <int, int>{};
-      final Map<int, StringBuffer> _redactedThinkingData = <int, StringBuffer>{};
+      final Map<int, StringBuffer> _redactedThinkingData =
+          <int, StringBuffer>{};
 
       int? _parseIndex(dynamic raw) {
         if (raw == null) return null;
@@ -4032,7 +5305,8 @@ class ChatApiService {
       // Server tool helpers (web_search)
       final Map<int, String> _srvIndexToId = <int, String>{};
       final Map<String, String> _srvArgsStr = <String, String>{};
-      final Map<String, Map<String, dynamic>> _srvArgs = <String, Map<String, dynamic>>{};
+      final Map<String, Map<String, dynamic>> _srvArgs =
+          <String, Map<String, dynamic>>{};
 
       bool messageStopped = false;
 
@@ -4057,16 +5331,25 @@ class ChatApiService {
                 // Preserve thinking blocks (with signature) for tool-use continuation.
                 _flushTextBlock();
                 if (idx != null) {
-                  assistantBlocks.add({'type': 'thinking', 'thinking': '', 'signature': ''});
-                  _thinkingIndexToAssistantBlock[idx] = assistantBlocks.length - 1;
+                  assistantBlocks.add({
+                    'type': 'thinking',
+                    'thinking': '',
+                    'signature': '',
+                  });
+                  _thinkingIndexToAssistantBlock[idx] =
+                      assistantBlocks.length - 1;
                   _thinkingText[idx] = StringBuffer();
                   _thinkingSig[idx] = StringBuffer();
                 }
               } else if (cb is Map && (cb['type'] == 'redacted_thinking')) {
                 _flushTextBlock();
                 if (idx != null) {
-                  assistantBlocks.add({'type': 'redacted_thinking', 'data': ''});
-                  _redactedThinkingIndexToAssistantBlock[idx] = assistantBlocks.length - 1;
+                  assistantBlocks.add({
+                    'type': 'redacted_thinking',
+                    'data': '',
+                  });
+                  _redactedThinkingIndexToAssistantBlock[idx] =
+                      assistantBlocks.length - 1;
                   _redactedThinkingData[idx] = StringBuffer();
                 }
               } else if (cb is Map && (cb['type'] == 'tool_use')) {
@@ -4076,8 +5359,16 @@ class ChatApiService {
                 final name = (cb['name'] ?? '').toString();
                 final idx2 = idx ?? -1;
                 if (id.isNotEmpty) {
-                  _anthToolUse.putIfAbsent(id, () => {'name': name, 'args': ''});
-                  assistantBlocks.add({'type': 'tool_use', 'id': id, 'name': name, 'input': {}});
+                  _anthToolUse.putIfAbsent(
+                    id,
+                    () => {'name': name, 'args': ''},
+                  );
+                  assistantBlocks.add({
+                    'type': 'tool_use',
+                    'id': id,
+                    'name': name,
+                    'input': {},
+                  });
                   if (idx2 >= 0) _cliIndexToId[idx2] = id;
                   // Emit placeholder tool-call card immediately
                   yield ChatStreamChunk(
@@ -4085,7 +5376,13 @@ class ChatApiService {
                     isDone: false,
                     totalTokens: roundTokens,
                     usage: usage,
-                    toolCalls: [ToolCallInfo(id: id, name: name, arguments: const <String, dynamic>{})],
+                    toolCalls: [
+                      ToolCallInfo(
+                        id: id,
+                        name: name,
+                        arguments: const <String, dynamic>{},
+                      ),
+                    ],
                   );
                 }
               } else if (cb is Map && (cb['type'] == 'server_tool_use')) {
@@ -4102,10 +5399,17 @@ class ChatApiService {
                     isDone: false,
                     totalTokens: roundTokens,
                     usage: usage,
-                    toolCalls: [ToolCallInfo(id: id, name: 'search_web', arguments: const <String, dynamic>{})],
+                    toolCalls: [
+                      ToolCallInfo(
+                        id: id,
+                        name: 'search_web',
+                        arguments: const <String, dynamic>{},
+                      ),
+                    ],
                   );
                 }
-              } else if (cb is Map && (cb['type'] == 'web_search_tool_result')) {
+              } else if (cb is Map &&
+                  (cb['type'] == 'web_search_tool_result')) {
                 // Emit simplified search results to UI
                 final toolUseId = (cb['tool_use_id'] ?? '').toString();
                 final contentBlock = cb['content'];
@@ -4119,22 +5423,35 @@ class ChatApiService {
                         'index': j + 1,
                         'title': (it['title'] ?? '').toString(),
                         'url': (it['url'] ?? '').toString(),
-                        if ((it['page_age'] ?? '').toString().isNotEmpty) 'page_age': (it['page_age'] ?? '').toString(),
+                        if ((it['page_age'] ?? '').toString().isNotEmpty)
+                          'page_age': (it['page_age'] ?? '').toString(),
                       });
                     }
                   }
-                } else if (contentBlock is Map && (contentBlock['type'] == 'web_search_tool_result_error')) {
+                } else if (contentBlock is Map &&
+                    (contentBlock['type'] == 'web_search_tool_result_error')) {
                   errorCode = (contentBlock['error_code'] ?? '').toString();
                 }
                 Map<String, dynamic> args = const <String, dynamic>{};
-                if (_srvArgs.containsKey(toolUseId)) args = _srvArgs[toolUseId]!;
-                final payload = jsonEncode({'items': items, if ((errorCode ?? '').isNotEmpty) 'error': errorCode});
+                if (_srvArgs.containsKey(toolUseId))
+                  args = _srvArgs[toolUseId]!;
+                final payload = jsonEncode({
+                  'items': items,
+                  if ((errorCode ?? '').isNotEmpty) 'error': errorCode,
+                });
                 yield ChatStreamChunk(
                   content: '',
                   isDone: false,
                   totalTokens: roundTokens,
                   usage: usage,
-                  toolResults: [ToolResultInfo(id: toolUseId.isEmpty ? 'builtin_search' : toolUseId, name: 'search_web', arguments: args, content: payload)],
+                  toolResults: [
+                    ToolResultInfo(
+                      id: toolUseId.isEmpty ? 'builtin_search' : toolUseId,
+                      name: 'search_web',
+                      arguments: args,
+                      content: payload,
+                    ),
+                  ],
                 );
               }
             } else if (type == 'content_block_delta') {
@@ -4144,13 +5461,23 @@ class ChatApiService {
                   final content = delta['text'] ?? '';
                   if (content is String && content.isNotEmpty) {
                     textBuf.write(content);
-                    yield ChatStreamChunk(content: content, isDone: false, totalTokens: roundTokens);
+                    yield ChatStreamChunk(
+                      content: content,
+                      isDone: false,
+                      totalTokens: roundTokens,
+                    );
                   }
                 } else if (delta['type'] == 'thinking_delta') {
                   final idx = _parseIndex(obj['index']);
-                  final thinking = (delta['thinking'] ?? delta['text'] ?? '') as String;
+                  final thinking =
+                      (delta['thinking'] ?? delta['text'] ?? '') as String;
                   if (thinking.isNotEmpty) {
-                    yield ChatStreamChunk(content: '', reasoning: thinking, isDone: false, totalTokens: roundTokens);
+                    yield ChatStreamChunk(
+                      content: '',
+                      reasoning: thinking,
+                      isDone: false,
+                      totalTokens: roundTokens,
+                    );
                     if (idx != null && _thinkingText.containsKey(idx)) {
                       _thinkingText[idx]!.write(thinking);
                     }
@@ -4158,32 +5485,54 @@ class ChatApiService {
                 } else if (delta['type'] == 'signature_delta') {
                   final idx = _parseIndex(obj['index']);
                   final sig = (delta['signature'] ?? '').toString();
-                  if (sig.isNotEmpty && idx != null && _thinkingSig.containsKey(idx)) {
+                  if (sig.isNotEmpty &&
+                      idx != null &&
+                      _thinkingSig.containsKey(idx)) {
                     _thinkingSig[idx]!.write(sig);
                   }
                 } else if (delta['type'] == 'redacted_thinking_delta') {
                   final idx = _parseIndex(obj['index']);
                   final data = (delta['data'] ?? '').toString();
-                  if (data.isNotEmpty && idx != null && _redactedThinkingData.containsKey(idx)) {
+                  if (data.isNotEmpty &&
+                      idx != null &&
+                      _redactedThinkingData.containsKey(idx)) {
                     _redactedThinkingData[idx]!.write(data);
                   }
                 } else if (delta['type'] == 'tool_use_delta') {
                   // Client tool input fragments stream under the same content_block index
-                  final idx = (obj['index'] is int) ? obj['index'] as int : int.tryParse((obj['index'] ?? '').toString());
-                  final id = (idx != null && _cliIndexToId.containsKey(idx)) ? _cliIndexToId[idx]! : '';
+                  final idx = (obj['index'] is int)
+                      ? obj['index'] as int
+                      : int.tryParse((obj['index'] ?? '').toString());
+                  final id = (idx != null && _cliIndexToId.containsKey(idx))
+                      ? _cliIndexToId[idx]!
+                      : '';
                   if (id.isNotEmpty) {
-                    final argsDelta = (delta['partial_json'] ?? delta['input'] ?? delta['text'] ?? '').toString();
-                    final entry = _anthToolUse.putIfAbsent(id, () => {'name': '', 'args': ''});
-                    if (argsDelta.isNotEmpty) entry['args'] = (entry['args'] ?? '') + argsDelta;
+                    final argsDelta =
+                        (delta['partial_json'] ??
+                                delta['input'] ??
+                                delta['text'] ??
+                                '')
+                            .toString();
+                    final entry = _anthToolUse.putIfAbsent(
+                      id,
+                      () => {'name': '', 'args': ''},
+                    );
+                    if (argsDelta.isNotEmpty)
+                      entry['args'] = (entry['args'] ?? '') + argsDelta;
                   }
                 } else if (delta['type'] == 'input_json_delta') {
                   final idxRaw = obj['index'];
-                  final index = (idxRaw is int) ? idxRaw : int.tryParse((idxRaw ?? '').toString());
+                  final index = (idxRaw is int)
+                      ? idxRaw
+                      : int.tryParse((idxRaw ?? '').toString());
                   final part = (delta['partial_json'] ?? '').toString();
                   if (index != null && part.isNotEmpty) {
                     if (_cliIndexToId.containsKey(index)) {
                       final id = _cliIndexToId[index]!;
-                      final entry = _anthToolUse.putIfAbsent(id, () => {'name': '', 'args': ''});
+                      final entry = _anthToolUse.putIfAbsent(
+                        id,
+                        () => {'name': '', 'args': ''},
+                      );
                       entry['args'] = (entry['args'] ?? '') + part;
                     } else if (_srvIndexToId.containsKey(index)) {
                       final id = _srvIndexToId[index]!;
@@ -4195,30 +5544,54 @@ class ChatApiService {
             } else if (type == 'content_block_stop') {
               final idx = _parseIndex(obj['index']);
               // Finalize thinking blocks so they can be sent back unmodified.
-              if (idx != null && _thinkingIndexToAssistantBlock.containsKey(idx)) {
+              if (idx != null &&
+                  _thinkingIndexToAssistantBlock.containsKey(idx)) {
                 final pos = _thinkingIndexToAssistantBlock.remove(idx)!;
                 final t = _thinkingText.remove(idx)?.toString() ?? '';
                 final sig = _thinkingSig.remove(idx)?.toString() ?? '';
-                assistantBlocks[pos] = {'type': 'thinking', 'thinking': t, 'signature': sig};
+                assistantBlocks[pos] = {
+                  'type': 'thinking',
+                  'thinking': t,
+                  'signature': sig,
+                };
               }
-              if (idx != null && _redactedThinkingIndexToAssistantBlock.containsKey(idx)) {
+              if (idx != null &&
+                  _redactedThinkingIndexToAssistantBlock.containsKey(idx)) {
                 final pos = _redactedThinkingIndexToAssistantBlock.remove(idx)!;
-                final data = _redactedThinkingData.remove(idx)?.toString() ?? '';
-                assistantBlocks[pos] = {'type': 'redacted_thinking', 'data': data};
+                final data =
+                    _redactedThinkingData.remove(idx)?.toString() ?? '';
+                assistantBlocks[pos] = {
+                  'type': 'redacted_thinking',
+                  'data': data,
+                };
               }
-              String id = (obj['content_block']?['id'] ?? obj['id'] ?? '').toString();
+              String id = (obj['content_block']?['id'] ?? obj['id'] ?? '')
+                  .toString();
               if (id.isEmpty && idx != null && _cliIndexToId.containsKey(idx)) {
                 id = _cliIndexToId[idx]!;
               }
               if (id.isNotEmpty && _anthToolUse.containsKey(id)) {
                 final name = (_anthToolUse[id]!['name'] ?? '').toString();
                 Map<String, dynamic> args;
-                try { args = (jsonDecode((_anthToolUse[id]!['args'] ?? '{}') as String) as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+                try {
+                  args =
+                      (jsonDecode((_anthToolUse[id]!['args'] ?? '{}') as String)
+                              as Map)
+                          .cast<String, dynamic>();
+                } catch (_) {
+                  args = <String, dynamic>{};
+                }
                 // Update last assistant tool_use block input
                 for (int k = assistantBlocks.length - 1; k >= 0; k--) {
                   final b = assistantBlocks[k];
-                  if (b['type'] == 'tool_use' && (b['id']?.toString() ?? '') == id) {
-                    assistantBlocks[k] = {'type': 'tool_use', 'id': id, 'name': name, 'input': args};
+                  if (b['type'] == 'tool_use' &&
+                      (b['id']?.toString() ?? '') == id) {
+                    assistantBlocks[k] = {
+                      'type': 'tool_use',
+                      'id': id,
+                      'name': name,
+                      'input': args,
+                    };
                     break;
                   }
                 }
@@ -4226,15 +5599,45 @@ class ChatApiService {
                 if (onToolCall != null) {
                   final res = await onToolCall(name, args) ?? '';
                   _toolResultsContent[id] = res;
-                  yield ChatStreamChunk(content: '', isDone: false, totalTokens: roundTokens, toolResults: [ToolResultInfo(id: id, name: name, arguments: args, content: res)], usage: usage);
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: false,
+                    totalTokens: roundTokens,
+                    toolResults: [
+                      ToolResultInfo(
+                        id: id,
+                        name: name,
+                        arguments: args,
+                        content: res,
+                      ),
+                    ],
+                    usage: usage,
+                  );
                 }
               } else {
                 if (idx != null && _srvIndexToId.containsKey(idx)) {
                   final sid = _srvIndexToId[idx]!;
                   Map<String, dynamic> args;
-                  try { args = (jsonDecode((_srvArgsStr[sid] ?? '{}')) as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+                  try {
+                    args = (jsonDecode((_srvArgsStr[sid] ?? '{}')) as Map)
+                        .cast<String, dynamic>();
+                  } catch (_) {
+                    args = <String, dynamic>{};
+                  }
                   _srvArgs[sid] = args;
-                  yield ChatStreamChunk(content: '', isDone: false, totalTokens: roundTokens, usage: usage, toolCalls: [ToolCallInfo(id: sid, name: 'search_web', arguments: args)]);
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: false,
+                    totalTokens: roundTokens,
+                    usage: usage,
+                    toolCalls: [
+                      ToolCallInfo(
+                        id: sid,
+                        name: 'search_web',
+                        arguments: args,
+                      ),
+                    ],
+                  );
                 }
               }
             } else if (type == 'message_delta') {
@@ -4242,13 +5645,17 @@ class ChatApiService {
               if (u != null) {
                 final inTok = (u['input_tokens'] ?? 0) as int;
                 final outTok = (u['output_tokens'] ?? 0) as int;
-                usage = (usage ?? const TokenUsage()).merge(TokenUsage(promptTokens: inTok, completionTokens: outTok));
+                usage = (usage ?? const TokenUsage()).merge(
+                  TokenUsage(promptTokens: inTok, completionTokens: outTok),
+                );
                 roundTokens = usage!.totalTokens;
               }
               // Capture stop reason to handle pause_turn for server tools
               try {
                 final d = obj['delta'];
-                final sr = (d is Map) ? (d['stop_reason'] ?? d['stopReason']) : null;
+                final sr = (d is Map)
+                    ? (d['stop_reason'] ?? d['stopReason'])
+                    : null;
                 if (sr is String && sr.isNotEmpty) {
                   _lastStopReason = sr;
                 }
@@ -4256,7 +5663,8 @@ class ChatApiService {
             } else if (type == 'message_stop') {
               // Flush remaining text
               final t = textBuf.toString();
-              if (t.isNotEmpty) assistantBlocks.add({'type': 'text', 'text': t});
+              if (t.isNotEmpty)
+                assistantBlocks.add({'type': 'text', 'text': t});
               messageStopped = true;
             }
           } catch (_) {
@@ -4267,11 +5675,18 @@ class ChatApiService {
       }
 
       // Merge usage across rounds for final token count
-      if (usage != null) totalUsage = (totalUsage ?? const TokenUsage()).merge(usage!);
+      if (usage != null)
+        totalUsage = (totalUsage ?? const TokenUsage()).merge(usage!);
 
       // If no client tool calls, decide whether to continue (pause_turn/server tool) or finalize
       if (_anthToolUse.isEmpty) {
-        final hadServerTool = assistantBlocks.any((b) => (b is Map) && (b['type'] == 'tool_use' || b['type'] == 'text')) && _srvIndexToId.isNotEmpty;
+        final hadServerTool =
+            assistantBlocks.any(
+              (b) =>
+                  (b is Map) &&
+                  (b['type'] == 'tool_use' || b['type'] == 'text'),
+            ) &&
+            _srvIndexToId.isNotEmpty;
         final sr = _lastStopReason ?? '';
         if (sr == 'pause_turn' || hadServerTool) {
           // Continue this turn with assistant content only
@@ -4282,7 +5697,12 @@ class ChatApiService {
           // Loop to next round
           continue;
         } else {
-          yield ChatStreamChunk(content: '', isDone: true, totalTokens: (totalUsage?.totalTokens ?? roundTokens), usage: totalUsage ?? usage);
+          yield ChatStreamChunk(
+            content: '',
+            isDone: true,
+            totalTokens: (totalUsage?.totalTokens ?? roundTokens),
+            usage: totalUsage ?? usage,
+          );
           return;
         }
       }
@@ -4293,7 +5713,12 @@ class ChatApiService {
         final id = entry.key;
         final name = (entry.value['name'] ?? '').toString();
         Map<String, dynamic> args;
-        try { args = (jsonDecode((entry.value['args'] ?? '{}') as String) as Map).cast<String, dynamic>(); } catch (_) { args = <String, dynamic>{}; }
+        try {
+          args = (jsonDecode((entry.value['args'] ?? '{}') as String) as Map)
+              .cast<String, dynamic>();
+        } catch (_) {
+          args = <String, dynamic>{};
+        }
         String res = _toolResultsContent[id] ?? '';
         if (res.isEmpty && onToolCall != null) {
           res = await onToolCall(name, args) ?? '';
@@ -4316,24 +5741,41 @@ class ChatApiService {
   }
 
   static Stream<ChatStreamChunk> _sendGoogleStream(
-      http.Client client,
-      ProviderConfig config,
-      String modelId,
-      List<Map<String, dynamic>> messages,
-      {List<String>? userImagePaths, int? thinkingBudget, double? temperature, double? topP, int? maxTokens, List<Map<String, dynamic>>? tools, Future<String> Function(String, Map<String, dynamic>)? onToolCall, Map<String, String>? extraHeaders, Map<String, dynamic>? extraBody, bool stream = true}
-      ) async* {
-    final bool _persistGeminiThoughtSigs = modelId.toLowerCase().contains('gemini-3');
+    http.Client client,
+    ProviderConfig config,
+    String modelId,
+    List<Map<String, dynamic>> messages, {
+    List<String>? userImagePaths,
+    int? thinkingBudget,
+    double? temperature,
+    double? topP,
+    int? maxTokens,
+    List<Map<String, dynamic>>? tools,
+    Future<String> Function(String, Map<String, dynamic>)? onToolCall,
+    Map<String, String>? extraHeaders,
+    Map<String, dynamic>? extraBody,
+    bool stream = true,
+  }) async* {
+    final upstreamModelId = _apiModelId(config, modelId);
+    final bool _persistGeminiThoughtSigs = upstreamModelId
+        .toLowerCase()
+        .contains('gemini-3');
     final builtIns = _builtInTools(config, modelId);
     final enableYoutube = builtIns.contains(BuiltInToolNames.youtube);
     // Non-streaming path: use generateContent
     if (!stream) {
       final isVertex = config.vertexAI == true;
-      final base = config.baseUrl.endsWith('/') ? config.baseUrl.substring(0, config.baseUrl.length - 1) : config.baseUrl;
+      final base = config.baseUrl.endsWith('/')
+          ? config.baseUrl.substring(0, config.baseUrl.length - 1)
+          : config.baseUrl;
       String url;
-      if (isVertex && (config.projectId?.isNotEmpty == true) && (config.location?.isNotEmpty == true)) {
-        url = 'https://aiplatform.googleapis.com/v1/projects/${config.projectId}/locations/${config.location}/publishers/google/models/$modelId:generateContent';
+      if (isVertex &&
+          (config.projectId?.isNotEmpty == true) &&
+          (config.location?.isNotEmpty == true)) {
+        url =
+            'https://aiplatform.googleapis.com/v1/projects/${config.projectId}/locations/${config.location}/publishers/google/models/$upstreamModelId:generateContent';
       } else {
-        url = '$base/models/$modelId:generateContent';
+        url = '$base/models/$upstreamModelId:generateContent';
       }
 
       // Convert messages to contents
@@ -4343,7 +5785,9 @@ class ChatApiService {
         final role = msg['role'] == 'assistant' ? 'model' : 'user';
         final isLast = i == messages.length - 1;
         final parts = <Map<String, dynamic>>[];
-        final meta = _extractGeminiThoughtMeta((msg['content'] ?? '').toString());
+        final meta = _extractGeminiThoughtMeta(
+          (msg['content'] ?? '').toString(),
+        );
         final raw = meta.cleanedText;
         final seenSources = <String>{};
         String normalizeSrc(String src) {
@@ -4354,9 +5798,11 @@ class ChatApiService {
             return src;
           }
         }
+
         final hasMarkdownImages = raw.contains('![') && raw.contains('](');
         final hasCustomImages = raw.contains('[image:');
-        final hasAttachedImages = isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
+        final hasAttachedImages =
+            isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
         if (hasMarkdownImages || hasCustomImages || hasAttachedImages) {
           final parsed = await _parseTextAndImages(
             raw,
@@ -4374,14 +5820,18 @@ class ChatApiService {
               final idx = ref.src.indexOf('base64,');
               if (idx > 0) {
                 final b64 = ref.src.substring(idx + 7);
-                parts.add({'inline_data': {'mime_type': mime, 'data': b64}});
+                parts.add({
+                  'inline_data': {'mime_type': mime, 'data': b64},
+                });
               } else {
                 parts.add({'text': ref.src});
               }
             } else if (ref.kind == 'path') {
               final mime = _mimeFromPath(ref.src);
               final b64 = await _encodeBase64File(ref.src, withPrefix: false);
-              parts.add({'inline_data': {'mime_type': mime, 'data': b64}});
+              parts.add({
+                'inline_data': {'mime_type': mime, 'data': b64},
+              });
             } else {
               parts.add({'text': '(image) ${ref.src}'});
             }
@@ -4395,12 +5845,17 @@ class ChatApiService {
                 final idx = p.indexOf('base64,');
                 if (idx > 0) {
                   final b64 = p.substring(idx + 7);
-                  parts.add({'inline_data': {'mime_type': mime, 'data': b64}});
+                  parts.add({
+                    'inline_data': {'mime_type': mime, 'data': b64},
+                  });
                 }
-              } else if (!(p.startsWith('http://') || p.startsWith('https://'))) {
+              } else if (!(p.startsWith('http://') ||
+                  p.startsWith('https://'))) {
                 final mime = _mimeFromPath(p);
                 final b64 = await _encodeBase64File(p, withPrefix: false);
-                parts.add({'inline_data': {'mime_type': mime, 'data': b64}});
+                parts.add({
+                  'inline_data': {'mime_type': mime, 'data': b64},
+                });
               } else {
                 parts.add({'text': '(image) ${p}'});
               }
@@ -4416,14 +5871,22 @@ class ChatApiService {
           for (final u in urls) {
             // Vertex AI requires mime_type for file_data
             if (isVertex) {
-              parts.add({'file_data': {'file_uri': u, 'mime_type': 'video/*'}});
+              parts.add({
+                'file_data': {'file_uri': u, 'mime_type': 'video/*'},
+              });
             } else {
-              parts.add({'file_data': {'file_uri': u}});
+              parts.add({
+                'file_data': {'file_uri': u},
+              });
             }
           }
         }
         if (role == 'model') {
-          _applyGeminiThoughtSignatures(meta, parts, attachDummyWhenMissing: _persistGeminiThoughtSigs);
+          _applyGeminiThoughtSignatures(
+            meta,
+            parts,
+            attachDummyWhenMissing: _persistGeminiThoughtSigs,
+          );
         }
         contents.add({'role': role, 'parts': parts});
       }
@@ -4442,16 +5905,24 @@ class ChatApiService {
           if (name.isEmpty) continue;
           final desc = (fn['description'] ?? '').toString();
           final params = (fn['parameters'] as Map?)?.cast<String, dynamic>();
-          final d = <String, dynamic>{'name': name, if (desc.isNotEmpty) 'description': desc};
+          final d = <String, dynamic>{
+            'name': name,
+            if (desc.isNotEmpty) 'description': desc,
+          };
           if (params != null) d['parameters'] = _cleanSchemaForGemini(params);
           decls.add(d);
         }
-        if (decls.isNotEmpty) geminiTools = [{'function_declarations': decls}];
+        if (decls.isNotEmpty)
+          geminiTools = [
+            {'function_declarations': decls},
+          ];
       }
 
       final headers = <String, String>{'Content-Type': 'application/json'};
       if (isVertex) {
-        final token = await GoogleServiceAccountAuth.getAccessTokenFromJson(config.serviceAccountJson ?? '');
+        final token = await GoogleServiceAccountAuth.getAccessTokenFromJson(
+          config.serviceAccountJson ?? '',
+        );
         headers['Authorization'] = 'Bearer $token';
       } else {
         final apiKey = _effectiveApiKey(config);
@@ -4466,30 +5937,42 @@ class ChatApiService {
       final toolsArr = <Map<String, dynamic>>[];
       if (builtIns.contains(BuiltInToolNames.codeExecution)) {
         toolsArr.add({'code_execution': {}});
-      } else if (builtIns.contains(BuiltInToolNames.search) || builtIns.contains(BuiltInToolNames.urlContext)) {
-        if (builtIns.contains(BuiltInToolNames.search)) toolsArr.add({'google_search': {}});
-        if (builtIns.contains(BuiltInToolNames.urlContext)) toolsArr.add({'url_context': {}});
+      } else if (builtIns.contains(BuiltInToolNames.search) ||
+          builtIns.contains(BuiltInToolNames.urlContext)) {
+        if (builtIns.contains(BuiltInToolNames.search))
+          toolsArr.add({'google_search': {}});
+        if (builtIns.contains(BuiltInToolNames.urlContext))
+          toolsArr.add({'url_context': {}});
       } else if (geminiTools != null) {
         toolsArr.addAll(geminiTools);
       }
-      final shouldAttachToolConfig = shouldAttachGeminiFunctionCallingConfig(toolsArr);
+      final shouldAttachToolConfig = shouldAttachGeminiFunctionCallingConfig(
+        toolsArr,
+      );
 
       Map<String, dynamic> baseBody = {
         'contents': contents,
         if (temperature != null) 'temperature': temperature,
         if (topP != null) 'topP': topP,
-        if (maxTokens != null) 'generationConfig': {'maxOutputTokens': maxTokens},
+        if (maxTokens != null)
+          'generationConfig': {'maxOutputTokens': maxTokens},
         if (toolsArr.isNotEmpty) 'tools': toolsArr,
-        if (shouldAttachToolConfig) 'toolConfig': {'function_calling_config': {'mode': 'AUTO'}},
+        if (shouldAttachToolConfig)
+          'toolConfig': {
+            'function_calling_config': {'mode': 'AUTO'},
+          },
       };
       final extraG = _customBody(config, modelId);
       if (extraG.isNotEmpty) baseBody.addAll(extraG);
       if (extraBody != null && extraBody.isNotEmpty) {
-        extraBody.forEach((k, v) { baseBody[k] = (v is String) ? _parseOverrideValue(v) : v; });
+        extraBody.forEach((k, v) {
+          baseBody[k] = (v is String) ? _parseOverrideValue(v) : v;
+        });
       }
 
       TokenUsage? totalUsage;
-      List<Map<String, dynamic>> currentContents = List<Map<String, dynamic>>.from(contents);
+      List<Map<String, dynamic>> currentContents =
+          List<Map<String, dynamic>>.from(contents);
       while (true) {
         final req = http.Request('POST', Uri.parse(url));
         req.headers.addAll(headers);
@@ -4508,39 +5991,91 @@ class ChatApiService {
           if (u != null) {
             final prompt = (u['promptTokenCount'] ?? 0) as int? ?? 0;
             final completion = (u['candidatesTokenCount'] ?? 0) as int? ?? 0;
-            totalUsage = (totalUsage ?? const TokenUsage()).merge(TokenUsage(promptTokens: prompt, completionTokens: completion, cachedTokens: 0));
+            totalUsage = (totalUsage ?? const TokenUsage()).merge(
+              TokenUsage(
+                promptTokens: prompt,
+                completionTokens: completion,
+                cachedTokens: 0,
+              ),
+            );
           }
         } catch (_) {}
         final candidates = (obj['candidates'] as List?) ?? const <dynamic>[];
         if (candidates.isEmpty) {
-          yield ChatStreamChunk(content: '', isDone: true, totalTokens: totalUsage?.totalTokens ?? 0, usage: totalUsage);
+          yield ChatStreamChunk(
+            content: '',
+            isDone: true,
+            totalTokens: totalUsage?.totalTokens ?? 0,
+            usage: totalUsage,
+          );
           return;
         }
         final cand = (candidates.first as Map).cast<String, dynamic>();
         final parts = (cand['content']?['parts'] as List?) ?? const <dynamic>[];
-        final fc = parts.firstWhere((e) => (e is Map) && e.containsKey('functionCall'), orElse: () => null);
+        final fc = parts.firstWhere(
+          (e) => (e is Map) && e.containsKey('functionCall'),
+          orElse: () => null,
+        );
         if (fc is Map && fc['functionCall'] is Map && onToolCall != null) {
           final call = (fc['functionCall'] as Map).cast<String, dynamic>();
           final name = (call['name'] ?? '').toString();
-          final args = (call['args'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
-          yield ChatStreamChunk(content: '', isDone: false, totalTokens: totalUsage?.totalTokens ?? 0, usage: totalUsage, toolCalls: [ToolCallInfo(id: 'fn_0', name: name, arguments: args)]);
+          final args =
+              (call['args'] as Map?)?.cast<String, dynamic>() ??
+              const <String, dynamic>{};
+          yield ChatStreamChunk(
+            content: '',
+            isDone: false,
+            totalTokens: totalUsage?.totalTokens ?? 0,
+            usage: totalUsage,
+            toolCalls: [ToolCallInfo(id: 'fn_0', name: name, arguments: args)],
+          );
           final res = await onToolCall(name, args) ?? '';
-          yield ChatStreamChunk(content: '', isDone: false, totalTokens: totalUsage?.totalTokens ?? 0, usage: totalUsage, toolResults: [ToolResultInfo(id: 'fn_0', name: name, arguments: args, content: res)]);
+          yield ChatStreamChunk(
+            content: '',
+            isDone: false,
+            totalTokens: totalUsage?.totalTokens ?? 0,
+            usage: totalUsage,
+            toolResults: [
+              ToolResultInfo(
+                id: 'fn_0',
+                name: name,
+                arguments: args,
+                content: res,
+              ),
+            ],
+          );
           currentContents = [
             ...currentContents,
             {'role': 'model', 'parts': parts},
-            {'role': 'user', 'parts': [ {'functionResponse': {'name': name, 'response': {'result': res}}} ]},
+            {
+              'role': 'user',
+              'parts': [
+                {
+                  'functionResponse': {
+                    'name': name,
+                    'response': {'result': res},
+                  },
+                },
+              ],
+            },
           ];
           continue;
         }
         final buf = StringBuffer();
-        for (final p in parts) { if (p is Map && p['text'] is String) buf.write(p['text']); }
+        for (final p in parts) {
+          if (p is Map && p['text'] is String) buf.write(p['text']);
+        }
         var contentStr = buf.toString();
         if (_persistGeminiThoughtSigs) {
           final metaComment = _collectThoughtSigCommentFromParts(parts);
           if (metaComment.isNotEmpty) contentStr += metaComment;
         }
-        yield ChatStreamChunk(content: contentStr, isDone: true, totalTokens: totalUsage?.totalTokens ?? 0, usage: totalUsage);
+        yield ChatStreamChunk(
+          content: contentStr,
+          isDone: true,
+          totalTokens: totalUsage?.totalTokens ?? 0,
+          usage: totalUsage,
+        );
         return;
       }
     }
@@ -4548,15 +6083,18 @@ class ChatApiService {
     // Implement SSE streaming via :streamGenerateContent with alt=sse
     // Build endpoint per Vertex vs Gemini
     String baseUrl;
-    if (config.vertexAI == true && (config.location?.isNotEmpty == true) && (config.projectId?.isNotEmpty == true)) {
+    if (config.vertexAI == true &&
+        (config.location?.isNotEmpty == true) &&
+        (config.projectId?.isNotEmpty == true)) {
       final loc = config.location!.trim();
       final proj = config.projectId!.trim();
-      baseUrl = 'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$modelId:streamGenerateContent';
+      baseUrl =
+          'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$upstreamModelId:streamGenerateContent';
     } else {
       final base = config.baseUrl.endsWith('/')
           ? config.baseUrl.substring(0, config.baseUrl.length - 1)
           : config.baseUrl;
-      baseUrl = '$base/models/$modelId:streamGenerateContent';
+      baseUrl = '$base/models/$upstreamModelId:streamGenerateContent';
     }
 
     // Build query with alt=sse
@@ -4588,7 +6126,8 @@ class ChatApiService {
       // Only parse images if there are images to process
       final hasMarkdownImages = raw.contains('![') && raw.contains('](');
       final hasCustomImages = raw.contains('[image:');
-      final hasAttachedImages = isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
+      final hasAttachedImages =
+          isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
 
       if (hasMarkdownImages || hasCustomImages || hasAttachedImages) {
         final parsed = await _parseTextAndImages(
@@ -4608,7 +6147,9 @@ class ChatApiService {
             final idx = ref.src.indexOf('base64,');
             if (idx > 0) {
               final b64 = ref.src.substring(idx + 7);
-              parts.add({'inline_data': {'mime_type': mime, 'data': b64}});
+              parts.add({
+                'inline_data': {'mime_type': mime, 'data': b64},
+              });
             } else {
               // If malformed data URL, include as plain text fallback
               parts.add({'text': ref.src});
@@ -4616,7 +6157,9 @@ class ChatApiService {
           } else if (ref.kind == 'path') {
             final mime = _mimeFromPath(ref.src);
             final b64 = await _encodeBase64File(ref.src, withPrefix: false);
-            parts.add({'inline_data': {'mime_type': mime, 'data': b64}});
+            parts.add({
+              'inline_data': {'mime_type': mime, 'data': b64},
+            });
           } else {
             // Remote URL: Gemini official API doesn't fetch http(s) here; keep short reference
             parts.add({'text': '(image) ${ref.src}'});
@@ -4631,12 +6174,16 @@ class ChatApiService {
               final idx = p.indexOf('base64,');
               if (idx > 0) {
                 final b64 = p.substring(idx + 7);
-                parts.add({'inline_data': {'mime_type': mime, 'data': b64}});
+                parts.add({
+                  'inline_data': {'mime_type': mime, 'data': b64},
+                });
               }
             } else if (!(p.startsWith('http://') || p.startsWith('https://'))) {
               final mime = _mimeFromPath(p);
               final b64 = await _encodeBase64File(p, withPrefix: false);
-              parts.add({'inline_data': {'mime_type': mime, 'data': b64}});
+              parts.add({
+                'inline_data': {'mime_type': mime, 'data': b64},
+              });
             } else {
               // http url fallback reference text
               parts.add({'text': '(image) ${p}'});
@@ -4654,14 +6201,22 @@ class ChatApiService {
         for (final u in urls) {
           // Vertex AI requires mime_type for file_data
           if (isVertex) {
-            parts.add({'file_data': {'file_uri': u, 'mime_type': 'video/*'}});
+            parts.add({
+              'file_data': {'file_uri': u, 'mime_type': 'video/*'},
+            });
           } else {
-            parts.add({'file_data': {'file_uri': u}});
+            parts.add({
+              'file_data': {'file_uri': u},
+            });
           }
         }
       }
       if (role == 'model') {
-        _applyGeminiThoughtSignatures(meta, parts, attachDummyWhenMissing: _persistGeminiThoughtSigs);
+        _applyGeminiThoughtSignatures(
+          meta,
+          parts,
+          attachDummyWhenMissing: _persistGeminiThoughtSigs,
+        );
       }
       contents.add({'role': role, 'parts': parts});
     }
@@ -4685,7 +6240,10 @@ class ChatApiService {
         if (name.isEmpty) continue;
         final desc = (fn['description'] ?? '').toString();
         final params = (fn['parameters'] as Map?)?.cast<String, dynamic>();
-        final d = <String, dynamic>{'name': name, if (desc.isNotEmpty) 'description': desc};
+        final d = <String, dynamic>{
+          'name': name,
+          if (desc.isNotEmpty) 'description': desc,
+        };
         if (params != null) {
           // Google Gemini requires strict JSON Schema compliance
           // Fix array properties that are missing 'items' field
@@ -4694,7 +6252,10 @@ class ChatApiService {
         }
         decls.add(d);
       }
-      if (decls.isNotEmpty) geminiTools = [{'function_declarations': decls}];
+      if (decls.isNotEmpty)
+        geminiTools = [
+          {'function_declarations': decls},
+        ];
     }
     // Built-in tools and function_declarations (MCP) are mutually exclusive in Gemini API
     // code_execution = exclusive mode (cannot coexist with anything)
@@ -4702,21 +6263,29 @@ class ChatApiService {
     final toolsArr = <Map<String, dynamic>>[];
     if (builtIns.contains(BuiltInToolNames.codeExecution)) {
       toolsArr.add({'code_execution': {}});
-    } else if (builtIns.contains(BuiltInToolNames.search) || builtIns.contains(BuiltInToolNames.urlContext)) {
-      if (builtIns.contains(BuiltInToolNames.search)) toolsArr.add({'google_search': {}});
-      if (builtIns.contains(BuiltInToolNames.urlContext)) toolsArr.add({'url_context': {}});
+    } else if (builtIns.contains(BuiltInToolNames.search) ||
+        builtIns.contains(BuiltInToolNames.urlContext)) {
+      if (builtIns.contains(BuiltInToolNames.search))
+        toolsArr.add({'google_search': {}});
+      if (builtIns.contains(BuiltInToolNames.urlContext))
+        toolsArr.add({'url_context': {}});
     } else if (geminiTools != null) {
       toolsArr.addAll(geminiTools);
     }
-    final shouldAttachToolConfig = shouldAttachGeminiFunctionCallingConfig(toolsArr);
+    final shouldAttachToolConfig = shouldAttachGeminiFunctionCallingConfig(
+      toolsArr,
+    );
 
     // Maintain a rolling conversation for multi-round tool calls
-    List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(contents);
+    List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(
+      contents,
+    );
     TokenUsage? usage;
     int totalTokens = 0;
 
     // Accumulate built-in search citations across stream rounds
-    final List<Map<String, dynamic>> _builtinCitations = <Map<String, dynamic>>[];
+    final List<Map<String, dynamic>> _builtinCitations =
+        <Map<String, dynamic>>[];
 
     List<Map<String, dynamic>> _parseCitations(dynamic gm) {
       final out = <Map<String, dynamic>>[];
@@ -4726,7 +6295,8 @@ class ChatApiService {
       final seen = <String>{};
       for (final ch in chunks) {
         if (ch is! Map) continue;
-        final web = ch['web'] as Map? ?? ch['webSite'] as Map? ?? ch['webPage'] as Map?;
+        final web =
+            ch['web'] as Map? ?? ch['webSite'] as Map? ?? ch['webPage'] as Map?;
         if (web is! Map) continue;
         final uri = (web['uri'] ?? web['url'] ?? '').toString();
         if (uri.isEmpty) continue;
@@ -4751,10 +6321,18 @@ class ChatApiService {
         if (isReasoning)
           'thinkingConfig': () {
             // Match gemini-3-pro or gemini-3-pro-preview (and similar variants)
-            final isGemini3ProImage = modelId.contains(RegExp(r'gemini-3-pro-image(-preview)?', caseSensitive: false));
-            final isGemini31Pro = modelId.contains(RegExp(r'gemini-3\.1-pro(-preview)?', caseSensitive: false));
-            final isGemini3Pro = modelId.contains(RegExp(r'gemini-3-pro(-preview)?', caseSensitive: false));
-            final isGemini3Flash = modelId.contains(RegExp(r'gemini-3-flash(-preview)?', caseSensitive: false));
+            final isGemini3ProImage = upstreamModelId.contains(
+              RegExp(r'gemini-3-pro-image(-preview)?', caseSensitive: false),
+            );
+            final isGemini31Pro = upstreamModelId.contains(
+              RegExp(r'gemini-3\.1-pro(-preview)?', caseSensitive: false),
+            );
+            final isGemini3Pro = upstreamModelId.contains(
+              RegExp(r'gemini-3-pro(-preview)?', caseSensitive: false),
+            );
+            final isGemini3Flash = upstreamModelId.contains(
+              RegExp(r'gemini-3-flash(-preview)?', caseSensitive: false),
+            );
             if (isGemini3ProImage) {
               return {
                 'includeThoughts': true,
@@ -4768,19 +6346,27 @@ class ChatApiService {
               if (off) {
                 level = 'low';
               } else if (thinkingBudget != null && thinkingBudget > 0) {
-                if (thinkingBudget < 8000) level = 'low';
-                else if (thinkingBudget < 24000) level = 'medium'; // gemini 3.1 pro support medium
+                if (thinkingBudget < 8000)
+                  level = 'low';
+                else if (thinkingBudget < 24000)
+                  level = 'medium'; // gemini 3.1 pro support medium
               }
               return {'includeThoughts': true, 'thinkingLevel': level};
             }
             // Gemini 3 Pro: supports 'low' and 'high' only (no off)
             if (isGemini3Pro) {
               String level = 'high';
-              if (off || (thinkingBudget != null && thinkingBudget > 0 && thinkingBudget < 8000)) {
+              if (off ||
+                  (thinkingBudget != null &&
+                      thinkingBudget > 0 &&
+                      thinkingBudget < 8000)) {
                 // Off or Light (1024) → low
                 level = 'low';
               }
-              return {'includeThoughts': true, 'thinkingLevel': level}; // Gemini 3.0 Pro does not support medium, only low and high
+              return {
+                'includeThoughts': true,
+                'thinkingLevel': level,
+              }; // Gemini 3.0 Pro does not support medium, only low and high
             }
             // Gemini 3 Flash: supports 'minimal', 'low', 'medium', 'high'
             if (isGemini3Flash) {
@@ -4789,8 +6375,10 @@ class ChatApiService {
                 level = 'minimal';
               } else if (thinkingBudget != null && thinkingBudget > 0) {
                 // Light (1024) → low, Medium (16000) → medium, Heavy (32000) → high
-                if (thinkingBudget < 8000) level = 'low';
-                else if (thinkingBudget < 24000) level = 'medium';
+                if (thinkingBudget < 8000)
+                  level = 'low';
+                else if (thinkingBudget < 24000)
+                  level = 'medium';
               }
               return {'includeThoughts': true, 'thinkingLevel': level};
             }
@@ -4807,7 +6395,10 @@ class ChatApiService {
         'contents': convo,
         if (gen.isNotEmpty) 'generationConfig': gen,
         if (toolsArr.isNotEmpty) 'tools': toolsArr,
-        if (shouldAttachToolConfig) 'toolConfig': {'function_calling_config': {'mode': 'AUTO'}},
+        if (shouldAttachToolConfig)
+          'toolConfig': {
+            'function_calling_config': {'mode': 'AUTO'},
+          },
       };
 
       final request = http.Request('POST', uri);
@@ -4829,13 +6420,16 @@ class ChatApiService {
         }
       }
       headers.addAll(_customHeaders(config, modelId));
-      if (extraHeaders != null && extraHeaders.isNotEmpty) headers.addAll(extraHeaders);
+      if (extraHeaders != null && extraHeaders.isNotEmpty)
+        headers.addAll(extraHeaders);
       request.headers.addAll(headers);
       final extra = _customBody(config, modelId);
       if (extra.isNotEmpty) (body as Map<String, dynamic>).addAll(extra);
       if (extraBody != null && extraBody.isNotEmpty) {
         extraBody.forEach((k, v) {
-          (body as Map<String, dynamic>)[k] = (v is String) ? _parseOverrideValue(v) : v;
+          (body as Map<String, dynamic>)[k] = (v is String)
+              ? _parseOverrideValue(v)
+              : v;
         });
       }
       request.body = jsonEncode(body);
@@ -4849,15 +6443,17 @@ class ChatApiService {
       final sse = resp.stream.transform(utf8.decoder);
       String buffer = '';
       // Collect any function calls in this round
-      final List<Map<String, dynamic>> calls = <Map<String, dynamic>>[]; // {id,name,args,res}
-      
+      final List<Map<String, dynamic>> calls =
+          <Map<String, dynamic>>[]; // {id,name,args,res}
+
       // Track thought signature across chunks (Gemini 3 requirement)
       String? persistentThoughtSigKey;
       dynamic persistentThoughtSigVal;
       // Capture thought signatures for history (Gemini 3 image/editing)
       String? responseTextThoughtSigKey;
       dynamic responseTextThoughtSigVal;
-      final List<Map<String, dynamic>> responseImageThoughtSigs = <Map<String, dynamic>>[];
+      final List<Map<String, dynamic>> responseImageThoughtSigs =
+          <Map<String, dynamic>>[];
 
       // Track a streaming inline image; buffer chunks and emit only the latest frame once finished
       String _imageMime = 'image/png';
@@ -4884,7 +6480,9 @@ class ChatApiService {
         if (input.isEmpty) return input;
         if (input.contains('data:image') && input.contains('base64,')) {
           try {
-            return await MarkdownMediaSanitizer.replaceInlineBase64Images(input);
+            return await MarkdownMediaSanitizer.replaceInlineBase64Images(
+              input,
+            );
           } catch (_) {
             return input;
           }
@@ -4897,7 +6495,8 @@ class ChatApiService {
         final hasExisting = _pendingImageData.isNotEmpty;
         // Gemini image-preview streams often send full preview frames instead of deltas.
         // If the previous chunk already looks complete (padding) or a new frame header appears, replace it.
-        final prevLooksComplete = hasExisting && _pendingImageData.endsWith('=');
+        final prevLooksComplete =
+            hasExisting && _pendingImageData.endsWith('=');
         final newFrame = hasExisting && _looksLikeImageStart(data);
         if (prevLooksComplete || newFrame) {
           _pendingImageData = data;
@@ -4911,12 +6510,18 @@ class ChatApiService {
       Future<String> _takeBufferedImageMarkdown() async {
         if (!_bufferingInlineImage || _pendingImageData.isEmpty) return '';
         final trailing = _pendingImageTrailingText;
-        final path = await AppDirectories.saveBase64Image(_imageMime, _pendingImageData);
+        final path = await AppDirectories.saveBase64Image(
+          _imageMime,
+          _pendingImageData,
+        );
         _bufferingInlineImage = false;
         _pendingImageData = '';
         _pendingImageTrailingText = '';
         if (path == null || path.isEmpty) return '';
-        final sb = StringBuffer()..write('\n\n![image](')..write(path)..write(')');
+        final sb = StringBuffer()
+          ..write('\n\n![image](')
+          ..write(path)
+          ..write(')');
         if (trailing.isNotEmpty) {
           sb.write(trailing);
         }
@@ -4938,11 +6543,13 @@ class ChatApiService {
             final obj = jsonDecode(data) as Map<String, dynamic>;
             final um = obj['usageMetadata'];
             if (um is Map<String, dynamic>) {
-              usage = (usage ?? const TokenUsage()).merge(TokenUsage(
-                promptTokens: (um['promptTokenCount'] ?? 0) as int,
-                completionTokens: (um['candidatesTokenCount'] ?? 0) as int,
-                totalTokens: (um['totalTokenCount'] ?? 0) as int,
-              ));
+              usage = (usage ?? const TokenUsage()).merge(
+                TokenUsage(
+                  promptTokens: (um['promptTokenCount'] ?? 0) as int,
+                  completionTokens: (um['candidatesTokenCount'] ?? 0) as int,
+                  totalTokens: (um['totalTokenCount'] ?? 0) as int,
+                ),
+              );
               totalTokens = usage!.totalTokens;
             }
 
@@ -4978,7 +6585,10 @@ class ChatApiService {
                   }
 
                   // Capture thought signature for text part (Gemini 3 image/editing)
-                  if (_persistGeminiThoughtSigs && !thought && partThoughtSigKey != null && partThoughtSigVal != null) {
+                  if (_persistGeminiThoughtSigs &&
+                      !thought &&
+                      partThoughtSigKey != null &&
+                      partThoughtSigVal != null) {
                     if (t.isNotEmpty && responseTextThoughtSigKey == null) {
                       responseTextThoughtSigKey = partThoughtSigKey;
                       responseTextThoughtSigVal = partThoughtSigVal;
@@ -4998,12 +6608,26 @@ class ChatApiService {
                   // Response shape: { inlineData: { mimeType: 'image/png', data: '...base64...' } }
                   final inline = (p['inlineData'] ?? p['inline_data']);
                   if (inline is Map) {
-                    final mime = (inline['mimeType'] ?? inline['mime_type'] ?? 'image/png').toString();
+                    final mime =
+                        (inline['mimeType'] ??
+                                inline['mime_type'] ??
+                                'image/png')
+                            .toString();
                     final data = (inline['data'] ?? '').toString();
                     if (data.isNotEmpty) {
-                      if (_persistGeminiThoughtSigs && partThoughtSigKey != null && partThoughtSigVal != null) {
-                        final exists = responseImageThoughtSigs.any((e) => e['k'] == partThoughtSigKey && e['v'] == partThoughtSigVal);
-                        if (!exists) responseImageThoughtSigs.add({'k': partThoughtSigKey, 'v': partThoughtSigVal});
+                      if (_persistGeminiThoughtSigs &&
+                          partThoughtSigKey != null &&
+                          partThoughtSigVal != null) {
+                        final exists = responseImageThoughtSigs.any(
+                          (e) =>
+                              e['k'] == partThoughtSigKey &&
+                              e['v'] == partThoughtSigVal,
+                        );
+                        if (!exists)
+                          responseImageThoughtSigs.add({
+                            'k': partThoughtSigKey,
+                            'v': partThoughtSigVal,
+                          });
                       }
                       _bufferInlineImageChunk(mime, data);
                     }
@@ -5011,14 +6635,37 @@ class ChatApiService {
                   // Parse fileData: { fileUri: 'https://...', mimeType: 'image/png' }
                   final fileData = (p['fileData'] ?? p['file_data']);
                   if (fileData is Map) {
-                    final mime = (fileData['mimeType'] ?? fileData['mime_type'] ?? 'image/png').toString();
-                    final uri = (fileData['fileUri'] ?? fileData['file_uri'] ?? fileData['uri'] ?? '').toString();
+                    final mime =
+                        (fileData['mimeType'] ??
+                                fileData['mime_type'] ??
+                                'image/png')
+                            .toString();
+                    final uri =
+                        (fileData['fileUri'] ??
+                                fileData['file_uri'] ??
+                                fileData['uri'] ??
+                                '')
+                            .toString();
                     if (uri.startsWith('http')) {
                       try {
-                        final b64 = await _downloadRemoteAsBase64(client, config, uri);
-                        if (_persistGeminiThoughtSigs && partThoughtSigKey != null && partThoughtSigVal != null) {
-                          final exists = responseImageThoughtSigs.any((e) => e['k'] == partThoughtSigKey && e['v'] == partThoughtSigVal);
-                          if (!exists) responseImageThoughtSigs.add({'k': partThoughtSigKey, 'v': partThoughtSigVal});
+                        final b64 = await _downloadRemoteAsBase64(
+                          client,
+                          config,
+                          uri,
+                        );
+                        if (_persistGeminiThoughtSigs &&
+                            partThoughtSigKey != null &&
+                            partThoughtSigVal != null) {
+                          final exists = responseImageThoughtSigs.any(
+                            (e) =>
+                                e['k'] == partThoughtSigKey &&
+                                e['v'] == partThoughtSigVal,
+                          );
+                          if (!exists)
+                            responseImageThoughtSigs.add({
+                              'k': partThoughtSigKey,
+                              'v': partThoughtSigVal,
+                            });
                         }
                         _bufferInlineImageChunk(mime, b64);
                       } catch (_) {}
@@ -5032,10 +6679,13 @@ class ChatApiService {
                     if (rawArgs is Map) {
                       args = rawArgs.cast<String, dynamic>();
                     } else if (rawArgs is String && rawArgs.isNotEmpty) {
-                      try { args = (jsonDecode(rawArgs) as Map).cast<String, dynamic>(); } catch (_) {}
+                      try {
+                        args = (jsonDecode(rawArgs) as Map)
+                            .cast<String, dynamic>();
+                      } catch (_) {}
                     }
                     final id = 'call_${DateTime.now().microsecondsSinceEpoch}';
-                    
+
                     // Capture thought signature (Gemini 3 Pro requirement)
                     // Preserve exact key/value as received
                     String? thoughtSigKey;
@@ -5047,19 +6697,41 @@ class ChatApiService {
                       thoughtSigKey = 'thought_signature';
                       thoughtSigVal = p['thought_signature'];
                     }
-                    
+
                     // Fallback to persistent signature if not found in this part
-                    if (thoughtSigKey == null && persistentThoughtSigKey != null) {
+                    if (thoughtSigKey == null &&
+                        persistentThoughtSigKey != null) {
                       thoughtSigKey = persistentThoughtSigKey;
                       thoughtSigVal = persistentThoughtSigVal;
                     }
 
                     // Emit placeholder immediately
-                    yield ChatStreamChunk(content: '', isDone: false, totalTokens: totalTokens, usage: usage, toolCalls: [ToolCallInfo(id: id, name: name, arguments: args)]);
+                    yield ChatStreamChunk(
+                      content: '',
+                      isDone: false,
+                      totalTokens: totalTokens,
+                      usage: usage,
+                      toolCalls: [
+                        ToolCallInfo(id: id, name: name, arguments: args),
+                      ],
+                    );
                     String resText = '';
                     if (onToolCall != null) {
                       resText = await onToolCall(name, args) ?? '';
-                      yield ChatStreamChunk(content: '', isDone: false, totalTokens: totalTokens, usage: usage, toolResults: [ToolResultInfo(id: id, name: name, arguments: args, content: resText)]);
+                      yield ChatStreamChunk(
+                        content: '',
+                        isDone: false,
+                        totalTokens: totalTokens,
+                        usage: usage,
+                        toolResults: [
+                          ToolResultInfo(
+                            id: id,
+                            name: name,
+                            arguments: args,
+                            content: resText,
+                          ),
+                        ],
+                      );
                     }
                     calls.add({
                       'id': id,
@@ -5076,11 +6748,14 @@ class ChatApiService {
                 if (fr is String && fr.isNotEmpty) finishReason = fr;
 
                 // Parse grounding metadata for citations if present
-                final gm = cand['groundingMetadata'] ?? obj['groundingMetadata'];
+                final gm =
+                    cand['groundingMetadata'] ?? obj['groundingMetadata'];
                 final cite = _parseCitations(gm);
                 if (cite.isNotEmpty) {
                   // merge unique by url
-                  final existingUrls = _builtinCitations.map((e) => e['url']?.toString() ?? '').toSet();
+                  final existingUrls = _builtinCitations
+                      .map((e) => e['url']?.toString() ?? '')
+                      .toSet();
                   for (final it in cite) {
                     final u = it['url']?.toString() ?? '';
                     if (u.isEmpty || existingUrls.contains(u)) continue;
@@ -5094,7 +6769,14 @@ class ChatApiService {
                     isDone: false,
                     totalTokens: totalTokens,
                     usage: usage,
-                    toolResults: [ToolResultInfo(id: 'builtin_search', name: 'builtin_search', arguments: const <String, dynamic>{}, content: payload)],
+                    toolResults: [
+                      ToolResultInfo(
+                        id: 'builtin_search',
+                        name: 'builtin_search',
+                        arguments: const <String, dynamic>{},
+                        content: payload,
+                      ),
+                    ],
                   );
                 }
               }
@@ -5108,19 +6790,45 @@ class ChatApiService {
               }
 
               if (reasoningDelta.isNotEmpty) {
-                yield ChatStreamChunk(content: '', reasoning: reasoningDelta, isDone: false, totalTokens: totalTokens, usage: usage);
+                yield ChatStreamChunk(
+                  content: '',
+                  reasoning: reasoningDelta,
+                  isDone: false,
+                  totalTokens: totalTokens,
+                  usage: usage,
+                );
               }
               if (textDelta.isNotEmpty) {
                 textDelta = await _sanitizeTextIfNeeded(textDelta);
-                yield ChatStreamChunk(content: textDelta, isDone: false, totalTokens: totalTokens, usage: usage);
+                yield ChatStreamChunk(
+                  content: textDelta,
+                  isDone: false,
+                  totalTokens: totalTokens,
+                  usage: usage,
+                );
               }
 
               // If server signaled finish, end stream immediately
-              if (finishReason != null && calls.isEmpty && (!_expectImage || _receivedImage)) {
+              if (finishReason != null &&
+                  calls.isEmpty &&
+                  (!_expectImage || _receivedImage)) {
                 // Emit final citations if any not emitted
                 if (_builtinCitations.isNotEmpty) {
                   final payload = jsonEncode({'items': _builtinCitations});
-                  yield ChatStreamChunk(content: '', isDone: false, totalTokens: totalTokens, usage: usage, toolResults: [ToolResultInfo(id: 'builtin_search', name: 'builtin_search', arguments: const <String, dynamic>{}, content: payload)]);
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: false,
+                    totalTokens: totalTokens,
+                    usage: usage,
+                    toolResults: [
+                      ToolResultInfo(
+                        id: 'builtin_search',
+                        name: 'builtin_search',
+                        arguments: const <String, dynamic>{},
+                        content: payload,
+                      ),
+                    ],
+                  );
                 }
                 if (_persistGeminiThoughtSigs) {
                   final metaComment = _buildGeminiThoughtSigComment(
@@ -5129,10 +6837,20 @@ class ChatApiService {
                     imageSigs: responseImageThoughtSigs,
                   );
                   if (metaComment.isNotEmpty) {
-                    yield ChatStreamChunk(content: metaComment, isDone: false, totalTokens: totalTokens, usage: usage);
+                    yield ChatStreamChunk(
+                      content: metaComment,
+                      isDone: false,
+                      totalTokens: totalTokens,
+                      usage: usage,
+                    );
                   }
                 }
-                yield ChatStreamChunk(content: '', isDone: true, totalTokens: totalTokens, usage: usage);
+                yield ChatStreamChunk(
+                  content: '',
+                  isDone: true,
+                  totalTokens: totalTokens,
+                  usage: usage,
+                );
                 return;
               }
             }
@@ -5146,7 +6864,12 @@ class ChatApiService {
       final pendingImage = await _takeBufferedImageMarkdown();
       if (pendingImage.isNotEmpty) {
         final sanitized = await _sanitizeTextIfNeeded(pendingImage);
-        yield ChatStreamChunk(content: sanitized, isDone: false, totalTokens: totalTokens, usage: usage);
+        yield ChatStreamChunk(
+          content: sanitized,
+          isDone: false,
+          totalTokens: totalTokens,
+          usage: usage,
+        );
       }
 
       if (calls.isEmpty) {
@@ -5158,17 +6881,28 @@ class ChatApiService {
             imageSigs: responseImageThoughtSigs,
           );
           if (metaComment.isNotEmpty) {
-            yield ChatStreamChunk(content: metaComment, isDone: false, totalTokens: totalTokens, usage: usage);
+            yield ChatStreamChunk(
+              content: metaComment,
+              isDone: false,
+              totalTokens: totalTokens,
+              usage: usage,
+            );
           }
         }
-        yield ChatStreamChunk(content: '', isDone: true, totalTokens: totalTokens, usage: usage);
+        yield ChatStreamChunk(
+          content: '',
+          isDone: true,
+          totalTokens: totalTokens,
+          usage: usage,
+        );
         return;
       }
 
       // Append model functionCall(s) and user functionResponse(s) to conversation, then loop
       for (final c in calls) {
         final name = (c['name'] ?? '').toString();
-        final args = (c['args'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+        final args =
+            (c['args'] as Map<String, dynamic>? ?? const <String, dynamic>{});
         final resText = (c['result'] ?? '').toString();
         final thoughtSigKey = c['thoughtSigKey'] as String?;
         final thoughtSigVal = c['thoughtSigVal'];
@@ -5181,7 +6915,10 @@ class ChatApiService {
           part[thoughtSigKey] = thoughtSigVal;
         }
 
-        convo.add({'role': 'model', 'parts': [part]});
+        convo.add({
+          'role': 'model',
+          'parts': [part],
+        });
         // Prepare JSON response object
         Map<String, dynamic> responseObj;
         try {
@@ -5191,21 +6928,31 @@ class ChatApiService {
           responseObj = {'result': resText};
         }
         // Add user's functionResponse turn
-        convo.add({'role': 'user', 'parts': [
-          {'functionResponse': {'name': name, 'response': responseObj}},
-        ]});
+        convo.add({
+          'role': 'user',
+          'parts': [
+            {
+              'functionResponse': {'name': name, 'response': responseObj},
+            },
+          ],
+        });
       }
       // Continue while(true) for next round
     }
   }
 
-  static Future<String> _downloadRemoteAsBase64(http.Client client, ProviderConfig config, String url) async {
+  static Future<String> _downloadRemoteAsBase64(
+    http.Client client,
+    ProviderConfig config,
+    String url,
+  ) async {
     final req = http.Request('GET', Uri.parse(url));
     // Add Vertex auth if enabled
     if (config.vertexAI == true) {
       try {
         final token = await _maybeVertexAccessToken(config);
-        if (token != null && token.isNotEmpty) req.headers['Authorization'] = 'Bearer $token';
+        if (token != null && token.isNotEmpty)
+          req.headers['Authorization'] = 'Bearer $token';
       } catch (_) {}
       final proj = (config.projectId ?? '').trim();
       if (proj.isNotEmpty) req.headers['X-Goog-User-Project'] = proj;
@@ -5215,9 +6962,13 @@ class ChatApiService {
       final err = await resp.stream.bytesToString();
       throw HttpException('HTTP ${resp.statusCode}: $err');
     }
-    final bytes = await resp.stream.fold<List<int>>(<int>[], (acc, b) { acc.addAll(b); return acc; });
+    final bytes = await resp.stream.fold<List<int>>(<int>[], (acc, b) {
+      acc.addAll(b);
+      return acc;
+    });
     return base64Encode(bytes);
   }
+
   // Returns OAuth token for Vertex AI when serviceAccountJson is configured; otherwise null.
   static Future<String?> _maybeVertexAccessToken(ProviderConfig cfg) async {
     if (cfg.vertexAI == true) {
@@ -5236,7 +6987,6 @@ class ChatApiService {
     }
     return null;
   }
-
 }
 
 class _ImageRef {
@@ -5301,5 +7051,10 @@ class ToolResultInfo {
   final String name;
   final Map<String, dynamic> arguments;
   final String content;
-  ToolResultInfo({required this.id, required this.name, required this.arguments, required this.content});
+  ToolResultInfo({
+    required this.id,
+    required this.name,
+    required this.arguments,
+    required this.content,
+  });
 }
