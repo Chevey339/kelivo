@@ -667,6 +667,10 @@
     }
   },
   "chatMessageWidgetRegenerateTooltip": "Regenerate",
+  "chatMessageWidgetRegenerateConfirmTitle": "Confirm Regenerate",
+  "chatMessageWidgetRegenerateConfirmContent": "Regenerating will overwrite all messages after this one and cannot be undone. Are you sure?",
+  "chatMessageWidgetRegenerateConfirmCancel": "Cancel",
+  "chatMessageWidgetRegenerateConfirmOk": "Regenerate",
   "chatMessageWidgetStopTooltip": "Stop",
   "chatMessageWidgetSpeakTooltip": "Speak",
   "chatMessageWidgetTranslateTooltip": "Translate",

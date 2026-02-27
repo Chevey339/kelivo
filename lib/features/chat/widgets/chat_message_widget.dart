@@ -904,7 +904,21 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     padding: EdgeInsets.all(4),
                     icon: Lucide.RefreshCw,
                     color: cs.onSurface.withOpacity(0.9),
-                    onTap: widget.onResend,
+                    onTap: widget.onResend == null ? null : () async {
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (dctx) => AlertDialog(
+                          backgroundColor: Theme.of(dctx).colorScheme.surface,
+                          title: Text(l10n.chatMessageWidgetRegenerateConfirmTitle),
+                          content: Text(l10n.chatMessageWidgetRegenerateConfirmContent),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.of(dctx).pop(false), child: Text(l10n.chatMessageWidgetRegenerateConfirmCancel)),
+                            TextButton(onPressed: () => Navigator.of(dctx).pop(true), child: Text(l10n.chatMessageWidgetRegenerateConfirmOk)),
+                          ],
+                        ),
+                      );
+                      if (ok == true) widget.onResend!();
+                    },
                   ),
                 ),
               ),
@@ -1533,7 +1547,21 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               padding: EdgeInsets.all(4),
                               icon: Lucide.RefreshCw,
                               color: cs.onSurface.withOpacity(0.9),
-                              onTap: widget.onRegenerate,
+                              onTap: widget.onRegenerate == null ? null : () async {
+                                final ok = await showDialog<bool>(
+                                  context: context,
+                                  builder: (dctx) => AlertDialog(
+                                    backgroundColor: Theme.of(dctx).colorScheme.surface,
+                                    title: Text(l10n.chatMessageWidgetRegenerateConfirmTitle),
+                                    content: Text(l10n.chatMessageWidgetRegenerateConfirmContent),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.of(dctx).pop(false), child: Text(l10n.chatMessageWidgetRegenerateConfirmCancel)),
+                                      TextButton(onPressed: () => Navigator.of(dctx).pop(true), child: Text(l10n.chatMessageWidgetRegenerateConfirmOk)),
+                                    ],
+                                  ),
+                                );
+                                if (ok == true) widget.onRegenerate!();
+                              },
                             ),
                           ),
                         ),

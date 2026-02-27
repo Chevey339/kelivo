@@ -1517,6 +1517,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatMessageWidgetRegenerateTooltip => '重新生成';
 
   @override
+  String get chatMessageWidgetRegenerateConfirmTitle => '确认重新生成';
+
+  @override
+  String get chatMessageWidgetRegenerateConfirmContent =>
+      '重新生成将会覆盖此消息之后的所有消息，且无法撤销。确定要继续吗？';
+
+  @override
+  String get chatMessageWidgetRegenerateConfirmCancel => '取消';
+
+  @override
+  String get chatMessageWidgetRegenerateConfirmOk => '重新生成';
+
+  @override
   String get chatMessageWidgetStopTooltip => '停止';
 
   @override
@@ -5539,6 +5552,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatMessageWidgetRegenerateTooltip => '重新生成';
 
   @override
+  String get chatMessageWidgetRegenerateConfirmTitle => '确认重新生成';
+
+  @override
+  String get chatMessageWidgetRegenerateConfirmContent =>
+      '重新生成将会覆盖此消息之后的所有消息，且无法撤销。确定要继续吗？';
+
+  @override
+  String get chatMessageWidgetRegenerateConfirmCancel => '取消';
+
+  @override
+  String get chatMessageWidgetRegenerateConfirmOk => '重新生成';
+
+  @override
   String get chatMessageWidgetStopTooltip => '停止';
 
   @override
@@ -9506,6 +9532,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetRegenerateTooltip => '重新生成';
+
+  @override
+  String get chatMessageWidgetRegenerateConfirmTitle => '確認重新生成';
+
+  @override
+  String get chatMessageWidgetRegenerateConfirmContent =>
+      '重新生成將會覆蓋此訊息之後的所有訊息，且無法撤銷。確定要繼續嗎？';
+
+  @override
+  String get chatMessageWidgetRegenerateConfirmCancel => '取消';
+
+  @override
+  String get chatMessageWidgetRegenerateConfirmOk => '重新生成';
 
   @override
   String get chatMessageWidgetStopTooltip => '停止';

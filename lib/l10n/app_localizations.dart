@@ -3005,6 +3005,30 @@ abstract class AppLocalizations {
   /// **'Regenerate'**
   String get chatMessageWidgetRegenerateTooltip;
 
+  /// No description provided for @chatMessageWidgetRegenerateConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Regenerate'**
+  String get chatMessageWidgetRegenerateConfirmTitle;
+
+  /// No description provided for @chatMessageWidgetRegenerateConfirmContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Regenerating will overwrite all messages after this one and cannot be undone. Are you sure?'**
+  String get chatMessageWidgetRegenerateConfirmContent;
+
+  /// No description provided for @chatMessageWidgetRegenerateConfirmCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get chatMessageWidgetRegenerateConfirmCancel;
+
+  /// No description provided for @chatMessageWidgetRegenerateConfirmOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Regenerate'**
+  String get chatMessageWidgetRegenerateConfirmOk;
+
   /// No description provided for @chatMessageWidgetStopTooltip.
   ///
   /// In en, this message translates to:
