@@ -96,6 +96,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayEnableMathRenderingKey = 'display_enable_math_rendering_v1';
   static const String _displayEnableUserMarkdownKey = 'display_enable_user_markdown_v1';
   static const String _displayEnableReasoningMarkdownKey = 'display_enable_reasoning_markdown_v1';
+  static const String _displayEnableAssistantMarkdownKey = 'display_enable_assistant_markdown_v1';
   static const String _displayShowChatListDateKey = 'display_show_chat_list_date_v1';
   static const String _displayMobileCodeBlockWrapKey = 'display_mobile_code_block_wrap_v1';
   static const String _displayAutoCollapseCodeBlockKey = 'display_auto_collapse_code_block_v1';
@@ -510,6 +511,7 @@ class SettingsProvider extends ChangeNotifier {
     _enableMathRendering = prefs.getBool(_displayEnableMathRenderingKey) ?? true;
     _enableUserMarkdown = prefs.getBool(_displayEnableUserMarkdownKey) ?? true;
     _enableReasoningMarkdown = prefs.getBool(_displayEnableReasoningMarkdownKey) ?? true;
+    _enableAssistantMarkdown = prefs.getBool(_displayEnableAssistantMarkdownKey) ?? true;
     _showChatListDate = prefs.getBool(_displayShowChatListDateKey) ?? false;
     _mobileCodeBlockWrap = prefs.getBool(_displayMobileCodeBlockWrapKey) ?? false;
     _autoCollapseCodeBlock = prefs.getBool(_displayAutoCollapseCodeBlockKey) ?? false;
@@ -2386,6 +2388,17 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_displayEnableReasoningMarkdownKey, v);
   }
 
+  // Display: render assistant messages with Markdown
+  bool _enableAssistantMarkdown = true;
+  bool get enableAssistantMarkdown => _enableAssistantMarkdown;
+  Future<void> setEnableAssistantMarkdown(bool v) async {
+    if (_enableAssistantMarkdown == v) return;
+    _enableAssistantMarkdown = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayEnableAssistantMarkdownKey, v);
+  }
+
   // Display: show chat list date
   bool _showChatListDate = false;
   bool get showChatListDate => _showChatListDate;
@@ -2767,6 +2780,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._enableMathRendering = _enableMathRendering;
     copy._enableUserMarkdown = _enableUserMarkdown;
     copy._enableReasoningMarkdown = _enableReasoningMarkdown;
+    copy._enableAssistantMarkdown = _enableAssistantMarkdown;
     copy._showChatListDate = _showChatListDate;
     copy._autoCollapseCodeBlock = _autoCollapseCodeBlock;
     copy._autoCollapseCodeBlockLines = _autoCollapseCodeBlockLines;

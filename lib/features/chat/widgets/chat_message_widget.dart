@@ -1362,16 +1362,25 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       defaultTargetPlatform == TargetPlatform.windows ||
                       defaultTargetPlatform == TargetPlatform.linux;
                   final double baseAssistant = isDesktop ? 14.0 : 15.7;
+                  Widget assistantContent;
+                  if (settings.enableAssistantMarkdown) {
+                    assistantContent = MarkdownWithCodeHighlight(
+                      text: visualContent,
+                      onCitationTap: (id) => _handleCitationTap(id),
+                      baseStyle: TextStyle(fontSize: baseAssistant, height: 1.5),
+                    );
+                  } else {
+                    assistantContent = Text(
+                      visualContent,
+                      style: TextStyle(fontSize: baseAssistant, height: 1.5, color: cs.onSurface),
+                    );
+                  }
                   return RepaintBoundary(
                     child: SelectionArea(
                       key: ValueKey('assistant_${widget.message.id}'),
                       child: DefaultTextStyle.merge(
                         style: TextStyle(fontSize: baseAssistant, height: 1.5),
-                        child: MarkdownWithCodeHighlight(
-                          text: visualContent,
-                          onCitationTap: (id) => _handleCitationTap(id),
-                          baseStyle: TextStyle(fontSize: baseAssistant, height: 1.5),
-                        ),
+                        child: assistantContent,
                       ),
                     ),
                   );
@@ -1470,13 +1479,22 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                           defaultTargetPlatform == TargetPlatform.windows ||
                                           defaultTargetPlatform == TargetPlatform.linux;
                                       final double baseTranslation = isDesktop ? 14.0 : 15.5;
-                                      return DefaultTextStyle.merge(
-                                        style: TextStyle(fontSize: baseTranslation, height: 1.4),
-                                        child: MarkdownWithCodeHighlight(
+                                      Widget translationContent;
+                                      if (settings.enableAssistantMarkdown) {
+                                        translationContent = MarkdownWithCodeHighlight(
                                           text: translationText!,
                                           onCitationTap: (id) => _handleCitationTap(id),
                                           baseStyle: TextStyle(fontSize: baseTranslation, height: 1.4),
-                                        ),
+                                        );
+                                      } else {
+                                        translationContent = Text(
+                                          translationText!,
+                                          style: TextStyle(fontSize: baseTranslation, height: 1.4, color: cs.onSurface),
+                                        );
+                                      }
+                                      return DefaultTextStyle.merge(
+                                        style: TextStyle(fontSize: baseTranslation, height: 1.4),
+                                        child: translationContent,
                                       );
                                     }),
                                   ),

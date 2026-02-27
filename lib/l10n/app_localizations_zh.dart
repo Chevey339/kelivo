@@ -1648,6 +1648,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '思维链 Markdown 渲染';
 
   @override
+  String get displaySettingsPageEnableAssistantMarkdownTitle =>
+      '助手消息 Markdown 渲染';
+
+  @override
   String get displaySettingsPageMobileCodeBlockWrapTitle => '移动端代码块自动换行';
 
   @override
@@ -5683,6 +5687,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '思维链 Markdown 渲染';
 
   @override
+  String get displaySettingsPageEnableAssistantMarkdownTitle =>
+      '助手消息 Markdown 渲染';
+
+  @override
   String get displaySettingsPageMobileCodeBlockWrapTitle => '移动端代码块自动换行';
 
   @override
@@ -9663,6 +9671,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageEnableReasoningMarkdownTitle =>
       '思维鏈 Markdown 渲染';
+
+  @override
+  String get displaySettingsPageEnableAssistantMarkdownTitle =>
+      '助手訊息 Markdown 渲染';
 
   @override
   String get displaySettingsPageMobileCodeBlockWrapTitle => '行動端程式碼區塊自動換行';

@@ -1136,6 +1136,7 @@
   "displaySettingsPageEnableMathTitle": "启用数学公式渲染",
   "displaySettingsPageEnableUserMarkdownTitle": "用户消息 Markdown 渲染",
   "displaySettingsPageEnableReasoningMarkdownTitle": "思维链 Markdown 渲染",
+  "displaySettingsPageEnableAssistantMarkdownTitle": "助手消息 Markdown 渲染",
   "displaySettingsPageEnableMathSubtitle": "渲染 LaTeX 数学公式（行内与块级）",
   "displaySettingsPageMobileCodeBlockWrapTitle": "移动端代码块自动换行",
   "displaySettingsPageAutoCollapseCodeBlockTitle": "自动折叠代码块",

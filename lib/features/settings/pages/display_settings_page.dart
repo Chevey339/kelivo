@@ -1030,6 +1030,8 @@ class RenderingSettingsPage extends StatelessWidget {
           _iosDivider(context),
           _iosSwitchRow(context, icon: Lucide.Brain, label: l10n.displaySettingsPageEnableReasoningMarkdownTitle, value: sp.enableReasoningMarkdown, onChanged: (v) => context.read<SettingsProvider>().setEnableReasoningMarkdown(v)),
           _iosDivider(context),
+          _iosSwitchRow(context, icon: Lucide.MessageSquare, label: l10n.displaySettingsPageEnableAssistantMarkdownTitle, value: sp.enableAssistantMarkdown, onChanged: (v) => context.read<SettingsProvider>().setEnableAssistantMarkdown(v)),
+          _iosDivider(context),
           _iosSwitchRow(
             context,
             icon: Lucide.FoldVertical,
