@@ -158,4 +158,5 @@ class Lucide {
   static const IconData Folder = lucide.LucideIcons.folder;
   static const IconData CornerDownLeft = lucide.LucideIcons.cornerDownLeft;
   static const IconData package2 = lucide.LucideIcons.package2;
+  static const IconData workflow = lucide.LucideIcons.workflow;
 }

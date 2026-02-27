@@ -309,7 +309,7 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
         ],
         const SizedBox(height: 8),
         _row(
-          icon: Lucide.Layers,
+          icon: Lucide.workflow,
           label: l10n.contextManagement,
           onTap: () {
             Haptics.light();
