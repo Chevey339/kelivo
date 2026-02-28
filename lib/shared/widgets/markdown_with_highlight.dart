@@ -93,14 +93,6 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     if (settings.enableMathRendering) {
       // Block-level LaTeX (e.g., $$...$$ or \[...\])
       components.insert(0, LatexBlockScrollableMd());
-      // Inline LaTeX: $...$ and \(...\)
-      if (settings.enableDollarLatex) {
-        components.insert(0, InlineLatexParenScrollableMd());
-        components.insert(0, InlineLatexDollarScrollableMd());
-      } else {
-        // Only \(...\) inline
-        components.insert(0, InlineLatexParenScrollableMd());
-      }
     }
     components.insert(0, AtxHeadingMd());
     // Ensure fenced code blocks take precedence over headings and other blocks
@@ -112,6 +104,18 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     );
     // Add whitelist-based HTML tag renderer (e.g., <br>)
     inlineComponents.insert(0, AllowedHtmlTagsMd());
+
+    // Conditionally add inline LaTeX/math renderers
+    if (settings.enableMathRendering) {
+      // Inline LaTeX: $...$ and \(...\)
+      if (settings.enableDollarLatex) {
+        inlineComponents.insert(0, InlineLatexParenScrollableMd());
+        inlineComponents.insert(0, InlineLatexDollarScrollableMd());
+      } else {
+        // Only \(...\) inline
+        inlineComponents.insert(0, InlineLatexParenScrollableMd());
+      }
+    }
 
     final linkIdxInline = inlineComponents.indexWhere((c) => c is ATagMd);
     if (linkIdxInline != -1) {
@@ -757,7 +761,9 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     // Skips $$...$$ blocks, which are handled separately.
     // NOW SAFE: Code blocks are masked, so $variables in code won't be converted.
     if (enableMath && enableDollarLatex) {
-      final inlineDollar = RegExp(r"(?<!\$)\$([^\$\n]+?)\$(?!\$)");
+      // Require that the matched inline math does not cross table column separators (|)
+      // to avoid breaking markdown tables.
+      final inlineDollar = RegExp(r"(?<!\$)\$([^\$\n|]+?)\$(?!\$)");
       out = out.replaceAllMapped(inlineDollar, (m) {
         return "\\(${m[1]}\\)";
       });
