@@ -5778,11 +5778,20 @@ class ChatApiService {
         url = '$base/models/$upstreamModelId:generateContent';
       }
 
-      // Convert messages to contents
+      // Extract system messages into systemInstruction (Google Gemini API best practice)
+      String systemPrompt = '';
       final contents = <Map<String, dynamic>>[];
       for (int i = 0; i < messages.length; i++) {
         final msg = messages[i];
-        final role = msg['role'] == 'assistant' ? 'model' : 'user';
+        final roleRaw = (msg['role'] ?? 'user').toString();
+        if (roleRaw == 'system') {
+          final s = (msg['content'] ?? '').toString();
+          if (s.isNotEmpty) {
+            systemPrompt = systemPrompt.isEmpty ? s : (systemPrompt + '\n\n' + s);
+          }
+          continue;
+        }
+        final role = roleRaw == 'assistant' ? 'model' : 'user';
         final isLast = i == messages.length - 1;
         final parts = <Map<String, dynamic>>[];
         final meta = _extractGeminiThoughtMeta(
@@ -5952,6 +5961,7 @@ class ChatApiService {
 
       Map<String, dynamic> baseBody = {
         'contents': contents,
+        if (systemPrompt.isNotEmpty) 'systemInstruction': {'parts': [{'text': systemPrompt}]},
         if (temperature != null) 'temperature': temperature,
         if (topP != null) 'topP': topP,
         if (maxTokens != null)
@@ -6104,11 +6114,20 @@ class ChatApiService {
     final uri = uriBase.replace(queryParameters: qp);
     final isVertex = config.vertexAI == true;
 
-    // Convert messages to Google contents format
+    // Extract system messages into systemInstruction (Google Gemini API best practice)
+    String systemPrompt = '';
     final contents = <Map<String, dynamic>>[];
     for (int i = 0; i < messages.length; i++) {
       final msg = messages[i];
-      final role = msg['role'] == 'assistant' ? 'model' : 'user';
+      final roleRaw = (msg['role'] ?? 'user').toString();
+      if (roleRaw == 'system') {
+        final s = (msg['content'] ?? '').toString();
+        if (s.isNotEmpty) {
+          systemPrompt = systemPrompt.isEmpty ? s : (systemPrompt + '\n\n' + s);
+        }
+        continue;
+      }
+      final role = roleRaw == 'assistant' ? 'model' : 'user';
       final isLast = i == messages.length - 1;
       final parts = <Map<String, dynamic>>[];
       final meta = _extractGeminiThoughtMeta((msg['content'] ?? '').toString());
@@ -6393,6 +6412,7 @@ class ChatApiService {
       };
       final body = <String, dynamic>{
         'contents': convo,
+        if (systemPrompt.isNotEmpty) 'systemInstruction': {'parts': [{'text': systemPrompt}]},
         if (gen.isNotEmpty) 'generationConfig': gen,
         if (toolsArr.isNotEmpty) 'tools': toolsArr,
         if (shouldAttachToolConfig)
