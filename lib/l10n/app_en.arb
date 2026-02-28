@@ -1036,6 +1036,7 @@
   "modelDetailSheetAddHeader": "Add Header",
   "modelDetailSheetCustomBodyTitle": "Custom Body",
   "modelFetchInvertTooltip": "Invert",
+  "modelDetailSheetSaveFailedMessage": "Save failed. Please try again.",
   "modelDetailSheetAddBody": "Add Body",
   "modelDetailSheetBuiltinToolsDescription": "Built-in tools only support official APIs.",
   "modelDetailSheetGeminiCodeExecutionMutuallyExclusiveHint": "Code execution cannot coexist with Search/URL Context/MCP tools.",

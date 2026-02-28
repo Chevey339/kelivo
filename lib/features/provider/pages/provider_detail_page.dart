@@ -18,7 +18,10 @@ import '../widgets/share_provider_sheet.dart';
 import '../widgets/provider_group_picker_sheet.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/services/logging/flutter_logger.dart';
+import '../../../core/services/model_override_resolver.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -29,7 +32,11 @@ import '../../provider/widgets/provider_avatar.dart';
 import '../../../utils/model_grouping.dart';
 
 class ProviderDetailPage extends StatefulWidget {
-  const ProviderDetailPage({super.key, required this.keyName, required this.displayName});
+  const ProviderDetailPage({
+    super.key,
+    required this.keyName,
+    required this.displayName,
+  });
   final String keyName;
   final String displayName;
 
@@ -61,7 +68,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   final _proxyPortCtrl = TextEditingController(text: '8080');
   final _proxyUserCtrl = TextEditingController();
   final _proxyPassCtrl = TextEditingController();
-  
+
   // 模型选择模式相关
   bool _isSelectionMode = false;
   final Set<String> _selectedModels = {};
@@ -77,8 +84,14 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   void initState() {
     super.initState();
     final settings = context.read<SettingsProvider>();
-    _cfg = settings.getProviderConfig(widget.keyName, defaultName: widget.displayName);
-    _kind = ProviderConfig.classify(widget.keyName, explicitType: _cfg.providerType);
+    _cfg = settings.getProviderConfig(
+      widget.keyName,
+      defaultName: widget.displayName,
+    );
+    _kind = ProviderConfig.classify(
+      widget.keyName,
+      explicitType: _cfg.providerType,
+    );
     _enabled = _cfg.enabled;
     _nameCtrl.text = _cfg.name;
     _keyCtrl.text = _cfg.apiKey;
@@ -122,8 +135,19 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final l10n = AppLocalizations.of(context)!;
     bool _isUserAdded(String key) {
       const fixed = {
-        'KelivoIN', 'OpenAI', 'Gemini', 'SiliconFlow', 'OpenRouter',
-        'DeepSeek', 'Tensdaq', 'AIhubmix', 'Aliyun', 'Zhipu AI', 'Claude', 'Grok', 'ByteDance',
+        'KelivoIN',
+        'OpenAI',
+        'Gemini',
+        'SiliconFlow',
+        'OpenRouter',
+        'DeepSeek',
+        'Tensdaq',
+        'AIhubmix',
+        'Aliyun',
+        'Zhipu AI',
+        'Claude',
+        'Grok',
+        'ByteDance',
       };
       return !fixed.contains(key);
     }
@@ -144,10 +168,14 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           children: [
             ProviderAvatar(
               providerKey: widget.keyName,
-              displayName: (_nameCtrl.text.isEmpty ? widget.displayName : _nameCtrl.text),
+              displayName: (_nameCtrl.text.isEmpty
+                  ? widget.displayName
+                  : _nameCtrl.text),
               size: 24,
               onTap: () async {
-                try { Haptics.light(); } catch (_) {}
+                try {
+                  Haptics.light();
+                } catch (_) {}
                 await _editProviderAvatar(context);
               },
             ),
@@ -190,11 +218,15 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             )
           else
             Tooltip(
-              message: _isDetecting ? l10n.providerDetailPageBatchDetecting : l10n.providerDetailPageTestButton,
+              message: _isDetecting
+                  ? l10n.providerDetailPageBatchDetecting
+                  : l10n.providerDetailPageTestButton,
               child: _TactileIconButton(
                 icon: _isDetecting ? Lucide.Loader : Lucide.HeartPulse,
                 color: cs.onSurface,
-                semanticLabel: _isDetecting ? l10n.providerDetailPageBatchDetecting : l10n.providerDetailPageTestButton,
+                semanticLabel: _isDetecting
+                    ? l10n.providerDetailPageBatchDetecting
+                    : l10n.providerDetailPageTestButton,
                 size: 22,
                 onTap: _isDetecting ? () {} : _enterSelectionMode,
               ),
@@ -224,10 +256,21 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     context: context,
                     builder: (ctx) => AlertDialog(
                       title: Text(l10n.providerDetailPageDeleteProviderTitle),
-                      content: Text(l10n.providerDetailPageDeleteProviderContent),
+                      content: Text(
+                        l10n.providerDetailPageDeleteProviderContent,
+                      ),
                       actions: [
-                        TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.providerDetailPageCancelButton)),
-                        TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.providerDetailPageDeleteButton, style: const TextStyle(color: Colors.red))),
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: Text(l10n.providerDetailPageCancelButton),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: Text(
+                            l10n.providerDetailPageDeleteButton,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -237,13 +280,17 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       final ap = context.read<AssistantProvider>();
                       for (final a in ap.assistants) {
                         if (a.chatModelProvider == widget.keyName) {
-                          await ap.updateAssistant(a.copyWith(clearChatModel: true));
+                          await ap.updateAssistant(
+                            a.copyWith(clearChatModel: true),
+                          );
                         }
                       }
                     } catch (_) {}
 
                     // Remove provider config and related selections/pins
-                    await context.read<SettingsProvider>().removeProviderConfig(widget.keyName);
+                    await context.read<SettingsProvider>().removeProviderConfig(
+                      widget.keyName,
+                    );
                     if (!mounted) return;
                     Navigator.of(context).maybePop();
                     showAppSnackBar(
@@ -251,10 +298,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       message: l10n.providerDetailPageProviderDeletedSnackbar,
                       type: NotificationType.success,
                     );
-                }
-              },
+                  }
+                },
+              ),
             ),
-          ),
           const SizedBox(width: 12),
         ],
       ),
@@ -296,7 +343,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) {
         final cs = Theme.of(ctx).colorScheme;
         final maxH = MediaQuery.of(ctx).size.height * 0.8;
@@ -310,17 +359,29 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 baseColor: cs.surface,
                 duration: const Duration(milliseconds: 260),
                 onTap: () async {
-                  try { Haptics.light(); } catch (_) {}
+                  try {
+                    Haptics.light();
+                  } catch (_) {}
                   Navigator.of(ctx).pop();
                   await Future<void>.delayed(const Duration(milliseconds: 10));
                   onTap();
                 },
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Align(alignment: Alignment.centerLeft, child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500))),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    text,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ),
             ),
           );
         }
+
         return SafeArea(
           top: false,
           child: ConstrainedBox(
@@ -336,16 +397,27 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       child: Container(
                         width: 40,
                         height: 4,
-                        decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(999)),
+                        decoration: BoxDecoration(
+                          color: cs.onSurface.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 10),
                     row(l10n.sideDrawerChooseImage, () async {
                       try {
                         final ImagePicker picker = ImagePicker();
-                        final XFile? img = await picker.pickImage(source: ImageSource.gallery, requestFullMetadata: false);
+                        final XFile? img = await picker.pickImage(
+                          source: ImageSource.gallery,
+                          requestFullMetadata: false,
+                        );
                         if (img != null && img.path.isNotEmpty) {
-                          await context.read<SettingsProvider>().setProviderAvatarFilePath(widget.keyName, img.path);
+                          await context
+                              .read<SettingsProvider>()
+                              .setProviderAvatarFilePath(
+                                widget.keyName,
+                                img.path,
+                              );
                         }
                       } catch (_) {}
                     }),
@@ -353,7 +425,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       await _inputProviderAvatarUrl(context);
                     }),
                     row(l10n.sideDrawerReset, () async {
-                      await context.read<SettingsProvider>().resetProviderAvatar(widget.keyName);
+                      await context
+                          .read<SettingsProvider>()
+                          .resetProviderAvatar(widget.keyName);
                     }),
                     const SizedBox(height: 4),
                   ],
@@ -373,50 +447,90 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       context: context,
       builder: (ctx) {
         final cs = Theme.of(ctx).colorScheme;
-        bool valid(String s) => s.trim().startsWith('http://') || s.trim().startsWith('https://');
+        bool valid(String s) =>
+            s.trim().startsWith('http://') || s.trim().startsWith('https://');
         String value = '';
-        return StatefulBuilder(builder: (ctx2, setLocal) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            backgroundColor: cs.surface,
-            title: Text(l10n.sideDrawerImageUrlDialogTitle),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: l10n.sideDrawerImageUrlDialogHint,
-                filled: true,
-                fillColor: Theme.of(ctx2).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.transparent)),
-                enabledBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide(color: Colors.transparent)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary.withOpacity(0.4))),
+        return StatefulBuilder(
+          builder: (ctx2, setLocal) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              onChanged: (v) => setLocal(() => value = v),
-              onSubmitted: (_) { if (valid(value)) Navigator.of(ctx2).pop(true); },
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.sideDrawerCancel)),
-              TextButton(
-                onPressed: valid(value) ? () => Navigator.of(ctx).pop(true) : null,
-                child: Text(l10n.sideDrawerSave, style: TextStyle(color: valid(value) ? cs.primary : cs.onSurface.withOpacity(0.38), fontWeight: FontWeight.w600)),
+              backgroundColor: cs.surface,
+              title: Text(l10n.sideDrawerImageUrlDialogTitle),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: l10n.sideDrawerImageUrlDialogHint,
+                  filled: true,
+                  fillColor: Theme.of(ctx2).brightness == Brightness.dark
+                      ? Colors.white10
+                      : const Color(0xFFF2F3F5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.transparent),
+                  ),
+                  enabledBorder: const OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                    borderSide: BorderSide(color: Colors.transparent),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
+                  ),
+                ),
+                onChanged: (v) => setLocal(() => value = v),
+                onSubmitted: (_) {
+                  if (valid(value)) Navigator.of(ctx2).pop(true);
+                },
               ),
-            ],
-          );
-        });
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text(l10n.sideDrawerCancel),
+                ),
+                TextButton(
+                  onPressed: valid(value)
+                      ? () => Navigator.of(ctx).pop(true)
+                      : null,
+                  child: Text(
+                    l10n.sideDrawerSave,
+                    style: TextStyle(
+                      color: valid(value)
+                          ? cs.primary
+                          : cs.onSurface.withOpacity(0.38),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
       },
     );
     if (ok == true) {
       final url = controller.text.trim();
       if (url.isNotEmpty) {
-        await context.read<SettingsProvider>().setProviderAvatarUrl(widget.keyName, url);
+        await context.read<SettingsProvider>().setProviderAvatarUrl(
+          widget.keyName,
+          url,
+        );
       }
     }
   }
 
-  Widget _buildConfigTab(BuildContext context, ColorScheme cs, AppLocalizations l10n) {
+  Widget _buildConfigTab(
+    BuildContext context,
+    ColorScheme cs,
+    AppLocalizations l10n,
+  ) {
     final sp = context.watch<SettingsProvider>();
     final gid = sp.groupIdForProvider(widget.keyName);
-    final groupName = gid == null ? l10n.providerGroupsOther : (sp.groupById(gid)?.name ?? l10n.providerGroupsOther);
+    final groupName = gid == null
+        ? l10n.providerGroupsOther
+        : (sp.groupById(gid)?.name ?? l10n.providerGroupsOther);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -444,7 +558,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       ..onTap = () async {
                         final uri = Uri.parse('https://pollinations.ai');
                         try {
-                          final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          final ok = await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
                           if (!ok) {
                             await launchUrl(uri);
                           }
@@ -482,12 +599,20 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     children: [
                       TextSpan(
                         text: 'https://dashboard.x-aio.com',
-                        style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          color: cs.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
                         recognizer: TapGestureRecognizer()
                           ..onTap = () async {
-                            final uri = Uri.parse('https://dashboard.x-aio.com');
+                            final uri = Uri.parse(
+                              'https://dashboard.x-aio.com',
+                            );
                             try {
-                              final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              final ok = await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
                               if (!ok) {
                                 await launchUrl(uri);
                               }
@@ -527,14 +652,24 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     children: [
                       TextSpan(
                         text: 'https://siliconflow.cn',
-                        style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          color: cs.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
                         recognizer: TapGestureRecognizer()
                           ..onTap = () async {
                             final uri = Uri.parse('https://siliconflow.cn');
                             try {
-                              final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-                              if (!ok) { await launchUrl(uri); }
-                            } catch (_) { await launchUrl(uri); }
+                              final ok = await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                              if (!ok) {
+                                await launchUrl(uri);
+                              }
+                            } catch (_) {
+                              await launchUrl(uri);
+                            }
                           },
                       ),
                     ],
@@ -550,122 +685,192 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           padding: const EdgeInsets.only(left: 12),
           child: Text(
             l10n.providerDetailPageManageSectionTitle,
-            style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.8)),
+            style: TextStyle(
+              fontSize: 13,
+              color: cs.onSurface.withOpacity(0.8),
+            ),
           ),
         ),
         const SizedBox(height: 6),
         // Top iOS-style section card for key settings
-        _iosSectionCard(children: [
-          if (widget.keyName.toLowerCase() != 'kelivoin') _providerKindRow(context),
-          _providerGroupRow(context, groupName: groupName),
-          _iosRow(
-            context,
-            label: l10n.providerDetailPageEnabledTitle,
-            trailing: IosSwitch(value: _enabled, onChanged: (v) { setState(() => _enabled = v); _save(); }),
-          ),
-          _iosRow(
-            context,
-            label: l10n.providerDetailPageMultiKeyModeTitle,
-            trailing: IosSwitch(value: _multiKeyEnabled, onChanged: (v) { setState(() => _multiKeyEnabled = v); _save(); }),
-          ),
-          if (_multiKeyEnabled)
-          _TactileRow(
-            onTap: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => MultiKeyManagerPage(
-                    providerKey: widget.keyName,
-                    providerDisplayName: widget.displayName,
-                  ),
-                ),
-              );
-              if (mounted) setState(() {});
-            },
-            builder: (pressed) {
-              final base = Theme.of(context).colorScheme.onSurface;
-              final isDark = Theme.of(context).brightness == Brightness.dark;
-              final target = pressed ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base) : base;
-              return TweenAnimationBuilder<Color?>(
-                tween: ColorTween(end: target),
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                builder: (context, color, _) {
-                  final c = color ?? base;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(l10n.providerDetailPageManageKeysButton, style: TextStyle(fontSize: 15, color: c))),
-                        Icon(Lucide.ChevronRight, size: 16, color: c),
-                      ],
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-          if (_kind == ProviderKind.openai)
+        _iosSectionCard(
+          children: [
+            if (widget.keyName.toLowerCase() != 'kelivoin')
+              _providerKindRow(context),
+            _providerGroupRow(context, groupName: groupName),
             _iosRow(
               context,
-              label: l10n.providerDetailPageResponseApiTitle,
-              trailing: IosSwitch(value: _useResp, onChanged: (v) { setState(() => _useResp = v); _save(); }),
+              label: l10n.providerDetailPageEnabledTitle,
+              trailing: IosSwitch(
+                value: _enabled,
+                onChanged: (v) {
+                  setState(() => _enabled = v);
+                  _save();
+                },
+              ),
             ),
-          if (_kind == ProviderKind.google)
             _iosRow(
               context,
-              label: l10n.providerDetailPageVertexAiTitle,
-              trailing: IosSwitch(value: _vertexAI, onChanged: (v) { setState(() => _vertexAI = v); _save(); }),
+              label: l10n.providerDetailPageMultiKeyModeTitle,
+              trailing: IosSwitch(
+                value: _multiKeyEnabled,
+                onChanged: (v) {
+                  setState(() => _multiKeyEnabled = v);
+                  _save();
+                },
+              ),
             ),
-          if (_isAihubmix)
-            _iosRowWithHelp(
-              context,
-              label: l10n.providerDetailPageAihubmixAppCodeLabel,
-              helpText: l10n.providerDetailPageAihubmixAppCodeHelp,
-              trailing: IosSwitch(value: _aihubmixAppCodeEnabled, onChanged: (v) { setState(() => _aihubmixAppCodeEnabled = v); _save(); }),
-            ),
-          _TactileRow(
-            onTap: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ProviderNetworkPage(
-                    providerKey: widget.keyName,
-                    providerDisplayName: widget.displayName,
-                  ),
-                ),
-              );
-              final settings = context.read<SettingsProvider>();
-              final latest = settings.getProviderConfig(widget.keyName, defaultName: widget.displayName);
-              setState(() {
-                _proxyEnabled = latest.proxyEnabled ?? false;
-                _proxyHostCtrl.text = latest.proxyHost ?? '';
-                _proxyPortCtrl.text = latest.proxyPort ?? '8080';
-              });
-            },
-            builder: (pressed) {
-              final cs2 = Theme.of(context).colorScheme;
-              final base = cs2.onSurface;
-              final isDark = Theme.of(context).brightness == Brightness.dark;
-              final target = pressed ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base) : base;
-              return TweenAnimationBuilder<Color?>(
-                tween: ColorTween(end: target),
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                builder: (context, color, _) {
-                  final c = color ?? base;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(l10n.providerDetailPageNetworkTab, style: TextStyle(fontSize: 15, color: c))),
-                        Icon(Lucide.ChevronRight, size: 16, color: c),
-                      ],
+            if (_multiKeyEnabled)
+              _TactileRow(
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => MultiKeyManagerPage(
+                        providerKey: widget.keyName,
+                        providerDisplayName: widget.displayName,
+                      ),
                     ),
                   );
+                  if (mounted) setState(() {});
                 },
-              );
-            },
-          ),
-        ]),
+                builder: (pressed) {
+                  final base = Theme.of(context).colorScheme.onSurface;
+                  final isDark =
+                      Theme.of(context).brightness == Brightness.dark;
+                  final target = pressed
+                      ? (Color.lerp(
+                              base,
+                              isDark ? Colors.black : Colors.white,
+                              0.55,
+                            ) ??
+                            base)
+                      : base;
+                  return TweenAnimationBuilder<Color?>(
+                    tween: ColorTween(end: target),
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, color, _) {
+                      final c = color ?? base;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                l10n.providerDetailPageManageKeysButton,
+                                style: TextStyle(fontSize: 15, color: c),
+                              ),
+                            ),
+                            Icon(Lucide.ChevronRight, size: 16, color: c),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            if (_kind == ProviderKind.openai)
+              _iosRow(
+                context,
+                label: l10n.providerDetailPageResponseApiTitle,
+                trailing: IosSwitch(
+                  value: _useResp,
+                  onChanged: (v) {
+                    setState(() => _useResp = v);
+                    _save();
+                  },
+                ),
+              ),
+            if (_kind == ProviderKind.google)
+              _iosRow(
+                context,
+                label: l10n.providerDetailPageVertexAiTitle,
+                trailing: IosSwitch(
+                  value: _vertexAI,
+                  onChanged: (v) {
+                    setState(() => _vertexAI = v);
+                    _save();
+                  },
+                ),
+              ),
+            if (_isAihubmix)
+              _iosRowWithHelp(
+                context,
+                label: l10n.providerDetailPageAihubmixAppCodeLabel,
+                helpText: l10n.providerDetailPageAihubmixAppCodeHelp,
+                trailing: IosSwitch(
+                  value: _aihubmixAppCodeEnabled,
+                  onChanged: (v) {
+                    setState(() => _aihubmixAppCodeEnabled = v);
+                    _save();
+                  },
+                ),
+              ),
+            _TactileRow(
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ProviderNetworkPage(
+                      providerKey: widget.keyName,
+                      providerDisplayName: widget.displayName,
+                    ),
+                  ),
+                );
+                final settings = context.read<SettingsProvider>();
+                final latest = settings.getProviderConfig(
+                  widget.keyName,
+                  defaultName: widget.displayName,
+                );
+                setState(() {
+                  _proxyEnabled = latest.proxyEnabled ?? false;
+                  _proxyHostCtrl.text = latest.proxyHost ?? '';
+                  _proxyPortCtrl.text = latest.proxyPort ?? '8080';
+                });
+              },
+              builder: (pressed) {
+                final cs2 = Theme.of(context).colorScheme;
+                final base = cs2.onSurface;
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                final target = pressed
+                    ? (Color.lerp(
+                            base,
+                            isDark ? Colors.black : Colors.white,
+                            0.55,
+                          ) ??
+                          base)
+                    : base;
+                return TweenAnimationBuilder<Color?>(
+                  tween: ColorTween(end: target),
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, color, _) {
+                    final c = color ?? base;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              l10n.providerDetailPageNetworkTab,
+                              style: TextStyle(fontSize: 15, color: c),
+                            ),
+                          ),
+                          Icon(Lucide.ChevronRight, size: 16, color: c),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
         const SizedBox(height: 12),
         _inputRow(
           context,
@@ -677,7 +882,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         ),
         const SizedBox(height: 12),
         if (!(_kind == ProviderKind.google && _vertexAI)) ...[
-          if (widget.keyName.toLowerCase() != 'kelivoin' && !_multiKeyEnabled) ...[
+          if (widget.keyName.toLowerCase() != 'kelivoin' &&
+              !_multiKeyEnabled) ...[
             _inputRow(
               context,
               label: l10n.multiKeyPageKey,
@@ -685,8 +891,14 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               hint: l10n.providerDetailPageApiKeyHint,
               obscure: !_showApiKey,
               suffix: IconButton(
-                tooltip: _showApiKey ? l10n.providerDetailPageHideTooltip : l10n.providerDetailPageShowTooltip,
-                icon: Icon(_showApiKey ? Lucide.EyeOff : Lucide.Eye, color: cs.onSurface.withOpacity(0.7), size: 18),
+                tooltip: _showApiKey
+                    ? l10n.providerDetailPageHideTooltip
+                    : l10n.providerDetailPageShowTooltip,
+                icon: Icon(
+                  _showApiKey ? Lucide.EyeOff : Lucide.Eye,
+                  color: cs.onSurface.withOpacity(0.7),
+                  size: 18,
+                ),
                 onPressed: () => setState(() => _showApiKey = !_showApiKey),
               ),
               onChanged: (_) => _save(),
@@ -697,18 +909,25 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             context,
             label: l10n.providerDetailPageApiBaseUrlLabel,
             controller: _baseCtrl,
-            hint: ProviderConfig.defaultsFor(widget.keyName, displayName: widget.displayName).baseUrl,
+            hint: ProviderConfig.defaultsFor(
+              widget.keyName,
+              displayName: widget.displayName,
+            ).baseUrl,
             enabled: widget.keyName.toLowerCase() != 'kelivoin',
             onChanged: (_) => _save(),
           ),
         ],
-        if (_kind == ProviderKind.openai && widget.keyName.toLowerCase() != 'kelivoin' && !_useResp) ...[
+        if (_kind == ProviderKind.openai &&
+            widget.keyName.toLowerCase() != 'kelivoin' &&
+            !_useResp) ...[
           const SizedBox(height: 12),
           _inputRow(
             context,
             label: l10n.providerDetailPageApiPathLabel,
             controller: _pathCtrl,
-            enabled: widget.keyName.toLowerCase() != 'openai' && widget.keyName.toLowerCase() != 'tensdaq',
+            enabled:
+                widget.keyName.toLowerCase() != 'openai' &&
+                widget.keyName.toLowerCase() != 'tensdaq',
             hint: '/chat/completions',
             onChanged: (_) => _save(),
           ),
@@ -717,9 +936,21 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           const SizedBox(height: 12),
           if (_vertexAI) ...[
             const SizedBox(height: 12),
-            _inputRow(context, label: l10n.providerDetailPageLocationLabel, controller: _locationCtrl, hint: 'us-central1', onChanged: (_) => _save()),
+            _inputRow(
+              context,
+              label: l10n.providerDetailPageLocationLabel,
+              controller: _locationCtrl,
+              hint: 'us-central1',
+              onChanged: (_) => _save(),
+            ),
             const SizedBox(height: 12),
-            _inputRow(context, label: l10n.providerDetailPageProjectIdLabel, controller: _projectCtrl, hint: 'my-project-id', onChanged: (_) => _save()),
+            _inputRow(
+              context,
+              label: l10n.providerDetailPageProjectIdLabel,
+              controller: _projectCtrl,
+              hint: 'my-project-id',
+              onChanged: (_) => _save(),
+            ),
             const SizedBox(height: 12),
             _multilineRow(
               context,
@@ -754,16 +985,30 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     );
   }
 
-  Widget _buildModelsTab(BuildContext context, ColorScheme cs, AppLocalizations l10n) {
-    final cfg = context.watch<SettingsProvider>().providerConfigs[widget.keyName];
-    if (cfg == null) {
-      // Provider has been removed; avoid recreating it via getProviderConfig.
+  Widget _buildModelsTab(
+    BuildContext context,
+    ColorScheme cs,
+    AppLocalizations l10n,
+  ) {
+    final settings = context.watch<SettingsProvider>();
+    final bool providerKnown =
+        settings.providersOrder.contains(widget.keyName) ||
+        settings.providerConfigs.containsKey(widget.keyName);
+    if (!providerKnown) {
       return Center(
-        child: Text(l10n.providerDetailPageProviderRemovedMessage, style: TextStyle(color: cs.onSurface.withOpacity(0.7))),
+        child: Text(
+          l10n.providerDetailPageProviderRemovedMessage,
+          style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+        ),
       );
     }
+    final cfg = settings.getProviderConfig(
+      widget.keyName,
+      defaultName: widget.displayName,
+    );
     final models = cfg.models;
-    final allSelected = _selectedModels.length == models.length && models.isNotEmpty;
+    final allSelected =
+        _selectedModels.length == models.length && models.isNotEmpty;
     return Stack(
       children: [
         if (models.isEmpty)
@@ -771,7 +1016,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(l10n.providerDetailPageNoModelsTitle, style: TextStyle(fontSize: 18, color: cs.onSurface)),
+                Text(
+                  l10n.providerDetailPageNoModelsTitle,
+                  style: TextStyle(fontSize: 18, color: cs.onSurface),
+                ),
                 const SizedBox(height: 6),
                 Text(
                   l10n.providerDetailPageNoModelsSubtitle,
@@ -783,21 +1031,30 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           )
         else
           ReorderableListView.builder(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, _isSelectionMode ? 160 : 100),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              _isSelectionMode ? 160 : 100,
+            ),
             itemCount: models.length,
             onReorder: (oldIndex, newIndex) {
               if (_isSelectionMode) return;
               if (newIndex > oldIndex) newIndex -= 1;
-              final id = models[oldIndex];
               final list = List<String>.from(models);
               final item = list.removeAt(oldIndex);
               list.insert(newIndex, item);
               setState(() {});
+              final settings = context.read<SettingsProvider>();
               // 使用 Future.microtask 来异步执行，避免阻塞回调
               Future.microtask(() async {
-                await context.read<SettingsProvider>().setProviderConfig(
+                final latest = settings.getProviderConfig(
                   widget.keyName,
-                  cfg.copyWith(models: list),
+                  defaultName: widget.displayName,
+                );
+                await settings.setProviderConfig(
+                  widget.keyName,
+                  latest.copyWith(models: list),
                 );
               });
             },
@@ -806,10 +1063,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 animation: animation,
                 builder: (context, _) {
                   final t = Curves.easeOut.transform(animation.value);
-                  return Transform.scale(
-                    scale: 0.98 + 0.02 * t,
-                    child: child,
-                  );
+                  return Transform.scale(scale: 0.98 + 0.02 * t, child: child);
                 },
                 child: child,
               );
@@ -836,20 +1090,39 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                             width: double.infinity,
                             height: double.infinity,
                             decoration: BoxDecoration(
-                              color: Theme.of(context).brightness == Brightness.dark ? cs.error.withOpacity(0.22) : cs.error.withOpacity(0.14),
+                              color:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? cs.error.withOpacity(0.22)
+                                  : cs.error.withOpacity(0.14),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: cs.error.withOpacity(0.35)),
+                              border: Border.all(
+                                color: cs.error.withOpacity(0.35),
+                              ),
                             ),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                             alignment: Alignment.center,
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Lucide.Trash2, color: cs.error, size: 18),
+                                  Icon(
+                                    Lucide.Trash2,
+                                    color: cs.error,
+                                    size: 18,
+                                  ),
                                   const SizedBox(width: 6),
-                                  Text(l10n.providerDetailPageDeleteModelButton, style: TextStyle(color: cs.error, fontWeight: FontWeight.w700)),
+                                  Text(
+                                    l10n.providerDetailPageDeleteModelButton,
+                                    style: TextStyle(
+                                      color: cs.error,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -859,31 +1132,68 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                               context: context,
                               builder: (dctx) => AlertDialog(
                                 backgroundColor: cs.surface,
-                                title: Text(l10n.providerDetailPageConfirmDeleteTitle),
-                                content: Text(l10n.providerDetailPageConfirmDeleteContent),
+                                title: Text(
+                                  l10n.providerDetailPageConfirmDeleteTitle,
+                                ),
+                                content: Text(
+                                  l10n.providerDetailPageConfirmDeleteContent,
+                                ),
                                 actions: [
-                                  TextButton(onPressed: () => Navigator.of(dctx).pop(false), child: Text(l10n.providerDetailPageCancelButton)),
-                                  TextButton(onPressed: () => Navigator.of(dctx).pop(true), child: Text(l10n.providerDetailPageDeleteButton)),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(dctx).pop(false),
+                                    child: Text(
+                                      l10n.providerDetailPageCancelButton,
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(dctx).pop(true),
+                                    child: Text(
+                                      l10n.providerDetailPageDeleteButton,
+                                    ),
+                                  ),
                                 ],
                               ),
                             );
                             if (ok != true) return;
                             final settings = context.read<SettingsProvider>();
-                            final old = settings.getProviderConfig(widget.keyName, defaultName: widget.displayName);
+                            final old = settings.getProviderConfig(
+                              widget.keyName,
+                              defaultName: widget.displayName,
+                            );
                             final prevList = List<String>.from(old.models);
-                            final prevOverrides = Map<String, dynamic>.from(old.modelOverrides);
+                            final prevOverrides = Map<String, dynamic>.from(
+                              old.modelOverrides,
+                            );
                             final removeIndex = prevList.indexOf(id);
-                            final newList = prevList.where((e) => e != id).toList();
-                            final newOverrides = Map<String, dynamic>.from(prevOverrides)..remove(id);
-                            await settings.setProviderConfig(widget.keyName, old.copyWith(models: newList, modelOverrides: newOverrides));
+                            final newList = prevList
+                                .where((e) => e != id)
+                                .toList();
+                            final newOverrides = Map<String, dynamic>.from(
+                              prevOverrides,
+                            )..remove(id);
+                            await settings.setProviderConfig(
+                              widget.keyName,
+                              old.copyWith(
+                                models: newList,
+                                modelOverrides: newOverrides,
+                              ),
+                            );
 
                             // Clear global and assistant-level model selections that reference the deleted model
-                            await settings.clearSelectionsForModel(widget.keyName, id);
+                            await settings.clearSelectionsForModel(
+                              widget.keyName,
+                              id,
+                            );
                             try {
                               final ap = context.read<AssistantProvider>();
                               for (final a in ap.assistants) {
-                                if (a.chatModelProvider == widget.keyName && a.chatModelId == id) {
-                                  await ap.updateAssistant(a.copyWith(clearChatModel: true));
+                                if (a.chatModelProvider == widget.keyName &&
+                                    a.chatModelId == id) {
+                                  await ap.updateAssistant(
+                                    a.copyWith(clearChatModel: true),
+                                  );
                                 }
                               }
                             } catch (_) {}
@@ -891,25 +1201,44 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                             if (!mounted) return;
                             showAppSnackBar(
                               context,
-                              message: l10n.providerDetailPageModelDeletedSnackbar,
+                              message:
+                                  l10n.providerDetailPageModelDeletedSnackbar,
                               type: NotificationType.info,
                               actionLabel: l10n.providerDetailPageUndoButton,
                               onAction: () {
                                 Future(() async {
-                                  final cfg2 = context.read<SettingsProvider>().getProviderConfig(widget.keyName, defaultName: widget.displayName);
-                                  final restoredList = List<String>.from(cfg2.models);
+                                  final cfg2 = context
+                                      .read<SettingsProvider>()
+                                      .getProviderConfig(
+                                        widget.keyName,
+                                        defaultName: widget.displayName,
+                                      );
+                                  final restoredList = List<String>.from(
+                                    cfg2.models,
+                                  );
                                   if (!restoredList.contains(id)) {
-                                    if (removeIndex >= 0 && removeIndex <= restoredList.length) {
+                                    if (removeIndex >= 0 &&
+                                        removeIndex <= restoredList.length) {
                                       restoredList.insert(removeIndex, id);
                                     } else {
                                       restoredList.add(id);
                                     }
                                   }
-                                  final restoredOverrides = Map<String, dynamic>.from(cfg2.modelOverrides);
-                                  if (!restoredOverrides.containsKey(id) && prevOverrides.containsKey(id)) {
+                                  final restoredOverrides =
+                                      Map<String, dynamic>.from(
+                                        cfg2.modelOverrides,
+                                      );
+                                  if (!restoredOverrides.containsKey(id) &&
+                                      prevOverrides.containsKey(id)) {
                                     restoredOverrides[id] = prevOverrides[id];
                                   }
-                                  await settings.setProviderConfig(widget.keyName, cfg2.copyWith(models: restoredList, modelOverrides: restoredOverrides));
+                                  await settings.setProviderConfig(
+                                    widget.keyName,
+                                    cfg2.copyWith(
+                                      models: restoredList,
+                                      modelOverrides: restoredOverrides,
+                                    ),
+                                  );
                                 });
                               },
                             );
@@ -950,11 +1279,17 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               child: Container(
                 decoration: BoxDecoration(
                   color: Theme.of(context).brightness == Brightness.dark
-                      ? Color.alphaBlend(Colors.white.withOpacity(0.12), cs.surface)
+                      ? Color.alphaBlend(
+                          Colors.white.withOpacity(0.12),
+                          cs.surface,
+                        )
                       : const Color(0xFFF2F3F5),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -971,25 +1306,49 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                         }
                       },
                       builder: (pressed) {
-                        final icon = allSelected ? Lucide.Square : Lucide.CheckSquare;
-                        final label = allSelected ? l10n.mcpAssistantSheetClearAll : l10n.mcpAssistantSheetSelectAll;
+                        final icon = allSelected
+                            ? Lucide.Square
+                            : Lucide.CheckSquare;
+                        final label = allSelected
+                            ? l10n.mcpAssistantSheetClearAll
+                            : l10n.mcpAssistantSheetSelectAll;
                         return Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: cs.onSurface.withOpacity(0.2)),
-                            color: pressed ? cs.onSurface.withOpacity(0.06) : null,
+                            border: Border.all(
+                              color: cs.onSurface.withOpacity(0.2),
+                            ),
+                            color: pressed
+                                ? cs.onSurface.withOpacity(0.06)
+                                : null,
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 10,
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 160),
-                                transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
-                                child: Icon(icon, key: ValueKey(allSelected), size: 20, color: cs.onSurface),
+                                transitionBuilder: (child, anim) =>
+                                    ScaleTransition(scale: anim, child: child),
+                                child: Icon(
+                                  icon,
+                                  key: ValueKey(allSelected),
+                                  size: 20,
+                                  color: cs.onSurface,
+                                ),
                               ),
                               const SizedBox(width: 8),
-                              Text(label, style: TextStyle(color: cs.onSurface, fontSize: 14, fontWeight: FontWeight.w600)),
+                              Text(
+                                label,
+                                style: TextStyle(
+                                  color: cs.onSurface,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ],
                           ),
                         );
@@ -999,22 +1358,35 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     _TactileRow(
                       pressedScale: 0.97,
                       haptics: false,
-                      onTap: () => setState(() => _detectUseStream = !_detectUseStream),
+                      onTap: () =>
+                          setState(() => _detectUseStream = !_detectUseStream),
                       builder: (pressed) {
                         return AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
                           curve: Curves.easeOutCubic,
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 9,
+                          ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: cs.onSurface.withOpacity(0.2)),
-                            color: pressed ? cs.onSurface.withOpacity(0.06) : (_detectUseStream ? cs.onSurface.withOpacity(0.08) : Colors.transparent),
+                            border: Border.all(
+                              color: cs.onSurface.withOpacity(0.2),
+                            ),
+                            color: pressed
+                                ? cs.onSurface.withOpacity(0.06)
+                                : (_detectUseStream
+                                      ? cs.onSurface.withOpacity(0.08)
+                                      : Colors.transparent),
                           ),
                           child: AnimatedSwitcher(
                             duration: const Duration(milliseconds: 160),
-                            transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+                            transitionBuilder: (child, anim) =>
+                                ScaleTransition(scale: anim, child: child),
                             child: Icon(
-                              _detectUseStream ? Lucide.AudioWaveform : Lucide.SquareEqual,
+                              _detectUseStream
+                                  ? Lucide.AudioWaveform
+                                  : Lucide.SquareEqual,
                               key: ValueKey(_detectUseStream),
                               size: 18,
                               color: cs.onSurface,
@@ -1031,18 +1403,40 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       builder: (pressed) {
                         return Container(
                           decoration: BoxDecoration(
-                            color: _selectedModels.isEmpty 
+                            color: _selectedModels.isEmpty
                                 ? cs.onSurface.withOpacity(0.1)
                                 : cs.primary.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(999),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 10,
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(_isDetecting ? Lucide.Loader : Lucide.HeartPulse, size: 20, color: _selectedModels.isEmpty ? cs.onSurface.withOpacity(0.5) : cs.primary),
+                              Icon(
+                                _isDetecting
+                                    ? Lucide.Loader
+                                    : Lucide.HeartPulse,
+                                size: 20,
+                                color: _selectedModels.isEmpty
+                                    ? cs.onSurface.withOpacity(0.5)
+                                    : cs.primary,
+                              ),
                               const SizedBox(width: 8),
-                              Text(_isDetecting ? l10n.providerDetailPageBatchDetecting : l10n.providerDetailPageBatchDetectButton, style: TextStyle(color: _selectedModels.isEmpty ? cs.onSurface.withOpacity(0.5) : cs.primary, fontSize: 14, fontWeight: FontWeight.w600)),
+                              Text(
+                                _isDetecting
+                                    ? l10n.providerDetailPageBatchDetecting
+                                    : l10n.providerDetailPageBatchDetectButton,
+                                style: TextStyle(
+                                  color: _selectedModels.isEmpty
+                                      ? cs.onSurface.withOpacity(0.5)
+                                      : cs.primary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ],
                           ),
                         );
@@ -1063,11 +1457,17 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 decoration: BoxDecoration(
                   // Solid color: dark theme uses an opaque lightened surface; light uses input-like gray
                   color: Theme.of(context).brightness == Brightness.dark
-                      ? Color.alphaBlend(Colors.white.withOpacity(0.12), cs.surface)
+                      ? Color.alphaBlend(
+                          Colors.white.withOpacity(0.12),
+                          cs.surface,
+                        )
                       : const Color(0xFFF2F3F5),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1079,45 +1479,69 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                         return Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: cs.primary.withOpacity(0.35)),
+                            border: Border.all(
+                              color: cs.primary.withOpacity(0.35),
+                            ),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 10,
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Lucide.Boxes, size: 20, color: cs.primary),
                               const SizedBox(width: 8),
-                              Text(l10n.providerDetailPageFetchModelsButton, style: TextStyle(color: cs.primary, fontSize: 14, fontWeight: FontWeight.w600)),
+                              Text(
+                                l10n.providerDetailPageFetchModelsButton,
+                                style: TextStyle(
+                                  color: cs.primary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ],
                           ),
                         );
                       },
                     ),
                     const SizedBox(width: 10),
-                  _TactileRow(
-                    pressedScale: 0.97,
-                    haptics: false,
-                    onTap: () async {
-                      await showCreateModelSheet(context, providerKey: widget.keyName);
-                    },
-                    builder: (pressed) {
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: cs.primary.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Lucide.Plus, size: 20, color: cs.primary),
-                            const SizedBox(width: 8),
-                            Text(l10n.providerDetailPageAddNewModelButton, style: TextStyle(color: cs.primary, fontSize: 14)),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                    _TactileRow(
+                      pressedScale: 0.97,
+                      haptics: false,
+                      onTap: () async {
+                        await showCreateModelSheet(
+                          context,
+                          providerKey: widget.keyName,
+                        );
+                      },
+                      builder: (pressed) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: cs.primary.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 10,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Lucide.Plus, size: 20, color: cs.primary),
+                              const SizedBox(width: 8),
+                              Text(
+                                l10n.providerDetailPageAddNewModelButton,
+                                style: TextStyle(
+                                  color: cs.primary,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                     if (models.isNotEmpty) ...[
                       const SizedBox(width: 10),
                       _TactileRow(
@@ -1130,7 +1554,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                               color: cs.error.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(999),
                             ),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -1141,25 +1568,33 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                         },
                       ),
                     ],
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ),
       ],
     );
   }
 
   // Legacy network tab removed (replaced by ProviderNetworkPage)
 
-  Widget _switchRow({required IconData icon, required String title, required bool value, required ValueChanged<bool> onChanged}) {
+  Widget _switchRow({
+    required IconData icon,
+    required String title,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
     final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
         Container(
           width: 36,
           height: 36,
-          decoration: BoxDecoration(color: cs.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+          decoration: BoxDecoration(
+            color: cs.primary.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(10),
+          ),
           alignment: Alignment.center,
           margin: const EdgeInsets.only(right: 12),
           child: Icon(icon, size: 20, color: cs.primary),
@@ -1170,7 +1605,16 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     );
   }
 
-  Widget _inputRow(BuildContext context, {required String label, required TextEditingController controller, String? hint, bool obscure = false, bool enabled = true, Widget? suffix, ValueChanged<String>? onChanged}) {
+  Widget _inputRow(
+    BuildContext context, {
+    required String label,
+    required TextEditingController controller,
+    String? hint,
+    bool obscure = false,
+    bool enabled = true,
+    Widget? suffix,
+    ValueChanged<String>? onChanged,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
     return Column(
@@ -1178,7 +1622,13 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 12),
-          child: Text(label, style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.8))),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: cs.onSurface.withOpacity(0.8),
+            ),
+          ),
         ),
         const SizedBox(height: 6),
         TextField(
@@ -1202,7 +1652,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
             suffixIcon: suffix,
           ),
         ),
@@ -1210,7 +1663,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     );
   }
 
-  Widget _checkboxRow(BuildContext context, {required String title, required bool value, required ValueChanged<bool> onChanged}) {
+  Widget _checkboxRow(
+    BuildContext context, {
+    required String title,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
     final cs = Theme.of(context).colorScheme;
     return InkWell(
       onTap: () => onChanged(!value),
@@ -1231,12 +1689,17 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final Color base = cs.surface;
-    final Color bg = isDark ? Color.lerp(base, Colors.white, 0.06)! : Color.lerp(base, Colors.white, 0.92)!;
+    final Color bg = isDark
+        ? Color.lerp(base, Colors.white, 0.06)!
+        : Color.lerp(base, Colors.white, 0.92)!;
     return Container(
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06), width: 0.6),
+        border: Border.all(
+          color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+          width: 0.6,
+        ),
         // boxShadow: [
         //   if (!isDark) BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 1)),
         // ],
@@ -1258,7 +1721,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       builder: (pressed) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final base = cs.onSurface;
-        final target = pressed ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base) : base;
+        final target = pressed
+            ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
+                  base)
+            : base;
         return TweenAnimationBuilder<Color?>(
           tween: ColorTween(end: target),
           duration: const Duration(milliseconds: 220),
@@ -1269,7 +1735,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
               child: Row(
                 children: [
-                  Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: c))),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(fontSize: 15, color: c),
+                    ),
+                  ),
                   if (trailing != null) trailing,
                 ],
               ),
@@ -1292,7 +1763,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       builder: (pressed) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final base = cs.onSurface;
-        final target = pressed ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base) : base;
+        final target = pressed
+            ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
+                  base)
+            : base;
         return TweenAnimationBuilder<Color?>(
           tween: ColorTween(end: target),
           duration: const Duration(milliseconds: 220),
@@ -1306,12 +1780,21 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   Expanded(
                     child: Row(
                       children: [
-                        Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: c))),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: TextStyle(fontSize: 15, color: c),
+                          ),
+                        ),
                         Tooltip(
                           message: helpText,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Icon(Icons.help_outline, size: 18, color: cs.onSurface.withOpacity(0.6)),
+                            child: Icon(
+                              Icons.help_outline,
+                              size: 18,
+                              color: cs.onSurface.withOpacity(0.6),
+                            ),
                           ),
                         ),
                       ],
@@ -1345,13 +1828,17 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           return 'OpenAI';
       }
     }
+
     return _TactileRow(
       onTap: _showProviderKindSheet,
       builder: (pressed) {
         final cs = Theme.of(context).colorScheme;
         final base = cs.onSurface;
         final isDark = Theme.of(context).brightness == Brightness.dark;
-        final target = pressed ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base) : base;
+        final target = pressed
+            ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
+                  base)
+            : base;
         return TweenAnimationBuilder<Color?>(
           tween: ColorTween(end: target),
           duration: const Duration(milliseconds: 220),
@@ -1362,8 +1849,18 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               child: Row(
                 children: [
-                  Expanded(child: Text(AppLocalizations.of(context)!.providerDetailPageProviderTypeTitle, style: TextStyle(fontSize: 15, color: c))),
-                  Text(labelFor(_kind), style: TextStyle(fontSize: 15, color: c)),
+                  Expanded(
+                    child: Text(
+                      AppLocalizations.of(
+                        context,
+                      )!.providerDetailPageProviderTypeTitle,
+                      style: TextStyle(fontSize: 15, color: c),
+                    ),
+                  ),
+                  Text(
+                    labelFor(_kind),
+                    style: TextStyle(fontSize: 15, color: c),
+                  ),
                   const SizedBox(width: 6),
                   Icon(Lucide.ChevronRight, size: 16, color: c),
                 ],
@@ -1379,7 +1876,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final l10n = AppLocalizations.of(context)!;
     return _TactileRow(
       onTap: () async {
-        await showProviderGroupPickerSheet(context, providerKey: widget.keyName);
+        await showProviderGroupPickerSheet(
+          context,
+          providerKey: widget.keyName,
+        );
       },
       pressedScale: 1.00,
       haptics: false,
@@ -1387,7 +1887,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         final cs = Theme.of(context).colorScheme;
         final base = cs.onSurface;
         final isDark = Theme.of(context).brightness == Brightness.dark;
-        final target = pressed ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base) : base;
+        final target = pressed
+            ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
+                  base)
+            : base;
         return TweenAnimationBuilder<Color?>(
           tween: ColorTween(end: target),
           duration: const Duration(milliseconds: 220),
@@ -1401,7 +1904,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   final maxTrailingW = constraints.maxWidth * 0.55;
                   return Row(
                     children: [
-                      Expanded(child: Text(l10n.providerGroupsGroupLabel, style: TextStyle(fontSize: 15, color: c))),
+                      Expanded(
+                        child: Text(
+                          l10n.providerGroupsGroupLabel,
+                          style: TextStyle(fontSize: 15, color: c),
+                        ),
+                      ),
                       ConstrainedBox(
                         constraints: BoxConstraints(maxWidth: maxTrailingW),
                         child: Text(
@@ -1430,7 +1938,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final selected = await showModalBottomSheet<ProviderKind>(
       context: context,
       backgroundColor: cs.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (ctx) {
         return SafeArea(
           top: false,
@@ -1442,7 +1952,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 Container(
                   width: 40,
                   height: 4,
-                  decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(999)),
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _providerKindTile(ctx, ProviderKind.openai, label: 'OpenAI'),
@@ -1460,7 +1973,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     }
   }
 
-  Widget _providerKindTile(BuildContext ctx, ProviderKind k, {required String label}) {
+  Widget _providerKindTile(
+    BuildContext ctx,
+    ProviderKind k, {
+    required String label,
+  }) {
     final cs = Theme.of(ctx).colorScheme;
     final selected = _kind == k;
     return _TactileRow(
@@ -1470,7 +1987,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       builder: (pressed) {
         final base = cs.onSurface;
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final target = pressed ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base) : base;
+        final target = pressed
+            ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
+                  base)
+            : base;
         return TweenAnimationBuilder<Color?>(
           tween: ColorTween(end: target),
           duration: const Duration(milliseconds: 200),
@@ -1481,7 +2001,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               child: Row(
                 children: [
-                  Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: c))),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(fontSize: 15, color: c),
+                    ),
+                  ),
                   if (selected) Icon(Icons.check, color: cs.primary),
                 ],
               ),
@@ -1492,10 +2017,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     );
   }
 
-
   Future<void> _save() async {
     final settings = context.read<SettingsProvider>();
-    final old = settings.getProviderConfig(widget.keyName, defaultName: widget.displayName);
+    final old = settings.getProviderConfig(
+      widget.keyName,
+      defaultName: widget.displayName,
+    );
     String projectId = _projectCtrl.text.trim();
     if ((_kind == ProviderKind.google) && _vertexAI && projectId.isEmpty) {
       try {
@@ -1505,16 +2032,26 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     }
     final updated = old.copyWith(
       enabled: _enabled,
-      name: _nameCtrl.text.trim().isEmpty ? widget.displayName : _nameCtrl.text.trim(),
+      name: _nameCtrl.text.trim().isEmpty
+          ? widget.displayName
+          : _nameCtrl.text.trim(),
       apiKey: _keyCtrl.text.trim(),
       baseUrl: _baseCtrl.text.trim(),
-      providerType: _kind,  // Save the selected provider type
-      chatPath: _kind == ProviderKind.openai ? _pathCtrl.text.trim() : old.chatPath,
-      useResponseApi: _kind == ProviderKind.openai ? _useResp : old.useResponseApi,
+      providerType: _kind, // Save the selected provider type
+      chatPath: _kind == ProviderKind.openai
+          ? _pathCtrl.text.trim()
+          : old.chatPath,
+      useResponseApi: _kind == ProviderKind.openai
+          ? _useResp
+          : old.useResponseApi,
       vertexAI: _kind == ProviderKind.google ? _vertexAI : old.vertexAI,
-      location: _kind == ProviderKind.google ? _locationCtrl.text.trim() : old.location,
+      location: _kind == ProviderKind.google
+          ? _locationCtrl.text.trim()
+          : old.location,
       projectId: _kind == ProviderKind.google ? projectId : old.projectId,
-      serviceAccountJson: _kind == ProviderKind.google ? _saJsonCtrl.text.trim() : old.serviceAccountJson,
+      serviceAccountJson: _kind == ProviderKind.google
+          ? _saJsonCtrl.text.trim()
+          : old.serviceAccountJson,
       multiKeyEnabled: _multiKeyEnabled,
       aihubmixAppCodeEnabled: _aihubmixAppCodeEnabled,
       // preserve models and modelOverrides and proxy fields implicitly via copyWith
@@ -1557,7 +2094,13 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(left: 12),
-                child: Text(label, style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.8))),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withOpacity(0.8),
+                  ),
+                ),
               ),
             ),
             if (actions != null) ...actions,
@@ -1586,7 +2129,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
           ),
         ),
       ],
@@ -1617,11 +2163,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      showAppSnackBar(
-        context,
-        message: '$e',
-        type: NotificationType.error,
-      );
+      showAppSnackBar(context, message: '$e', type: NotificationType.error);
     }
   }
 
@@ -1662,7 +2204,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   }
 
   void _selectAll() {
-    final cfg = context.read<SettingsProvider>().getProviderConfig(widget.keyName, defaultName: widget.displayName);
+    final cfg = context.read<SettingsProvider>().getProviderConfig(
+      widget.keyName,
+      defaultName: widget.displayName,
+    );
     setState(() {
       _selectedModels.clear();
       _selectedModels.addAll(cfg.models);
@@ -1670,7 +2215,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   }
 
   void _invertSelection() {
-    final cfg = context.read<SettingsProvider>().getProviderConfig(widget.keyName, defaultName: widget.displayName);
+    final cfg = context.read<SettingsProvider>().getProviderConfig(
+      widget.keyName,
+      defaultName: widget.displayName,
+    );
     setState(() {
       final newSelection = <String>{};
       for (final model in cfg.models) {
@@ -1685,9 +2233,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
 
   Future<void> _startDetection() async {
     if (_selectedModels.isEmpty || _isDetecting) return;
-    
+
     final modelsToTest = Set<String>.from(_selectedModels);
-    
+
     setState(() {
       _isDetecting = true;
       _detectionResults.clear();
@@ -1699,8 +2247,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       _currentDetectingModel = null;
     });
 
-    final cfg = context.read<SettingsProvider>().getProviderConfig(widget.keyName, defaultName: widget.displayName);
-    
+    final cfg = context.read<SettingsProvider>().getProviderConfig(
+      widget.keyName,
+      defaultName: widget.displayName,
+    );
+
     // 顺序检测,防止并发导致API被封锁
     for (final modelId in modelsToTest) {
       if (mounted) {
@@ -1709,9 +2260,13 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           _pendingModels.remove(modelId);
         });
       }
-      
+
       try {
-        await ProviderManager.testConnection(cfg, modelId, useStream: _detectUseStream);
+        await ProviderManager.testConnection(
+          cfg,
+          modelId,
+          useStream: _detectUseStream,
+        );
         if (mounted) {
           setState(() {
             _detectionResults[modelId] = true;
@@ -1739,7 +2294,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
 
   Future<void> _deleteAllModels() async {
     final settings = context.read<SettingsProvider>();
-    final cfg = settings.getProviderConfig(widget.keyName, defaultName: widget.displayName);
+    final cfg = settings.getProviderConfig(
+      widget.keyName,
+      defaultName: widget.displayName,
+    );
     if (cfg.models.isEmpty) return;
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
@@ -1750,8 +2308,17 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         title: Text(l10n.providerDetailPageConfirmDeleteTitle),
         content: Text(l10n.providerDetailPageDeleteAllModelsWarning),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(l10n.providerDetailPageCancelButton)),
-          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(l10n.providerDetailPageDeleteButton, style: TextStyle(color: cs.error))),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.providerDetailPageCancelButton),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.providerDetailPageDeleteButton,
+              style: TextStyle(color: cs.error),
+            ),
+          ),
         ],
       ),
     );
@@ -1773,13 +2340,20 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => _ConnectionTestDialog(providerKey: widget.keyName, providerDisplayName: widget.displayName),
+      builder: (ctx) => _ConnectionTestDialog(
+        providerKey: widget.keyName,
+        providerDisplayName: widget.displayName,
+      ),
     );
   }
 
   // _saveNetwork moved to ProviderNetworkPage
 
-  Widget _buildProviderTypeSelector(BuildContext context, ColorScheme cs, AppLocalizations l10n) {
+  Widget _buildProviderTypeSelector(
+    BuildContext context,
+    ColorScheme cs,
+    AppLocalizations l10n,
+  ) {
     return Row(
       children: [
         Expanded(
@@ -1792,15 +2366,15 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               decoration: BoxDecoration(
-                color: _kind == ProviderKind.openai 
-                    ? cs.primary.withOpacity(0.15) 
-                    : Theme.of(context).brightness == Brightness.dark 
-                        ? Colors.white10 
-                        : const Color(0xFFF7F7F9),
+                color: _kind == ProviderKind.openai
+                    ? cs.primary.withOpacity(0.15)
+                    : Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white10
+                    : const Color(0xFFF7F7F9),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _kind == ProviderKind.openai 
-                      ? cs.primary.withOpacity(0.5) 
+                  color: _kind == ProviderKind.openai
+                      ? cs.primary.withOpacity(0.5)
                       : cs.outlineVariant.withOpacity(0.2),
                   width: _kind == ProviderKind.openai ? 2 : 1,
                 ),
@@ -1811,8 +2385,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     'OpenAI',
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: _kind == ProviderKind.openai ? FontWeight.w600 : FontWeight.w500,
-                      color: _kind == ProviderKind.openai ? cs.primary : cs.onSurface,
+                      fontWeight: _kind == ProviderKind.openai
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: _kind == ProviderKind.openai
+                          ? cs.primary
+                          : cs.onSurface,
                     ),
                   ),
                 ],
@@ -1831,15 +2409,15 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               decoration: BoxDecoration(
-                color: _kind == ProviderKind.google 
-                    ? cs.primary.withOpacity(0.15) 
-                    : Theme.of(context).brightness == Brightness.dark 
-                        ? Colors.white10 
-                        : const Color(0xFFF7F7F9),
+                color: _kind == ProviderKind.google
+                    ? cs.primary.withOpacity(0.15)
+                    : Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white10
+                    : const Color(0xFFF7F7F9),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _kind == ProviderKind.google 
-                      ? cs.primary.withOpacity(0.5) 
+                  color: _kind == ProviderKind.google
+                      ? cs.primary.withOpacity(0.5)
                       : cs.outlineVariant.withOpacity(0.2),
                   width: _kind == ProviderKind.google ? 2 : 1,
                 ),
@@ -1850,8 +2428,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     'Gemini',
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: _kind == ProviderKind.google ? FontWeight.w600 : FontWeight.w500,
-                      color: _kind == ProviderKind.google ? cs.primary : cs.onSurface,
+                      fontWeight: _kind == ProviderKind.google
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: _kind == ProviderKind.google
+                          ? cs.primary
+                          : cs.onSurface,
                     ),
                   ),
                 ],
@@ -1870,15 +2452,15 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               decoration: BoxDecoration(
-                color: _kind == ProviderKind.claude 
-                    ? cs.primary.withOpacity(0.15) 
-                    : Theme.of(context).brightness == Brightness.dark 
-                        ? Colors.white10 
-                        : const Color(0xFFF7F7F9),
+                color: _kind == ProviderKind.claude
+                    ? cs.primary.withOpacity(0.15)
+                    : Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white10
+                    : const Color(0xFFF7F7F9),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _kind == ProviderKind.claude 
-                      ? cs.primary.withOpacity(0.5) 
+                  color: _kind == ProviderKind.claude
+                      ? cs.primary.withOpacity(0.5)
                       : cs.outlineVariant.withOpacity(0.2),
                   width: _kind == ProviderKind.claude ? 2 : 1,
                 ),
@@ -1889,8 +2471,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     'Claude',
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: _kind == ProviderKind.claude ? FontWeight.w600 : FontWeight.w500,
-                      color: _kind == ProviderKind.claude ? cs.primary : cs.onSurface,
+                      fontWeight: _kind == ProviderKind.claude
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: _kind == ProviderKind.claude
+                          ? cs.primary
+                          : cs.onSurface,
                     ),
                   ),
                 ],
@@ -1905,9 +2491,15 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   Future<void> _showModelPicker(BuildContext context) async {
     final cs = Theme.of(context).colorScheme;
     final settings = context.read<SettingsProvider>();
-    final cfg = settings.getProviderConfig(widget.keyName, defaultName: widget.displayName);
-    final bool _isDefaultSilicon = widget.keyName.toLowerCase() == 'siliconflow';
-    final bool _hasUserKey = (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) || cfg.apiKey.trim().isNotEmpty;
+    final cfg = settings.getProviderConfig(
+      widget.keyName,
+      defaultName: widget.displayName,
+    );
+    final bool _isDefaultSilicon =
+        widget.keyName.toLowerCase() == 'siliconflow';
+    final bool _hasUserKey =
+        (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) ||
+        cfg.apiKey.trim().isNotEmpty;
     final bool _restrictToFree = _isDefaultSilicon && !_hasUserKey;
     final controller = TextEditingController();
     List<dynamic> items = const [];
@@ -1924,336 +2516,658 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        return StatefulBuilder(builder: (ctx, setLocal) {
-          final l10n = AppLocalizations.of(ctx)!;
-          Future<void> _load() async {
-            try {
-              if (_restrictToFree) {
-                final list = <ModelInfo>[
-                  ModelRegistry.infer(ModelInfo(id: 'THUDM/GLM-4-9B-0414', displayName: 'THUDM/GLM-4-9B-0414')),
-                  ModelRegistry.infer(ModelInfo(id: 'Qwen/Qwen3-8B', displayName: 'Qwen/Qwen3-8B')),
-                ];
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            final l10n = AppLocalizations.of(ctx)!;
+            Future<void> _load() async {
+              try {
+                if (_restrictToFree) {
+                  final list = <ModelInfo>[
+                    ModelRegistry.infer(
+                      ModelInfo(
+                        id: 'THUDM/GLM-4-9B-0414',
+                        displayName: 'THUDM/GLM-4-9B-0414',
+                      ),
+                    ),
+                    ModelRegistry.infer(
+                      ModelInfo(
+                        id: 'Qwen/Qwen3-8B',
+                        displayName: 'Qwen/Qwen3-8B',
+                      ),
+                    ),
+                  ];
+                  setLocal(() {
+                    items = list;
+                    loading = false;
+                  });
+                } else {
+                  final list = await ProviderManager.listModels(cfg);
+                  setLocal(() {
+                    items = list;
+                    loading = false;
+                  });
+                }
+              } catch (e) {
                 setLocal(() {
-                  items = list;
+                  items = const [];
                   loading = false;
-                });
-              } else {
-                final list = await ProviderManager.listModels(cfg);
-                setLocal(() {
-                  items = list;
-                  loading = false;
+                  error = '$e';
                 });
               }
-            } catch (e) {
-              setLocal(() {
-                items = const [];
-                loading = false;
-                error = '$e';
-              });
             }
-          }
 
-          if (loading) {
-            // kick off loading once
-            Future.microtask(_load);
-          }
+            if (loading) {
+              // kick off loading once
+              Future.microtask(_load);
+            }
 
-          final selected = settings.getProviderConfig(widget.keyName, defaultName: widget.displayName).models.toSet();
-          final query = controller.text.trim().toLowerCase();
-          final filtered = <ModelInfo>[
-            for (final m in items)
-              if (m is ModelInfo && (query.isEmpty || m.id.toLowerCase().contains(query) || m.displayName.toLowerCase().contains(query))) m
-          ];
+            final selected = settings
+                .getProviderConfig(
+                  widget.keyName,
+                  defaultName: widget.displayName,
+                )
+                .models
+                .toSet();
+            final query = controller.text.trim().toLowerCase();
+            final filtered = <ModelInfo>[
+              for (final m in items)
+                if (m is ModelInfo &&
+                    (query.isEmpty ||
+                        m.id.toLowerCase().contains(query) ||
+                        m.displayName.toLowerCase().contains(query)))
+                  m,
+            ];
 
-          String _groupFor(ModelInfo m) {
-            return ModelGrouping.groupFor(
-              m,
-              embeddingsLabel: l10n.providerDetailPageEmbeddingsGroupTitle,
-              otherLabel: l10n.providerDetailPageOtherModelsGroupTitle,
-            );
-          }
+            String _groupFor(ModelInfo m) {
+              return ModelGrouping.groupFor(
+                m,
+                embeddingsLabel: l10n.providerDetailPageEmbeddingsGroupTitle,
+                otherLabel: l10n.providerDetailPageOtherModelsGroupTitle,
+              );
+            }
 
-          final Map<String, List<ModelInfo>> grouped = {};
-          for (final m in filtered) {
-            final g = _groupFor(m);
-            (grouped[g] ??= []).add(m);
-          }
-          final groupKeys = grouped.keys.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+            final Map<String, List<ModelInfo>> grouped = {};
+            for (final m in filtered) {
+              final g = _groupFor(m);
+              (grouped[g] ??= []).add(m);
+            }
+            final groupKeys = grouped.keys.toList()
+              ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
-          return SafeArea(
-            top: false,
-            child: AnimatedPadding(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-              child: DraggableScrollableSheet(
-                expand: false,
-                initialChildSize: 0.7,
-                maxChildSize: 0.8,
-                minChildSize: 0.4,
-                builder: (c, scrollController) {
-                  final bottomPadding = MediaQuery.of(ctx).padding.bottom + 16;
-                  return Column(
-                    children: [
-                      const SizedBox(height: 8),
-                      Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(999))),
-                      const SizedBox(height: 12),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: TextField(
-                          controller: controller,
-                          onChanged: (_) => setLocal(() {}),
-                          decoration: InputDecoration(
-                            hintText: l10n.providerDetailPageFilterHint,
-                            filled: true,
-                            fillColor: Theme.of(ctx).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
-                            prefixIcon: Icon(Lucide.Search, size: 20, color: cs.onSurface.withOpacity(0.7)),
-                            suffixIcon: ExcludeSemantics(
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // Animated toggle: Select All / Deselect All (based on current filtered state)
-                                  Builder(
-                                    builder: (_) {
-                                      final allSelected = filtered.isNotEmpty && filtered.every((m) => selected.contains(m.id));
-                                      return IconButton(
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(minWidth: 44, minHeight: 40),
-                                        icon: Icon(allSelected ? Lucide.Square : Lucide.CheckSquare, size: 22, color: cs.onSurface.withOpacity(0.7)),
-                                        tooltip: allSelected ? l10n.mcpAssistantSheetClearAll : l10n.mcpAssistantSheetSelectAll,
-                                        onPressed: () async {
-                                          final old = settings.getProviderConfig(widget.keyName, defaultName: widget.displayName);
-                                          if (filtered.isEmpty) return;
-                                          if (allSelected) {
-                                            // Deselect all filtered
-                                            final toRemove = filtered.map((m) => m.id).toSet();
-                                            final next = old.models.where((id) => !toRemove.contains(id)).toList();
-                                            await settings.setProviderConfig(widget.keyName, old.copyWith(models: next));
-                                          } else {
-                                            // Select all filtered
-                                            final setIds = old.models.toSet();
-                                            setIds.addAll(filtered.map((m) => m.id));
-                                            await settings.setProviderConfig(widget.keyName, old.copyWith(models: setIds.toList()));
-                                          }
-                                          setLocal(() {});
-                                        },
-                                      );
-                                    },
-                                  ),
-                                  IconButton(
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 44, minHeight: 40),
-                                    icon: Icon(Lucide.Repeat, size: 22, color: cs.onSurface.withOpacity(0.7)),
-                                    tooltip: l10n.modelFetchInvertTooltip,
-                                    onPressed: () async {
-                                      final old = settings.getProviderConfig(widget.keyName, defaultName: widget.displayName);
-                                      final q = controller.text.trim().toLowerCase();
-                                      final filteredNow = <ModelInfo>[
-                                        for (final m in items)
-                                          if (m is ModelInfo && (q.isEmpty || m.id.toLowerCase().contains(q) || m.displayName.toLowerCase().contains(q))) m,
-                                      ];
-                                      if (filteredNow.isEmpty) return;
-                                      final current = old.models.toSet();
-                                      for (final m in filteredNow) {
-                                        if (current.contains(m.id)) {
-                                          current.remove(m.id);
-                                        } else {
-                                          current.add(m.id);
-                                        }
-                                      }
-                                      await settings.setProviderConfig(widget.keyName, old.copyWith(models: current.toList()));
-                                      setLocal(() {});
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.transparent)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary.withOpacity(0.4))),
+            return SafeArea(
+              top: false,
+              child: AnimatedPadding(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                ),
+                child: DraggableScrollableSheet(
+                  expand: false,
+                  initialChildSize: 0.7,
+                  maxChildSize: 0.8,
+                  minChildSize: 0.4,
+                  builder: (c, scrollController) {
+                    final bottomPadding =
+                        MediaQuery.of(ctx).padding.bottom + 16;
+                    return Column(
+                      children: [
+                        const SizedBox(height: 8),
+                        Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: cs.onSurface.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(999),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: loading
-                            ? const Center(child: CircularProgressIndicator())
-                          : error.isNotEmpty
-                              ? Center(child: Text(error, style: TextStyle(color: cs.error)))
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: TextField(
+                            controller: controller,
+                            onChanged: (_) => setLocal(() {}),
+                            decoration: InputDecoration(
+                              hintText: l10n.providerDetailPageFilterHint,
+                              filled: true,
+                              fillColor:
+                                  Theme.of(ctx).brightness == Brightness.dark
+                                  ? Colors.white10
+                                  : const Color(0xFFF2F3F5),
+                              prefixIcon: Icon(
+                                Lucide.Search,
+                                size: 20,
+                                color: cs.onSurface.withOpacity(0.7),
+                              ),
+                              suffixIcon: ExcludeSemantics(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Animated toggle: Select All / Deselect All (based on current filtered state)
+                                    Builder(
+                                      builder: (_) {
+                                        final allSelected =
+                                            filtered.isNotEmpty &&
+                                            filtered.every(
+                                              (m) => selected.contains(m.id),
+                                            );
+                                        return IconButton(
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(
+                                            minWidth: 44,
+                                            minHeight: 40,
+                                          ),
+                                          icon: Icon(
+                                            allSelected
+                                                ? Lucide.Square
+                                                : Lucide.CheckSquare,
+                                            size: 22,
+                                            color: cs.onSurface.withOpacity(
+                                              0.7,
+                                            ),
+                                          ),
+                                          tooltip: allSelected
+                                              ? l10n.mcpAssistantSheetClearAll
+                                              : l10n.mcpAssistantSheetSelectAll,
+                                          onPressed: () async {
+                                            final old = settings
+                                                .getProviderConfig(
+                                                  widget.keyName,
+                                                  defaultName:
+                                                      widget.displayName,
+                                                );
+                                            if (filtered.isEmpty) return;
+                                            if (allSelected) {
+                                              // Deselect all filtered
+                                              final toRemove = filtered
+                                                  .map((m) => m.id)
+                                                  .toSet();
+                                              final next = old.models
+                                                  .where(
+                                                    (id) =>
+                                                        !toRemove.contains(id),
+                                                  )
+                                                  .toList();
+                                              await settings.setProviderConfig(
+                                                widget.keyName,
+                                                old.copyWith(models: next),
+                                              );
+                                            } else {
+                                              // Select all filtered
+                                              final setIds = old.models.toSet();
+                                              setIds.addAll(
+                                                filtered.map((m) => m.id),
+                                              );
+                                              await settings.setProviderConfig(
+                                                widget.keyName,
+                                                old.copyWith(
+                                                  models: setIds.toList(),
+                                                ),
+                                              );
+                                            }
+                                            setLocal(() {});
+                                          },
+                                        );
+                                      },
+                                    ),
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 44,
+                                        minHeight: 40,
+                                      ),
+                                      icon: Icon(
+                                        Lucide.Repeat,
+                                        size: 22,
+                                        color: cs.onSurface.withOpacity(0.7),
+                                      ),
+                                      tooltip: l10n.modelFetchInvertTooltip,
+                                      onPressed: () async {
+                                        final old = settings.getProviderConfig(
+                                          widget.keyName,
+                                          defaultName: widget.displayName,
+                                        );
+                                        final q = controller.text
+                                            .trim()
+                                            .toLowerCase();
+                                        final filteredNow = <ModelInfo>[
+                                          for (final m in items)
+                                            if (m is ModelInfo &&
+                                                (q.isEmpty ||
+                                                    m.id.toLowerCase().contains(
+                                                      q,
+                                                    ) ||
+                                                    m.displayName
+                                                        .toLowerCase()
+                                                        .contains(q)))
+                                              m,
+                                        ];
+                                        if (filteredNow.isEmpty) return;
+                                        final current = old.models.toSet();
+                                        for (final m in filteredNow) {
+                                          if (current.contains(m.id)) {
+                                            current.remove(m.id);
+                                          } else {
+                                            current.add(m.id);
+                                          }
+                                        }
+                                        await settings.setProviderConfig(
+                                          widget.keyName,
+                                          old.copyWith(
+                                            models: current.toList(),
+                                          ),
+                                        );
+                                        setLocal(() {});
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.transparent,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.transparent,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: cs.primary.withOpacity(0.4),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: loading
+                              ? const Center(child: CircularProgressIndicator())
+                              : error.isNotEmpty
+                              ? Center(
+                                  child: Text(
+                                    error,
+                                    style: TextStyle(color: cs.error),
+                                  ),
+                                )
                               : ListView(
                                   controller: scrollController,
-                                  padding: EdgeInsets.only(bottom: bottomPadding),
+                                  padding: EdgeInsets.only(
+                                    bottom: bottomPadding,
+                                  ),
                                   children: [
                                     for (final g in groupKeys) ...[
                                       // Group header with actions
                                       Padding(
-                                        padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+                                        padding: const EdgeInsets.fromLTRB(
+                                          12,
+                                          6,
+                                          12,
+                                          6,
+                                        ),
                                         child: _TactileRow(
                                           pressedScale: 0.98,
                                           haptics: false,
                                           onTap: () => setLocal(() {
-                                            collapsed[g] = !(collapsed[g] == true);
+                                            collapsed[g] =
+                                                !(collapsed[g] == true);
                                           }),
                                           builder: (_) {
                                             return Container(
                                               decoration: BoxDecoration(
-                                                color: Theme.of(context).brightness == Brightness.dark
+                                                color:
+                                                    Theme.of(
+                                                          context,
+                                                        ).brightness ==
+                                                        Brightness.dark
                                                     ? Colors.white10
                                                     : const Color(0xFFF2F3F5),
-                                                borderRadius: BorderRadius.circular(12),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
                                               ),
                                               child: Padding(
-                                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 16,
+                                                      vertical: 6,
+                                                    ),
                                                 child: Row(
                                                   children: [
-                                                  SizedBox(
-                                                    width: 28,
-                                                    child: Center(
-                                                      child: AnimatedRotation(
-                                                        turns: (collapsed[g] == true) ? 0.0 : 0.25,
-                                                        duration: const Duration(milliseconds: 220),
-                                                        curve: Curves.easeOutCubic,
-                                                        child: Icon(
-                                                          Lucide.ChevronRight,
-                                                          size: 20,
-                                                          color: cs.onSurface.withOpacity(0.7),
+                                                    SizedBox(
+                                                      width: 28,
+                                                      child: Center(
+                                                        child: AnimatedRotation(
+                                                          turns:
+                                                              (collapsed[g] ==
+                                                                  true)
+                                                              ? 0.0
+                                                              : 0.25,
+                                                          duration:
+                                                              const Duration(
+                                                                milliseconds:
+                                                                    220,
+                                                              ),
+                                                          curve: Curves
+                                                              .easeOutCubic,
+                                                          child: Icon(
+                                                            Lucide.ChevronRight,
+                                                            size: 20,
+                                                            color: cs.onSurface
+                                                                .withOpacity(
+                                                                  0.7,
+                                                                ),
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
-                                                  ),
-                                                  const SizedBox(width: 16),
-                                                  Expanded(
-                                                    child: Text(
-                                                      g,
-                                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
+                                                    const SizedBox(width: 16),
+                                                    Expanded(
+                                                      child: Text(
+                                                        g,
+                                                        style: const TextStyle(
+                                                          fontSize: 14,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
                                                     ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Builder(builder: (ctx2) {
-                                                    final allAdded = grouped[g]!.every((m) => selected.contains(m.id));
-                                                    return IconButton(
-                                                      padding: EdgeInsets.zero,
-                                                      constraints: const BoxConstraints(minWidth: 48, minHeight: 40),
-                                                      tooltip: allAdded ? l10n.providerDetailPageRemoveGroupTooltip : l10n.providerDetailPageAddGroupTooltip,
-                                                      icon: Icon(allAdded ? Lucide.Minus : Lucide.Plus, size: 24, color: allAdded ? cs.onSurface.withValues(alpha: 0.7) : cs.onSurface.withValues(alpha: 0.7)),
-                                                      onPressed: () async {
-                                                        final old = settings.getProviderConfig(widget.keyName, defaultName: widget.displayName);
-                                                        if (allAdded) {
-                                                          final toRemove = grouped[g]!.map((m) => m.id).toSet();
-                                                          final list = old.models.where((id) => !toRemove.contains(id)).toList();
-                                                          await settings.setProviderConfig(widget.keyName, old.copyWith(models: list));
-                                                        } else {
-                                                          final toAdd = grouped[g]!.where((m) => !selected.contains(m.id)).map((m) => m.id).toList();
-                                                          if (toAdd.isEmpty) return;
-                                                          final set = old.models.toSet()..addAll(toAdd);
-                                                          await settings.setProviderConfig(widget.keyName, old.copyWith(models: set.toList()));
-                                                        }
-                                                        setLocal(() {});
+                                                    const SizedBox(width: 8),
+                                                    Builder(
+                                                      builder: (ctx2) {
+                                                        final allAdded =
+                                                            grouped[g]!.every(
+                                                              (m) => selected
+                                                                  .contains(
+                                                                    m.id,
+                                                                  ),
+                                                            );
+                                                        return IconButton(
+                                                          padding:
+                                                              EdgeInsets.zero,
+                                                          constraints:
+                                                              const BoxConstraints(
+                                                                minWidth: 48,
+                                                                minHeight: 40,
+                                                              ),
+                                                          tooltip: allAdded
+                                                              ? l10n.providerDetailPageRemoveGroupTooltip
+                                                              : l10n.providerDetailPageAddGroupTooltip,
+                                                          icon: Icon(
+                                                            allAdded
+                                                                ? Lucide.Minus
+                                                                : Lucide.Plus,
+                                                            size: 24,
+                                                            color: allAdded
+                                                                ? cs.onSurface
+                                                                      .withValues(
+                                                                        alpha:
+                                                                            0.7,
+                                                                      )
+                                                                : cs.onSurface
+                                                                      .withValues(
+                                                                        alpha:
+                                                                            0.7,
+                                                                      ),
+                                                          ),
+                                                          onPressed: () async {
+                                                            final old = settings
+                                                                .getProviderConfig(
+                                                                  widget
+                                                                      .keyName,
+                                                                  defaultName:
+                                                                      widget
+                                                                          .displayName,
+                                                                );
+                                                            if (allAdded) {
+                                                              final toRemove =
+                                                                  grouped[g]!
+                                                                      .map(
+                                                                        (m) => m
+                                                                            .id,
+                                                                      )
+                                                                      .toSet();
+                                                              final list = old
+                                                                  .models
+                                                                  .where(
+                                                                    (
+                                                                      id,
+                                                                    ) => !toRemove
+                                                                        .contains(
+                                                                          id,
+                                                                        ),
+                                                                  )
+                                                                  .toList();
+                                                              await settings
+                                                                  .setProviderConfig(
+                                                                    widget
+                                                                        .keyName,
+                                                                    old.copyWith(
+                                                                      models:
+                                                                          list,
+                                                                    ),
+                                                                  );
+                                                            } else {
+                                                              final toAdd = grouped[g]!
+                                                                  .where(
+                                                                    (
+                                                                      m,
+                                                                    ) => !selected
+                                                                        .contains(
+                                                                          m.id,
+                                                                        ),
+                                                                  )
+                                                                  .map(
+                                                                    (m) => m.id,
+                                                                  )
+                                                                  .toList();
+                                                              if (toAdd.isEmpty)
+                                                                return;
+                                                              final set =
+                                                                  old.models
+                                                                      .toSet()
+                                                                    ..addAll(
+                                                                      toAdd,
+                                                                    );
+                                                              await settings
+                                                                  .setProviderConfig(
+                                                                    widget
+                                                                        .keyName,
+                                                                    old.copyWith(
+                                                                      models: set
+                                                                          .toList(),
+                                                                    ),
+                                                                  );
+                                                            }
+                                                            setLocal(() {});
+                                                          },
+                                                        );
                                                       },
-                                                    );
-                                                  }),
-                                                ],
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
-                                              ));
-
+                                            );
                                           },
                                         ),
                                       ),
                                       AnimatedSize(
-                                        duration: const Duration(milliseconds: 220),
+                                        duration: const Duration(
+                                          milliseconds: 220,
+                                        ),
                                         curve: Curves.easeOutCubic,
                                         child: (collapsed[g] == true)
                                             ? const SizedBox.shrink()
                                             : Column(
                                                 children: [
                                                   for (final m in grouped[g]!)
-                                                    Builder(builder: (c2) {
-                                            final added = selected.contains(m.id);
-                                            return Padding(
-                                              padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-                                              child: _TactileRow(
-                                                pressedScale: 0.98,
-                                                haptics: false,
-                                                onTap: () {},
-                                                builder: (_) {
-                                                  return Container(
-                                                    decoration: BoxDecoration(
-                                                      borderRadius: BorderRadius.circular(12),
-                                                    ),
-                                                    child: Padding(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                                      child: Row(
-                                                        children: [
-                                                          SizedBox(
-                                                            width: 28,
-                                                            child: Center(child: _BrandAvatar(name: m.id, size: 28)),
-                                                          ),
-                                                          const SizedBox(width: 16),
-                                                          Expanded(
-                                                            child: Column(
-                                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                                              children: [
-                                                                Text(m.displayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                                                const SizedBox(height: 4),
-                                                                _modelTagWrap(context, m),
-                                                              ],
-                                                            ),
-                                                          ),
-                                                          const SizedBox(width: 8),
-                                                          IconButton(
-                                                            padding: EdgeInsets.zero,
-                                                            constraints: const BoxConstraints(minWidth: 48, minHeight: 40),
-                                                            onPressed: () async {
-                                                              final old = settings.getProviderConfig(widget.keyName, defaultName: widget.displayName);
-                                                              final list = old.models.toList();
-                                                              if (added) {
-                                                                list.removeWhere((e) => e == m.id);
-                                                              } else {
-                                                                list.add(m.id);
-                                                              }
-                                                              await settings.setProviderConfig(widget.keyName, old.copyWith(models: list));
-                                                              setLocal(() {});
+                                                    Builder(
+                                                      builder: (c2) {
+                                                        final added = selected
+                                                            .contains(m.id);
+                                                        return Padding(
+                                                          padding:
+                                                              const EdgeInsets.fromLTRB(
+                                                                12,
+                                                                6,
+                                                                12,
+                                                                6,
+                                                              ),
+                                                          child: _TactileRow(
+                                                            pressedScale: 0.98,
+                                                            haptics: false,
+                                                            onTap: () {},
+                                                            builder: (_) {
+                                                              return Container(
+                                                                decoration:
+                                                                    BoxDecoration(
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            12,
+                                                                          ),
+                                                                    ),
+                                                                child: Padding(
+                                                                  padding:
+                                                                      const EdgeInsets.symmetric(
+                                                                        horizontal:
+                                                                            16,
+                                                                        vertical:
+                                                                            10,
+                                                                      ),
+                                                                  child: Row(
+                                                                    children: [
+                                                                      SizedBox(
+                                                                        width:
+                                                                            28,
+                                                                        child: Center(
+                                                                          child: _BrandAvatar(
+                                                                            name:
+                                                                                m.id,
+                                                                            size:
+                                                                                28,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                      const SizedBox(
+                                                                        width:
+                                                                            16,
+                                                                      ),
+                                                                      Expanded(
+                                                                        child: Column(
+                                                                          crossAxisAlignment:
+                                                                              CrossAxisAlignment.start,
+                                                                          children: [
+                                                                            Text(
+                                                                              m.displayName,
+                                                                              style: const TextStyle(
+                                                                                fontSize: 14,
+                                                                                fontWeight: FontWeight.w600,
+                                                                              ),
+                                                                              maxLines: 1,
+                                                                              overflow: TextOverflow.ellipsis,
+                                                                            ),
+                                                                            const SizedBox(
+                                                                              height: 4,
+                                                                            ),
+                                                                            ModelTagWrap(
+                                                                              model: m,
+                                                                            ),
+                                                                          ],
+                                                                        ),
+                                                                      ),
+                                                                      const SizedBox(
+                                                                        width:
+                                                                            8,
+                                                                      ),
+                                                                      IconButton(
+                                                                        padding:
+                                                                            EdgeInsets.zero,
+                                                                        constraints: const BoxConstraints(
+                                                                          minWidth:
+                                                                              48,
+                                                                          minHeight:
+                                                                              40,
+                                                                        ),
+                                                                        onPressed: () async {
+                                                                          final old = settings.getProviderConfig(
+                                                                            widget.keyName,
+                                                                            defaultName:
+                                                                                widget.displayName,
+                                                                          );
+                                                                          final list = old
+                                                                              .models
+                                                                              .toList();
+                                                                          if (added) {
+                                                                            list.removeWhere(
+                                                                              (
+                                                                                e,
+                                                                              ) =>
+                                                                                  e ==
+                                                                                  m.id,
+                                                                            );
+                                                                          } else {
+                                                                            list.add(
+                                                                              m.id,
+                                                                            );
+                                                                          }
+                                                                          await settings.setProviderConfig(
+                                                                            widget.keyName,
+                                                                            old.copyWith(
+                                                                              models: list,
+                                                                            ),
+                                                                          );
+                                                                          setLocal(
+                                                                            () {},
+                                                                          );
+                                                                        },
+                                                                        icon: Icon(
+                                                                          added
+                                                                              ? Lucide.Minus
+                                                                              : Lucide.Plus,
+                                                                          size:
+                                                                              24,
+                                                                          color:
+                                                                              added
+                                                                              ? cs.onSurface.withValues(
+                                                                                  alpha: 0.7,
+                                                                                )
+                                                                              : cs.onSurface.withValues(
+                                                                                  alpha: 0.7,
+                                                                                ),
+                                                                        ),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                ),
+                                                              );
                                                             },
-                                                            icon: Icon(added ? Lucide.Minus : Lucide.Plus, size: 24, color: added ? cs.onSurface.withValues(alpha: 0.7) : cs.onSurface.withValues(alpha: 0.7)),
                                                           ),
-                                                        ],
-                                                      ),
+                                                        );
+                                                      },
                                                     ),
-                                                  );
-                                                },
-                                              ),
-                                            );
-                                          }),
                                                 ],
                                               ),
                                       ),
                                     ],
                                   ],
                                 ),
-                    ),
-                    ],
-                  );
-                },
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
-            ),
-          );
-        });
+            );
+          },
+        );
       },
-    );
-  }
-
-  Widget _capPill(BuildContext context, IconData icon, String label) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(color: cs.primary.withOpacity(0.10), borderRadius: BorderRadius.circular(999)),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 12, color: cs.primary),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: cs.primary)),
-      ]),
     );
   }
 }
@@ -2269,7 +3183,9 @@ Widget _buildDismissBg(BuildContext context, {required bool alignStart}) {
     padding: const EdgeInsets.symmetric(horizontal: 16),
     alignment: alignStart ? Alignment.centerLeft : Alignment.centerRight,
     child: Row(
-      mainAxisAlignment: alignStart ? MainAxisAlignment.start : MainAxisAlignment.end,
+      mainAxisAlignment: alignStart
+          ? MainAxisAlignment.start
+          : MainAxisAlignment.end,
       children: [
         Icon(Lucide.Trash2, color: cs.error, size: 20),
         const SizedBox(width: 6),
@@ -2308,10 +3224,22 @@ class _ModelCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final resolved = _resolveBaseAndOverride(context);
+    final effective = resolved.ov == null
+        ? resolved.base
+        : _applyModelOverride(
+            resolved.base,
+            resolved.ov!,
+            applyDisplayName: true,
+          );
+    String displayName = effective.displayName.trim();
+    if (displayName.isEmpty) displayName = modelId;
     return _TactileRow(
       pressedScale: 0.98,
       haptics: false,
-      onTap: isSelectionMode ? () => onSelectionChanged?.call(!isSelected) : () {},
+      onTap: isSelectionMode
+          ? () => onSelectionChanged?.call(!isSelected)
+          : () {},
       builder: (pressed) {
         return Container(
           decoration: BoxDecoration(
@@ -2329,7 +3257,7 @@ class _ModelCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                 ],
-                _BrandAvatar(name: modelId, size: 28),
+                _BrandAvatar(name: resolved.baseId, size: 28),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -2338,14 +3266,23 @@ class _ModelCard extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(_displayName(context), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                            child: Text(
+                              displayName,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                           if (isDetecting) ...[
                             const SizedBox(width: 8),
                             SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: cs.primary,
+                              ),
                             ),
                           ] else if (isPending) ...[
                             const SizedBox(width: 8),
@@ -2354,7 +3291,10 @@ class _ModelCard extends StatelessWidget {
                               height: 16,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: cs.onSurface.withOpacity(0.3), width: 2),
+                                border: Border.all(
+                                  color: cs.onSurface.withOpacity(0.3),
+                                  width: 2,
+                                ),
                               ),
                             ),
                           ] else if (detectionResult != null) ...[
@@ -2362,11 +3302,18 @@ class _ModelCard extends StatelessWidget {
                             MouseRegion(
                               cursor: SystemMouseCursors.click,
                               child: Tooltip(
-                                message: detectionResult! ? l10n.providerDetailPageDetectSuccess : (detectionErrorMessage ?? l10n.providerDetailPageDetectFailed),
+                                message: detectionResult!
+                                    ? l10n.providerDetailPageDetectSuccess
+                                    : (detectionErrorMessage ??
+                                          l10n.providerDetailPageDetectFailed),
                                 child: Icon(
-                                  detectionResult! ? Lucide.CheckCircle : Lucide.XCircle,
+                                  detectionResult!
+                                      ? Lucide.CheckCircle
+                                      : Lucide.XCircle,
                                   size: 16,
-                                  color: detectionResult! ? Colors.green : cs.error,
+                                  color: detectionResult!
+                                      ? Colors.green
+                                      : cs.error,
                                 ),
                               ),
                             ),
@@ -2374,7 +3321,7 @@ class _ModelCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      _modelTagWrap(context, _effective(context)),
+                      ModelTagWrap(model: effective),
                     ],
                   ),
                 ),
@@ -2387,7 +3334,11 @@ class _ModelCard extends StatelessWidget {
                     semanticLabel: l10n.providerDetailPageEditTooltip,
                     haptics: false,
                     onTap: () async {
-                      await showModelDetailSheet(context, providerKey: providerKey, modelId: modelId);
+                      await showModelDetailSheet(
+                        context,
+                        providerKey: providerKey,
+                        modelId: modelId,
+                      );
                     },
                   ),
                 ],
@@ -2404,67 +3355,44 @@ class _ModelCard extends StatelessWidget {
     return ModelRegistry.infer(ModelInfo(id: id, displayName: id));
   }
 
-  ModelInfo _effective(BuildContext context) {
-    final base = _infer(modelId);
-    final cfg = context.watch<SettingsProvider>().getProviderConfig(providerKey);
-    final ov = cfg.modelOverrides[modelId] as Map?;
-    if (ov == null) return base;
-    ModelType? type;
-    final t = (ov['type'] as String?) ?? '';
-    if (t == 'embedding') type = ModelType.embedding; else if (t == 'chat') type = ModelType.chat;
-    List<Modality>? input;
-    if (ov['input'] is List) {
-      input = [
-        for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-      ];
+  _ResolvedModelOverride _resolveBaseAndOverride(BuildContext context) {
+    final configs = context.watch<SettingsProvider>().providerConfigs;
+    final cfg = configs[providerKey];
+    if (cfg == null) {
+      final base = _infer(modelId);
+      return _ResolvedModelOverride(base: base, ov: null, baseId: modelId);
     }
-    List<Modality>? output;
-    if (ov['output'] is List) {
-      output = [
-        for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-      ];
-    }
-    List<ModelAbility>? abilities;
-    if (ov['abilities'] is List) {
-      abilities = [
-        for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)
-      ];
-    }
-    return base.copyWith(
-      displayName: (ov['name'] as String?)?.isNotEmpty == true ? ov['name'] as String : base.displayName,
-      type: type ?? base.type,
-      input: input ?? base.input,
-      output: output ?? base.output,
-      abilities: abilities ?? base.abilities,
-    );
-  }
-
-  String _displayName(BuildContext context) {
-    final cfg = context.watch<SettingsProvider>().getProviderConfig(providerKey);
-    final ov = cfg.modelOverrides[modelId] as Map?;
+    final rawOv = cfg.modelOverrides[modelId];
+    final Map<String, dynamic>? ov = rawOv is Map
+        ? {for (final e in rawOv.entries) e.key.toString(): e.value}
+        : null;
+    String baseId = modelId;
     if (ov != null) {
-      final n = (ov['name'] as String?)?.trim();
-      if (n != null && n.isNotEmpty) return n;
+      final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+      if (raw != null && raw.isNotEmpty) baseId = raw;
     }
-    return modelId;
-  }
-
-  Widget _pill(BuildContext context, IconData icon, String label) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(color: cs.primary.withOpacity(0.10), borderRadius: BorderRadius.circular(999)),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 12, color: cs.primary),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 11, color: cs.primary)),
-      ]),
-    );
+    final base = _infer(baseId);
+    return _ResolvedModelOverride(base: base, ov: ov, baseId: baseId);
   }
 }
 
+class _ResolvedModelOverride {
+  const _ResolvedModelOverride({
+    required this.base,
+    required this.ov,
+    required this.baseId,
+  });
+
+  final ModelInfo base;
+  final Map<String, dynamic>? ov;
+  final String baseId;
+}
+
 class _ConnectionTestDialog extends StatefulWidget {
-  const _ConnectionTestDialog({required this.providerKey, required this.providerDisplayName});
+  const _ConnectionTestDialog({
+    required this.providerKey,
+    required this.providerDisplayName,
+  });
   final String providerKey;
   final String providerDisplayName;
 
@@ -2498,18 +3426,33 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Center(child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+              Center(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
               _buildBody(context, cs, l10n),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.providerDetailPageCancelButton)),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(l10n.providerDetailPageCancelButton),
+                  ),
                   const SizedBox(width: 8),
                   TextButton(
                     onPressed: canTest ? _doTest : null,
-                    style: TextButton.styleFrom(foregroundColor: canTest ? cs.primary : cs.onSurface.withOpacity(0.4)),
+                    style: TextButton.styleFrom(
+                      foregroundColor: canTest
+                          ? cs.primary
+                          : cs.onSurface.withOpacity(0.4),
+                    ),
                     child: Text(l10n.providerDetailPageTestButton),
                   ),
                 ],
@@ -2521,22 +3464,40 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
     );
   }
 
-  
-
-  Widget _buildBody(BuildContext context, ColorScheme cs, AppLocalizations l10n) {
+  Widget _buildBody(
+    BuildContext context,
+    ColorScheme cs,
+    AppLocalizations l10n,
+  ) {
     switch (_state) {
       case _TestState.idle:
         return _buildIdle(context, cs, l10n);
       case _TestState.loading:
         return _buildLoading(context, cs, l10n);
       case _TestState.success:
-        return _buildResult(context, cs, l10n, success: true, message: l10n.providerDetailPageTestSuccessMessage);
+        return _buildResult(
+          context,
+          cs,
+          l10n,
+          success: true,
+          message: l10n.providerDetailPageTestSuccessMessage,
+        );
       case _TestState.error:
-        return _buildResult(context, cs, l10n, success: false, message: _errorMessage);
+        return _buildResult(
+          context,
+          cs,
+          l10n,
+          success: false,
+          message: _errorMessage,
+        );
     }
   }
 
-  Widget _buildIdle(BuildContext context, ColorScheme cs, AppLocalizations l10n) {
+  Widget _buildIdle(
+    BuildContext context,
+    ColorScheme cs,
+    AppLocalizations l10n,
+  ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -2561,7 +3522,10 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
                 ),
               ),
               const SizedBox(width: 10),
-              TextButton(onPressed: _pickModel, child: Text(l10n.providerDetailPageChangeButton)),
+              TextButton(
+                onPressed: _pickModel,
+                child: Text(l10n.providerDetailPageChangeButton),
+              ),
             ],
           ),
         if (_selectedModelId != null) ...[
@@ -2571,7 +3535,10 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
             children: [
               Text(
                 l10n.providerDetailPageUseStreamingLabel,
-                style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.9)),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: cs.onSurface.withOpacity(0.9),
+                ),
               ),
               const SizedBox(width: 8),
               IosSwitch(
@@ -2585,7 +3552,11 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
     );
   }
 
-  Widget _buildLoading(BuildContext context, ColorScheme cs, AppLocalizations l10n) {
+  Widget _buildLoading(
+    BuildContext context,
+    ColorScheme cs,
+    AppLocalizations l10n,
+  ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -2609,12 +3580,21 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
         const SizedBox(height: 16),
         const LinearProgressIndicator(minHeight: 4),
         const SizedBox(height: 12),
-        Text(l10n.providerDetailPageTestingMessage, style: TextStyle(color: cs.onSurface.withOpacity(0.7))),
+        Text(
+          l10n.providerDetailPageTestingMessage,
+          style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+        ),
       ],
     );
   }
 
-  Widget _buildResult(BuildContext context, ColorScheme cs, AppLocalizations l10n, {required bool success, required String message}) {
+  Widget _buildResult(
+    BuildContext context,
+    ColorScheme cs,
+    AppLocalizations l10n, {
+    required bool success,
+    required String message,
+  }) {
     final color = success ? Colors.green : cs.error;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -2644,20 +3624,35 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Icon(Lucide.ChevronDown, size: 16, color: cs.onSurface.withOpacity(0.7)),
+                    Icon(
+                      Lucide.ChevronDown,
+                      size: 16,
+                      color: cs.onSurface.withOpacity(0.7),
+                    ),
                   ],
                 ),
               );
             },
           ),
         const SizedBox(height: 14),
-        Text(message, style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w600)),
+        Text(
+          message,
+          style: TextStyle(
+            color: color,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }
 
   Future<void> _pickModel() async {
-    final selected = await showModelPickerForTest(context, widget.providerKey, widget.providerDisplayName);
+    final selected = await showModelPickerForTest(
+      context,
+      widget.providerKey,
+      widget.providerDisplayName,
+    );
     if (selected != null) {
       setState(() {
         _selectedModelId = selected;
@@ -2674,8 +3669,15 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
       _errorMessage = '';
     });
     try {
-      final cfg = context.read<SettingsProvider>().getProviderConfig(widget.providerKey, defaultName: widget.providerDisplayName);
-      await ProviderManager.testConnection(cfg, _selectedModelId!, useStream: _useStream);
+      final cfg = context.read<SettingsProvider>().getProviderConfig(
+        widget.providerKey,
+        defaultName: widget.providerDisplayName,
+      );
+      await ProviderManager.testConnection(
+        cfg,
+        _selectedModelId!,
+        useStream: _useStream,
+      );
       if (!mounted) return;
       setState(() => _state = _TestState.success);
     } catch (e) {
@@ -2688,130 +3690,47 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
   }
 }
 
-Future<String?> showModelPickerForTest(BuildContext context, String providerKey, String providerDisplayName) async {
-  final cs = Theme.of(context).colorScheme;
-  final settings = context.read<SettingsProvider>();
-  final cfg = settings.getProviderConfig(providerKey, defaultName: providerDisplayName);
+Future<String?> showModelPickerForTest(
+  BuildContext context,
+  String providerKey,
+  String providerDisplayName,
+) async {
   final sel = await showModelSelector(context, limitProviderKey: providerKey);
   return sel?.modelId;
 }
 
-ModelInfo _effectiveFor(BuildContext context, String providerKey, String providerDisplayName, ModelInfo base) {
-  final cfg = context.read<SettingsProvider>().getProviderConfig(providerKey, defaultName: providerDisplayName);
-  final ov = cfg.modelOverrides[base.id] as Map?;
-  if (ov == null) return base;
-  ModelType? type;
-  final t = (ov['type'] as String?) ?? '';
-  if (t == 'embedding') type = ModelType.embedding; else if (t == 'chat') type = ModelType.chat;
-  List<Modality>? input;
-  if (ov['input'] is List) {
-    input = [
-      for (final e in (ov['input'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-    ];
+ModelInfo _applyModelOverride(
+  ModelInfo base,
+  Map<String, dynamic> ov, {
+  bool applyDisplayName = false,
+}) {
+  try {
+    return ModelOverrideResolver.applyModelOverride(
+      base,
+      ov,
+      applyDisplayName: applyDisplayName,
+    );
+  } catch (e, st) {
+    FlutterLogger.log(
+      '[ModelOverride] applyModelOverride failed: $e\n$st',
+      tag: 'ModelOverride',
+    );
+    assert(() {
+      debugPrint('[ModelOverride] applyModelOverride failed: $e');
+      return true;
+    }());
+    return base;
   }
-  List<Modality>? output;
-  if (ov['output'] is List) {
-    output = [
-      for (final e in (ov['output'] as List)) (e.toString() == 'image' ? Modality.image : Modality.text)
-    ];
-  }
-  List<ModelAbility>? abilities;
-  if (ov['abilities'] is List) {
-    abilities = [
-      for (final e in (ov['abilities'] as List)) (e.toString() == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool)
-    ];
-  }
-  return base.copyWith(
-    type: type ?? base.type,
-    input: input ?? base.input,
-    output: output ?? base.output,
-    abilities: abilities ?? base.abilities,
-  );
 }
-
 
 // Using flutter_slidable for reliable swipe actions with confirm + undo.
 
-Widget _modelTagWrap(BuildContext context, ModelInfo m) {
-  final cs = Theme.of(context).colorScheme;
-  final l10n = AppLocalizations.of(context)!;
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  List<Widget> chips = [];
-  // type tag
-  chips.add(Container(
-    decoration: BoxDecoration(
-      color: isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15),
-      borderRadius: BorderRadius.circular(999),
-      border: Border.all(color: cs.primary.withOpacity(0.2), width: 0.5),
-    ),
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    child: Text(m.type == ModelType.chat ? l10n.modelSelectSheetChatType : l10n.modelSelectSheetEmbeddingType, style: TextStyle(fontSize: 11, color: isDark ? cs.primary : cs.primary.withOpacity(0.9), fontWeight: FontWeight.w500)),
-  ));
-  // modality tag capsule
-  chips.add(Container(
-    decoration: BoxDecoration(
-      color: isDark ? cs.tertiary.withOpacity(0.25) : cs.tertiary.withOpacity(0.15),
-      borderRadius: BorderRadius.circular(999),
-      border: Border.all(color: cs.tertiary.withOpacity(0.2), width: 0.5),
-    ),
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      for (final mod in m.input)
-        Padding(
-          padding: const EdgeInsets.only(right: 2),
-          child: Icon(mod == Modality.text ? Lucide.Type : Lucide.Image, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-        ),
-      Icon(Lucide.ChevronRight, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-      for (final mod in m.output)
-        Padding(
-          padding: const EdgeInsets.only(left: 2),
-          child: Icon(mod == Modality.text ? Lucide.Type : Lucide.Image, size: 12, color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9)),
-        ),
-    ]),
-  ));
-  // abilities capsules (icon-only)
-  for (final ab in m.abilities) {
-    if (ab == ModelAbility.tool) {
-      chips.add(Container(
-        decoration: BoxDecoration(
-          color: isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.primary.withOpacity(0.2), width: 0.5),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        child: Icon(Lucide.Hammer, size: 12, color: isDark ? cs.primary : cs.primary.withOpacity(0.9)),
-      ));
-    } else if (ab == ModelAbility.reasoning) {
-      chips.add(Container(
-        decoration: BoxDecoration(
-          color: isDark ? cs.secondary.withOpacity(0.3) : cs.secondary.withOpacity(0.18),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.secondary.withOpacity(0.25), width: 0.5),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        child: SvgPicture.asset('assets/icons/deepthink.svg', width: 12, height: 12, colorFilter: ColorFilter.mode(isDark ? cs.secondary : cs.secondary.withOpacity(0.9), BlendMode.srcIn)),
-      ));
-    }
-  }
-  return Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: chips);
-}
-
-
 // Legacy page-based implementations removed in favor of swipeable PageView tabs.
-
 
 class _BrandAvatar extends StatelessWidget {
   const _BrandAvatar({required this.name, this.size = 20});
   final String name;
   final double size;
-
-
-  bool _preferMonochromeWhite(String n) {
-    final k = n.toLowerCase();
-    if (RegExp(r'openai|gpt|o\d').hasMatch(k)) return true;
-    if (RegExp(r'grok|xai').hasMatch(k)) return true;
-    return false;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -2819,35 +3738,52 @@ class _BrandAvatar extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final asset = BrandAssets.assetForName(name);
     final lower = name.toLowerCase();
-    final bool _mono = isDark && (RegExp(r'openai|gpt|o\\d').hasMatch(lower) || RegExp(r'grok|xai').hasMatch(lower) || RegExp(r'openrouter').hasMatch(lower));
+    final bool mono =
+        isDark &&
+        (RegExp(r'openai|gpt|o\\d').hasMatch(lower) ||
+            RegExp(r'grok|xai').hasMatch(lower) ||
+            RegExp(r'openrouter').hasMatch(lower));
     return CircleAvatar(
       radius: size / 2,
       backgroundColor: isDark ? Colors.white10 : cs.primary.withOpacity(0.1),
       child: asset == null
-          ? Text(name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-              style: TextStyle(color: cs.primary, fontSize: size * 0.5, fontWeight: FontWeight.w700))
+          ? Text(
+              name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
+              style: TextStyle(
+                color: cs.primary,
+                fontSize: size * 0.5,
+                fontWeight: FontWeight.w700,
+              ),
+            )
           : (asset.endsWith('.svg')
-              ? SvgPicture.asset(
-                  asset,
-                  width: size * 0.7,
-                  height: size * 0.7,
-                  colorFilter: _mono ? const ColorFilter.mode(Colors.white, BlendMode.srcIn) : null,
-                )
-              : Image.asset(
-                  asset,
-                  width: size * 0.7,
-                  height: size * 0.7,
-                  fit: BoxFit.contain,
-                  color: _mono ? Colors.white : null,
-                  colorBlendMode: _mono ? BlendMode.srcIn : null,
-                )),
+                ? SvgPicture.asset(
+                    asset,
+                    width: size * 0.7,
+                    height: size * 0.7,
+                    colorFilter: mono
+                        ? const ColorFilter.mode(Colors.white, BlendMode.srcIn)
+                        : null,
+                  )
+                : Image.asset(
+                    asset,
+                    width: size * 0.7,
+                    height: size * 0.7,
+                    fit: BoxFit.contain,
+                    color: mono ? Colors.white : null,
+                    colorBlendMode: mono ? BlendMode.srcIn : null,
+                  )),
     );
   }
 }
 
 // Top-level tactile row used by iOS-style lists here
 class _TactileRow extends StatefulWidget {
-  const _TactileRow({required this.builder, this.onTap, this.pressedScale = 1.00, this.haptics = true});
+  const _TactileRow({
+    required this.builder,
+    this.onTap,
+    this.pressedScale = 1.00,
+    this.haptics = true,
+  });
   final Widget Function(bool pressed) builder;
   final VoidCallback? onTap;
   final double pressedScale;
@@ -2887,7 +3823,12 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   Widget build(BuildContext context) {
     final base = widget.color;
     final pressColor = base.withOpacity(0.7);
-    final icon = Icon(widget.icon, size: widget.size, color: _pressed ? pressColor : base, semanticLabel: widget.semanticLabel);
+    final icon = Icon(
+      widget.icon,
+      size: widget.size,
+      color: _pressed ? pressColor : base,
+      semanticLabel: widget.semanticLabel,
+    );
 
     return Semantics(
       button: true,
@@ -2926,6 +3867,7 @@ class _TactileRowState extends State<_TactileRow> {
   void _setPressed(bool v) {
     if (_pressed != v) setState(() => _pressed = v);
   }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -2936,7 +3878,9 @@ class _TactileRowState extends State<_TactileRow> {
       onTap: widget.onTap == null
           ? null
           : () {
-              if (widget.haptics && context.read<SettingsProvider>().hapticsOnListItemTap) Haptics.soft();
+              if (widget.haptics &&
+                  context.read<SettingsProvider>().hapticsOnListItemTap)
+                Haptics.soft();
               widget.onTap!.call();
             },
       child: AnimatedScale(
@@ -2974,13 +3918,30 @@ class _BottomTabs extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? Colors.transparent : cs.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cs.outlineVariant.withOpacity(isDark ? 0.18 : 0.12), width: 0.8),
+        border: Border.all(
+          color: cs.outlineVariant.withOpacity(isDark ? 0.18 : 0.12),
+          width: 0.8,
+        ),
       ),
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
       child: Row(
         children: [
-          Expanded(child: _BottomTabItem(icon: leftIcon, label: leftLabel, selected: index == 0, onTap: () => onSelect(0))),
-          Expanded(child: _BottomTabItem(icon: rightIcon, label: rightLabel, selected: index == 1, onTap: () => onSelect(1))),
+          Expanded(
+            child: _BottomTabItem(
+              icon: leftIcon,
+              label: leftLabel,
+              selected: index == 0,
+              onTap: () => onSelect(0),
+            ),
+          ),
+          Expanded(
+            child: _BottomTabItem(
+              icon: rightIcon,
+              label: rightLabel,
+              selected: index == 1,
+              onTap: () => onSelect(1),
+            ),
+          ),
         ],
       ),
     );
@@ -2988,7 +3949,12 @@ class _BottomTabs extends StatelessWidget {
 }
 
 class _BottomTabItem extends StatefulWidget {
-  const _BottomTabItem({required this.icon, required this.label, required this.selected, required this.onTap});
+  const _BottomTabItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
   final IconData icon;
   final String label;
   final bool selected;
@@ -3037,8 +4003,16 @@ class _BottomTabItemState extends State<_BottomTabItem> {
                   AnimatedDefaultTextStyle(
                     duration: const Duration(milliseconds: 200),
                     curve: Curves.easeOutCubic,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c),
-                    child: Text(widget.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: c,
+                    ),
+                    child: Text(
+                      widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),

@@ -4,14 +4,21 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
+import '../../../core/services/model_override_resolver.dart';
+import '../../../core/services/logging/flutter_logger.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
+import 'model_edit_state_helper.dart';
 
-Future<bool?> showModelDetailSheet(BuildContext context, {required String providerKey, required String modelId}) {
+Future<bool?> showModelDetailSheet(
+  BuildContext context, {
+  required String providerKey,
+  required String modelId,
+}) {
   final cs = Theme.of(context).colorScheme;
   return showModalBottomSheet<bool>(
     context: context,
@@ -26,13 +33,20 @@ Future<bool?> showModelDetailSheet(BuildContext context, {required String provid
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: _ModelDetailSheet(providerKey: providerKey, modelId: modelId, isNew: false),
+        child: _ModelDetailSheet(
+          providerKey: providerKey,
+          modelId: modelId,
+          isNew: false,
+        ),
       ),
     ),
   );
 }
 
-Future<bool?> showCreateModelSheet(BuildContext context, {required String providerKey}) {
+Future<bool?> showCreateModelSheet(
+  BuildContext context, {
+  required String providerKey,
+}) {
   final cs = Theme.of(context).colorScheme;
   return showModalBottomSheet<bool>(
     context: context,
@@ -47,14 +61,22 @@ Future<bool?> showCreateModelSheet(BuildContext context, {required String provid
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: _ModelDetailSheet(providerKey: providerKey, modelId: '', isNew: true),
+        child: _ModelDetailSheet(
+          providerKey: providerKey,
+          modelId: '',
+          isNew: true,
+        ),
       ),
     ),
   );
 }
 
 class _ModelDetailSheet extends StatefulWidget {
-  const _ModelDetailSheet({required this.providerKey, required this.modelId, this.isNew = false});
+  const _ModelDetailSheet({
+    required this.providerKey,
+    required this.modelId,
+    this.isNew = false,
+  });
   final String providerKey;
   final String modelId;
   final bool isNew;
@@ -64,7 +86,8 @@ class _ModelDetailSheet extends StatefulWidget {
 
 enum _TabKind { basic, advanced, tools }
 
-class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerProviderStateMixin {
+class _ModelDetailSheetState extends State<_ModelDetailSheet>
+    with SingleTickerProviderStateMixin {
   _TabKind _tab = _TabKind.basic;
   late final TabController _tabCtrl;
   late final ProviderKind _providerKind;
@@ -77,6 +100,10 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
   final Set<Modality> _input = {Modality.text};
   final Set<Modality> _output = {Modality.text};
   final Set<ModelAbility> _abilities = {};
+  Set<Modality>? _cachedChatInput;
+  Set<Modality>? _cachedChatOutput;
+  Set<ModelAbility>? _cachedChatAbilities;
+  Set<Modality>? _cachedEmbeddingInput;
 
   // Advanced (UI only)
   final List<_HeaderKV> _headers = [];
@@ -94,8 +121,13 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     super.initState();
     final settings = context.read<SettingsProvider>();
     final cfg = settings.getProviderConfig(widget.providerKey);
-    _providerKind = ProviderConfig.classify(cfg.id, explicitType: cfg.providerType);
-    _showBuiltinToolsTab = _providerKind == ProviderKind.google || _providerKind == ProviderKind.openai;
+    _providerKind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
+    _showBuiltinToolsTab =
+        _providerKind == ProviderKind.google ||
+        _providerKind == ProviderKind.openai;
     _tabCtrl = TabController(length: _showBuiltinToolsTab ? 3 : 2, vsync: this);
     _tabCtrl.addListener(() {
       if (_tabCtrl.indexIsChanging) return;
@@ -111,14 +143,16 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     });
     // Resolve display model id from per-model overrides when present (apiModelId),
     // falling back to the logical key for backwards compatibility.
-    Map? _initialOv;
+    Map<String, dynamic>? _initialOv;
     if (!widget.isNew) {
       final raw = cfg.modelOverrides[widget.modelId];
-      if (raw is Map) _initialOv = raw;
+      if (raw is Map) _initialOv = raw.map((k, v) => MapEntry(k.toString(), v));
     }
     String displayModelId = widget.modelId;
     if (_initialOv != null) {
-      final raw = (_initialOv['apiModelId'] ?? _initialOv['api_model_id'])?.toString().trim();
+      final raw = (_initialOv['apiModelId'] ?? _initialOv['api_model_id'])
+          ?.toString()
+          .trim();
       if (raw != null && raw.isNotEmpty) {
         displayModelId = raw;
       }
@@ -131,62 +165,102 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
         displayName: displayModelId.isEmpty ? '' : displayModelId,
       ),
     );
-    _nameCtrl = TextEditingController(text: base.displayName);
-    _type = base.type;
-    _input..clear()..addAll(base.input);
-    _output..clear()..addAll(base.output);
-    _abilities..clear()..addAll(base.abilities);
-
-    if (!widget.isNew) {
-      final rawOv = cfg.modelOverrides[widget.modelId];
-      final ov = _initialOv ?? (rawOv is Map ? rawOv : null);
-      if (ov != null) {
-        _nameCtrl.text = (ov['name'] as String?)?.trim().isNotEmpty == true ? (ov['name'] as String) : _nameCtrl.text;
-        final t = (ov['type'] as String?) ?? '';
-        if (t == 'embedding') _type = ModelType.embedding; else if (t == 'chat') _type = ModelType.chat;
-        final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        final outArr = (ov['output'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        final abArr = (ov['abilities'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-        _output..clear()..addAll(outArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-        _abilities..clear()..addAll(abArr.map((e) => e == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool));
-        // headers/body
-        final rawHdrs = ov['headers'];
-        final hdrs = (rawHdrs is List) ? rawHdrs : const <dynamic>[];
-        for (final h in hdrs) {
-          if (h is Map) {
-            final kv = _HeaderKV();
-            kv.name.text = (h['name'] as String?) ?? '';
-            kv.value.text = (h['value'] as String?) ?? '';
-            _headers.add(kv);
-          }
-        }
-        final rawBds = ov['body'];
-        final bds = (rawBds is List) ? rawBds : const <dynamic>[];
-        for (final b in bds) {
-          if (b is Map) {
-            final kv = _BodyKV();
-            kv.keyCtrl.text = (b['key'] as String?) ?? '';
-            kv.valueCtrl.text = (b['value'] as String?) ?? '';
-            _bodies.add(kv);
-          }
-        }
-        // Built-in tools toggles
-        final builtInSet = BuiltInToolNames.parseAndNormalize(ov['builtInTools']);
-
-        _googleUrlContextTool = builtInSet.contains(BuiltInToolNames.urlContext);
-        _googleCodeExecutionTool = builtInSet.contains(BuiltInToolNames.codeExecution);
-        _googleYoutubeTool = builtInSet.contains(BuiltInToolNames.youtube);
-
-        _openaiCodeInterpreterTool = builtInSet.contains(BuiltInToolNames.codeInterpreter);
-        _openaiImageGenerationTool = builtInSet.contains(BuiltInToolNames.imageGeneration);
-
-        // Backward compatibility: legacy UI-only tools map (older versions)
-        final rawTools = ov['tools'];
-        final tools = rawTools is Map ? rawTools : const <dynamic, dynamic>{};
-        _googleUrlContextTool = _googleUrlContextTool || ((tools['urlContext'] as bool?) ?? false);
-      }
+    final ov = _initialOv;
+    final effective = ov == null
+        ? base
+        : ModelOverrideResolver.applyModelOverride(
+            base,
+            ov,
+            applyDisplayName: true,
+          );
+    _nameCtrl = TextEditingController(text: effective.displayName);
+    _type = effective.type;
+    _input
+      ..clear()
+      ..addAll(effective.input);
+    _output
+      ..clear()
+      ..addAll(effective.output);
+    _abilities
+      ..clear()
+      ..addAll(effective.abilities);
+    if (_type == ModelType.embedding) {
+      if (_input.isEmpty) _input.add(Modality.text);
+      _cachedEmbeddingInput = {..._input};
+    } else if (_type == ModelType.chat) {
+      if (_input.isEmpty) _input.add(Modality.text);
+      if (_output.isEmpty) _output.add(Modality.text);
     }
+
+    if (ov != null) {
+      final rawHdrs = ov['headers'];
+      final hdrs = (rawHdrs is List) ? rawHdrs : const <dynamic>[];
+      for (final h in hdrs) {
+        if (h is Map) {
+          final kv = _HeaderKV();
+          kv.name.text = h['name']?.toString() ?? '';
+          kv.value.text = h['value']?.toString() ?? '';
+          _headers.add(kv);
+        }
+      }
+      final rawBds = ov['body'];
+      final bds = (rawBds is List) ? rawBds : const <dynamic>[];
+      for (final b in bds) {
+        if (b is Map) {
+          final kv = _BodyKV();
+          kv.keyCtrl.text = b['key']?.toString() ?? '';
+          kv.valueCtrl.text = b['value']?.toString() ?? '';
+          _bodies.add(kv);
+        }
+      }
+      final builtInSet = BuiltInToolNames.parseAndNormalize(ov['builtInTools']);
+      _googleUrlContextTool = builtInSet.contains(BuiltInToolNames.urlContext);
+      _googleCodeExecutionTool = builtInSet.contains(
+        BuiltInToolNames.codeExecution,
+      );
+      _googleYoutubeTool = builtInSet.contains(BuiltInToolNames.youtube);
+      _openaiCodeInterpreterTool = builtInSet.contains(
+        BuiltInToolNames.codeInterpreter,
+      );
+      _openaiImageGenerationTool = builtInSet.contains(
+        BuiltInToolNames.imageGeneration,
+      );
+
+      final rawTools = ov['tools'];
+      final tools = rawTools is Map ? rawTools : const <dynamic, dynamic>{};
+      _googleUrlContextTool =
+          _googleUrlContextTool || ((tools['urlContext'] as bool?) ?? false);
+    }
+  }
+
+  void _setType(ModelType next) {
+    final prev = _type;
+    if (prev == next) return;
+    _type = next;
+    final result = ModelEditTypeSwitch.apply(
+      prev: prev,
+      next: next,
+      input: _input,
+      output: _output,
+      abilities: _abilities,
+      cachedChatInput: _cachedChatInput,
+      cachedChatOutput: _cachedChatOutput,
+      cachedChatAbilities: _cachedChatAbilities,
+      cachedEmbeddingInput: _cachedEmbeddingInput,
+    );
+    _input
+      ..clear()
+      ..addAll(result.input);
+    _output
+      ..clear()
+      ..addAll(result.output);
+    _abilities
+      ..clear()
+      ..addAll(result.abilities);
+    _cachedChatInput = result.cachedChatInput;
+    _cachedChatOutput = result.cachedChatOutput;
+    _cachedChatAbilities = result.cachedChatAbilities;
+    _cachedEmbeddingInput = result.cachedEmbeddingInput;
   }
 
   @override
@@ -194,6 +268,14 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     _tabCtrl.dispose();
     _idCtrl.dispose();
     _nameCtrl.dispose();
+    for (final h in _headers) {
+      h.name.dispose();
+      h.value.dispose();
+    }
+    for (final b in _bodies) {
+      b.keyCtrl.dispose();
+      b.valueCtrl.dispose();
+    }
     super.dispose();
   }
 
@@ -210,7 +292,14 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
         return Column(
           children: [
             const SizedBox(height: 8),
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(999))),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: cs.onSurface.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
             const SizedBox(height: 8),
             _buildHeader(context, l10n),
             _buildTabs(context, l10n),
@@ -251,8 +340,13 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
             Expanded(
               child: Center(
                 child: Text(
-                  widget.isNew ? l10n.modelDetailSheetAddModel : l10n.modelDetailSheetEditModel,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  widget.isNew
+                      ? l10n.modelDetailSheetAddModel
+                      : l10n.modelDetailSheetEditModel,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -273,10 +367,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: _SegTabBar(
-        controller: _tabCtrl,
-        tabs: tabs,
-      ),
+      child: _SegTabBar(controller: _tabCtrl, tabs: tabs),
     );
   }
 
@@ -306,7 +397,9 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
               controller: _idCtrl,
               readOnly: !widget.isNew, // existing model ID is read-only
               enableInteractiveSelection: widget.isNew,
-              style: TextStyle(color: widget.isNew ? null : cs.onSurface.withOpacity(0.6)),
+              style: TextStyle(
+                color: widget.isNew ? null : cs.onSurface.withOpacity(0.6),
+              ),
               onChanged: widget.isNew
                   ? (v) {
                       if (!_nameEdited) {
@@ -319,10 +412,34 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
                 filled: true,
                 fillColor: isDark ? Colors.white10 : Colors.white,
                 hintText: l10n.modelDetailSheetModelIdHint,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5))),
-                suffixIconConstraints: const BoxConstraints(minWidth: 46, minHeight: 40),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant.withOpacity(0.4),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant.withOpacity(0.4),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.5),
+                  ),
+                ),
+                suffixIconConstraints: const BoxConstraints(
+                  minWidth: 46,
+                  minHeight: 40,
+                ),
                 suffixIcon: widget.isNew
                     ? null
                     : Padding(
@@ -358,51 +475,83 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
               decoration: InputDecoration(
                 filled: true,
                 fillColor: isDark ? Colors.white10 : Colors.white,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5))),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant.withOpacity(0.4),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant.withOpacity(0.4),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.5),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 12),
             _label(context, l10n.modelDetailSheetModelTypeLabel),
             const SizedBox(height: 6),
             _SegmentedSingle(
-              options: [l10n.modelDetailSheetChatType, l10n.modelDetailSheetEmbeddingType],
+              options: [
+                l10n.modelDetailSheetChatType,
+                l10n.modelDetailSheetEmbeddingType,
+              ],
               value: _type == ModelType.chat ? 0 : 1,
-              onChanged: (i) => setState(() => _type = i == 0 ? ModelType.chat : ModelType.embedding),
+              onChanged: (i) => setState(
+                () => _setType(i == 0 ? ModelType.chat : ModelType.embedding),
+              ),
             ),
           ],
         ),
       ),
-      if (_type == ModelType.chat)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _label(context, l10n.modelDetailSheetInputModesLabel),
-              const SizedBox(height: 6),
-              _SegmentedMulti(
-                options: [l10n.modelDetailSheetTextMode, l10n.modelDetailSheetImageMode],
-                isSelected: [
-                  _input.contains(Modality.text),
-                  _input.contains(Modality.image),
-                ],
-                onChanged: (idx) => setState(() {
-                  final mod = idx == 0 ? Modality.text : Modality.image;
-                  if (_input.contains(mod)) {
-                    _input.remove(mod);
-                    if (_input.isEmpty) _input.add(Modality.text);
-                  } else {
-                    _input.add(mod);
-                  }
-                }),
-              ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _label(context, l10n.modelDetailSheetInputModesLabel),
+            const SizedBox(height: 6),
+            _SegmentedMulti(
+              options: [
+                l10n.modelDetailSheetTextMode,
+                l10n.modelDetailSheetImageMode,
+              ],
+              isSelected: [
+                _input.contains(Modality.text),
+                _input.contains(Modality.image),
+              ],
+              onChanged: (idx) => setState(() {
+                final mod = idx == 0 ? Modality.text : Modality.image;
+                if (_input.contains(mod)) {
+                  _input.remove(mod);
+                  if (_input.isEmpty) _input.add(Modality.text);
+                } else {
+                  _input.add(mod);
+                }
+              }),
+            ),
+            if (_type == ModelType.chat) ...[
               const SizedBox(height: 12),
               _label(context, l10n.modelDetailSheetOutputModesLabel),
               const SizedBox(height: 6),
               _SegmentedMulti(
-                options: [l10n.modelDetailSheetTextMode, l10n.modelDetailSheetImageMode],
+                options: [
+                  l10n.modelDetailSheetTextMode,
+                  l10n.modelDetailSheetImageMode,
+                ],
                 isSelected: [
                   _output.contains(Modality.text),
                   _output.contains(Modality.image),
@@ -421,14 +570,19 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
               _label(context, l10n.modelDetailSheetAbilitiesLabel),
               const SizedBox(height: 6),
               _SegmentedMulti(
-                options: [l10n.modelDetailSheetToolsAbility, l10n.modelDetailSheetReasoningAbility],
+                options: [
+                  l10n.modelDetailSheetToolsAbility,
+                  l10n.modelDetailSheetReasoningAbility,
+                ],
                 isSelected: [
                   _abilities.contains(ModelAbility.tool),
                   _abilities.contains(ModelAbility.reasoning),
                 ],
                 allowEmpty: true,
                 onChanged: (idx) => setState(() {
-                  final ab = idx == 0 ? ModelAbility.tool : ModelAbility.reasoning;
+                  final ab = idx == 0
+                      ? ModelAbility.tool
+                      : ModelAbility.reasoning;
                   if (_abilities.contains(ab)) {
                     _abilities.remove(ab);
                   } else {
@@ -437,8 +591,9 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
                 }),
               ),
             ],
-          ),
+          ],
         ),
+      ),
     ];
   }
 
@@ -452,7 +607,10 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
           children: [
             Text(
               l10n.modelDetailSheetProviderOverrideDescription,
-              style: TextStyle(color: cs.onSurface.withOpacity(0.8), fontSize: 13),
+              style: TextStyle(
+                color: cs.onSurface.withOpacity(0.8),
+                fontSize: 13,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -467,13 +625,24 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-        child: Text(l10n.modelDetailSheetCustomHeadersTitle, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+        child: Text(
+          l10n.modelDetailSheetCustomHeadersTitle,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
         child: Column(
           children: [
-            for (int i = 0; i < _headers.length; i++) _HeaderRow(kv: _headers[i], onDelete: () => setState(() => _headers.removeAt(i))),
+            for (int i = 0; i < _headers.length; i++)
+              _HeaderRow(
+                kv: _headers[i],
+                onDelete: () => setState(() {
+                  final kv = _headers.removeAt(i);
+                  kv.name.dispose();
+                  kv.value.dispose();
+                }),
+              ),
             const SizedBox(height: 8),
             _OutlinedAddButton(
               label: l10n.modelDetailSheetAddHeader,
@@ -484,13 +653,24 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-        child: Text(l10n.modelDetailSheetCustomBodyTitle, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+        child: Text(
+          l10n.modelDetailSheetCustomBodyTitle,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
         child: Column(
           children: [
-            for (int i = 0; i < _bodies.length; i++) _BodyRow(kv: _bodies[i], onDelete: () => setState(() => _bodies.removeAt(i))),
+            for (int i = 0; i < _bodies.length; i++)
+              _BodyRow(
+                kv: _bodies[i],
+                onDelete: () => setState(() {
+                  final kv = _bodies.removeAt(i);
+                  kv.keyCtrl.dispose();
+                  kv.valueCtrl.dispose();
+                }),
+              ),
             const SizedBox(height: 8),
             _OutlinedAddButton(
               label: l10n.modelDetailSheetAddBody,
@@ -506,6 +686,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final cfg = settings.getProviderConfig(widget.providerKey);
+    final bool disableTools = _type == ModelType.embedding;
     return [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -519,7 +700,10 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
           child: Text(
             l10n.modelDetailSheetGeminiCodeExecutionMutuallyExclusiveHint,
-            style: TextStyle(color: cs.onSurface.withOpacity(0.65), fontSize: 12),
+            style: TextStyle(
+              color: cs.onSurface.withOpacity(0.65),
+              fontSize: 12,
+            ),
           ),
         ),
         Padding(
@@ -528,10 +712,12 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
             title: l10n.modelDetailSheetUrlContextTool,
             desc: l10n.modelDetailSheetUrlContextToolDescription,
             value: _googleUrlContextTool,
-            // URL Context is disabled when Code Execution is enabled (mutually exclusive)
-            onChanged: _googleCodeExecutionTool
+            onChanged: disableTools
                 ? null
-                : (v) => setState(() => _googleUrlContextTool = v),
+                : (v) => setState(() {
+                    _googleUrlContextTool = v;
+                    if (v) _googleCodeExecutionTool = false;
+                  }),
           ),
         ),
         Padding(
@@ -540,10 +726,12 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
             title: l10n.modelDetailSheetCodeExecutionTool,
             desc: l10n.modelDetailSheetCodeExecutionToolDescription,
             value: _googleCodeExecutionTool,
-            // Code Execution is disabled when URL Context is enabled (mutually exclusive)
-            onChanged: _googleUrlContextTool
+            onChanged: disableTools
                 ? null
-                : (v) => setState(() => _googleCodeExecutionTool = v),
+                : (v) => setState(() {
+                    _googleCodeExecutionTool = v;
+                    if (v) _googleUrlContextTool = false;
+                  }),
           ),
         ),
         Padding(
@@ -552,7 +740,9 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
             title: l10n.modelDetailSheetYoutubeTool,
             desc: l10n.modelDetailSheetYoutubeToolDescription,
             value: _googleYoutubeTool,
-            onChanged: (v) => setState(() => _googleYoutubeTool = v),
+            onChanged: disableTools
+                ? null
+                : (v) => setState(() => _googleYoutubeTool = v),
           ),
         ),
       ] else if (_providerKind == ProviderKind.openai) ...[
@@ -561,7 +751,10 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: Text(
               l10n.modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint,
-              style: TextStyle(color: cs.onSurface.withOpacity(0.65), fontSize: 12),
+              style: TextStyle(
+                color: cs.onSurface.withOpacity(0.65),
+                fontSize: 12,
+              ),
             ),
           ),
         Padding(
@@ -570,9 +763,11 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
             title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
             desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
             value: _openaiCodeInterpreterTool,
-            onChanged: (cfg.useResponseApi == true)
-                ? (v) => setState(() => _openaiCodeInterpreterTool = v)
-                : null,
+            onChanged: disableTools
+                ? null
+                : ((cfg.useResponseApi == true)
+                      ? (v) => setState(() => _openaiCodeInterpreterTool = v)
+                      : null),
           ),
         ),
         Padding(
@@ -581,9 +776,11 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
             title: l10n.modelDetailSheetOpenaiImageGenerationTool,
             desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
             value: _openaiImageGenerationTool,
-            onChanged: (cfg.useResponseApi == true)
-                ? (v) => setState(() => _openaiImageGenerationTool = v)
-                : null,
+            onChanged: disableTools
+                ? null
+                : ((cfg.useResponseApi == true)
+                      ? (v) => setState(() => _openaiImageGenerationTool = v)
+                      : null),
           ),
         ),
       ] else
@@ -591,7 +788,10 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
           child: Text(
             l10n.modelDetailSheetBuiltinToolsUnsupportedHint,
-            style: TextStyle(color: cs.onSurface.withOpacity(0.65), fontSize: 12),
+            style: TextStyle(
+              color: cs.onSurface.withOpacity(0.65),
+              fontSize: 12,
+            ),
           ),
         ),
     ];
@@ -600,12 +800,19 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
   Widget _buildFooter(BuildContext context, AppLocalizations l10n) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 8, 16, 10 + MediaQuery.of(context).padding.bottom),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        10 + MediaQuery.of(context).padding.bottom,
+      ),
       child: SizedBox(
         width: double.infinity,
         child: IosTileButton(
           icon: widget.isNew ? Lucide.Plus : Lucide.Check,
-          label: widget.isNew ? l10n.modelDetailSheetAddButton : l10n.modelDetailSheetConfirmButton,
+          label: widget.isNew
+              ? l10n.modelDetailSheetAddButton
+              : l10n.modelDetailSheetConfirmButton,
           backgroundColor: cs.primary,
           onTap: _save,
         ),
@@ -613,13 +820,13 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     );
   }
 
-  Widget _label(BuildContext context, String text) => Text(text, style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8)));
-
-  Color _segSelectedColor(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return isDark ? cs.primary.withOpacity(0.20) : cs.primary.withOpacity(0.14);
-  }
+  Widget _label(BuildContext context, String text) => Text(
+    text,
+    style: TextStyle(
+      fontSize: 13,
+      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+    ),
+  );
 
   // Generate a unique logical key for a model instance within a provider.
   // This allows multiple configurations to share the same upstream API model id.
@@ -656,12 +863,12 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
     final headers = [
       for (final h in _headers)
         if (h.name.text.trim().isNotEmpty)
-          {'name': h.name.text.trim(), 'value': h.value.text}
+          {'name': h.name.text.trim(), 'value': h.value.text},
     ];
     final bodies = [
       for (final b in _bodies)
         if (b.keyCtrl.text.trim().isNotEmpty)
-          {'key': b.keyCtrl.text.trim(), 'value': b.valueCtrl.text}
+          {'key': b.keyCtrl.text.trim(), 'value': b.valueCtrl.text},
     ];
     final prev = (prevKey.isNotEmpty && ov[prevKey] is Map)
         ? (ov[prevKey] as Map).cast<String, dynamic>()
@@ -672,37 +879,72 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet> with SingleTickerP
       builtInSet.remove(BuiltInToolNames.codeExecution);
       builtInSet.remove(BuiltInToolNames.youtube);
       if (_googleUrlContextTool) builtInSet.add(BuiltInToolNames.urlContext);
-      if (_googleCodeExecutionTool) builtInSet.add(BuiltInToolNames.codeExecution);
+      if (_googleCodeExecutionTool)
+        builtInSet.add(BuiltInToolNames.codeExecution);
       if (_googleYoutubeTool) builtInSet.add(BuiltInToolNames.youtube);
     } else if (_providerKind == ProviderKind.openai) {
       builtInSet.remove(BuiltInToolNames.codeInterpreter);
       builtInSet.remove(BuiltInToolNames.imageGeneration);
-      if (_openaiCodeInterpreterTool) builtInSet.add(BuiltInToolNames.codeInterpreter);
-      if (_openaiImageGenerationTool) builtInSet.add(BuiltInToolNames.imageGeneration);
+      if (_openaiCodeInterpreterTool)
+        builtInSet.add(BuiltInToolNames.codeInterpreter);
+      if (_openaiImageGenerationTool)
+        builtInSet.add(BuiltInToolNames.imageGeneration);
     }
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
     // Decide which logical key to use for this instance
-    final String key = (prevKey.isEmpty || widget.isNew) ? _nextModelKey(old, apiModelId) : prevKey;
+    final String key = (prevKey.isEmpty || widget.isNew)
+        ? _nextModelKey(old, apiModelId)
+        : prevKey;
+    final bool isEmbedding = _type == ModelType.embedding;
     ov[key] = {
       'apiModelId': apiModelId,
       'name': _nameCtrl.text.trim(),
       'type': _type == ModelType.chat ? 'chat' : 'embedding',
-      'input': _input.map((e) => e == Modality.image ? 'image' : 'text').toList(),
-      'output': _output.map((e) => e == Modality.image ? 'image' : 'text').toList(),
-      'abilities': _abilities.map((e) => e == ModelAbility.reasoning ? 'reasoning' : 'tool').toList(),
+      'input': _input
+          .map((e) => e == Modality.image ? 'image' : 'text')
+          .toList(),
+      if (!isEmbedding)
+        'output': _output
+            .map((e) => e == Modality.image ? 'image' : 'text')
+            .toList(),
+      if (!isEmbedding)
+        'abilities': _abilities
+            .map((e) => e == ModelAbility.reasoning ? 'reasoning' : 'tool')
+            .toList(),
       'headers': headers,
       'body': bodies,
-      if (builtInTools.isNotEmpty) 'builtInTools': builtInTools,
+      if (!isEmbedding && builtInTools.isNotEmpty) 'builtInTools': builtInTools,
     };
 
     // Apply updates to provider config
-    if (prevKey.isEmpty || widget.isNew) {
-      // Creating a new model
-      final list = old.models.toList()..add(key);
-      await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov, models: list));
-    } else {
-      // Existing model instance; keep logical key stable and just persist overrides
-      await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov));
+    try {
+      if (prevKey.isEmpty || widget.isNew) {
+        // Creating a new model
+        final list = old.models.toList()..add(key);
+        await settings.setProviderConfig(
+          widget.providerKey,
+          old.copyWith(modelOverrides: ov, models: list),
+        );
+      } else {
+        // Existing model instance; keep logical key stable and just persist overrides
+        await settings.setProviderConfig(
+          widget.providerKey,
+          old.copyWith(modelOverrides: ov),
+        );
+      }
+    } catch (e, st) {
+      FlutterLogger.log(
+        '[ModelDetailSheet] save failed: $e\n$st',
+        tag: 'Model',
+      );
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
+      showAppSnackBar(
+        context,
+        message: l10n.modelDetailSheetSaveFailedMessage,
+        type: NotificationType.error,
+      );
+      return;
     }
     if (!mounted) return;
     Navigator.of(context).pop(true);
@@ -718,8 +960,12 @@ class _TabChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = selected ? (isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15)) : Colors.transparent;
-    final fg = selected ? (isDark ? cs.primary : cs.primary) : cs.onSurface.withOpacity(0.8);
+    final bg = selected
+        ? (isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15))
+        : Colors.transparent;
+    final fg = selected
+        ? (isDark ? cs.primary : cs.primary)
+        : cs.onSurface.withOpacity(0.8);
     return Padding(
       padding: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
       child: InkWell(
@@ -730,9 +976,21 @@ class _TabChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: selected ? cs.primary.withOpacity(0.25) : cs.outlineVariant.withOpacity(0.4), width: 1),
+            border: Border.all(
+              color: selected
+                  ? cs.primary.withOpacity(0.25)
+                  : cs.outlineVariant.withOpacity(0.4),
+              width: 1,
+            ),
           ),
-          child: Text(label, style: TextStyle(fontSize: 13, color: fg, fontWeight: FontWeight.w600)),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: fg,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ),
     );
@@ -740,7 +998,11 @@ class _TabChip extends StatelessWidget {
 }
 
 class _SegmentedSingle extends StatelessWidget {
-  const _SegmentedSingle({required this.options, required this.value, required this.onChanged});
+  const _SegmentedSingle({
+    required this.options,
+    required this.value,
+    required this.onChanged,
+  });
   final List<String> options;
   final int value; // index
   final ValueChanged<int> onChanged;
@@ -748,12 +1010,16 @@ class _SegmentedSingle extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color sel = isDark ? cs.primary.withOpacity(0.20) : cs.primary.withOpacity(0.14);
+    final Color sel = isDark
+        ? cs.primary.withOpacity(0.20)
+        : cs.primary.withOpacity(0.14);
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.35)),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.35),
+        ),
       ),
       child: Row(
         children: [
@@ -763,7 +1029,10 @@ class _SegmentedSingle extends StatelessWidget {
                 onTap: () => onChanged(i),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 160),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: i == value ? sel : Colors.transparent,
                     borderRadius: BorderRadius.circular(12),
@@ -771,8 +1040,22 @@ class _SegmentedSingle extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      if (i == value) Padding(padding: const EdgeInsets.only(right: 6), child: Icon(Lucide.Check, size: 16, color: cs.primary)),
-                      Text(options[i], style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w600)),
+                      if (i == value)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: Icon(
+                            Lucide.Check,
+                            size: 16,
+                            color: cs.primary,
+                          ),
+                        ),
+                      Text(
+                        options[i],
+                        style: TextStyle(
+                          color: cs.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -802,20 +1085,26 @@ class _SegmentedMulti extends StatelessWidget {
     assert(options.length == isSelected.length);
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bool allSelected = isSelected.isNotEmpty && isSelected.every((e) => e);
+    final bool allSelected =
+        isSelected.isNotEmpty && isSelected.every((e) => e);
     final int selectedCount = isSelected.where((e) => e).length;
 
     final base = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
-    final sel  = isDark ? cs.primary.withOpacity(0.20) : cs.primary.withOpacity(0.14);
+    final sel = isDark
+        ? cs.primary.withOpacity(0.20)
+        : cs.primary.withOpacity(0.14);
     final r = BorderRadius.circular(12);
 
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: r,
         color: base, // 外层始终用同一个“底色”
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.35)),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.35),
+        ),
       ),
-      child: ClipRRect( // 确保内部遮罩遵守圆角
+      child: ClipRRect(
+        // 确保内部遮罩遵守圆角
         borderRadius: r,
         child: Stack(
           children: [
@@ -837,7 +1126,10 @@ class _SegmentedMulti extends StatelessWidget {
                       onTap: () => onChanged(i),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 160),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           // 全选时子项透明，让上面的整条遮罩生效；
                           // 非全选时按原逻辑逐项着色
@@ -847,10 +1139,16 @@ class _SegmentedMulti extends StatelessWidget {
                           borderRadius: selectedCount == 1 && isSelected[i]
                               ? r
                               : i == 0
-                              ? const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12))
+                              ? const BorderRadius.only(
+                                  topLeft: Radius.circular(12),
+                                  bottomLeft: Radius.circular(12),
+                                )
                               : (i == options.length - 1
-                              ? const BorderRadius.only(topRight: Radius.circular(12), bottomRight: Radius.circular(12))
-                              : BorderRadius.zero),
+                                    ? const BorderRadius.only(
+                                        topRight: Radius.circular(12),
+                                        bottomRight: Radius.circular(12),
+                                      )
+                                    : BorderRadius.zero),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -858,9 +1156,19 @@ class _SegmentedMulti extends StatelessWidget {
                             if (isSelected[i])
                               Padding(
                                 padding: const EdgeInsets.only(right: 6),
-                                child: Icon(Lucide.Check, size: 16, color: cs.primary),
+                                child: Icon(
+                                  Lucide.Check,
+                                  size: 16,
+                                  color: cs.primary,
+                                ),
                               ),
-                            Text(options[i], style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w600)),
+                            Text(
+                              options[i],
+                              style: TextStyle(
+                                color: cs.onSurface,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -874,7 +1182,6 @@ class _SegmentedMulti extends StatelessWidget {
     );
   }
 }
-
 
 class _HeaderKV {
   final TextEditingController name = TextEditingController();
@@ -908,9 +1215,24 @@ class _HeaderRow extends StatelessWidget {
                     hintText: l10n.modelDetailSheetHeaderKeyHint,
                     filled: true,
                     fillColor: isDark ? Colors.white10 : Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary.withOpacity(0.5))),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: cs.outlineVariant.withOpacity(0.4),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: cs.outlineVariant.withOpacity(0.4),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: cs.primary.withOpacity(0.5),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -921,7 +1243,7 @@ class _HeaderRow extends StatelessWidget {
                 onTap: onDelete,
                 semanticLabel: 'Delete header',
                 minSize: 40,
-              )
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -931,9 +1253,24 @@ class _HeaderRow extends StatelessWidget {
               hintText: l10n.modelDetailSheetHeaderValueHint,
               filled: true,
               fillColor: isDark ? Colors.white10 : Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5))),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: cs.outlineVariant.withOpacity(0.4),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: cs.outlineVariant.withOpacity(0.4),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                ),
+              ),
             ),
           ),
         ],
@@ -964,9 +1301,30 @@ class _BodyRow extends StatelessWidget {
                     hintText: l10n.modelDetailSheetBodyKeyHint,
                     filled: true,
                     fillColor: isDark ? Colors.white10 : Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5))),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outlineVariant.withOpacity(0.4),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outlineVariant.withOpacity(0.4),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withOpacity(0.5),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -977,7 +1335,7 @@ class _BodyRow extends StatelessWidget {
                 onTap: onDelete,
                 semanticLabel: 'Delete entry',
                 minSize: 40,
-              )
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -989,9 +1347,28 @@ class _BodyRow extends StatelessWidget {
               hintText: l10n.modelDetailSheetBodyJsonHint,
               filled: true,
               fillColor: isDark ? Colors.white10 : Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4))),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5))),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withOpacity(0.4),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withOpacity(0.4),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                ),
+              ),
             ),
           ),
         ],
@@ -1001,7 +1378,12 @@ class _BodyRow extends StatelessWidget {
 }
 
 class _ToolTile extends StatelessWidget {
-  const _ToolTile({required this.title, required this.desc, required this.value, required this.onChanged});
+  const _ToolTile({
+    required this.title,
+    required this.desc,
+    required this.value,
+    required this.onChanged,
+  });
   final String title;
   final String desc;
   final bool value;
@@ -1024,9 +1406,21 @@ class _ToolTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(desc, style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.7))),
+                    Text(
+                      desc,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withOpacity(0.7),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1096,13 +1490,18 @@ class _CopySuffixButtonState extends State<_CopySuffixButton> {
 
   @override
   Widget build(BuildContext context) {
-    final bg = _pressed ? widget.pressedColor : (_hover ? widget.hoverColor : Colors.transparent);
+    final bg = _pressed
+        ? widget.pressedColor
+        : (_hover ? widget.hoverColor : Colors.transparent);
     final icon = Icon(widget.icon, size: 18, color: widget.color);
 
     Widget child = AnimatedContainer(
       duration: const Duration(milliseconds: 140),
       curve: Curves.easeOutCubic,
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: icon,
     );
@@ -1124,6 +1523,7 @@ class _CopySuffixButtonState extends State<_CopySuffixButton> {
     return Tooltip(message: widget.tooltip, child: child);
   }
 }
+
 // Segmented tab bar matching provider add sheet style
 class _SegTabBar extends StatelessWidget {
   const _SegTabBar({required this.controller, required this.tabs});
@@ -1141,7 +1541,10 @@ class _SegTabBar extends StatelessWidget {
     const double gap = 6;
     const double minSegWidth = 88;
     final double pillRadius = 18;
-    final double innerRadius = ((pillRadius - innerPadding).clamp(0.0, pillRadius)).toDouble();
+    final double innerRadius = ((pillRadius - innerPadding).clamp(
+      0.0,
+      pillRadius,
+    )).toDouble();
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1149,9 +1552,12 @@ class _SegTabBar extends StatelessWidget {
         final double innerAvailWidth = availWidth - innerPadding * 2;
         final double segWidth =
             (innerAvailWidth - gap * (tabs.length - 1)) / tabs.length;
-        final double rowWidth = segWidth * tabs.length + gap * (tabs.length - 1);
+        final double rowWidth =
+            segWidth * tabs.length + gap * (tabs.length - 1);
 
-        final Color shellBg = isDark ? Colors.white.withOpacity(0.08) : Colors.white;
+        final Color shellBg = isDark
+            ? Colors.white.withOpacity(0.08)
+            : Colors.white;
 
         List<Widget> children = [];
         for (int index = 0; index < tabs.length; index++) {
@@ -1167,7 +1573,9 @@ class _SegTabBar extends StatelessWidget {
                   duration: const Duration(milliseconds: 160),
                   curve: Curves.easeOutCubic,
                   decoration: BoxDecoration(
-                    color: selected ? cs.primary.withOpacity(0.14) : Colors.transparent,
+                    color: selected
+                        ? cs.primary.withOpacity(0.14)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(innerRadius),
                   ),
                   alignment: Alignment.center,
@@ -1176,7 +1584,9 @@ class _SegTabBar extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: selected ? cs.primary : cs.onSurface.withOpacity(0.82),
+                      color: selected
+                          ? cs.primary
+                          : cs.onSurface.withOpacity(0.82),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1184,7 +1594,8 @@ class _SegTabBar extends StatelessWidget {
               ),
             ),
           );
-          if (index != tabs.length - 1) children.add(const SizedBox(width: gap));
+          if (index != tabs.length - 1)
+            children.add(const SizedBox(width: gap));
         }
 
         return Container(
@@ -1201,7 +1612,10 @@ class _SegTabBar extends StatelessWidget {
               physics: const BouncingScrollPhysics(),
               child: ConstrainedBox(
                 constraints: BoxConstraints(minWidth: innerAvailWidth),
-                child: SizedBox(width: rowWidth, child: Row(children: children)),
+                child: SizedBox(
+                  width: rowWidth,
+                  child: Row(children: children),
+                ),
               ),
             ),
           ),

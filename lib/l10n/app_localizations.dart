@@ -4340,6 +4340,12 @@ abstract class AppLocalizations {
   /// **'Invert'**
   String get modelFetchInvertTooltip;
 
+  /// No description provided for @modelDetailSheetSaveFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Save failed. Please try again.'**
+  String get modelDetailSheetSaveFailedMessage;
+
   /// No description provided for @modelDetailSheetAddBody.
   ///
   /// In en, this message translates to:

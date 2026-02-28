@@ -7,35 +7,74 @@ import '../l10n/app_localizations.dart';
 import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
 import '../core/services/api/builtin_tools.dart';
+import '../core/services/model_override_resolver.dart';
+import '../core/services/logging/flutter_logger.dart';
 import '../shared/widgets/ios_switch.dart';
 import '../shared/widgets/snackbar.dart';
+import '../features/model/widgets/model_edit_state_helper.dart';
 
-Future<bool?> showDesktopModelEditDialog(BuildContext context, {required String providerKey, required String modelId}) async {
-  return _openDialog(context, providerKey: providerKey, modelId: modelId, isNew: false);
+Future<bool?> showDesktopModelEditDialog(
+  BuildContext context, {
+  required String providerKey,
+  required String modelId,
+}) async {
+  return _openDialog(
+    context,
+    providerKey: providerKey,
+    modelId: modelId,
+    isNew: false,
+  );
 }
 
-Future<bool?> showDesktopCreateModelDialog(BuildContext context, {required String providerKey}) async {
-  return _openDialog(context, providerKey: providerKey, modelId: '', isNew: true);
+Future<bool?> showDesktopCreateModelDialog(
+  BuildContext context, {
+  required String providerKey,
+}) async {
+  return _openDialog(
+    context,
+    providerKey: providerKey,
+    modelId: '',
+    isNew: true,
+  );
 }
 
-Future<bool?> _openDialog(BuildContext context, {required String providerKey, required String modelId, required bool isNew}) async {
+Future<bool?> _openDialog(
+  BuildContext context, {
+  required String providerKey,
+  required String modelId,
+  required bool isNew,
+}) async {
   bool? result;
   await showGeneralDialog<bool>(
     context: context,
     barrierDismissible: true,
     barrierColor: Colors.black.withOpacity(0.25),
     barrierLabel: 'model-edit-dialog',
-    pageBuilder: (ctx, _, __) => _ModelEditDialogBody(providerKey: providerKey, modelId: modelId, isNew: isNew),
+    pageBuilder: (ctx, _, __) => _ModelEditDialogBody(
+      providerKey: providerKey,
+      modelId: modelId,
+      isNew: isNew,
+    ),
     transitionBuilder: (ctx, anim, _, child) {
       final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-      return FadeTransition(opacity: curved, child: ScaleTransition(scale: Tween<double>(begin: 0.98, end: 1).animate(curved), child: child));
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.98, end: 1).animate(curved),
+          child: child,
+        ),
+      );
     },
   ).then((v) => result = v);
   return result;
 }
 
 class _ModelEditDialogBody extends StatefulWidget {
-  const _ModelEditDialogBody({required this.providerKey, required this.modelId, required this.isNew});
+  const _ModelEditDialogBody({
+    required this.providerKey,
+    required this.modelId,
+    required this.isNew,
+  });
   final String providerKey;
   final String modelId;
   final bool isNew;
@@ -45,7 +84,8 @@ class _ModelEditDialogBody extends StatefulWidget {
 
 enum _TabKind { basic, advanced, tools }
 
-class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleTickerProviderStateMixin {
+class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabCtrl;
   _TabKind _tab = _TabKind.basic;
 
@@ -56,6 +96,10 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
   final Set<Modality> _input = {Modality.text};
   final Set<Modality> _output = {Modality.text};
   final Set<ModelAbility> _abilities = {};
+  Set<Modality>? _cachedChatInput;
+  Set<Modality>? _cachedChatOutput;
+  Set<ModelAbility>? _cachedChatAbilities;
+  Set<Modality>? _cachedEmbeddingInput;
   final List<_HeaderKV> _headers = [];
   final List<_BodyKV> _bodies = [];
 
@@ -76,10 +120,15 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     super.initState();
     final settings = context.read<SettingsProvider>();
     final cfg = settings.getProviderConfig(widget.providerKey);
-    _providerKind = cfg.providerType;
+    _providerKind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
 
     // Determine tab count: 3 for Google/OpenAI (has tools tab), 2 for others
-    final hasToolsTab = _providerKind == ProviderKind.google || _providerKind == ProviderKind.openai;
+    final hasToolsTab =
+        _providerKind == ProviderKind.google ||
+        _providerKind == ProviderKind.openai;
     _tabCtrl = TabController(length: hasToolsTab ? 3 : 2, vsync: this);
     _tabCtrl.addListener(() {
       if (!_tabCtrl.indexIsChanging) {
@@ -97,14 +146,16 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
 
     // Resolve display model id from per-model overrides when present (apiModelId),
     // falling back to the logical key for backwards compatibility.
-    Map? _initialOv;
+    Map<String, dynamic>? _initialOv;
     if (!widget.isNew) {
       final raw = cfg.modelOverrides[widget.modelId];
-      if (raw is Map) _initialOv = raw;
+      if (raw is Map) _initialOv = raw.map((k, v) => MapEntry(k.toString(), v));
     }
     String displayModelId = widget.modelId;
     if (_initialOv != null) {
-      final raw = (_initialOv['apiModelId'] ?? _initialOv['api_model_id'])?.toString().trim();
+      final raw = (_initialOv['apiModelId'] ?? _initialOv['api_model_id'])
+          ?.toString()
+          .trim();
       if (raw != null && raw.isNotEmpty) displayModelId = raw;
     }
     _idCtrl = TextEditingController(text: displayModelId);
@@ -114,39 +165,109 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
         displayName: displayModelId.isEmpty ? '' : displayModelId,
       ),
     );
-    _nameCtrl = TextEditingController(text: base.displayName);
-    _type = base.type;
-    _input..clear()..addAll(base.input);
-    _output..clear()..addAll(base.output);
-    _abilities..clear()..addAll(base.abilities);
+    final ov = _initialOv;
+    final effective = ov == null
+        ? base
+        : ModelOverrideResolver.applyModelOverride(
+            base,
+            ov,
+            applyDisplayName: true,
+          );
+    _nameCtrl = TextEditingController(text: effective.displayName);
+    _type = effective.type;
+    _input
+      ..clear()
+      ..addAll(effective.input);
+    _output
+      ..clear()
+      ..addAll(effective.output);
+    _abilities
+      ..clear()
+      ..addAll(effective.abilities);
+    if (_type == ModelType.embedding) {
+      if (_input.isEmpty) _input.add(Modality.text);
+      _cachedEmbeddingInput = {..._input};
+    } else if (_type == ModelType.chat) {
+      if (_input.isEmpty) _input.add(Modality.text);
+      if (_output.isEmpty) _output.add(Modality.text);
+    }
 
-    if (!widget.isNew) {
-      final ov = _initialOv ?? cfg.modelOverrides[widget.modelId] as Map?;
-      if (ov != null) {
-        _nameCtrl.text = (ov['name'] as String?)?.trim().isNotEmpty == true ? (ov['name'] as String) : _nameCtrl.text;
-        final t = (ov['type'] as String?) ?? '';
-        if (t == 'embedding') _type = ModelType.embedding; else if (t == 'chat') _type = ModelType.chat;
-        final inArr = (ov['input'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        final outArr = (ov['output'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        final abArr = (ov['abilities'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        _input..clear()..addAll(inArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-        _output..clear()..addAll(outArr.map((e) => e == 'image' ? Modality.image : Modality.text));
-        _abilities..clear()..addAll(abArr.map((e) => e == 'reasoning' ? ModelAbility.reasoning : ModelAbility.tool));
-        final hdrs = (ov['headers'] as List?) ?? const [];
-        for (final h in hdrs) { if (h is Map) { final kv = _HeaderKV(); kv.name.text = (h['name'] as String?) ?? ''; kv.value.text = (h['value'] as String?) ?? ''; _headers.add(kv); } }
-        final bds = (ov['body'] as List?) ?? const [];
-        for (final b in bds) { if (b is Map) { final kv = _BodyKV(); kv.keyCtrl.text = (b['key'] as String?) ?? ''; kv.valueCtrl.text = (b['value'] as String?) ?? ''; _bodies.add(kv); } }
-
-        // Read built-in tools from builtInTools array
-        final builtInSet = BuiltInToolNames.parseAndNormalize(ov['builtInTools']);
-        // Google tools
-        _googleUrlContextTool = builtInSet.contains(BuiltInToolNames.urlContext);
-        _googleCodeExecutionTool = builtInSet.contains(BuiltInToolNames.codeExecution);
-        _googleYoutubeTool = builtInSet.contains(BuiltInToolNames.youtube);
-        // OpenAI tools
-        _openaiCodeInterpreterTool = builtInSet.contains(BuiltInToolNames.codeInterpreter);
-        _openaiImageGenerationTool = builtInSet.contains(BuiltInToolNames.imageGeneration);
+    if (ov != null) {
+      final rawHdrs = ov['headers'];
+      final hdrs = (rawHdrs is List) ? rawHdrs : const <dynamic>[];
+      for (final h in hdrs) {
+        if (h is Map) {
+          final kv = _HeaderKV();
+          kv.name.text = h['name']?.toString() ?? '';
+          kv.value.text = h['value']?.toString() ?? '';
+          _headers.add(kv);
+        }
       }
+      final rawBds = ov['body'];
+      final bds = (rawBds is List) ? rawBds : const <dynamic>[];
+      for (final b in bds) {
+        if (b is Map) {
+          final kv = _BodyKV();
+          kv.keyCtrl.text = b['key']?.toString() ?? '';
+          kv.valueCtrl.text = b['value']?.toString() ?? '';
+          _bodies.add(kv);
+        }
+      }
+
+      final builtInSet = BuiltInToolNames.parseAndNormalize(ov['builtInTools']);
+      _googleUrlContextTool = builtInSet.contains(BuiltInToolNames.urlContext);
+      _googleCodeExecutionTool = builtInSet.contains(
+        BuiltInToolNames.codeExecution,
+      );
+      _googleYoutubeTool = builtInSet.contains(BuiltInToolNames.youtube);
+      _openaiCodeInterpreterTool = builtInSet.contains(
+        BuiltInToolNames.codeInterpreter,
+      );
+      _openaiImageGenerationTool = builtInSet.contains(
+        BuiltInToolNames.imageGeneration,
+      );
+    }
+  }
+
+  void _setType(ModelType next) {
+    final prev = _type;
+    if (prev == next) return;
+    _type = next;
+    final result = ModelEditTypeSwitch.apply(
+      prev: prev,
+      next: next,
+      input: _input,
+      output: _output,
+      abilities: _abilities,
+      cachedChatInput: _cachedChatInput,
+      cachedChatOutput: _cachedChatOutput,
+      cachedChatAbilities: _cachedChatAbilities,
+      cachedEmbeddingInput: _cachedEmbeddingInput,
+    );
+    _input
+      ..clear()
+      ..addAll(result.input);
+    _output
+      ..clear()
+      ..addAll(result.output);
+    _abilities
+      ..clear()
+      ..addAll(result.abilities);
+    _cachedChatInput = result.cachedChatInput;
+    _cachedChatOutput = result.cachedChatOutput;
+    _cachedChatAbilities = result.cachedChatAbilities;
+    _cachedEmbeddingInput = result.cachedEmbeddingInput;
+  }
+
+  void _toggleModality(Set<Modality> modalities, int index) {
+    const modalityOrder = <Modality>[Modality.text, Modality.image];
+    if (index < 0 || index >= modalityOrder.length) return;
+    final mod = modalityOrder[index];
+    if (modalities.contains(mod)) {
+      modalities.remove(mod);
+      if (modalities.isEmpty) modalities.add(Modality.text);
+    } else {
+      modalities.add(mod);
     }
   }
 
@@ -158,9 +279,24 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
       isDense: true,
       filled: true,
       fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.12), width: 0.6)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.12), width: 0.6)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(
+          color: cs.outlineVariant.withOpacity(0.12),
+          width: 0.6,
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(
+          color: cs.outlineVariant.withOpacity(0.12),
+          width: 0.6,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8),
+      ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     );
   }
@@ -170,6 +306,14 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     _tabCtrl.dispose();
     _idCtrl.dispose();
     _nameCtrl.dispose();
+    for (final h in _headers) {
+      h.name.dispose();
+      h.value.dispose();
+    }
+    for (final b in _bodies) {
+      b.keyCtrl.dispose();
+      b.valueCtrl.dispose();
+    }
     super.dispose();
   }
 
@@ -179,12 +323,20 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     final l10n = AppLocalizations.of(context)!;
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 540, maxWidth: 700, maxHeight: 650),
+        constraints: const BoxConstraints(
+          minWidth: 540,
+          maxWidth: 700,
+          maxHeight: 650,
+        ),
         child: Material(
           color: cs.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.08) : cs.outlineVariant.withOpacity(0.25)),
+            side: BorderSide(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white.withOpacity(0.08)
+                  : cs.outlineVariant.withOpacity(0.25),
+            ),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
@@ -201,16 +353,26 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
                       children: [
                         Expanded(
                           child: Text(
-                            widget.isNew ? l10n.modelDetailSheetAddModel : l10n.modelDetailSheetEditModel,
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                            widget.isNew
+                                ? l10n.modelDetailSheetAddModel
+                                : l10n.modelDetailSheetEditModel,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         IconButton(
                           tooltip: l10n.mcpPageClose,
-                          onPressed: () => Navigator.of(context).maybePop(false),
-                          icon: Icon(lucide.Lucide.X, size: 20, color: cs.onSurface.withOpacity(0.9)),
+                          onPressed: () =>
+                              Navigator.of(context).maybePop(false),
+                          icon: Icon(
+                            lucide.Lucide.X,
+                            size: 20,
+                            color: cs.onSurface.withOpacity(0.9),
+                          ),
                         ),
                       ],
                     ),
@@ -229,7 +391,8 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
                             tabs: [
                               l10n.modelDetailSheetBasicTab,
                               l10n.modelDetailSheetAdvancedTab,
-                              if (_providerKind == ProviderKind.google || _providerKind == ProviderKind.openai)
+                              if (_providerKind == ProviderKind.google ||
+                                  _providerKind == ProviderKind.openai)
                                 l10n.modelDetailSheetBuiltinToolsTab,
                             ],
                           ),
@@ -241,11 +404,17 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
                             switchInCurve: Curves.easeOutCubic,
                             switchOutCurve: Curves.easeInCubic,
                             transitionBuilder: (child, anim) {
-                              final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+                              final curved = CurvedAnimation(
+                                parent: anim,
+                                curve: Curves.easeOutCubic,
+                              );
                               return FadeTransition(
                                 opacity: curved,
                                 child: SlideTransition(
-                                  position: Tween<Offset>(begin: const Offset(0, 0.02), end: Offset.zero).animate(curved),
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0, 0.02),
+                                    end: Offset.zero,
+                                  ).animate(curved),
                                   child: child,
                                 ),
                               );
@@ -269,8 +438,12 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
                     children: [
                       const Spacer(),
                       _PrimaryDeskButton(
-                        icon: widget.isNew ? lucide.Lucide.Plus : lucide.Lucide.Check,
-                        label: widget.isNew ? l10n.modelDetailSheetAddButton : l10n.modelDetailSheetConfirmButton,
+                        icon: widget.isNew
+                            ? lucide.Lucide.Plus
+                            : lucide.Lucide.Check,
+                        label: widget.isNew
+                            ? l10n.modelDetailSheetAddButton
+                            : l10n.modelDetailSheetConfirmButton,
                         onTap: _save,
                       ),
                     ],
@@ -308,7 +481,9 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
               controller: _idCtrl,
               readOnly: !widget.isNew,
               enableInteractiveSelection: widget.isNew,
-              style: TextStyle(color: widget.isNew ? null : cs.onSurface.withOpacity(0.6)),
+              style: TextStyle(
+                color: widget.isNew ? null : cs.onSurface.withOpacity(0.6),
+              ),
               onChanged: widget.isNew
                   ? (v) {
                       if (!_nameEdited) {
@@ -319,7 +494,10 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
                   : null,
               decoration: _deskInputDecoration(context).copyWith(
                 hintText: l10n.modelDetailSheetModelIdHint,
-                suffixIconConstraints: const BoxConstraints(minWidth: 42, minHeight: 40),
+                suffixIconConstraints: const BoxConstraints(
+                  minWidth: 42,
+                  minHeight: 40,
+                ),
                 suffixIcon: widget.isNew
                     ? null
                     : Padding(
@@ -365,45 +543,65 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
             _label(context, l10n.modelDetailSheetModelTypeLabel),
             const SizedBox(height: 6),
             _SegmentedSingle(
-              options: [l10n.modelDetailSheetChatType, l10n.modelDetailSheetEmbeddingType],
+              options: [
+                l10n.modelDetailSheetChatType,
+                l10n.modelDetailSheetEmbeddingType,
+              ],
               value: _type == ModelType.chat ? 0 : 1,
-              onChanged: (i) => setState(() => _type = i == 0 ? ModelType.chat : ModelType.embedding),
+              onChanged: (i) => setState(
+                () => _setType(i == 0 ? ModelType.chat : ModelType.embedding),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _label(context, l10n.modelDetailSheetInputModesLabel),
+            const SizedBox(height: 6),
+            _SegmentedMulti(
+              options: [
+                l10n.modelDetailSheetTextMode,
+                l10n.modelDetailSheetImageMode,
+              ],
+              isSelected: [
+                _input.contains(Modality.text),
+                _input.contains(Modality.image),
+              ],
+              onChanged: (idx) => setState(() => _toggleModality(_input, idx)),
             ),
             if (_type == ModelType.chat) ...[
-              const SizedBox(height: 12),
-              _label(context, l10n.modelDetailSheetInputModesLabel),
-              const SizedBox(height: 6),
-              _SegmentedMulti(
-                options: [l10n.modelDetailSheetTextMode, l10n.modelDetailSheetImageMode],
-                isSelected: [_input.contains(Modality.text), _input.contains(Modality.image)],
-                onChanged: (idx) => setState(() {
-                  final mod = idx == 0 ? Modality.text : Modality.image;
-                  if (_input.contains(mod)) _input.remove(mod);
-                  else _input.add(mod);
-                }),
-              ),
               const SizedBox(height: 12),
               _label(context, l10n.modelDetailSheetOutputModesLabel),
               const SizedBox(height: 6),
               _SegmentedMulti(
-                options: [l10n.modelDetailSheetTextMode, l10n.modelDetailSheetImageMode],
-                isSelected: [_output.contains(Modality.text), _output.contains(Modality.image)],
-                onChanged: (idx) => setState(() {
-                  final mod = idx == 0 ? Modality.text : Modality.image;
-                  if (_output.contains(mod)) _output.remove(mod);
-                  else _output.add(mod);
-                }),
+                options: [
+                  l10n.modelDetailSheetTextMode,
+                  l10n.modelDetailSheetImageMode,
+                ],
+                isSelected: [
+                  _output.contains(Modality.text),
+                  _output.contains(Modality.image),
+                ],
+                onChanged: (idx) =>
+                    setState(() => _toggleModality(_output, idx)),
               ),
               const SizedBox(height: 12),
               _label(context, l10n.modelDetailSheetAbilitiesLabel),
               const SizedBox(height: 6),
               _SegmentedMulti(
-                options: [l10n.modelDetailSheetToolsAbility, l10n.modelDetailSheetReasoningAbility],
-                isSelected: [_abilities.contains(ModelAbility.tool), _abilities.contains(ModelAbility.reasoning)],
+                options: [
+                  l10n.modelDetailSheetToolsAbility,
+                  l10n.modelDetailSheetReasoningAbility,
+                ],
+                isSelected: [
+                  _abilities.contains(ModelAbility.tool),
+                  _abilities.contains(ModelAbility.reasoning),
+                ],
                 onChanged: (idx) => setState(() {
-                  final ab = idx == 0 ? ModelAbility.tool : ModelAbility.reasoning;
-                  if (_abilities.contains(ab)) _abilities.remove(ab);
-                  else _abilities.add(ab);
+                  final ab = idx == 0
+                      ? ModelAbility.tool
+                      : ModelAbility.reasoning;
+                  if (_abilities.contains(ab))
+                    _abilities.remove(ab);
+                  else
+                    _abilities.add(ab);
                 }),
               ),
             ],
@@ -421,8 +619,19 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
           children: [
             Row(
               children: [
-                Expanded(child: Text(l10n.modelDetailSheetCustomHeadersTitle, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
-                _OutlinedAddButton(label: l10n.modelDetailSheetAddHeader, onTap: () => setState(() => _headers.add(_HeaderKV()))),
+                Expanded(
+                  child: Text(
+                    l10n.modelDetailSheetCustomHeadersTitle,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                _OutlinedAddButton(
+                  label: l10n.modelDetailSheetAddHeader,
+                  onTap: () => setState(() => _headers.add(_HeaderKV())),
+                ),
               ],
             ),
             if (_headers.isNotEmpty) ...[
@@ -430,7 +639,11 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
               for (final h in _headers)
                 _HeaderRow(
                   kv: h,
-                  onDelete: () => setState(() => _headers.remove(h)),
+                  onDelete: () => setState(() {
+                    h.name.dispose();
+                    h.value.dispose();
+                    _headers.remove(h);
+                  }),
                 ),
             ],
           ],
@@ -443,8 +656,19 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
           children: [
             Row(
               children: [
-                Expanded(child: Text(l10n.modelDetailSheetCustomBodyTitle, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
-                _OutlinedAddButton(label: l10n.modelDetailSheetAddBody, onTap: () => setState(() => _bodies.add(_BodyKV()))),
+                Expanded(
+                  child: Text(
+                    l10n.modelDetailSheetCustomBodyTitle,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                _OutlinedAddButton(
+                  label: l10n.modelDetailSheetAddBody,
+                  onTap: () => setState(() => _bodies.add(_BodyKV())),
+                ),
               ],
             ),
             if (_bodies.isNotEmpty) ...[
@@ -452,7 +676,11 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
               for (final b in _bodies)
                 _BodyRow(
                   kv: b,
-                  onDelete: () => setState(() => _bodies.remove(b)),
+                  onDelete: () => setState(() {
+                    b.keyCtrl.dispose();
+                    b.valueCtrl.dispose();
+                    _bodies.remove(b);
+                  }),
                 ),
             ],
           ],
@@ -465,7 +693,10 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final cfg = settings.getProviderConfig(widget.providerKey);
-    final bool hasTiles = _providerKind == ProviderKind.google || _providerKind == ProviderKind.openai;
+    final bool disableTools = _type == ModelType.embedding;
+    final bool hasTiles =
+        _providerKind == ProviderKind.google ||
+        _providerKind == ProviderKind.openai;
     return [
       _DeskCard(
         child: Column(
@@ -473,25 +704,38 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
           children: [
             Text(
               l10n.modelDetailSheetBuiltinToolsDescription,
-              style: TextStyle(color: cs.onSurface.withOpacity(0.8), fontSize: 13),
+              style: TextStyle(
+                color: cs.onSurface.withOpacity(0.8),
+                fontSize: 13,
+              ),
             ),
             if (_providerKind == ProviderKind.google) ...[
               const SizedBox(height: 6),
               Text(
                 l10n.modelDetailSheetGeminiCodeExecutionMutuallyExclusiveHint,
-                style: TextStyle(color: cs.onSurface.withOpacity(0.65), fontSize: 12),
+                style: TextStyle(
+                  color: cs.onSurface.withOpacity(0.65),
+                  fontSize: 12,
+                ),
               ),
-            ] else if (_providerKind == ProviderKind.openai && cfg.useResponseApi != true) ...[
+            ] else if (_providerKind == ProviderKind.openai &&
+                cfg.useResponseApi != true) ...[
               const SizedBox(height: 6),
               Text(
                 l10n.modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint,
-                style: TextStyle(color: cs.onSurface.withOpacity(0.65), fontSize: 12),
+                style: TextStyle(
+                  color: cs.onSurface.withOpacity(0.65),
+                  fontSize: 12,
+                ),
               ),
             ] else if (!hasTiles) ...[
               const SizedBox(height: 6),
               Text(
                 l10n.modelDetailSheetBuiltinToolsUnsupportedHint,
-                style: TextStyle(color: cs.onSurface.withOpacity(0.65), fontSize: 12),
+                style: TextStyle(
+                  color: cs.onSurface.withOpacity(0.65),
+                  fontSize: 12,
+                ),
               ),
             ],
           ],
@@ -503,51 +747,67 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
           title: l10n.modelDetailSheetUrlContextTool,
           desc: l10n.modelDetailSheetUrlContextToolDescription,
           value: _googleUrlContextTool,
-          // URL Context is disabled when Code Execution is enabled (mutually exclusive)
-          onChanged: _googleCodeExecutionTool
+          onChanged: disableTools
               ? null
-              : (v) => setState(() => _googleUrlContextTool = v),
+              : (v) => setState(() {
+                  _googleUrlContextTool = v;
+                  if (v) _googleCodeExecutionTool = false;
+                }),
         ),
         const SizedBox(height: 8),
         _ToolTile(
           title: l10n.modelDetailSheetCodeExecutionTool,
           desc: l10n.modelDetailSheetCodeExecutionToolDescription,
           value: _googleCodeExecutionTool,
-          // Code Execution is disabled when URL Context is enabled (mutually exclusive)
-          onChanged: _googleUrlContextTool
+          onChanged: disableTools
               ? null
-              : (v) => setState(() => _googleCodeExecutionTool = v),
+              : (v) => setState(() {
+                  _googleCodeExecutionTool = v;
+                  if (v) _googleUrlContextTool = false;
+                }),
         ),
         const SizedBox(height: 8),
         _ToolTile(
           title: l10n.modelDetailSheetYoutubeTool,
           desc: l10n.modelDetailSheetYoutubeToolDescription,
           value: _googleYoutubeTool,
-          onChanged: (v) => setState(() => _googleYoutubeTool = v),
+          onChanged: disableTools
+              ? null
+              : (v) => setState(() => _googleYoutubeTool = v),
         ),
       ] else if (_providerKind == ProviderKind.openai) ...[
         _ToolTile(
           title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
           desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
           value: _openaiCodeInterpreterTool,
-          onChanged: (cfg.useResponseApi == true)
-              ? (v) => setState(() => _openaiCodeInterpreterTool = v)
-              : null,
+          onChanged: disableTools
+              ? null
+              : ((cfg.useResponseApi == true)
+                    ? (v) => setState(() => _openaiCodeInterpreterTool = v)
+                    : null),
         ),
         const SizedBox(height: 8),
         _ToolTile(
           title: l10n.modelDetailSheetOpenaiImageGenerationTool,
           desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
           value: _openaiImageGenerationTool,
-          onChanged: (cfg.useResponseApi == true)
-              ? (v) => setState(() => _openaiImageGenerationTool = v)
-              : null,
+          onChanged: disableTools
+              ? null
+              : ((cfg.useResponseApi == true)
+                    ? (v) => setState(() => _openaiImageGenerationTool = v)
+                    : null),
         ),
       ],
     ];
   }
 
-  Widget _label(BuildContext context, String text) => Text(text, style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8)));
+  Widget _label(BuildContext context, String text) => Text(
+    text,
+    style: TextStyle(
+      fontSize: 13,
+      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+    ),
+  );
 
   // Generate a unique logical key for a model instance within a provider.
   // This allows multiple configurations to share the same upstream API model id.
@@ -569,42 +829,99 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
     final String apiModelId = _idCtrl.text.trim();
     if (apiModelId.isEmpty || apiModelId.length < 2) {
       final l10n = AppLocalizations.of(context)!;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.modelDetailSheetInvalidIdError), backgroundColor: Theme.of(context).colorScheme.error));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.modelDetailSheetInvalidIdError),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
       return;
     }
     final ov = Map<String, dynamic>.from(old.modelOverrides);
-    final headers = [for (final h in _headers) if (h.name.text.trim().isNotEmpty) {'name': h.name.text.trim(), 'value': h.value.text}];
-    final bodies = [for (final b in _bodies) if (b.keyCtrl.text.trim().isNotEmpty) {'key': b.keyCtrl.text.trim(), 'value': b.valueCtrl.text}];
+    final headers = [
+      for (final h in _headers)
+        if (h.name.text.trim().isNotEmpty)
+          {'name': h.name.text.trim(), 'value': h.value.text},
+    ];
+    final bodies = [
+      for (final b in _bodies)
+        if (b.keyCtrl.text.trim().isNotEmpty)
+          {'key': b.keyCtrl.text.trim(), 'value': b.valueCtrl.text},
+    ];
 
-    // Build builtInTools list based on provider type
-    final builtInTools = <String>[];
+    final prev = (prevKey.isNotEmpty && ov[prevKey] is Map)
+        ? {
+            for (final e in (ov[prevKey] as Map).entries)
+              e.key.toString(): e.value,
+          }
+        : const <String, dynamic>{};
+    final builtInSet = BuiltInToolNames.parseAndNormalize(prev['builtInTools']);
     if (_providerKind == ProviderKind.google) {
-      if (_googleUrlContextTool) builtInTools.add('url_context');
-      if (_googleCodeExecutionTool) builtInTools.add('code_execution');
-      if (_googleYoutubeTool) builtInTools.add('youtube');
+      builtInSet.remove(BuiltInToolNames.urlContext);
+      builtInSet.remove(BuiltInToolNames.codeExecution);
+      builtInSet.remove(BuiltInToolNames.youtube);
+      if (_googleUrlContextTool) builtInSet.add(BuiltInToolNames.urlContext);
+      if (_googleCodeExecutionTool)
+        builtInSet.add(BuiltInToolNames.codeExecution);
+      if (_googleYoutubeTool) builtInSet.add(BuiltInToolNames.youtube);
     } else if (_providerKind == ProviderKind.openai) {
-      if (_openaiCodeInterpreterTool) builtInTools.add('code_interpreter');
-      if (_openaiImageGenerationTool) builtInTools.add('image_generation');
+      builtInSet.remove(BuiltInToolNames.codeInterpreter);
+      builtInSet.remove(BuiltInToolNames.imageGeneration);
+      if (_openaiCodeInterpreterTool)
+        builtInSet.add(BuiltInToolNames.codeInterpreter);
+      if (_openaiImageGenerationTool)
+        builtInSet.add(BuiltInToolNames.imageGeneration);
     }
+    final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
 
-    final String key = (prevKey.isEmpty || widget.isNew) ? _nextModelKey(old, apiModelId) : prevKey;
+    final String key = (prevKey.isEmpty || widget.isNew)
+        ? _nextModelKey(old, apiModelId)
+        : prevKey;
+    final bool isEmbedding = _type == ModelType.embedding;
     ov[key] = {
       'apiModelId': apiModelId,
       'name': _nameCtrl.text.trim(),
       'type': _type == ModelType.chat ? 'chat' : 'embedding',
-      'input': _input.map((e) => e == Modality.image ? 'image' : 'text').toList(),
-      'output': _output.map((e) => e == Modality.image ? 'image' : 'text').toList(),
-      'abilities': _abilities.map((e) => e == ModelAbility.reasoning ? 'reasoning' : 'tool').toList(),
+      'input': _input
+          .map((e) => e == Modality.image ? 'image' : 'text')
+          .toList(),
+      if (!isEmbedding)
+        'output': _output
+            .map((e) => e == Modality.image ? 'image' : 'text')
+            .toList(),
+      if (!isEmbedding)
+        'abilities': _abilities
+            .map((e) => e == ModelAbility.reasoning ? 'reasoning' : 'tool')
+            .toList(),
       'headers': headers,
       'body': bodies,
-      'builtInTools': builtInTools,
+      if (!isEmbedding && builtInTools.isNotEmpty) 'builtInTools': builtInTools,
     };
 
-    if (prevKey.isEmpty || widget.isNew) {
-      final list = old.models.toList()..add(key);
-      await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov, models: list));
-    } else {
-      await settings.setProviderConfig(widget.providerKey, old.copyWith(modelOverrides: ov));
+    try {
+      if (prevKey.isEmpty || widget.isNew) {
+        final list = old.models.toList()..add(key);
+        await settings.setProviderConfig(
+          widget.providerKey,
+          old.copyWith(modelOverrides: ov, models: list),
+        );
+      } else {
+        await settings.setProviderConfig(
+          widget.providerKey,
+          old.copyWith(modelOverrides: ov),
+        );
+      }
+    } catch (e, st) {
+      FlutterLogger.log('[ModelEditDialog] save failed: $e\n$st', tag: 'Model');
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.modelDetailSheetSaveFailedMessage),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
     }
     if (!mounted) return;
     Navigator.of(context).pop(true);
@@ -612,7 +929,11 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody> with SingleT
 }
 
 class _PrimaryDeskButton extends StatefulWidget {
-  const _PrimaryDeskButton({required this.label, required this.onTap, this.icon});
+  const _PrimaryDeskButton({
+    required this.label,
+    required this.onTap,
+    this.icon,
+  });
   final String label;
   final VoidCallback onTap;
   final IconData? icon;
@@ -626,7 +947,9 @@ class _PrimaryDeskButtonState extends State<_PrimaryDeskButton> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bg = _pressed ? cs.primary.withOpacity(0.85) : (_hover ? cs.primary.withOpacity(0.92) : cs.primary);
+    final bg = _pressed
+        ? cs.primary.withOpacity(0.85)
+        : (_hover ? cs.primary.withOpacity(0.92) : cs.primary);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -639,7 +962,10 @@ class _PrimaryDeskButtonState extends State<_PrimaryDeskButton> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(10),
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -647,7 +973,13 @@ class _PrimaryDeskButtonState extends State<_PrimaryDeskButton> {
                 Icon(widget.icon!, size: 16, color: cs.onPrimary),
                 const SizedBox(width: 8),
               ],
-              Text(widget.label, style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.w600)),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  color: cs.onPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -657,7 +989,11 @@ class _PrimaryDeskButtonState extends State<_PrimaryDeskButton> {
 }
 
 class _SegmentedSingle extends StatelessWidget {
-  const _SegmentedSingle({required this.options, required this.value, required this.onChanged});
+  const _SegmentedSingle({
+    required this.options,
+    required this.value,
+    required this.onChanged,
+  });
   final List<String> options;
   final int value;
   final ValueChanged<int> onChanged;
@@ -665,7 +1001,9 @@ class _SegmentedSingle extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selBg = isDark ? cs.primary.withOpacity(0.20) : cs.primary.withOpacity(0.12);
+    final selBg = isDark
+        ? cs.primary.withOpacity(0.20)
+        : cs.primary.withOpacity(0.12);
     final baseBg = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
     final children = <Widget>[];
     for (int i = 0; i < options.length; i++) {
@@ -684,14 +1022,21 @@ class _SegmentedSingle extends StatelessWidget {
               decoration: BoxDecoration(
                 color: selected ? selBg : baseBg,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: selected ? cs.primary.withOpacity(0.35) : cs.outlineVariant.withOpacity(0.35)),
+                border: Border.all(
+                  color: selected
+                      ? cs.primary.withOpacity(0.35)
+                      : cs.outlineVariant.withOpacity(0.35),
+                ),
               ),
               alignment: Alignment.center,
               child: Text(
                 options[i],
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: selected ? cs.primary : cs.onSurface.withOpacity(0.82), fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: selected ? cs.primary : cs.onSurface.withOpacity(0.82),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -704,7 +1049,11 @@ class _SegmentedSingle extends StatelessWidget {
 }
 
 class _SegmentedMulti extends StatelessWidget {
-  const _SegmentedMulti({required this.options, required this.isSelected, required this.onChanged});
+  const _SegmentedMulti({
+    required this.options,
+    required this.isSelected,
+    required this.onChanged,
+  });
   final List<String> options;
   final List<bool> isSelected;
   final ValueChanged<int> onChanged;
@@ -712,7 +1061,9 @@ class _SegmentedMulti extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selBg = isDark ? cs.primary.withOpacity(0.20) : cs.primary.withOpacity(0.12);
+    final selBg = isDark
+        ? cs.primary.withOpacity(0.20)
+        : cs.primary.withOpacity(0.12);
     final baseBg = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
     final children = <Widget>[];
     for (int i = 0; i < options.length; i++) {
@@ -731,10 +1082,22 @@ class _SegmentedMulti extends StatelessWidget {
               decoration: BoxDecoration(
                 color: selected ? selBg : baseBg,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: selected ? cs.primary.withOpacity(0.35) : cs.outlineVariant.withOpacity(0.35)),
+                border: Border.all(
+                  color: selected
+                      ? cs.primary.withOpacity(0.35)
+                      : cs.outlineVariant.withOpacity(0.35),
+                ),
               ),
               alignment: Alignment.center,
-              child: Text(options[i], maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: selected ? cs.primary : cs.onSurface.withOpacity(0.82), fontWeight: FontWeight.w600)),
+              child: Text(
+                options[i],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? cs.primary : cs.onSurface.withOpacity(0.82),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ),
@@ -773,19 +1136,29 @@ class _OutlinedAddButtonState extends State<_OutlinedAddButton> {
             borderRadius: BorderRadius.circular(12),
             border: Border.fromBorderSide(border),
           ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(lucide.Lucide.Plus, size: 16, color: cs.primary),
-            const SizedBox(width: 6),
-            Text(widget.label, style: TextStyle(color: cs.primary)),
-          ]),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(lucide.Lucide.Plus, size: 16, color: cs.primary),
+              const SizedBox(width: 6),
+              Text(widget.label, style: TextStyle(color: cs.primary)),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _HeaderKV { final TextEditingController name = TextEditingController(); final TextEditingController value = TextEditingController(); }
-class _BodyKV { final TextEditingController keyCtrl = TextEditingController(); final TextEditingController valueCtrl = TextEditingController(); }
+class _HeaderKV {
+  final TextEditingController name = TextEditingController();
+  final TextEditingController value = TextEditingController();
+}
+
+class _BodyKV {
+  final TextEditingController keyCtrl = TextEditingController();
+  final TextEditingController valueCtrl = TextEditingController();
+}
 
 class _HeaderRow extends StatelessWidget {
   const _HeaderRow({required this.kv, required this.onDelete});
@@ -807,11 +1180,32 @@ class _HeaderRow extends StatelessWidget {
                 hintText: l10n.modelDetailSheetHeaderKeyHint,
                 filled: true,
                 fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.12), width: 0.6)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.12), width: 0.6)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: cs.outlineVariant.withOpacity(0.12),
+                    width: 0.6,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: cs.outlineVariant.withOpacity(0.12),
+                    width: 0.6,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: cs.primary.withOpacity(0.35),
+                    width: 0.8,
+                  ),
+                ),
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
               ),
             ),
           ),
@@ -823,15 +1217,43 @@ class _HeaderRow extends StatelessWidget {
                 hintText: l10n.modelDetailSheetHeaderValueHint,
                 filled: true,
                 fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.12), width: 0.6)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.12), width: 0.6)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: cs.outlineVariant.withOpacity(0.12),
+                    width: 0.6,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: cs.outlineVariant.withOpacity(0.12),
+                    width: 0.6,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: cs.primary.withOpacity(0.35),
+                    width: 0.8,
+                  ),
+                ),
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
               ),
             ),
           ),
-          IconButton(icon: Icon(lucide.Lucide.Trash2, size: 18, color: cs.onSurface.withOpacity(0.8)), onPressed: onDelete),
+          IconButton(
+            icon: Icon(
+              lucide.Lucide.Trash2,
+              size: 18,
+              color: cs.onSurface.withOpacity(0.8),
+            ),
+            onPressed: onDelete,
+          ),
         ],
       ),
     );
@@ -849,48 +1271,108 @@ class _BodyRow extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Column(children: [
-        Row(children: [
-          Expanded(
-            child: TextField(
-              controller: kv.keyCtrl,
-              decoration: InputDecoration(
-                hintText: l10n.modelDetailSheetBodyKeyHint,
-                filled: true,
-                fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.12), width: 0.6)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.12), width: 0.6)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8)),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: kv.keyCtrl,
+                  decoration: InputDecoration(
+                    hintText: l10n.modelDetailSheetBodyKeyHint,
+                    filled: true,
+                    fillColor: isDark
+                        ? Colors.white10
+                        : const Color(0xFFF7F7F9),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: cs.outlineVariant.withOpacity(0.12),
+                        width: 0.6,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: cs.outlineVariant.withOpacity(0.12),
+                        width: 0.6,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(
+                        color: cs.primary.withOpacity(0.35),
+                        width: 0.8,
+                      ),
+                    ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  lucide.Lucide.Trash2,
+                  size: 18,
+                  color: cs.onSurface.withOpacity(0.8),
+                ),
+                onPressed: onDelete,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: kv.valueCtrl,
+            minLines: 3,
+            maxLines: 6,
+            decoration: InputDecoration(
+              hintText: l10n.modelDetailSheetBodyJsonHint,
+              filled: true,
+              fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: cs.outlineVariant.withOpacity(0.12),
+                  width: 0.6,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: cs.outlineVariant.withOpacity(0.12),
+                  width: 0.6,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: cs.primary.withOpacity(0.35),
+                  width: 0.8,
+                ),
+              ),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
               ),
             ),
           ),
-          IconButton(icon: Icon(lucide.Lucide.Trash2, size: 18, color: cs.onSurface.withOpacity(0.8)), onPressed: onDelete),
-        ]),
-        const SizedBox(height: 8),
-        TextField(
-          controller: kv.valueCtrl,
-          minLines: 3,
-          maxLines: 6,
-          decoration: InputDecoration(
-            hintText: l10n.modelDetailSheetBodyJsonHint,
-            filled: true,
-            fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.12), width: 0.6)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.12), width: 0.6)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8)),
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 }
 
 class _ToolTile extends StatefulWidget {
-  const _ToolTile({required this.title, required this.desc, required this.value, required this.onChanged});
+  const _ToolTile({
+    required this.title,
+    required this.desc,
+    required this.value,
+    required this.onChanged,
+  });
   final String title;
   final String desc;
   final bool value;
@@ -908,9 +1390,17 @@ class _ToolTileState extends State<_ToolTile> {
     final cs = Theme.of(context).colorScheme;
     final bool isDisabled = widget.onChanged == null;
     final baseBg = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
-    final hoverBg = Color.alphaBlend(cs.primary.withOpacity(isDark ? 0.10 : 0.06), baseBg);
-    final pressedBg = Color.alphaBlend(cs.primary.withOpacity(isDark ? 0.16 : 0.10), baseBg);
-    final bg = isDisabled ? baseBg : (_pressed ? pressedBg : (_hover ? hoverBg : baseBg));
+    final hoverBg = Color.alphaBlend(
+      cs.primary.withOpacity(isDark ? 0.10 : 0.06),
+      baseBg,
+    );
+    final pressedBg = Color.alphaBlend(
+      cs.primary.withOpacity(isDark ? 0.16 : 0.10),
+      baseBg,
+    );
+    final bg = isDisabled
+        ? baseBg
+        : (_pressed ? pressedBg : (_hover ? hoverBg : baseBg));
     final borderColor = (!isDisabled && _hover)
         ? cs.primary.withOpacity(isDark ? 0.28 : 0.22)
         : cs.outlineVariant.withOpacity(0.35);
@@ -922,7 +1412,9 @@ class _ToolTileState extends State<_ToolTile> {
           _hover = false;
           _pressed = false;
         }),
-        cursor: isDisabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+        cursor: isDisabled
+            ? SystemMouseCursors.basic
+            : SystemMouseCursors.click,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,
@@ -933,22 +1425,47 @@ class _ToolTileState extends State<_ToolTile> {
           ),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTapDown: isDisabled ? null : (_) => setState(() => _pressed = true),
-            onTapUp: isDisabled ? null : (_) => setState(() => _pressed = false),
-            onTapCancel: isDisabled ? null : () => setState(() => _pressed = false),
-            onTap: isDisabled ? null : () => widget.onChanged?.call(!widget.value),
+            onTapDown: isDisabled
+                ? null
+                : (_) => setState(() => _pressed = true),
+            onTapUp: isDisabled
+                ? null
+                : (_) => setState(() => _pressed = false),
+            onTapCancel: isDisabled
+                ? null
+                : () => setState(() => _pressed = false),
+            onTap: isDisabled
+                ? null
+                : () => widget.onChanged?.call(!widget.value),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(children: [
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(widget.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    Text(widget.desc, style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.7))),
-                  ]),
-                ),
-                IosSwitch(value: widget.value, onChanged: widget.onChanged),
-              ]),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.title,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.desc,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurface.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IosSwitch(value: widget.value, onChanged: widget.onChanged),
+                ],
+              ),
             ),
           ),
         ),
@@ -958,7 +1475,10 @@ class _ToolTileState extends State<_ToolTile> {
 }
 
 class _DeskCard extends StatelessWidget {
-  const _DeskCard({required this.child, this.padding = const EdgeInsets.all(12)});
+  const _DeskCard({
+    required this.child,
+    this.padding = const EdgeInsets.all(12),
+  });
   final Widget child;
   final EdgeInsets padding;
 
@@ -966,12 +1486,17 @@ class _DeskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF2F3F5);
+    final bg = isDark
+        ? Colors.white.withOpacity(0.06)
+        : const Color(0xFFF2F3F5);
     return Container(
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18), width: 0.8),
+        border: Border.all(
+          color: cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18),
+          width: 0.8,
+        ),
       ),
       padding: padding,
       child: child,
@@ -1001,81 +1526,104 @@ class _SegTabBarState extends State<_SegTabBar> {
     const double gap = 6;
     const double minSegWidth = 88;
     final double pillRadius = 14;
-    final double innerRadius = ((pillRadius - innerPadding).clamp(0.0, pillRadius)).toDouble();
+    final double innerRadius = ((pillRadius - innerPadding).clamp(
+      0.0,
+      pillRadius,
+    )).toDouble();
 
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
-        return LayoutBuilder(builder: (context, constraints) {
-          final tabs = widget.tabs;
-          final controller = widget.controller;
-          final double availWidth = constraints.maxWidth;
-          final double innerAvailWidth = availWidth - innerPadding * 2;
-          final double segWidth = (innerAvailWidth - gap * (tabs.length - 1)) / tabs.length;
-          final double rowWidth = segWidth * tabs.length + gap * (tabs.length - 1);
-          final Color shellBg = isDark ? Colors.white.withOpacity(0.08) : Colors.white;
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final tabs = widget.tabs;
+            final controller = widget.controller;
+            final double availWidth = constraints.maxWidth;
+            final double innerAvailWidth = availWidth - innerPadding * 2;
+            final double segWidth =
+                (innerAvailWidth - gap * (tabs.length - 1)) / tabs.length;
+            final double rowWidth =
+                segWidth * tabs.length + gap * (tabs.length - 1);
+            final Color shellBg = isDark
+                ? Colors.white.withOpacity(0.08)
+                : Colors.white;
 
-          List<Widget> children = [];
-          for (int index = 0; index < tabs.length; index++) {
-            final bool selected = controller.index == index;
-            final bool hovered = _hover == index;
-            final Color bg = selected
-                ? cs.primary.withOpacity(0.14)
-                : hovered
-                    ? (isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.03))
-                    : Colors.transparent;
-            final Color fg = selected ? cs.primary : cs.onSurface.withOpacity(0.82);
+            List<Widget> children = [];
+            for (int index = 0; index < tabs.length; index++) {
+              final bool selected = controller.index == index;
+              final bool hovered = _hover == index;
+              final Color bg = selected
+                  ? cs.primary.withOpacity(0.14)
+                  : hovered
+                  ? (isDark
+                        ? Colors.white.withOpacity(0.06)
+                        : Colors.black.withOpacity(0.03))
+                  : Colors.transparent;
+              final Color fg = selected
+                  ? cs.primary
+                  : cs.onSurface.withOpacity(0.82);
 
-            children.add(
-              SizedBox(
-                width: segWidth < minSegWidth ? minSegWidth : segWidth,
-                height: double.infinity,
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  onEnter: (_) => setState(() => _hover = index),
-                  onExit: (_) => setState(() => _hover = -1),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => controller.index = index,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      curve: Curves.easeOutCubic,
-                      decoration: BoxDecoration(
-                        color: bg,
-                        borderRadius: BorderRadius.circular(innerRadius),
+              children.add(
+                SizedBox(
+                  width: segWidth < minSegWidth ? minSegWidth : segWidth,
+                  height: double.infinity,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    onEnter: (_) => setState(() => _hover = index),
+                    onExit: (_) => setState(() => _hover = -1),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => controller.index = index,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOutCubic,
+                        decoration: BoxDecoration(
+                          color: bg,
+                          borderRadius: BorderRadius.circular(innerRadius),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          tabs[index],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: fg,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        tabs[index],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: fg, fontWeight: FontWeight.w600),
-                      ),
+                    ),
+                  ),
+                ),
+              );
+              if (index != tabs.length - 1)
+                children.add(const SizedBox(width: gap));
+            }
+
+            return Container(
+              height: outerHeight,
+              decoration: BoxDecoration(
+                color: shellBg,
+                borderRadius: BorderRadius.circular(pillRadius),
+              ),
+              clipBehavior: Clip.hardEdge,
+              child: Padding(
+                padding: const EdgeInsets.all(innerPadding),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: innerAvailWidth),
+                    child: SizedBox(
+                      width: rowWidth,
+                      child: Row(children: children),
                     ),
                   ),
                 ),
               ),
             );
-            if (index != tabs.length - 1) children.add(const SizedBox(width: gap));
-          }
-
-          return Container(
-            height: outerHeight,
-            decoration: BoxDecoration(color: shellBg, borderRadius: BorderRadius.circular(pillRadius)),
-            clipBehavior: Clip.hardEdge,
-            child: Padding(
-              padding: const EdgeInsets.all(innerPadding),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minWidth: innerAvailWidth),
-                  child: SizedBox(width: rowWidth, child: Row(children: children)),
-                ),
-              ),
-            ),
-          );
-        });
+          },
+        );
       },
     );
   }
@@ -1107,13 +1655,18 @@ class _CopySuffixButtonState extends State<_CopySuffixButton> {
 
   @override
   Widget build(BuildContext context) {
-    final bg = _pressed ? widget.pressedColor : (_hover ? widget.hoverColor : Colors.transparent);
+    final bg = _pressed
+        ? widget.pressedColor
+        : (_hover ? widget.hoverColor : Colors.transparent);
     final icon = Icon(widget.icon, size: 18, color: widget.color);
 
     Widget child = AnimatedContainer(
       duration: const Duration(milliseconds: 140),
       curve: Curves.easeOutCubic,
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: icon,
     );

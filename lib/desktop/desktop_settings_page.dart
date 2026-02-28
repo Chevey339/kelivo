@@ -13,6 +13,7 @@ import '../l10n/app_localizations.dart';
 import '../theme/palettes.dart';
 import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
+import '../core/services/model_override_resolver.dart';
 import 'model_fetch_dialog.dart' show showModelFetchDialog;
 import 'widgets/desktop_select_dropdown.dart';
 import '../shared/widgets/ios_switch.dart';
@@ -38,6 +39,7 @@ import '../features/model/widgets/model_select_sheet.dart'
 import '../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:async';
+import '../shared/widgets/model_tag_wrap.dart';
 import '../core/models/api_keys.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
@@ -437,4 +439,3 @@ class _MenuItemState extends State<_MenuItem> {
     );
   }
 }
-

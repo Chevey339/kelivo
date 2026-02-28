@@ -2230,6 +2230,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelFetchInvertTooltip => '反选';
 
   @override
+  String get modelDetailSheetSaveFailedMessage => '保存失败，请重试';
+
+  @override
   String get modelDetailSheetAddBody => '添加 Body';
 
   @override
@@ -6236,6 +6239,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelFetchInvertTooltip => '反选';
+
+  @override
+  String get modelDetailSheetSaveFailedMessage => '保存失败，请重试';
 
   @override
   String get modelDetailSheetAddBody => '添加 Body';
@@ -10253,6 +10259,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelFetchInvertTooltip => '反選';
+
+  @override
+  String get modelDetailSheetSaveFailedMessage => '保存失敗，請重試';
 
   @override
   String get modelDetailSheetAddBody => '新增 Body';

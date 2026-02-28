@@ -16,6 +16,9 @@ import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../utils/unicode_sanitizer.dart';
 import 'builtin_tools.dart';
 import 'gemini_tool_config.dart';
+import '../logging/flutter_logger.dart';
+import '../model_override_resolver.dart';
+import '../model_override_payload_parser.dart';
 
 class ChatApiService {
   static const String _aihubmixAppCode = 'ZKRT3588';
@@ -38,11 +41,9 @@ class ChatApiService {
   /// logical `modelId` key is treated as the upstream id (backwards compatible).
   static String _apiModelId(ProviderConfig cfg, String modelId) {
     try {
-      final ov = cfg.modelOverrides[modelId];
-      if (ov is Map<String, dynamic>) {
-        final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
-        if (raw != null && raw.isNotEmpty) return raw;
-      }
+      final ov = _modelOverride(cfg, modelId);
+      final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+      if (raw != null && raw.isNotEmpty) return raw;
     } catch (_) {}
     return modelId;
   }
@@ -93,9 +94,7 @@ class ChatApiService {
     ProviderConfig cfg,
     String modelId,
   ) {
-    final ov = cfg.modelOverrides[modelId];
-    if (ov is Map<String, dynamic>) return ov;
-    return const <String, dynamic>{};
+    return ModelOverridePayloadParser.modelOverride(cfg.modelOverrides, modelId);
   }
 
   static Map<String, String> _customHeaders(
@@ -103,53 +102,21 @@ class ChatApiService {
     String modelId,
   ) {
     final ov = _modelOverride(cfg, modelId);
-    final list = (ov['headers'] as List?) ?? const <dynamic>[];
-    final out = <String, String>{};
+    final out = ModelOverridePayloadParser.customHeaders(ov);
     // AIhubmix promo header (opt-in per-provider)
     if (_isAihubmix(cfg) && cfg.aihubmixAppCodeEnabled == true) {
       out.putIfAbsent('APP-Code', () => _aihubmixAppCode);
-    }
-    for (final e in list) {
-      if (e is Map) {
-        final name = (e['name'] ?? e['key'] ?? '').toString().trim();
-        final value = (e['value'] ?? '').toString();
-        if (name.isNotEmpty) out[name] = value;
-      }
     }
     return out;
   }
 
   static dynamic _parseOverrideValue(String v) {
-    final s = v.trim();
-    if (s.isEmpty) return s;
-    if (s == 'true') return true;
-    if (s == 'false') return false;
-    if (s == 'null') return null;
-    final i = int.tryParse(s);
-    if (i != null) return i;
-    final d = double.tryParse(s);
-    if (d != null) return d;
-    if ((s.startsWith('{') && s.endsWith('}')) ||
-        (s.startsWith('[') && s.endsWith(']'))) {
-      try {
-        return jsonDecode(s);
-      } catch (_) {}
-    }
-    return v;
+    return ModelOverridePayloadParser.parseOverrideValue(v);
   }
 
   static Map<String, dynamic> _customBody(ProviderConfig cfg, String modelId) {
     final ov = _modelOverride(cfg, modelId);
-    final list = (ov['body'] as List?) ?? const <dynamic>[];
-    final out = <String, dynamic>{};
-    for (final e in list) {
-      if (e is Map) {
-        final key = (e['key'] ?? e['name'] ?? '').toString().trim();
-        final val = (e['value'] ?? '').toString();
-        if (key.isNotEmpty) out[key] = _parseOverrideValue(val);
-      }
-    }
-    return out;
+    return ModelOverridePayloadParser.customBody(ov);
   }
 
   static bool _isAihubmix(ProviderConfig cfg) {
@@ -164,41 +131,16 @@ class ChatApiService {
       ModelInfo(id: upstreamId, displayName: upstreamId),
     );
     final ov = _modelOverride(cfg, modelId);
-    ModelType? type;
-    final t = (ov['type'] as String?) ?? '';
-    if (t == 'embedding')
-      type = ModelType.embedding;
-    else if (t == 'chat')
-      type = ModelType.chat;
-    List<Modality>? input;
-    if (ov['input'] is List) {
-      input = [
-        for (final e in (ov['input'] as List))
-          (e.toString() == 'image' ? Modality.image : Modality.text),
-      ];
+    if (ov.isEmpty) return base;
+    try {
+      return ModelOverrideResolver.applyModelOverride(base, ov);
+    } catch (e, st) {
+      FlutterLogger.log(
+        '[ModelOverride] applyModelOverride failed: $e\n$st',
+        tag: 'ModelOverride',
+      );
+      return base;
     }
-    List<Modality>? output;
-    if (ov['output'] is List) {
-      output = [
-        for (final e in (ov['output'] as List))
-          (e.toString() == 'image' ? Modality.image : Modality.text),
-      ];
-    }
-    List<ModelAbility>? abilities;
-    if (ov['abilities'] is List) {
-      abilities = [
-        for (final e in (ov['abilities'] as List))
-          (e.toString() == 'reasoning'
-              ? ModelAbility.reasoning
-              : ModelAbility.tool),
-      ];
-    }
-    return base.copyWith(
-      type: type ?? base.type,
-      input: input ?? base.input,
-      output: output ?? base.output,
-      abilities: abilities ?? base.abilities,
-    );
   }
 
   static String _mimeFromPath(String path) {
@@ -5787,7 +5729,9 @@ class ChatApiService {
         if (roleRaw == 'system') {
           final s = (msg['content'] ?? '').toString();
           if (s.isNotEmpty) {
-            systemPrompt = systemPrompt.isEmpty ? s : (systemPrompt + '\n\n' + s);
+            systemPrompt = systemPrompt.isEmpty
+                ? s
+                : (systemPrompt + '\n\n' + s);
           }
           continue;
         }
@@ -5961,7 +5905,12 @@ class ChatApiService {
 
       Map<String, dynamic> baseBody = {
         'contents': contents,
-        if (systemPrompt.isNotEmpty) 'systemInstruction': {'parts': [{'text': systemPrompt}]},
+        if (systemPrompt.isNotEmpty)
+          'systemInstruction': {
+            'parts': [
+              {'text': systemPrompt},
+            ],
+          },
         if (temperature != null) 'temperature': temperature,
         if (topP != null) 'topP': topP,
         if (maxTokens != null)
@@ -6412,7 +6361,12 @@ class ChatApiService {
       };
       final body = <String, dynamic>{
         'contents': convo,
-        if (systemPrompt.isNotEmpty) 'systemInstruction': {'parts': [{'text': systemPrompt}]},
+        if (systemPrompt.isNotEmpty)
+          'systemInstruction': {
+            'parts': [
+              {'text': systemPrompt},
+            ],
+          },
         if (gen.isNotEmpty) 'generationConfig': gen,
         if (toolsArr.isNotEmpty) 'tools': toolsArr,
         if (shouldAttachToolConfig)

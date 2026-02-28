@@ -2303,6 +2303,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modelFetchInvertTooltip => 'Invert';
 
   @override
+  String get modelDetailSheetSaveFailedMessage =>
+      'Save failed. Please try again.';
+
+  @override
   String get modelDetailSheetAddBody => 'Add Body';
 
   @override

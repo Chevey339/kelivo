@@ -1,105 +1,95 @@
+export '../models/model_types.dart';
+
 import 'dart:convert';
 import 'dart:io' show HttpException;
 import 'package:http/http.dart' as http;
 import 'settings_provider.dart';
 import '../services/network/dio_http_client.dart';
 import '../services/api_key_manager.dart';
+import '../services/model_override_payload_parser.dart';
 import 'package:Kelivo/secrets/fallback.dart';
 import '../services/api/google_service_account_auth.dart';
-
-enum ModelType { chat, embedding }
-enum Modality { text, image }
-enum ModelAbility { tool, reasoning }
-
-class ModelInfo {
-  final String id;
-  final String displayName;
-  final ModelType type;
-  final List<Modality> input;
-  final List<Modality> output;
-  final List<ModelAbility> abilities;
-  ModelInfo({
-    required this.id,
-    required this.displayName,
-    this.type = ModelType.chat,
-    this.input = const [Modality.text],
-    this.output = const [Modality.text],
-    this.abilities = const [],
-  });
-
-  ModelInfo copyWith({
-    String? id,
-    String? displayName,
-    ModelType? type,
-    List<Modality>? input,
-    List<Modality>? output,
-    List<ModelAbility>? abilities,
-  }) => ModelInfo(
-        id: id ?? this.id,
-        displayName: displayName ?? this.displayName,
-        type: type ?? this.type,
-        input: input ?? this.input,
-        output: output ?? this.output,
-        abilities: abilities ?? this.abilities,
-      );
-}
+import '../models/model_types.dart';
 
 class ModelRegistry {
   // Updated model groups to reflect new series
   // Vision-capable models (text + image input)
   static final RegExp vision = RegExp(
-      // GPT family incl. 4o, 4.1, 5 (exclude gpt-5-chat), and OpenAI o* series
-      r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|o\d|gemini|claude|doubao.+1([-.])6|grok-4|step-3|intern-s1)',
-      caseSensitive: false);
+    // GPT family incl. 4o, 4.1, 5 (exclude gpt-5-chat), and OpenAI o* series
+    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|o\d|gemini|claude|doubao.+1([-.])6|grok-4|step-3|intern-s1)',
+    caseSensitive: false,
+  );
   // Tool-using models
   static final RegExp tool = RegExp(
-      (
-              r'(gpt-4o|gpt-4\.1|gpt-oss|gpt-5(?!-chat)|o\d|'
-              r'gemini|claude|'
-              r'qwen-?3|doubao.+1([-.])6|grok-4|kimi-k2|'
-              r'step-3|intern-s1|glm-4\.5|glm-4\.6|minimax-m2|'
-              r'deepseek-(?:r1|v3|chat|v3\.1|v3\.2)|'
-              r'deepseek-reasoner|'
-              r'mimo-v2-flash'
-              r')'
-          )
-          .replaceAll(' ', ''),
-      caseSensitive: false);
+    (r'(gpt-4o|gpt-4\.1|gpt-oss|gpt-5(?!-chat)|o\d|'
+            r'gemini|claude|'
+            r'qwen-?3|doubao.+1([-.])6|grok-4|kimi-k2|'
+            r'step-3|intern-s1|glm-4\.5|glm-4\.6|minimax-m2|'
+            r'deepseek-(?:r1|v3|chat|v3\.1|v3\.2)|'
+            r'deepseek-reasoner|'
+            r'mimo-v2-flash'
+            r')')
+        .replaceAll(' ', ''),
+    caseSensitive: false,
+  );
   static final RegExp reasoning = RegExp(
-      (
-              r'(gpt-oss|gpt-5(?!-chat)|o\d|'
-              r'gemini-(?:2\.5|3).*|gemini-(?:flash-latest|pro-latest)|'
-              r'gemini-3-pro-image-preview|'
-              r'claude|'
-              r'qwen-?3|doubao.+1([-.])6|grok-4|kimi-k2|'
-              r'step-3|intern-s1|glm-4\.5|glm-4\.6|minimax-m2|'
-              r'deepseek-(?:r1|v3\.1|v3\.2)|'
-              r'deepseek-reasoner|'
-              r'mimo-v2-flash'
-              r')'
-          )
-          .replaceAll(' ', ''),
-      caseSensitive: false);
+    (r'(gpt-oss|gpt-5(?!-chat)|o\d|'
+            r'gemini-(?:2\.5|3).*|gemini-(?:flash-latest|pro-latest)|'
+            r'gemini-3-pro-image-preview|'
+            r'claude|'
+            r'qwen-?3|doubao.+1([-.])6|grok-4|kimi-k2|'
+            r'step-3|intern-s1|glm-4\.5|glm-4\.6|minimax-m2|'
+            r'deepseek-(?:r1|v3\.1|v3\.2)|'
+            r'deepseek-reasoner|'
+            r'mimo-v2-flash'
+            r')')
+        .replaceAll(' ', ''),
+    caseSensitive: false,
+  );
+
+  static bool isLikelyEmbeddingId(String rawId) {
+    final id = rawId.toLowerCase();
+    return id.contains('embedding') ||
+        RegExp(r'(^|[-_/])embed(?:dings?)?([-.]|$)').hasMatch(id);
+  }
 
   static ModelInfo infer(ModelInfo base) {
     final id = base.id.toLowerCase();
     final inMods = <Modality>[...base.input];
     final outMods = <Modality>[...base.output];
     final ab = <ModelAbility>[...base.abilities];
+    final bool inferEmbeddingById = isLikelyEmbeddingId(id);
+    if (base.type == ModelType.embedding || inferEmbeddingById) {
+      if (!inMods.contains(Modality.text)) inMods.add(Modality.text);
+      outMods
+        ..clear()
+        ..add(Modality.text);
+      ab.clear();
+      return base.copyWith(
+        type: ModelType.embedding,
+        input: inMods,
+        output: outMods,
+        abilities: ab,
+      );
+    }
     // If model id contains 'image', treat it as an image model:
     // - Input and output both include image
     // - No tool or reasoning abilities
     if (id.contains('image')) {
       if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
       if (!outMods.contains(Modality.image)) outMods.add(Modality.image);
-      ab.removeWhere((x) => x == ModelAbility.tool || x == ModelAbility.reasoning);
+      ab.removeWhere(
+        (x) => x == ModelAbility.tool || x == ModelAbility.reasoning,
+      );
       return base.copyWith(input: inMods, output: outMods, abilities: ab);
     }
     if (vision.hasMatch(id)) {
       if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
     }
-    if (tool.hasMatch(id) && !ab.contains(ModelAbility.tool)) ab.add(ModelAbility.tool);
-    if (reasoning.hasMatch(id) && !ab.contains(ModelAbility.reasoning)) ab.add(ModelAbility.reasoning);
+    if (tool.hasMatch(id) && !ab.contains(ModelAbility.tool))
+      ab.add(ModelAbility.tool);
+    if (reasoning.hasMatch(id) && !ab.contains(ModelAbility.reasoning))
+      ab.add(ModelAbility.reasoning);
     return base.copyWith(input: inMods, output: outMods, abilities: ab);
   }
 }
@@ -146,7 +136,12 @@ class OpenAIProvider extends BaseProvider {
         return [
           for (final e in data)
             if (e is Map && e['id'] is String)
-              ModelRegistry.infer(ModelInfo(id: e['id'] as String, displayName: e['id'] as String))
+              ModelRegistry.infer(
+                ModelInfo(
+                  id: e['id'] as String,
+                  displayName: e['id'] as String,
+                ),
+              ),
         ];
       }
       return [];
@@ -164,9 +159,7 @@ class ClaudeProvider extends BaseProvider {
     final client = _Http.clientFor(cfg);
     try {
       final uri = Uri.parse('${cfg.baseUrl}/models');
-      final headers = <String, String>{
-        'anthropic-version': anthropicVersion,
-      };
+      final headers = <String, String>{'anthropic-version': anthropicVersion};
       if (key.isNotEmpty) headers['x-api-key'] = key;
       final res = await client.get(uri, headers: headers);
       if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -175,10 +168,13 @@ class ClaudeProvider extends BaseProvider {
         return [
           for (final e in data)
             if (e is Map && e['id'] is String)
-              ModelRegistry.infer(ModelInfo(
-                id: e['id'] as String,
-                displayName: (e['display_name'] as String?) ?? (e['id'] as String),
-              ))
+              ModelRegistry.infer(
+                ModelInfo(
+                  id: e['id'] as String,
+                  displayName:
+                      (e['display_name'] as String?) ?? (e['id'] as String),
+                ),
+              ),
         ];
       }
       return [];
@@ -190,12 +186,16 @@ class ClaudeProvider extends BaseProvider {
 
 class GoogleProvider extends BaseProvider {
   String _buildUrl(ProviderConfig cfg) {
-    if (cfg.vertexAI == true && (cfg.location?.isNotEmpty == true) && (cfg.projectId?.isNotEmpty == true)) {
+    if (cfg.vertexAI == true &&
+        (cfg.location?.isNotEmpty == true) &&
+        (cfg.projectId?.isNotEmpty == true)) {
       final loc = cfg.location!;
       final proj = cfg.projectId!;
       return 'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models';
     }
-    final base = cfg.baseUrl.endsWith('/') ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1) : cfg.baseUrl;
+    final base = cfg.baseUrl.endsWith('/')
+        ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
+        : cfg.baseUrl;
     return '$base/models';
   }
 
@@ -209,7 +209,9 @@ class GoogleProvider extends BaseProvider {
         final jsonStr = (cfg.serviceAccountJson ?? '').trim();
         if (jsonStr.isNotEmpty) {
           try {
-            final token = await GoogleServiceAccountAuth.getAccessTokenFromJson(jsonStr);
+            final token = await GoogleServiceAccountAuth.getAccessTokenFromJson(
+              jsonStr,
+            );
             headers['Authorization'] = 'Bearer $token';
             final proj = (cfg.projectId ?? '').trim();
             if (proj.isNotEmpty) headers['X-Goog-User-Project'] = proj;
@@ -235,15 +237,29 @@ class GoogleProvider extends BaseProvider {
         for (final e in arr) {
           if (e is Map) {
             final name = (e['name'] as String?) ?? '';
-            final id = name.startsWith('models/') ? name.substring('models/'.length) : name;
+            final id = name.startsWith('models/')
+                ? name.substring('models/'.length)
+                : name;
             final displayName = (e['displayName'] as String?) ?? id;
-            final methods = (e['supportedGenerationMethods'] as List?)?.map((m) => m.toString()).toSet() ?? {};
-            if (!(methods.contains('generateContent') || methods.contains('embedContent'))) continue;
-            out.add(ModelRegistry.infer(ModelInfo(
-              id: id,
-              displayName: displayName,
-              type: methods.contains('generateContent') ? ModelType.chat : ModelType.embedding,
-            )));
+            final methods =
+                (e['supportedGenerationMethods'] as List?)
+                    ?.map((m) => m.toString())
+                    .toSet() ??
+                {};
+            if (!(methods.contains('generateContent') ||
+                methods.contains('embedContent')))
+              continue;
+            out.add(
+              ModelRegistry.infer(
+                ModelInfo(
+                  id: id,
+                  displayName: displayName,
+                  type: methods.contains('generateContent')
+                      ? ModelType.chat
+                      : ModelType.embedding,
+                ),
+              ),
+            );
           }
         }
         return out;
@@ -265,58 +281,33 @@ class ProviderManager {
     } catch (_) {}
     return cfg.apiKey;
   }
+
   // Per-model override helpers (duplicated logic from ChatApiService)
-  static Map<String, dynamic> _modelOverride(ProviderConfig cfg, String modelId) {
-    final ov = cfg.modelOverrides[modelId];
-    if (ov is Map<String, dynamic>) return ov;
-    return const <String, dynamic>{};
+  static Map<String, dynamic> _modelOverride(
+    ProviderConfig cfg,
+    String modelId,
+  ) {
+    return ModelOverridePayloadParser.modelOverride(cfg.modelOverrides, modelId);
   }
 
-  static Map<String, String> _customHeaders(ProviderConfig cfg, String modelId) {
+  static Map<String, String> _customHeaders(
+    ProviderConfig cfg,
+    String modelId,
+  ) {
     final ov = _modelOverride(cfg, modelId);
-    final list = (ov['headers'] as List?) ?? const <dynamic>[];
-    final out = <String, String>{};
-    for (final e in list) {
-      if (e is Map) {
-        final name = (e['name'] ?? e['key'] ?? '').toString().trim();
-        final value = (e['value'] ?? '').toString();
-        if (name.isNotEmpty) out[name] = value;
-      }
-    }
-    return out;
-  }
-
-  static dynamic _parseOverrideValue(String v) {
-    final s = v.trim();
-    if (s.isEmpty) return s;
-    if (s == 'true') return true;
-    if (s == 'false') return false;
-    if (s == 'null') return null;
-    final i = int.tryParse(s);
-    if (i != null) return i;
-    final d = double.tryParse(s);
-    if (d != null) return d;
-    if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
-      try { return jsonDecode(s); } catch (_) {}
-    }
-    return v;
+    return ModelOverridePayloadParser.customHeaders(ov);
   }
 
   static Map<String, dynamic> _customBody(ProviderConfig cfg, String modelId) {
     final ov = _modelOverride(cfg, modelId);
-    final list = (ov['body'] as List?) ?? const <dynamic>[];
-    final out = <String, dynamic>{};
-    for (final e in list) {
-      if (e is Map) {
-        final key = (e['key'] ?? e['name'] ?? '').toString().trim();
-        final val = (e['value'] ?? '').toString();
-        if (key.isNotEmpty) out[key] = _parseOverrideValue(val);
-      }
-    }
-    return out;
+    return ModelOverridePayloadParser.customBody(ov);
   }
+
   static BaseProvider forConfig(ProviderConfig cfg) {
-    final kind = ProviderConfig.classify(cfg.id, explicitType: cfg.providerType);
+    final kind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
     switch (kind) {
       case ProviderKind.google:
         return GoogleProvider();
@@ -332,32 +323,45 @@ class ProviderManager {
     return forConfig(cfg).listModels(cfg);
   }
 
-  static Future<void> testConnection(ProviderConfig cfg, String modelId, {bool useStream = false}) async {
-    final kind = ProviderConfig.classify(cfg.id, explicitType: cfg.providerType);
+  static Future<void> testConnection(
+    ProviderConfig cfg,
+    String modelId, {
+    bool useStream = false,
+  }) async {
+    final kind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
     final client = _Http.clientFor(cfg);
     try {
       if (kind == ProviderKind.openai) {
-        final base = cfg.baseUrl.endsWith('/') ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1) : cfg.baseUrl;
-        final path = (cfg.useResponseApi == true) ? '/responses' : (cfg.chatPath ?? '/chat/completions');
+        final base = cfg.baseUrl.endsWith('/')
+            ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
+            : cfg.baseUrl;
+        final path = (cfg.useResponseApi == true)
+            ? '/responses'
+            : (cfg.chatPath ?? '/chat/completions');
         final url = Uri.parse('$base$path');
         final ov = _modelOverride(cfg, modelId);
         String upstreamId = modelId;
         try {
-          final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+          final raw = (ov['apiModelId'] ?? ov['api_model_id'])
+              ?.toString()
+              .trim();
           if (raw != null && raw.isNotEmpty) upstreamId = raw;
         } catch (_) {}
         final body = cfg.useResponseApi == true
             ? {
                 'model': upstreamId,
                 'input': [
-                  {'role': 'user', 'content': 'hello'}
+                  {'role': 'user', 'content': 'hello'},
                 ],
                 if (useStream) 'stream': true,
               }
             : {
                 'model': upstreamId,
                 'messages': [
-                  {'role': 'user', 'content': 'hello'}
+                  {'role': 'user', 'content': 'hello'},
                 ],
                 if (useStream) 'stream': true,
               };
@@ -371,8 +375,9 @@ class ProviderManager {
           if ((cfg.id) == 'SiliconFlow') {
             final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
             if (host.contains('siliconflow') && apiKey.trim().isEmpty) {
-              final m = modelId.toLowerCase();
-              final allowed = m == 'thudm/glm-4-9b-0414' || m == 'qwen/qwen3-8b';
+              final m = upstreamId.toLowerCase();
+              final allowed =
+                  m == 'thudm/glm-4-9b-0414' || m == 'qwen/qwen3-8b';
               final fb = siliconflowFallbackKey.trim();
               if (allowed && fb.isNotEmpty) apiKey = fb;
             }
@@ -383,7 +388,11 @@ class ProviderManager {
           'Content-Type': 'application/json',
         };
         headers.addAll(_customHeaders(cfg, modelId));
-        final res = await client.post(url, headers: headers, body: jsonEncode(body));
+        final res = await client.post(
+          url,
+          headers: headers,
+          body: jsonEncode(body),
+        );
         if (res.statusCode < 200 || res.statusCode >= 300) {
           throw HttpException('HTTP ${res.statusCode}: ${res.body}');
         }
@@ -394,36 +403,41 @@ class ProviderManager {
             throw HttpException('Stream response expected but not received');
           }
         }
-        return;
-      } else if (kind == ProviderKind.claude) {
-        final base = cfg.baseUrl.endsWith('/') ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1) : cfg.baseUrl;
+      return;
+    } else if (kind == ProviderKind.claude) {
+        final base = cfg.baseUrl.endsWith('/')
+            ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
+            : cfg.baseUrl;
         final url = Uri.parse('$base/messages');
         final ov = _modelOverride(cfg, modelId);
         String upstreamId = modelId;
         try {
-          final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+          final raw = (ov['apiModelId'] ?? ov['api_model_id'])
+              ?.toString()
+              .trim();
           if (raw != null && raw.isNotEmpty) upstreamId = raw;
         } catch (_) {}
         final body = {
           'model': upstreamId,
           'max_tokens': 8,
           'messages': [
-            {
-              'role': 'user',
-              'content': 'hello',
-            }
+            {'role': 'user', 'content': 'hello'},
           ],
           if (useStream) 'stream': true,
         };
         final extra = _customBody(cfg, modelId);
         if (extra.isNotEmpty) (body as Map<String, dynamic>).addAll(extra);
         final headers = <String, String>{
-          'x-api-key': cfg.apiKey,
+          'x-api-key': _effectiveApiKey(cfg),
           'anthropic-version': ClaudeProvider.anthropicVersion,
           'Content-Type': 'application/json',
         };
         headers.addAll(_customHeaders(cfg, modelId));
-        final res = await client.post(url, headers: headers, body: jsonEncode(body));
+        final res = await client.post(
+          url,
+          headers: headers,
+          body: jsonEncode(body),
+        );
         if (res.statusCode < 200 || res.statusCode >= 300) {
           throw HttpException('HTTP ${res.statusCode}: ${res.body}');
         }
@@ -441,36 +455,49 @@ class ProviderManager {
         // Resolve upstream/api model id for this logical key when present.
         String upstreamId = modelId;
         try {
-          final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+          final raw = (ov['apiModelId'] ?? ov['api_model_id'])
+              ?.toString()
+              .trim();
           if (raw != null && raw.isNotEmpty) upstreamId = raw;
         } catch (_) {}
 
         String url;
-        final endpoint = useStream ? 'streamGenerateContent' : 'generateContent';
-        if (cfg.vertexAI == true && (cfg.location?.isNotEmpty == true) && (cfg.projectId?.isNotEmpty == true)) {
+        final endpoint = useStream
+            ? 'streamGenerateContent'
+            : 'generateContent';
+        if (cfg.vertexAI == true &&
+            (cfg.location?.isNotEmpty == true) &&
+            (cfg.projectId?.isNotEmpty == true)) {
           final loc = cfg.location!;
           final proj = cfg.projectId!;
-          url = 'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$upstreamId:$endpoint';
+          url =
+              'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$upstreamId:$endpoint';
         } else {
-          final base = cfg.baseUrl.endsWith('/') ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1) : cfg.baseUrl;
+          final base = cfg.baseUrl.endsWith('/')
+              ? cfg.baseUrl.substring(0, cfg.baseUrl.length - 1)
+              : cfg.baseUrl;
           url = '$base/models/$upstreamId:$endpoint';
         }
         // Determine if model outputs images (override wins; otherwise inference)
         bool wantsImageOutput = false;
         if (ov['output'] is List) {
-          final outList = (ov['output'] as List).map((e) => e.toString().toLowerCase()).toList();
+          final outList = (ov['output'] as List)
+              .map((e) => e.toString().toLowerCase())
+              .toList();
           wantsImageOutput = outList.contains('image');
         } else {
-          wantsImageOutput = ModelRegistry.infer(ModelInfo(id: upstreamId, displayName: upstreamId)).output.contains(Modality.image);
+          wantsImageOutput = ModelRegistry.infer(
+            ModelInfo(id: upstreamId, displayName: upstreamId),
+          ).output.contains(Modality.image);
         }
         final body = {
           'contents': [
             {
               'role': 'user',
               'parts': [
-                {'text': 'hello'}
-              ]
-            }
+                {'text': 'hello'},
+              ],
+            },
           ],
           if (wantsImageOutput)
             'generationConfig': {
@@ -478,25 +505,33 @@ class ProviderManager {
             },
         };
         final headers = <String, String>{'Content-Type': 'application/json'};
+        final effectiveKey = _effectiveApiKey(cfg);
         if (cfg.vertexAI == true) {
           final jsonStr = (cfg.serviceAccountJson ?? '').trim();
           if (jsonStr.isNotEmpty) {
             try {
-              final token = await GoogleServiceAccountAuth.getAccessTokenFromJson(jsonStr);
+              final token =
+                  await GoogleServiceAccountAuth.getAccessTokenFromJson(
+                    jsonStr,
+                  );
               headers['Authorization'] = 'Bearer $token';
             } catch (_) {}
-          } else if (cfg.apiKey.isNotEmpty) {
-            headers['Authorization'] = 'Bearer ${cfg.apiKey}';
+          } else if (effectiveKey.isNotEmpty) {
+            headers['Authorization'] = 'Bearer $effectiveKey';
           }
         } else {
-          if (cfg.apiKey.isNotEmpty) {
-            headers['x-goog-api-key'] = cfg.apiKey;
+          if (effectiveKey.isNotEmpty) {
+            headers['x-goog-api-key'] = effectiveKey;
           }
         }
         headers.addAll(_customHeaders(cfg, modelId));
         final extra = _customBody(cfg, modelId);
         if (extra.isNotEmpty) (body as Map<String, dynamic>).addAll(extra);
-        final res = await client.post(Uri.parse(url), headers: headers, body: jsonEncode(body));
+        final res = await client.post(
+          Uri.parse(url),
+          headers: headers,
+          body: jsonEncode(body),
+        );
         if (res.statusCode < 200 || res.statusCode >= 300) {
           throw HttpException('HTTP ${res.statusCode}: ${res.body}');
         }

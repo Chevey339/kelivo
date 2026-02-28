@@ -7,7 +7,7 @@ class ModelGrouping {
     required String otherLabel,
   }) {
     final id = m.id.toLowerCase();
-    if (m.type == ModelType.embedding || id.contains('embedding') || id.contains('embed')) {
+    if (m.type == ModelType.embedding || ModelRegistry.isLikelyEmbeddingId(id)) {
       return embeddingsLabel;
     }
     if (id.contains('gpt') || RegExp(r'(^|[^a-z])o[134]').hasMatch(id)) return 'GPT';
@@ -32,4 +32,3 @@ class ModelGrouping {
     return otherLabel;
   }
 }
-
