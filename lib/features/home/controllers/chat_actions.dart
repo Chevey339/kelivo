@@ -83,7 +83,7 @@ class ChatActions {
 
   /// Called when stream content is updated (for throttled updates).
   void Function(String messageId, String content, int totalTokens)?
-      onContentUpdated;
+  onContentUpdated;
 
   /// Called when an error occurs during streaming.
   void Function(String error)? onStreamError;
@@ -96,7 +96,7 @@ class ChatActions {
 
   /// Called to schedule inline image sanitization.
   void Function(String messageId, String content, {bool immediate})?
-      onScheduleImageSanitize;
+  onScheduleImageSanitize;
 
   /// Called when streaming finishes.
   VoidCallback? onStreamFinished;
@@ -112,6 +112,12 @@ class ChatActions {
   // ============================================================================
 
   List<ChatMessage> get _messages => chatController.messages;
+  List<ChatMessage> get _allMessagesForApi {
+    final conversationId = _currentConversation?.id;
+    if (conversationId == null) return _messages;
+    return chatController.chatService.getMessages(conversationId);
+  }
+
   Map<String, int> get _versionSelections => chatController.versionSelections;
   Conversation? get _currentConversation => chatController.currentConversation;
   Set<String> get _loadingConversationIds =>
@@ -133,8 +139,10 @@ class ChatActions {
   }
 
   /// Transform raw content using assistant regexes.
-  String _transformAssistantContent(stream_ctrl.StreamingState state,
-      [String? raw]) {
+  String _transformAssistantContent(
+    stream_ctrl.StreamingState state, [
+    String? raw,
+  ]) {
     return applyAssistantRegexes(
       raw ?? state.fullContentRaw,
       assistant: state.ctx.assistant,
@@ -167,10 +175,14 @@ class ChatActions {
     }
 
     final settings = contextProvider.read<SettingsProvider>();
-    final assistant = contextProvider.read<AssistantProvider>().currentAssistant;
+    final assistant = contextProvider
+        .read<AssistantProvider>()
+        .currentAssistant;
     final assistantId = assistant?.id;
-    final modelConfig =
-        messageGenerationService.getModelConfig(settings, assistant);
+    final modelConfig = messageGenerationService.getModelConfig(
+      settings,
+      assistant,
+    );
 
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
       return ChatActionResult.noModel();
@@ -190,12 +202,12 @@ class ChatActions {
     _setConversationLoading(conversation.id, true);
 
     // Create assistant message placeholder
-    final assistantMessage =
-        await messageGenerationService.createAssistantPlaceholder(
-      conversationId: conversation.id,
-      modelId: modelId,
-      providerKey: providerKey,
-    );
+    final assistantMessage = await messageGenerationService
+        .createAssistantPlaceholder(
+          conversationId: conversation.id,
+          modelId: modelId,
+          providerKey: providerKey,
+        );
 
     // Pre-create streaming notifier BEFORE adding message to list
     // so that MessageListView can detect it's streaming on first render
@@ -207,26 +219,32 @@ class ChatActions {
     // Reset tool parts and initialize reasoning
     streamController.toolParts.remove(assistantMessage.id);
     final supportsReasoning = _isReasoningModel(providerKey, modelId);
-    final enableReasoning = supportsReasoning &&
-        _isReasoningEnabled(assistant?.thinkingBudget ?? settings.thinkingBudget);
+    final enableReasoning =
+        supportsReasoning &&
+        _isReasoningEnabled(
+          assistant?.thinkingBudget ?? settings.thinkingBudget,
+        );
     await messageGenerationService.initializeReasoningState(
-        messageId: assistantMessage.id, enableReasoning: enableReasoning);
+      messageId: assistantMessage.id,
+      enableReasoning: enableReasoning,
+    );
 
     // Prepare API messages
     messageGenerationService.onFileProcessingStarted = onFileProcessingStarted;
-    messageGenerationService.onFileProcessingFinished = onFileProcessingFinished;
+    messageGenerationService.onFileProcessingFinished =
+        onFileProcessingFinished;
     try {
-      final prepared =
-          await messageGenerationService.prepareApiMessagesWithInjections(
-        messages: _messages,
-        versionSelections: _versionSelections,
-        currentConversation: conversation,
-        settings: settings,
-        assistant: assistant,
-        assistantId: assistantId,
-        providerKey: providerKey,
-        modelId: modelId,
-      );
+      final prepared = await messageGenerationService
+          .prepareApiMessagesWithInjections(
+            messages: _allMessagesForApi,
+            versionSelections: _versionSelections,
+            currentConversation: conversation,
+            settings: settings,
+            assistant: assistant,
+            assistantId: assistantId,
+            providerKey: providerKey,
+            modelId: modelId,
+          );
 
       // Build user image paths
       final userImagePaths = messageGenerationService.buildUserImagePaths(
@@ -305,10 +323,14 @@ class ChatActions {
 
     // Get model config
     final settings = contextProvider.read<SettingsProvider>();
-    final assistant = contextProvider.read<AssistantProvider>().currentAssistant;
+    final assistant = contextProvider
+        .read<AssistantProvider>()
+        .currentAssistant;
     final assistantId = assistant?.id;
-    final modelConfig =
-        messageGenerationService.getModelConfig(settings, assistant);
+    final modelConfig = messageGenerationService.getModelConfig(
+      settings,
+      assistant,
+    );
 
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
       return ChatActionResult.noModel();
@@ -317,14 +339,14 @@ class ChatActions {
     final modelId = modelConfig.modelId!;
 
     // Create assistant message placeholder (new version)
-    final assistantMessage =
-        await messageGenerationService.createAssistantPlaceholder(
-      conversationId: conversation.id,
-      modelId: modelId,
-      providerKey: providerKey,
-      groupId: versioning.targetGroupId,
-      version: versioning.nextVersion,
-    );
+    final assistantMessage = await messageGenerationService
+        .createAssistantPlaceholder(
+          conversationId: conversation.id,
+          modelId: modelId,
+          providerKey: providerKey,
+          groupId: versioning.targetGroupId,
+          version: versioning.nextVersion,
+        );
 
     // Pre-create streaming notifier BEFORE adding message to list
     // so that MessageListView can detect it's streaming on first render
@@ -334,7 +356,10 @@ class ChatActions {
     final gid = assistantMessage.groupId ?? assistantMessage.id;
     _versionSelections[gid] = assistantMessage.version;
     await chatService.setSelectedVersion(
-        conversation.id, gid, assistantMessage.version);
+      conversation.id,
+      gid,
+      assistantMessage.version,
+    );
 
     _messages.add(assistantMessage);
     onMessagesChanged?.call();
@@ -343,23 +368,28 @@ class ChatActions {
 
     // Initialize reasoning
     final supportsReasoning = _isReasoningModel(providerKey, modelId);
-    final enableReasoning = supportsReasoning &&
-        _isReasoningEnabled(assistant?.thinkingBudget ?? settings.thinkingBudget);
+    final enableReasoning =
+        supportsReasoning &&
+        _isReasoningEnabled(
+          assistant?.thinkingBudget ?? settings.thinkingBudget,
+        );
     await messageGenerationService.initializeReasoningState(
-        messageId: assistantMessage.id, enableReasoning: enableReasoning);
+      messageId: assistantMessage.id,
+      enableReasoning: enableReasoning,
+    );
 
     // Prepare API messages
-    final prepared =
-        await messageGenerationService.prepareApiMessagesWithInjections(
-      messages: _messages,
-      versionSelections: _versionSelections,
-      currentConversation: conversation,
-      settings: settings,
-      assistant: assistant,
-      assistantId: assistantId,
-      providerKey: providerKey,
-      modelId: modelId,
-    );
+    final prepared = await messageGenerationService
+        .prepareApiMessagesWithInjections(
+          messages: _allMessagesForApi,
+          versionSelections: _versionSelections,
+          currentConversation: conversation,
+          settings: settings,
+          assistant: assistant,
+          assistantId: assistantId,
+          providerKey: providerKey,
+          modelId: modelId,
+        );
 
     // Build user image paths
     final userImagePaths = messageGenerationService.buildUserImagePaths(
@@ -394,7 +424,7 @@ class ChatActions {
   Future<void> cancelStreaming(Conversation? conversation) async {
     final cid = conversation?.id;
     if (cid == null) return;
-    
+
     // Reset file processing state on cancel
     onFileProcessingFinished?.call();
 
@@ -433,24 +463,28 @@ class ChatActions {
       // Use unified reasoning completion method
       await streamController.finishReasoningAndPersist(
         streaming.id,
-        updateReasoningInDb: (
-          String messageId, {
-          String? reasoningText,
-          DateTime? reasoningFinishedAt,
-          String? reasoningSegmentsJson,
-        }) async {
-          await chatService.updateMessage(
-            messageId,
-            reasoningText: reasoningText,
-            reasoningFinishedAt: reasoningFinishedAt,
-            reasoningSegmentsJson: reasoningSegmentsJson,
-          );
-        },
+        updateReasoningInDb:
+            (
+              String messageId, {
+              String? reasoningText,
+              DateTime? reasoningFinishedAt,
+              String? reasoningSegmentsJson,
+            }) async {
+              await chatService.updateMessage(
+                messageId,
+                reasoningText: reasoningText,
+                reasoningFinishedAt: reasoningFinishedAt,
+                reasoningSegmentsJson: reasoningSegmentsJson,
+              );
+            },
       );
 
       // If streaming output included inline base64 images, sanitize them even on manual cancel
-      onScheduleImageSanitize?.call(streaming.id, streaming.content,
-          immediate: true);
+      onScheduleImageSanitize?.call(
+        streaming.id,
+        streaming.content,
+        immediate: true,
+      );
     } else {
       _setConversationLoading(cid, false);
     }
@@ -475,7 +509,8 @@ class ChatActions {
         modelId: ctx.modelId,
         messages: ctx.apiMessages,
         userImagePaths: ctx.userImagePaths,
-        thinkingBudget: assistant?.thinkingBudget ?? ctx.settings.thinkingBudget,
+        thinkingBudget:
+            assistant?.thinkingBudget ?? ctx.settings.thinkingBudget,
         temperature: assistant?.temperature,
         topP: assistant?.topP,
         maxTokens: assistant?.maxTokens,
@@ -506,10 +541,14 @@ class ChatActions {
 
   /// Dispatch stream chunk to appropriate handler.
   Future<void> _handleStreamChunk(
-      ChatStreamChunk chunk, stream_ctrl.StreamingState state) async {
+    ChatStreamChunk chunk,
+    stream_ctrl.StreamingState state,
+  ) async {
     final chunkContent = chunk.content.isNotEmpty
         ? streamController.captureGeminiThoughtSignature(
-            chunk.content, state.messageId)
+            chunk.content,
+            state.messageId,
+          )
         : '';
 
     // Handle reasoning
@@ -537,41 +576,49 @@ class ChatActions {
 
   /// Handle reasoning chunk from stream.
   Future<void> _handleReasoningChunk(
-      ChatStreamChunk chunk, stream_ctrl.StreamingState state) async {
+    ChatStreamChunk chunk,
+    stream_ctrl.StreamingState state,
+  ) async {
     await streamController.handleReasoningChunk(
       chunk,
       state,
-      updateReasoningInDb: (
-        String messageId, {
-        String? reasoningText,
-        DateTime? reasoningStartAt,
-        String? reasoningSegmentsJson,
-      }) async {
-        // Use silent update during streaming to avoid UI rebuilds
-        await chatService.updateMessageSilent(
-          messageId,
-          reasoningText: reasoningText,
-          reasoningStartAt: reasoningStartAt,
-          reasoningSegmentsJson: reasoningSegmentsJson,
-        );
-      },
+      updateReasoningInDb:
+          (
+            String messageId, {
+            String? reasoningText,
+            DateTime? reasoningStartAt,
+            String? reasoningSegmentsJson,
+          }) async {
+            // Use silent update during streaming to avoid UI rebuilds
+            await chatService.updateMessageSilent(
+              messageId,
+              reasoningText: reasoningText,
+              reasoningStartAt: reasoningStartAt,
+              reasoningSegmentsJson: reasoningSegmentsJson,
+            );
+          },
     );
   }
 
   /// Handle tool calls chunk from stream.
   Future<void> _handleToolCallsChunk(
-      ChatStreamChunk chunk, stream_ctrl.StreamingState state) async {
+    ChatStreamChunk chunk,
+    stream_ctrl.StreamingState state,
+  ) async {
     await streamController.handleToolCallsChunk(
       chunk,
       state,
       updateReasoningSegmentsInDb: (String messageId, String json) async {
         // Use silent update during streaming to avoid UI rebuilds
-        await chatService.updateMessageSilent(messageId, reasoningSegmentsJson: json);
+        await chatService.updateMessageSilent(
+          messageId,
+          reasoningSegmentsJson: json,
+        );
       },
       setToolEventsInDb:
           (String messageId, List<Map<String, dynamic>> events) async {
-        await chatService.setToolEvents(messageId, events);
-      },
+            await chatService.setToolEvents(messageId, events);
+          },
       getToolEventsFromDb: (String messageId) =>
           chatService.getToolEvents(messageId),
     );
@@ -579,31 +626,37 @@ class ChatActions {
 
   /// Handle tool results chunk from stream.
   Future<void> _handleToolResultsChunk(
-      ChatStreamChunk chunk, stream_ctrl.StreamingState state) async {
+    ChatStreamChunk chunk,
+    stream_ctrl.StreamingState state,
+  ) async {
     await streamController.handleToolResultsChunk(
       chunk,
       state,
-      upsertToolEventInDb: (
-        String messageId, {
-        required String id,
-        required String name,
-        required Map<String, dynamic> arguments,
-        String? content,
-      }) async {
-        await chatService.upsertToolEvent(
-          messageId,
-          id: id,
-          name: name,
-          arguments: arguments,
-          content: content,
-        );
-      },
+      upsertToolEventInDb:
+          (
+            String messageId, {
+            required String id,
+            required String name,
+            required Map<String, dynamic> arguments,
+            String? content,
+          }) async {
+            await chatService.upsertToolEvent(
+              messageId,
+              id: id,
+              name: name,
+              arguments: arguments,
+              content: content,
+            );
+          },
     );
   }
 
   /// Handle content chunk from stream (non-done).
-  Future<void> _handleContentChunk(ChatStreamChunk chunk,
-      stream_ctrl.StreamingState state, String chunkContent) async {
+  Future<void> _handleContentChunk(
+    ChatStreamChunk chunk,
+    stream_ctrl.StreamingState state,
+    String chunkContent,
+  ) async {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
 
@@ -620,8 +673,10 @@ class ChatActions {
     if (streamingProcessed.contains('data:image') &&
         streamingProcessed.contains('base64,')) {
       try {
-        final sanitized = await MarkdownMediaSanitizer.replaceInlineBase64Images(
-            streamingProcessed);
+        final sanitized =
+            await MarkdownMediaSanitizer.replaceInlineBase64Images(
+              streamingProcessed,
+            );
         if (sanitized != streamingProcessed) {
           streamingProcessed = sanitized;
           state.fullContentRaw = sanitized;
@@ -630,8 +685,11 @@ class ChatActions {
         // ignore
       }
     }
-    onScheduleImageSanitize?.call(messageId, streamingProcessed,
-        immediate: true);
+    onScheduleImageSanitize?.call(
+      messageId,
+      streamingProcessed,
+      immediate: true,
+    );
     // Use silent update to avoid triggering ChatService.notifyListeners()
     // which would cause side_drawer and other widgets to rebuild
     await chatService.updateMessageSilent(
@@ -640,8 +698,7 @@ class ChatActions {
       totalTokens: state.totalTokens,
     );
 
-    if (state.ctx.streamOutput &&
-        _currentConversation?.id == conversationId) {
+    if (state.ctx.streamOutput && _currentConversation?.id == conversationId) {
       final index = _messages.indexWhere((m) => m.id == messageId);
       if (index != -1) {
         _messages[index] = _messages[index].copyWith(
@@ -676,29 +733,34 @@ class ChatActions {
 
   /// Finish reasoning segment when content starts arriving.
   Future<void> _finishReasoningOnContent(
-      stream_ctrl.StreamingState state) async {
+    stream_ctrl.StreamingState state,
+  ) async {
     await streamController.finishReasoningAndPersist(
       state.messageId,
-      updateReasoningInDb: (
-        String messageId, {
-        String? reasoningText,
-        DateTime? reasoningFinishedAt,
-        String? reasoningSegmentsJson,
-      }) async {
-        // Use silent update during streaming to avoid UI rebuilds
-        await chatService.updateMessageSilent(
-          messageId,
-          reasoningText: reasoningText,
-          reasoningFinishedAt: reasoningFinishedAt,
-          reasoningSegmentsJson: reasoningSegmentsJson,
-        );
-      },
+      updateReasoningInDb:
+          (
+            String messageId, {
+            String? reasoningText,
+            DateTime? reasoningFinishedAt,
+            String? reasoningSegmentsJson,
+          }) async {
+            // Use silent update during streaming to avoid UI rebuilds
+            await chatService.updateMessageSilent(
+              messageId,
+              reasoningText: reasoningText,
+              reasoningFinishedAt: reasoningFinishedAt,
+              reasoningSegmentsJson: reasoningSegmentsJson,
+            );
+          },
     );
   }
 
   /// Handle stream finish (isDone == true).
-  Future<void> _handleStreamFinish(ChatStreamChunk chunk,
-      stream_ctrl.StreamingState state, String chunkContent) async {
+  Future<void> _handleStreamFinish(
+    ChatStreamChunk chunk,
+    stream_ctrl.StreamingState state,
+    String chunkContent,
+  ) async {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
 
@@ -736,8 +798,9 @@ class ChatActions {
         reasoningStartAt: startAt,
         reasoningFinishedAt: now,
       );
-      final autoCollapse =
-          contextProvider.read<SettingsProvider>().autoCollapseThinking;
+      final autoCollapse = contextProvider
+          .read<SettingsProvider>()
+          .autoCollapseThinking;
       streamController.reasoning[messageId] = stream_ctrl.ReasoningData()
         ..text = state.bufferedReasoning
         ..startAt = startAt
@@ -760,8 +823,10 @@ class ChatActions {
   }
 
   /// Finish streaming and persist final state.
-  Future<void> _finishStreaming(stream_ctrl.StreamingState state,
-      {bool generateTitle = true}) async {
+  Future<void> _finishStreaming(
+    stream_ctrl.StreamingState state, {
+    bool generateTitle = true,
+  }) async {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
 
@@ -788,7 +853,9 @@ class ChatActions {
     // Replace extremely long inline base64 images with local files to avoid jank
     final processedContent = _transformAssistantContent(state);
     final sanitizedContent =
-        await MarkdownMediaSanitizer.replaceInlineBase64Images(processedContent);
+        await MarkdownMediaSanitizer.replaceInlineBase64Images(
+          processedContent,
+        );
     await chatService.updateMessage(
       messageId,
       content: sanitizedContent,
@@ -810,19 +877,20 @@ class ChatActions {
     // Use unified reasoning completion method
     await streamController.finishReasoningAndPersist(
       messageId,
-      updateReasoningInDb: (
-        String messageId, {
-        String? reasoningText,
-        DateTime? reasoningFinishedAt,
-        String? reasoningSegmentsJson,
-      }) async {
-        await chatService.updateMessage(
-          messageId,
-          reasoningText: reasoningText,
-          reasoningFinishedAt: reasoningFinishedAt,
-          reasoningSegmentsJson: reasoningSegmentsJson,
-        );
-      },
+      updateReasoningInDb:
+          (
+            String messageId, {
+            String? reasoningText,
+            DateTime? reasoningFinishedAt,
+            String? reasoningSegmentsJson,
+          }) async {
+            await chatService.updateMessage(
+              messageId,
+              reasoningText: reasoningText,
+              reasoningFinishedAt: reasoningFinishedAt,
+              reasoningSegmentsJson: reasoningSegmentsJson,
+            );
+          },
     );
 
     if (shouldGenerateTitle) {
@@ -835,11 +903,13 @@ class ChatActions {
 
   /// Handle stream error.
   Future<void> _handleStreamError(
-      dynamic e, stream_ctrl.StreamingState state) async {
+    dynamic e,
+    stream_ctrl.StreamingState state,
+  ) async {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
     final errorText = e.toString();
-    
+
     // Reset file processing state on error
     onFileProcessingFinished?.call();
 
@@ -847,8 +917,9 @@ class ChatActions {
     streamController.markStreamingEnded(messageId);
 
     streamController.cleanupTimers(messageId);
-    final rawContent =
-        state.fullContentRaw.isNotEmpty ? state.fullContentRaw : errorText;
+    final rawContent = state.fullContentRaw.isNotEmpty
+        ? state.fullContentRaw
+        : errorText;
     final processed = _transformAssistantContent(state, rawContent);
     // Let UI provide the localized error message
     final displayContent = processed.isNotEmpty ? processed : errorText;
@@ -873,19 +944,20 @@ class ChatActions {
     // Use unified reasoning completion method on error
     await streamController.finishReasoningAndPersist(
       messageId,
-      updateReasoningInDb: (
-        String messageId, {
-        String? reasoningText,
-        DateTime? reasoningFinishedAt,
-        String? reasoningSegmentsJson,
-      }) async {
-        await chatService.updateMessage(
-          messageId,
-          reasoningText: reasoningText,
-          reasoningFinishedAt: reasoningFinishedAt,
-          reasoningSegmentsJson: reasoningSegmentsJson,
-        );
-      },
+      updateReasoningInDb:
+          (
+            String messageId, {
+            String? reasoningText,
+            DateTime? reasoningFinishedAt,
+            String? reasoningSegmentsJson,
+          }) async {
+            await chatService.updateMessage(
+              messageId,
+              reasoningText: reasoningText,
+              reasoningFinishedAt: reasoningFinishedAt,
+              reasoningSegmentsJson: reasoningSegmentsJson,
+            );
+          },
     );
 
     await _conversationStreams.remove(conversationId)?.cancel();
@@ -897,7 +969,7 @@ class ChatActions {
   Future<void> _handleStreamDone(stream_ctrl.StreamingState state) async {
     // Reset file processing state on done (just in case)
     onFileProcessingFinished?.call();
-    
+
     final conversationId = state.conversationId;
 
     // Ensure streaming is marked as ended
@@ -905,8 +977,10 @@ class ChatActions {
 
     streamController.cleanupTimers(state.messageId);
     if (_loadingConversationIds.contains(conversationId)) {
-      await _finishStreaming(state,
-          generateTitle: state.ctx.generateTitleOnFinish);
+      await _finishStreaming(
+        state,
+        generateTitle: state.ctx.generateTitleOnFinish,
+      );
     }
     onStreamFinished?.call();
     await _conversationStreams.remove(conversationId)?.cancel();
@@ -956,12 +1030,17 @@ class ChatActions {
       if (segs != null && segs.isNotEmpty) {
         await chatService.updateMessage(
           streaming.id,
-          reasoningSegmentsJson: streamController.serializeReasoningSegments(segs),
+          reasoningSegmentsJson: streamController.serializeReasoningSegments(
+            segs,
+          ),
         );
       }
       // Ensure any inline data URLs get converted even if the user navigates away mid-stream
-      onScheduleImageSanitize?.call(streaming.id, latestContent,
-          immediate: true);
+      onScheduleImageSanitize?.call(
+        streaming.id,
+        latestContent,
+        immediate: true,
+      );
     } catch (_) {}
   }
 }

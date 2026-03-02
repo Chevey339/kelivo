@@ -13,7 +13,8 @@ import '../../../core/services/chat/chat_service.dart';
 /// - Conversation stream subscriptions
 /// - Message grouping and collapsing logic
 class ChatController extends ChangeNotifier {
-  ChatController({required ChatService chatService}) : _chatService = chatService;
+  ChatController({required ChatService chatService})
+    : _chatService = chatService;
 
   final ChatService _chatService;
 
@@ -33,13 +34,22 @@ class ChatController extends ChangeNotifier {
   Map<String, int> _versionSelections = <String, int>{};
   Map<String, int> get versionSelections => _versionSelections;
 
+  static const int _messagePageSize = 12;
+  int _loadedMessageCount = 0;
+  bool _hasMoreMessages = false;
+  bool get hasMoreMessages => _hasMoreMessages;
+  bool _isLoadingMoreMessages = false;
+  bool get isLoadingMoreMessages => _isLoadingMoreMessages;
+
   /// Conversation IDs that are currently generating (streaming).
   final Set<String> _loadingConversationIds = <String>{};
   Set<String> get loadingConversationIds => _loadingConversationIds;
 
   /// Active stream subscriptions per conversation.
-  final Map<String, StreamSubscription<dynamic>> _conversationStreams = <String, StreamSubscription<dynamic>>{};
-  Map<String, StreamSubscription<dynamic>> get conversationStreams => _conversationStreams;
+  final Map<String, StreamSubscription<dynamic>> _conversationStreams =
+      <String, StreamSubscription<dynamic>>{};
+  Map<String, StreamSubscription<dynamic>> get conversationStreams =>
+      _conversationStreams;
 
   // ============================================================================
   // Getters
@@ -63,13 +73,82 @@ class ChatController extends ChangeNotifier {
   void setCurrentConversation(Conversation? conversation) {
     _currentConversation = conversation;
     if (conversation != null) {
-      _messages = List.of(_chatService.getMessages(conversation.id));
+      _loadRecentMessages(conversation);
       _loadVersionSelections();
     } else {
       _messages = [];
       _versionSelections = <String, int>{};
+      _loadedMessageCount = 0;
+      _hasMoreMessages = false;
+      _isLoadingMoreMessages = false;
     }
     notifyListeners();
+  }
+
+  void _loadRecentMessages(Conversation conversation) {
+    final total = conversation.messageIds.length;
+    final start = total > _messagePageSize ? total - _messagePageSize : 0;
+    final ids = conversation.messageIds.sublist(start, total);
+    _messages = List.of(_chatService.getMessagesByIds(ids));
+    _loadedMessageCount = _messages.length;
+    _hasMoreMessages = start > 0;
+    _isLoadingMoreMessages = false;
+  }
+
+  Future<void> loadMoreMessages() async {
+    final convo = _currentConversation;
+    if (convo == null || _isLoadingMoreMessages || !_hasMoreMessages) return;
+
+    _isLoadingMoreMessages = true;
+    notifyListeners();
+
+    try {
+      final total = convo.messageIds.length;
+      final currentlyLoaded = _messages.length;
+      if (currentlyLoaded >= total) {
+        _hasMoreMessages = false;
+        return;
+      }
+
+      final nextLoaded = (currentlyLoaded + _messagePageSize > total)
+          ? total
+          : currentlyLoaded + _messagePageSize;
+      final start = total - nextLoaded;
+      final end = total - currentlyLoaded;
+      if (start < end) {
+        final olderIds = convo.messageIds.sublist(start, end);
+        final olderMessages = _chatService.getMessagesByIds(olderIds);
+        if (olderMessages.isNotEmpty) {
+          _messages = <ChatMessage>[...olderMessages, ..._messages];
+        }
+      }
+
+      _loadedMessageCount = _messages.length;
+      _hasMoreMessages = nextLoaded < total;
+    } finally {
+      _isLoadingMoreMessages = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadAllMessages() async {
+    final convo = _currentConversation;
+    if (convo == null || _isLoadingMoreMessages) return;
+
+    final total = convo.messageIds.length;
+    if (_messages.length >= total && !_hasMoreMessages) return;
+
+    _isLoadingMoreMessages = true;
+    notifyListeners();
+
+    try {
+      _messages = List.of(_chatService.getMessages(convo.id));
+      _loadedMessageCount = _messages.length;
+      _hasMoreMessages = false;
+    } finally {
+      _isLoadingMoreMessages = false;
+      notifyListeners();
+    }
   }
 
   /// Update the current conversation reference (e.g., after title change).
@@ -110,6 +189,9 @@ class ChatController extends ChangeNotifier {
     _currentConversation = conversation;
     _messages = [];
     _versionSelections.clear();
+    _loadedMessageCount = 0;
+    _hasMoreMessages = false;
+    _isLoadingMoreMessages = false;
     notifyListeners();
     return conversation;
   }
@@ -122,7 +204,7 @@ class ChatController extends ChangeNotifier {
     final convo = _chatService.getConversation(id);
     if (convo != null) {
       _currentConversation = convo;
-      _messages = List.of(_chatService.getMessages(id));
+      _loadRecentMessages(convo);
       _loadVersionSelections();
       notifyListeners();
     }
@@ -133,6 +215,9 @@ class ChatController extends ChangeNotifier {
     _currentConversation = null;
     _messages = [];
     _versionSelections.clear();
+    _loadedMessageCount = 0;
+    _hasMoreMessages = false;
+    _isLoadingMoreMessages = false;
     notifyListeners();
   }
 
@@ -166,6 +251,10 @@ class ChatController extends ChangeNotifier {
     );
 
     _messages.add(message);
+    _loadedMessageCount = _messages.length;
+    final total =
+        _currentConversation?.messageIds.length ?? _loadedMessageCount;
+    _hasMoreMessages = _loadedMessageCount < total;
     notifyListeners();
     return message;
   }
@@ -222,7 +311,29 @@ class ChatController extends ChangeNotifier {
   /// Reload messages from storage.
   void reloadMessages() {
     if (_currentConversation == null) return;
-    _messages = List.of(_chatService.getMessages(_currentConversation!.id));
+    final convo =
+        _chatService.getConversation(_currentConversation!.id) ??
+        _currentConversation!;
+    _currentConversation = convo;
+
+    final total = convo.messageIds.length;
+    if (total == 0) {
+      _messages = [];
+      _loadedMessageCount = 0;
+      _hasMoreMessages = false;
+      notifyListeners();
+      return;
+    }
+
+    final desiredWindow = _messages.isNotEmpty
+        ? _messages.length
+        : (_loadedMessageCount > 0 ? _loadedMessageCount : _messagePageSize);
+    final windowSize = desiredWindow > total ? total : desiredWindow;
+    final start = total - windowSize;
+    final ids = convo.messageIds.sublist(start, total);
+    _messages = List.of(_chatService.getMessagesByIds(ids));
+    _loadedMessageCount = _messages.length;
+    _hasMoreMessages = start > 0;
     notifyListeners();
   }
 
@@ -286,7 +397,10 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Set a stream subscription for a conversation.
-  void setStreamSubscription(String conversationId, StreamSubscription<dynamic> subscription) {
+  void setStreamSubscription(
+    String conversationId,
+    StreamSubscription<dynamic> subscription,
+  ) {
     _conversationStreams[conversationId] = subscription;
   }
 
@@ -313,7 +427,8 @@ class ChatController extends ChangeNotifier {
   /// This groups messages by their groupId and returns only the message
   /// at the selected version index for each group.
   List<ChatMessage> collapseVersions(List<ChatMessage> items) {
-    final Map<String, List<ChatMessage>> byGroup = <String, List<ChatMessage>>{};
+    final Map<String, List<ChatMessage>> byGroup =
+        <String, List<ChatMessage>>{};
     final List<String> order = <String>[];
 
     for (final m in items) {
@@ -349,7 +464,8 @@ class ChatController extends ChangeNotifier {
 
   /// Group all messages by their groupId.
   Map<String, List<ChatMessage>> groupMessagesByGroup() {
-    final Map<String, List<ChatMessage>> byGroup = <String, List<ChatMessage>>{};
+    final Map<String, List<ChatMessage>> byGroup =
+        <String, List<ChatMessage>>{};
     for (final m in _messages) {
       final gid = (m.groupId ?? m.id);
       byGroup.putIfAbsent(gid, () => <ChatMessage>[]).add(m);

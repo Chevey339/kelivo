@@ -16,10 +16,10 @@ class ChatScrollController {
     required VoidCallback onStateChanged,
     required bool Function() getAutoScrollEnabled,
     required int Function() getAutoScrollIdleSeconds,
-  })  : _scrollController = scrollController,
-        _onStateChanged = onStateChanged,
-        _getAutoScrollEnabled = getAutoScrollEnabled,
-        _getAutoScrollIdleSeconds = getAutoScrollIdleSeconds {
+  }) : _scrollController = scrollController,
+       _onStateChanged = onStateChanged,
+       _getAutoScrollEnabled = getAutoScrollEnabled,
+       _getAutoScrollIdleSeconds = getAutoScrollIdleSeconds {
     _scrollController.addListener(_onScrollControllerChanged);
   }
 
@@ -66,6 +66,8 @@ class ChatScrollController {
 
   /// Tolerance for "near bottom" detection.
   static const double _autoScrollSnapTolerance = 56.0;
+  double? _preservedOffsetForPrepend;
+  double? _preservedMaxExtentForPrepend;
 
   // ============================================================================
   // Public Getters
@@ -118,7 +120,8 @@ class ChatScrollController {
       final autoScrollEnabled = _getAutoScrollEnabled();
 
       // Detect user scrolling
-      if (_scrollController.position.userScrollDirection != ScrollDirection.idle) {
+      if (_scrollController.position.userScrollDirection !=
+          ScrollDirection.idle) {
         _isUserScrolling = true;
         _autoStickToBottom = false;
         // Reset chained jump anchor when user manually scrolls
@@ -145,7 +148,8 @@ class ChatScrollController {
       final atBottom = isNearBottom(24);
       if (!atBottom) {
         _autoStickToBottom = false;
-      } else if (!_isUserScrolling && (autoScrollEnabled || _autoStickToBottom)) {
+      } else if (!_isUserScrolling &&
+          (autoScrollEnabled || _autoStickToBottom)) {
         _autoStickToBottom = true;
       }
       final shouldShow = !atBottom;
@@ -159,12 +163,15 @@ class ChatScrollController {
   /// Reset the auto-hide timer for navigation buttons.
   void _resetNavButtonsHideTimer() {
     _navButtonsHideTimer?.cancel();
-    _navButtonsHideTimer = Timer(const Duration(milliseconds: _navButtonsHideDelayMs), () {
-      if (_showNavButtons) {
-        _showNavButtons = false;
-        _onStateChanged();
-      }
-    });
+    _navButtonsHideTimer = Timer(
+      const Duration(milliseconds: _navButtonsHideDelayMs),
+      () {
+        if (_showNavButtons) {
+          _showNavButtons = false;
+          _onStateChanged();
+        }
+      },
+    );
   }
 
   /// Show navigation buttons manually (e.g., when user taps a button).
@@ -183,6 +190,36 @@ class ChatScrollController {
       _showNavButtons = false;
       _onStateChanged();
     }
+  }
+
+  void preserveScrollPositionForPrepend() {
+    try {
+      if (!_scrollController.hasClients) return;
+      final pos = _scrollController.position;
+      _preservedOffsetForPrepend = pos.pixels;
+      _preservedMaxExtentForPrepend = pos.maxScrollExtent;
+    } catch (_) {}
+  }
+
+  void restoreScrollPositionAfterPrepend() {
+    final oldOffset = _preservedOffsetForPrepend;
+    final oldMax = _preservedMaxExtentForPrepend;
+    _preservedOffsetForPrepend = null;
+    _preservedMaxExtentForPrepend = null;
+    if (oldOffset == null || oldMax == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        if (!_scrollController.hasClients) return;
+        final pos = _scrollController.position;
+        final deltaExtent = pos.maxScrollExtent - oldMax;
+        final targetOffset = (oldOffset + deltaExtent).clamp(
+          0.0,
+          pos.maxScrollExtent,
+        );
+        pos.jumpTo(targetOffset);
+      } catch (_) {}
+    });
   }
 
   // ============================================================================
@@ -213,14 +250,21 @@ class ChatScrollController {
   }) {
     _isUserScrolling = false;
     _userScrollTimer?.cancel();
-    WidgetsBinding.instance.addPostFrameCallback((_) => scrollToBottom(animate: animate));
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => scrollToBottom(animate: animate),
+    );
     Future.delayed(postSwitchDelay, () => scrollToBottom(animate: animate));
   }
 
   /// Ensure scroll reaches bottom even after widget tree transitions.
   void scrollToBottomSoon({bool animate = true}) {
-    WidgetsBinding.instance.addPostFrameCallback((_) => scrollToBottom(animate: animate));
-    Future.delayed(const Duration(milliseconds: 120), () => scrollToBottom(animate: animate));
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => scrollToBottom(animate: animate),
+    );
+    Future.delayed(
+      const Duration(milliseconds: 120),
+      () => scrollToBottom(animate: animate),
+    );
   }
 
   /// Auto-scroll to bottom if conditions are met.
@@ -251,7 +295,10 @@ class ChatScrollController {
   }
 
   /// Animate or jump to the bottom of the scroll view.
-  Future<void> _animateToBottom({required bool force, bool animate = true}) async {
+  Future<void> _animateToBottom({
+    required bool force,
+    bool animate = true,
+  }) async {
     try {
       if (!_scrollController.hasClients) return;
       if (!force) {
@@ -264,7 +311,9 @@ class ChatScrollController {
       // Prevent using controller while it is still attached to old/new list simultaneously
       if (_scrollController.positions.length != 1) {
         // Try again after microtask when the previous list detaches
-        Future.microtask(() => _animateToBottom(force: force, animate: animate));
+        Future.microtask(
+          () => _animateToBottom(force: force, animate: animate),
+        );
         return;
       }
       final pos = _scrollController.position;
@@ -280,7 +329,11 @@ class ChatScrollController {
       if (!doAnimate) {
         pos.jumpTo(max);
       } else {
-        final durationMs = distance < 36 ? 120 : distance < 140 ? 180 : 240;
+        final durationMs = distance < 36
+            ? 120
+            : distance < 140
+            ? 180
+            : 240;
         await pos.animateTo(
           max,
           duration: Duration(milliseconds: durationMs),
@@ -309,7 +362,11 @@ class ChatScrollController {
       if (animate) {
         final pos = _scrollController.position;
         final distance = pos.pixels;
-        final durationMs = distance < 200 ? 150 : distance < 800 ? 220 : 300;
+        final durationMs = distance < 200
+            ? 150
+            : distance < 800
+            ? 220
+            : 300;
         pos.animateTo(
           0.0,
           duration: Duration(milliseconds: durationMs),
@@ -343,7 +400,8 @@ class ChatScrollController {
 
       // Determine anchor index: prefer last jumped user; otherwise bottom-most visible item
       int? anchor;
-      if (_lastJumpUserMessageId != null && idxById.containsKey(_lastJumpUserMessageId)) {
+      if (_lastJumpUserMessageId != null &&
+          idxById.containsKey(_lastJumpUserMessageId)) {
         anchor = idxById[_lastJumpUserMessageId!];
       } else {
         final (listTop, listBottom) = getViewportBounds();
@@ -437,7 +495,8 @@ class ChatScrollController {
 
       // Determine anchor index: prefer last jumped user; otherwise top-most visible item
       int? anchor;
-      if (_lastJumpUserMessageId != null && idxById.containsKey(_lastJumpUserMessageId)) {
+      if (_lastJumpUserMessageId != null &&
+          idxById.containsKey(_lastJumpUserMessageId)) {
         anchor = idxById[_lastJumpUserMessageId!];
       } else {
         final (listTop, listBottom) = getViewportBounds();
@@ -545,7 +604,10 @@ class ChatScrollController {
       final pos0 = _scrollController.position;
       final denom = (messages.length - 1).clamp(1, 1 << 30);
       final ratio = tIndex / denom;
-      final coarse = (pos0.maxScrollExtent * ratio).clamp(0.0, pos0.maxScrollExtent);
+      final coarse = (pos0.maxScrollExtent * ratio).clamp(
+        0.0,
+        pos0.maxScrollExtent,
+      );
       _scrollController.jumpTo(coarse);
       await WidgetsBinding.instance.endOfFrame;
       final tCtxAfterCoarse = messageKeys[targetId]?.currentContext;
