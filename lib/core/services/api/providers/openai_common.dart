@@ -2,6 +2,11 @@ part of '../chat_api_service.dart';
 
 String _openAIEffortForBudget(int? budget, String upstreamModelId) {
   final effort = _effortForBudget(budget);
+  // GPT-5.2+ uses "none" (not "off") for lowest reasoning effort.
+  // Source: https://developers.openai.com/api/docs/guides/latest-model#gpt-54-parameter-compatibility
+  if (effort == 'off' && _supportsOpenAINone(upstreamModelId)) {
+    return 'none';
+  }
   if (effort != 'high') return effort;
   if (budget != null &&
       budget >= 64000 &&
@@ -12,6 +17,11 @@ String _openAIEffortForBudget(int? budget, String upstreamModelId) {
 }
 
 bool _supportsOpenAIXhigh(String modelId) {
+  final minor = _gpt5MinorVersion(modelId);
+  return minor != null && minor >= 2;
+}
+
+bool _supportsOpenAINone(String modelId) {
   final minor = _gpt5MinorVersion(modelId);
   return minor != null && minor >= 2;
 }
