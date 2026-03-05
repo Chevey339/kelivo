@@ -235,7 +235,11 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                       currentBudget,
                     );
                   }
-                  await showReasoningBudgetSheet(context);
+                  await showReasoningBudgetSheet(
+                    context,
+                    modelProvider: a.chatModelProvider,
+                    modelId: a.chatModelId,
+                  );
                   final chosen = context
                       .read<SettingsProvider>()
                       .thinkingBudget;

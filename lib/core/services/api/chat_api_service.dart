@@ -520,7 +520,7 @@ class ChatApiService {
         final isReasoning = effectiveInfo.abilities.contains(
           ModelAbility.reasoning,
         );
-        final effort = _effortForBudget(thinkingBudget);
+        final effort = _openAIEffortForBudget(thinkingBudget, upstreamModelId);
         final host = Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '';
         final modelLower = upstreamModelId.toLowerCase();
         final bool isMimo =

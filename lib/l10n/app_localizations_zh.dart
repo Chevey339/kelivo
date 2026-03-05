@@ -1468,6 +1468,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reasoningBudgetSheetHeavy => '重度推理';
 
   @override
+  String get reasoningBudgetSheetXhigh => '极限推理';
+
+  @override
   String get reasoningBudgetSheetTitle => '思维链强度';
 
   @override
@@ -1489,6 +1492,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get reasoningBudgetSheetHeavySubtitle => '使用大量推理来回答问题，适合复杂问题';
+
+  @override
+  String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，适合最复杂的问题';
 
   @override
   String get reasoningBudgetSheetCustomLabel => '自定义推理预算 (tokens)';
@@ -5542,6 +5548,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get reasoningBudgetSheetHeavy => '重度推理';
 
   @override
+  String get reasoningBudgetSheetXhigh => '极限推理';
+
+  @override
   String get reasoningBudgetSheetTitle => '思维链强度';
 
   @override
@@ -5563,6 +5572,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get reasoningBudgetSheetHeavySubtitle => '使用大量推理来回答问题，适合复杂问题';
+
+  @override
+  String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，适合最复杂的问题';
 
   @override
   String get reasoningBudgetSheetCustomLabel => '自定义推理预算 (tokens)';
@@ -9563,6 +9575,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get reasoningBudgetSheetHeavy => '重度推理';
 
   @override
+  String get reasoningBudgetSheetXhigh => '極限推理';
+
+  @override
   String get reasoningBudgetSheetTitle => '思維鏈強度';
 
   @override
@@ -9584,6 +9599,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get reasoningBudgetSheetHeavySubtitle => '使用大量推理來回答問題，適合複雜問題';
+
+  @override
+  String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，適合最複雜的問題';
 
   @override
   String get reasoningBudgetSheetCustomLabel => '自訂推理預算 (tokens)';

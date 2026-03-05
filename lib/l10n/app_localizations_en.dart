@@ -1506,6 +1506,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reasoningBudgetSheetHeavy => 'Heavy Reasoning';
 
   @override
+  String get reasoningBudgetSheetXhigh => 'Extreme Reasoning';
+
+  @override
   String get reasoningBudgetSheetTitle => 'Reasoning Chain Strength';
 
   @override
@@ -1532,6 +1535,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get reasoningBudgetSheetHeavySubtitle =>
       'Use heavy reasoning for complex questions';
+
+  @override
+  String get reasoningBudgetSheetXhighSubtitle =>
+      'Use maximum reasoning depth for the toughest problems';
 
   @override
   String get reasoningBudgetSheetCustomLabel =>

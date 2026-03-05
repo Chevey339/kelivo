@@ -316,6 +316,39 @@ class SettingsProvider extends ChangeNotifier {
     return ProviderConfig.defaultsFor(key, displayName: defaultName);
   }
 
+  String resolveOpenAIUpstreamModelId(String providerKey, String modelId) {
+    final cfg = getProviderConfig(providerKey);
+    final kind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
+    if (kind != ProviderKind.openai) return modelId;
+    final rawOv = cfg.modelOverrides[modelId];
+    final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
+    final apiModelId = (ov?['apiModelId'] is String)
+        ? (ov?['apiModelId'] as String).trim()
+        : '';
+    return apiModelId.isNotEmpty ? apiModelId : modelId;
+  }
+
+  bool supportsOpenAIXhighReasoning(String providerKey, String modelId) {
+    final cfg = getProviderConfig(providerKey);
+    final kind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
+    if (kind != ProviderKind.openai) return false;
+    final modelForCheck = resolveOpenAIUpstreamModelId(providerKey, modelId);
+    final minor = int.tryParse(
+      RegExp(
+            r'gpt-5\.(\d+)',
+            caseSensitive: false,
+          ).firstMatch(modelForCheck)?.group(1) ??
+          '',
+    );
+    return minor != null && minor >= 2;
+  }
+
   // Explicitly ensure a provider config exists in memory (without persisting to storage).
   // Useful for seeding first-run defaults.
   ProviderConfig ensureProviderConfig(String key, {String? defaultName}) {

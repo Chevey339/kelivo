@@ -1,5 +1,26 @@
 part of '../chat_api_service.dart';
 
+String _openAIEffortForBudget(int? budget, String upstreamModelId) {
+  final effort = _effortForBudget(budget);
+  if (effort != 'high') return effort;
+  if (budget != null &&
+      budget >= 64000 &&
+      _supportsOpenAIXhigh(upstreamModelId)) {
+    return 'xhigh';
+  }
+  return 'high';
+}
+
+bool _supportsOpenAIXhigh(String modelId) {
+  final minor = _gpt5MinorVersion(modelId);
+  return minor != null && minor >= 2;
+}
+
+int? _gpt5MinorVersion(String modelId) {
+  final m = RegExp(r'gpt-5\.(\d+)', caseSensitive: false).firstMatch(modelId);
+  return int.tryParse(m?.group(1) ?? '');
+}
+
 Stream<ChatStreamChunk> _sendOpenAIStream(
   http.Client client,
   ProviderConfig config,
@@ -30,7 +51,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   final wantsImageOutput = effectiveInfo.output.contains(Modality.image);
   final bool canImageInput = effectiveInfo.input.contains(Modality.image);
 
-  final effort = _effortForBudget(thinkingBudget);
+  final effort = _openAIEffortForBudget(thinkingBudget, upstreamModelId);
   final host = Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '';
   final modelLower = upstreamModelId.toLowerCase();
   final bool isAzureOpenAI = host.contains('openai.azure.com');

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
+import '../core/providers/assistant_provider.dart';
 import '../core/providers/settings_provider.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
@@ -12,6 +13,8 @@ import '../l10n/app_localizations.dart';
 Future<void> showDesktopReasoningBudgetPopover(
   BuildContext context, {
   required GlobalKey anchorKey,
+  String? modelProvider,
+  String? modelId,
 }) async {
   final overlay = Overlay.of(context);
   if (overlay == null) return;
@@ -31,6 +34,8 @@ Future<void> showDesktopReasoningBudgetPopover(
     builder: (ctx) => _ReasoningPopoverOverlay(
       anchorRect: anchorRect,
       anchorWidth: size.width,
+      modelProvider: modelProvider,
+      modelId: modelId,
       onClose: () {
         try { entry.remove(); } catch (_) {}
         if (!completer.isCompleted) completer.complete();
@@ -45,11 +50,15 @@ class _ReasoningPopoverOverlay extends StatefulWidget {
   const _ReasoningPopoverOverlay({
     required this.anchorRect,
     required this.anchorWidth,
+    this.modelProvider,
+    this.modelId,
     required this.onClose,
   });
 
   final Rect anchorRect;
   final double anchorWidth;
+  final String? modelProvider;
+  final String? modelId;
   final VoidCallback onClose;
 
   @override
@@ -127,7 +136,7 @@ class _ReasoningPopoverOverlayState extends State<_ReasoningPopoverOverlay>
                       offset: _offset,
                       child: _GlassPanel(
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-                        child: _ReasoningContent(onDone: _close),
+                        child: _ReasoningContent(onDone: _close, modelProvider: widget.modelProvider, modelId: widget.modelId),
                       ),
                     ),
                   ),
@@ -174,23 +183,36 @@ class _GlassPanel extends StatelessWidget {
 }
 
 class _ReasoningContent extends StatelessWidget {
-  const _ReasoningContent({required this.onDone});
+  const _ReasoningContent({required this.onDone, this.modelProvider, this.modelId});
   final VoidCallback onDone;
+  final String? modelProvider;
+  final String? modelId;
 
-  int _bucket(int? n) {
+  int _bucket(int? n, {bool allowXhigh = true}) {
     if (n == null) return -1;
     if (n == -1) return -1;
     if (n < 1024) return 0;
     if (n < 16000) return 1024;
     if (n < 32000) return 16000;
-    return 32000;
+    if (!allowXhigh) return 32000;
+    if (n < 64000) return 32000;
+    return 64000;
+  }
+
+  bool _showXhighOption(BuildContext context, SettingsProvider settings) {
+    final assistant = context.read<AssistantProvider>().currentAssistant;
+    final currentProvider = modelProvider ?? assistant?.chatModelProvider ?? settings.currentModelProvider;
+    final currentModelId = modelId ?? assistant?.chatModelId ?? settings.currentModelId;
+    if (currentProvider == null || currentModelId == null) return false;
+    return settings.supportsOpenAIXhighReasoning(currentProvider, currentModelId);
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
-    final selected = _bucket(sp.thinkingBudget);
+    final showXhigh = _showXhighOption(context, sp);
+    final selected = _bucket(sp.thinkingBudget, allowXhigh: showXhigh);
 
     Widget tile({
       required Widget Function(Color color) leadingBuilder,
@@ -249,6 +271,12 @@ class _ReasoningContent extends StatelessWidget {
               label: l10n.reasoningBudgetSheetHeavy,
               value: 32000,
             ),
+            if (showXhigh)
+              tile(
+                leadingBuilder: (c) => SvgPicture.asset('assets/icons/deepthink.svg', width: 16, height: 16, colorFilter: ColorFilter.mode(c, BlendMode.srcIn)),
+                label: l10n.reasoningBudgetSheetXhigh,
+                value: 64000,
+              ),
           ],
         ),
       ),

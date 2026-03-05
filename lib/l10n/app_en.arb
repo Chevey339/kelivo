@@ -613,6 +613,7 @@
   "reasoningBudgetSheetLight": "Light Reasoning",
   "reasoningBudgetSheetMedium": "Medium Reasoning",
   "reasoningBudgetSheetHeavy": "Heavy Reasoning",
+  "reasoningBudgetSheetXhigh": "Extreme Reasoning",
   "reasoningBudgetSheetTitle": "Reasoning Chain Strength",
   "reasoningBudgetSheetCurrentLevel": "Current Level: {level}",
   "@reasoningBudgetSheetCurrentLevel": {
@@ -627,6 +628,7 @@
   "reasoningBudgetSheetLightSubtitle": "Use light reasoning to answer questions",
   "reasoningBudgetSheetMediumSubtitle": "Use moderate reasoning to answer questions",
   "reasoningBudgetSheetHeavySubtitle": "Use heavy reasoning for complex questions",
+  "reasoningBudgetSheetXhighSubtitle": "Use maximum reasoning depth for the toughest problems",
   "reasoningBudgetSheetCustomLabel": "Custom Reasoning Budget (tokens)",
   "reasoningBudgetSheetCustomHint": "e.g. 2048 (-1 auto, 0 off)",
   "chatMessageWidgetFileNotFound": "File not found: {fileName}",

@@ -2933,6 +2933,12 @@ abstract class AppLocalizations {
   /// **'Heavy Reasoning'**
   String get reasoningBudgetSheetHeavy;
 
+  /// No description provided for @reasoningBudgetSheetXhigh.
+  ///
+  /// In en, this message translates to:
+  /// **'Extreme Reasoning'**
+  String get reasoningBudgetSheetXhigh;
+
   /// No description provided for @reasoningBudgetSheetTitle.
   ///
   /// In en, this message translates to:
@@ -2974,6 +2980,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use heavy reasoning for complex questions'**
   String get reasoningBudgetSheetHeavySubtitle;
+
+  /// No description provided for @reasoningBudgetSheetXhighSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use maximum reasoning depth for the toughest problems'**
+  String get reasoningBudgetSheetXhighSubtitle;
 
   /// No description provided for @reasoningBudgetSheetCustomLabel.
   ///
