@@ -21,6 +21,69 @@ int? _gpt5MinorVersion(String modelId) {
   return int.tryParse(m?.group(1) ?? '');
 }
 
+bool _isGpt5FamilyModel(String modelId) {
+  return RegExp(r'gpt-5(?=$|[-.])', caseSensitive: false).hasMatch(modelId);
+}
+
+String _effectiveOpenAIEffort(
+  Map<String, dynamic> body, {
+  required String fallbackEffort,
+}) {
+  // Read the effort from the final payload shape first, then fall back to the
+  // budget-derived value. Overrides can set either chat-completions style
+  // (`reasoning_effort`) or Responses style (`reasoning.effort`).
+  final reasoningEffort = body['reasoning_effort'];
+  if (reasoningEffort is String && reasoningEffort.trim().isNotEmpty) {
+    return reasoningEffort.trim().toLowerCase();
+  }
+  final reasoning = body['reasoning'];
+  if (reasoning is Map) {
+    final effort = reasoning['effort'];
+    if (effort is String && effort.trim().isNotEmpty) {
+      return effort.trim().toLowerCase();
+    }
+  }
+  return fallbackEffort.toLowerCase();
+}
+
+bool _allowsSamplingParamsForOpenAIModel(
+  String upstreamModelId, {
+  required String effort,
+}) {
+  // Source: https://developers.openai.com/api/docs/guides/latest-model#gpt-54-parameter-compatibility
+  // GPT-5.2/GPT-5.4 accept temperature/top_p/logprobs only when effort is
+  // none-like. Other GPT-5 variants reject these sampling params.
+  if (!_isGpt5FamilyModel(upstreamModelId)) return true;
+  final minor = _gpt5MinorVersion(upstreamModelId);
+  final supportsSampling = minor == 2 || minor == 4;
+  if (!supportsSampling) return false;
+  return effort == 'none' || effort == 'off' || effort == 'auto';
+}
+
+void _sanitizeOpenAIGpt5SamplingParams(
+  Map<String, dynamic> body,
+  String upstreamModelId, {
+  required String fallbackEffort,
+}) {
+  // Must run on the final request body (after override merges), otherwise
+  // we may keep/drop sampling params based on stale effort assumptions.
+  if (!body.containsKey('temperature') &&
+      !body.containsKey('top_p') &&
+      !body.containsKey('logprobs')) {
+    return;
+  }
+  final effort = _effectiveOpenAIEffort(body, fallbackEffort: fallbackEffort);
+  final allowed = _allowsSamplingParamsForOpenAIModel(
+    upstreamModelId,
+    effort: effort,
+  );
+  if (!allowed) {
+    body.remove('temperature');
+    body.remove('top_p');
+    body.remove('logprobs');
+  }
+}
+
 Stream<ChatStreamChunk> _sendOpenAIStream(
   http.Client client,
   ProviderConfig config,
@@ -669,6 +732,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           : v;
     });
   }
+  _sanitizeOpenAIGpt5SamplingParams(
+    body as Map<String, dynamic>,
+    upstreamModelId,
+    fallbackEffort: effort,
+  );
   request.body = jsonEncode(body);
 
   final response = await client.send(request);
@@ -1219,6 +1287,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 body2[k] = (v is String) ? _parseOverrideValue(v) : v;
               });
             }
+
+            _sanitizeOpenAIGpt5SamplingParams(
+              body2,
+              upstreamModelId,
+              fallbackEffort: effort,
+            );
 
             final req2 = http.Request('POST', url);
             final headers2 = <String, String>{
@@ -1890,6 +1964,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     );
                   }
                 } catch (_) {}
+
+                _sanitizeOpenAIGpt5SamplingParams(
+                  body2,
+                  upstreamModelId,
+                  fallbackEffort: effort,
+                );
 
                 final req2 = http.Request('POST', url);
                 final headers2 = <String, String>{
@@ -2602,6 +2682,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 body2[k] = (v is String) ? _parseOverrideValue(v) : v;
               });
             }
+            _sanitizeOpenAIGpt5SamplingParams(
+              body2,
+              upstreamModelId,
+              fallbackEffort: effort,
+            );
             final req2 = http.Request('POST', url);
             final headers2 = <String, String>{
               'Authorization': 'Bearer ${_effectiveApiKey(config)}',
@@ -3168,6 +3253,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     body2[k] = (v is String) ? _parseOverrideValue(v) : v;
                   });
                 }
+                _sanitizeOpenAIGpt5SamplingParams(
+                  body2,
+                  upstreamModelId,
+                  fallbackEffort: effort,
+                );
                 final req2 = http.Request('POST', url);
                 final headers2 = <String, String>{
                   'Authorization': 'Bearer ${_effectiveApiKey(config)}',

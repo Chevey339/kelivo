@@ -640,6 +640,11 @@ class ChatApiService {
             );
           }
         } catch (_) {}
+        _sanitizeOpenAIGpt5SamplingParams(
+          body as Map<String, dynamic>,
+          upstreamModelId,
+          fallbackEffort: effort,
+        );
         final resp = await client.post(
           url,
           headers: headers,
