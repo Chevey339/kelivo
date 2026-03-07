@@ -139,7 +139,20 @@ class _MiniMapSheetState extends State<_MiniMapSheet> with TickerProviderStateMi
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
+                    SizedBox(
+                      height: 36,
+                      width: 36,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(Lucide.ChevronsDown, size: 18, color: cs.onSurface),
+                        onPressed: () {
+                          if (controller.hasClients && controller.position.maxScrollExtent > 0) {
+                            controller.jumpTo(controller.position.maxScrollExtent);
+                          }
+                        },
+                      ),
+                    ),
                     _buildSearchToggle(context, searchWidth),
                   ],
                 ),
