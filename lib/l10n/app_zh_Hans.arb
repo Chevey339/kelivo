@@ -165,6 +165,7 @@
   "desktopNavChatTooltip": "聊天",
   "desktopNavTranslateTooltip": "翻译",
   "desktopNavStorageTooltip": "存储",
+  "desktopNavGlobalSearchTooltip": "全局搜索",
   "desktopNavThemeToggleTooltip": "主题切换",
   "desktopNavSettingsTooltip": "设置",
   "desktopAvatarMenuUseEmoji": "使用表情符号",
@@ -632,6 +633,17 @@
   "sideDrawerDateFullPattern": "yyyy年M月d日",
   "sideDrawerSearchHint": "搜索聊天记录",
   "sideDrawerSearchAssistantsHint": "搜索助手",
+  "sideDrawerGlobalSearchHint": "搜索全部会话",
+  "sideDrawerGlobalSearchEmptyHint": "在标题和消息中全局搜索",
+  "sideDrawerGlobalSearchNoResults": "没有匹配的会话",
+  "sideDrawerGlobalSearchResultCount": "共 {count} 条结果",
+  "@sideDrawerGlobalSearchResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "sideDrawerUpdateTitle": "发现新版本：{version}",
   "sideDrawerUpdateTitleWithBuild": "发现新版本：{version} ({build})",
   "sideDrawerLinkCopied": "已复制下载链接",

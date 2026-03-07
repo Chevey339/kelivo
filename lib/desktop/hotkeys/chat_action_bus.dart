@@ -6,6 +6,8 @@ enum ChatAction {
   toggleLeftPanelTopics,
   focusInput,
   switchModel,
+  enterGlobalSearch,
+  exitGlobalSearch,
 }
 
 class ChatActionBus {

@@ -336,6 +336,7 @@
   "desktopNavChatTooltip": "Chat",
   "desktopNavTranslateTooltip": "Translate",
   "desktopNavStorageTooltip": "Storage",
+  "desktopNavGlobalSearchTooltip": "Global Search",
   "desktopNavThemeToggleTooltip": "Theme",
   "desktopNavSettingsTooltip": "Settings",
   "desktopAvatarMenuUseEmoji": "Use emoji",
@@ -825,6 +826,17 @@
   "sideDrawerDateFullPattern": "MMM d, yyyy",
   "sideDrawerSearchHint": "Search chat history",
   "sideDrawerSearchAssistantsHint": "Search assistants",
+  "sideDrawerGlobalSearchHint": "Search all sessions",
+  "sideDrawerGlobalSearchEmptyHint": "Search across titles and messages",
+  "sideDrawerGlobalSearchNoResults": "No matching sessions",
+  "sideDrawerGlobalSearchResultCount": "{count} results",
+  "@sideDrawerGlobalSearchResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "sideDrawerUpdateTitle": "New version: {version}",
   "@sideDrawerUpdateTitle": {
     "placeholders": {

@@ -15,14 +15,18 @@ class DesktopNavRail extends StatelessWidget {
   const DesktopNavRail({
     super.key,
     required this.activeIndex,
+    this.globalSearchActive = false,
     required this.onTapChat,
+    required this.onTapGlobalSearch,
     required this.onTapTranslate,
     required this.onTapStorage,
     required this.onTapSettings,
   });
 
   final int activeIndex; // 0=Chat, 1=Translate, 2=Storage, 3=Settings
+  final bool globalSearchActive;
   final VoidCallback onTapChat;
+  final VoidCallback onTapGlobalSearch;
   final VoidCallback onTapTranslate;
   final VoidCallback onTapStorage;
   final VoidCallback onTapSettings;
@@ -35,7 +39,8 @@ class DesktopNavRail extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final isMac = Platform.isMacOS;
     final double topGap = isMac ? 36.0 : 8.0;
-    final isChatActive = activeIndex == 0;
+    final isChatActive = activeIndex == 0 && !globalSearchActive;
+    final isGlobalSearchActive = globalSearchActive;
     final isTranslateActive = activeIndex == 1;
     final isStorageActive = activeIndex == 2;
     final isSettingsActive = activeIndex == 3;
@@ -55,6 +60,15 @@ class DesktopNavRail extends StatelessWidget {
             size: 40,
             iconSize: 18,
             iconColor: isChatActive ? cs.primary : null,
+          ),
+          const SizedBox(height: 8),
+          _CircleAction(
+            tooltip: l10n.desktopNavGlobalSearchTooltip,
+            icon: lucide.Lucide.Search,
+            onTap: onTapGlobalSearch,
+            size: 40,
+            iconSize: 18,
+            iconColor: isGlobalSearchActive ? cs.primary : null,
           ),
           const SizedBox(height: 8),
           _CircleAction(
@@ -98,7 +112,6 @@ class _UserAvatarButton extends StatefulWidget {
 }
 
 class _UserAvatarButtonState extends State<_UserAvatarButton> {
-
   @override
   Widget build(BuildContext context) {
     final up = context.watch<UserProvider>();
@@ -110,19 +123,24 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
       avatar = Container(
         width: 36,
         height: 36,
-        decoration: BoxDecoration(color: cs.primary.withOpacity(0.15), shape: BoxShape.circle),
-        alignment: Alignment.center,
-        child: EmojiText(
-          value,
-          fontSize: 18,
-          optimizeEmojiAlign: true,
+        decoration: BoxDecoration(
+          color: cs.primary.withOpacity(0.15),
+          shape: BoxShape.circle,
         ),
+        alignment: Alignment.center,
+        child: EmojiText(value, fontSize: 18, optimizeEmojiAlign: true),
       );
     } else if (type == 'url' && value != null && value.isNotEmpty) {
       avatar = ClipOval(
-        child: Image.network(value, width: 36, height: 36, fit: BoxFit.cover, errorBuilder: (_, __, ___) {
-          return _initialAvatar(up.name, cs);
-        }),
+        child: Image.network(
+          value,
+          width: 36,
+          height: 36,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) {
+            return _initialAvatar(up.name, cs);
+          },
+        ),
       );
     } else if (type == 'file' && value != null && value.isNotEmpty) {
       // Local file path (gracefully handle missing files from imported backups)
@@ -130,7 +148,12 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
       final f = File(fixed);
       if (f.existsSync()) {
         avatar = ClipOval(
-          child: Image(image: FileImage(f), width: 36, height: 36, fit: BoxFit.cover),
+          child: Image(
+            image: FileImage(f),
+            width: 36,
+            height: 36,
+            fit: BoxFit.cover,
+          ),
         );
       } else {
         avatar = _initialAvatar(up.name, cs);
@@ -160,7 +183,10 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
     return Container(
       width: 36,
       height: 36,
-      decoration: BoxDecoration(color: cs.primary.withOpacity(0.15), shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: cs.primary.withOpacity(0.15),
+        shape: BoxShape.circle,
+      ),
       alignment: Alignment.center,
       child: Text(
         letter,
@@ -178,7 +204,14 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
 }
 
 class _CircleAction extends StatelessWidget {
-  const _CircleAction({required this.icon, required this.onTap, required this.tooltip, this.size = 44, this.iconSize = 20, this.iconColor});
+  const _CircleAction({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+    this.size = 44,
+    this.iconSize = 20,
+    this.iconColor,
+  });
   final IconData icon;
   final VoidCallback onTap;
   final String tooltip;

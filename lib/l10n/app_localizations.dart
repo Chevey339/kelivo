@@ -1415,6 +1415,12 @@ abstract class AppLocalizations {
   /// **'Storage'**
   String get desktopNavStorageTooltip;
 
+  /// No description provided for @desktopNavGlobalSearchTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Global Search'**
+  String get desktopNavGlobalSearchTooltip;
+
   /// No description provided for @desktopNavThemeToggleTooltip.
   ///
   /// In en, this message translates to:
@@ -3574,6 +3580,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Search assistants'**
   String get sideDrawerSearchAssistantsHint;
+
+  /// No description provided for @sideDrawerGlobalSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search all sessions'**
+  String get sideDrawerGlobalSearchHint;
+
+  /// No description provided for @sideDrawerGlobalSearchEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search across titles and messages'**
+  String get sideDrawerGlobalSearchEmptyHint;
+
+  /// No description provided for @sideDrawerGlobalSearchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching sessions'**
+  String get sideDrawerGlobalSearchNoResults;
+
+  /// No description provided for @sideDrawerGlobalSearchResultCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} results'**
+  String sideDrawerGlobalSearchResultCount(int count);
 
   /// No description provided for @sideDrawerUpdateTitle.
   ///

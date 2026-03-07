@@ -165,6 +165,7 @@
   "desktopNavChatTooltip": "聊天",
   "desktopNavTranslateTooltip": "翻譯",
   "desktopNavStorageTooltip": "儲存",
+  "desktopNavGlobalSearchTooltip": "全域搜尋",
   "desktopNavThemeToggleTooltip": "主題切換",
   "desktopNavSettingsTooltip": "設定",
   "hotkeyToggleAppVisibility": "顯示/隱藏應用",
@@ -586,6 +587,17 @@
   "sideDrawerDateFullPattern": "yyyy年M月d日",
   "sideDrawerSearchHint": "搜尋聊天記錄",
   "sideDrawerSearchAssistantsHint": "搜尋助理",
+  "sideDrawerGlobalSearchHint": "搜尋全部會話",
+  "sideDrawerGlobalSearchEmptyHint": "在標題與訊息中全域搜尋",
+  "sideDrawerGlobalSearchNoResults": "沒有匹配的會話",
+  "sideDrawerGlobalSearchResultCount": "共 {count} 筆結果",
+  "@sideDrawerGlobalSearchResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "sideDrawerUpdateTitle": "發現新版本：{version}",
   "sideDrawerUpdateTitleWithBuild": "發現新版本：{version} ({build})",
   "sideDrawerLinkCopied": "已複製下載連結",
