@@ -39,6 +39,7 @@ import '../services/translation_service.dart';
 import '../services/file_upload_service.dart';
 import '../widgets/chat_input_bar.dart';
 import '../../model/widgets/model_select_sheet.dart';
+import '../../search/services/global_session_search_service.dart';
 
 /// Translation data for UI state (expanded/collapsed).
 class TranslationData {
@@ -68,13 +69,13 @@ class HomePageController extends ChangeNotifier {
     required ChatInputBarController mediaController,
     required ScrollController scrollController,
   })  : _context = context,
-        _vsync = vsync,
-        _scaffoldKey = scaffoldKey,
-        _inputBarKey = inputBarKey,
-        _inputFocus = inputFocus,
-        _inputController = inputController,
-        _mediaController = mediaController,
-        _scrollController = scrollController {
+       _vsync = vsync,
+       _scaffoldKey = scaffoldKey,
+       _inputBarKey = inputBarKey,
+       _inputFocus = inputFocus,
+       _inputController = inputController,
+       _mediaController = mediaController,
+       _scrollController = scrollController {
     _initialize();
   }
 
@@ -150,6 +151,14 @@ class HomePageController extends ChangeNotifier {
   // Drawer state
   double _lastDrawerValue = 0.0;
 
+  // Desktop global-search mode
+  bool _isGlobalSearchMode = false;
+  String _globalSearchQuery = '';
+
+  // Message-level spotlight target after selecting a global search result
+  String? _spotlightMessageId;
+  int _spotlightToken = 0;
+
   // Input bar measurement
   double _inputBarHeight = 72;
 
@@ -185,6 +194,10 @@ class HomePageController extends ChangeNotifier {
   double get rightSidebarWidth => _rightSidebarWidth;
   double get inputBarHeight => _inputBarHeight;
   bool get desktopUiInited => _desktopUiInited;
+  bool get isGlobalSearchMode => _isGlobalSearchMode;
+  String get globalSearchQuery => _globalSearchQuery;
+  String? get spotlightMessageId => _spotlightMessageId;
+  int get spotlightToken => _spotlightToken;
 
   static double get sidebarMinWidth => _sidebarMinWidth;
   static double get sidebarMaxWidth => _sidebarMaxWidth;
@@ -323,7 +336,7 @@ class HomePageController extends ChangeNotifier {
     };
     _viewModel.onScheduleImageSanitize = (messageId, content, {bool immediate = false}) {
       _scheduleInlineImageSanitize(messageId, latestContent: content, immediate: immediate);
-    };
+        };
     _viewModel.onConversationSwitched = () {
       _restoreMessageUiState();
       _scrollToBottom(animate: false);
@@ -400,8 +413,48 @@ class HomePageController extends ChangeNotifier {
         case ChatAction.switchModel:
           await showModelSelectSheet(_context);
           break;
+        case ChatAction.enterGlobalSearch:
+          enterGlobalSearchMode(preserveQuery: true);
+          break;
+        case ChatAction.exitGlobalSearch:
+          exitGlobalSearchMode(clearQuery: true);
+          break;
       }
     });
+  }
+
+  void enterGlobalSearchMode({bool preserveQuery = true}) {
+    _isGlobalSearchMode = true;
+    if (!preserveQuery) _globalSearchQuery = '';
+    notifyListeners();
+  }
+
+  void exitGlobalSearchMode({bool clearQuery = true}) {
+    _isGlobalSearchMode = false;
+    if (clearQuery) _globalSearchQuery = '';
+    notifyListeners();
+  }
+
+  void setGlobalSearchQuery(String value) {
+    if (_globalSearchQuery == value) return;
+    _globalSearchQuery = value;
+    notifyListeners();
+  }
+
+  Future<void> openGlobalSearchResult({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    await switchConversationAnimated(conversationId);
+    // Wait one extra frame so the new conversation's message widgets have
+    // had a chance to build and register their GlobalKeys in _messageKeys.
+    try { await WidgetsBinding.instance.endOfFrame; } catch (_) {}
+    if (messageId.isNotEmpty) {
+      await scrollToMessageId(messageId);
+      _spotlightMessageId = messageId;
+      _spotlightToken++;
+      notifyListeners();
+    }
   }
 
   Future<void> initChat() async {
@@ -458,10 +511,10 @@ class HomePageController extends ChangeNotifier {
     if (currentConversation == null) return;
 
     final versioning = _messageGenerationService.calculateRegenerationVersioning(
-      message: message,
-      messages: messages,
-      assistantAsNewReply: assistantAsNewReply,
-    );
+          message: message,
+          messages: messages,
+          assistantAsNewReply: assistantAsNewReply,
+        );
     if (versioning.lastKeep >= 0 && versioning.lastKeep < messages.length - 1) {
       for (int i = versioning.lastKeep + 1; i < messages.length; i++) {
         _translations.remove(messages[i].id);
@@ -1108,9 +1161,9 @@ class HomePageController extends ChangeNotifier {
   void scrollToBottom({bool animate = true}) => _scrollToBottom(animate: animate);
   void forceScrollToBottom() => _scrollCtrl.forceScrollToBottom();
   void forceScrollToBottomSoon({bool animate = true}) => _scrollCtrl.forceScrollToBottomSoon(
-    animate: animate,
-    postSwitchDelay: _postSwitchScrollDelay,
-  );
+        animate: animate,
+        postSwitchDelay: _postSwitchScrollDelay,
+      );
 
   Future<void> scrollToMessageId(String targetId) async {
     final collapsed = collapseVersions(messages);

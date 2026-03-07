@@ -78,6 +78,8 @@ class MessageListView extends StatelessWidget {
     this.isPinnedIndicatorActive = false,
     required this.isProcessingFiles,
     this.streamingContentNotifier,
+    this.spotlightMessageId,
+    this.spotlightToken = 0,
     this.onVersionChange,
     this.onRegenerateMessage,
     this.onResendMessage,
@@ -115,6 +117,13 @@ class MessageListView extends StatelessWidget {
   /// to avoid full page rebuilds.
   final StreamingContentNotifier? streamingContentNotifier;
 
+  /// When set, the message with this ID will receive a spotlight pulse animation.
+  final String? spotlightMessageId;
+
+  /// Incremented each time a new spotlight is triggered. Used as an animation key
+  /// so re-selecting the same message re-triggers the pulse.
+  final int spotlightToken;
+
   // Callbacks
   final OnVersionChange? onVersionChange;
   final OnRegenerateMessage? onRegenerateMessage;
@@ -137,11 +146,11 @@ class MessageListView extends StatelessWidget {
     final List<String> order = <String>[];
     for (final m in items) {
       final gid = (m.groupId ?? m.id);
-      final list = byGroup.putIfAbsent(gid, () {
+      if (!byGroup.containsKey(gid)) {
+        byGroup[gid] = <ChatMessage>[];
         order.add(gid);
-        return <ChatMessage>[];
-      });
-      list.add(m);
+      }
+      byGroup[gid]!.add(m);
     }
     for (final e in byGroup.entries) {
       e.value.sort((a, b) => a.version.compareTo(b.version));
@@ -281,7 +290,7 @@ class MessageListView extends StatelessWidget {
         streamingContentNotifier != null &&
         streamingContentNotifier!.hasNotifier(message.id);
 
-    return Column(
+    final messageColumn = Column(
       key: _keyForMessage(message.id),
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -370,6 +379,36 @@ class MessageListView extends StatelessWidget {
             child: _buildContextDivider(context),
           ),
       ],
+    );
+
+    final isSpotlight =
+        spotlightMessageId != null && message.id == spotlightMessageId;
+    if (!isSpotlight) return messageColumn;
+
+    return TweenAnimationBuilder<double>(
+      key: ValueKey('spotlight-$spotlightToken'),
+      tween: Tween<double>(begin: 1.0, end: 0.0),
+      duration: const Duration(milliseconds: 1200),
+      curve: Curves.easeOut,
+      builder: (context, opacity, child) {
+        return Stack(
+          children: [
+            child!,
+            if (opacity > 0.0)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFA726).withOpacity(opacity * 0.30),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+      child: messageColumn,
     );
   }
 

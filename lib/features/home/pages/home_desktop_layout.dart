@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
@@ -16,6 +17,7 @@ import '../../../shared/animations/widgets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../desktop/hotkeys/chat_action_bus.dart';
 
 /// Desktop/Tablet layout scaffold for the home page
 /// Handles the overall structure: left sidebar, main content, optional right sidebar
@@ -43,6 +45,10 @@ class HomeDesktopScaffold extends StatelessWidget {
     required this.onNewConversation,
     required this.onCreateNewConversation,
     required this.onSelectModel,
+    required this.globalSearchMode,
+    required this.globalSearchQuery,
+    required this.onGlobalSearchQueryChanged,
+    required this.onOpenGlobalSearchResult,
     required this.onSidebarWidthChanged,
     required this.onSidebarWidthChangeEnd,
     required this.onRightSidebarWidthChanged,
@@ -74,6 +80,11 @@ class HomeDesktopScaffold extends StatelessWidget {
   final VoidCallback onNewConversation;
   final Future<void> Function() onCreateNewConversation;
   final VoidCallback onSelectModel;
+  final bool globalSearchMode;
+  final String globalSearchQuery;
+  final ValueChanged<String> onGlobalSearchQueryChanged;
+  final Future<void> Function(String conversationId, String messageId)
+  onOpenGlobalSearchResult;
   final void Function(double dx) onSidebarWidthChanged;
   final VoidCallback onSidebarWidthChangeEnd;
   final void Function(double dx) onRightSidebarWidthChanged;
@@ -154,6 +165,13 @@ class HomeDesktopScaffold extends StatelessWidget {
       loadingConversationIds: loadingConversationIds,
       useDesktopTabs: _isDesktop && !topicsOnRight,
       desktopAssistantsOnly: _isDesktop && topicsOnRight,
+      globalSearchMode: globalSearchMode,
+      globalSearchQuery: globalSearchQuery,
+      onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,
+      onExitGlobalSearch: () {
+        ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
+      },
+      onOpenGlobalSearchResult: onOpenGlobalSearchResult,
       onNewConversation: ({closeDrawer = true}) => onNewConversation(),
       onSelectConversation: (id, {closeDrawer = true}) => onSelectConversation(id),
     );
@@ -205,6 +223,11 @@ class HomeDesktopScaffold extends StatelessWidget {
                   loadingConversationIds: loadingConversationIds,
                   useDesktopTabs: false,
                   desktopTopicsOnly: true,
+                  globalSearchMode: false,
+                  globalSearchQuery: '',
+                  onGlobalSearchQueryChanged: (_) {},
+                  onExitGlobalSearch: () {},
+                  onOpenGlobalSearchResult: (_, __) async {},
                   onSelectConversation: (id, {closeDrawer = true}) => onSelectConversation(id),
                   onNewConversation: ({closeDrawer = true}) => onNewConversation(),
                 ),

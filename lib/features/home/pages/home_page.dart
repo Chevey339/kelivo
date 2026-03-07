@@ -410,6 +410,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         await _controller.createNewConversationAnimated();
         if (mounted) _controller.forceScrollToBottomSoon(animate: false);
       },
+      globalSearchMode: _controller.isGlobalSearchMode,
+      globalSearchQuery: _controller.globalSearchQuery,
+      onGlobalSearchQueryChanged: _controller.setGlobalSearchQuery,
+      onOpenGlobalSearchResult: (convId, msgId) => _controller
+          .openGlobalSearchResult(conversationId: convId, messageId: msgId),
       onSelectModel: () => showModelSelectSheet(context),
       onSidebarWidthChanged: _controller.updateSidebarWidth,
       onSidebarWidthChangeEnd: _controller.saveSidebarWidth,
@@ -478,7 +483,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       dividerPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                     ),
                   ).animate(key: ValueKey('tab_body_'+(_controller.currentConversation?.id ?? 'none')))
-                   .fadeIn(duration: 200.ms, curve: Curves.easeOutCubic),
+                          .fadeIn(duration: 200.ms, curve: Curves.easeOutCubic),
                 ),
               ),
               if (_controller.selecting)
@@ -648,6 +653,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       selectedItems: _controller.selectedItems,
       dividerPadding: dividerPadding,
       streamingContentNotifier: _controller.streamingContentNotifier,
+      spotlightMessageId: _controller.spotlightMessageId,
+      spotlightToken: _controller.spotlightToken,
       onVersionChange: (groupId, version) async {
         await _controller.setSelectedVersion(groupId, version);
       },
