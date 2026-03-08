@@ -290,6 +290,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         }
       },
       onSelectModel: () => showModelSelectSheet(context),
+      globalSearchMode: _controller.isGlobalSearchMode,
+      globalSearchQuery: _controller.globalSearchQuery,
+      onGlobalSearchQueryChanged: _controller.setGlobalSearchQuery,
+      onEnterGlobalSearch: () => _controller.enterGlobalSearchMode(preserveQuery: false),
+      onExitGlobalSearch: () => _controller.exitGlobalSearchMode(clearQuery: true),
+      onOpenGlobalSearchResult: (convId, msgId) => _controller
+          .openGlobalSearchResult(conversationId: convId, messageId: msgId),
       appBarOverride: _controller.selecting
           ? ChatSelectionAppBar(
               selectedCount: _controller.selectedCount,

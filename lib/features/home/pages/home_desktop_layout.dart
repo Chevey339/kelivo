@@ -168,6 +168,9 @@ class HomeDesktopScaffold extends StatelessWidget {
       globalSearchMode: globalSearchMode,
       globalSearchQuery: globalSearchQuery,
       onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,
+      onEnterGlobalSearch: () {
+        ChatActionBus.instance.fire(ChatAction.enterGlobalSearch);
+      },
       onExitGlobalSearch: () {
         ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
       },
@@ -226,6 +229,7 @@ class HomeDesktopScaffold extends StatelessWidget {
                   globalSearchMode: false,
                   globalSearchQuery: '',
                   onGlobalSearchQueryChanged: (_) {},
+                  onEnterGlobalSearch: () {},
                   onExitGlobalSearch: () {},
                   onOpenGlobalSearchResult: (_, __) async {},
                   onSelectConversation: (id, {closeDrawer = true}) => onSelectConversation(id),

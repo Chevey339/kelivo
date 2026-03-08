@@ -39,6 +39,12 @@ class HomeMobileScaffold extends StatelessWidget {
     required this.onOpenMiniMap,
     required this.onCreateNewConversation,
     required this.onSelectModel,
+    required this.globalSearchMode,
+    required this.globalSearchQuery,
+    required this.onGlobalSearchQueryChanged,
+    required this.onEnterGlobalSearch,
+    required this.onExitGlobalSearch,
+    required this.onOpenGlobalSearchResult,
     this.appBarOverride,
     required this.body,
   });
@@ -57,6 +63,13 @@ class HomeMobileScaffold extends StatelessWidget {
   final VoidCallback onOpenMiniMap;
   final Future<void> Function() onCreateNewConversation;
   final VoidCallback onSelectModel;
+  final bool globalSearchMode;
+  final String globalSearchQuery;
+  final ValueChanged<String> onGlobalSearchQueryChanged;
+  final VoidCallback onEnterGlobalSearch;
+  final VoidCallback onExitGlobalSearch;
+  final Future<void> Function(String conversationId, String messageId)
+  onOpenGlobalSearchResult;
   final PreferredSizeWidget? appBarOverride;
   final Widget body;
 
@@ -76,6 +89,15 @@ class HomeMobileScaffold extends StatelessWidget {
         assistantName: _getAssistantName(context),
         closePickerTicker: assistantPickerCloseTick,
         loadingConversationIds: loadingConversationIds,
+        globalSearchMode: globalSearchMode,
+        globalSearchQuery: globalSearchQuery,
+        onGlobalSearchQueryChanged: onGlobalSearchQueryChanged,
+        onEnterGlobalSearch: onEnterGlobalSearch,
+        onExitGlobalSearch: onExitGlobalSearch,
+        onOpenGlobalSearchResult: (conversationId, messageId) async {
+          await onOpenGlobalSearchResult(conversationId, messageId);
+          drawerController.close();
+        },
         onSelectConversation: (id, {closeDrawer = true}) {
           onSelectConversation(id);
           if (closeDrawer) drawerController.close();

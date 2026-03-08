@@ -3572,7 +3572,7 @@ abstract class AppLocalizations {
   /// No description provided for @sideDrawerSearchHint.
   ///
   /// In en, this message translates to:
-  /// **'Search chat history'**
+  /// **'Search current assistant'**
   String get sideDrawerSearchHint;
 
   /// No description provided for @sideDrawerSearchAssistantsHint.
@@ -3580,6 +3580,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Search assistants'**
   String get sideDrawerSearchAssistantsHint;
+
+  /// No description provided for @sideDrawerTopicSearchModeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Topic mode'**
+  String get sideDrawerTopicSearchModeLabel;
+
+  /// No description provided for @sideDrawerGlobalSearchModeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Global mode'**
+  String get sideDrawerGlobalSearchModeLabel;
+
+  /// No description provided for @sideDrawerSearchModeSwipeToTopicHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe the search bar for topic search'**
+  String get sideDrawerSearchModeSwipeToTopicHint;
+
+  /// No description provided for @sideDrawerSearchModeSwipeToGlobalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe the search bar for global search'**
+  String get sideDrawerSearchModeSwipeToGlobalHint;
 
   /// No description provided for @sideDrawerGlobalSearchHint.
   ///
