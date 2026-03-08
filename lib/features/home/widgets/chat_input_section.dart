@@ -20,6 +20,9 @@ typedef IsToolModelCallback = bool Function(String providerKey, String modelId);
 /// Callback for checking if a model supports reasoning.
 typedef IsReasoningModelCallback = bool Function(String providerKey, String modelId);
 
+/// Callback for checking if a model supports verbosity.
+typedef IsVerbosityModelCallback = bool Function(String providerKey, String modelId);
+
 /// Callback for checking if reasoning is enabled.
 typedef IsReasoningEnabledCallback = bool Function(int? budget);
 
@@ -39,6 +42,7 @@ class ChatInputSection extends StatelessWidget {
     required this.isToolModel,
     required this.isReasoningModel,
     required this.isReasoningEnabled,
+    this.isVerbosityModel,
     this.onMore,
     this.onSelectModel,
     this.onLongPressSelectModel,
@@ -46,6 +50,7 @@ class ChatInputSection extends StatelessWidget {
     this.onLongPressMcp,
     this.onOpenSearch,
     this.onConfigureReasoning,
+    this.onConfigureVerbosity,
     this.onSend,
     this.onStop,
     this.onQuickPhrase,
@@ -73,6 +78,7 @@ class ChatInputSection extends StatelessWidget {
   final IsToolModelCallback isToolModel;
   final IsReasoningModelCallback isReasoningModel;
   final IsReasoningEnabledCallback isReasoningEnabled;
+  final IsVerbosityModelCallback? isVerbosityModel;
 
   // Callbacks
   final VoidCallback? onMore;
@@ -82,6 +88,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onLongPressMcp;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onConfigureReasoning;
+  final VoidCallback? onConfigureVerbosity;
   final ValueChanged<ChatInputData>? onSend;
   final VoidCallback? onStop;
   final VoidCallback? onQuickPhrase;
@@ -143,6 +150,12 @@ class ChatInputSection extends StatelessWidget {
       controller: inputController,
       mediaController: mediaController,
       onConfigureReasoning: onConfigureReasoning,
+      onConfigureVerbosity: onConfigureVerbosity,
+      supportsVerbosity: (pk != null && mid != null && isVerbosityModel != null) ? isVerbosityModel!(pk, mid) : false,
+      verbosityActive: (() {
+        final v = (a?.verbosity) ?? settings.verbosity;
+        return v != null && v != 'medium';
+      })(),
       reasoningActive: isReasoningEnabled(
         (context.watch<AssistantProvider>().currentAssistant?.thinkingBudget) ?? settings.thinkingBudget,
       ),

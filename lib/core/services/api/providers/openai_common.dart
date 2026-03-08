@@ -79,6 +79,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
   bool stream = true,
+  String? verbosity,
 }) async* {
   final upstreamModelId = _apiModelId(config, modelId);
   final base = config.baseUrl.endsWith('/')
@@ -414,6 +415,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           'summary': 'auto',
           if (effort != 'auto') 'effort': effort,
         },
+      // GPT-5 family: verbosity (Responses API nests under 'text')
+      if (verbosity != null && isOpenAIGpt5FamilyModel(upstreamModelId))
+        'text': {'verbosity': verbosity},
     };
     // Append include parameter if we opted into sources via overrides
     try {
@@ -581,6 +585,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       if (tools != null && tools.isNotEmpty)
         'tools': _cleanToolsForCompatibility(tools),
       if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
+      // GPT-5 family: verbosity (Chat Completions uses top-level key)
+      if (verbosity != null && isOpenAIGpt5FamilyModel(upstreamModelId))
+        'verbosity': verbosity,
     };
     _setMaxTokens(body);
   }

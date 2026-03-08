@@ -23,6 +23,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
 import '../../../desktop/reasoning_budget_popover.dart';
+import '../../../desktop/verbosity_popover.dart';
 import '../../../desktop/mcp_servers_popover.dart';
 import '../../../desktop/mini_map_popover.dart';
 import '../../../desktop/quick_phrase_popover.dart';
@@ -31,6 +32,7 @@ import '../../../desktop/world_book_popover.dart';
 import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/context_management_sheet.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
+import '../../chat/widgets/verbosity_sheet.dart';
 import '../../search/widgets/search_settings_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
@@ -685,6 +687,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       isToolModel: _controller.isToolModel,
       isReasoningModel: _controller.isReasoningModel,
       isReasoningEnabled: _controller.isReasoningEnabled,
+      isVerbosityModel: _controller.supportsVerbosity,
       onMore: _toggleTools,
       onSelectModel: () => showModelSelectSheet(context),
       onLongPressSelectModel: () {
@@ -718,6 +721,19 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           final chosen = context.read<SettingsProvider>().thinkingBudget;
           await context.read<AssistantProvider>().updateAssistant(
             assistant.copyWith(thinkingBudget: chosen),
+          );
+        }
+      },
+      onConfigureVerbosity: () async {
+        final assistant = context.read<AssistantProvider>().currentAssistant;
+        if (assistant != null) {
+          if (assistant.verbosity != null) {
+            context.read<SettingsProvider>().setVerbosity(assistant.verbosity);
+          }
+          await _openVerbositySettings();
+          final chosen = context.read<SettingsProvider>().verbosity;
+          await context.read<AssistantProvider>().updateAssistant(
+            assistant.copyWith(verbosity: chosen),
           );
         }
       },
@@ -842,6 +858,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       await showDesktopReasoningBudgetPopover(context, anchorKey: _inputBarKey);
     } else {
       await showReasoningBudgetSheet(context);
+    }
+  }
+
+  Future<void> _openVerbositySettings() async {
+    if (PlatformUtils.isDesktop) {
+      await showDesktopVerbosityPopover(context, anchorKey: _inputBarKey);
+    } else {
+      await showVerbositySheet(context);
     }
   }
 

@@ -54,6 +54,7 @@ class ChatInputBar extends StatefulWidget {
     this.onOpenSearch,
     this.onMore,
     this.onConfigureReasoning,
+    this.onConfigureVerbosity,
     this.moreOpen = false,
     this.focusNode,
     this.modelIcon,
@@ -62,6 +63,8 @@ class ChatInputBar extends StatefulWidget {
     this.loading = false,
     this.reasoningActive = false,
     this.supportsReasoning = true,
+    this.supportsVerbosity = false,
+    this.verbosityActive = false,
     this.showMcpButton = false,
     this.mcpActive = false,
     this.searchEnabled = false,
@@ -96,6 +99,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onOpenSearch;
   final VoidCallback? onMore;
   final VoidCallback? onConfigureReasoning;
+  final VoidCallback? onConfigureVerbosity;
   final bool moreOpen;
   final FocusNode? focusNode;
   final Widget? modelIcon;
@@ -104,6 +108,8 @@ class ChatInputBar extends StatefulWidget {
   final bool loading;
   final bool reasoningActive;
   final bool supportsReasoning;
+  final bool supportsVerbosity;
+  final bool verbosityActive;
   final bool showMcpButton;
   final bool mcpActive;
   final bool searchEnabled;
@@ -869,6 +875,24 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
               icon: Lucide.Hammer,
               label: l10n.chatInputBarMcpServersTooltip,
               onTap: widget.onOpenMcp,
+            ),
+          ));
+        }
+
+        // Verbosity button (GPT-5 family)
+        if (widget.supportsVerbosity) {
+          actions.add(_OverflowAction(
+            width: normalButtonW,
+            builder: () => _CompactIconButton(
+              tooltip: l10n.verbosityTooltip,
+              icon: Lucide.MessageCircleMore,
+              active: widget.verbosityActive,
+              onTap: widget.onConfigureVerbosity,
+            ),
+            menu: DesktopContextMenuItem(
+              icon: Lucide.MessageCircleMore,
+              label: l10n.verbosityTooltip,
+              onTap: widget.onConfigureVerbosity,
             ),
           ));
         }
