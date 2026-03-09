@@ -56,7 +56,7 @@ part 'assistant_settings_edit_custom_request_tab.dart';
 part 'assistant_settings_edit_mcp_tab.dart';
 
 const int _contextMessageMin = 1;
-const int _contextMessageMax = 256;
+const int _contextMessageMax = 1024;
 
 int _clampContextMessages(num value) =>
     value.clamp(_contextMessageMin, _contextMessageMax).toInt();
@@ -1705,6 +1705,8 @@ class _DesktopAssistantBasicPaneState
                           64.0,
                           128.0,
                           256.0,
+                          512.0,
+                          1024.0,
                         ],
                         onLabelTap: a.limitContextMessages
                             ? () async {
