@@ -874,6 +874,7 @@
   "chatInputBarReasoningStrengthTooltip": "Reasoning Strength",
   "chatInputBarMcpServersTooltip": "MCP Servers",
   "verbosityTooltip": "Verbosity",
+  "verbosityDefault": "Default",
   "verbosityLow": "Low",
   "verbosityMedium": "Medium",
   "verbosityHigh": "High",

@@ -105,7 +105,12 @@ class GenerationController {
   }
 
   bool supportsVerbosity(String providerKey, String modelId) {
-    return isOpenAIGpt5FamilyModel(modelId);
+    final settings = contextProvider.read<SettingsProvider>();
+    final cfg = settings.getProviderConfig(providerKey);
+    final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
+    final isAzureOpenAI = host.contains('openai.azure.com');
+    final isOpenAIHost = host.contains('openai.com') && !isAzureOpenAI;
+    return isOpenAIHost && isOpenAIGpt5FamilyModel(modelId);
   }
 
   // ============================================================================

@@ -727,14 +727,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       onConfigureVerbosity: () async {
         final assistant = context.read<AssistantProvider>().currentAssistant;
         if (assistant != null) {
-          if (assistant.verbosity != null) {
-            context.read<SettingsProvider>().setVerbosity(assistant.verbosity);
+          final chosen = await _openVerbositySettings(assistant.verbosity);
+          if (chosen == null) return;
+          if (chosen == kVerbosityDefaultSelection) {
+            await context.read<AssistantProvider>().updateAssistant(
+              assistant.copyWith(clearVerbosity: true),
+            );
+          } else if (chosen != assistant.verbosity) {
+            await context.read<AssistantProvider>().updateAssistant(
+              assistant.copyWith(verbosity: chosen),
+            );
           }
-          await _openVerbositySettings();
-          final chosen = context.read<SettingsProvider>().verbosity;
-          await context.read<AssistantProvider>().updateAssistant(
-            assistant.copyWith(verbosity: chosen),
-          );
         }
       },
       onSend: (text) {
@@ -861,11 +864,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
   }
 
-  Future<void> _openVerbositySettings() async {
+  Future<String?> _openVerbositySettings(String? initialValue) async {
     if (PlatformUtils.isDesktop) {
-      await showDesktopVerbosityPopover(context, anchorKey: _inputBarKey);
+      return showDesktopVerbosityPopover(
+        context,
+        anchorKey: _inputBarKey,
+        initialValue: initialValue,
+      );
     } else {
-      await showVerbositySheet(context);
+      return showVerbositySheet(context, initialValue: initialValue);
     }
   }
 

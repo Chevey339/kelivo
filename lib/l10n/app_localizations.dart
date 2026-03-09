@@ -3767,6 +3767,12 @@ abstract class AppLocalizations {
   /// **'Verbosity'**
   String get verbosityTooltip;
 
+  /// No description provided for @verbosityDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get verbosityDefault;
+
   /// No description provided for @verbosityLow.
   ///
   /// In en, this message translates to:

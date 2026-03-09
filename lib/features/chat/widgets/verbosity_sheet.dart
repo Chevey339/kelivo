@@ -1,37 +1,52 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
-import '../../../theme/design_tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 
-Future<void> showVerbositySheet(BuildContext context) async {
-  await showModalBottomSheet(
+const String kVerbosityDefaultSelection = '__default__';
+
+Future<String?> showVerbositySheet(
+  BuildContext context, {
+  String? initialValue,
+}) async {
+  return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Theme.of(context).colorScheme.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (ctx) => const _VerbositySheet(),
+    builder: (ctx) => _VerbositySheet(initialValue: initialValue),
   );
 }
 
-class _VerbositySheet extends StatelessWidget {
-  const _VerbositySheet();
+class _VerbositySheet extends StatefulWidget {
+  const _VerbositySheet({this.initialValue});
 
-  String _effectiveVerbosity(String? v) => (v == null || v.isEmpty) ? 'medium' : v;
+  final String? initialValue;
 
-  Widget _tile(BuildContext context, {
+  @override
+  State<_VerbositySheet> createState() => _VerbositySheetState();
+}
+
+class _VerbositySheetState extends State<_VerbositySheet> {
+  late String _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.initialValue ?? kVerbosityDefaultSelection;
+  }
+
+  Widget _tile(
+    BuildContext context, {
     required IconData icon,
     required String title,
     required String value,
-    required String selected,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final active = selected == value;
+    final active = _selected == value;
     final Color iconColor = active ? cs.primary : cs.onSurface.withOpacity(0.7);
     final Color onColor = active ? cs.primary : cs.onSurface;
     return Padding(
@@ -44,8 +59,9 @@ class _VerbositySheet extends StatelessWidget {
           duration: const Duration(milliseconds: 260),
           onTap: () {
             Haptics.light();
-            context.read<SettingsProvider>().setVerbosity(value);
-            Navigator.of(context).maybePop();
+            Navigator.of(context).maybePop(
+              value == kVerbosityDefaultSelection ? kVerbosityDefaultSelection : value,
+            );
           },
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
@@ -71,8 +87,6 @@ class _VerbositySheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final settings = context.watch<SettingsProvider>();
-    final selected = _effectiveVerbosity(settings.verbosity);
     final cs = Theme.of(context).colorScheme;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.8;
     return SafeArea(
@@ -95,9 +109,15 @@ class _VerbositySheet extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Column(
                     children: [
-                      _tile(context, icon: Lucide.MessageCircleMore, title: l10n.verbosityLow, value: 'low', selected: selected),
-                      _tile(context, icon: Lucide.MessageCircleMore, title: l10n.verbosityMedium, value: 'medium', selected: selected),
-                      _tile(context, icon: Lucide.MessageCircleMore, title: l10n.verbosityHigh, value: 'high', selected: selected),
+                      _tile(
+                        context,
+                        icon: Lucide.RotateCcw,
+                        title: l10n.verbosityDefault,
+                        value: kVerbosityDefaultSelection,
+                      ),
+                      _tile(context, icon: Lucide.MessageCircleMore, title: l10n.verbosityLow, value: 'low'),
+                      _tile(context, icon: Lucide.MessageCircleMore, title: l10n.verbosityMedium, value: 'medium'),
+                      _tile(context, icon: Lucide.MessageCircleMore, title: l10n.verbosityHigh, value: 'high'),
                     ],
                   ),
                 ),

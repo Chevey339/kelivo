@@ -618,6 +618,7 @@
   "chatInputBarReasoningStrengthTooltip": "思維鏈強度",
   "chatInputBarMcpServersTooltip": "MCP伺服器",
   "verbosityTooltip": "回答詳細程度",
+  "verbosityDefault": "預設",
   "verbosityLow": "簡潔",
   "verbosityMedium": "適中",
   "verbosityHigh": "詳細",
