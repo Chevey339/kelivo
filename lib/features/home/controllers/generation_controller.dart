@@ -8,6 +8,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../services/message_builder_service.dart';
+import '../../../core/utils/openai_model_compat.dart';
 import '../services/tool_handler_service.dart';
 import 'chat_controller.dart';
 import 'stream_controller.dart' as stream_ctrl;
@@ -109,6 +110,15 @@ class GenerationController {
     if (budget == null) return true; // treat null as default/auto -> enabled
     if (budget == -1) return true; // auto
     return budget >= 1024;
+  }
+
+  bool supportsVerbosity(String providerKey, String modelId) {
+    final settings = contextProvider.read<SettingsProvider>();
+    final cfg = settings.getProviderConfig(providerKey);
+    final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
+    final isAzureOpenAI = host.contains('openai.azure.com');
+    final isOpenAIHost = host.contains('openai.com') && !isAzureOpenAI;
+    return isOpenAIHost && isOpenAIGpt5FamilyModel(modelId);
   }
 
   // ============================================================================

@@ -1951,6 +1951,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarMcpServersTooltip => 'MCP服务器';
 
   @override
+  String get verbosityTooltip => '回答详细程度';
+
+  @override
+  String get verbosityDefault => '默认';
+
+  @override
+  String get verbosityLow => '简洁';
+
+  @override
+  String get verbosityMedium => '适中';
+
+  @override
+  String get verbosityHigh => '详细';
+
+  @override
   String get chatInputBarMoreTooltip => '更多';
 
   @override
@@ -6096,6 +6111,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarMcpServersTooltip => 'MCP服务器';
 
   @override
+  String get verbosityTooltip => '回答详细程度';
+
+  @override
+  String get verbosityDefault => '默认';
+
+  @override
+  String get verbosityLow => '简洁';
+
+  @override
+  String get verbosityMedium => '适中';
+
+  @override
+  String get verbosityHigh => '详细';
+
+  @override
   String get chatInputBarMoreTooltip => '更多';
 
   @override
@@ -10186,6 +10216,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatInputBarMcpServersTooltip => 'MCP伺服器';
+
+  @override
+  String get verbosityTooltip => '回答詳細程度';
+
+  @override
+  String get verbosityDefault => '預設';
+
+  @override
+  String get verbosityLow => '簡潔';
+
+  @override
+  String get verbosityMedium => '適中';
+
+  @override
+  String get verbosityHigh => '詳細';
 
   @override
   String get chatInputBarMoreTooltip => '更多';

@@ -514,6 +514,7 @@ class ChatActions {
         extraBody: ctx.extraBody,
         stream: ctx.streamOutput,
         requestId: conversationId,
+        verbosity: assistant?.verbosity ?? ctx.settings.verbosity,
       );
 
       await _conversationStreams[conversationId]?.cancel();

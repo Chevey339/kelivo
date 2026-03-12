@@ -3815,6 +3815,36 @@ abstract class AppLocalizations {
   /// **'MCP Servers'**
   String get chatInputBarMcpServersTooltip;
 
+  /// No description provided for @verbosityTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Verbosity'**
+  String get verbosityTooltip;
+
+  /// No description provided for @verbosityDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get verbosityDefault;
+
+  /// No description provided for @verbosityLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Low'**
+  String get verbosityLow;
+
+  /// No description provided for @verbosityMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get verbosityMedium;
+
+  /// No description provided for @verbosityHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get verbosityHigh;
+
   /// No description provided for @chatInputBarMoreTooltip.
   ///
   /// In en, this message translates to:
