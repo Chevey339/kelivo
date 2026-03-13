@@ -52,7 +52,9 @@ class _MessageEditPageState extends State<MessageEditPage> {
           padding: const EdgeInsets.all(16),
           child: Container(
             decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white10
+                  : const Color(0xFFF2F3F5),
               borderRadius: BorderRadius.circular(12),
             ),
             clipBehavior: Clip.antiAlias,

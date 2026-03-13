@@ -50,6 +50,7 @@ class PlainTextCodeEditor extends StatelessWidget {
     super.key,
     required this.controller,
     this.focusNode,
+    this.toolbarController,
     this.readOnly = false,
     this.autofocus = false,
     this.wordWrap = true,
@@ -75,6 +76,7 @@ class PlainTextCodeEditor extends StatelessWidget {
 
   final CodeLineEditingController controller;
   final FocusNode? focusNode;
+  final SelectionToolbarController? toolbarController;
   final bool readOnly;
   final bool autofocus;
   final bool wordWrap;
@@ -104,7 +106,8 @@ class PlainTextCodeEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final resolvedStyle = style ??
+    final resolvedStyle =
+        style ??
         buildPlainTextCodeEditorStyle(
           context,
           fontSize: fontSize,
@@ -123,6 +126,7 @@ class PlainTextCodeEditor extends StatelessWidget {
     return CodeEditor(
       controller: controller,
       focusNode: focusNode,
+      toolbarController: toolbarController,
       readOnly: readOnly,
       autofocus: autofocus,
       wordWrap: wordWrap,
@@ -137,4 +141,3 @@ class PlainTextCodeEditor extends StatelessWidget {
     );
   }
 }
-

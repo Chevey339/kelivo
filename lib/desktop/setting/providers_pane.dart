@@ -808,7 +808,7 @@ class _DesktopProviderDetailPaneState
   final CodeLineEditingController _saJsonCtrl = CodeLineEditingController();
   final TextEditingController _apiPathCtrl = TextEditingController();
   Timer? _saJsonSaveTimer;
-  String _lastSavedSaJson = '';
+  String _lastPersistedSaJson = '';
 
   void _syncCtrl(TextEditingController c, String newText) {
     final v = c.value;
@@ -826,20 +826,26 @@ class _DesktopProviderDetailPaneState
     c.setTextSafely(newText);
   }
 
+  bool _hasPendingSaJsonChanges() {
+    return _saJsonSaveTimer != null || _saJsonCtrl.text != _lastPersistedSaJson;
+  }
+
   void _syncControllersFromConfig(ProviderConfig cfg) {
     _syncCtrl(_apiKeyCtrl, cfg.apiKey);
     _syncCtrl(_baseUrlCtrl, cfg.baseUrl);
     _syncCtrl(_apiPathCtrl, cfg.chatPath ?? '/chat/completions');
     _syncCtrl(_locationCtrl, cfg.location ?? '');
     _syncCtrl(_projectIdCtrl, cfg.projectId ?? '');
-    _syncCodeCtrl(_saJsonCtrl, cfg.serviceAccountJson ?? '');
-    _lastSavedSaJson = cfg.serviceAccountJson ?? '';
+    final persistedSaJson = cfg.serviceAccountJson ?? '';
+    if (!_saJsonCtrl.isComposing && !_hasPendingSaJsonChanges()) {
+      _syncCodeCtrl(_saJsonCtrl, persistedSaJson);
+    }
+    _lastPersistedSaJson = persistedSaJson;
   }
 
   Future<void> _saveSaJsonNow(SettingsProvider sp) async {
     final text = _saJsonCtrl.text;
-    if (text == _lastSavedSaJson) return;
-    _lastSavedSaJson = text;
+    if (text == _lastPersistedSaJson) return;
     final old = sp.getProviderConfig(
       widget.providerKey,
       defaultName: widget.displayName,
@@ -848,6 +854,7 @@ class _DesktopProviderDetailPaneState
       widget.providerKey,
       old.copyWith(serviceAccountJson: text),
     );
+    _lastPersistedSaJson = text;
   }
 
   void _scheduleSaJsonSave(SettingsProvider sp) {
@@ -1515,7 +1522,8 @@ class _DesktopProviderDetailPaneState
                         },
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Theme.of(context).brightness == Brightness.dark
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
                                 ? Colors.white10
                                 : const Color(0xFFF7F7F9),
                             borderRadius: BorderRadius.circular(10),
