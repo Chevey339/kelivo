@@ -956,7 +956,7 @@ class _DesktopProviderDetailPaneState
   final TextEditingController _balanceResultPathCtrl = TextEditingController();
   bool _balanceLoading = false;
   Timer? _saJsonSaveTimer;
-  String _lastSavedSaJson = '';
+  String _lastPersistedSaJson = '';
 
   void _syncCtrl(TextEditingController c, String newText) {
     final v = c.value;
@@ -974,13 +974,20 @@ class _DesktopProviderDetailPaneState
     c.setTextSafely(newText);
   }
 
+  bool _hasPendingSaJsonChanges() {
+    return _saJsonSaveTimer != null || _saJsonCtrl.text != _lastPersistedSaJson;
+  }
+
   void _syncControllersFromConfig(ProviderConfig cfg) {
     _syncCtrl(_apiKeyCtrl, cfg.apiKey);
     _syncCtrl(_baseUrlCtrl, cfg.baseUrl);
     _syncCtrl(_apiPathCtrl, cfg.chatPath ?? '/chat/completions');
     _syncCtrl(_locationCtrl, cfg.location ?? '');
     _syncCtrl(_projectIdCtrl, cfg.projectId ?? '');
-    _syncCodeCtrl(_saJsonCtrl, cfg.serviceAccountJson ?? '');
+    final persistedSaJson = cfg.serviceAccountJson ?? '';
+    if (!_saJsonCtrl.isComposing && !_hasPendingSaJsonChanges()) {
+      _syncCodeCtrl(_saJsonCtrl, persistedSaJson);
+    }
     _syncCtrl(
       _balanceApiPathCtrl,
       cfg.balanceApiPath ??
@@ -999,13 +1006,12 @@ class _DesktopProviderDetailPaneState
           ).balanceResultPath ??
           'data.total_usage',
     );
-    _lastSavedSaJson = cfg.serviceAccountJson ?? '';
+    _lastPersistedSaJson = persistedSaJson;
   }
 
   Future<void> _saveSaJsonNow(SettingsProvider sp) async {
     final text = _saJsonCtrl.text;
-    if (text == _lastSavedSaJson) return;
-    _lastSavedSaJson = text;
+    if (text == _lastPersistedSaJson) return;
     final old = sp.getProviderConfig(
       widget.providerKey,
       defaultName: widget.displayName,
@@ -1014,6 +1020,7 @@ class _DesktopProviderDetailPaneState
       widget.providerKey,
       old.copyWith(serviceAccountJson: text),
     );
+    _lastPersistedSaJson = text;
   }
 
   void _scheduleSaJsonSave(SettingsProvider sp) {

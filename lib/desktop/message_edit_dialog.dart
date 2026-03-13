@@ -96,8 +96,6 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                       TextButton.icon(
                         onPressed: () {
                           final text = _controller.text.trim();
-                          // TODO: Provide user feedback (disable button or show snackbar) when content is empty.
-                          if (text.isEmpty) return;
                           Navigator.of(context).pop<MessageEditResult>(
                             MessageEditResult(content: text, shouldSend: true),
                           );
@@ -119,8 +117,6 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                       TextButton.icon(
                         onPressed: () {
                           final text = _controller.text.trim();
-                          // TODO: Provide user feedback (disable button or show snackbar) when content is empty.
-                          if (text.isEmpty) return;
                           Navigator.of(context).pop<MessageEditResult>(
                             MessageEditResult(content: text, shouldSend: false),
                           );

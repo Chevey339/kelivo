@@ -351,6 +351,73 @@ class _ChatInputBarState extends State<ChatInputBar>
     return l10n.chatInputBarHint;
   }
 
+  bool _useDesktopSendShortcuts(BuildContext context) {
+    if (_isDesktopPlatform()) {
+      return true;
+    }
+    return MediaQuery.sizeOf(context).width >= AppBreakpoints.tablet;
+  }
+
+  SelectionToolbarController? _buildSelectionToolbarController(
+    BuildContext context,
+  ) {
+    if (!_isIOSPlatform()) {
+      return null;
+    }
+    final materialL10n = MaterialLocalizations.of(context);
+    return MobileSelectionToolbarController(
+      builder:
+          ({
+            required TextSelectionToolbarAnchors anchors,
+            required BuildContext context,
+            required CodeLineEditingController controller,
+            required VoidCallback onDismiss,
+            required VoidCallback onRefresh,
+          }) {
+            final selection = controller.selection;
+            final hasSelection = !selection.isCollapsed;
+            final hasText = controller.text.isNotEmpty;
+            final buttonItems = <ContextMenuButtonItem>[
+              if (hasSelection)
+                ContextMenuButtonItem(
+                  label: materialL10n.cutButtonLabel,
+                  onPressed: () {
+                    controller.cut();
+                    onDismiss();
+                  },
+                ),
+              if (hasSelection)
+                ContextMenuButtonItem(
+                  label: materialL10n.copyButtonLabel,
+                  onPressed: () {
+                    unawaited(controller.copy());
+                    onDismiss();
+                  },
+                ),
+              ContextMenuButtonItem(
+                label: materialL10n.pasteButtonLabel,
+                onPressed: () {
+                  onDismiss();
+                  unawaited(_handlePasteFromClipboard());
+                },
+              ),
+              if (hasText)
+                ContextMenuButtonItem(
+                  label: materialL10n.selectAllButtonLabel,
+                  onPressed: () {
+                    controller.selectAll();
+                    onRefresh();
+                  },
+                ),
+            ];
+            return AdaptiveTextSelectionToolbar.buttonItems(
+              anchors: anchors,
+              buttonItems: buttonItems,
+            );
+          },
+    );
+  }
+
   ({double height, int lineCount}) _measureInputMetrics({
     required BuildContext context,
     required String text,
@@ -445,8 +512,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         keys.contains(LogicalKeyboardKey.metaRight);
     final ctrlOrMeta = ctrl || meta;
 
-    final isDesktopOs = _isDesktopPlatform();
-    if (isDesktopOs) {
+    if (_useDesktopSendShortcuts(context)) {
       final sendShortcut = context.read<SettingsProvider>().desktopSendShortcut;
       if (sendShortcut == DesktopSendShortcut.ctrlEnter) {
         if (ctrlOrMeta) {
@@ -1688,10 +1754,19 @@ class _ChatInputBarState extends State<ChatInputBar>
                                       child: PlainTextCodeEditor(
                                         controller: _controller,
                                         focusNode: widget.focusNode,
+                                        toolbarController:
+                                            _buildSelectionToolbarController(
+                                              context,
+                                            ),
                                         wordWrap: true,
                                         autofocus: false,
                                         shortcutsActivatorsBuilder:
-                                            const _ChatInputShortcutsActivatorsBuilder(),
+                                            _ChatInputShortcutsActivatorsBuilder(
+                                              useDesktopSendShortcuts:
+                                                  _useDesktopSendShortcuts(
+                                                    context,
+                                                  ),
+                                            ),
                                         shortcutOverrideActions:
                                             _shortcutOverrideActions,
                                         // Make wrapping behavior stable by ensuring we always use the same padding.
@@ -2188,6 +2263,9 @@ class _ComposingAwareNewLineAction extends Action<CodeShortcutNewLineIntent> {
   final Object? Function(CodeShortcutNewLineIntent) onInvoke;
 
   @override
+  bool consumesKey(CodeShortcutNewLineIntent intent) => !isComposing();
+
+  @override
   Object? invoke(CodeShortcutNewLineIntent intent) {
     if (isComposing()) {
       return null;
@@ -2198,19 +2276,27 @@ class _ComposingAwareNewLineAction extends Action<CodeShortcutNewLineIntent> {
 
 class _ChatInputShortcutsActivatorsBuilder
     extends CodeShortcutsActivatorsBuilder {
-  const _ChatInputShortcutsActivatorsBuilder();
+  const _ChatInputShortcutsActivatorsBuilder({
+    required this.useDesktopSendShortcuts,
+  });
+
+  final bool useDesktopSendShortcuts;
 
   @override
   List<ShortcutActivator>? build(CodeShortcutType type) {
     if (type == CodeShortcutType.newLine) {
       final activators = <ShortcutActivator>[
         SingleActivator(LogicalKeyboardKey.enter),
+        SingleActivator(LogicalKeyboardKey.numpadEnter),
         SingleActivator(LogicalKeyboardKey.enter, shift: true),
+        SingleActivator(LogicalKeyboardKey.numpadEnter, shift: true),
       ];
-      if (_isDesktopPlatform()) {
+      if (useDesktopSendShortcuts) {
         activators.addAll(const [
           SingleActivator(LogicalKeyboardKey.enter, control: true),
+          SingleActivator(LogicalKeyboardKey.numpadEnter, control: true),
           SingleActivator(LogicalKeyboardKey.enter, meta: true),
+          SingleActivator(LogicalKeyboardKey.numpadEnter, meta: true),
         ]);
       }
       return activators;
