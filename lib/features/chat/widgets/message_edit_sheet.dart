@@ -99,8 +99,6 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                         onTap: () {
                           Haptics.light();
                           final text = _controller.text.trim();
-                          // TODO: Provide user feedback (disable button or show snackbar) when content is empty.
-                          if (text.isEmpty) return;
                           Navigator.of(context).pop<MessageEditResult>(
                             MessageEditResult(content: text, shouldSend: true),
                           );
@@ -140,8 +138,6 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                         onTap: () {
                           Haptics.light();
                           final text = _controller.text.trim();
-                          // TODO: Provide user feedback (disable button or show snackbar) when content is empty.
-                          if (text.isEmpty) return;
                           Navigator.of(context).pop<MessageEditResult>(
                             MessageEditResult(content: text, shouldSend: false),
                           );
@@ -172,7 +168,9 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : const Color(0xFFF2F3F5),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white10
+                        : const Color(0xFFF2F3F5),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   clipBehavior: Clip.antiAlias,

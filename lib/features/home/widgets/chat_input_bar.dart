@@ -150,7 +150,8 @@ class ChatInputBar extends StatefulWidget {
   State<ChatInputBar> createState() => _ChatInputBarState();
 }
 
-class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver {
+class _ChatInputBarState extends State<ChatInputBar>
+    with WidgetsBindingObserver {
   late CodeLineEditingController _controller;
   late final Map<Type, Action<Intent>> _shortcutOverrideActions;
   bool _isExpanded = false; // Track expand/collapse state for input field
@@ -168,7 +169,6 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
     debugLabel: 'context-mgmt-anchor',
   );
   String _lastText = '';
-
 
   void _addImages(List<String> paths) {
     if (paths.isEmpty) return;
@@ -229,7 +229,8 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       widget.focusNode?.unfocus();
-    } else if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
       // When going to background, hide any open toolbar
       widget.focusNode?.unfocus();
     }
@@ -278,6 +279,73 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
     return l10n.chatInputBarHint;
   }
 
+  bool _useDesktopSendShortcuts(BuildContext context) {
+    if (_isDesktopPlatform()) {
+      return true;
+    }
+    return MediaQuery.sizeOf(context).width >= AppBreakpoints.tablet;
+  }
+
+  SelectionToolbarController? _buildSelectionToolbarController(
+    BuildContext context,
+  ) {
+    if (!_isIOSPlatform()) {
+      return null;
+    }
+    final materialL10n = MaterialLocalizations.of(context);
+    return MobileSelectionToolbarController(
+      builder:
+          ({
+            required TextSelectionToolbarAnchors anchors,
+            required BuildContext context,
+            required CodeLineEditingController controller,
+            required VoidCallback onDismiss,
+            required VoidCallback onRefresh,
+          }) {
+            final selection = controller.selection;
+            final hasSelection = !selection.isCollapsed;
+            final hasText = controller.text.isNotEmpty;
+            final buttonItems = <ContextMenuButtonItem>[
+              if (hasSelection)
+                ContextMenuButtonItem(
+                  label: materialL10n.cutButtonLabel,
+                  onPressed: () {
+                    controller.cut();
+                    onDismiss();
+                  },
+                ),
+              if (hasSelection)
+                ContextMenuButtonItem(
+                  label: materialL10n.copyButtonLabel,
+                  onPressed: () {
+                    unawaited(controller.copy());
+                    onDismiss();
+                  },
+                ),
+              ContextMenuButtonItem(
+                label: materialL10n.pasteButtonLabel,
+                onPressed: () {
+                  onDismiss();
+                  unawaited(_handlePasteFromClipboard());
+                },
+              ),
+              if (hasText)
+                ContextMenuButtonItem(
+                  label: materialL10n.selectAllButtonLabel,
+                  onPressed: () {
+                    controller.selectAll();
+                    onRefresh();
+                  },
+                ),
+            ];
+            return AdaptiveTextSelectionToolbar.buttonItems(
+              anchors: anchors,
+              buttonItems: buttonItems,
+            );
+          },
+    );
+  }
+
   ({double height, int lineCount}) _measureInputMetrics({
     required BuildContext context,
     required String text,
@@ -295,7 +363,9 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
     }
 
     const int wrapMeasureLimit = 4000;
-    final limitedText = text.length > wrapMeasureLimit ? text.substring(0, wrapMeasureLimit) : text;
+    final limitedText = text.length > wrapMeasureLimit
+        ? text.substring(0, wrapMeasureLimit)
+        : text;
     final effectiveText = limitedText.isEmpty ? ' ' : limitedText;
 
     final painter = TextPainter(
@@ -339,7 +409,8 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
         documents: List.of(_docs),
       ),
     );
-    _controller.value = const CodeLineEditingValue.empty(); // Clear + reset selection/composing
+    _controller.value =
+        const CodeLineEditingValue.empty(); // Clear + reset selection/composing
     _images.clear();
     _docs.clear();
     setState(() {});
@@ -357,16 +428,18 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
 
   Object? _handleNewLineIntent(CodeShortcutNewLineIntent intent) {
     final keys = HardwareKeyboard.instance.logicalKeysPressed;
-    final shift = keys.contains(LogicalKeyboardKey.shiftLeft) ||
+    final shift =
+        keys.contains(LogicalKeyboardKey.shiftLeft) ||
         keys.contains(LogicalKeyboardKey.shiftRight);
-    final ctrl = keys.contains(LogicalKeyboardKey.controlLeft) ||
+    final ctrl =
+        keys.contains(LogicalKeyboardKey.controlLeft) ||
         keys.contains(LogicalKeyboardKey.controlRight);
-    final meta = keys.contains(LogicalKeyboardKey.metaLeft) ||
+    final meta =
+        keys.contains(LogicalKeyboardKey.metaLeft) ||
         keys.contains(LogicalKeyboardKey.metaRight);
     final ctrlOrMeta = ctrl || meta;
 
-    final isDesktopOs = _isDesktopPlatform();
-    if (isDesktopOs) {
+    if (_useDesktopSendShortcuts(context)) {
       final sendShortcut = context.read<SettingsProvider>().desktopSendShortcut;
       if (sendShortcut == DesktopSendShortcut.ctrlEnter) {
         if (ctrlOrMeta) {
@@ -384,7 +457,9 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
       return null;
     }
 
-    final enterToSendOnMobile = context.read<SettingsProvider>().enterToSendOnMobile;
+    final enterToSendOnMobile = context
+        .read<SettingsProvider>()
+        .enterToSendOnMobile;
     if (shift || !enterToSendOnMobile) {
       _insertNewlineAtCursor();
     } else {
@@ -410,7 +485,9 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
     final isIosTablet = _isIOSPlatform() && isTabletOrDesktop;
 
     final key = event.logicalKey;
-    final isArrow = key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight;
+    final isArrow =
+        key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight;
     final isPasteV = key == LogicalKeyboardKey.keyV;
 
     // Paste handling for images on iOS/macOS (tablet/desktop)
@@ -1239,7 +1316,7 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
   void _moveCaret(int dir, {bool extend = false, bool byWord = false}) {
     // Use CodeLineEditingController's built-in methods for cursor movement
     if (_controller.text.isEmpty) return;
-    
+
     if (byWord) {
       if (extend) {
         // Extend selection to word boundary
@@ -1413,7 +1490,7 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
                               width: 22,
                               height: 22,
                               decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.6),
+                                color: Colors.black.withValues(alpha: 0.6),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(
@@ -1453,238 +1530,276 @@ class _ChatInputBarState extends State<ChatInputBar> with WidgetsBindingObserver
                   ),
                   child: Column(
                     children: [
-                  // Input field with expand/collapse button
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xxs, AppSpacing.md, AppSpacing.xs),
-                    child: ConstrainedBox(
-                      constraints: textFieldConstraints,
-                      child: LayoutBuilder(
-                        builder: (ctx, constraints) {
-                          // Desktop: show a right-click context menu with paste/cut/copy/select all
-                          // Future<void> _showDesktopContextMenu(Offset globalPos) async {
-                          //   bool isDesktop = false;
-                          //   try { isDesktop = Platform.isMacOS || Platform.isWindows || Platform.isLinux; } catch (_) {}
-                          //   if (!isDesktop) return;
-                          //   // Ensure input has focus so operations apply correctly
-                          //   try { widget.focusNode?.requestFocus(); } catch (_) {}
-                          //
-                          //   final sel = _controller.selection;
-                          //   final hasSelection = sel.isValid && !sel.isCollapsed;
-                          //   final hasText = _controller.text.isNotEmpty;
-                          //
-                          //   final l10n = MaterialLocalizations.of(ctx);
-                          //   await showDesktopContextMenuAt(
-                          //     ctx,
-                          //     globalPosition: globalPos,
-                          //     items: [
-                          //       DesktopContextMenuItem(
-                          //         icon: Lucide.Clipboard,
-                          //         label: l10n.pasteButtonLabel,
-                          //         onTap: () async {
-                          //           await _handlePasteFromClipboard();
-                          //         },
-                          //       ),
-                          //       DesktopContextMenuItem(
-                          //         icon: Lucide.Cut,
-                          //         label: l10n.cutButtonLabel,
-                          //         onTap: () async {
-                          //           final s = _controller.selection;
-                          //           if (s.isValid && !s.isCollapsed) {
-                          //             final text = _controller.text.substring(s.start, s.end);
-                          //             try { await Clipboard.setData(ClipboardData(text: text)); } catch (_) {}
-                          //             final newText = _controller.text.replaceRange(s.start, s.end, '');
-                          //             _controller.value = TextEditingValue(
-                          //               text: newText,
-                          //               selection: TextSelection.collapsed(offset: s.start),
-                          //             );
-                          //             setState(() {});
-                          //           }
-                          //         },
-                          //       ),
-                          //       DesktopContextMenuItem(
-                          //         icon: Lucide.Copy,
-                          //         label: l10n.copyButtonLabel,
-                          //         onTap: () async {
-                          //           final s2 = _controller.selection;
-                          //           if (s2.isValid && !s2.isCollapsed) {
-                          //             final text = _controller.text.substring(s2.start, s2.end);
-                          //             try { await Clipboard.setData(ClipboardData(text: text)); } catch (_) {}
-                          //           }
-                          //         },
-                          //       ),
-                          //       // DesktopContextMenuItem(
-                          //       //   // icon: Lucide.TextSelect,
-                          //       //   label: l10n.selectAllButtonLabel,
-                          //       //   onTap: () {
-                          //       //     if (hasText) {
-                          //       //       _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
-                          //       //       setState(() {});
-                          //       //     }
-                          //       //   },
-                          //       // ),
-                          //     ],
-                          //   );
-                          // }
+                      // Input field with expand/collapse button
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          AppSpacing.xxs,
+                          AppSpacing.md,
+                          AppSpacing.xs,
+                        ),
+                        child: ConstrainedBox(
+                          constraints: textFieldConstraints,
+                          child: LayoutBuilder(
+                            builder: (ctx, constraints) {
+                              // Desktop: show a right-click context menu with paste/cut/copy/select all
+                              // Future<void> _showDesktopContextMenu(Offset globalPos) async {
+                              //   bool isDesktop = false;
+                              //   try { isDesktop = Platform.isMacOS || Platform.isWindows || Platform.isLinux; } catch (_) {}
+                              //   if (!isDesktop) return;
+                              //   // Ensure input has focus so operations apply correctly
+                              //   try { widget.focusNode?.requestFocus(); } catch (_) {}
+                              //
+                              //   final sel = _controller.selection;
+                              //   final hasSelection = sel.isValid && !sel.isCollapsed;
+                              //   final hasText = _controller.text.isNotEmpty;
+                              //
+                              //   final l10n = MaterialLocalizations.of(ctx);
+                              //   await showDesktopContextMenuAt(
+                              //     ctx,
+                              //     globalPosition: globalPos,
+                              //     items: [
+                              //       DesktopContextMenuItem(
+                              //         icon: Lucide.Clipboard,
+                              //         label: l10n.pasteButtonLabel,
+                              //         onTap: () async {
+                              //           await _handlePasteFromClipboard();
+                              //         },
+                              //       ),
+                              //       DesktopContextMenuItem(
+                              //         icon: Lucide.Cut,
+                              //         label: l10n.cutButtonLabel,
+                              //         onTap: () async {
+                              //           final s = _controller.selection;
+                              //           if (s.isValid && !s.isCollapsed) {
+                              //             final text = _controller.text.substring(s.start, s.end);
+                              //             try { await Clipboard.setData(ClipboardData(text: text)); } catch (_) {}
+                              //             final newText = _controller.text.replaceRange(s.start, s.end, '');
+                              //             _controller.value = TextEditingValue(
+                              //               text: newText,
+                              //               selection: TextSelection.collapsed(offset: s.start),
+                              //             );
+                              //             setState(() {});
+                              //           }
+                              //         },
+                              //       ),
+                              //       DesktopContextMenuItem(
+                              //         icon: Lucide.Copy,
+                              //         label: l10n.copyButtonLabel,
+                              //         onTap: () async {
+                              //           final s2 = _controller.selection;
+                              //           if (s2.isValid && !s2.isCollapsed) {
+                              //             final text = _controller.text.substring(s2.start, s2.end);
+                              //             try { await Clipboard.setData(ClipboardData(text: text)); } catch (_) {}
+                              //           }
+                              //         },
+                              //       ),
+                              //       // DesktopContextMenuItem(
+                              //       //   // icon: Lucide.TextSelect,
+                              //       //   label: l10n.selectAllButtonLabel,
+                              //       //   onTap: () {
+                              //       //     if (hasText) {
+                              //       //       _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
+                              //       //       setState(() {});
+                              //       //     }
+                              //       //   },
+                              //       // ),
+                              //     ],
+                              //   );
+                              // }
 
-                          // enterToSend setting is checked but CodeEditor handles Enter differently.
-                          // Keep watching to rebuild when the setting changes.
-                          // ignore: unused_local_variable
-                          final enterToSendOnMobile = context.watch<SettingsProvider>().enterToSendOnMobile;
-                          final fontSize = _isDesktopPlatform() ? 14.0 : 15.0;
-                          final fontHeight = 1.4;
-                          final baseFont = theme.textTheme.bodyLarge;
-                          final fontFamily = baseFont?.fontFamily;
-                          final fontFamilyFallback = baseFont?.fontFamilyFallback;
-                          final maxLinesLimit = _isExpanded ? 25 : 5;
-                          final verticalPadding = 8.0;
-                          const double overlayGutter = 28.0;
-                          // Match CodeEditor's own padding so measurement width equals real content width.
-                          // (Otherwise the wrap threshold will drift.)
-                          // Slightly more top padding so placeholder "输入消息与AI聊天" sits lower visually.
-                          final contentPadding = EdgeInsets.fromLTRB(
-                            0,
-                            verticalPadding,
-                            overlayGutter,
-                            verticalPadding / 2,
-                          );
+                              // enterToSend setting is checked but CodeEditor handles Enter differently.
+                              // Keep watching to rebuild when the setting changes.
+                              // ignore: unused_local_variable
+                              final enterToSendOnMobile = context
+                                  .watch<SettingsProvider>()
+                                  .enterToSendOnMobile;
+                              final fontSize = _isDesktopPlatform()
+                                  ? 14.0
+                                  : 15.0;
+                              final fontHeight = 1.4;
+                              final baseFont = theme.textTheme.bodyLarge;
+                              final fontFamily = baseFont?.fontFamily;
+                              final fontFamilyFallback =
+                                  baseFont?.fontFamilyFallback;
+                              final maxLinesLimit = _isExpanded ? 25 : 5;
+                              final verticalPadding = 8.0;
+                              const double overlayGutter = 28.0;
+                              // Match CodeEditor's own padding so measurement width equals real content width.
+                              // (Otherwise the wrap threshold will drift.)
+                              // Slightly more top padding so placeholder "输入消息与AI聊天" sits lower visually.
+                              final contentPadding = EdgeInsets.fromLTRB(
+                                0,
+                                verticalPadding,
+                                overlayGutter,
+                                verticalPadding / 2,
+                              );
 
-                          final metrics = _measureInputMetrics(
-                            context: ctx,
-                            text: _controller.text,
-                            maxWidth: math.max(0, constraints.maxWidth - contentPadding.horizontal),
-                            fontSize: fontSize,
-                            fontFamily: fontFamily,
-                            fontFamilyFallback: fontFamilyFallback,
-                            fontHeight: fontHeight,
-                            verticalPadding: contentPadding.vertical,
-                            maxLines: maxLinesLimit,
-                          );
-
-                          final minHeight = fontSize * fontHeight + contentPadding.vertical;
-                          final height = constraints.maxHeight.isFinite
-                              ? math.max(minHeight, math.min(metrics.height, constraints.maxHeight))
-                              : math.max(minHeight, metrics.height);
-                          final showExpandButton = metrics.lineCount >= 3;
-
-                          return Stack(
-                            children: [
-                              Focus(
-                                onKeyEvent: _handleKeyEvent,
-                                child: SizedBox(
-                                  height: height,
-                                  child: PlainTextCodeEditor(
-                                    controller: _controller,
-                                    focusNode: widget.focusNode,
-                                    wordWrap: true,
-                                    autofocus: false,
-                                    shortcutsActivatorsBuilder: const _ChatInputShortcutsActivatorsBuilder(),
-                                    shortcutOverrideActions: _shortcutOverrideActions,
-                                    // Make wrapping behavior stable by ensuring we always use the same padding.
-                                    hint: _hint(context),
-                                    padding: contentPadding,
-                                    fontSize: fontSize,
-                                    fontFamily: fontFamily,
-                                    fontFamilyFallback: fontFamilyFallback,
-                                    fontHeight: fontHeight,
-                                    hintAlpha: 0.45,
-                                  ),
+                              final metrics = _measureInputMetrics(
+                                context: ctx,
+                                text: _controller.text,
+                                maxWidth: math.max(
+                                  0,
+                                  constraints.maxWidth -
+                                      contentPadding.horizontal,
                                 ),
-                              ),
-                              // Expand/Collapse icon button (only shown when 3+ lines)
-                              if (showExpandButton)
-                                Positioned(
-                                  top: 10,
-                                  right: 12,
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setState(() => _isExpanded = !_isExpanded);
-                                      _ensureCaretVisible();
-                                    },
-                                    child: Icon(
-                                      _isExpanded ? Lucide.ChevronsDownUp : Lucide.ChevronsUpDown,
-                                      size: 16,
-                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                                fontSize: fontSize,
+                                fontFamily: fontFamily,
+                                fontFamilyFallback: fontFamilyFallback,
+                                fontHeight: fontHeight,
+                                verticalPadding: contentPadding.vertical,
+                                maxLines: maxLinesLimit,
+                              );
+
+                              final minHeight =
+                                  fontSize * fontHeight +
+                                  contentPadding.vertical;
+                              final height = constraints.maxHeight.isFinite
+                                  ? math.max(
+                                      minHeight,
+                                      math.min(
+                                        metrics.height,
+                                        constraints.maxHeight,
+                                      ),
+                                    )
+                                  : math.max(minHeight, metrics.height);
+                              final showExpandButton = metrics.lineCount >= 3;
+
+                              return Stack(
+                                children: [
+                                  Focus(
+                                    onKeyEvent: _handleKeyEvent,
+                                    child: SizedBox(
+                                      height: height,
+                                      child: PlainTextCodeEditor(
+                                        controller: _controller,
+                                        focusNode: widget.focusNode,
+                                        toolbarController:
+                                            _buildSelectionToolbarController(
+                                              context,
+                                            ),
+                                        wordWrap: true,
+                                        autofocus: false,
+                                        shortcutsActivatorsBuilder:
+                                            _ChatInputShortcutsActivatorsBuilder(
+                                              useDesktopSendShortcuts:
+                                                  _useDesktopSendShortcuts(
+                                                    context,
+                                                  ),
+                                            ),
+                                        shortcutOverrideActions:
+                                            _shortcutOverrideActions,
+                                        // Make wrapping behavior stable by ensuring we always use the same padding.
+                                        hint: _hint(context),
+                                        padding: contentPadding,
+                                        fontSize: fontSize,
+                                        fontFamily: fontFamily,
+                                        fontFamilyFallback: fontFamilyFallback,
+                                        fontHeight: fontHeight,
+                                        hintAlpha: 0.45,
+                                      ),
                                     ),
                                   ),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  // Bottom buttons row (no divider)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.xs,
-                      0,
-                      AppSpacing.xs,
-                      AppSpacing.xs,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: _buildResponsiveLeftActions(context),
-                        ),
-                        Row(
-                          children: [
-                            if (widget.showMoreButton) ...[
-                              _CompactIconButton(
-                                tooltip: AppLocalizations.of(
-                                  context,
-                                )!.chatInputBarMoreTooltip,
-                                icon: Lucide.Plus,
-                                active: widget.moreOpen,
-                                onTap: widget.onMore,
-                                childBuilder: (c) => AnimatedSwitcher(
-                                  duration: const Duration(
-                                    milliseconds: 200,
-                                  ),
-                                  transitionBuilder: (child, anim) =>
-                                      RotationTransition(
-                                        turns: Tween<double>(
-                                          begin: 0.85,
-                                          end: 1,
-                                        ).animate(anim),
-                                        child: FadeTransition(
-                                          opacity: anim,
-                                          child: child,
+                                  // Expand/Collapse icon button (only shown when 3+ lines)
+                                  if (showExpandButton)
+                                    Positioned(
+                                      top: 10,
+                                      right: 12,
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          setState(
+                                            () => _isExpanded = !_isExpanded,
+                                          );
+                                          _ensureCaretVisible();
+                                        },
+                                        child: Icon(
+                                          _isExpanded
+                                              ? Lucide.ChevronsDownUp
+                                              : Lucide.ChevronsUpDown,
+                                          size: 16,
+                                          color: theme.colorScheme.onSurface
+                                              .withValues(alpha: 0.45),
                                         ),
                                       ),
-                                  child: Icon(
-                                    widget.moreOpen
-                                        ? Lucide.X
-                                        : Lucide.Plus,
-                                    key: ValueKey(
-                                      widget.moreOpen ? 'close' : 'add',
                                     ),
-                                    size: 20,
-                                    color: c,
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      // Bottom buttons row (no divider)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.xs,
+                          0,
+                          AppSpacing.xs,
+                          AppSpacing.xs,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: _buildResponsiveLeftActions(context),
+                            ),
+                            Row(
+                              children: [
+                                if (widget.showMoreButton) ...[
+                                  _CompactIconButton(
+                                    tooltip: AppLocalizations.of(
+                                      context,
+                                    )!.chatInputBarMoreTooltip,
+                                    icon: Lucide.Plus,
+                                    active: widget.moreOpen,
+                                    onTap: widget.onMore,
+                                    childBuilder: (c) => AnimatedSwitcher(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      transitionBuilder: (child, anim) =>
+                                          RotationTransition(
+                                            turns: Tween<double>(
+                                              begin: 0.85,
+                                              end: 1,
+                                            ).animate(anim),
+                                            child: FadeTransition(
+                                              opacity: anim,
+                                              child: child,
+                                            ),
+                                          ),
+                                      child: Icon(
+                                        widget.moreOpen
+                                            ? Lucide.X
+                                            : Lucide.Plus,
+                                        key: ValueKey(
+                                          widget.moreOpen ? 'close' : 'add',
+                                        ),
+                                        size: 20,
+                                        color: c,
+                                      ),
+                                    ),
                                   ),
+                                  const SizedBox(width: 8),
+                                ],
+                                _CompactSendButton(
+                                  enabled:
+                                      (hasText || hasImages || hasDocs) &&
+                                      !widget.loading,
+                                  loading: widget.loading,
+                                  onSend: _handleSend,
+                                  onStop: widget.loading ? widget.onStop : null,
+                                  color: theme.colorScheme.primary,
+                                  icon: Lucide.ArrowUp,
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            _CompactSendButton(
-                              enabled:
-                                  (hasText || hasImages || hasDocs) &&
-                                  !widget.loading,
-                              loading: widget.loading,
-                              onSend: _handleSend,
-                              onStop: widget.loading ? widget.onStop : null,
-                              color: theme.colorScheme.primary,
-                              icon: Lucide.ArrowUp,
+                              ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  ],
                 ),
               ),
-            ),
             ),
           ],
         ),
@@ -1852,6 +1967,9 @@ class _ComposingAwareNewLineAction extends Action<CodeShortcutNewLineIntent> {
   final Object? Function(CodeShortcutNewLineIntent) onInvoke;
 
   @override
+  bool consumesKey(CodeShortcutNewLineIntent intent) => !isComposing();
+
+  @override
   Object? invoke(CodeShortcutNewLineIntent intent) {
     if (isComposing()) {
       return null;
@@ -1860,20 +1978,29 @@ class _ComposingAwareNewLineAction extends Action<CodeShortcutNewLineIntent> {
   }
 }
 
-class _ChatInputShortcutsActivatorsBuilder extends CodeShortcutsActivatorsBuilder {
-  const _ChatInputShortcutsActivatorsBuilder();
+class _ChatInputShortcutsActivatorsBuilder
+    extends CodeShortcutsActivatorsBuilder {
+  const _ChatInputShortcutsActivatorsBuilder({
+    required this.useDesktopSendShortcuts,
+  });
+
+  final bool useDesktopSendShortcuts;
 
   @override
   List<ShortcutActivator>? build(CodeShortcutType type) {
     if (type == CodeShortcutType.newLine) {
       final activators = <ShortcutActivator>[
         SingleActivator(LogicalKeyboardKey.enter),
+        SingleActivator(LogicalKeyboardKey.numpadEnter),
         SingleActivator(LogicalKeyboardKey.enter, shift: true),
+        SingleActivator(LogicalKeyboardKey.numpadEnter, shift: true),
       ];
-      if (_isDesktopPlatform()) {
+      if (useDesktopSendShortcuts) {
         activators.addAll(const [
           SingleActivator(LogicalKeyboardKey.enter, control: true),
+          SingleActivator(LogicalKeyboardKey.numpadEnter, control: true),
           SingleActivator(LogicalKeyboardKey.enter, meta: true),
+          SingleActivator(LogicalKeyboardKey.numpadEnter, meta: true),
         ]);
       }
       return activators;
