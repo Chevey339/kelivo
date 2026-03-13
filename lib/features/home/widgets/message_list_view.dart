@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/chat_message.dart';
-import '../../../core/models/conversation.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../l10n/app_localizations.dart';
@@ -26,8 +25,7 @@ typedef OnDeleteMessage =
       Map<String, List<ChatMessage>> byGroup,
     );
 typedef OnForkConversation = Future<void> Function(ChatMessage message);
-typedef OnShareMessage =
-    void Function(int messageIndex, List<ChatMessage> messages);
+typedef OnShareMessage = void Function(ChatMessage message);
 typedef OnSpeakMessage = Future<void> Function(ChatMessage message);
 
 /// Data class for reasoning UI state
@@ -66,8 +64,9 @@ class MessageListView extends StatelessWidget {
     super.key,
     required this.scrollController,
     required this.messages,
+    required this.byGroup,
     required this.versionSelections,
-    required this.currentConversation,
+    required this.truncateVisibleIndex,
     required this.messageKeys,
     required this.reasoning,
     required this.reasoningSegments,
@@ -100,8 +99,9 @@ class MessageListView extends StatelessWidget {
 
   final ScrollController scrollController;
   final List<ChatMessage> messages;
+  final Map<String, List<ChatMessage>> byGroup;
   final Map<String, int> versionSelections;
-  final Conversation? currentConversation;
+  final int truncateVisibleIndex;
   final Map<String, GlobalKey> messageKeys;
   final Map<String, stream_ctrl.ReasoningData> reasoning;
   final Map<String, List<stream_ctrl.ReasoningSegmentData>> reasoningSegments;
@@ -143,45 +143,6 @@ class MessageListView extends StatelessWidget {
   onToggleReasoningSegment;
   final Widget Function()? buildPinnedStreamingIndicator;
 
-  /// Collapse message versions to show only selected version per group.
-  List<ChatMessage> _collapseVersions(List<ChatMessage> items) {
-    final Map<String, List<ChatMessage>> byGroup =
-        <String, List<ChatMessage>>{};
-    final List<String> order = <String>[];
-    for (final m in items) {
-      final gid = (m.groupId ?? m.id);
-      if (!byGroup.containsKey(gid)) {
-        byGroup[gid] = <ChatMessage>[];
-        order.add(gid);
-      }
-      byGroup[gid]!.add(m);
-    }
-    for (final e in byGroup.entries) {
-      e.value.sort((a, b) => a.version.compareTo(b.version));
-    }
-    final out = <ChatMessage>[];
-    for (final gid in order) {
-      final vers = byGroup[gid]!;
-      final sel = versionSelections[gid];
-      final idx = (sel != null && sel >= 0 && sel < vers.length)
-          ? sel
-          : (vers.length - 1);
-      out.add(vers[idx]);
-    }
-    return out;
-  }
-
-  /// Group messages by their group ID for version navigation.
-  Map<String, List<ChatMessage>> _groupMessages(List<ChatMessage> items) {
-    final Map<String, List<ChatMessage>> byGroup =
-        <String, List<ChatMessage>>{};
-    for (final m in items) {
-      final gid = (m.groupId ?? m.id);
-      byGroup.putIfAbsent(gid, () => <ChatMessage>[]).add(m);
-    }
-    return byGroup;
-  }
-
   /// Build the context divider widget shown at truncate position.
   Widget _buildContextDivider(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -222,24 +183,6 @@ class MessageListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Stable snapshot for this build (collapse versions)
-    final collapsedMessages = _collapseVersions(messages);
-    final byGroup = _groupMessages(messages);
-
-    // Map persisted truncateIndex (raw message count) to collapsed index
-    final int truncRaw = currentConversation?.truncateIndex ?? -1;
-    int truncCollapsed = -1;
-    if (truncRaw > 0) {
-      final seen = <String>{};
-      final int limit = truncRaw < messages.length ? truncRaw : messages.length;
-      int count = 0;
-      for (int i = 0; i < limit; i++) {
-        final gid0 = (messages[i].groupId ?? messages[i].id);
-        if (seen.add(gid0)) count++;
-      }
-      truncCollapsed = count - 1;
-    }
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final horizontalPad =
@@ -257,18 +200,18 @@ class MessageListView extends StatelessWidget {
                 horizontalPad,
                 isPinnedIndicatorActive ? 28 : 16,
               ),
-              itemCount: collapsedMessages.length,
+              itemCount: messages.length,
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               itemBuilder: (context, index) {
-                if (index < 0 || index >= collapsedMessages.length) {
+                if (index < 0 || index >= messages.length) {
                   return const SizedBox.shrink();
                 }
                 return _buildMessageItem(
                   context,
                   index: index,
-                  messages: collapsedMessages,
+                  messages: messages,
                   byGroup: byGroup,
-                  truncCollapsed: truncCollapsed,
+                  truncCollapsed: truncateVisibleIndex,
                   isProcessingFiles: isProcessing,
                 );
               },
@@ -627,7 +570,7 @@ class MessageListView extends StatelessWidget {
         } else if (action == MessageMoreAction.fork) {
           await onForkConversation?.call(message);
         } else if (action == MessageMoreAction.share) {
-          onShareMessage?.call(index, messages);
+          onShareMessage?.call(message);
         }
       },
       toolParts: message.role == 'assistant' ? toolParts[message.id] : null,

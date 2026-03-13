@@ -259,7 +259,7 @@ class _HomePageState extends State<HomePage>
     required String? modelDisplay,
     required ColorScheme cs,
   }) {
-    final collapsed = _controller.collapseVersions(_controller.messages);
+    final collapsed = _controller.collapsedMessages;
     final selectable = collapsed
         .where((m) => m.role == 'user' || m.role == 'assistant')
         .toList();
@@ -284,7 +284,7 @@ class _HomePageState extends State<HomePage>
         await _controller.createNewConversationAnimated();
       },
       onOpenMiniMap: () async {
-        final collapsed = _controller.collapseVersions(_controller.messages);
+        final collapsed = _controller.collapsedMessages;
         String? selectedId;
         if (PlatformUtils.isDesktop) {
           selectedId = await showDesktopMiniMapPopover(
@@ -427,7 +427,7 @@ class _HomePageState extends State<HomePage>
   }) {
     _controller.initDesktopUi();
 
-    final collapsed = _controller.collapseVersions(_controller.messages);
+    final collapsed = _controller.collapsedMessages;
     final selectable = collapsed
         .where((m) => m.role == 'user' || m.role == 'assistant')
         .toList();
@@ -489,7 +489,7 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _openSelectionMiniMap() async {
-    final collapsed = _controller.collapseVersions(_controller.messages);
+    final collapsed = _controller.collapsedMessages;
     if (collapsed.isEmpty) return;
 
     if (PlatformUtils.isDesktop &&
@@ -733,9 +733,10 @@ class _HomePageState extends State<HomePage>
     return MessageListView(
       isProcessingFiles: _controller.isProcessingFiles,
       scrollController: _scrollController,
-      messages: _controller.messages,
+      messages: _controller.visibleMessages,
+      byGroup: _controller.visibleMessageGroups,
       versionSelections: _controller.versionSelections,
-      currentConversation: _controller.currentConversation,
+      truncateVisibleIndex: _controller.visibleTruncateIndex,
       messageKeys: _controller.messageKeys,
       reasoning: _controller.reasoning,
       reasoningSegments: _controller.reasoningSegments,
@@ -758,8 +759,7 @@ class _HomePageState extends State<HomePage>
       onDeleteMessage: (message, byGroup) =>
           _handleDeleteMessage(context, message, byGroup),
       onForkConversation: (message) => _controller.forkConversation(message),
-      onShareMessage: (index, messages) =>
-          _controller.shareMessage(index, messages),
+      onShareMessage: (message) => _controller.shareMessage(message),
       onSpeakMessage: (message) => _controller.speakMessage(message),
       onToggleSelection: (messageId, selected) {
         _controller.toggleSelection(messageId, selected);
@@ -850,7 +850,7 @@ class _HomePageState extends State<HomePage>
         await sp.setOcrEnabled(!sp.ocrEnabled);
       },
       onOpenMiniMap: () async {
-        final collapsed = _controller.collapseVersions(_controller.messages);
+        final collapsed = _controller.collapsedMessages;
         String? selectedId;
         if (PlatformUtils.isDesktop) {
           selectedId = await showDesktopMiniMapPopover(

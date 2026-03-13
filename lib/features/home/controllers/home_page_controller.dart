@@ -39,7 +39,7 @@ import '../services/translation_service.dart';
 import '../services/file_upload_service.dart';
 import '../widgets/chat_input_bar.dart';
 import '../../model/widgets/model_select_sheet.dart';
-import '../../search/services/global_session_search_service.dart';
+import 'message_page_window.dart';
 
 /// Translation data for UI state (expanded/collapsed).
 class TranslationData {
@@ -128,6 +128,19 @@ class HomePageController extends ChangeNotifier {
 
   // Message widget keys for navigation
   final Map<String, GlobalKey> _messageKeys = <String, GlobalKey>{};
+  final MessagePageWindowController _messagePageWindowController =
+      const MessagePageWindowController(pageSize: 20, maxPages: 3);
+  MessagePageWindow _messagePageWindow = const MessagePageWindow.empty();
+  List<ChatMessage> _collapsedMessages = const <ChatMessage>[];
+  List<ChatMessage> _visibleMessages = const <ChatMessage>[];
+  Map<String, List<ChatMessage>> _allMessageGroups =
+      const <String, List<ChatMessage>>{};
+  Map<String, List<ChatMessage>> _visibleMessageGroups =
+      const <String, List<ChatMessage>>{};
+  final Set<String> _restoredMessageUiIds = <String>{};
+  String? _messageWindowConversationId;
+  int _visibleTruncateIndex = -1;
+  bool _isAdjustingMessageWindow = false;
 
   // Selection mode
   bool _selecting = false;
@@ -167,6 +180,7 @@ class HomePageController extends ChangeNotifier {
   static const Duration _postSwitchScrollDelay = Duration(milliseconds: 220);
   static const double _sidebarMinWidth = 200;
   static const double _sidebarMaxWidth = 360;
+  static const double _messagePagePreloadTriggerExtent = 240;
 
   // ============================================================================
   // Getters - State Access
@@ -183,6 +197,11 @@ class HomePageController extends ChangeNotifier {
 
   Map<String, TranslationData> get translations => _translations;
   Map<String, GlobalKey> get messageKeys => _messageKeys;
+  List<ChatMessage> get collapsedMessages => _collapsedMessages;
+  List<ChatMessage> get visibleMessages => _visibleMessages;
+  Map<String, List<ChatMessage>> get visibleMessageGroups =>
+      _visibleMessageGroups;
+  int get visibleTruncateIndex => _visibleTruncateIndex;
   bool get selecting => _selecting;
   Set<String> get selectedItems => _selectedItems;
   int get selectedCount => _selectedItems.length;
@@ -206,6 +225,7 @@ class HomePageController extends ChangeNotifier {
   // Delegate to ChatController
   Conversation? get currentConversation => _chatController.currentConversation;
   List<ChatMessage> get messages => _chatController.messages;
+  List<ChatMessage> get allMessages => _chatController.allMessages;
   Map<String, int> get versionSelections => _chatController.versionSelections;
   Set<String> get loadingConversationIds =>
       _chatController.loadingConversationIds;
@@ -234,6 +254,9 @@ class HomePageController extends ChangeNotifier {
     if (cid == null) return false;
     return loadingConversationIds.contains(cid);
   }
+
+  @visibleForTesting
+  ChatController get chatControllerForTesting => _chatController;
 
   ValueNotifier<bool> get isProcessingFiles => _viewModel.isProcessingFiles;
 
@@ -325,7 +348,7 @@ class HomePageController extends ChangeNotifier {
       contextProvider: _context,
       getTitleForLocale: _titleForLocale,
     );
-    _viewModel.addListener(notifyListeners);
+    _viewModel.addListener(_onViewModelChanged);
   }
 
   void _wireViewModelCallbacks() {
@@ -347,7 +370,11 @@ class HomePageController extends ChangeNotifier {
         );
       }
     };
-    _viewModel.onScrollToBottom = () => _scrollToBottomSoon();
+    _viewModel.onScrollToBottom = () {
+      _syncVisibleMessageWindow(keepLatest: true);
+      notifyListeners();
+      _scrollToBottomSoon();
+    };
     _viewModel.onHapticFeedback = () {
       try {
         final settings = _context.read<SettingsProvider>();
@@ -363,6 +390,7 @@ class HomePageController extends ChangeNotifier {
           );
         };
     _viewModel.onConversationSwitched = () {
+      _syncVisibleMessageWindow(resetToLatest: true, keepLatest: true);
       _restoreMessageUiState();
       _scrollToBottom(animate: false);
     };
@@ -381,6 +409,7 @@ class HomePageController extends ChangeNotifier {
       getAutoScrollIdleSeconds: () =>
           _context.read<SettingsProvider>().autoScrollIdleSeconds,
     );
+    _scrollController.addListener(_onMessageListScrolled);
   }
 
   void _initializeProviders() {
@@ -482,7 +511,7 @@ class HomePageController extends ChangeNotifier {
     } catch (_) {}
     if (messageId.isNotEmpty) {
       await scrollToMessageId(messageId);
-      _spotlightMessageId = messageId;
+      _spotlightMessageId = _resolveCollapsedMessageId(messageId) ?? messageId;
       _spotlightToken++;
       notifyListeners();
     }
@@ -507,11 +536,349 @@ class HomePageController extends ChangeNotifier {
         _chatService.setCurrentConversation(recent.id);
         _chatController.setCurrentConversation(recent);
         _streamController.clearGeminiThoughtSigs();
+        _syncVisibleMessageWindow(resetToLatest: true, keepLatest: true);
         _restoreMessageUiState();
         notifyListeners();
         _scrollToBottomSoon(animate: false);
       }
     }
+  }
+
+  void _onViewModelChanged() {
+    _syncVisibleMessageWindow(keepLatest: _shouldStickMessageWindowToLatest());
+    notifyListeners();
+  }
+
+  bool _shouldStickMessageWindowToLatest() {
+    if (currentConversation == null) return true;
+    try {
+      if (_scrollController.hasClients) {
+        return _scrollCtrl.autoStickToBottom || _scrollCtrl.isNearBottom(64);
+      }
+    } catch (_) {}
+    return _messageWindowConversationId != currentConversation?.id;
+  }
+
+  void _syncVisibleMessageWindow({
+    bool resetToLatest = false,
+    bool keepLatest = false,
+  }) {
+    final conversationId = currentConversation?.id;
+    final conversationChanged =
+        conversationId != _messageWindowConversationId || resetToLatest;
+    final previousWindow = _messagePageWindow;
+    final previousTotal = _collapsedMessages.length;
+
+    _collapsedMessages = _chatController.collapsedMessages;
+    _allMessageGroups = _chatController.groupMessagesByGroup();
+
+    if (conversationChanged) {
+      _messageKeys.clear();
+      _restoredMessageUiIds.clear();
+      _messageWindowConversationId = conversationId;
+      _messagePageWindow = _messagePageWindowController.resetToLatest(
+        _collapsedMessages.length,
+      );
+    } else {
+      _messagePageWindow = _messagePageWindowController.sync(
+        current: previousWindow,
+        previousTotalItems: previousTotal,
+        nextTotalItems: _collapsedMessages.length,
+        stickToLatest: keepLatest,
+      );
+    }
+
+    _rebuildVisibleMessageWindow();
+  }
+
+  void _rebuildVisibleMessageWindow() {
+    if (_collapsedMessages.isEmpty) {
+      _messagePageWindow = const MessagePageWindow.empty();
+      _visibleMessages = const <ChatMessage>[];
+      _visibleMessageGroups = const <String, List<ChatMessage>>{};
+      _visibleTruncateIndex = -1;
+      return;
+    }
+
+    _messagePageWindow = _messagePageWindowController.sync(
+      current: _messagePageWindow,
+      previousTotalItems: _collapsedMessages.length,
+      nextTotalItems: _collapsedMessages.length,
+      stickToLatest: false,
+    );
+    _visibleMessages = _collapsedMessages.sublist(
+      _messagePageWindow.start,
+      _messagePageWindow.end,
+    );
+
+    final visibleGroupIds = _visibleMessages
+        .map((m) => m.groupId ?? m.id)
+        .toSet();
+    _visibleMessageGroups = <String, List<ChatMessage>>{
+      for (final groupId in visibleGroupIds)
+        if (_allMessageGroups[groupId] != null)
+          groupId: _allMessageGroups[groupId]!,
+    };
+    _visibleTruncateIndex = _computeVisibleTruncateIndex();
+    _restoreMessageUiState();
+  }
+
+  void _refreshVisibleMessageWindowSnapshot({bool keepLatest = false}) {
+    final previousWindow = _messagePageWindow;
+    final previousTotal = _collapsedMessages.length;
+    _collapsedMessages = _chatController.collapsedMessages;
+    _allMessageGroups = _chatController.groupMessagesByGroup();
+    _messagePageWindow = _messagePageWindowController.sync(
+      current: previousWindow,
+      previousTotalItems: previousTotal,
+      nextTotalItems: _collapsedMessages.length,
+      stickToLatest: keepLatest,
+    );
+    _rebuildVisibleMessageWindow();
+  }
+
+  void _replaceMessageInVisibleCaches(ChatMessage message) {
+    final collapsedIndex = _collapsedMessages.indexWhere(
+      (item) => item.id == message.id,
+    );
+    if (collapsedIndex != -1) {
+      final nextCollapsed = List<ChatMessage>.of(_collapsedMessages);
+      nextCollapsed[collapsedIndex] = message;
+      _collapsedMessages = nextCollapsed;
+    }
+
+    final visibleIndex = _visibleMessages.indexWhere(
+      (item) => item.id == message.id,
+    );
+    if (visibleIndex != -1) {
+      final nextVisible = List<ChatMessage>.of(_visibleMessages);
+      nextVisible[visibleIndex] = message;
+      _visibleMessages = nextVisible;
+    }
+
+    final groupId = message.groupId ?? message.id;
+    final versions = _allMessageGroups[groupId];
+    if (versions == null) return;
+
+    final nextVersions = versions
+        .map((item) => item.id == message.id ? message : item)
+        .toList(growable: false);
+    _allMessageGroups = <String, List<ChatMessage>>{
+      ..._allMessageGroups,
+      groupId: nextVersions,
+    };
+    if (_visibleMessageGroups.containsKey(groupId)) {
+      _visibleMessageGroups = <String, List<ChatMessage>>{
+        ..._visibleMessageGroups,
+        groupId: nextVersions,
+      };
+    }
+  }
+
+  @visibleForTesting
+  void syncVisibleMessageWindowForTesting({
+    bool resetToLatest = false,
+    bool keepLatest = false,
+  }) {
+    _syncVisibleMessageWindow(
+      resetToLatest: resetToLatest,
+      keepLatest: keepLatest,
+    );
+  }
+
+  @visibleForTesting
+  void replaceMessageInVisibleCachesForTesting(ChatMessage message) {
+    _replaceMessageInVisibleCaches(message);
+  }
+
+  int _computeVisibleTruncateIndex() {
+    final truncRaw = currentConversation?.truncateIndex ?? -1;
+    if (truncRaw <= 0 || _collapsedMessages.isEmpty) return -1;
+
+    final seen = <String>{};
+    final limit = truncRaw < messages.length ? truncRaw : messages.length;
+    int collapsedCount = 0;
+    for (int i = 0; i < limit; i++) {
+      final groupId = messages[i].groupId ?? messages[i].id;
+      if (seen.add(groupId)) {
+        collapsedCount++;
+      }
+    }
+    if (collapsedCount <= 0) return -1;
+
+    final globalIndex = collapsedCount - 1;
+    if (!_messagePageWindow.contains(globalIndex)) return -1;
+    return globalIndex - _messagePageWindow.start;
+  }
+
+  void _onMessageListScrolled() {
+    if (_isAdjustingMessageWindow) return;
+    if (_collapsedMessages.length <= _messagePageWindowController.pageSize) {
+      return;
+    }
+    try {
+      if (!_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      if (position.pixels <= _messagePagePreloadTriggerExtent) {
+        unawaited(_preloadOlderMessagePage());
+        return;
+      }
+      if ((position.maxScrollExtent - position.pixels) <=
+          _messagePagePreloadTriggerExtent) {
+        unawaited(_preloadNewerMessagePage());
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _preloadOlderMessagePage() async {
+    if (_isAdjustingMessageWindow) return;
+    final nextWindow = _messagePageWindowController.preloadOlder(
+      _messagePageWindow,
+      _collapsedMessages.length,
+    );
+    if (nextWindow == _messagePageWindow) return;
+
+    _isAdjustingMessageWindow = true;
+    final previousOffset = _scrollController.hasClients
+        ? _scrollController.position.pixels
+        : 0.0;
+    final addedMessageIds = _collapsedMessages
+        .sublist(nextWindow.start, _messagePageWindow.start)
+        .map((m) => m.id)
+        .toList(growable: false);
+
+    _messagePageWindow = nextWindow;
+    _rebuildVisibleMessageWindow();
+    notifyListeners();
+
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      if (_scrollController.hasClients) {
+        final position = _scrollController.position;
+        final addedExtent = _measureMessageExtent(addedMessageIds);
+        final targetOffset = (previousOffset + addedExtent).clamp(
+          0.0,
+          position.maxScrollExtent,
+        );
+        _scrollController.jumpTo(targetOffset);
+      }
+    } catch (_) {
+      // Ignore jump failures during transient tree rebuilds.
+    } finally {
+      _isAdjustingMessageWindow = false;
+    }
+  }
+
+  Future<void> _preloadNewerMessagePage() async {
+    if (_isAdjustingMessageWindow) return;
+    final nextWindow = _messagePageWindowController.preloadNewer(
+      _messagePageWindow,
+      _collapsedMessages.length,
+    );
+    if (nextWindow == _messagePageWindow) return;
+
+    _isAdjustingMessageWindow = true;
+    final distanceFromBottom = _scrollController.hasClients
+        ? (_scrollController.position.maxScrollExtent -
+              _scrollController.position.pixels)
+        : 0.0;
+
+    _messagePageWindow = nextWindow;
+    _rebuildVisibleMessageWindow();
+    notifyListeners();
+
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      if (_scrollController.hasClients) {
+        final position = _scrollController.position;
+        final targetOffset = (position.maxScrollExtent - distanceFromBottom)
+            .clamp(0.0, position.maxScrollExtent);
+        _scrollController.jumpTo(targetOffset);
+      }
+    } catch (_) {
+      // Ignore jump failures during transient tree rebuilds.
+    } finally {
+      _isAdjustingMessageWindow = false;
+    }
+  }
+
+  double _measureMessageExtent(Iterable<String> messageIds) {
+    double total = 0;
+    for (final id in messageIds) {
+      final context = _messageKeys[id]?.currentContext;
+      final box = context?.findRenderObject() as RenderBox?;
+      if (box != null && box.attached) {
+        total += box.size.height;
+      }
+    }
+    return total;
+  }
+
+  Future<void> _ensureMessageWindowContains(String messageId) async {
+    final resolvedId = _resolveCollapsedMessageId(messageId);
+    if (resolvedId == null) return;
+    final index = _collapsedMessages.indexWhere((m) => m.id == resolvedId);
+    if (index < 0 || _messagePageWindow.contains(index)) return;
+
+    _messagePageWindow = _messagePageWindowController.windowForIndex(
+      totalItems: _collapsedMessages.length,
+      targetIndex: index,
+    );
+    _rebuildVisibleMessageWindow();
+    notifyListeners();
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+    } catch (_) {}
+  }
+
+  String? _resolveCollapsedMessageId(String messageId) {
+    final direct = _collapsedMessages.indexWhere(
+      (message) => message.id == messageId,
+    );
+    if (direct != -1) return messageId;
+
+    final rawIndex = messages.indexWhere((message) => message.id == messageId);
+    if (rawIndex == -1) return null;
+    final groupId = messages[rawIndex].groupId ?? messages[rawIndex].id;
+    final collapsedIndex = _collapsedMessages.indexWhere(
+      (message) => (message.groupId ?? message.id) == groupId,
+    );
+    if (collapsedIndex == -1) return null;
+    return _collapsedMessages[collapsedIndex].id;
+  }
+
+  int? _resolveQuestionNavigationAnchor({required bool preferLastVisible}) {
+    final chainedId = _scrollCtrl.lastJumpUserMessageId;
+    if (chainedId != null) {
+      final resolvedId = _resolveCollapsedMessageId(chainedId);
+      final chainedIndex = resolvedId == null
+          ? -1
+          : collapsedMessages.indexWhere((message) => message.id == resolvedId);
+      if (chainedIndex >= 0) return chainedIndex;
+    }
+
+    final (listTop, listBottom) = _getViewportBounds();
+    int? firstVisible;
+    int? lastVisible;
+    for (int i = 0; i < visibleMessages.length; i++) {
+      final context = _messageKeys[visibleMessages[i].id]?.currentContext;
+      final box = context?.findRenderObject() as RenderBox?;
+      if (box == null || !box.attached) continue;
+      final top = box.localToGlobal(Offset.zero).dy;
+      final bottom = top + box.size.height;
+      if (!(bottom > listTop && top < listBottom)) continue;
+      firstVisible ??= _messagePageWindow.start + i;
+      lastVisible = _messagePageWindow.start + i;
+    }
+
+    if (preferLastVisible) {
+      return lastVisible ??
+          firstVisible ??
+          (collapsedMessages.isEmpty ? null : collapsedMessages.length - 1);
+    }
+    return firstVisible ??
+        lastVisible ??
+        (collapsedMessages.isEmpty ? null : 0);
   }
 
   void initDesktopUi() {
@@ -713,6 +1080,9 @@ class HomePageController extends ChangeNotifier {
     messages.add(newMsg);
     final gid = (newMsg.groupId ?? newMsg.id);
     versionSelections[gid] = newMsg.version;
+    _refreshVisibleMessageWindowSnapshot(
+      keepLatest: _shouldStickMessageWindowToLatest(),
+    );
     notifyListeners();
 
     if (currentConversation != null) {
@@ -739,29 +1109,34 @@ class HomePageController extends ChangeNotifier {
     final result = await _translationService.translateMessage(
       message: message,
       onTranslationStarted: () {
-        final loadingMessage = message.copyWith(
-          translation: l10n.homePageTranslating,
-        );
         final index = messages.indexWhere((m) => m.id == message.id);
         if (index != -1) {
+          final loadingMessage = messages[index].copyWith(
+            translation: l10n.homePageTranslating,
+          );
           messages[index] = loadingMessage;
+          _replaceMessageInVisibleCaches(loadingMessage);
         }
         _translations[message.id] = TranslationData();
         notifyListeners();
       },
       onTranslationUpdate: (translation) {
-        final updatingMessage = message.copyWith(translation: translation);
         final index = messages.indexWhere((m) => m.id == message.id);
         if (index != -1) {
+          final updatingMessage = messages[index].copyWith(
+            translation: translation,
+          );
           messages[index] = updatingMessage;
+          _replaceMessageInVisibleCaches(updatingMessage);
         }
         notifyListeners();
       },
       onTranslationCleared: () {
-        final clearedMessage = message.copyWith(translation: '');
         final index = messages.indexWhere((m) => m.id == message.id);
         if (index != -1) {
+          final clearedMessage = messages[index].copyWith(translation: '');
           messages[index] = clearedMessage;
+          _replaceMessageInVisibleCaches(clearedMessage);
         }
         _translations.remove(message.id);
         notifyListeners();
@@ -810,13 +1185,17 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
-  void shareMessage(int messageIndex, List<ChatMessage> messageList) {
+  void shareMessage(ChatMessage message) {
     dismissKeyboard();
     _selecting = true;
     _selectedItems.clear();
     _showThinkingTools = false;
     _showThinkingContent = false;
 
+    final messageList = collapsedMessages;
+    final messageIndex = messageList.indexWhere(
+      (item) => item.id == message.id,
+    );
     if (messageIndex < 0 || messageIndex >= messageList.length) {
       notifyListeners();
       return;
@@ -867,7 +1246,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   void selectAll() {
-    final collapsed = collapseVersions(messages);
+    final collapsed = collapsedMessages;
     for (final m in collapsed) {
       if (m.role == 'user' || m.role == 'assistant') {
         _selectedItems.add(m.id);
@@ -877,7 +1256,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   void toggleSelectAll() {
-    final collapsed = collapseVersions(messages);
+    final collapsed = collapsedMessages;
     final selectable = collapsed
         .where((m) => m.role == 'user' || m.role == 'assistant')
         .toList();
@@ -897,7 +1276,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   void invertSelection() {
-    final collapsed = collapseVersions(messages);
+    final collapsed = collapsedMessages;
     for (final m in collapsed) {
       if (m.role != 'user' && m.role != 'assistant') continue;
       if (_selectedItems.contains(m.id)) {
@@ -922,7 +1301,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   List<ChatMessage> _selectedCollapsedMessages() {
-    final collapsed = collapseVersions(messages);
+    final collapsed = collapsedMessages;
     final selected = <ChatMessage>[];
     for (final m in collapsed) {
       if (_selectedItems.contains(m.id)) selected.add(m);
@@ -1014,7 +1393,7 @@ class HomePageController extends ChangeNotifier {
   Future<void> confirmSelection() async {
     final convo = currentConversation;
     if (convo == null) return;
-    final collapsed = collapseVersions(messages);
+    final collapsed = collapsedMessages;
     final selected = <ChatMessage>[];
     for (final m in collapsed) {
       if (_selectedItems.contains(m.id)) selected.add(m);
@@ -1065,6 +1444,7 @@ class HomePageController extends ChangeNotifier {
       groupId,
       version,
     );
+    _syncVisibleMessageWindow(keepLatest: _shouldStickMessageWindowToLatest());
     notifyListeners();
   }
 
@@ -1286,19 +1666,33 @@ class HomePageController extends ChangeNotifier {
   // Public Methods - Scroll
   // ============================================================================
 
-  void scrollToBottom({bool animate = true}) =>
-      _scrollToBottom(animate: animate);
-  void forceScrollToBottom() => _scrollCtrl.forceScrollToBottom();
-  void forceScrollToBottomSoon({bool animate = true}) =>
-      _scrollCtrl.forceScrollToBottomSoon(
-        animate: animate,
-        postSwitchDelay: _postSwitchScrollDelay,
-      );
+  void scrollToBottom({bool animate = true}) {
+    _syncVisibleMessageWindow(keepLatest: true);
+    notifyListeners();
+    _scrollToBottom(animate: animate);
+  }
+
+  void forceScrollToBottom() {
+    _syncVisibleMessageWindow(keepLatest: true);
+    notifyListeners();
+    _scrollCtrl.forceScrollToBottom();
+  }
+
+  void forceScrollToBottomSoon({bool animate = true}) {
+    _syncVisibleMessageWindow(keepLatest: true);
+    notifyListeners();
+    _scrollCtrl.forceScrollToBottomSoon(
+      animate: animate,
+      postSwitchDelay: _postSwitchScrollDelay,
+    );
+  }
 
   Future<void> scrollToMessageId(String targetId) async {
-    final collapsed = collapseVersions(messages);
+    await _ensureMessageWindowContains(targetId);
+    final resolvedId = _resolveCollapsedMessageId(targetId) ?? targetId;
+    final collapsed = collapsedMessages;
     await _scrollCtrl.scrollToMessageId(
-      targetId: targetId,
+      targetId: resolvedId,
       messages: collapsed,
       messageKeys: _messageKeys,
       getViewportBounds: _getViewportBounds,
@@ -1307,21 +1701,33 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> jumpToPreviousQuestion() async {
-    final collapsed = collapseVersions(messages);
-    await _scrollCtrl.jumpToPreviousQuestion(
-      messages: collapsed,
-      messageKeys: _messageKeys,
-      getViewportBounds: _getViewportBounds,
-    );
+    final anchor = _resolveQuestionNavigationAnchor(preferLastVisible: true);
+    if (anchor == null) return;
+
+    for (int i = anchor - 1; i >= 0; i--) {
+      if (collapsedMessages[i].role == 'user') {
+        await scrollToMessageId(collapsedMessages[i].id);
+        return;
+      }
+    }
+
+    _scrollCtrl.resetLastJumpUserMessageId();
+    _scrollCtrl.scrollToTop();
   }
 
   Future<void> jumpToNextQuestion() async {
-    final collapsed = collapseVersions(messages);
-    await _scrollCtrl.jumpToNextQuestion(
-      messages: collapsed,
-      messageKeys: _messageKeys,
-      getViewportBounds: _getViewportBounds,
-    );
+    final anchor = _resolveQuestionNavigationAnchor(preferLastVisible: false);
+    if (anchor == null) return;
+
+    for (int i = anchor + 1; i < collapsedMessages.length; i++) {
+      if (collapsedMessages[i].role == 'user') {
+        await scrollToMessageId(collapsedMessages[i].id);
+        return;
+      }
+    }
+
+    _scrollCtrl.resetLastJumpUserMessageId();
+    forceScrollToBottom();
   }
 
   void scrollToTop({bool animate = true}) {
@@ -1435,40 +1841,59 @@ class HomePageController extends ChangeNotifier {
     return (listTop, listBottom);
   }
 
-  void _restoreMessageUiState() {
-    for (int i = 0; i < messages.length; i++) {
-      final m = messages[i];
-      if (m.role == 'assistant') {
-        _streamController.restoreMessageUiState(
-          m,
-          getToolEventsFromDb: (id) => _chatService.getToolEvents(id),
-          getGeminiThoughtSigFromDb: (id) =>
-              _chatService.getGeminiThoughtSignature(id),
-        );
+  void _restoreMessageUiState([Iterable<ChatMessage>? targetMessages]) {
+    final targets = targetMessages ?? _visibleMessages;
+    for (final target in targets) {
+      final index = messages.indexWhere((message) => message.id == target.id);
+      if (index < 0) continue;
+      final message = messages[index];
 
-        final cleanedContent = _streamController.captureGeminiThoughtSignature(
-          m.content,
-          m.id,
-        );
-        if (cleanedContent != m.content) {
-          final updated = m.copyWith(content: cleanedContent);
-          messages[i] = updated;
-          unawaited(_chatService.updateMessage(m.id, content: cleanedContent));
-        }
+      if (message.translation != null && message.translation!.isNotEmpty) {
+        _translations.putIfAbsent(message.id, () {
+          final td = TranslationData();
+          td.expanded = false;
+          return td;
+        });
+      }
 
-        _scheduleInlineImageSanitize(
-          m.id,
-          latestContent: messages[i].content,
-          immediate: true,
+      if (message.role != 'assistant' ||
+          !_restoredMessageUiIds.add(message.id)) {
+        continue;
+      }
+
+      _streamController.restoreMessageUiState(
+        message,
+        getToolEventsFromDb: (id) => _chatService.getToolEvents(id),
+        getGeminiThoughtSigFromDb: (id) =>
+            _chatService.getGeminiThoughtSignature(id),
+      );
+
+      final cleanedContent = _streamController.captureGeminiThoughtSignature(
+        message.content,
+        message.id,
+      );
+      if (cleanedContent != message.content) {
+        final updated = message.copyWith(content: cleanedContent);
+        messages[index] = updated;
+        _replaceMessageInVisibleCaches(updated);
+        unawaited(
+          _chatService.updateMessage(message.id, content: cleanedContent),
         );
       }
 
-      if (m.translation != null && m.translation!.isNotEmpty) {
-        final td = TranslationData();
-        td.expanded = false;
-        _translations[m.id] = td;
-      }
+      _scheduleInlineImageSanitize(
+        message.id,
+        latestContent: messages[index].content,
+        immediate: true,
+      );
     }
+  }
+
+  @visibleForTesting
+  void restoreMessageUiStateForTesting([
+    Iterable<ChatMessage>? targetMessages,
+  ]) {
+    _restoreMessageUiState(targetMessages);
   }
 
   void _scheduleInlineImageSanitize(
@@ -1496,7 +1921,9 @@ class HomePageController extends ChangeNotifier {
         await _chatService.updateMessage(id, content: sanitized);
         final i = messages.indexWhere((m) => m.id == id);
         if (i != -1) {
-          messages[i] = messages[i].copyWith(content: sanitized);
+          final updated = messages[i].copyWith(content: sanitized);
+          messages[i] = updated;
+          _replaceMessageInVisibleCaches(updated);
         }
         notifyListeners();
       },
@@ -1525,6 +1952,8 @@ class HomePageController extends ChangeNotifier {
   void dispose() {
     _convoFadeController.dispose();
     _mcpProvider?.removeListener(_onMcpChanged);
+    _scrollController.removeListener(_onMessageListScrolled);
+    _viewModel.removeListener(_onViewModelChanged);
     _scrollCtrl.dispose();
     try {
       _chatActionSub?.cancel();

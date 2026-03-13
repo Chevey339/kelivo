@@ -29,6 +29,7 @@ class ChatController extends ChangeNotifier {
   /// Messages in the current conversation.
   List<ChatMessage> _messages = [];
   List<ChatMessage> get messages => _messages;
+  List<ChatMessage> get allMessages => _messages;
 
   /// Selected version per message group (groupId -> selected version index).
   Map<String, int> _versionSelections = <String, int>{};
