@@ -2175,12 +2175,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   for (int i = 0; i < items.length; i++)
-                                    _SourceRow(
+                                    _SearchResultCard(
                                       index: (items[i]['index'] ?? (i + 1))
                                           .toString(),
                                       title: (items[i]['title'] ?? '')
                                           .toString(),
                                       url: (items[i]['url'] ?? '').toString(),
+                                      text: (items[i]['text'] ?? '')
+                                          .toString(),
                                     ),
                                 ],
                               ),
@@ -2241,11 +2243,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             for (int i = 0; i < items.length; i++)
-                              _SourceRow(
+                              _SearchResultCard(
                                 index: (items[i]['index'] ?? (i + 1))
                                     .toString(),
                                 title: (items[i]['title'] ?? '').toString(),
                                 url: (items[i]['url'] ?? '').toString(),
+                                text: (items[i]['text'] ?? '').toString(),
                               ),
                           ],
                         ),
@@ -2984,7 +2987,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                // Search tools: show clickable result items
+                                // Search tools: show clickable result cards
                                 if (searchItems.isNotEmpty)
                                   Column(
                                     crossAxisAlignment:
@@ -2993,7 +2996,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                       for (int i = 0;
                                           i < searchItems.length;
                                           i++)
-                                        _SourceRow(
+                                        _SearchResultCard(
                                           index:
                                               (searchItems[i]['index'] ??
                                                       (i + 1))
@@ -3002,6 +3005,8 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                               (searchItems[i]['title'] ?? '')
                                                   .toString(),
                                           url: (searchItems[i]['url'] ?? '')
+                                              .toString(),
+                                          text: (searchItems[i]['text'] ?? '')
                                               .toString(),
                                         ),
                                     ],
@@ -3152,18 +3157,20 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    // Search tools: show clickable result items
+                    // Search tools: show clickable result cards
                     if (searchItems.isNotEmpty)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           for (int i = 0; i < searchItems.length; i++)
-                            _SourceRow(
+                            _SearchResultCard(
                               index: (searchItems[i]['index'] ?? (i + 1))
                                   .toString(),
                               title:
                                   (searchItems[i]['title'] ?? '').toString(),
                               url: (searchItems[i]['url'] ?? '').toString(),
+                              text:
+                                  (searchItems[i]['text'] ?? '').toString(),
                             ),
                         ],
                       )
@@ -3252,98 +3259,164 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   }
 }
 
-class _SourcesList extends StatelessWidget {
-  const _SourcesList({required this.items});
-  final List<Map<String, dynamic>> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    if (items.isEmpty) return const SizedBox.shrink();
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
-      ),
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              l10n.chatMessageWidgetCitationsTitle(items.length),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface.withOpacity(0.75),
-              ),
-            ),
-          ),
-          for (int i = 0; i < items.length; i++)
-            _SourceRow(
-              index: (items[i]['index'] ?? (i + 1)).toString(),
-              title: (items[i]['title'] ?? '').toString(),
-              url: (items[i]['url'] ?? '').toString(),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SourceRow extends StatelessWidget {
-  const _SourceRow({
-    required this.index,
+/// Card-style search result item for tool detail view.
+/// Shows favicon, title, text snippet, and URL in a tappable card.
+class _SearchResultCard extends StatelessWidget {
+  const _SearchResultCard({
     required this.title,
     required this.url,
+    this.text = '',
+    this.index,
   });
-  final String index;
   final String title;
   final String url;
+  final String text;
+  final String? index;
+
+  String _domain(String url) {
+    try {
+      return Uri.parse(url).host;
+    } catch (_) {
+      return '';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final domain = _domain(url);
+    final faviconUrl = domain.isNotEmpty
+        ? 'https://www.google.com/s2/favicons?domain=$domain&sz=32'
+        : '';
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 18,
-            height: 18,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: cs.primary.withOpacity(0.20),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            margin: const EdgeInsets.only(top: 2),
-            child: Text(index, style: const TextStyle(fontSize: 11)),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: InkWell(
-              onTap: () async {
-                try {
-                  await launchUrl(
-                    Uri.parse(url),
-                    mode: LaunchMode.externalApplication,
-                  );
-                } catch (_) {}
-              },
-              child: Text(
-                title.isNotEmpty ? title : url,
-                style: TextStyle(color: cs.primary),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+      padding: const EdgeInsets.only(bottom: 8),
+      child: IosCardPress(
+        borderRadius: BorderRadius.circular(12),
+        baseColor: isDark
+            ? cs.surfaceContainerHighest.withOpacity(0.5)
+            : cs.surfaceContainerHighest.withOpacity(0.45),
+        pressedScale: 1.0,
+        duration: const Duration(milliseconds: 200),
+        onTap: () async {
+          try {
+            await launchUrl(
+              Uri.parse(url),
+              mode: LaunchMode.externalApplication,
+            );
+          } catch (_) {}
+        },
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Favicon with optional index badge
+            SizedBox(
+              width: 36,
+              height: 36,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        color: cs.surfaceContainerHigh,
+                        child: faviconUrl.isNotEmpty
+                            ? Image.network(
+                                faviconUrl,
+                                width: 32,
+                                height: 32,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => Icon(
+                                  Lucide.Globe,
+                                  size: 18,
+                                  color: cs.onSurface.withOpacity(0.5),
+                                ),
+                              )
+                            : Icon(
+                                Lucide.Globe,
+                                size: 18,
+                                color: cs.onSurface.withOpacity(0.5),
+                              ),
+                      ),
+                    ),
+                  ),
+                  if (index != null)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: cs.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          index!,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: cs.onPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 10),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title
+                  Text(
+                    title.isNotEmpty ? title : domain,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  // Text snippet
+                  if (text.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      text,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withOpacity(0.6),
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  // URL
+                  const SizedBox(height: 3),
+                  Text(
+                    url,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: cs.onSurface.withOpacity(0.4),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
