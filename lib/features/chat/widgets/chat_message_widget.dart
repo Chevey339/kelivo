@@ -2834,6 +2834,24 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     );
   }
 
+  /// Try to parse search result items from tool content JSON.
+  List<Map<String, dynamic>> _tryParseSearchItems() {
+    final content = widget.part.content;
+    if (content == null || content.isEmpty) return const [];
+    final name = widget.part.toolName;
+    if (name != 'search_web' && name != 'builtin_search') return const [];
+    try {
+      final obj = jsonDecode(content) as Map<String, dynamic>;
+      final arr = obj['items'] as List? ?? const <dynamic>[];
+      return [
+        for (final it in arr)
+          if (it is Map) it.cast<String, dynamic>(),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
   void _showDetail(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
@@ -2844,6 +2862,9 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     final resultText = cleanText.isNotEmpty
         ? cleanText
         : l10n.chatMessageWidgetNoResultYet;
+
+    // For search tools, parse items for structured display
+    final searchItems = _tryParseSearchItems();
 
     final bool isDesktop =
         defaultTargetPlatform == TargetPlatform.macOS ||
@@ -2963,25 +2984,49 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? Colors.white10
-                                        : const Color(0xFFF7F7F9),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: cs.outlineVariant.withOpacity(0.2),
+                                // Search tools: show clickable result items
+                                if (searchItems.isNotEmpty)
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      for (int i = 0;
+                                          i < searchItems.length;
+                                          i++)
+                                        _SourceRow(
+                                          index:
+                                              (searchItems[i]['index'] ??
+                                                      (i + 1))
+                                                  .toString(),
+                                          title:
+                                              (searchItems[i]['title'] ?? '')
+                                                  .toString(),
+                                          url: (searchItems[i]['url'] ?? '')
+                                              .toString(),
+                                        ),
+                                    ],
+                                  )
+                                else
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Theme.of(context).brightness ==
+                                                  Brightness.dark
+                                              ? Colors.white10
+                                              : const Color(0xFFF7F7F9),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color:
+                                            cs.outlineVariant.withOpacity(0.2),
+                                      ),
+                                    ),
+                                    child: SelectableText(
+                                      resultText,
+                                      style: const TextStyle(fontSize: 12),
                                     ),
                                   ),
-                                  child: SelectableText(
-                                    resultText,
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                ),
                                 // Show images if available
                                 if (images.isNotEmpty) ...[
                                   const SizedBox(height: 12),
@@ -3107,23 +3152,40 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white10
-                            : const Color(0xFFF7F7F9),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: cs.outlineVariant.withOpacity(0.2),
+                    // Search tools: show clickable result items
+                    if (searchItems.isNotEmpty)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (int i = 0; i < searchItems.length; i++)
+                            _SourceRow(
+                              index: (searchItems[i]['index'] ?? (i + 1))
+                                  .toString(),
+                              title:
+                                  (searchItems[i]['title'] ?? '').toString(),
+                              url: (searchItems[i]['url'] ?? '').toString(),
+                            ),
+                        ],
+                      )
+                    else
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color:
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.white10
+                                  : const Color(0xFFF7F7F9),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: cs.outlineVariant.withOpacity(0.2),
+                          ),
+                        ),
+                        child: SelectableText(
+                          resultText,
+                          style: const TextStyle(fontSize: 12),
                         ),
                       ),
-                      child: SelectableText(
-                        resultText,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
                     // Show images if available
                     if (images.isNotEmpty) ...[
                       const SizedBox(height: 12),

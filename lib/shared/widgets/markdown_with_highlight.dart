@@ -829,7 +829,17 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     );
     out = out.replaceAllMapped(atxEnum, (m) => "${m[1]}.\u200C${m[2]}${m[3]}");
 
-    // 7) Fix: when multiple markdown links are placed on separate lines using
+    // 7) Normalize double-bracket citation links: [[n]](url) → [n](url)
+    //    Many LLMs with built-in web search (DashScope, Perplexity, etc.) emit
+    //    citations as [[1]](url), where the inner [1] is the display text. The
+    //    link regex cannot match nested brackets, so flatten them first.
+    final doubleBracketLink = RegExp(r'\[\[([^\]]+)\]\]\(([^\s)]+)\)');
+    out = out.replaceAllMapped(
+      doubleBracketLink,
+      (m) => '[${m[1]}](${m[2]})',
+    );
+
+    // 8) Fix: when multiple markdown links are placed on separate lines using
     //    trailing double-spaces (hard line breaks), gpt_markdown may treat them
     //    as a single paragraph and only render the first link correctly.
     //    To avoid this, convert such lines into separate paragraphs by
