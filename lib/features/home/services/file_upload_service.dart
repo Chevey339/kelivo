@@ -5,14 +5,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as p;
-
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/dialogs/file_duplicate_dialog.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/file_import_helper.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/models/chat_input_data.dart';
+import '../../../core/utils/multimodal_input_utils.dart';
 import '../widgets/chat_input_bar.dart';
 
 /// 文件选取和上传服务
@@ -153,17 +152,9 @@ class FileUploadService {
 
   /// 根据文件扩展名推断 MIME 类型
   String inferMimeByExtension(String name) {
+    final mediaMime = inferMediaMimeFromSource(name);
+    if (mediaMime.isNotEmpty) return mediaMime;
     final lower = name.toLowerCase();
-    // Video
-    if (lower.endsWith('.mp4')) return 'video/mp4';
-    if (lower.endsWith('.mpeg') || lower.endsWith('.mpg')) return 'video/mpeg';
-    if (lower.endsWith('.mov')) return 'video/quicktime';
-    if (lower.endsWith('.avi')) return 'video/x-msvideo';
-    if (lower.endsWith('.mkv')) return 'video/x-matroska';
-    if (lower.endsWith('.flv')) return 'video/x-flv';
-    if (lower.endsWith('.wmv')) return 'video/x-ms-wmv';
-    if (lower.endsWith('.webm')) return 'video/webm';
-    if (lower.endsWith('.3gp') || lower.endsWith('.3gpp')) return 'video/3gpp';
     // Documents / text
     if (lower.endsWith('.pdf')) return 'application/pdf';
     if (lower.endsWith('.docx')) {
@@ -209,6 +200,11 @@ class FileUploadService {
           'webm',
           '3gp',
           '3gpp',
+          // audio
+          'wav',
+          'mp3',
+          'pcm',
+          'pcm16',
           // docs
           'txt',
           'md',

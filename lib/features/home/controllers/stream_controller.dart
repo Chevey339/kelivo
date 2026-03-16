@@ -386,12 +386,21 @@ class StreamController {
     _inlineImageSanitizeTimers[messageId]?.cancel();
     _inlineImageSanitizeTimers.remove(messageId);
     _inlineImageSanitizing.remove(messageId);
-    streamingContentNotifier.removeNotifier(messageId);
   }
 
   /// Clean up timers for a message (public API).
   void cleanupTimers(String messageId) {
     _cleanupStreamTimers(messageId);
+  }
+
+  /// Remove the streaming content notifier for a message.
+  ///
+  /// This must be called AFTER onMessagesChanged to avoid a race where
+  /// the UI rebuilds without the notifier and falls back to stale
+  /// message.content (which may still be empty).
+  /// Idempotent: safe to call multiple times.
+  void removeStreamingNotifier(String messageId) {
+    streamingContentNotifier.removeNotifier(messageId);
   }
 
   /// Cancel all throttle timers.

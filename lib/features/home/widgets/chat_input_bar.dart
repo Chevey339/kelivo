@@ -9,11 +9,9 @@ import '../../../l10n/app_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../utils/file_import_helper.dart';
 import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../../../shared/responsive/breakpoints.dart';
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:io';
 import '../../../core/models/chat_input_data.dart';
 import '../../../utils/clipboard_images.dart';
@@ -21,14 +19,12 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/api/builtin_tools.dart';
+import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/app_directories.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
-
-// Desktop context menu actions for right-click on the input field
-enum _DesktopTextMenuAction { paste, cut, copy, selectAll }
 
 class ChatInputBarController {
   _ChatInputBarState? _state;
@@ -136,7 +132,6 @@ class ChatInputBar extends StatefulWidget {
 class _ChatInputBarState extends State<ChatInputBar>
     with WidgetsBindingObserver {
   late TextEditingController _controller;
-  bool _searchEnabled = false;
   bool _isExpanded = false; // Track expand/collapse state for input field
   final List<String> _images = <String>[]; // local file paths
   final List<DocumentAttachment> _docs =
@@ -192,7 +187,6 @@ class _ChatInputBarState extends State<ChatInputBar>
     super.initState();
     _controller = widget.controller ?? TextEditingController();
     widget.mediaController?._bind(this);
-    _searchEnabled = widget.searchEnabled;
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -221,11 +215,11 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _repeatTimers.values.forEach((t) {
+    for (final timer in _repeatTimers.values) {
       try {
-        t?.cancel();
+        timer?.cancel();
       } catch (_) {}
-    });
+    }
     _repeatTimers.clear();
     widget.mediaController?._unbind(this);
     if (widget.controller == null) {
@@ -237,9 +231,6 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   void didUpdateWidget(covariant ChatInputBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.searchEnabled != widget.searchEnabled) {
-      _searchEnabled = widget.searchEnabled;
-    }
   }
 
   String _hint(BuildContext context) {
@@ -284,7 +275,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     final selection = value.selection;
     final text = value.text;
     if (!selection.isValid) {
-      _controller.text = text + '\n';
+      _controller.text = '$text\n';
       _controller.selection = TextSelection.collapsed(
         offset: _controller.text.length,
       );
@@ -434,13 +425,13 @@ class _ChatInputBarState extends State<ChatInputBar>
     );
   }
 
-  KeyEventResult _handleKeyEvent(FocusNode node, RawKeyEvent event) {
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     // Enhance hardware keyboard behavior
     final w = MediaQuery.sizeOf(node.context!).width;
     final isTabletOrDesktop = w >= AppBreakpoints.tablet;
     final isIosTablet = Platform.isIOS && isTabletOrDesktop;
 
-    final isDown = event is RawKeyDownEvent;
+    final isDown = event is KeyDownEvent;
     final key = event.logicalKey;
     final isEnter =
         key == LogicalKeyboardKey.enter ||
@@ -457,7 +448,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       final composing = _controller.value.composing;
       final composingActive = composing.isValid && !composing.isCollapsed;
       if (composingActive) return KeyEventResult.ignored;
-      final keys = RawKeyboard.instance.keysPressed;
+      final keys = HardwareKeyboard.instance.logicalKeysPressed;
       final shift =
           keys.contains(LogicalKeyboardKey.shiftLeft) ||
           keys.contains(LogicalKeyboardKey.shiftRight);
@@ -496,7 +487,7 @@ class _ChatInputBarState extends State<ChatInputBar>
 
     // Paste handling for images on iOS/macOS (tablet/desktop)
     if (isDown && isPasteV) {
-      final keys = RawKeyboard.instance.keysPressed;
+      final keys = HardwareKeyboard.instance.logicalKeysPressed;
       final meta =
           keys.contains(LogicalKeyboardKey.metaLeft) ||
           keys.contains(LogicalKeyboardKey.metaRight);
@@ -512,7 +503,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     // Arrow repeat fix only needed on iOS tablets
     if (!isIosTablet || !isArrow) return KeyEventResult.ignored;
 
-    final keys = RawKeyboard.instance.keysPressed;
+    final keys = HardwareKeyboard.instance.logicalKeysPressed;
     final shift =
         keys.contains(LogicalKeyboardKey.shiftLeft) ||
         keys.contains(LogicalKeyboardKey.shiftRight);
@@ -532,7 +523,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       }
     }
 
-    if (isDown) {
+    if (event is KeyDownEvent) {
       // Initial move
       moveOnce();
       // Start repeat timer if not already
@@ -546,7 +537,9 @@ class _ChatInputBarState extends State<ChatInputBar>
         _repeatTimers[key] = starter;
       }
       return KeyEventResult.handled;
-    } else {
+    }
+
+    if (event is KeyUpEvent) {
       // Key up -> cancel repeat
       final t = _repeatTimers.remove(key);
       try {
@@ -554,6 +547,8 @@ class _ChatInputBarState extends State<ChatInputBar>
       } catch (_) {}
       return KeyEventResult.handled;
     }
+
+    return KeyEventResult.handled;
   }
 
   Future<void> _handlePasteFromClipboard() async {
@@ -564,7 +559,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         final reader = await clipboard.read();
 
         // Helper: read bytes for a given file format from DataReader (ClipboardReader or item)
-        Future<Uint8List?> _readFileBytes(
+        Future<Uint8List?> readFileBytes(
           DataReader dataReader,
           FileFormat format,
         ) async {
@@ -594,7 +589,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         }
 
         // Helper: persist bytes as a file under upload directory
-        Future<String?> _saveImageBytes(String format, Uint8List bytes) async {
+        Future<String?> saveImageBytes(String format, Uint8List bytes) async {
           try {
             final dir = await AppDirectories.getUploadDirectory();
             if (!await dir.exists()) {
@@ -602,11 +597,12 @@ class _ChatInputBarState extends State<ChatInputBar>
             }
             final ts = DateTime.now().millisecondsSinceEpoch;
             final ext = format.toLowerCase();
-            String name = 'paste_${ts}.${ext == 'jpeg' ? 'jpg' : ext}';
+            final fileExt = ext == 'jpeg' ? 'jpg' : ext;
+            String name = 'paste_$ts.$fileExt';
             String destPath = p.join(dir.path, name);
             if (await File(destPath).exists()) {
               name =
-                  'paste_${ts}_${DateTime.now().microsecondsSinceEpoch}.${ext == 'jpeg' ? 'jpg' : ext}';
+                  'paste_${ts}_${DateTime.now().microsecondsSinceEpoch}.$fileExt';
               destPath = p.join(dir.path, name);
             }
             await File(destPath).writeAsBytes(bytes, flush: true);
@@ -620,19 +616,19 @@ class _ChatInputBarState extends State<ChatInputBar>
         Uint8List? bytes;
         String? fmt;
         if (reader.canProvide(Formats.png)) {
-          bytes = await _readFileBytes(reader, Formats.png);
+          bytes = await readFileBytes(reader, Formats.png);
           fmt = 'png';
         }
         bytes ??= reader.canProvide(Formats.jpeg)
-            ? await _readFileBytes(reader, Formats.jpeg)
+            ? await readFileBytes(reader, Formats.jpeg)
             : null;
         fmt = (bytes != null && fmt == null) ? 'jpeg' : fmt;
         if (bytes == null && reader.canProvide(Formats.gif)) {
-          bytes = await _readFileBytes(reader, Formats.gif);
+          bytes = await readFileBytes(reader, Formats.gif);
           fmt = 'gif';
         }
         if (bytes == null && reader.canProvide(Formats.webp)) {
-          bytes = await _readFileBytes(reader, Formats.webp);
+          bytes = await readFileBytes(reader, Formats.webp);
           fmt = 'webp';
         }
 
@@ -640,19 +636,19 @@ class _ChatInputBarState extends State<ChatInputBar>
           // Try per-item formats
           for (final item in reader.items) {
             if (bytes == null && item.canProvide(Formats.png)) {
-              bytes = await _readFileBytes(item, Formats.png);
+              bytes = await readFileBytes(item, Formats.png);
               fmt = 'png';
             }
             if (bytes == null && item.canProvide(Formats.jpeg)) {
-              bytes = await _readFileBytes(item, Formats.jpeg);
+              bytes = await readFileBytes(item, Formats.jpeg);
               fmt = 'jpeg';
             }
             if (bytes == null && item.canProvide(Formats.gif)) {
-              bytes = await _readFileBytes(item, Formats.gif);
+              bytes = await readFileBytes(item, Formats.gif);
               fmt = 'gif';
             }
             if (bytes == null && item.canProvide(Formats.webp)) {
-              bytes = await _readFileBytes(item, Formats.webp);
+              bytes = await readFileBytes(item, Formats.webp);
               fmt = 'webp';
             }
             if (bytes != null) break;
@@ -660,7 +656,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         }
 
         if (bytes != null && bytes.isNotEmpty && fmt != null) {
-          final savedPath = await _saveImageBytes(fmt, bytes);
+          final savedPath = await saveImageBytes(fmt, bytes);
           if (savedPath != null) {
             _addImages([savedPath]);
             return;
@@ -759,6 +755,9 @@ class _ChatInputBarState extends State<ChatInputBar>
     try {
       final dir = await AppDirectories.getUploadDirectory();
       for (final raw in srcPaths) {
+        if (!mounted) {
+          return (images: images, docs: docs);
+        }
         final src = raw.startsWith('file://') ? raw.substring(7) : raw;
         final savedPath = await FileImportHelper.copyXFile(
           XFile(src),
@@ -806,10 +805,10 @@ class _ChatInputBarState extends State<ChatInputBar>
             builder: () => _CompactIconButton(
               tooltip: l10n.chatInputBarSelectModelTooltip,
               icon: Lucide.Boxes,
-              child: widget.modelIcon,
               modelIcon: true,
               onTap: widget.onSelectModel,
               onLongPress: widget.onLongPressSelectModel,
+              child: widget.modelIcon,
             ),
             menu: DesktopContextMenuItem(
               icon: Lucide.Boxes,
@@ -1251,32 +1250,27 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   String _inferMimeByExtension(String name) {
+    final mediaMime = inferMediaMimeFromSource(name);
+    if (mediaMime.isNotEmpty) return mediaMime;
     final lower = name.toLowerCase();
-    // Video
-    if (lower.endsWith('.mp4')) return 'video/mp4';
-    if (lower.endsWith('.mov')) return 'video/quicktime';
-    if (lower.endsWith('.mpeg') || lower.endsWith('.mpg')) return 'video/mpeg';
-    if (lower.endsWith('.avi')) return 'video/x-msvideo';
-    if (lower.endsWith('.mkv')) return 'video/x-matroska';
-    if (lower.endsWith('.flv')) return 'video/x-flv';
-    if (lower.endsWith('.wmv')) return 'video/x-ms-wmv';
-    if (lower.endsWith('.webm')) return 'video/webm';
-    if (lower.endsWith('.3gp') || lower.endsWith('.3gpp')) return 'video/3gpp';
     // Documents / text
     if (lower.endsWith('.pdf')) return 'application/pdf';
-    if (lower.endsWith('.docx'))
+    if (lower.endsWith('.docx')) {
       return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
     if (lower.endsWith('.json')) return 'application/json';
     if (lower.endsWith('.js')) return 'application/javascript';
     if (lower.endsWith('.txt') ||
         lower.endsWith('.md') ||
         lower.endsWith('.markdown') ||
-        lower.endsWith('.mdx'))
+        lower.endsWith('.mdx')) {
       return 'text/plain';
+    }
     if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'text/html';
     if (lower.endsWith('.xml')) return 'application/xml';
-    if (lower.endsWith('.yml') || lower.endsWith('.yaml'))
+    if (lower.endsWith('.yml') || lower.endsWith('.yaml')) {
       return 'application/x-yaml';
+    }
     if (lower.endsWith('.py')) return 'text/x-python';
     if (lower.endsWith('.java')) return 'text/x-java-source';
     if (lower.endsWith('.kt') || lower.endsWith('.kts')) return 'text/x-kotlin';
@@ -1353,12 +1347,20 @@ class _ChatInputBarState extends State<ChatInputBar>
       int i = from;
       if (direction < 0) {
         // Move left
-        while (i > 0 && text[i - 1].trim().isEmpty) i--;
-        while (i > 0 && text[i - 1].trim().isNotEmpty) i--;
+        while (i > 0 && text[i - 1].trim().isEmpty) {
+          i--;
+        }
+        while (i > 0 && text[i - 1].trim().isNotEmpty) {
+          i--;
+        }
       } else {
         // Move right
-        while (i < text.length && text[i].trim().isEmpty) i++;
-        while (i < text.length && text[i].trim().isNotEmpty) i++;
+        while (i < text.length && text[i].trim().isEmpty) {
+          i++;
+        }
+        while (i < text.length && text[i].trim().isNotEmpty) {
+          i++;
+        }
       }
       return i.clamp(0, text.length);
     }
@@ -1516,7 +1518,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                               width: 22,
                               height: 22,
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.6),
+                                color: Colors.black.withValues(alpha: 0.6),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(
@@ -1543,14 +1545,14 @@ class _ChatInputBarState extends State<ChatInputBar>
                   decoration: BoxDecoration(
                     // Translucent background over blurred content
                     color: isDark
-                        ? Colors.white.withOpacity(0.06)
-                        : Colors.white.withOpacity(0.07),
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.white.withValues(alpha: 0.07),
                     borderRadius: BorderRadius.circular(20),
                     // Use previous gray border for better contrast on white
                     border: Border.all(
                       color: isDark
-                          ? Colors.white.withOpacity(0.10)
-                          : theme.colorScheme.outline.withOpacity(0.20),
+                          ? Colors.white.withValues(alpha: 0.10)
+                          : theme.colorScheme.outline.withValues(alpha: 0.20),
                       width: 1,
                     ),
                   ),
@@ -1569,8 +1571,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                             child: ConstrainedBox(
                               constraints: textFieldConstraints,
                               child: Focus(
-                                onKey: (node, event) =>
-                                    _handleKeyEvent(node, event),
+                                onKeyEvent: _handleKeyEvent,
                                 child: Builder(
                                   builder: (ctx) {
                                     // Desktop: show a right-click context menu with paste/cut/copy/select all
@@ -1671,7 +1672,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                           hintText: _hint(context),
                                           hintStyle: TextStyle(
                                             color: theme.colorScheme.onSurface
-                                                .withOpacity(0.45),
+                                                .withValues(alpha: 0.45),
                                           ),
                                           border: InputBorder.none,
                                           contentPadding:
@@ -1711,8 +1712,9 @@ class _ChatInputBarState extends State<ChatInputBar>
                                       ? Lucide.ChevronsDownUp
                                       : Lucide.ChevronsUpDown,
                                   size: 16,
-                                  color: theme.colorScheme.onSurface
-                                      .withOpacity(0.45),
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.45,
+                                  ),
                                 ),
                               ),
                             ),
@@ -1889,59 +1891,6 @@ class _CompactIconButton extends StatelessWidget {
   }
 }
 
-// Keep original button for compatibility if needed elsewhere
-class _CircleIconButton extends StatelessWidget {
-  const _CircleIconButton({
-    required this.icon,
-    this.onTap,
-    this.tooltip,
-    this.active = false,
-    this.child,
-    this.padding,
-  });
-
-  final IconData icon;
-  final VoidCallback? onTap;
-  final String? tooltip;
-  final bool active;
-  final Widget? child;
-  final double? padding;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final bgColor = active
-        ? theme.colorScheme.primary.withOpacity(0.12)
-        : Colors.transparent;
-    final fgColor = active
-        ? theme.colorScheme.primary
-        : (isDark ? Colors.white : Colors.black87);
-
-    final button = AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      decoration: const ShapeDecoration(shape: CircleBorder()),
-      child: Material(
-        color: bgColor,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: Padding(
-            padding: EdgeInsets.all(padding ?? 10),
-            child: child ?? Icon(icon, size: 22, color: fgColor),
-          ),
-        ),
-      ),
-    );
-
-    // Avoid Material Tooltip's ticker conflicts on some platforms; use semantics-only tooltip
-    return tooltip == null
-        ? button
-        : Semantics(tooltip: tooltip!, child: button);
-  }
-}
-
 // New compact send button for the integrated input bar
 class _CompactSendButton extends StatelessWidget {
   const _CompactSendButton({
@@ -1965,7 +1914,9 @@ class _CompactSendButton extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = (enabled || loading)
         ? color
-        : (isDark ? Colors.white12 : Colors.grey.shade300.withOpacity(0.84));
+        : (isDark
+              ? Colors.white12
+              : Colors.grey.shade300.withValues(alpha: 0.84));
     final fg = (enabled || loading)
         ? (isDark ? Colors.black : Colors.white)
         : (isDark ? Colors.white70 : Colors.grey.shade600);
@@ -1993,64 +1944,6 @@ class _CompactSendButton extends StatelessWidget {
                     colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
                   )
                 : Icon(icon, key: const ValueKey('send'), size: 18, color: fg),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// Keep original button for compatibility if needed elsewhere
-class _SendButton extends StatelessWidget {
-  const _SendButton({
-    required this.enabled,
-    required this.onSend,
-    required this.color,
-    required this.icon,
-    this.loading = false,
-    this.onStop,
-  });
-
-  final bool enabled;
-  final bool loading;
-  final VoidCallback onSend;
-  final VoidCallback? onStop;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = (enabled || loading)
-        ? color
-        : (isDark ? Colors.white12 : Colors.grey.shade300);
-    final fg = (enabled || loading)
-        ? (isDark ? Colors.black : Colors.white)
-        : (isDark ? Colors.white70 : Colors.grey.shade600);
-
-    return Material(
-      color: bg,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: loading ? onStop : (enabled ? onSend : null),
-        child: Padding(
-          padding: const EdgeInsets.all(9),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            transitionBuilder: (child, anim) => ScaleTransition(
-              scale: anim,
-              child: FadeTransition(opacity: anim, child: child),
-            ),
-            child: loading
-                ? SvgPicture.asset(
-                    key: const ValueKey('stop'),
-                    'assets/icons/stop.svg',
-                    width: 22,
-                    height: 22,
-                    colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
-                  )
-                : Icon(icon, key: const ValueKey('send'), size: 22, color: fg),
           ),
         ),
       ),

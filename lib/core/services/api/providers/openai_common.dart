@@ -144,6 +144,265 @@ void _sanitizeOpenAIGpt5SamplingParams(
   }
 }
 
+bool _isLongCatHost(String baseUrl) {
+  final host =
+      Uri.tryParse(baseUrl)?.host.toLowerCase() ?? baseUrl.toLowerCase();
+  return host.contains('longcat');
+}
+
+bool _shouldUseLongCatOmniPayload(
+  ProviderConfig config,
+  String upstreamModelId,
+) {
+  return config.useResponseApi != true && isLongCatOmniModelId(upstreamModelId);
+}
+
+bool _shouldIncludeStreamingUsageOptions(
+  String host, {
+  required String upstreamModelId,
+}) {
+  if (isLongCatOmniModelId(upstreamModelId) || _isLongCatHost(host)) {
+    return false;
+  }
+  return !host.contains('mistral.ai') && !host.contains('openrouter');
+}
+
+void _maybeAddStreamingUsageOptions(
+  Map<String, dynamic> body, {
+  required bool stream,
+  required ProviderConfig config,
+  required String host,
+  required String upstreamModelId,
+}) {
+  if (!stream || config.useResponseApi == true) return;
+  if (_shouldIncludeStreamingUsageOptions(
+    host,
+    upstreamModelId: upstreamModelId,
+  )) {
+    body['stream_options'] = {'include_usage': true};
+  }
+}
+
+String _stripDataUrlPrefix(String dataUrl) {
+  final commaIndex = dataUrl.indexOf(',');
+  if (commaIndex >= 0 && commaIndex + 1 < dataUrl.length) {
+    return dataUrl.substring(commaIndex + 1);
+  }
+  return dataUrl;
+}
+
+String? _longCatAudioFormatForMimeOrPath(String source, {String? mime}) {
+  final normalizedMime = (mime ?? '').toLowerCase();
+  final normalizedSource = source.toLowerCase();
+  if (normalizedMime.contains('mpeg') || normalizedSource.endsWith('.mp3')) {
+    return 'mp3';
+  }
+  if (normalizedMime.contains('wav') || normalizedSource.endsWith('.wav')) {
+    return 'wav';
+  }
+  if (normalizedMime.endsWith('pcm16') || normalizedSource.endsWith('.pcm16')) {
+    return 'pcm16';
+  }
+  if (normalizedMime.endsWith('/pcm') || normalizedSource.endsWith('.pcm')) {
+    return 'pcm';
+  }
+  return null;
+}
+
+String _normalizeOpenAICompatibleSource(String src) {
+  if (src.startsWith('http://') ||
+      src.startsWith('https://') ||
+      src.startsWith('data:')) {
+    return src;
+  }
+  try {
+    return SandboxPathResolver.fix(src);
+  } catch (_) {
+    return src;
+  }
+}
+
+Future<Map<String, dynamic>?> _buildLongCatOmniAttachmentPart(
+  String source,
+) async {
+  final normalized = source.trim();
+  if (normalized.isEmpty) return null;
+
+  final bool isRemoteUrl =
+      normalized.startsWith('http://') || normalized.startsWith('https://');
+  final bool isDataUrl = normalized.startsWith('data:');
+  final String mime = isDataUrl
+      ? _mimeFromDataUrl(normalized)
+      : _mimeFromPath(normalized);
+
+  if (isAudioMime(mime)) {
+    final format = _longCatAudioFormatForMimeOrPath(normalized, mime: mime);
+    if (format == null) return null;
+    final data = isRemoteUrl
+        ? normalized
+        : isDataUrl
+        ? _stripDataUrlPrefix(normalized)
+        : await _encodeBase64File(normalized, withPrefix: false);
+    return {
+      'type': 'input_audio',
+      'input_audio': {
+        'type': isRemoteUrl ? 'url' : 'base64',
+        'data': data,
+        'format': format,
+        if (format == 'pcm16') 'sample_rate': 16000,
+      },
+    };
+  }
+
+  if (isVideoMime(mime)) {
+    final data = isRemoteUrl
+        ? normalized
+        : isDataUrl
+        ? _stripDataUrlPrefix(normalized)
+        : await _encodeBase64File(normalized, withPrefix: false);
+    return {
+      'type': 'input_video',
+      'input_video': {'type': isRemoteUrl ? 'url' : 'base64', 'data': data},
+    };
+  }
+
+  final imageData = <String>[
+    isRemoteUrl
+        ? normalized
+        : isDataUrl
+        ? _stripDataUrlPrefix(normalized)
+        : await _encodeBase64File(normalized, withPrefix: false),
+  ];
+  return {
+    'type': 'input_image',
+    'input_image': {'type': isRemoteUrl ? 'url' : 'base64', 'data': imageData},
+  };
+}
+
+Future<List<Map<String, dynamic>>> _buildLongCatOmniMessages(
+  List<Map<String, dynamic>> messages, {
+  List<String>? userMediaPaths,
+}) async {
+  int lastUserIndex = -1;
+  for (int i = messages.length - 1; i >= 0; i--) {
+    if ((messages[i]['role'] ?? '').toString() == 'user') {
+      lastUserIndex = i;
+      break;
+    }
+  }
+
+  final out = <Map<String, dynamic>>[];
+  for (int i = 0; i < messages.length; i++) {
+    final original = messages[i];
+    final role = (original['role'] ?? 'user').toString();
+    final raw = (original['content'] ?? '').toString();
+    final outMsg = Map<String, dynamic>.from(original);
+    outMsg.remove(multimodalInternalMediaPathsKey);
+    outMsg['role'] = role;
+    final internalMediaPaths =
+        (original[multimodalInternalMediaPathsKey] as List?)
+            ?.map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList(growable: false) ??
+        const <String>[];
+
+    if (role == 'system') {
+      outMsg['content'] = <Map<String, dynamic>>[
+        {'type': 'text', 'text': raw},
+      ];
+      out.add(outMsg);
+      continue;
+    }
+
+    if (role == 'tool' ||
+        (role == 'assistant' &&
+            outMsg['tool_calls'] is List &&
+            (outMsg['tool_calls'] as List).isNotEmpty)) {
+      outMsg['content'] = raw;
+      out.add(outMsg);
+      continue;
+    }
+
+    if (role == 'assistant') {
+      outMsg['content'] = <Map<String, dynamic>>[
+        {'type': 'text', 'text': raw},
+      ];
+      out.add(outMsg);
+      continue;
+    }
+
+    final parsed = await _parseTextAndImages(
+      raw,
+      allowRemoteImages: true,
+      allowLocalImages: true,
+      keepRemoteMarkdownText: true,
+    );
+    final parts = <Map<String, dynamic>>[];
+    final seenSources = <String>{};
+
+    if (parsed.text.isNotEmpty) {
+      parts.add({'type': 'text', 'text': parsed.text});
+    }
+
+    for (final ref in parsed.images) {
+      final normalized = _normalizeOpenAICompatibleSource(ref.src);
+      if (!seenSources.add(normalized)) continue;
+      final source = ref.kind == 'path' ? normalized : ref.src;
+      final part = await _buildLongCatOmniAttachmentPart(source);
+      if (part != null) {
+        parts.add(part);
+      }
+    }
+
+    final supplementalMediaPaths = <String>[
+      ...internalMediaPaths,
+      if (i == lastUserIndex && userMediaPaths != null) ...userMediaPaths,
+    ];
+    for (final path in supplementalMediaPaths) {
+      final normalized = _normalizeOpenAICompatibleSource(path);
+      if (!seenSources.add(normalized)) continue;
+      final part = await _buildLongCatOmniAttachmentPart(normalized);
+      if (part != null) {
+        parts.add(part);
+      }
+    }
+
+    if (parts.isEmpty) {
+      parts.add({'type': 'text', 'text': raw});
+    }
+
+    outMsg['content'] = parts;
+    out.add(outMsg);
+  }
+  return out;
+}
+
+String _extractOpenAICompatibleDeltaText(Map? delta) {
+  if (delta == null) return '';
+  final deltaType = (delta['type'] ?? '').toString();
+  if (deltaType == 'response.audio.delta') {
+    return '';
+  }
+  final content = delta['content'];
+  if (content is String) {
+    return content;
+  }
+  if (content is List) {
+    final buffer = StringBuffer();
+    for (final item in content) {
+      if (item is! Map) continue;
+      final text = (item['text'] ?? item['delta'] ?? '').toString();
+      final type = (item['type'] ?? '').toString();
+      if (text.isEmpty) continue;
+      if (type.isEmpty || type == 'text') {
+        buffer.write(text);
+      }
+    }
+    return buffer.toString();
+  }
+  return '';
+}
+
 Stream<ChatStreamChunk> _sendOpenAIStream(
   http.Client client,
   ProviderConfig config,
@@ -176,6 +435,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   final bool isMimoModel =
       modelLower.startsWith('mimo-') || modelLower.contains('/mimo-');
   final bool isMimo = isMimoHost || isMimoModel;
+  final bool useLongCatOmniPayload = _shouldUseLongCatOmniPayload(
+    config,
+    upstreamModelId,
+  );
   final bool needsReasoningEcho =
       (host.contains('deepseek') ||
           modelLower.contains('deepseek') ||
@@ -518,135 +781,156 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       responsesIncludeParam = null;
     }
   } else {
-    final mm = <Map<String, dynamic>>[];
-    for (int i = 0; i < messages.length; i++) {
-      final m = messages[i];
-      final isLast = i == messages.length - 1;
-      final raw = (m['content'] ?? '').toString();
-      final role = (m['role'] ?? 'user').toString();
-      final outMsg = Map<String, dynamic>.from(m);
-      outMsg['role'] = role;
+    if (useLongCatOmniPayload) {
+      body = {
+        'model': upstreamModelId,
+        'messages': await _buildLongCatOmniMessages(
+          messages,
+          userMediaPaths: userImagePaths,
+        ),
+        'stream': stream,
+        'output_modalities': const ['text'],
+        if (temperature != null) 'temperature': temperature,
+        if (topP != null) 'top_p': topP,
+        if (isReasoning && effort != 'off' && effort != 'auto')
+          'reasoning_effort': effort,
+        if (tools != null && tools.isNotEmpty)
+          'tools': _cleanToolsForCompatibility(tools),
+        if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
+      };
+    } else {
+      final mm = <Map<String, dynamic>>[];
+      for (int i = 0; i < messages.length; i++) {
+        final m = messages[i];
+        final isLast = i == messages.length - 1;
+        final raw = (m['content'] ?? '').toString();
+        final role = (m['role'] ?? 'user').toString();
+        final outMsg = Map<String, dynamic>.from(m);
+        outMsg.remove(multimodalInternalMediaPathsKey);
+        outMsg['role'] = role;
 
-      // System 消息保持为纯文本，不解析为图片
-      if (role == 'system') {
-        outMsg['content'] = raw;
-        mm.add(outMsg);
-        continue;
-      }
-
-      // Tool / tool_calls messages must preserve tool-specific fields (tool_call_id / tool_calls / name).
-      // Also do not convert tool output to multimodal parts, as many OpenAI-compatible backends require tool content to be a string.
-      if (role == 'tool' ||
-          (role == 'assistant' &&
-              outMsg['tool_calls'] is List &&
-              (outMsg['tool_calls'] as List).isNotEmpty)) {
-        outMsg['content'] = raw;
-        mm.add(outMsg);
-        continue;
-      }
-
-      // Only parse images if there are images to process
-      final hasMarkdownImages = raw.contains('![') && raw.contains('](');
-      final hasCustomImages = raw.contains('[image:');
-      final hasAttachedImages =
-          isLast && (userImagePaths?.isNotEmpty == true) && (role == 'user');
-
-      if (hasMarkdownImages || hasCustomImages || hasAttachedImages) {
-        final parsed = await _parseTextAndImages(
-          raw,
-          allowRemoteImages: canImageInput,
-          allowLocalImages: true,
-          keepRemoteMarkdownText: true,
-        );
-        final parts = <Map<String, dynamic>>[];
-        final seenSources = <String>{};
-        final seenImageUrls = <String>{};
-        final seenVideoUrls = <String>{};
-        String normalizeSrc(String src) {
-          if (src.startsWith('http') || src.startsWith('data:')) return src;
-          try {
-            return SandboxPathResolver.fix(src);
-          } catch (_) {
-            return src;
-          }
+        // System 消息保持为纯文本，不解析为图片
+        if (role == 'system') {
+          outMsg['content'] = raw;
+          mm.add(outMsg);
+          continue;
         }
 
-        void addImageUrl(String url) {
-          if (url.isEmpty) return;
-          if (seenImageUrls.add(url)) {
-            parts.add({
-              'type': 'image_url',
-              'image_url': {'url': url},
-            });
-          }
+        // Tool / tool_calls messages must preserve tool-specific fields (tool_call_id / tool_calls / name).
+        // Also do not convert tool output to multimodal parts, as many OpenAI-compatible backends require tool content to be a string.
+        if (role == 'tool' ||
+            (role == 'assistant' &&
+                outMsg['tool_calls'] is List &&
+                (outMsg['tool_calls'] as List).isNotEmpty)) {
+          outMsg['content'] = raw;
+          mm.add(outMsg);
+          continue;
         }
 
-        void addVideoUrl(String url) {
-          if (url.isEmpty) return;
-          if (seenVideoUrls.add(url)) {
-            parts.add({
-              'type': 'video_url',
-              'video_url': {'url': url},
-            });
-          }
-        }
+        // Only parse images if there are images to process
+        final hasMarkdownImages = raw.contains('![') && raw.contains('](');
+        final hasCustomImages = raw.contains('[image:');
+        final hasAttachedImages =
+            isLast && (userImagePaths?.isNotEmpty == true) && (role == 'user');
 
-        if (parsed.text.isNotEmpty) {
-          parts.add({'type': 'text', 'text': parsed.text});
-        }
-        for (final ref in parsed.images) {
-          final normalized = normalizeSrc(ref.src);
-          if (!seenSources.add(normalized)) continue;
-          String url;
-          if (ref.kind == 'data') {
-            url = ref.src;
-          } else if (ref.kind == 'path') {
-            url = await _encodeBase64File(ref.src, withPrefix: true);
-          } else {
-            url = ref.src;
-          }
-          addImageUrl(url);
-        }
-        if (hasAttachedImages) {
-          for (final p in userImagePaths!) {
-            final normalized = normalizeSrc(p);
-            if (!seenSources.add(normalized)) continue;
-            final bool isInlineUrl =
-                p.startsWith('http') || p.startsWith('data:');
-            final String mime = isInlineUrl
-                ? _mimeFromDataUrl(p)
-                : _mimeFromPath(p);
-            final bool isVideo = mime.toLowerCase().startsWith('video/');
-            final String dataUrl = isInlineUrl
-                ? p
-                : await _encodeBase64File(p, withPrefix: true);
-            if (isVideo) {
-              addVideoUrl(dataUrl);
-            } else {
-              addImageUrl(dataUrl);
+        if (hasMarkdownImages || hasCustomImages || hasAttachedImages) {
+          final parsed = await _parseTextAndImages(
+            raw,
+            allowRemoteImages: canImageInput,
+            allowLocalImages: true,
+            keepRemoteMarkdownText: true,
+          );
+          final parts = <Map<String, dynamic>>[];
+          final seenSources = <String>{};
+          final seenImageUrls = <String>{};
+          final seenVideoUrls = <String>{};
+          String normalizeSrc(String src) {
+            if (src.startsWith('http') || src.startsWith('data:')) return src;
+            try {
+              return SandboxPathResolver.fix(src);
+            } catch (_) {
+              return src;
             }
           }
+
+          void addImageUrl(String url) {
+            if (url.isEmpty) return;
+            if (seenImageUrls.add(url)) {
+              parts.add({
+                'type': 'image_url',
+                'image_url': {'url': url},
+              });
+            }
+          }
+
+          void addVideoUrl(String url) {
+            if (url.isEmpty) return;
+            if (seenVideoUrls.add(url)) {
+              parts.add({
+                'type': 'video_url',
+                'video_url': {'url': url},
+              });
+            }
+          }
+
+          if (parsed.text.isNotEmpty) {
+            parts.add({'type': 'text', 'text': parsed.text});
+          }
+          for (final ref in parsed.images) {
+            final normalized = normalizeSrc(ref.src);
+            if (!seenSources.add(normalized)) continue;
+            String url;
+            if (ref.kind == 'data') {
+              url = ref.src;
+            } else if (ref.kind == 'path') {
+              url = await _encodeBase64File(ref.src, withPrefix: true);
+            } else {
+              url = ref.src;
+            }
+            addImageUrl(url);
+          }
+          if (hasAttachedImages) {
+            for (final p in userImagePaths!) {
+              final normalized = normalizeSrc(p);
+              if (!seenSources.add(normalized)) continue;
+              final bool isInlineUrl =
+                  p.startsWith('http') || p.startsWith('data:');
+              final String mime = isInlineUrl
+                  ? _mimeFromDataUrl(p)
+                  : _mimeFromPath(p);
+              if (isAudioMime(mime)) continue;
+              final bool isVideo = isVideoMime(mime);
+              final String dataUrl = isInlineUrl
+                  ? p
+                  : await _encodeBase64File(p, withPrefix: true);
+              if (isVideo) {
+                addVideoUrl(dataUrl);
+              } else {
+                addImageUrl(dataUrl);
+              }
+            }
+          }
+          outMsg['content'] = parts;
+          mm.add(outMsg);
+        } else {
+          // No images, use simple string content
+          outMsg['content'] = raw;
+          mm.add(outMsg);
         }
-        outMsg['content'] = parts;
-        mm.add(outMsg);
-      } else {
-        // No images, use simple string content
-        outMsg['content'] = raw;
-        mm.add(outMsg);
       }
+      body = {
+        'model': upstreamModelId,
+        'messages': mm,
+        'stream': stream,
+        if (temperature != null) 'temperature': temperature,
+        if (topP != null) 'top_p': topP,
+        if (isReasoning && effort != 'off' && effort != 'auto')
+          'reasoning_effort': effort,
+        if (tools != null && tools.isNotEmpty)
+          'tools': _cleanToolsForCompatibility(tools),
+        if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
+      };
     }
-    body = {
-      'model': upstreamModelId,
-      'messages': mm,
-      'stream': stream,
-      if (temperature != null) 'temperature': temperature,
-      if (topP != null) 'top_p': topP,
-      if (isReasoning && effort != 'off' && effort != 'auto')
-        'reasoning_effort': effort,
-      if (tools != null && tools.isNotEmpty)
-        'tools': _cleanToolsForCompatibility(tools),
-      if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
-    };
     setMaxTokens(body);
   }
 
@@ -759,13 +1043,13 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     headers.addAll(extraHeaders);
   }
   request.headers.addAll(headers);
-  // Ask for usage in streaming for chat-completions compatible hosts (when supported)
-  if (stream && config.useResponseApi != true) {
-    final h = Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '';
-    if (!h.contains('mistral.ai') && !h.contains('openrouter')) {
-      body['stream_options'] = {'include_usage': true};
-    }
-  }
+  _maybeAddStreamingUsageOptions(
+    body,
+    stream: stream,
+    config: config,
+    host: host,
+    upstreamModelId: upstreamModelId,
+  );
   _applyCompatibleBuiltInSearch(
     body,
     config: config,
@@ -1021,7 +1305,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             });
           }
           final reqBody = Map<String, dynamic>.from(body);
-          reqBody['messages'] = next;
+          reqBody['messages'] = useLongCatOmniPayload
+              ? await _buildLongCatOmniMessages(
+                  next,
+                  userMediaPaths: userImagePaths,
+                )
+              : next;
           reqBody.remove('stream');
           req.body = jsonEncode(reqBody);
           final resp2 = await client.send(req);
@@ -1218,18 +1507,37 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           // Follow-up request(s) with multi-round tool calls
           var currentMessages = mm2;
           while (true) {
-            final Map<String, dynamic> body2 = {
-              'model': upstreamModelId,
-              'messages': currentMessages,
-              'stream': true,
-              if (temperature != null) 'temperature': temperature,
-              if (topP != null) 'top_p': topP,
-              if (isReasoning && effort != 'off' && effort != 'auto')
-                'reasoning_effort': effort,
-              if (tools != null && tools.isNotEmpty)
-                'tools': _cleanToolsForCompatibility(tools),
-              if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
-            };
+            final Map<String, dynamic> body2 = useLongCatOmniPayload
+                ? {
+                    'model': upstreamModelId,
+                    'messages': await _buildLongCatOmniMessages(
+                      currentMessages,
+                      userMediaPaths: userImagePaths,
+                    ),
+                    'stream': true,
+                    'output_modalities': const ['text'],
+                    if (temperature != null) 'temperature': temperature,
+                    if (topP != null) 'top_p': topP,
+                    if (isReasoning && effort != 'off' && effort != 'auto')
+                      'reasoning_effort': effort,
+                    if (tools != null && tools.isNotEmpty)
+                      'tools': _cleanToolsForCompatibility(tools),
+                    if (tools != null && tools.isNotEmpty)
+                      'tool_choice': 'auto',
+                  }
+                : {
+                    'model': upstreamModelId,
+                    'messages': currentMessages,
+                    'stream': true,
+                    if (temperature != null) 'temperature': temperature,
+                    if (topP != null) 'top_p': topP,
+                    if (isReasoning && effort != 'off' && effort != 'auto')
+                      'reasoning_effort': effort,
+                    if (tools != null && tools.isNotEmpty)
+                      'tools': _cleanToolsForCompatibility(tools),
+                    if (tools != null && tools.isNotEmpty)
+                      'tool_choice': 'auto',
+                  };
             setMaxTokens(body2);
 
             // Apply the same vendor-specific reasoning settings as the original request
@@ -1328,9 +1636,13 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               modelId: modelId,
               upstreamModelId: upstreamModelId,
             );
-            if (!host.contains('mistral.ai') && !host.contains('openrouter')) {
-              body2['stream_options'] = {'include_usage': true};
-            }
+            _maybeAddStreamingUsageOptions(
+              body2,
+              stream: true,
+              config: config,
+              host: host,
+              upstreamModelId: upstreamModelId,
+            );
 
             // Apply custom body overrides
             if (extraBodyCfg.isNotEmpty) {
@@ -1396,7 +1708,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     finishReason2 = c0['finish_reason'] as String?;
                     final delta = c0['delta'] as Map?;
                     final message = c0['message'] as Map?;
-                    final txt = delta?['content'];
+                    final txt = _extractOpenAICompatibleDeltaText(delta);
                     final rc =
                         delta?['reasoning_content'] ?? delta?['reasoning'];
                     final u = o['usage'];
@@ -1452,7 +1764,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         usage: usage,
                       );
                     }
-                    if (txt is String && txt.isNotEmpty) {
+                    if (txt.isNotEmpty) {
                       contentAccum += txt; // Accumulate content
                       yield ChatStreamChunk(
                         content: txt,
@@ -1502,9 +1814,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       final List<dynamic> imageItems = <dynamic>[];
                       final imgs = delta?['images'];
                       if (imgs is List) imageItems.addAll(imgs);
-                      final contentArr = (txt is List)
-                          ? txt
-                          : (delta?['content'] as List?);
+                      final contentArr = delta?['content'] as List?;
                       if (contentArr is List) {
                         for (final it in contentArr) {
                           if (it is Map &&
@@ -2304,25 +2614,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             if (delta != null) {
               // Streaming format: choices[0].delta.content
               final dc = delta['content'];
-              String deltaContent = '';
-              if (dc is String) {
-                deltaContent = dc;
-              } else if (dc is List) {
-                final sb = StringBuffer();
-                for (final it in dc) {
-                  if (it is Map) {
-                    final t =
-                        (it['text'] ?? it['delta'] ?? '') as String? ?? '';
-                    if (t.isNotEmpty &&
-                        (it['type'] == null || it['type'] == 'text')) {
-                      sb.write(t);
-                    }
-                  }
-                }
-                deltaContent = sb.toString();
-              } else {
-                deltaContent = (dc ?? '') as String;
-              }
+              final deltaContent = _extractOpenAICompatibleDeltaText(delta);
               if (deltaContent.isNotEmpty) {
                 content += deltaContent;
                 approxCompletionChars += deltaContent.length;
@@ -2646,18 +2938,37 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           // Continue streaming with follow-up request
           var currentMessages = mm2;
           while (true) {
-            final Map<String, dynamic> body2 = {
-              'model': upstreamModelId,
-              'messages': currentMessages,
-              'stream': true,
-              if (temperature != null) 'temperature': temperature,
-              if (topP != null) 'top_p': topP,
-              if (isReasoning && effort != 'off' && effort != 'auto')
-                'reasoning_effort': effort,
-              if (tools != null && tools.isNotEmpty)
-                'tools': _cleanToolsForCompatibility(tools),
-              if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
-            };
+            final Map<String, dynamic> body2 = useLongCatOmniPayload
+                ? {
+                    'model': upstreamModelId,
+                    'messages': await _buildLongCatOmniMessages(
+                      currentMessages,
+                      userMediaPaths: userImagePaths,
+                    ),
+                    'stream': true,
+                    'output_modalities': const ['text'],
+                    if (temperature != null) 'temperature': temperature,
+                    if (topP != null) 'top_p': topP,
+                    if (isReasoning && effort != 'off' && effort != 'auto')
+                      'reasoning_effort': effort,
+                    if (tools != null && tools.isNotEmpty)
+                      'tools': _cleanToolsForCompatibility(tools),
+                    if (tools != null && tools.isNotEmpty)
+                      'tool_choice': 'auto',
+                  }
+                : {
+                    'model': upstreamModelId,
+                    'messages': currentMessages,
+                    'stream': true,
+                    if (temperature != null) 'temperature': temperature,
+                    if (topP != null) 'top_p': topP,
+                    if (isReasoning && effort != 'off' && effort != 'auto')
+                      'reasoning_effort': effort,
+                    if (tools != null && tools.isNotEmpty)
+                      'tools': _cleanToolsForCompatibility(tools),
+                    if (tools != null && tools.isNotEmpty)
+                      'tool_choice': 'auto',
+                  };
             setMaxTokens(body2);
             final off = _isOff(thinkingBudget);
             if (host.contains('openrouter.ai')) {
@@ -2752,9 +3063,13 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               modelId: modelId,
               upstreamModelId: upstreamModelId,
             );
-            if (!host.contains('mistral.ai') && !host.contains('openrouter')) {
-              body2['stream_options'] = {'include_usage': true};
-            }
+            _maybeAddStreamingUsageOptions(
+              body2,
+              stream: true,
+              config: config,
+              host: host,
+              upstreamModelId: upstreamModelId,
+            );
             if (extraBodyCfg.isNotEmpty) {
               body2.addAll(extraBodyCfg);
             }
@@ -2812,7 +3127,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     final c0 = (o['choices'] as List).first;
                     finishReason2 = c0['finish_reason'] as String?;
                     final delta = c0['delta'] as Map?;
-                    final txt = delta?['content'];
+                    final txt = _extractOpenAICompatibleDeltaText(delta);
                     final rc =
                         delta?['reasoning_content'] ?? delta?['reasoning'];
                     final u = o['usage'];
@@ -2868,7 +3183,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         usage: usage,
                       );
                     }
-                    if (txt is String && txt.isNotEmpty) {
+                    if (txt.isNotEmpty) {
                       contentAccum += txt;
                       yield ChatStreamChunk(
                         content: txt,
@@ -2881,9 +3196,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       final List<dynamic> imageItems = <dynamic>[];
                       final imgs = delta?['images'];
                       if (imgs is List) imageItems.addAll(imgs);
-                      final contentArr = (txt is List)
-                          ? txt
-                          : (delta?['content'] as List?);
+                      final contentArr = delta?['content'] as List?;
                       if (contentArr is List) {
                         for (final it in contentArr) {
                           if (it is Map &&
@@ -3234,18 +3547,37 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               // Continue streaming with follow-up request - reuse existing multi-round logic from [DONE] handler
               var currentMessages = mm2;
               while (true) {
-                final Map<String, dynamic> body2 = {
-                  'model': upstreamModelId,
-                  'messages': currentMessages,
-                  'stream': true,
-                  if (temperature != null) 'temperature': temperature,
-                  if (topP != null) 'top_p': topP,
-                  if (isReasoning && effort != 'off' && effort != 'auto')
-                    'reasoning_effort': effort,
-                  if (tools != null && tools.isNotEmpty)
-                    'tools': _cleanToolsForCompatibility(tools),
-                  if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
-                };
+                final Map<String, dynamic> body2 = useLongCatOmniPayload
+                    ? {
+                        'model': upstreamModelId,
+                        'messages': await _buildLongCatOmniMessages(
+                          currentMessages,
+                          userMediaPaths: userImagePaths,
+                        ),
+                        'stream': true,
+                        'output_modalities': const ['text'],
+                        if (temperature != null) 'temperature': temperature,
+                        if (topP != null) 'top_p': topP,
+                        if (isReasoning && effort != 'off' && effort != 'auto')
+                          'reasoning_effort': effort,
+                        if (tools != null && tools.isNotEmpty)
+                          'tools': _cleanToolsForCompatibility(tools),
+                        if (tools != null && tools.isNotEmpty)
+                          'tool_choice': 'auto',
+                      }
+                    : {
+                        'model': upstreamModelId,
+                        'messages': currentMessages,
+                        'stream': true,
+                        if (temperature != null) 'temperature': temperature,
+                        if (topP != null) 'top_p': topP,
+                        if (isReasoning && effort != 'off' && effort != 'auto')
+                          'reasoning_effort': effort,
+                        if (tools != null && tools.isNotEmpty)
+                          'tools': _cleanToolsForCompatibility(tools),
+                        if (tools != null && tools.isNotEmpty)
+                          'tool_choice': 'auto',
+                      };
                 setMaxTokens(body2);
                 final off = _isOff(thinkingBudget);
                 if (host.contains('openrouter.ai')) {
@@ -3333,10 +3665,13 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   modelId: modelId,
                   upstreamModelId: upstreamModelId,
                 );
-                if (!host.contains('mistral.ai') &&
-                    !host.contains('openrouter')) {
-                  body2['stream_options'] = {'include_usage': true};
-                }
+                _maybeAddStreamingUsageOptions(
+                  body2,
+                  stream: true,
+                  config: config,
+                  host: host,
+                  upstreamModelId: upstreamModelId,
+                );
                 if (extraBodyCfg.isNotEmpty) {
                   body2.addAll(extraBodyCfg);
                 }
@@ -3394,7 +3729,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         final c0 = (o['choices'] as List).first;
                         finishReason2 = c0['finish_reason'] as String?;
                         final delta = c0['delta'] as Map?;
-                        final txt = delta?['content'];
+                        final txt = _extractOpenAICompatibleDeltaText(delta);
                         final rc =
                             delta?['reasoning_content'] ?? delta?['reasoning'];
                         final u = o['usage'];
@@ -3426,7 +3761,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                             usage: usage,
                           );
                         }
-                        if (txt is String && txt.isNotEmpty) {
+                        if (txt.isNotEmpty) {
                           contentAccum += txt;
                           yield ChatStreamChunk(
                             content: txt,
@@ -3439,9 +3774,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                           final List<dynamic> imageItems = <dynamic>[];
                           final imgs = delta?['images'];
                           if (imgs is List) imageItems.addAll(imgs);
-                          final contentArr = (txt is List)
-                              ? txt
-                              : (delta?['content'] as List?);
+                          final contentArr = delta?['content'] as List?;
                           if (contentArr is List) {
                             for (final it in contentArr) {
                               if (it is Map &&

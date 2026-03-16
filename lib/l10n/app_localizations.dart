@@ -959,6 +959,12 @@ abstract class AppLocalizations {
   /// **'Please select a model first'**
   String get homePagePleaseSelectModel;
 
+  /// No description provided for @homePageAudioAttachmentUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'The current model does not support audio attachments. Switch to a model that supports audio input or remove the audio file and try again.'**
+  String get homePageAudioAttachmentUnsupported;
+
   /// No description provided for @homePagePleaseSetupTranslateModel.
   ///
   /// In en, this message translates to:

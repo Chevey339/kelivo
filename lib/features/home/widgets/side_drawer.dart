@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
-import 'package:characters/characters.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import '../../../icons/lucide_adapter.dart';
@@ -215,7 +214,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.15),
+        color: cs.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
@@ -235,7 +234,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.15),
+        color: cs.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
@@ -354,6 +353,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               final conv = chatService.getConversation(chat.id);
               final movingCurrent =
                   chatService.currentConversationId == chat.id;
+              final keepSidebarOpenOnTopicTap = context
+                  .read<SettingsProvider>()
+                  .keepSidebarOpenOnTopicTap;
               // Pre-compute next recent conversation for current assistant
               String? nextId;
               try {
@@ -376,19 +378,19 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                 context,
                 excludeAssistantId: conv?.assistantId,
               );
+              if (!mounted) return;
               if (targetId != null) {
                 await chatService.moveConversationToAssistant(
                   conversationId: chat.id,
                   assistantId: targetId,
                 );
+                if (!mounted) return;
                 if (movingCurrent ||
                     chatService.currentConversationId == null) {
-                  final closeDrawer = !context
-                      .read<SettingsProvider>()
-                      .keepSidebarOpenOnTopicTap;
+                  final closeDrawer = !keepSidebarOpenOnTopicTap;
                   if (nextId != null) {
                     widget.onSelectConversation?.call(
-                      nextId!,
+                      nextId,
                       closeDrawer: closeDrawer,
                     );
                   } else {
@@ -404,11 +406,13 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
             danger: true,
             onTap: () async {
               final confirmed = await _confirmDeleteConversation(context, chat);
+              if (!context.mounted) return;
               if (!confirmed) return;
               final deletingCurrent =
                   chatService.currentConversationId == chat.id;
               final nextId = _nextRecentConversation(chatService, chat.id);
               await chatService.deleteConversation(chat.id);
+              if (!context.mounted) return;
               showAppSnackBar(
                 context,
                 message: l10n.sideDrawerDeleteSnackbar(chat.title),
@@ -498,7 +502,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: cs.onSurface.withOpacity(0.2),
+                          color: cs.onSurface.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -553,27 +557,31 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                     (a, b) =>
                                         b.updatedAt.compareTo(a.updatedAt),
                                   );
-                            if (candidates.isNotEmpty)
+                            if (candidates.isNotEmpty) {
                               nextId = candidates.first.id;
+                            }
                           }
                         } catch (_) {}
+                        final keepSidebarOpenOnTopicTap = context
+                            .read<SettingsProvider>()
+                            .keepSidebarOpenOnTopicTap;
                         final targetId = await showAssistantMoveSelector(
                           context,
                           excludeAssistantId: conv?.assistantId,
                         );
+                        if (!mounted) return;
                         if (targetId != null) {
                           await chatService.moveConversationToAssistant(
                             conversationId: chat.id,
                             assistantId: targetId,
                           );
+                          if (!mounted) return;
                           if (movingCurrent ||
                               chatService.currentConversationId == null) {
-                            final closeDrawer = !context
-                                .read<SettingsProvider>()
-                                .keepSidebarOpenOnTopicTap;
+                            final closeDrawer = !keepSidebarOpenOnTopicTap;
                             if (nextId != null) {
                               widget.onSelectConversation?.call(
-                                nextId!,
+                                nextId,
                                 closeDrawer: closeDrawer,
                               );
                             } else {
@@ -594,6 +602,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                           context,
                           chat,
                         );
+                        if (!mounted) return;
                         if (!confirmed) return;
                         final deletingCurrent =
                             chatService.currentConversationId == chat.id;
@@ -602,6 +611,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                           chat.id,
                         );
                         await chatService.deleteConversation(chat.id);
+                        if (!context.mounted) return;
                         showAppSnackBar(
                           context,
                           message: l10n.sideDrawerDeleteSnackbar(chat.title),
@@ -711,6 +721,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   Future<void> _renameChat(BuildContext context, ChatItem chat) async {
     final controller = TextEditingController(text: chat.title);
     final l10n = AppLocalizations.of(context)!;
+    final chatService = context.read<ChatService>();
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) {
@@ -736,10 +747,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       },
     );
     if (ok == true) {
-      await context.read<ChatService>().renameConversation(
-        chat.id,
-        controller.text.trim(),
-      );
+      if (!context.mounted) return;
+      await chatService.renameConversation(chat.id, controller.text.trim());
     }
   }
 
@@ -926,8 +935,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     TextStyle base,
     TextStyle highlight,
   ) {
-    if (tokens.isEmpty || text.isEmpty)
+    if (tokens.isEmpty || text.isEmpty) {
       return [TextSpan(text: text, style: base)];
+    }
     final spans = <TextSpan>[];
     final lower = text.toLowerCase();
     int pos = 0;
@@ -972,8 +982,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         .where((e) => e.isNotEmpty)
         .toList();
     final highlightColor = isDark
-        ? const Color(0xFFB8860B).withOpacity(0.55)
-        : const Color(0xFFFFD700).withOpacity(0.55);
+        ? const Color(0xFFB8860B).withValues(alpha: 0.55)
+        : const Color(0xFFFFD700).withValues(alpha: 0.55);
 
     if (!_globalSearchHasRun) {
       if (!_isDesktop) {
@@ -987,7 +997,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           child: Text(
             l10n.sideDrawerGlobalSearchEmptyHint,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: textBase.withOpacity(0.45)),
+            style: TextStyle(
+              fontSize: 13,
+              color: textBase.withValues(alpha: 0.45),
+            ),
           ),
         ),
       );
@@ -1001,7 +1014,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           child: Text(
             l10n.sideDrawerGlobalSearchNoResults,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: textBase.withOpacity(0.45)),
+            style: TextStyle(
+              fontSize: 13,
+              color: textBase.withValues(alpha: 0.45),
+            ),
           ),
         ),
       );
@@ -1019,7 +1035,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
             l10n.sideDrawerGlobalSearchResultCount(resultCount),
             style: TextStyle(
               fontSize: 12,
-              color: textBase.withOpacity(0.5),
+              color: textBase.withValues(alpha: 0.5),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -1035,9 +1051,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               final isHovered =
                   _hoveredResultConversationId == result.conversationId;
               final Color tileBg = isSelected
-                  ? cs.primary.withOpacity(0.16)
+                  ? cs.primary.withValues(alpha: 0.16)
                   : (isHovered
-                        ? cs.primary.withOpacity(0.10)
+                        ? cs.primary.withValues(alpha: 0.10)
                         : Colors.transparent);
               final titleStyle = TextStyle(
                 fontSize: 14,
@@ -1052,12 +1068,12 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               );
               final snippetStyle = TextStyle(
                 fontSize: 12.5,
-                color: textBase.withOpacity(0.65),
+                color: textBase.withValues(alpha: 0.65),
                 height: 1.4,
               );
               final snippetHighlight = TextStyle(
                 fontSize: 12.5,
-                color: textBase.withOpacity(0.85),
+                color: textBase.withValues(alpha: 0.85),
                 height: 1.4,
                 backgroundColor: highlightColor,
               );
@@ -1146,15 +1162,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     _closeAssistantPicker();
   }
 
-  String _greeting(BuildContext context) {
-    final hour = DateTime.now().hour;
-    final l10n = AppLocalizations.of(context)!;
-    if (hour < 11) return l10n.sideDrawerGreetingMorning;
-    if (hour < 13) return l10n.sideDrawerGreetingNoon;
-    if (hour < 18) return l10n.sideDrawerGreetingAfternoon;
-    return l10n.sideDrawerGreetingEvening;
-  }
-
   String _dateLabel(BuildContext context, DateTime date) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -1185,7 +1192,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       for (final k in keys)
         _ChatGroup(
           label: _dateLabel(context, k),
-          items: (map[k]!..sort((a, b) => b.created.compareTo(a.created)))!,
+          items: (map[k]!..sort((a, b) => b.created.compareTo(a.created))),
         ),
     ];
   }
@@ -1195,7 +1202,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final l10n = AppLocalizations.of(context)!;
     final textBase = isDark ? Colors.white : Colors.black; // 纯黑（白天），夜间自动适配
     final chatService = context.watch<ChatService>();
     final ap = context.watch<AssistantProvider>();
@@ -1239,7 +1245,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: cs.primary.withOpacity(0.15),
+            color: cs.primary.withValues(alpha: 0.15),
             shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
@@ -1276,7 +1282,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                   height: size,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: cs.primary.withOpacity(0.15),
+                    color: cs.primary.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                   child: Text(
@@ -1313,7 +1319,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: cs.primary.withOpacity(0.15),
+          color: cs.primary.withValues(alpha: 0.15),
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
@@ -1329,16 +1335,16 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     }
 
     // Desktop-only: enable tabs for embedded sidebar when requested
-    final bool _assistOnly =
+    final bool assistOnly =
         widget.desktopAssistantsOnly && _isDesktop && widget.embedded;
-    final bool _topicsOnly =
+    final bool topicsOnly =
         widget.desktopTopicsOnly && _isDesktop && widget.embedded;
-    final bool _useTabs =
+    final bool useTabs =
         widget.useDesktopTabs &&
         _isDesktop &&
         widget.embedded &&
-        !_assistOnly &&
-        !_topicsOnly;
+        !assistOnly &&
+        !topicsOnly;
 
     final inner = SafeArea(
       child: Stack(
@@ -1372,11 +1378,11 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                   return l10n.sideDrawerGlobalSearchHint;
                                 }
                                 String hint;
-                                if (_useTabs) {
+                                if (useTabs) {
                                   hint = ((_tabController?.index ?? 0) == 0)
                                       ? l10n.sideDrawerSearchAssistantsHint
                                       : l10n.sideDrawerSearchHint;
-                                } else if (_assistOnly) {
+                                } else if (assistOnly) {
                                   hint = l10n.sideDrawerSearchAssistantsHint;
                                 } else {
                                   hint = l10n.sideDrawerSearchHint;
@@ -1401,22 +1407,23 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                           widget.embedded) {
                                         return l10n.sideDrawerGlobalSearchHint;
                                       }
-                                      if (_useTabs) {
+                                      if (useTabs) {
                                         return ((_tabController?.index ?? 0) ==
                                                 0)
                                             ? l10n.sideDrawerSearchAssistantsHint
                                             : l10n.sideDrawerSearchHint;
                                       }
-                                      if (_assistOnly)
+                                      if (assistOnly) {
                                         return l10n
                                             .sideDrawerSearchAssistantsHint;
+                                      }
                                       return l10n.sideDrawerSearchHint;
                                     })(),
                                     filled: true,
                                     fillColor: isDark
                                         ? Colors.white10
-                                        : Colors.grey.shade200.withOpacity(
-                                            0.80,
+                                        : Colors.grey.shade200.withValues(
+                                            alpha: 0.80,
                                           ),
                                     isDense: true,
                                     isCollapsed: true,
@@ -1428,7 +1435,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                       child: Icon(
                                         Lucide.Search,
                                         size: 16,
-                                        color: textBase.withOpacity(0.6),
+                                        color: textBase.withValues(alpha: 0.6),
                                       ),
                                     ),
                                     prefixIconConstraints: const BoxConstraints(
@@ -1463,19 +1470,25 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                                     4,
                                                   ),
                                                   onTap: () async {
+                                                    final keepSidebarOpenOnTopicTap =
+                                                        context
+                                                            .read<
+                                                              SettingsProvider
+                                                            >()
+                                                            .keepSidebarOpenOnTopicTap;
                                                     final selectedId =
                                                         await showChatHistoryDesktopDialog(
                                                           context,
                                                           assistantId:
                                                               currentAssistantId,
                                                         );
+                                                    if (!context.mounted) {
+                                                      return;
+                                                    }
                                                     if (selectedId != null &&
                                                         selectedId.isNotEmpty) {
-                                                      final closeDrawer = !context
-                                                          .read<
-                                                            SettingsProvider
-                                                          >()
-                                                          .keepSidebarOpenOnTopicTap;
+                                                      final closeDrawer =
+                                                          !keepSidebarOpenOnTopicTap;
                                                       widget
                                                           .onSelectConversation
                                                           ?.call(
@@ -1518,7 +1531,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                             ),
                                           )
                                         // Normal mode: history icon (skip for topics-only)
-                                        : _topicsOnly
+                                        : topicsOnly
                                         ? null
                                         : Padding(
                                             padding: const EdgeInsets.only(
@@ -1530,17 +1543,23 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                               icon: Lucide.History,
                                               padding: const EdgeInsets.all(4),
                                               onTap: () async {
+                                                final keepSidebarOpenOnTopicTap =
+                                                    context
+                                                        .read<
+                                                          SettingsProvider
+                                                        >()
+                                                        .keepSidebarOpenOnTopicTap;
                                                 final selectedId =
                                                     await showChatHistoryDesktopDialog(
                                                       context,
                                                       assistantId:
                                                           currentAssistantId,
                                                     );
+                                                if (!context.mounted) return;
                                                 if (selectedId != null &&
                                                     selectedId.isNotEmpty) {
-                                                  final closeDrawer = !context
-                                                      .read<SettingsProvider>()
-                                                      .keepSidebarOpenOnTopicTap;
+                                                  final closeDrawer =
+                                                      !keepSidebarOpenOnTopicTap;
                                                   widget.onSelectConversation
                                                       ?.call(
                                                         selectedId,
@@ -1615,8 +1634,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                           : null,
                                       onHorizontalDragUpdate: canSwipeSwitch
                                           ? (details) {
-                                              if (_mobileSearchSwipeHandled)
+                                              if (_mobileSearchSwipeHandled) {
                                                 return;
+                                              }
                                               _mobileSearchSwipeDx +=
                                                   details.delta.dx;
                                               if (_mobileSearchSwipeDx.abs() >=
@@ -1657,7 +1677,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                               fillColor: isDark
                                                   ? Colors.white10
                                                   : Colors.grey.shade200
-                                                        .withOpacity(0.80),
+                                                        .withValues(
+                                                          alpha: 0.80,
+                                                        ),
                                               isDense: true,
                                               isCollapsed: true,
                                               prefixIcon: Padding(
@@ -1698,8 +1720,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                                             );
                                                           },
                                                       child: _mobileModeSearchIcon(
-                                                        textBase.withOpacity(
-                                                          0.72,
+                                                        textBase.withValues(
+                                                          alpha: 0.72,
                                                         ),
                                                         key: ValueKey<bool>(
                                                           widget
@@ -1747,8 +1769,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                                                   Lucide.Search,
                                                                   size: 16,
                                                                   color: textBase
-                                                                      .withOpacity(
-                                                                        0.75,
+                                                                      .withValues(
+                                                                        alpha:
+                                                                            0.75,
                                                                       ),
                                                                 ),
                                                               ),
@@ -1810,8 +1833,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                                   overflow:
                                                       TextOverflow.ellipsis,
                                                   style: TextStyle(
-                                                    color: textBase.withOpacity(
-                                                      0.55,
+                                                    color: textBase.withValues(
+                                                      alpha: 0.55,
                                                     ),
                                                     fontSize: 14,
                                                   ),
@@ -1848,6 +1871,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                           );
                                       if (selectedId != null &&
                                           selectedId.isNotEmpty) {
+                                        if (!context.mounted) return;
                                         final closeDrawer = !context
                                             .read<SettingsProvider>()
                                             .keepSidebarOpenOnTopicTap;
@@ -1882,7 +1906,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                         style: TextStyle(
                                           fontSize: 11.5,
                                           fontWeight: FontWeight.w500,
-                                          color: textBase.withOpacity(0.52),
+                                          color: textBase.withValues(
+                                            alpha: 0.52,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1896,12 +1922,12 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       SizedBox(height: _isDesktop ? 8 : 12),
 
                       // 桌面端：替换为 Tab（助手 / 话题）
-                      if (_useTabs)
+                      if (useTabs)
                         _DesktopSidebarTabs(
                           textColor: textBase,
                           controller: _tabController!,
                         )
-                      else if (!_assistOnly && !_topicsOnly)
+                      else if (!assistOnly && !topicsOnly)
                         // 当前助手区域（固定）
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -1909,16 +1935,18 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                             key: _assistantTileKey,
                             child: MouseRegion(
                               onEnter: (_) {
-                                if (_isDesktop)
+                                if (_isDesktop) {
                                   setState(
                                     () => _assistantHeaderHovered = true,
                                   );
+                                }
                               },
                               onExit: (_) {
-                                if (_isDesktop)
+                                if (_isDesktop) {
                                   setState(
                                     () => _assistantHeaderHovered = false,
                                   );
+                                }
                               },
                               cursor: _isDesktop
                                   ? SystemMouseCursors.click
@@ -1931,8 +1959,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                       : cs.surface;
                                   if (_isDesktop && _assistantHeaderHovered) {
                                     return embedded
-                                        ? cs.primary.withOpacity(0.08)
-                                        : cs.surface.withOpacity(0.9);
+                                        ? cs.primary.withValues(alpha: 0.08)
+                                        : cs.surface.withValues(alpha: 0.9);
                                   }
                                   return base;
                                 })(),
@@ -1988,7 +2016,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                       child: Icon(
                                         Lucide.ChevronDown,
                                         size: 18,
-                                        color: textBase.withOpacity(0.7),
+                                        color: textBase.withValues(alpha: 0.7),
                                       ),
                                     ),
                                   ],
@@ -2011,7 +2039,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                   if (widget.globalSearchMode) {
                     return _buildGlobalSearchResultsList(context);
                   }
-                  if (_useTabs) {
+                  if (useTabs) {
                     return _DesktopTabViews(
                       controller: _tabController!,
                       listController: _listController,
@@ -2027,7 +2055,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       ),
                     );
                   }
-                  if (_assistOnly) {
+                  if (assistOnly) {
                     return ListView(
                       controller: _listController,
                       padding: const EdgeInsets.fromLTRB(10, 2, 10, 16),
@@ -2036,7 +2064,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       ],
                     );
                   }
-                  if (_topicsOnly) {
+                  if (topicsOnly) {
                     final isDesktop = _isDesktop;
                     final topPad =
                         context.watch<SettingsProvider>().showChatListDate
@@ -2191,9 +2219,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        cs.surface.withOpacity(0.0),
-                        cs.surface.withOpacity(0.8),
-                        cs.surface.withOpacity(1.0),
+                        cs.surface.withValues(alpha: 0.0),
+                        cs.surface.withValues(alpha: 0.8),
+                        cs.surface.withValues(alpha: 1.0),
                       ],
                       stops: const [0.0, 0.6, 1.0],
                     ),
@@ -2210,7 +2238,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         child: BackdropFilter(
           filter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
           child: Material(
-            color: cs.surface.withOpacity(0.60),
+            color: cs.surface.withValues(alpha: 0.60),
             child: SizedBox(width: widget.embeddedWidth ?? 300, child: inner),
           ),
         ),
@@ -2387,6 +2415,8 @@ extension on _SideDrawerState {
           label: l10n.assistantTagsContextMenuDeleteAssistant,
           danger: true,
           onTap: () async {
+            final assistantProvider = context.read<AssistantProvider>();
+            final tagProvider = context.read<TagProvider>();
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
@@ -2404,10 +2434,9 @@ extension on _SideDrawerState {
                 ],
               ),
             );
-            if (confirmed != true) return;
-            final ok = await context.read<AssistantProvider>().deleteAssistant(
-              a.id,
-            );
+            if (!mounted || confirmed != true) return;
+            final ok = await assistantProvider.deleteAssistant(a.id);
+            if (!mounted) return;
             if (!ok) {
               showAppSnackBar(
                 context,
@@ -2416,7 +2445,7 @@ extension on _SideDrawerState {
               );
             } else {
               try {
-                await context.read<TagProvider>().unassignAssistant(a.id);
+                await tagProvider.unassignAssistant(a.id);
               } catch (_) {}
             }
           },
@@ -2513,6 +2542,8 @@ extension on _SideDrawerState {
                   l10n.assistantTagsContextMenuDeleteAssistant,
                   Lucide.Trash2,
                   () async {
+                    final assistantProvider = context.read<AssistantProvider>();
+                    final tagProvider = context.read<TagProvider>();
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (ctx2) => AlertDialog(
@@ -2536,10 +2567,9 @@ extension on _SideDrawerState {
                         ],
                       ),
                     );
-                    if (confirmed != true) return;
-                    final ok = await context
-                        .read<AssistantProvider>()
-                        .deleteAssistant(a.id);
+                    if (!mounted || confirmed != true) return;
+                    final ok = await assistantProvider.deleteAssistant(a.id);
+                    if (!mounted) return;
                     if (!ok) {
                       showAppSnackBar(
                         context,
@@ -2549,9 +2579,7 @@ extension on _SideDrawerState {
                       );
                     } else {
                       try {
-                        await context.read<TagProvider>().unassignAssistant(
-                          a.id,
-                        );
+                        await tagProvider.unassignAssistant(a.id);
                       } catch (_) {}
                     }
                   },
@@ -2624,7 +2652,7 @@ extension on _SideDrawerState {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: cs.onSurface.withOpacity(0.2),
+                          color: cs.onSurface.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -2634,12 +2662,10 @@ extension on _SideDrawerState {
                       await _pickLocalImage(context);
                     }),
                     row(l10n.sideDrawerChooseEmoji, () async {
+                      final userProvider = context.read<UserProvider>();
                       final emoji = await _pickEmoji(context);
-                      if (emoji != null) {
-                        await context.read<UserProvider>().setAvatarEmoji(
-                          emoji,
-                        );
-                      }
+                      if (!context.mounted || emoji == null) return;
+                      await userProvider.setAvatarEmoji(emoji);
                     }),
                     row(l10n.sideDrawerEnterLink, () async {
                       await _inputAvatarUrl(context);
@@ -2815,7 +2841,7 @@ extension on _SideDrawerState {
                       width: 72,
                       height: 72,
                       decoration: BoxDecoration(
-                        color: cs.primary.withOpacity(0.08),
+                        color: cs.primary.withValues(alpha: 0.08),
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
@@ -2835,10 +2861,11 @@ extension on _SideDrawerState {
                       autofocus: true,
                       onChanged: (v) => setLocal(() => value = v),
                       onSubmitted: (_) {
-                        if (validGrapheme(value))
+                        if (validGrapheme(value)) {
                           Navigator.of(
                             ctx,
                           ).pop(value.characters.take(1).toString());
+                        }
                       },
                       decoration: InputDecoration(
                         hintText: l10n.sideDrawerEmojiDialogHint,
@@ -2857,7 +2884,7 @@ extension on _SideDrawerState {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
-                            color: cs.primary.withOpacity(0.4),
+                            color: cs.primary.withValues(alpha: 0.4),
                           ),
                         ),
                       ),
@@ -2882,7 +2909,7 @@ extension on _SideDrawerState {
                             onTap: () => Navigator.of(ctx).pop(e),
                             child: Container(
                               decoration: BoxDecoration(
-                                color: cs.primary.withOpacity(0.08),
+                                color: cs.primary.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               alignment: Alignment.center,
@@ -2917,7 +2944,7 @@ extension on _SideDrawerState {
                     style: TextStyle(
                       color: validGrapheme(value)
                           ? cs.primary
-                          : cs.onSurface.withOpacity(0.38),
+                          : cs.onSurface.withValues(alpha: 0.38),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -2932,6 +2959,7 @@ extension on _SideDrawerState {
 
   Future<void> _inputAvatarUrl(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
+    final userProvider = context.read<UserProvider>();
     final controller = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
@@ -2967,7 +2995,9 @@ extension on _SideDrawerState {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
+                    borderSide: BorderSide(
+                      color: cs.primary.withValues(alpha: 0.4),
+                    ),
                   ),
                 ),
                 onChanged: (v) => setLocal(() => value = v),
@@ -2989,7 +3019,7 @@ extension on _SideDrawerState {
                     style: TextStyle(
                       color: valid(value)
                           ? cs.primary
-                          : cs.onSurface.withOpacity(0.38),
+                          : cs.onSurface.withValues(alpha: 0.38),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -3000,16 +3030,16 @@ extension on _SideDrawerState {
         );
       },
     );
-    if (ok == true) {
-      final url = controller.text.trim();
-      if (url.isNotEmpty) {
-        await context.read<UserProvider>().setAvatarUrl(url);
-      }
+    if (!context.mounted || ok != true) return;
+    final url = controller.text.trim();
+    if (url.isNotEmpty) {
+      await userProvider.setAvatarUrl(url);
     }
   }
 
   Future<void> _inputQQAvatar(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
+    final userProvider = context.read<UserProvider>();
     final controller = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
@@ -3092,7 +3122,9 @@ extension on _SideDrawerState {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
+                    borderSide: BorderSide(
+                      color: cs.primary.withValues(alpha: 0.4),
+                    ),
                   ),
                 ),
                 onChanged: (v) => setLocal(() => value = v),
@@ -3111,25 +3143,27 @@ extension on _SideDrawerState {
                       final qq = randomQQ();
                       // debugPrint(qq);
                       final url =
-                          'https://q2.qlogo.cn/headimg_dl?dst_uin=' +
-                          qq +
-                          '&spec=100';
+                          'https://q2.qlogo.cn/headimg_dl?dst_uin=$qq&spec=100';
                       try {
                         final resp = await http
                             .get(Uri.parse(url))
                             .timeout(const Duration(seconds: 5));
+                        if (!context.mounted || !ctx.mounted) return;
                         if (resp.statusCode == 200 &&
                             resp.bodyBytes.isNotEmpty) {
-                          await context.read<UserProvider>().setAvatarUrl(url);
+                          await userProvider.setAvatarUrl(url);
                           applied = true;
                           break;
                         }
                       } catch (_) {}
                     }
                     if (applied) {
-                      if (Navigator.of(ctx).canPop())
+                      if (!ctx.mounted) return;
+                      if (Navigator.of(ctx).canPop()) {
                         Navigator.of(ctx).pop(false);
+                      }
                     } else {
+                      if (!context.mounted) return;
                       showAppSnackBar(
                         context,
                         message: l10n.sideDrawerQQAvatarFetchFailed,
@@ -3155,7 +3189,7 @@ extension on _SideDrawerState {
                         style: TextStyle(
                           color: valid(value)
                               ? cs.primary
-                              : cs.onSurface.withOpacity(0.38),
+                              : cs.onSurface.withValues(alpha: 0.38),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -3168,13 +3202,11 @@ extension on _SideDrawerState {
         );
       },
     );
-    if (ok == true) {
-      final qq = controller.text.trim();
-      if (qq.isNotEmpty) {
-        final url =
-            'https://q2.qlogo.cn/headimg_dl?dst_uin=' + qq + '&spec=100';
-        await context.read<UserProvider>().setAvatarUrl(url);
-      }
+    if (!context.mounted || ok != true) return;
+    final qq = controller.text.trim();
+    if (qq.isNotEmpty) {
+      final url = 'https://q2.qlogo.cn/headimg_dl?dst_uin=$qq&spec=100';
+      await userProvider.setAvatarUrl(url);
     }
   }
 
@@ -3183,6 +3215,7 @@ extension on _SideDrawerState {
       await _inputAvatarUrl(context);
       return;
     }
+    final userProvider = context.read<UserProvider>();
     try {
       final picker = ImagePicker();
       final XFile? file = await picker.pickImage(
@@ -3190,14 +3223,14 @@ extension on _SideDrawerState {
         maxWidth: 1024,
         imageQuality: 90,
       );
-      if (!mounted) return;
+      if (!context.mounted) return;
       if (file != null) {
-        await context.read<UserProvider>().setAvatarFilePath(file.path);
+        await userProvider.setAvatarFilePath(file.path);
         return;
       }
-    } on PlatformException catch (e) {
+    } on PlatformException {
       // Gracefully degrade when plugin channel isn't available or permission denied.
-      if (!mounted) return;
+      if (!context.mounted) return;
       final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
         context,
@@ -3207,7 +3240,7 @@ extension on _SideDrawerState {
       await _inputAvatarUrl(context);
       return;
     } catch (_) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
         context,
@@ -3221,6 +3254,7 @@ extension on _SideDrawerState {
 
   Future<void> _editUserName(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
+    final userProvider = context.read<UserProvider>();
     final initial = widget.userName;
     final controller = TextEditingController(text: initial);
     const maxLen = 24;
@@ -3272,7 +3306,7 @@ extension on _SideDrawerState {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
-                          color: cs.primary.withOpacity(0.4),
+                          color: cs.primary.withValues(alpha: 0.4),
                         ),
                       ),
                     ),
@@ -3286,7 +3320,7 @@ extension on _SideDrawerState {
                     child: Text(
                       '${value.trim().length}/$maxLen',
                       style: TextStyle(
-                        color: cs.onSurface.withOpacity(0.45),
+                        color: cs.onSurface.withValues(alpha: 0.45),
                         fontSize: 12,
                       ),
                     ),
@@ -3307,7 +3341,7 @@ extension on _SideDrawerState {
                     style: TextStyle(
                       color: valid(value)
                           ? cs.primary
-                          : cs.onSurface.withOpacity(0.38),
+                          : cs.onSurface.withValues(alpha: 0.38),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -3318,11 +3352,10 @@ extension on _SideDrawerState {
         );
       },
     );
-    if (ok == true) {
-      final text = controller.text.trim();
-      if (text.isNotEmpty) {
-        await context.read<UserProvider>().setName(text);
-      }
+    if (!context.mounted || ok != true) return;
+    final text = controller.text.trim();
+    if (text.isNotEmpty) {
+      await userProvider.setName(text);
     }
   }
 
@@ -3513,6 +3546,7 @@ extension on _SideDrawerState {
                       await launchUrl(uri);
                     } catch (_) {
                       Clipboard.setData(ClipboardData(text: url));
+                      if (!context.mounted) return;
                       showAppSnackBar(
                         context,
                         message: l10n.sideDrawerLinkCopied,
@@ -3549,7 +3583,7 @@ extension on _SideDrawerState {
                             info.notes!,
                             style: TextStyle(
                               fontSize: 13,
-                              color: cs2.onSurface.withOpacity(0.8),
+                              color: cs2.onSurface.withValues(alpha: 0.8),
                             ),
                           ),
                         ],
@@ -3583,11 +3617,7 @@ extension on _SideDrawerState {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           key: ValueKey(
-            '${_query}_' +
-                ([
-                  ...pinnedList.map((c) => c.id),
-                  ...groups.expand((g) => g.items.map((c) => c.id)),
-                ].join(',')),
+            '${_query}_${[...pinnedList.map((c) => c.id), ...groups.expand((g) => g.items.map((c) => c.id))].join(',')}',
           ),
           children: [
             if (pinnedList.isNotEmpty) ...[
@@ -3777,19 +3807,21 @@ class _ChatTileState extends State<_ChatTile> {
     if (embedded) {
       // In tablet embedded mode, keep selected highlight, others transparent
       tileColor = widget.selected
-          ? cs.primary.withOpacity(0.16)
+          ? cs.primary.withValues(alpha: 0.16)
           : Colors.transparent;
     } else {
-      tileColor = widget.selected ? cs.primary.withOpacity(0.12) : cs.surface;
+      tileColor = widget.selected
+          ? cs.primary.withValues(alpha: 0.12)
+          : cs.surface;
     }
     final base = _isDesktop && !widget.selected && _hovered
         ? (embedded
-              ? cs.primary.withOpacity(0.08)
-              : cs.surface.withOpacity(0.9))
+              ? cs.primary.withValues(alpha: 0.08)
+              : cs.surface.withValues(alpha: 0.9))
         : tileColor;
-    final double _vGap = _isDesktop ? 4 : 4;
+    final double vGap = _isDesktop ? 4 : 4;
     return Padding(
-      padding: EdgeInsets.only(bottom: _vGap),
+      padding: EdgeInsets.only(bottom: vGap),
       child: GestureDetector(
         onSecondaryTapDown: (details) {
           if (_isDesktop) {
@@ -3902,7 +3934,6 @@ class _GroupHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final textBase = cs.onSurface;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -3918,7 +3949,7 @@ class _GroupHeader extends StatelessWidget {
               child: Icon(
                 Lucide.ChevronRight,
                 size: 16,
-                color: textBase.withOpacity(0.7),
+                color: textBase.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(width: 8),
@@ -3992,7 +4023,7 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
               decoration: BoxDecoration(
                 color: isDark
                     ? Colors.white10
-                    : Colors.grey.shade200.withOpacity(0.80),
+                    : Colors.grey.shade200.withValues(alpha: 0.80),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Stack(
@@ -4009,7 +4040,9 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
                       duration: const Duration(milliseconds: 140),
                       curve: Curves.easeOutCubic,
                       decoration: BoxDecoration(
-                        color: cs.primary.withOpacity(isDark ? 0.16 : 0.12),
+                        color: cs.primary.withValues(
+                          alpha: isDark ? 0.16 : 0.12,
+                        ),
                         borderRadius: BorderRadius.circular(13),
                       ),
                     ),
@@ -4039,7 +4072,7 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
                                   child: Container(
                                     margin: EdgeInsets.all(pad),
                                     decoration: BoxDecoration(
-                                      color: cs.primary.withOpacity(0.06),
+                                      color: cs.primary.withValues(alpha: 0.06),
                                       borderRadius: BorderRadius.circular(13),
                                     ),
                                   ),
@@ -4059,8 +4092,9 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
                                               fontWeight: FontWeight.w700,
                                               color: idx == 0
                                                   ? cs.primary
-                                                  : widget.textColor
-                                                        .withOpacity(0.78),
+                                                  : widget.textColor.withValues(
+                                                      alpha: 0.78,
+                                                    ),
                                             ),
                                     child: Text(
                                       l10n.desktopSidebarTabAssistants,
@@ -4095,7 +4129,7 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
                                   child: Container(
                                     margin: EdgeInsets.all(pad),
                                     decoration: BoxDecoration(
-                                      color: cs.primary.withOpacity(0.06),
+                                      color: cs.primary.withValues(alpha: 0.06),
                                       borderRadius: BorderRadius.circular(13),
                                     ),
                                   ),
@@ -4114,8 +4148,9 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
                                               fontWeight: FontWeight.w700,
                                               color: idx == 1
                                                   ? cs.primary
-                                                  : widget.textColor
-                                                        .withOpacity(0.78),
+                                                  : widget.textColor.withValues(
+                                                      alpha: 0.78,
+                                                    ),
                                             ),
                                     child: Text(
                                       l10n.desktopSidebarTabTopics,
@@ -4280,14 +4315,16 @@ class _AssistantInlineTileState extends State<_AssistantInlineTile> {
     final Color tileColor = _isDesktop
         ? (embedded
               ? (widget.selected
-                    ? cs.primary.withOpacity(0.16)
+                    ? cs.primary.withValues(alpha: 0.16)
                     : Colors.transparent)
-              : (widget.selected ? cs.primary.withOpacity(0.12) : cs.surface))
+              : (widget.selected
+                    ? cs.primary.withValues(alpha: 0.12)
+                    : cs.surface))
         : (embedded ? Colors.transparent : cs.surface);
     final Color bg = _isDesktop && !widget.selected && _hovered
         ? (embedded
-              ? cs.primary.withOpacity(0.08)
-              : cs.surface.withOpacity(0.9))
+              ? cs.primary.withValues(alpha: 0.08)
+              : cs.surface.withValues(alpha: 0.9))
         : tileColor;
     final content = MouseRegion(
       onEnter: (_) {
@@ -4325,7 +4362,7 @@ class _AssistantInlineTileState extends State<_AssistantInlineTile> {
               IosIconButton(
                 icon: Lucide.Pencil,
                 size: 18,
-                color: cs.onSurface.withOpacity(0.7),
+                color: cs.onSurface.withValues(alpha: 0.7),
                 padding: const EdgeInsets.all(8),
                 minSize: 36,
                 onTap: widget.onEditTap,

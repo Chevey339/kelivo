@@ -21,6 +21,7 @@ import '../logging/flutter_logger.dart';
 import '../model_override_resolver.dart';
 import '../model_override_payload_parser.dart';
 import 'provider_request_headers.dart';
+import '../../utils/multimodal_input_utils.dart';
 
 part 'chat_api_service_shims.dart';
 part 'providers/openai_common.dart';
@@ -154,23 +155,7 @@ class ChatApiService {
   }
 
   static String _mimeFromPath(String path) {
-    final lower = path.toLowerCase();
-    // Images
-    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
-    if (lower.endsWith('.png')) return 'image/png';
-    if (lower.endsWith('.webp')) return 'image/webp';
-    if (lower.endsWith('.gif')) return 'image/gif';
-    // Video
-    if (lower.endsWith('.mp4')) return 'video/mp4';
-    if (lower.endsWith('.mpeg') || lower.endsWith('.mpg')) return 'video/mpeg';
-    if (lower.endsWith('.mov')) return 'video/quicktime';
-    if (lower.endsWith('.avi')) return 'video/x-msvideo';
-    if (lower.endsWith('.mkv')) return 'video/x-matroska';
-    if (lower.endsWith('.flv')) return 'video/x-flv';
-    if (lower.endsWith('.wmv')) return 'video/x-ms-wmv';
-    if (lower.endsWith('.webm')) return 'video/webm';
-    if (lower.endsWith('.3gp') || lower.endsWith('.3gpp')) return 'video/3gpp';
-    return 'image/png';
+    return inferMediaMimeFromSource(path, fallbackMime: 'image/png');
   }
 
   static String _mimeFromDataUrl(String dataUrl) {

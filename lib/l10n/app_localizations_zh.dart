@@ -468,6 +468,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePagePleaseSelectModel => '请先选择模型';
 
   @override
+  String get homePageAudioAttachmentUnsupported =>
+      '当前模型不支持音频附件，请切换到支持音频输入的模型或移除音频文件后重试。';
+
+  @override
   String get homePagePleaseSetupTranslateModel => '请先设置翻译模型';
 
   @override
@@ -4619,6 +4623,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get homePagePleaseSelectModel => '请先选择模型';
 
   @override
+  String get homePageAudioAttachmentUnsupported =>
+      '当前模型不支持音频附件，请切换到支持音频输入的模型或移除音频文件后重试。';
+
+  @override
   String get homePagePleaseSetupTranslateModel => '请先设置翻译模型';
 
   @override
@@ -8716,6 +8724,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get homePagePleaseSelectModel => '請先選擇模型';
+
+  @override
+  String get homePageAudioAttachmentUnsupported =>
+      '目前模型不支援音訊附件，請切換到支援音訊輸入的模型或移除音訊檔案後再試。';
 
   @override
   String get homePagePleaseSetupTranslateModel => '請先設定翻譯模型';

@@ -132,6 +132,79 @@ class ChatActions {
     return messageGenerationService.isReasoningEnabled(budget);
   }
 
+  bool _supportsAudioAttachmentsForProvider(
+    SettingsProvider settings, {
+    required String providerKey,
+    required String modelId,
+  }) {
+    return messageGenerationService.supportsAudioAttachmentsForProvider(
+      settings,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
+  }
+
+  bool _hasUnsupportedAudioAttachments({
+    required List<ChatMessage> messages,
+    required Conversation conversation,
+    required SettingsProvider settings,
+    required String providerKey,
+    required String modelId,
+    ChatInputData? pendingInput,
+  }) {
+    if (_supportsAudioAttachmentsForProvider(
+      settings,
+      providerKey: providerKey,
+      modelId: modelId,
+    )) {
+      return false;
+    }
+
+    if (pendingInput != null &&
+        messageGenerationService.inputContainsAudioAttachments(pendingInput)) {
+      return true;
+    }
+
+    final apiMessages = messageGenerationService.messageBuilderService
+        .buildApiMessages(
+          messages: messages,
+          versionSelections: _versionSelections,
+          currentConversation: conversation,
+        );
+    return messageGenerationService.apiMessagesContainAudioAttachments(
+      apiMessages,
+    );
+  }
+
+  List<ChatMessage> _projectMessagesAfterRegenerationCut({
+    required List<ChatMessage> messages,
+    required int lastKeep,
+    required String? targetGroupId,
+  }) {
+    if (lastKeep >= messages.length - 1) {
+      return List<ChatMessage>.of(messages);
+    }
+
+    final keepGroups = <String>{};
+    for (int i = 0; i <= lastKeep && i < messages.length; i++) {
+      keepGroups.add(messages[i].groupId ?? messages[i].id);
+    }
+    if (targetGroupId != null) keepGroups.add(targetGroupId);
+
+    final projected = <ChatMessage>[];
+    for (int i = 0; i < messages.length; i++) {
+      if (i <= lastKeep) {
+        projected.add(messages[i]);
+        continue;
+      }
+      final gid = messages[i].groupId ?? messages[i].id;
+      if (keepGroups.contains(gid)) {
+        projected.add(messages[i]);
+      }
+    }
+    return projected;
+  }
+
   /// Transform raw content using assistant regexes.
   String _transformAssistantContent(
     stream_ctrl.StreamingState state, [
@@ -183,6 +256,17 @@ class ChatActions {
     }
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
+
+    if (_hasUnsupportedAudioAttachments(
+      messages: _messages,
+      conversation: conversation,
+      settings: settings,
+      providerKey: providerKey,
+      modelId: modelId,
+      pendingInput: input,
+    )) {
+      return ChatActionResult.error('audio_attachment_unsupported');
+    }
 
     // Create user message
     final userMessage = await messageGenerationService.createUserMessage(
@@ -245,6 +329,8 @@ class ChatActions {
         input: input,
         lastUserImagePaths: prepared.lastUserImagePaths,
         settings: settings,
+        providerKey: providerKey,
+        modelId: modelId,
       );
 
       // Execute generation
@@ -304,17 +390,6 @@ class ChatActions {
       return ChatActionResult.error('invalid_versioning');
     }
 
-    // Remove trailing messages - returns list of removed IDs for UI cleanup
-    final removeIds = await messageGenerationService.removeTrailingMessages(
-      messages: _messages,
-      lastKeep: versioning.lastKeep,
-      targetGroupId: versioning.targetGroupId,
-    );
-    if (removeIds.isNotEmpty) {
-      _messages.removeWhere((m) => removeIds.contains(m.id));
-      onMessagesChanged?.call();
-    }
-
     // Get model config
     final settings = contextProvider.read<SettingsProvider>();
     final assistant = contextProvider
@@ -331,6 +406,32 @@ class ChatActions {
     }
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
+
+    final projectedMessages = _projectMessagesAfterRegenerationCut(
+      messages: _messages,
+      lastKeep: versioning.lastKeep,
+      targetGroupId: versioning.targetGroupId,
+    );
+    if (_hasUnsupportedAudioAttachments(
+      messages: projectedMessages,
+      conversation: conversation,
+      settings: settings,
+      providerKey: providerKey,
+      modelId: modelId,
+    )) {
+      return ChatActionResult.error('audio_attachment_unsupported');
+    }
+
+    // Remove trailing messages - returns list of removed IDs for UI cleanup
+    final removeIds = await messageGenerationService.removeTrailingMessages(
+      messages: _messages,
+      lastKeep: versioning.lastKeep,
+      targetGroupId: versioning.targetGroupId,
+    );
+    if (removeIds.isNotEmpty) {
+      _messages.removeWhere((m) => removeIds.contains(m.id));
+      onMessagesChanged?.call();
+    }
 
     // Create assistant message placeholder (new version)
     final assistantMessage = await messageGenerationService
@@ -390,6 +491,8 @@ class ChatActions {
       input: null,
       lastUserImagePaths: prepared.lastUserImagePaths,
       settings: settings,
+      providerKey: providerKey,
+      modelId: modelId,
     );
 
     // Execute generation
@@ -866,6 +969,10 @@ class ChatActions {
       );
       onMessagesChanged?.call();
     }
+
+    // Remove notifier AFTER onMessagesChanged so the UI rebuild sees final content
+    streamController.removeStreamingNotifier(messageId);
+
     _setConversationLoading(conversationId, false);
 
     // Use unified reasoning completion method
@@ -933,6 +1040,10 @@ class ChatActions {
       );
       onMessagesChanged?.call();
     }
+
+    // Remove notifier AFTER onMessagesChanged so the UI rebuild sees final content
+    streamController.removeStreamingNotifier(messageId);
+
     _setConversationLoading(conversationId, false);
 
     // Use unified reasoning completion method on error
@@ -976,6 +1087,8 @@ class ChatActions {
         generateTitle: state.ctx.generateTitleOnFinish,
       );
     }
+    // Idempotent: ensure notifier is removed even if _finishStreaming was skipped
+    streamController.removeStreamingNotifier(state.messageId);
     onStreamFinished?.call();
     await _conversationStreams.remove(conversationId)?.cancel();
   }

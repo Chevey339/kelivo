@@ -62,6 +62,7 @@ dependencies:
   gpt_markdown: ^1.1.4
   uuid: ^4.5.0
   intl: ^0.20.2
+  path: ^1.9.1
   path_provider: ^2.1.4
   file_picker: ^10.3.10
   archive: ^4.0.9

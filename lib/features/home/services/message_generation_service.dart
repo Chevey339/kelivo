@@ -6,6 +6,9 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/model_override_payload_parser.dart';
+import '../../../core/utils/multimodal_input_utils.dart';
+import '../../../core/utils/openai_model_compat.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
@@ -408,29 +411,124 @@ class MessageGenerationService {
     return removeIds;
   }
 
+  bool _shouldIncludeAudioForProvider(
+    SettingsProvider settings, {
+    required String providerKey,
+    required String modelId,
+  }) {
+    final cfg = settings.getProviderConfig(providerKey);
+    if (ProviderConfig.classify(providerKey, explicitType: cfg.providerType) !=
+        ProviderKind.openai) {
+      return false;
+    }
+    final override = ModelOverridePayloadParser.modelOverride(
+      cfg.modelOverrides,
+      modelId,
+    );
+    final upstreamModelId = resolveApiModelIdOverride(override, modelId);
+    return isLongCatOmniModelId(upstreamModelId);
+  }
+
+  bool supportsAudioAttachmentsForProvider(
+    SettingsProvider settings, {
+    required String providerKey,
+    required String modelId,
+  }) {
+    return _shouldIncludeAudioForProvider(
+      settings,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
+  }
+
+  String _effectiveAttachmentMime(DocumentAttachment attachment) {
+    return resolveDocumentAttachmentMime(attachment);
+  }
+
+  bool inputContainsAudioAttachments(ChatInputData input) {
+    for (final attachment in input.documents) {
+      if (isAudioMime(_effectiveAttachmentMime(attachment))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool apiMessagesContainAudioAttachments(List<Map<String, dynamic>> messages) {
+    for (final message in messages) {
+      if ((message['role'] ?? '').toString() != 'user') continue;
+      final parsed = messageBuilderService.parseInputFromRaw(
+        (message['content'] ?? '').toString(),
+      );
+      if (parsed.documents.any(
+        (attachment) => isAudioMime(_effectiveAttachmentMime(attachment)),
+      )) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  List<String> _filterMediaPathsForProvider(
+    List<String> paths, {
+    required bool includeAudio,
+  }) {
+    return paths
+        .where((path) {
+          final mime = inferMediaMimeFromSource(
+            path,
+            fallbackMime: 'image/png',
+          );
+          if (isAudioMime(mime)) return includeAudio;
+          return isImageMime(mime) || isVideoMime(mime);
+        })
+        .toList(growable: false);
+  }
+
   /// Build user image paths considering OCR mode.
   List<String> buildUserImagePaths({
     required ChatInputData? input,
     required List<String> lastUserImagePaths,
     required SettingsProvider settings,
+    required String providerKey,
+    required String modelId,
   }) {
     final bool ocrActive =
         settings.ocrEnabled &&
         settings.ocrModelProvider != null &&
         settings.ocrModelId != null;
 
-    if (ocrActive) {
-      return const <String>[];
-    }
+    final includeAudio = _shouldIncludeAudioForProvider(
+      settings,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
 
     if (input != null) {
-      final currentVideoPaths = <String>[
-        for (final d in input.documents)
-          if (d.mime.toLowerCase().startsWith('video/')) d.path,
-      ];
-      return <String>[...input.imagePaths, ...currentVideoPaths];
+      final currentMediaPaths = <String>[];
+      for (final d in input.documents) {
+        final effectiveMime = _effectiveAttachmentMime(d);
+        if (isVideoMime(effectiveMime) ||
+            (includeAudio && isAudioMime(effectiveMime))) {
+          currentMediaPaths.add(d.path);
+        }
+      }
+      return _filterMediaPathsForProvider(<String>[
+        if (!ocrActive) ...input.imagePaths,
+        ...currentMediaPaths,
+      ], includeAudio: includeAudio);
     }
 
-    return lastUserImagePaths;
+    return _filterMediaPathsForProvider(
+      lastUserImagePaths
+          .where((path) {
+            if (!ocrActive) return true;
+            return !isImageMime(
+              inferMediaMimeFromSource(path, fallbackMime: 'image/png'),
+            );
+          })
+          .toList(growable: false),
+      includeAudio: includeAudio,
+    );
   }
 }

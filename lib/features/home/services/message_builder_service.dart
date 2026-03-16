@@ -21,6 +21,7 @@ import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/models/assistant_regex.dart';
+import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 
@@ -36,6 +37,8 @@ import '../../../utils/markdown_media_sanitizer.dart';
 /// - Applying context limits
 /// - Inlining local images for model context
 class MessageBuilderService {
+  static const String internalMediaPathsKey = multimodalInternalMediaPathsKey;
+
   MessageBuilderService({
     required this.chatService,
     required this.contextProvider,
@@ -212,8 +215,10 @@ class MessageBuilderService {
         final mime = fileMatch.group(3)?.trim() ?? 'text/plain';
         final doc = DocumentAttachment(path: path, fileName: name, mime: mime);
         docs.add(doc);
-        // Treat video attachments as image-style attachments for downstream APIs (e.g., Qwen video_url).
-        if (mime.toLowerCase().startsWith('video/') && path.isNotEmpty) {
+        // Treat media attachments as image-style attachments for downstream API builders.
+        final effectiveMime = _effectiveAttachmentMime(doc);
+        if ((isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) &&
+            path.isNotEmpty) {
           images.add(path);
         }
         idx = fileMatch.end;
@@ -227,6 +232,10 @@ class MessageBuilderService {
       imagePaths: images,
       documents: docs,
     );
+  }
+
+  String _effectiveAttachmentMime(DocumentAttachment attachment) {
+    return resolveDocumentAttachmentMime(attachment);
   }
 
   /// Process user messages in apiMessages: extract documents, apply OCR, inject file prompts.
@@ -299,6 +308,31 @@ class MessageBuilderService {
       if (apiMessages[i]['role'] != 'user') continue;
       final rawUser = (apiMessages[i]['content'] ?? '').toString();
       final parsedUser = parseInputFromRaw(rawUser);
+      final videoPaths = <String>{
+        for (final d in parsedUser.documents)
+          if (isVideoMime(_effectiveAttachmentMime(d))) d.path.trim(),
+      }..removeWhere((p) => p.isEmpty);
+      final audioPaths = <String>{
+        for (final d in parsedUser.documents)
+          if (isAudioMime(_effectiveAttachmentMime(d))) d.path.trim(),
+      }..removeWhere((p) => p.isEmpty);
+
+      final messageMediaPaths = parsedUser.imagePaths
+          .map((p) => p.trim())
+          .where(
+            (p) =>
+                p.isNotEmpty &&
+                (!ocrActive ||
+                    videoPaths.contains(p) ||
+                    audioPaths.contains(p)),
+          )
+          .toSet()
+          .toList(growable: false);
+      if (messageMediaPaths.isEmpty) {
+        apiMessages[i].remove(internalMediaPathsKey);
+      } else {
+        apiMessages[i][internalMediaPathsKey] = messageMediaPaths;
+      }
 
       // Capture image paths from last user message
       if (i == lastUserIdx &&
@@ -307,14 +341,14 @@ class MessageBuilderService {
         lastUserImagePaths = List<String>.of(parsedUser.imagePaths);
       }
 
-      final videoPaths = <String>{
-        for (final d in parsedUser.documents)
-          if (d.mime.toLowerCase().startsWith('video/')) d.path.trim(),
-      }..removeWhere((p) => p.isEmpty);
-
       final inlineImagePaths = parsedUser.imagePaths
           .map((p) => p.trim())
-          .where((p) => p.isNotEmpty && !videoPaths.contains(p))
+          .where(
+            (p) =>
+                p.isNotEmpty &&
+                !videoPaths.contains(p) &&
+                !audioPaths.contains(p),
+          )
           .toList(growable: false);
 
       // Apply replace-only regexes at send-time on user text (exclude markers).
@@ -332,7 +366,10 @@ class MessageBuilderService {
 
       final filePrompts = StringBuffer();
       for (final d in parsedUser.documents) {
-        if (d.mime.toLowerCase().startsWith('video/')) continue;
+        final effectiveMime = _effectiveAttachmentMime(d);
+        if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
+          continue;
+        }
         final text = await readDocument(d);
         if (text == null || text.trim().isEmpty) continue;
         filePrompts.writeln('## user sent a file: ${d.fileName}');
@@ -349,7 +386,12 @@ class MessageBuilderService {
       if (ocrActive && ocrHandler != null) {
         final ocrTargets = parsedUser.imagePaths
             .map((p) => p.trim())
-            .where((p) => p.isNotEmpty && !videoPaths.contains(p))
+            .where(
+              (p) =>
+                  p.isNotEmpty &&
+                  !videoPaths.contains(p) &&
+                  !audioPaths.contains(p),
+            )
             .toSet()
             .toList();
         if (ocrTargets.isNotEmpty) {

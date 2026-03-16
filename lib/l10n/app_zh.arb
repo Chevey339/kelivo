@@ -360,6 +360,7 @@
   "displaySettingsPageLanguageChineseLabel": "简体中文",
   "displaySettingsPageLanguageEnglishLabel": "English",
   "homePagePleaseSelectModel": "请先选择模型",
+  "homePageAudioAttachmentUnsupported": "当前模型不支持音频附件，请切换到支持音频输入的模型或移除音频文件后重试。",
   "homePagePleaseSetupTranslateModel": "请先设置翻译模型",
   "homePageTranslating": "翻译中...",
   "homePageTranslateFailed": "翻译失败: {error}",

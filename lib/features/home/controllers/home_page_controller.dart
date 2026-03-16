@@ -39,7 +39,6 @@ import '../services/translation_service.dart';
 import '../services/file_upload_service.dart';
 import '../widgets/chat_input_bar.dart';
 import '../../model/widgets/model_select_sheet.dart';
-import '../../search/services/global_session_search_service.dart';
 
 /// Translation data for UI state (expanded/collapsed).
 class TranslationData {
@@ -333,7 +332,7 @@ class HomePageController extends ChangeNotifier {
       final l10n = AppLocalizations.of(_context)!;
       showAppSnackBar(
         _context,
-        message: '${l10n.generationInterrupted}: $error',
+        message: _localizeGenerationError(l10n, error),
         type: NotificationType.error,
       );
     };
@@ -370,6 +369,15 @@ class HomePageController extends ChangeNotifier {
       // Trigger UI update when streaming finishes
       notifyListeners();
     };
+  }
+
+  String _localizeGenerationError(AppLocalizations l10n, String error) {
+    switch (error) {
+      case 'audio_attachment_unsupported':
+        return l10n.homePageAudioAttachmentUnsupported;
+      default:
+        return '${l10n.generationInterrupted}: $error';
+    }
   }
 
   void _initializeScrollController() {

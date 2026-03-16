@@ -362,6 +362,7 @@
   "displaySettingsPageLanguageChineseLabel": "简体中文",
   "displaySettingsPageLanguageEnglishLabel": "English",
   "homePagePleaseSelectModel": "請先選擇模型",
+  "homePageAudioAttachmentUnsupported": "目前模型不支援音訊附件，請切換到支援音訊輸入的模型或移除音訊檔案後再試。",
   "homePagePleaseSetupTranslateModel": "請先設定翻譯模型",
   "homePageTranslating": "翻譯中...",
   "homePageTranslateFailed": "翻譯失敗: {error}",
