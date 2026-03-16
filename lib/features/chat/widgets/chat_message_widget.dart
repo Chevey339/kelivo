@@ -2837,21 +2837,14 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     );
   }
 
-  /// Try to parse search result items from tool content JSON.
-  List<Map<String, dynamic>> _tryParseSearchItems() {
-    final content = widget.part.content;
-    if (content == null || content.isEmpty) return const [];
-    final name = widget.part.toolName;
-    if (name != 'search_web' && name != 'builtin_search') return const [];
+  /// Try to pretty-format a string as indented JSON.
+  /// Returns the original string if it is not valid JSON.
+  static String _prettyJson(String raw) {
     try {
-      final obj = jsonDecode(content) as Map<String, dynamic>;
-      final arr = obj['items'] as List? ?? const <dynamic>[];
-      return [
-        for (final it in arr)
-          if (it is Map) it.cast<String, dynamic>(),
-      ];
+      final obj = jsonDecode(raw);
+      return const JsonEncoder.withIndent('  ').convert(obj);
     } catch (_) {
-      return const [];
+      return raw;
     }
   }
 
@@ -2863,11 +2856,8 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     ).convert(widget.part.arguments);
     final (cleanText, images) = _parseMcpImagePaths(widget.part.content);
     final resultText = cleanText.isNotEmpty
-        ? cleanText
+        ? _prettyJson(cleanText)
         : l10n.chatMessageWidgetNoResultYet;
-
-    // For search tools, parse items for structured display
-    final searchItems = _tryParseSearchItems();
 
     final bool isDesktop =
         defaultTargetPlatform == TargetPlatform.macOS ||
@@ -2987,32 +2977,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                // Search tools: show clickable result cards
-                                if (searchItems.isNotEmpty)
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      for (int i = 0;
-                                          i < searchItems.length;
-                                          i++)
-                                        _SearchResultCard(
-                                          index:
-                                              (searchItems[i]['index'] ??
-                                                      (i + 1))
-                                                  .toString(),
-                                          title:
-                                              (searchItems[i]['title'] ?? '')
-                                                  .toString(),
-                                          url: (searchItems[i]['url'] ?? '')
-                                              .toString(),
-                                          text: (searchItems[i]['text'] ?? '')
-                                              .toString(),
-                                        ),
-                                    ],
-                                  )
-                                else
-                                  Container(
+                                Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
@@ -3157,25 +3122,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    // Search tools: show clickable result cards
-                    if (searchItems.isNotEmpty)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          for (int i = 0; i < searchItems.length; i++)
-                            _SearchResultCard(
-                              index: (searchItems[i]['index'] ?? (i + 1))
-                                  .toString(),
-                              title:
-                                  (searchItems[i]['title'] ?? '').toString(),
-                              url: (searchItems[i]['url'] ?? '').toString(),
-                              text:
-                                  (searchItems[i]['text'] ?? '').toString(),
-                            ),
-                        ],
-                      )
-                    else
-                      Container(
+                    Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
@@ -3273,6 +3220,8 @@ class _SearchResultCard extends StatelessWidget {
   final String text;
   final String? index;
 
+  static final _pureNumber = RegExp(r'^\d+$');
+
   String _domain(String url) {
     try {
       return Uri.parse(url).host;
@@ -3280,6 +3229,10 @@ class _SearchResultCard extends StatelessWidget {
       return '';
     }
   }
+
+  /// A title is "real" if it is non-empty and not a pure number like "1","2".
+  bool _hasRealTitle() =>
+      title.isNotEmpty && !_pureNumber.hasMatch(title.trim());
 
   @override
   Widget build(BuildContext context) {
@@ -3379,7 +3332,7 @@ class _SearchResultCard extends StatelessWidget {
                 children: [
                   // Title
                   Text(
-                    title.isNotEmpty ? title : domain,
+                    _hasRealTitle() ? title : domain,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
