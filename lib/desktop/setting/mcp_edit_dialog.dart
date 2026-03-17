@@ -215,7 +215,6 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
   }
 
   Widget _headerBar() {
-    final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     return SizedBox(
       height: 52,
@@ -332,12 +331,13 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                   ? ['Streamable HTTP', 'SSE', l10n.mcpTransportOptionStdio]
                   : ['Streamable HTTP', 'SSE'];
               int selectedIdx;
-              if (_transport == McpTransportType.http)
+              if (_transport == McpTransportType.http) {
                 selectedIdx = 0;
-              else if (_transport == McpTransportType.sse)
+              } else if (_transport == McpTransportType.sse) {
                 selectedIdx = 1;
-              else
+              } else {
                 selectedIdx = isDesktop ? 2 : 0;
+              }
               return _SegChoiceBar(
                 labels: labels,
                 selectedIndex: selectedIdx,
@@ -364,7 +364,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
               l10n.mcpServerEditSheetSseRetryHint,
               style: TextStyle(
                 fontSize: 12,
-                color: cs.onSurface.withOpacity(0.7),
+                color: cs.onSurface.withValues(alpha: 0.7),
               ),
             ),
           ),
@@ -452,16 +452,16 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                         ),
                       ).copyWith(
                         splashFactory: NoSplash.splashFactory,
-                        overlayColor: const MaterialStatePropertyAll(
+                        overlayColor: const WidgetStatePropertyAll(
                           Colors.transparent,
                         ),
-                        backgroundColor: MaterialStateProperty.resolveWith((
+                        backgroundColor: WidgetStateProperty.resolveWith((
                           states,
                         ) {
-                          if (states.contains(MaterialState.hovered)) {
+                          if (states.contains(WidgetState.hovered)) {
                             return isDark
-                                ? Colors.white.withOpacity(0.06)
-                                : Colors.black.withOpacity(0.05);
+                                ? Colors.white.withValues(alpha: 0.06)
+                                : Colors.black.withValues(alpha: 0.05);
                           }
                           return Colors.transparent;
                         }),
@@ -534,16 +534,16 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                         ),
                       ).copyWith(
                         splashFactory: NoSplash.splashFactory,
-                        overlayColor: const MaterialStatePropertyAll(
+                        overlayColor: const WidgetStatePropertyAll(
                           Colors.transparent,
                         ),
-                        backgroundColor: MaterialStateProperty.resolveWith((
+                        backgroundColor: WidgetStateProperty.resolveWith((
                           states,
                         ) {
-                          if (states.contains(MaterialState.hovered)) {
+                          if (states.contains(WidgetState.hovered)) {
                             return isDark
-                                ? Colors.white.withOpacity(0.06)
-                                : Colors.black.withOpacity(0.05);
+                                ? Colors.white.withValues(alpha: 0.06)
+                                : Colors.black.withValues(alpha: 0.05);
                           }
                           return Colors.transparent;
                         }),
@@ -577,7 +577,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           padding: const EdgeInsets.only(top: 20),
           child: Text(
             l10n.mcpServerEditSheetNoToolsHint,
-            style: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+            style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6)),
           ),
         ),
       );
@@ -603,7 +603,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                           tool.description!,
                           style: TextStyle(
                             fontSize: 12,
-                            color: cs.onSurface.withOpacity(0.7),
+                            color: cs.onSurface.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -615,10 +615,10 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                           children: tool.params.map((p) {
                             final color = p.required
                                 ? cs.primary
-                                : cs.onSurface.withOpacity(0.5);
+                                : cs.onSurface.withValues(alpha: 0.5);
                             final bg = p.required
-                                ? cs.primary.withOpacity(0.12)
-                                : cs.onSurface.withOpacity(0.06);
+                                ? cs.primary.withValues(alpha: 0.12)
+                                : cs.onSurface.withValues(alpha: 0.06);
                             return Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -628,7 +628,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                                 color: bg,
                                 borderRadius: BorderRadius.circular(999),
                                 border: Border.all(
-                                  color: color.withOpacity(0.5),
+                                  color: color.withValues(alpha: 0.5),
                                 ),
                               ),
                               child: Text(
@@ -681,18 +681,19 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
+    final tab = _tab;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _headerBar(),
-        if (isEdit)
+        if (isEdit && tab != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: AnimatedBuilder(
-              animation: _tab!,
+              animation: tab,
               builder: (context, _) => _SegTabBar(
-                controller: _tab!,
+                controller: tab,
                 tabs: [
                   l10n.mcpServerEditSheetTabBasic,
                   l10n.mcpServerEditSheetTabTools,
@@ -704,11 +705,11 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: isEdit
+            child: isEdit && tab != null
                 ? AnimatedBuilder(
-                    animation: _tab!,
+                    animation: tab,
                     builder: (context, _) =>
-                        _tab!.index == 0 ? _basicForm() : _toolsTab(),
+                        tab.index == 0 ? _basicForm() : _toolsTab(),
                   )
                 : _basicForm(),
           ),
@@ -733,13 +734,13 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                       ),
                     ).copyWith(
                       splashFactory: NoSplash.splashFactory,
-                      overlayColor: const MaterialStatePropertyAll(
+                      overlayColor: const WidgetStatePropertyAll(
                         Colors.transparent,
                       ),
-                      backgroundColor: MaterialStateProperty.resolveWith((
+                      backgroundColor: WidgetStateProperty.resolveWith((
                         states,
                       ) {
-                        if (states.contains(MaterialState.hovered)) {
+                        if (states.contains(WidgetState.hovered)) {
                           return Color.lerp(
                             cs.primary,
                             Colors.white,
@@ -776,7 +777,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           style: TextStyle(
             fontSize: 13,
             fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-            color: cs.onSurface.withOpacity(0.8),
+            color: cs.onSurface.withValues(alpha: 0.8),
           ),
         ),
         const SizedBox(height: 6),
@@ -793,15 +794,19 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             fillColor: isDark ? Colors.white10 : Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+              borderSide: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+              borderSide: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+              borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
@@ -818,10 +823,10 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
+        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
           width: 0.6,
         ),
       ),
@@ -858,8 +863,8 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     final btn = Container(
       width: 28,
@@ -923,7 +928,7 @@ class _SegChoiceBar extends StatelessWidget {
             segWidth * labels.length + gap * (labels.length - 1);
 
         final Color shellBg = isDark
-            ? Colors.white.withOpacity(0.08)
+            ? Colors.white.withValues(alpha: 0.08)
             : Colors.white;
 
         List<Widget> children = [];
@@ -942,7 +947,7 @@ class _SegChoiceBar extends StatelessWidget {
                     curve: Curves.easeOutCubic,
                     decoration: BoxDecoration(
                       color: selected
-                          ? cs.primary.withOpacity(0.14)
+                          ? cs.primary.withValues(alpha: 0.14)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(innerRadius),
                     ),
@@ -956,7 +961,7 @@ class _SegChoiceBar extends StatelessWidget {
                         style: TextStyle(
                           color: selected
                               ? cs.primary
-                              : cs.onSurface.withOpacity(0.82),
+                              : cs.onSurface.withValues(alpha: 0.82),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -966,8 +971,9 @@ class _SegChoiceBar extends StatelessWidget {
               ),
             ),
           );
-          if (index != labels.length - 1)
+          if (index != labels.length - 1) {
             children.add(const SizedBox(width: gap));
+          }
         }
 
         return Container(
@@ -1030,7 +1036,7 @@ class _SegTabBar extends StatelessWidget {
             segWidth * tabs.length + gap * (tabs.length - 1);
 
         final Color shellBg = isDark
-            ? Colors.white.withOpacity(0.08)
+            ? Colors.white.withValues(alpha: 0.08)
             : Colors.white;
 
         List<Widget> children = [];
@@ -1049,7 +1055,7 @@ class _SegTabBar extends StatelessWidget {
                     curve: Curves.easeOutCubic,
                     decoration: BoxDecoration(
                       color: selected
-                          ? cs.primary.withOpacity(0.14)
+                          ? cs.primary.withValues(alpha: 0.14)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(innerRadius),
                     ),
@@ -1063,7 +1069,7 @@ class _SegTabBar extends StatelessWidget {
                         style: TextStyle(
                           color: selected
                               ? cs.primary
-                              : cs.onSurface.withOpacity(0.82),
+                              : cs.onSurface.withValues(alpha: 0.82),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -1073,8 +1079,9 @@ class _SegTabBar extends StatelessWidget {
               ),
             ),
           );
-          if (index != tabs.length - 1)
+          if (index != tabs.length - 1) {
             children.add(const SizedBox(width: gap));
+          }
         }
 
         return Container(
