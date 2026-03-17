@@ -52,7 +52,7 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w400,
-                              color: cs.onSurface.withOpacity(0.9),
+                              color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
                         ),
@@ -60,14 +60,15 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                       _SmallIconBtn(
                         icon: lucide.Lucide.Plus,
                         onTap: () async {
+                          final settingsProvider = context
+                              .read<SettingsProvider>();
                           final created = await _showAddServiceDialog(context);
+                          if (!context.mounted) return;
                           if (created != null) {
                             final list = List<SearchServiceOptions>.from(
-                              settings.searchServices,
+                              settingsProvider.searchServices,
                             )..add(created);
-                            await context
-                                .read<SettingsProvider>()
-                                .setSearchServices(list);
+                            await settingsProvider.setSearchServices(list);
                           }
                         },
                       ),
@@ -95,18 +96,19 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                               .read<SettingsProvider>()
                               .setSearchServiceSelected(index),
                           onEdit: () async {
+                            final settingsProvider = context
+                                .read<SettingsProvider>();
                             final updated = await _showEditServiceDialog(
                               context,
                               s,
                             );
+                            if (!context.mounted) return;
                             if (updated != null) {
                               final list = List<SearchServiceOptions>.from(
-                                context.read<SettingsProvider>().searchServices,
+                                settingsProvider.searchServices,
                               );
                               list[index] = updated;
-                              await context
-                                  .read<SettingsProvider>()
-                                  .setSearchServices(list);
+                              await settingsProvider.setSearchServices(list);
                             }
                           },
                           onDelete: () async {
@@ -136,8 +138,9 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                   if (oldIndex < 0 ||
                       oldIndex >= current.length ||
                       newIndex < 0 ||
-                      newIndex >= current.length)
+                      newIndex >= current.length) {
                     return;
+                  }
                   final moved = current.removeAt(oldIndex);
                   current.insert(newIndex, moved);
                   final selectedId =
@@ -282,10 +285,12 @@ class _ServiceCardState extends State<_ServiceCard> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final name = SearchService.getService(widget.service).name;
-    final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    final baseBg = isDark
+        ? Colors.white10
+        : Colors.white.withValues(alpha: 0.96);
     final borderColor = _hover || widget.selected
-        ? cs.primary.withOpacity(isDark ? 0.35 : 0.45)
-        : cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08);
+        ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
 
     // Connection/testing status capsule
     final l10n = AppLocalizations.of(context)!;
@@ -297,20 +302,20 @@ class _ServiceCardState extends State<_ServiceCard> {
     Color statusFg;
     if (widget.testing) {
       statusText = l10n.searchServicesPageTestingStatus;
-      statusBg = cs.primary.withOpacity(0.12);
+      statusBg = cs.primary.withValues(alpha: 0.12);
       statusFg = cs.primary;
     } else if (conn == true) {
       statusText = l10n.searchServicesPageConnectedStatus;
-      statusBg = Colors.green.withOpacity(0.12);
+      statusBg = Colors.green.withValues(alpha: 0.12);
       statusFg = Colors.green;
     } else if (conn == false) {
       statusText = l10n.searchServicesPageFailedStatus;
-      statusBg = Colors.orange.withOpacity(0.12);
+      statusBg = Colors.orange.withValues(alpha: 0.12);
       statusFg = Colors.orange;
     } else {
       statusText = l10n.searchServicesPageNotTestedStatus;
-      statusBg = cs.onSurface.withOpacity(0.06);
-      statusFg = cs.onSurface.withOpacity(0.7);
+      statusBg = cs.onSurface.withValues(alpha: 0.06);
+      statusFg = cs.onSurface.withValues(alpha: 0.7);
     }
 
     return MouseRegion(
@@ -410,7 +415,7 @@ class _ToggleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final labelColor = cs.onSurface.withOpacity(0.9);
+    final labelColor = cs.onSurface.withValues(alpha: 0.9);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => onChanged(!value),
@@ -464,7 +469,7 @@ class _StepperRowState extends State<_StepperRow> {
             child: Icon(
               widget.icon,
               size: 18,
-              color: cs.onSurface.withOpacity(0.9),
+              color: cs.onSurface.withValues(alpha: 0.9),
             ),
           ),
           const SizedBox(width: 12),
@@ -473,7 +478,7 @@ class _StepperRowState extends State<_StepperRow> {
               widget.label,
               style: TextStyle(
                 fontSize: 15,
-                color: cs.onSurface.withOpacity(0.9),
+                color: cs.onSurface.withValues(alpha: 0.9),
               ),
             ),
           ),
@@ -491,7 +496,7 @@ class _StepperRowState extends State<_StepperRow> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
-                color: cs.onSurface.withOpacity(0.9),
+                color: cs.onSurface.withValues(alpha: 0.9),
               ),
             ),
           ),
@@ -530,10 +535,12 @@ class _StepperButtonState extends State<_StepperButton> {
     final base = Colors.transparent;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.10)
-              : Colors.black.withOpacity(0.07))
+              ? Colors.white.withValues(alpha: 0.10)
+              : Colors.black.withValues(alpha: 0.07))
         : base;
-    final c = widget.enabled ? cs.onSurface : cs.onSurface.withOpacity(0.4);
+    final c = widget.enabled
+        ? cs.onSurface
+        : cs.onSurface.withValues(alpha: 0.4);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -602,7 +609,7 @@ class _BrandBadge extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final asset = BrandAssets.assetForName(name);
-    final bg = isDark ? Colors.white10 : cs.primary.withOpacity(0.1);
+    final bg = isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1);
     if (asset != null) {
       if (asset.endsWith('.svg')) {
         return Container(
@@ -664,8 +671,8 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -693,13 +700,15 @@ Widget _sectionCard({required List<Widget> children}) {
     builder: (context) {
       final cs = Theme.of(context).colorScheme;
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      final Color bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+      final Color bg = isDark
+          ? Colors.white10
+          : Colors.white.withValues(alpha: 0.96);
       return Container(
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
             width: 0.6,
           ),
         ),
@@ -720,7 +729,7 @@ Widget _divider(BuildContext context) {
     thickness: 0.6,
     indent: 12,
     endIndent: 12,
-    color: cs.outlineVariant.withOpacity(0.18),
+    color: cs.outlineVariant.withValues(alpha: 0.18),
   );
 }
 
@@ -769,7 +778,9 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
 
   @override
   void dispose() {
-    for (final c in _controllers.values) c.dispose();
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -1034,7 +1045,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
 
   @override
   void dispose() {
-    for (final c in _controllers.values) c.dispose();
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -1188,12 +1201,13 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
 
   SearchServiceOptions _updateService() {
     final s = widget.service;
-    if (s is TavilyOptions)
+    if (s is TavilyOptions) {
       return TavilyOptions(
         id: s.id,
         apiKey: _controllers['apiKey']!.text,
         url: _controllers['url']!.text.trim(),
       );
+    }
     if (s is DuckDuckGoOptions) {
       final region = (_controllers['region']?.text ?? s.region).trim();
       return DuckDuckGoOptions(
@@ -1201,15 +1215,17 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         region: region.isEmpty ? 'us-en' : region,
       );
     }
-    if (s is ExaOptions)
+    if (s is ExaOptions) {
       return ExaOptions(
         id: s.id,
         apiKey: _controllers['apiKey']!.text,
         url: _controllers['url']!.text.trim(),
       );
-    if (s is ZhipuOptions)
+    }
+    if (s is ZhipuOptions) {
       return ZhipuOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
-    if (s is SearXNGOptions)
+    }
+    if (s is SearXNGOptions) {
       return SearXNGOptions(
         id: s.id,
         url: _controllers['url']!.text,
@@ -1218,20 +1234,28 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         username: _controllers['username']!.text,
         password: _controllers['password']!.text,
       );
-    if (s is LinkUpOptions)
+    }
+    if (s is LinkUpOptions) {
       return LinkUpOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
-    if (s is BraveOptions)
+    }
+    if (s is BraveOptions) {
       return BraveOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
-    if (s is MetasoOptions)
+    }
+    if (s is MetasoOptions) {
       return MetasoOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
-    if (s is JinaOptions)
+    }
+    if (s is JinaOptions) {
       return JinaOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
-    if (s is OllamaOptions)
+    }
+    if (s is OllamaOptions) {
       return OllamaOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
-    if (s is PerplexityOptions)
+    }
+    if (s is PerplexityOptions) {
       return PerplexityOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
-    if (s is BochaOptions)
+    }
+    if (s is BochaOptions) {
       return BochaOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
+    }
     return s;
   }
 }
@@ -1275,9 +1299,9 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
         final it = _types[i];
         final selected = it.type == widget.selectedType;
         final bg = selected
-            ? cs.primary.withOpacity(isDark ? 0.18 : 0.12)
+            ? cs.primary.withValues(alpha: isDark ? 0.18 : 0.12)
             : (isDark ? Colors.white12 : const Color(0xFFF7F7F9));
-        final fg = selected ? cs.primary : cs.onSurface.withOpacity(0.85);
+        final fg = selected ? cs.primary : cs.onSurface.withValues(alpha: 0.85);
         return GestureDetector(
           onTap: () => widget.onChanged(it.type),
           child: Container(
@@ -1365,7 +1389,7 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
                   decoration: BoxDecoration(
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 12,
                         offset: const Offset(0, 6),
                       ),
@@ -1379,7 +1403,7 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
                             ? const Color(0xFF1C1C1E)
                             : Colors.white,
                         border: Border.all(
-                          color: cs.outlineVariant.withOpacity(0.12),
+                          color: cs.outlineVariant.withValues(alpha: 0.12),
                           width: 0.5,
                         ),
                       ),
@@ -1427,7 +1451,7 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
         );
       },
     );
-    Overlay.of(context)?.insert(_entry!);
+    Overlay.of(context).insert(_entry!);
     setState(() => _open = true);
   }
 
@@ -1456,8 +1480,8 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover || _open
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.04))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.04))
         : Colors.transparent;
     return CompositedTransformTarget(
       link: _link,
@@ -1476,7 +1500,7 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
               color: bg,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: cs.outlineVariant.withOpacity(0.12),
+                color: cs.outlineVariant.withValues(alpha: 0.12),
                 width: 0.6,
               ),
             ),
@@ -1489,7 +1513,7 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
                   _currentLabel,
                   style: TextStyle(
                     fontSize: 14.5,
-                    color: cs.onSurface.withOpacity(0.9),
+                    color: cs.onSurface.withValues(alpha: 0.9),
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -1500,7 +1524,7 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
                   child: Icon(
                     lucide.Lucide.ChevronDown,
                     size: 16,
-                    color: cs.onSurface.withOpacity(0.8),
+                    color: cs.onSurface.withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -1534,11 +1558,11 @@ class _DropdownItemState extends State<_DropdownItem> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = widget.selected
-        ? cs.primary.withOpacity(0.08)
+        ? cs.primary.withValues(alpha: 0.08)
         : (_hover
               ? (isDark
-                    ? Colors.white.withOpacity(0.06)
-                    : Colors.black.withOpacity(0.04))
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.04))
               : Colors.transparent);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1565,7 +1589,7 @@ class _DropdownItemState extends State<_DropdownItem> {
                   widget.label,
                   style: TextStyle(
                     fontSize: 14,
-                    color: cs.onSurface.withOpacity(0.9),
+                    color: cs.onSurface.withValues(alpha: 0.9),
                   ),
                 ),
               ),
@@ -1603,18 +1627,18 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final baseColor = widget.filled
         ? cs.primary
-        : cs.onSurface.withOpacity(0.8);
+        : cs.onSurface.withValues(alpha: 0.8);
     final textColor = widget.filled ? Colors.white : baseColor;
     final bg = widget.filled
-        ? (_hover ? cs.primary.withOpacity(0.92) : cs.primary)
+        ? (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary)
         : (_hover
               ? (isDark
-                    ? Colors.white.withOpacity(0.06)
-                    : Colors.black.withOpacity(0.05))
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.05))
               : Colors.transparent);
     final borderColor = widget.filled
         ? Colors.transparent
-        : cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18);
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.22 : 0.18);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -1665,20 +1689,23 @@ InputDecoration _deskInputDecoration(BuildContext context) {
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.2),
+        color: cs.outlineVariant.withValues(alpha: 0.2),
         width: 0.8,
       ),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.2),
+        color: cs.outlineVariant.withValues(alpha: 0.2),
         width: 0.8,
       ),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: cs.primary.withOpacity(0.45), width: 1.0),
+      borderSide: BorderSide(
+        color: cs.primary.withValues(alpha: 0.45),
+        width: 1.0,
+      ),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
   );
