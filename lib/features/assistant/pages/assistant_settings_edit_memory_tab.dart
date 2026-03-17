@@ -83,13 +83,13 @@ class _MemoryTab extends StatelessWidget {
                                 : const Color(0xFFF7F7F9),
                             border: OutlineInputBorder(
                               borderSide: BorderSide(
-                                color: cs.outlineVariant.withOpacity(0.2),
+                                color: cs.outlineVariant.withValues(alpha: 0.2),
                               ),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderSide: BorderSide(
-                                color: cs.primary.withOpacity(0.5),
+                                color: cs.primary.withValues(alpha: 0.5),
                               ),
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -215,13 +215,13 @@ class _MemoryTab extends StatelessWidget {
                             : const Color(0xFFF7F7F9),
                         border: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: cs.outlineVariant.withOpacity(0.2),
+                            color: cs.outlineVariant.withValues(alpha: 0.2),
                           ),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: cs.primary.withOpacity(0.5),
+                            color: cs.primary.withValues(alpha: 0.5),
                           ),
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -299,10 +299,10 @@ class _MemoryTab extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           // Match Settings page: Light uses translucent white; Dark uses subtle white10
-          color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
+          color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
             width: 0.6,
           ),
         ),
@@ -376,7 +376,7 @@ class _MemoryTab extends StatelessWidget {
                 pressedScale: 0.97,
                 builder: (pressed) {
                   final color = pressed
-                      ? cs.primary.withOpacity(0.7)
+                      ? cs.primary.withValues(alpha: 0.7)
                       : cs.primary;
                   return Row(
                     mainAxisSize: MainAxisSize.min,
@@ -404,7 +404,7 @@ class _MemoryTab extends StatelessWidget {
             child: Text(
               l10n.assistantEditMemoryEmpty,
               style: TextStyle(
-                color: cs.onSurface.withOpacity(0.6),
+                color: cs.onSurface.withValues(alpha: 0.6),
                 fontSize: 12,
               ),
             ),
@@ -416,10 +416,14 @@ class _MemoryTab extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
             child: Container(
               decoration: BoxDecoration(
-                color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
+                color: isDark
+                    ? Colors.white10
+                    : Colors.white.withValues(alpha: 0.96),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+                  color: cs.outlineVariant.withValues(
+                    alpha: isDark ? 0.08 : 0.06,
+                  ),
                   width: 0.6,
                 ),
               ),
@@ -496,7 +500,7 @@ class _MemoryTab extends StatelessWidget {
                 child: Text(
                   l10n.assistantEditSummaryEmpty,
                   style: TextStyle(
-                    color: cs.onSurface.withOpacity(0.6),
+                    color: cs.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -511,11 +515,11 @@ class _MemoryTab extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: isDark
                           ? Colors.white10
-                          : Colors.white.withOpacity(0.96),
+                          : Colors.white.withValues(alpha: 0.96),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: cs.outlineVariant.withOpacity(
-                          isDark ? 0.08 : 0.06,
+                        color: cs.outlineVariant.withValues(
+                          alpha: isDark ? 0.08 : 0.06,
                         ),
                         width: 0.6,
                       ),
@@ -530,7 +534,7 @@ class _MemoryTab extends StatelessWidget {
                               Icon(
                                 Lucide.MessageSquare,
                                 size: 14,
-                                color: cs.onSurface.withOpacity(0.5),
+                                color: cs.onSurface.withValues(alpha: 0.5),
                               ),
                               const SizedBox(width: 6),
                               Expanded(
@@ -540,7 +544,7 @@ class _MemoryTab extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: cs.onSurface.withOpacity(0.6),
+                                    color: cs.onSurface.withValues(alpha: 0.6),
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -665,7 +669,7 @@ class _MemoryTab extends StatelessWidget {
                       conversation.title,
                       style: TextStyle(
                         fontSize: 12,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -689,13 +693,13 @@ class _MemoryTab extends StatelessWidget {
                                 : const Color(0xFFF7F7F9),
                             border: OutlineInputBorder(
                               borderSide: BorderSide(
-                                color: cs.outlineVariant.withOpacity(0.2),
+                                color: cs.outlineVariant.withValues(alpha: 0.2),
                               ),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderSide: BorderSide(
-                                color: cs.primary.withOpacity(0.5),
+                                color: cs.primary.withValues(alpha: 0.5),
                               ),
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -787,7 +791,7 @@ class _MemoryTab extends StatelessWidget {
                   conversation.title,
                   style: TextStyle(
                     fontSize: 12,
-                    color: cs.onSurface.withOpacity(0.6),
+                    color: cs.onSurface.withValues(alpha: 0.6),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -805,13 +809,13 @@ class _MemoryTab extends StatelessWidget {
                         : const Color(0xFFF7F7F9),
                     border: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.2),
+                        color: cs.outlineVariant.withValues(alpha: 0.2),
                       ),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: cs.primary.withOpacity(0.5),
+                        color: cs.primary.withValues(alpha: 0.5),
                       ),
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -956,7 +960,7 @@ class _RecentChatsSummaryFrequencySection extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12,
                           height: 1.4,
-                          color: cs.onSurface.withOpacity(0.68),
+                          color: cs.onSurface.withValues(alpha: 0.68),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1044,7 +1048,7 @@ class _RecentChatsSummaryFrequencySection extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.4,
-                        color: cs.onSurface.withOpacity(0.68),
+                        color: cs.onSurface.withValues(alpha: 0.68),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1064,13 +1068,13 @@ class _RecentChatsSummaryFrequencySection extends StatelessWidget {
                             : const Color(0xFFF7F7F9),
                         border: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: cs.outlineVariant.withOpacity(0.2),
+                            color: cs.outlineVariant.withValues(alpha: 0.2),
                           ),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: cs.primary.withOpacity(0.5),
+                            color: cs.primary.withValues(alpha: 0.5),
                           ),
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -1127,7 +1131,6 @@ class _RecentChatsSummaryFrequencySection extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final ap = context.read<AssistantProvider>();
     final selected = assistant.recentChatsSummaryMessageCount;
     final options = <int>{
@@ -1148,7 +1151,7 @@ class _RecentChatsSummaryFrequencySection extends StatelessWidget {
                 child: Icon(
                   Lucide.FileClock,
                   size: 20,
-                  color: cs.onSurface.withOpacity(0.9),
+                  color: cs.onSurface.withValues(alpha: 0.9),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1160,7 +1163,7 @@ class _RecentChatsSummaryFrequencySection extends StatelessWidget {
                       l10n.assistantEditRecentChatsSummaryFrequencyTitle,
                       style: TextStyle(
                         fontSize: 15,
-                        color: cs.onSurface.withOpacity(0.9),
+                        color: cs.onSurface.withValues(alpha: 0.9),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1169,7 +1172,7 @@ class _RecentChatsSummaryFrequencySection extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         height: 1.35,
-                        color: cs.onSurface.withOpacity(0.65),
+                        color: cs.onSurface.withValues(alpha: 0.65),
                       ),
                     ),
                   ],
@@ -1238,16 +1241,16 @@ class _FrequencyChipButton extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final baseBackground = selected
-        ? cs.primary.withOpacity(isDark ? 0.22 : 0.12)
+        ? cs.primary.withValues(alpha: isDark ? 0.22 : 0.12)
         : (isDark ? Colors.white10 : const Color(0xFFF2F3F5));
     final borderColor = selected
-        ? cs.primary.withOpacity(0.38)
+        ? cs.primary.withValues(alpha: 0.38)
         : (emphasized
-              ? cs.primary.withOpacity(isDark ? 0.24 : 0.18)
-              : cs.outlineVariant.withOpacity(isDark ? 0.18 : 0.14));
+              ? cs.primary.withValues(alpha: isDark ? 0.24 : 0.18)
+              : cs.outlineVariant.withValues(alpha: isDark ? 0.18 : 0.14));
     final foregroundColor = selected || emphasized
         ? cs.primary
-        : cs.onSurface.withOpacity(0.8);
+        : cs.onSurface.withValues(alpha: 0.8);
 
     return MouseRegion(
       cursor: onTap == null
