@@ -305,7 +305,7 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w400,
-                              color: cs.onSurface.withOpacity(0.9),
+                              color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
                         ),
@@ -342,13 +342,13 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
                           Icon(
                             lucide.Lucide.BookOpen,
                             size: 56,
-                            color: cs.onSurface.withOpacity(0.28),
+                            color: cs.onSurface.withValues(alpha: 0.28),
                           ),
                           const SizedBox(height: 12),
                           Text(
                             l10n.worldBookEmptyMessage,
                             style: TextStyle(
-                              color: cs.onSurface.withOpacity(0.65),
+                              color: cs.onSurface.withValues(alpha: 0.65),
                               fontSize: 14,
                             ),
                           ),
@@ -465,10 +465,12 @@ class _WorldBookCardState extends State<_WorldBookCard> {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    final baseBg = isDark
+        ? Colors.white10
+        : Colors.white.withValues(alpha: 0.96);
     final borderColor = _hover
-        ? cs.primary.withOpacity(isDark ? 0.35 : 0.45)
-        : cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08);
+        ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
 
     final title = widget.book.name.trim().isEmpty
         ? l10n.worldBookUnnamed
@@ -506,7 +508,7 @@ class _WorldBookCardState extends State<_WorldBookCard> {
                         child: Icon(
                           lucide.Lucide.ChevronRight,
                           size: 16,
-                          color: cs.onSurface.withOpacity(0.62),
+                          color: cs.onSurface.withValues(alpha: 0.62),
                         ),
                       ),
                     ),
@@ -550,7 +552,7 @@ class _WorldBookCardState extends State<_WorldBookCard> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
-                            color: cs.onSurface.withOpacity(0.72),
+                            color: cs.onSurface.withValues(alpha: 0.72),
                           ),
                         ),
                       ],
@@ -624,9 +626,11 @@ class _EntriesPanel extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.16 : 0.12);
+    final borderColor = cs.outlineVariant.withValues(
+      alpha: isDark ? 0.16 : 0.12,
+    );
     final bg = isDark
-        ? Colors.white.withOpacity(0.04)
+        ? Colors.white.withValues(alpha: 0.04)
         : const Color(0xFFF8F8FA);
 
     if (entries.isEmpty) {
@@ -642,12 +646,12 @@ class _EntriesPanel extends StatelessWidget {
             Icon(
               lucide.Lucide.ListTree,
               size: 18,
-              color: cs.onSurface.withOpacity(0.55),
+              color: cs.onSurface.withValues(alpha: 0.55),
             ),
             const SizedBox(width: 10),
             Text(
               l10n.worldBookNoEntriesHint,
-              style: TextStyle(color: cs.onSurface.withOpacity(0.65)),
+              style: TextStyle(color: cs.onSurface.withValues(alpha: 0.65)),
             ),
           ],
         ),
@@ -694,8 +698,8 @@ class _EntryRowState extends State<_EntryRow> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(
-      isDark ? 0.08 : 0.04,
+    final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
+      alpha: isDark ? 0.08 : 0.04,
     );
 
     final title = widget.entry.name.trim().isEmpty
@@ -725,7 +729,7 @@ class _EntryRowState extends State<_EntryRow> {
                   size: 18,
                   color: widget.entry.enabled
                       ? cs.primary
-                      : cs.onSurface.withOpacity(0.35),
+                      : cs.onSurface.withValues(alpha: 0.35),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -741,7 +745,7 @@ class _EntryRowState extends State<_EntryRow> {
                             fontWeight: FontWeight.w600,
                             color: widget.entry.enabled
                                 ? cs.onSurface
-                                : cs.onSurface.withOpacity(0.55),
+                                : cs.onSurface.withValues(alpha: 0.55),
                           ),
                         ),
                       ),
@@ -792,8 +796,8 @@ class _TagPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = subtle
-        ? color.withOpacity(isDark ? 0.18 : 0.12)
-        : color.withOpacity(isDark ? 0.20 : 0.14);
+        ? color.withValues(alpha: isDark ? 0.18 : 0.12)
+        : color.withValues(alpha: isDark ? 0.20 : 0.14);
     final fg = subtle ? color : color;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -903,7 +907,7 @@ class _WorldBookEditDialogState extends State<_WorldBookEditDialog> {
                         child: Text(
                           l10n.worldBookEnabledLabel,
                           style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.8),
+                            color: cs.onSurface.withValues(alpha: 0.8),
                             fontSize: 13.5,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1066,12 +1070,12 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
     return TextStyle(
       fontSize: 13,
       fontWeight: FontWeight.w600,
-      color: cs.onSurface.withOpacity(0.82),
+      color: cs.onSurface.withValues(alpha: 0.82),
     );
   }
 
   TextStyle _hintStyle(ColorScheme cs) {
-    return TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.6));
+    return TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.6));
   }
 
   Widget _section({
@@ -1080,9 +1084,9 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
     required Widget child,
   }) {
     final bg = isDark
-        ? Colors.white.withOpacity(0.05)
-        : Colors.black.withOpacity(0.03);
-    final border = cs.outlineVariant.withOpacity(0.12);
+        ? Colors.white.withValues(alpha: 0.05)
+        : Colors.black.withValues(alpha: 0.03);
+    final border = cs.outlineVariant.withValues(alpha: 0.12);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1547,8 +1551,8 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     final btn = MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1599,17 +1603,17 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = widget.filled
         ? cs.onPrimary
-        : cs.onSurface.withOpacity(0.9);
+        : cs.onSurface.withValues(alpha: 0.9);
     final bg = widget.filled
-        ? (_hover ? cs.primary.withOpacity(0.92) : cs.primary)
+        ? (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary)
         : (_hover
               ? (isDark
-                    ? Colors.white.withOpacity(0.06)
-                    : Colors.black.withOpacity(0.05))
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.05))
               : Colors.transparent);
     final borderColor = widget.filled
         ? Colors.transparent
-        : cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18);
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.22 : 0.18);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -1660,20 +1664,23 @@ InputDecoration _deskInputDecoration(BuildContext context) {
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.2),
+        color: cs.outlineVariant.withValues(alpha: 0.2),
         width: 0.8,
       ),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.2),
+        color: cs.outlineVariant.withValues(alpha: 0.2),
         width: 0.8,
       ),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: cs.primary.withOpacity(0.45), width: 1.0),
+      borderSide: BorderSide(
+        color: cs.primary.withValues(alpha: 0.45),
+        width: 1.0,
+      ),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
   );
