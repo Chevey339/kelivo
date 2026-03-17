@@ -12,8 +12,6 @@ import 'dart:io';
 import 'package:open_filex/open_filex.dart';
 // import 'package:easy_image_viewer/easy_image_viewer.dart';
 import 'dart:convert';
-import 'dart:typed_data';
-import 'package:characters/characters.dart';
 import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
 import '../../../core/models/chat_message.dart';
@@ -146,7 +144,7 @@ class ChatMessageWidget extends StatefulWidget {
 
 class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   // Match vendor inline thinking blocks: <think>...</think> (or until end)
-  static final RegExp THINKING_REGEX = RegExp(
+  static final RegExp _thinkingRegex = RegExp(
     r"<think>([\s\S]*?)(?:</think>|$)",
     dotAll: true,
   );
@@ -156,14 +154,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   // Local expand state for inline <think> card (defaults to expanded)
   bool? _inlineThinkExpanded;
   bool _inlineThinkManuallyToggled = false;
-  bool _inlineThinkWasLoading = false;
   // User message context menu state
   final GlobalKey _userBubbleKey = GlobalKey();
   OverlayEntry? _userMenuOverlay;
-  bool _userMenuActive = false; // for bubble highlight/scale
   // Desktop anchored menus for bottom action buttons
   final GlobalKey _moreBtnKey1 = GlobalKey();
-  final GlobalKey _translateBtnKey1 = GlobalKey();
   final GlobalKey _moreBtnKey2 = GlobalKey();
   final GlobalKey _translateBtnKey2 = GlobalKey();
   // ValueNotifier for reasoning animation tick - avoids full widget rebuild
@@ -183,7 +178,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     // post-frame size changes that can cause list scroll jitter/snapping.
     try {
       // Check whether this message is using inline <think> content
-      final extracted = THINKING_REGEX
+      final extracted = _thinkingRegex
           .allMatches(widget.message.content)
           .map((m) => (m.group(1) ?? '').trim())
           .where((s) => s.isNotEmpty)
@@ -195,9 +190,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           usingInlineThink &&
           widget.message.isStreaming &&
           !widget.message.content.contains('</think>');
-
-      // Persist last loading state for later checks
-      _inlineThinkWasLoading = loading;
 
       if (usingInlineThink && _inlineThinkExpanded == null) {
         final autoCollapse = context
@@ -226,7 +218,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   void _applyAutoCollapseInlineThinkIfFinished({ChatMessageWidget? oldWidget}) {
     if (!mounted) return;
     // Determine if using inline <think>
-    final newExtracted = THINKING_REGEX
+    final newExtracted = _thinkingRegex
         .allMatches(widget.message.content)
         .map((m) => (m.group(1) ?? '').trim())
         .where((s) => s.isNotEmpty)
@@ -241,7 +233,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
     bool loadingOld = false;
     if (oldWidget != null) {
-      final oldExtracted = THINKING_REGEX
+      final oldExtracted = _thinkingRegex
           .allMatches(oldWidget.message.content)
           .map((m) => (m.group(1) ?? '').trim())
           .where((s) => s.isNotEmpty)
@@ -255,9 +247,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           oldWidget.message.isStreaming &&
           !oldWidget.message.content.contains('</think>');
     }
-
-    // Persist last loading to assist other checks
-    _inlineThinkWasLoading = loadingNew;
 
     final autoCollapse = context.read<SettingsProvider>().autoCollapseThinking;
 
@@ -388,14 +377,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     super.dispose();
   }
 
-  void _removeUserMenuOverlay() {
-    try {
-      _userMenuOverlay?.remove();
-    } catch (_) {}
-    _userMenuOverlay = null;
-    if (mounted && _userMenuActive) setState(() => _userMenuActive = false);
-  }
-
   void _showUserContextMenu() {
     // Haptic feedback (optional)
     try {
@@ -404,8 +385,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
     final box = _userBubbleKey.currentContext?.findRenderObject() as RenderBox?;
     final overlay = Overlay.of(context);
-    final overlayBox = overlay?.context.findRenderObject() as RenderBox?;
-    if (box == null || overlayBox == null || overlay == null) return;
+    final overlayBox = overlay.context.findRenderObject() as RenderBox?;
+    if (box == null || overlayBox == null) return;
 
     final bubbleTopLeft = box.localToGlobal(Offset.zero, ancestor: overlayBox);
     final bubbleSize = box.size;
@@ -457,7 +438,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     if (y < minY) y = minY;
     if (y > maxY) y = maxY;
 
-    if (mounted) setState(() => _userMenuActive = true);
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
@@ -466,7 +446,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'context-menu',
-      barrierColor: Colors.black.withOpacity(0.08),
+      barrierColor: Colors.black.withValues(alpha: 0.08),
       pageBuilder: (ctx, _, __) {
         return Stack(
           children: [
@@ -483,8 +463,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       borderRadius: BorderRadius.circular(16),
                       side: BorderSide(
                         color: isDark
-                            ? Colors.white.withOpacity(0.08)
-                            : cs.outlineVariant.withOpacity(0.2),
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : cs.outlineVariant.withValues(alpha: 0.2),
                         width: 1,
                       ),
                     ),
@@ -496,8 +476,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: isDark
-                              ? const Color(0xFF1C1C1E).withOpacity(0.66)
-                              : Colors.white.withOpacity(0.66),
+                              ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
+                              : Colors.white.withValues(alpha: 0.66),
                         ),
                         child: Material(
                           color: Colors.transparent,
@@ -558,7 +538,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         );
       },
     ).whenComplete(() {
-      if (mounted) setState(() => _userMenuActive = false);
+      if (mounted) {
+        setState(() {});
+      }
     });
   }
 
@@ -626,7 +608,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       width: 32,
       height: 32,
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.1),
+        color: cs.primary.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
       child: avatarContent,
@@ -694,7 +676,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
-                        color: cs.onSurface.withOpacity(0.7),
+                        color: cs.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -702,7 +684,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       _dateFormat.format(widget.message.timestamp),
                       style: TextStyle(
                         fontSize: 11,
-                        color: cs.onSurface.withOpacity(0.5),
+                        color: cs.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
                   ],
@@ -878,19 +860,20 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             color: Colors.transparent,
                             child: InkWell(
                               borderRadius: BorderRadius.circular(10),
-                              overlayColor: MaterialStateProperty.resolveWith(
-                                (states) => cs.primary.withOpacity(
-                                  states.contains(MaterialState.pressed)
+                              overlayColor: WidgetStateProperty.resolveWith(
+                                (states) => cs.primary.withValues(
+                                  alpha: states.contains(WidgetState.pressed)
                                       ? 0.14
                                       : 0.08,
                                 ),
                               ),
-                              splashColor: cs.primary.withOpacity(0.18),
+                              splashColor: cs.primary.withValues(alpha: 0.18),
                               onTap: () async {
                                 try {
                                   final fixed = SandboxPathResolver.fix(d.path);
                                   final f = File(fixed);
                                   if (!(await f.exists())) {
+                                    if (!mounted) return;
                                     showAppSnackBar(
                                       context,
                                       message: l10n
@@ -906,16 +889,21 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                     type: d.mime,
                                   );
                                   if (res.type != ResultType.done) {
+                                    if (!mounted) return;
+                                    final openMessage = res.message;
                                     showAppSnackBar(
                                       context,
                                       message: l10n
                                           .chatMessageWidgetCannotOpenFile(
-                                            res.message ?? res.type.toString(),
+                                            openMessage.isNotEmpty
+                                                ? openMessage
+                                                : res.type.toString(),
                                           ),
                                       type: NotificationType.error,
                                     );
                                   }
                                 } catch (e) {
+                                  if (!mounted) return;
                                   showAppSnackBar(
                                     context,
                                     message: l10n
@@ -987,7 +975,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             size: 16,
                             padding: EdgeInsets.all(4),
                             icon: Lucide.Copy,
-                            color: cs.onSurface.withOpacity(0.9),
+                            color: cs.onSurface.withValues(alpha: 0.9),
                             onTap:
                                 widget.onCopy ??
                                 () {
@@ -1013,7 +1001,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             size: 16,
                             padding: EdgeInsets.all(4),
                             icon: Lucide.RefreshCw,
-                            color: cs.onSurface.withOpacity(0.9),
+                            color: cs.onSurface.withValues(alpha: 0.9),
                             onTap: widget.onResend == null
                                 ? null
                                 : () async {
@@ -1062,7 +1050,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               size: 16,
                               padding: EdgeInsets.all(4),
                               icon: Lucide.Pencil,
-                              color: cs.onSurface.withOpacity(0.9),
+                              color: cs.onSurface.withValues(alpha: 0.9),
                               onTap: widget.onEdit,
                             ),
                           ),
@@ -1106,7 +1094,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               size: 16,
                               padding: EdgeInsets.all(4),
                               icon: Lucide.Ellipsis,
-                              color: cs.onSurface.withOpacity(0.9),
+                              color: cs.onSurface.withValues(alpha: 0.9),
                               onTap: null,
                             ),
                           ),
@@ -1206,11 +1194,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: isDark
-                    ? const Color(0xFF1C1C1E).withOpacity(0.66)
-                    : Colors.white.withOpacity(0.66),
+                    ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
+                    : Colors.white.withValues(alpha: 0.66),
                 borderRadius: radius,
                 border: Border.all(
-                  color: cs.outlineVariant.withOpacity(0.14),
+                  color: cs.outlineVariant.withValues(alpha: 0.14),
                   width: 0.8,
                 ),
               ),
@@ -1224,7 +1212,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
             borderRadius: radius,
             border: Border.all(
-              color: cs.outlineVariant.withOpacity(0.16),
+              color: cs.outlineVariant.withValues(alpha: 0.16),
               width: 0.8,
             ),
           ),
@@ -1232,15 +1220,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           child: child,
         );
       case ChatMessageBackgroundStyle.defaultStyle:
-      default:
         // Default: keep original visual — user has a tinted bubble; assistant is bare
         if (isUser) {
           return Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: isDark
-                  ? cs.primary.withOpacity(0.15)
-                  : cs.primary.withOpacity(0.08),
+                  ? cs.primary.withValues(alpha: 0.15)
+                  : cs.primary.withValues(alpha: 0.08),
               borderRadius: radius,
             ),
             child: child,
@@ -1295,14 +1282,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final assistant = _assistantForMessage();
 
     // Extract vendor inline <think>...</think> content (if present)
-    final extractedThinking = THINKING_REGEX
+    final extractedThinking = _thinkingRegex
         .allMatches(widget.message.content)
         .map((m) => (m.group(1) ?? '').trim())
         .where((s) => s.isNotEmpty)
         .join('\n\n');
     // Remove all <think> blocks from the visible assistant content
     final contentWithoutThink = extractedThinking.isNotEmpty
-        ? widget.message.content.replaceAll(THINKING_REGEX, '').trim()
+        ? widget.message.content.replaceAll(_thinkingRegex, '').trim()
         : widget.message.content;
     final visualContent = applyAssistantRegexes(
       contentWithoutThink,
@@ -1341,7 +1328,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: cs.secondary.withOpacity(0.1),
+                        color: cs.secondary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(Lucide.Bot, size: 18, color: cs.secondary),
@@ -1363,7 +1350,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: cs.onSurface.withOpacity(0.7),
+                          color: cs.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
                     Builder(
@@ -1375,21 +1362,22 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               _dateFormat.format(widget.message.timestamp),
                               style: TextStyle(
                                 fontSize: 11,
-                                color: cs.onSurface.withOpacity(0.5),
+                                color: cs.onSurface.withValues(alpha: 0.5),
                               ),
                             ),
                           );
                         }
                         if (widget.showTokenStats &&
                             widget.message.totalTokens != null) {
-                          if (rowChildren.isNotEmpty)
+                          if (rowChildren.isNotEmpty) {
                             rowChildren.add(const SizedBox(width: 8));
+                          }
                           rowChildren.add(
                             Text(
                               '${widget.message.totalTokens} tokens',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: cs.onSurface.withOpacity(0.5),
+                                color: cs.onSurface.withValues(alpha: 0.5),
                               ),
                             ),
                           );
@@ -1539,7 +1527,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             ],
           ],
           // Message content with markdown support (fill available width)
-          Container(
+          SizedBox(
             width: double.infinity,
             child: _buildAssistantBubbleContainer(
               context: context,
@@ -1622,8 +1610,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               color: Theme.of(context)
                                   .colorScheme
                                   .primaryContainer
-                                  .withOpacity(
-                                    Theme.of(context).brightness ==
+                                  .withValues(
+                                    alpha:
+                                        Theme.of(context).brightness ==
                                             Brightness.dark
                                         ? 0.25
                                         : 0.30,
@@ -1704,7 +1693,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                                         ? 14.0
                                                         : 15.5,
                                                     color: cs.onSurface
-                                                        .withOpacity(0.5),
+                                                        .withValues(alpha: 0.5),
                                                     fontStyle: FontStyle.italic,
                                                   ),
                                                 );
@@ -1743,7 +1732,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                                     .enableAssistantMarkdown) {
                                                   translationContent =
                                                       MarkdownWithCodeHighlight(
-                                                        text: translationText!,
+                                                        text: translationText,
                                                         onCitationTap: (id) =>
                                                             _handleCitationTap(
                                                               id,
@@ -1756,7 +1745,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                                       );
                                                 } else {
                                                   translationContent = Text(
-                                                    translationText!,
+                                                    translationText,
                                                     style: TextStyle(
                                                       fontSize: baseTranslation,
                                                       height: 1.4,
@@ -1819,7 +1808,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               size: 16,
                               padding: EdgeInsets.all(4),
                               icon: Lucide.Copy,
-                              color: cs.onSurface.withOpacity(0.9),
+                              color: cs.onSurface.withValues(alpha: 0.9),
                               onTap:
                                   widget.onCopy ??
                                   () {
@@ -1847,7 +1836,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               size: 16,
                               padding: EdgeInsets.all(4),
                               icon: Lucide.RefreshCw,
-                              color: cs.onSurface.withOpacity(0.9),
+                              color: cs.onSurface.withValues(alpha: 0.9),
                               onTap: widget.onRegenerate == null
                                   ? null
                                   : () async {
@@ -1896,7 +1885,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                 size: 16,
                                 padding: EdgeInsets.all(4),
                                 onTap: widget.onSpeak,
-                                color: cs.onSurface.withOpacity(0.9),
+                                color: cs.onSurface.withValues(alpha: 0.9),
                                 builder: (color) => AnimatedSwitcher(
                                   duration: const Duration(milliseconds: 200),
                                   transitionBuilder: (child, anim) =>
@@ -1962,7 +1951,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                 size: 16,
                                 padding: EdgeInsets.all(4),
                                 icon: Lucide.Languages,
-                                color: cs.onSurface.withOpacity(0.9),
+                                color: cs.onSurface.withValues(alpha: 0.9),
                                 onTap: null,
                               ),
                             ),
@@ -2008,7 +1997,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                 size: 16,
                                 padding: EdgeInsets.all(4),
                                 icon: Lucide.Ellipsis,
-                                color: cs.onSurface.withOpacity(0.9),
+                                color: cs.onSurface.withValues(alpha: 0.9),
                                 onTap: null,
                               ),
                             ),
@@ -2056,7 +2045,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         Uri.parse(url),
         mode: LaunchMode.externalApplication,
       );
-      if (!ok && context.mounted) {
+      if (!ok) {
+        if (!mounted) return;
         showAppSnackBar(
           context,
           message: l10n.chatMessageWidgetCannotOpenUrl(url),
@@ -2064,13 +2054,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         );
       }
     } catch (_) {
-      if (context.mounted) {
-        showAppSnackBar(
-          context,
-          message: l10n.chatMessageWidgetOpenLinkError,
-          type: NotificationType.error,
-        );
-      }
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.chatMessageWidgetOpenLinkError,
+        type: NotificationType.error,
+      );
     }
   }
 
@@ -2155,7 +2144,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                 icon: Icon(
                                   Lucide.X,
                                   size: 18,
-                                  color: cs.onSurface.withOpacity(0.75),
+                                  color: cs.onSurface.withValues(alpha: 0.75),
                                 ),
                                 onPressed: () => Navigator.of(ctx).maybePop(),
                               ),
@@ -2181,8 +2170,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                       title: (items[i]['title'] ?? '')
                                           .toString(),
                                       url: (items[i]['url'] ?? '').toString(),
-                                      text: (items[i]['text'] ?? '')
-                                          .toString(),
+                                      text: (items[i]['text'] ?? '').toString(),
                                     ),
                                 ],
                               ),
@@ -2312,7 +2300,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         width: 32,
         height: 32,
         decoration: BoxDecoration(
-          color: cs.primary.withOpacity(0.1),
+          color: cs.primary.withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
@@ -2334,7 +2322,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       width: 32,
       height: 32,
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.1),
+        color: cs.primary.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
@@ -2401,9 +2389,10 @@ class _MenuItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final fg = danger ? Colors.red.shade600 : cs.onSurface;
-    final ic = danger ? Colors.red.shade600 : cs.onSurface.withOpacity(0.9);
+    final ic = danger
+        ? Colors.red.shade600
+        : cs.onSurface.withValues(alpha: 0.9);
     // iOS-style press effect: no ripple. Use transparent base and a subtle
     // pressed blend inside the blurred/glass menu container.
     return IosCardPress(
@@ -2483,7 +2472,7 @@ class _BranchSelector extends StatelessWidget {
                 '${index + 1}/$total',
                 style: TextStyle(
                   fontSize: 12,
-                  color: cs.onSurface.withOpacity(0.8),
+                  color: cs.onSurface.withValues(alpha: 0.8),
                   fontWeight: FontWeight.w500,
                 ),
                 maxLines: 1,
@@ -2566,7 +2555,7 @@ class _LoadingIndicatorState extends State<LoadingIndicator>
                     height: 9,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: base.withOpacity(opacity),
+                      color: base.withValues(alpha: opacity),
                     ),
                   ),
                 ),
@@ -2667,7 +2656,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
       child: Icon(
         Lucide.ImageOff,
         size: 24,
-        color: cs.onSurface.withOpacity(0.5),
+        color: cs.onSurface.withValues(alpha: 0.5),
       ),
     );
 
@@ -2751,7 +2740,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = cs.primaryContainer.withOpacity(isDark ? 0.25 : 0.30);
+    final bg = cs.primaryContainer.withValues(alpha: isDark ? 0.25 : 0.30);
     final hasImages = _imagePaths.isNotEmpty;
 
     return IosCardPress(
@@ -2924,7 +2913,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                 icon: Icon(
                                   Lucide.X,
                                   size: 18,
-                                  color: cs.onSurface.withOpacity(0.75),
+                                  color: cs.onSurface.withValues(alpha: 0.75),
                                 ),
                                 onPressed: () => Navigator.of(ctx).maybePop(),
                               ),
@@ -2945,7 +2934,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   l10n.chatMessageWidgetArguments,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: cs.onSurface.withOpacity(0.6),
+                                    color: cs.onSurface.withValues(alpha: 0.6),
                                   ),
                                 ),
                                 const SizedBox(height: 6),
@@ -2960,7 +2949,9 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                         : const Color(0xFFF7F7F9),
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
-                                      color: cs.outlineVariant.withOpacity(0.2),
+                                      color: cs.outlineVariant.withValues(
+                                        alpha: 0.2,
+                                      ),
                                     ),
                                   ),
                                   child: SelectableText(
@@ -2973,30 +2964,31 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   l10n.chatMessageWidgetResult,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: cs.onSurface.withOpacity(0.6),
+                                    color: cs.onSurface.withValues(alpha: 0.6),
                                   ),
                                 ),
                                 const SizedBox(height: 6),
                                 Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          Theme.of(context).brightness ==
-                                                  Brightness.dark
-                                              ? Colors.white10
-                                              : const Color(0xFFF7F7F9),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color:
-                                            cs.outlineVariant.withOpacity(0.2),
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white10
+                                        : const Color(0xFFF7F7F9),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: cs.outlineVariant.withValues(
+                                        alpha: 0.2,
                                       ),
                                     ),
-                                    child: SelectableText(
-                                      resultText,
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
                                   ),
+                                  child: SelectableText(
+                                    resultText,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
                                 // Show images if available
                                 if (images.isNotEmpty) ...[
                                   const SizedBox(height: 12),
@@ -3004,7 +2996,9 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                     l10n.chatMessageWidgetImages,
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: cs.onSurface.withOpacity(0.6),
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.6,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 6),
@@ -3092,7 +3086,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       l10n.chatMessageWidgetArguments,
                       style: TextStyle(
                         fontSize: 12,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -3105,7 +3099,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                             : const Color(0xFFF7F7F9),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: cs.outlineVariant.withOpacity(0.2),
+                          color: cs.outlineVariant.withValues(alpha: 0.2),
                         ),
                       ),
                       child: SelectableText(
@@ -3118,28 +3112,27 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       l10n.chatMessageWidgetResult,
                       style: TextStyle(
                         fontSize: 12,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                     const SizedBox(height: 6),
                     Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color:
-                              Theme.of(context).brightness == Brightness.dark
-                                  ? Colors.white10
-                                  : const Color(0xFFF7F7F9),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: cs.outlineVariant.withOpacity(0.2),
-                          ),
-                        ),
-                        child: SelectableText(
-                          resultText,
-                          style: const TextStyle(fontSize: 12),
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white10
+                            : const Color(0xFFF7F7F9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.2),
                         ),
                       ),
+                      child: SelectableText(
+                        resultText,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
                     // Show images if available
                     if (images.isNotEmpty) ...[
                       const SizedBox(height: 12),
@@ -3147,7 +3140,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                         l10n.chatMessageWidgetImages,
                         style: TextStyle(
                           fontSize: 12,
-                          color: cs.onSurface.withOpacity(0.6),
+                          color: cs.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -3247,8 +3240,8 @@ class _SearchResultCard extends StatelessWidget {
       child: IosCardPress(
         borderRadius: BorderRadius.circular(12),
         baseColor: isDark
-            ? cs.surfaceContainerHighest.withOpacity(0.5)
-            : cs.surfaceContainerHighest.withOpacity(0.45),
+            ? cs.surfaceContainerHighest.withValues(alpha: 0.5)
+            : cs.surfaceContainerHighest.withValues(alpha: 0.45),
         pressedScale: 1.0,
         duration: const Duration(milliseconds: 200),
         onTap: () async {
@@ -3288,13 +3281,13 @@ class _SearchResultCard extends StatelessWidget {
                                 errorBuilder: (_, __, ___) => Icon(
                                   Lucide.Globe,
                                   size: 18,
-                                  color: cs.onSurface.withOpacity(0.5),
+                                  color: cs.onSurface.withValues(alpha: 0.5),
                                 ),
                               )
                             : Icon(
                                 Lucide.Globe,
                                 size: 18,
-                                color: cs.onSurface.withOpacity(0.5),
+                                color: cs.onSurface.withValues(alpha: 0.5),
                               ),
                       ),
                     ),
@@ -3348,7 +3341,7 @@ class _SearchResultCard extends StatelessWidget {
                       text,
                       style: TextStyle(
                         fontSize: 12,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -3360,7 +3353,7 @@ class _SearchResultCard extends StatelessWidget {
                     url,
                     style: TextStyle(
                       fontSize: 11,
-                      color: cs.onSurface.withOpacity(0.4),
+                      color: cs.onSurface.withValues(alpha: 0.4),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -3387,8 +3380,8 @@ class _SourcesSummaryCard extends StatelessWidget {
     final label = l10n.chatMessageWidgetCitationsCount(count);
     return IosCardPress(
       borderRadius: BorderRadius.circular(12),
-      baseColor: cs.primaryContainer.withOpacity(
-        Theme.of(context).brightness == Brightness.dark ? 0.25 : 0.30,
+      baseColor: cs.primaryContainer.withValues(
+        alpha: Theme.of(context).brightness == Brightness.dark ? 0.25 : 0.30,
       ),
       pressedScale: 1.0,
       duration: const Duration(milliseconds: 260),
@@ -3500,24 +3493,6 @@ class _ReasoningSectionState extends State<_ReasoningSection>
     if (over != _hasOverflow && mounted) setState(() => _hasOverflow = over);
   }
 
-  String _sanitizedeepthink(String s) {
-    // 统一换行
-    s = s.replaceAll('\r\n', '\n');
-
-    // 去掉首尾零宽字符（模型有时会插入）
-    s = s
-        .replaceAll(RegExp(r'^[\u200B\u200C\u200D\uFEFF]+'), '')
-        .replaceAll(RegExp(r'[\u200B\u200C\u200D\uFEFF]+$'), '');
-
-    // 去掉**开头**的纯空白行
-    s = s.replaceFirst(RegExp(r'^\s*\n+'), '');
-
-    // 去掉**结尾**的纯空白行
-    s = s.replaceFirst(RegExp(r'\n+\s*$'), '');
-
-    return s;
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -3527,8 +3502,7 @@ class _ReasoningSectionState extends State<_ReasoningSection>
     final loading = widget.loading;
 
     // Android-like surface style
-    final bg = cs.primaryContainer.withOpacity(isDark ? 0.25 : 0.30);
-    final fg = cs.onPrimaryContainer;
+    final bg = cs.primaryContainer.withValues(alpha: isDark ? 0.25 : 0.30);
 
     final curve = const Cubic(0.2, 0.8, 0.2, 1);
 
@@ -3572,7 +3546,7 @@ class _ReasoningSectionState extends State<_ReasoningSection>
                     _elapsed(),
                     style: TextStyle(
                       fontSize: 13,
-                      color: cs.secondary.withOpacity(0.9),
+                      color: cs.secondary.withValues(alpha: 0.9),
                     ),
                   ),
                 ),
@@ -3612,7 +3586,7 @@ class _ReasoningSectionState extends State<_ReasoningSection>
     final display = _sanitize(widget.text);
 
     // 未加载：不要再指定 color: fg，让它继承和"加载中"相同的颜色
-    Widget _reasoningContent(String text) {
+    Widget reasoningContent(String text) {
       if (settings.enableReasoningMarkdown) {
         return RepaintBoundary(
           child: MarkdownWithCodeHighlight(
@@ -3631,7 +3605,7 @@ class _ReasoningSectionState extends State<_ReasoningSection>
 
     Widget body = Padding(
       padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
-      child: _reasoningContent(display),
+      child: reasoningContent(display),
     );
 
     if (isLoading && !widget.expanded) {
@@ -3670,14 +3644,14 @@ class _ReasoningSectionState extends State<_ReasoningSection>
                     child: SingleChildScrollView(
                       controller: _scroll,
                       physics: const BouncingScrollPhysics(),
-                      child: _reasoningContent(display),
+                      child: reasoningContent(display),
                     ),
                   ),
                 )
               : SingleChildScrollView(
                   controller: _scroll,
                   physics: const NeverScrollableScrollPhysics(),
-                  child: _reasoningContent(display),
+                  child: reasoningContent(display),
                 ),
         ),
       );
@@ -3764,9 +3738,9 @@ class _ShimmerState extends State<_Shimmer> with TickerProviderStateMixin {
             );
             return LinearGradient(
               colors: [
-                Colors.white.withOpacity(0.0),
-                Colors.white.withOpacity(0.35),
-                Colors.white.withOpacity(0.0),
+                Colors.white.withValues(alpha: 0.0),
+                Colors.white.withValues(alpha: 0.35),
+                Colors.white.withValues(alpha: 0.0),
               ],
               stops: const [0.0, 0.5, 1.0],
               begin: Alignment.centerLeft,
@@ -3778,116 +3752,6 @@ class _ShimmerState extends State<_Shimmer> with TickerProviderStateMixin {
         );
       },
       child: widget.child,
-    );
-  }
-}
-
-// Simple marquee that bounces horizontally if text exceeds maxWidth
-class _Marquee extends StatefulWidget {
-  final String text;
-  final TextStyle style;
-  final double maxWidth;
-  final Duration duration;
-  const _Marquee({
-    required this.text,
-    required this.style,
-    this.maxWidth = 160,
-    this.duration = const Duration(milliseconds: 3000),
-  });
-
-  @override
-  State<_Marquee> createState() => _MarqueeState();
-}
-
-class _MarqueeState extends State<_Marquee>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: widget.duration,
-  )..repeat();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  double _measure(String text, TextStyle style) {
-    final tp = TextPainter(
-      text: TextSpan(text: text, style: style),
-      maxLines: 1,
-      textDirection: ui.TextDirection.ltr,
-      textScaleFactor: MediaQuery.textScaleFactorOf(context),
-    )..layout();
-    return tp.width;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final w = widget.maxWidth;
-    final textWidth = _measure(widget.text, widget.style);
-    final needScroll = textWidth > w;
-    final gap = 32.0;
-    final loopWidth = textWidth + gap;
-    return SizedBox(
-      width: w,
-      height: (widget.style.fontSize ?? 13) * 1.35,
-      child: ClipRect(
-        child: needScroll
-            ? AnimatedBuilder(
-                animation: _c,
-                builder: (context, _) {
-                  final t = Curves.linear.transform(_c.value);
-                  final dx = -loopWidth * t;
-                  return ShaderMask(
-                    shaderCallback: (rect) {
-                      return const LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [
-                          Color(0x00FFFFFF),
-                          Color(0xFFFFFFFF),
-                          Color(0xFFFFFFFF),
-                          Color(0x00FFFFFF),
-                        ],
-                        stops: [0.0, 0.07, 0.93, 1.0],
-                      ).createShader(rect);
-                    },
-                    blendMode: BlendMode.dstIn,
-                    child: Transform.translate(
-                      offset: Offset(dx, 0),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            widget.text,
-                            style: widget.style,
-                            maxLines: 1,
-                            softWrap: false,
-                          ),
-                          SizedBox(width: gap),
-                          Text(
-                            widget.text,
-                            style: widget.style,
-                            maxLines: 1,
-                            softWrap: false,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              )
-            : Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  widget.text,
-                  style: widget.style,
-                  maxLines: 1,
-                  softWrap: false,
-                ),
-              ),
-      ),
     );
   }
 }
