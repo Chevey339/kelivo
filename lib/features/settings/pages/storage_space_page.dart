@@ -83,7 +83,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
       case StorageUsageCategoryKey.logs:
         return const Color(0xFFEAB308); // yellow
       case StorageUsageCategoryKey.other:
-        return cs.onSurface.withOpacity(0.22);
+        return cs.onSurface.withValues(alpha: 0.22);
     }
   }
 
@@ -352,7 +352,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         ? Center(
             child: Text(
               l10n.storageSpaceLoadFailed,
-              style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+              style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
             ),
           )
         : isDesktop
@@ -457,7 +457,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                     '${l10n.storageSpaceTotalLabel}: ${_fmtBytes(total)}',
                     style: TextStyle(
                       fontSize: 12.5,
-                      color: cs.onSurface.withOpacity(0.7),
+                      color: cs.onSurface.withValues(alpha: 0.7),
                       decoration: TextDecoration.none,
                     ),
                   ),
@@ -467,7 +467,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                       l10n.storageSpaceClearableLabel(_fmtBytes(clearable)),
                       style: TextStyle(
                         fontSize: 12.5,
-                        color: cs.onSurface.withOpacity(0.7),
+                        color: cs.onSurface.withValues(alpha: 0.7),
                         decoration: TextDecoration.none,
                       ),
                     ),
@@ -491,7 +491,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                     ),
                     VerticalDivider(
                       width: 24,
-                      color: cs.onSurface.withOpacity(0.08),
+                      color: cs.onSurface.withValues(alpha: 0.08),
                     ),
                     Expanded(
                       child: _CategoryDetail(
@@ -584,7 +584,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                     ),
                     style: TextStyle(
                       fontSize: 12.5,
-                      color: cs.onSurface.withOpacity(0.65),
+                      color: cs.onSurface.withValues(alpha: 0.65),
                     ),
                   ),
                 ],
@@ -891,7 +891,10 @@ class _UsageBar extends StatelessWidget {
     if (items.isEmpty || totalBytes <= 0) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(10),
-        child: Container(height: 12, color: cs.onSurface.withOpacity(0.08)),
+        child: Container(
+          height: 12,
+          color: cs.onSurface.withValues(alpha: 0.08),
+        ),
       );
     }
 
@@ -953,7 +956,7 @@ class _UsageLegend extends StatelessWidget {
                 titleFor(c.key),
                 style: TextStyle(
                   fontSize: 12.5,
-                  color: cs.onSurface.withOpacity(0.75),
+                  color: cs.onSurface.withValues(alpha: 0.75),
                 ),
               ),
             ],
@@ -983,7 +986,7 @@ class _CategoryMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final border = cs.onSurface.withOpacity(0.08);
+    final border = cs.onSurface.withValues(alpha: 0.08);
 
     return ListView(
       children: [
@@ -1002,8 +1005,8 @@ class _CategoryMenu extends StatelessWidget {
                 pressedScale: 1.0,
                 borderRadius: BorderRadius.circular(10),
                 baseColor: c.key == selected
-                    ? cs.onSurface.withOpacity(0.06)
-                    : cs.onSurface.withOpacity(0.03),
+                    ? cs.onSurface.withValues(alpha: 0.06)
+                    : cs.onSurface.withValues(alpha: 0.03),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
                   vertical: 10,
@@ -1014,8 +1017,8 @@ class _CategoryMenu extends StatelessWidget {
                       iconFor(c.key),
                       size: 18,
                       color: c.key == selected
-                          ? cs.onSurface.withOpacity(0.9)
-                          : cs.onSurface.withOpacity(0.82),
+                          ? cs.onSurface.withValues(alpha: 0.9)
+                          : cs.onSurface.withValues(alpha: 0.82),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -1027,8 +1030,8 @@ class _CategoryMenu extends StatelessWidget {
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: c.key == selected
-                              ? cs.onSurface.withOpacity(0.92)
-                              : cs.onSurface.withOpacity(0.88),
+                              ? cs.onSurface.withValues(alpha: 0.92)
+                              : cs.onSurface.withValues(alpha: 0.88),
                         ),
                       ),
                     ),
@@ -1037,7 +1040,7 @@ class _CategoryMenu extends StatelessWidget {
                       fmtBytes(c.stats.bytes),
                       style: TextStyle(
                         fontSize: 12,
-                        color: cs.onSurface.withOpacity(0.65),
+                        color: cs.onSurface.withValues(alpha: 0.65),
                       ),
                     ),
                   ],
@@ -1151,7 +1154,7 @@ class _CategoryDetail extends StatelessWidget {
             subtitle,
             style: TextStyle(
               fontSize: 12.5,
-              color: cs.onSurface.withOpacity(0.7),
+              color: cs.onSurface.withValues(alpha: 0.7),
             ),
           ),
           const SizedBox(height: 8),
@@ -1159,7 +1162,7 @@ class _CategoryDetail extends StatelessWidget {
             hint,
             style: TextStyle(
               fontSize: 12.5,
-              color: cs.onSurface.withOpacity(0.7),
+              color: cs.onSurface.withValues(alpha: 0.7),
             ),
           ),
           const SizedBox(height: 12),
@@ -1187,7 +1190,7 @@ class _CategoryDetail extends StatelessWidget {
           subtitle,
           style: TextStyle(
             fontSize: 12.5,
-            color: cs.onSurface.withOpacity(0.7),
+            color: cs.onSurface.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 8),
@@ -1195,7 +1198,7 @@ class _CategoryDetail extends StatelessWidget {
           hint,
           style: TextStyle(
             fontSize: 12.5,
-            color: cs.onSurface.withOpacity(0.7),
+            color: cs.onSurface.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 14),
@@ -1220,10 +1223,10 @@ class _CategoryDetail extends StatelessWidget {
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                       decoration: BoxDecoration(
-                        color: cs.onSurface.withOpacity(0.03),
+                        color: cs.onSurface.withValues(alpha: 0.03),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: cs.onSurface.withOpacity(0.08),
+                          color: cs.onSurface.withValues(alpha: 0.08),
                         ),
                       ),
                       child: Row(
@@ -1244,7 +1247,7 @@ class _CategoryDetail extends StatelessWidget {
                                   '${fmtBytes(s.stats.bytes)} · ${l10n.storageSpaceFilesCount(s.stats.fileCount)}',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: cs.onSurface.withOpacity(0.65),
+                                    color: cs.onSurface.withValues(alpha: 0.65),
                                   ),
                                 ),
                                 if (s.path != null && s.path!.isNotEmpty) ...[
@@ -1255,7 +1258,9 @@ class _CategoryDetail extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 11.5,
-                                      color: cs.onSurface.withOpacity(0.55),
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.55,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -1453,9 +1458,7 @@ class _UploadManagerState extends State<_UploadManager> {
         if (!mounted) return;
         showAppSnackBar(
           context,
-          message: l10n.chatMessageWidgetCannotOpenFile(
-            res.message ?? res.type.name,
-          ),
+          message: l10n.chatMessageWidgetCannotOpenFile(res.message),
           type: NotificationType.error,
         );
       }
@@ -1482,7 +1485,7 @@ class _UploadManagerState extends State<_UploadManager> {
       return Center(
         child: Text(
           l10n.storageSpaceNoUploads,
-          style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+          style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
         ),
       );
     }
@@ -1526,7 +1529,7 @@ class _UploadManagerState extends State<_UploadManager> {
                         : l10n.storageSpaceUploadsCount(_entries.length),
                     style: TextStyle(
                       fontSize: 12.5,
-                      color: cs.onSurface.withOpacity(0.65),
+                      color: cs.onSurface.withValues(alpha: 0.65),
                     ),
                   ),
                 ),
@@ -1613,7 +1616,7 @@ class _ImageTile extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final cs = Theme.of(context).colorScheme;
-        final border = cs.onSurface.withOpacity(0.10);
+        final border = cs.onSurface.withValues(alpha: 0.10);
         final dpr = MediaQuery.of(context).devicePixelRatio;
         final side = constraints.maxWidth.isFinite && constraints.maxWidth > 0
             ? constraints.maxWidth
@@ -1624,7 +1627,7 @@ class _ImageTile extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: selected ? cs.primary.withOpacity(0.55) : border,
+              color: selected ? cs.primary.withValues(alpha: 0.55) : border,
             ),
           ),
           clipBehavior: Clip.antiAlias,
@@ -1634,7 +1637,7 @@ class _ImageTile extends StatelessWidget {
             haptics: false,
             pressedScale: 1.0,
             borderRadius: BorderRadius.circular(12),
-            baseColor: cs.onSurface.withOpacity(0.03),
+            baseColor: cs.onSurface.withValues(alpha: 0.03),
             padding: EdgeInsets.zero,
             child: Stack(
               fit: StackFit.expand,
@@ -1647,12 +1650,12 @@ class _ImageTile extends StatelessWidget {
                   filterQuality: FilterQuality.low,
                   errorBuilder: (_, __, ___) {
                     return Container(
-                      color: cs.onSurface.withOpacity(0.04),
+                      color: cs.onSurface.withValues(alpha: 0.04),
                       alignment: Alignment.center,
                       child: Icon(
                         Lucide.ImageOff,
                         size: 18,
-                        color: cs.onSurface.withOpacity(0.55),
+                        color: cs.onSurface.withValues(alpha: 0.55),
                       ),
                     );
                   },
@@ -1666,7 +1669,7 @@ class _ImageTile extends StatelessWidget {
                     hitTestSize: 22,
                     borderWidth: 1.6,
                     activeColor: cs.primary,
-                    borderColor: cs.primary.withOpacity(0.55),
+                    borderColor: cs.primary.withValues(alpha: 0.55),
                     onChanged: (_) => onToggle(),
                     enableHaptics: false,
                   ),
@@ -1700,7 +1703,7 @@ class _FileRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final border = cs.onSurface.withOpacity(0.08);
+    final border = cs.onSurface.withValues(alpha: 0.08);
 
     return Container(
       decoration: BoxDecoration(
@@ -1714,7 +1717,7 @@ class _FileRow extends StatelessWidget {
         haptics: false,
         pressedScale: 1.0,
         borderRadius: BorderRadius.circular(12),
-        baseColor: cs.onSurface.withOpacity(0.03),
+        baseColor: cs.onSurface.withValues(alpha: 0.03),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
@@ -1724,7 +1727,7 @@ class _FileRow extends StatelessWidget {
               hitTestSize: 22,
               borderWidth: 1.6,
               activeColor: cs.primary,
-              borderColor: cs.primary.withOpacity(0.55),
+              borderColor: cs.primary.withValues(alpha: 0.55),
               onChanged: (_) => onToggle(),
               enableHaptics: false,
             ),
@@ -1732,7 +1735,7 @@ class _FileRow extends StatelessWidget {
             Icon(
               Lucide.Paperclip,
               size: 18,
-              color: cs.onSurface.withOpacity(0.82),
+              color: cs.onSurface.withValues(alpha: 0.82),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -1746,7 +1749,7 @@ class _FileRow extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w600,
-                      color: cs.onSurface.withOpacity(0.88),
+                      color: cs.onSurface.withValues(alpha: 0.88),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -1754,7 +1757,7 @@ class _FileRow extends StatelessWidget {
                     '${fmtBytes(entry.bytes)} · ${_fmtTime(entry.modifiedAt)}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: cs.onSurface.withOpacity(0.65),
+                      color: cs.onSurface.withValues(alpha: 0.65),
                     ),
                   ),
                 ],
@@ -1791,13 +1794,15 @@ class _MiniActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final Color fg = enabled ? cs.primary : cs.onSurface.withOpacity(0.35);
+    final Color fg = enabled
+        ? cs.primary
+        : cs.onSurface.withValues(alpha: 0.35);
     final Color bg = enabled
-        ? cs.primary.withOpacity(0.12)
-        : cs.onSurface.withOpacity(0.03);
+        ? cs.primary.withValues(alpha: 0.12)
+        : cs.onSurface.withValues(alpha: 0.03);
     final Color border = enabled
-        ? cs.primary.withOpacity(0.35)
-        : cs.onSurface.withOpacity(0.10);
+        ? cs.primary.withValues(alpha: 0.35)
+        : cs.onSurface.withValues(alpha: 0.10);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: enabled ? onTap : null,
@@ -1826,19 +1831,13 @@ class _TactileIconButton extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    this.onLongPress,
-    this.semanticLabel,
     this.size = 22,
-    this.haptics = true,
   });
 
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final String? semanticLabel;
   final double size;
-  final bool haptics;
 
   @override
   State<_TactileIconButton> createState() => _TactileIconButtonState();
@@ -1850,32 +1849,24 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
       size: widget.size,
       color: _pressed ? pressColor : base,
-      semanticLabel: widget.semanticLabel,
     );
 
     return Semantics(
       button: true,
-      label: widget.semanticLabel,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
         onTap: () {
-          if (widget.haptics) Haptics.light();
+          Haptics.light();
           widget.onTap();
         },
-        onLongPress: widget.onLongPress == null
-            ? null
-            : () {
-                if (widget.haptics) Haptics.light();
-                widget.onLongPress!.call();
-              },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           child: icon,
@@ -1891,13 +1882,15 @@ Widget _iosSectionCard({required Widget child}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+      final Color bg = isDark
+          ? Colors.white10
+          : Colors.white.withValues(alpha: 0.96);
       return Container(
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
             width: 0.6,
           ),
         ),
@@ -1915,7 +1908,7 @@ Widget _iosDivider(BuildContext context) {
     thickness: 0.6,
     indent: 54,
     endIndent: 12,
-    color: cs.outlineVariant.withOpacity(0.18),
+    color: cs.outlineVariant.withValues(alpha: 0.18),
   );
 }
 
@@ -1938,7 +1931,11 @@ Widget _iosNavRow(
       children: [
         SizedBox(
           width: 36,
-          child: Icon(icon, size: 20, color: cs.onSurface.withOpacity(0.9)),
+          child: Icon(
+            icon,
+            size: 20,
+            color: cs.onSurface.withValues(alpha: 0.9),
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1946,7 +1943,7 @@ Widget _iosNavRow(
             label,
             style: TextStyle(
               fontSize: 15,
-              color: cs.onSurface.withOpacity(0.9),
+              color: cs.onSurface.withValues(alpha: 0.9),
               fontWeight: FontWeight.w500,
             ),
             maxLines: 1,
@@ -1959,7 +1956,7 @@ Widget _iosNavRow(
             detailText,
             style: TextStyle(
               fontSize: 13,
-              color: cs.onSurface.withOpacity(0.6),
+              color: cs.onSurface.withValues(alpha: 0.6),
             ),
           ),
         ),
@@ -1971,7 +1968,7 @@ Widget _iosNavRow(
         Icon(
           Lucide.ChevronRight,
           size: 16,
-          color: cs.onSurface.withOpacity(0.75),
+          color: cs.onSurface.withValues(alpha: 0.75),
         ),
       ],
     ),
