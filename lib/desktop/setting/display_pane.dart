@@ -771,6 +771,7 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
             '🇨🇳 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageChineseLabel}',
             '🇨🇳 ${AppLocalizations.of(ctx)!.languageDisplayTraditionalChinese}',
             '🇺🇸 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageEnglishLabel}',
+            '🇹🇷 ${AppLocalizations.of(ctx)!.languageDisplayTurkish}',
           ];
           double maxText = 0;
           for (final s in labels) {
@@ -834,6 +835,9 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
         if ((l.scriptCode ?? '').toLowerCase() == 'hant')
           return l10n.languageDisplayTraditionalChinese;
         return l10n.displaySettingsPageLanguageChineseLabel;
+      }
+      if (l.languageCode == 'tr') {
+        return l10n.languageDisplayTurkish;
       }
       return l10n.displaySettingsPageLanguageEnglishLabel;
     }
@@ -1173,6 +1177,14 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
         ),
         (!sp.isFollowingSystemLocale && sp.appLocale.languageCode == 'en'),
       ),
+      (
+        _LangItem(
+          flag: '🇹🇷',
+          label: l10n.languageDisplayTurkish,
+          tag: 'tr_TR',
+        ),
+        (!sp.isFollowingSystemLocale && sp.appLocale.languageCode == 'tr'),
+      ),
     ];
     final maxH = MediaQuery.of(context).size.height * 0.5;
     return AnimatedOpacity(
@@ -1237,6 +1249,15 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
                                   );
                               break;
                             case 'en_US':
+                              await context
+                                  .read<SettingsProvider>()
+                                  .setAppLocale(const Locale('en', 'US'));
+                              break;
+                            case 'tr_TR':
+                              await context
+                                  .read<SettingsProvider>()
+                                  .setAppLocale(const Locale('tr', 'TR'));
+                              break;
                             default:
                               await context
                                   .read<SettingsProvider>()
@@ -1260,7 +1281,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
 class _LangItem {
   final String flag;
   final String label;
-  final String tag; // 'system' | 'zh_CN' | 'zh_Hant' | 'en_US'
+  final String tag; // 'system' | 'zh_CN' | 'zh_Hant' | 'en_US' | 'tr_TR'
   const _LangItem({required this.flag, required this.label, required this.tag});
 }
 

@@ -1403,7 +1403,7 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   // ===== App locale (UI language) =====
-  String? _appLocaleTag; // 'system', 'zh_CN', 'zh_Hant', 'en_US'
+  String? _appLocaleTag; // 'system', 'zh_CN', 'zh_Hant', 'en_US', 'tr_TR'
   Locale get appLocale => _parseLocaleTag(_appLocaleTag ?? 'en_US');
   bool get isFollowingSystemLocale =>
       (_appLocaleTag == null) || (_appLocaleTag == 'system');
@@ -1433,6 +1433,9 @@ class SettingsProvider extends ChangeNotifier {
       if (script == 'hant') return 'zh_Hant';
       return 'zh_CN';
     }
+    if (lc == 'tr') {
+      return 'tr_TR';
+    }
     return 'en_US';
   }
 
@@ -1443,6 +1446,9 @@ class SettingsProvider extends ChangeNotifier {
       case 'zh_Hant':
         return const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant');
       case 'en_US':
+        return const Locale('en', 'US');
+      case 'tr_TR':
+        return const Locale('tr', 'TR');
       default:
         return const Locale('en', 'US');
     }

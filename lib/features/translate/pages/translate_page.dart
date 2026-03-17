@@ -205,6 +205,8 @@ class _TranslatePageState extends State<TranslatePage> {
         return l10n.languageDisplayItalian;
       case 'es':
         return l10n.languageDisplaySpanish;
+      case 'tr':
+        return l10n.languageDisplayTurkish;
       default:
         return code;
     }

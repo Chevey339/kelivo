@@ -112,6 +112,8 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
         return l10n.languageDisplayItalian;
       case 'es':
         return l10n.languageDisplaySpanish;
+      case 'tr':
+        return l10n.languageDisplayTurkish;
       default:
         return code;
     }
@@ -591,6 +593,8 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
         return l10n.languageDisplayItalian;
       case 'es':
         return l10n.languageDisplaySpanish;
+      case 'tr':
+        return l10n.languageDisplayTurkish;
       default:
         return code;
     }
@@ -824,6 +828,8 @@ class _LangOptionTileState extends State<_LangOptionTile> {
         return l10n.languageDisplayItalian;
       case 'es':
         return l10n.languageDisplaySpanish;
+      case 'tr':
+        return l10n.languageDisplayTurkish;
       default:
         return code;
     }

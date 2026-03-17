@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'app_localizations_en.dart';
+import 'app_localizations_tr.dart';
 import 'app_localizations_zh.dart';
 
 // ignore_for_file: type=lint
@@ -95,6 +96,7 @@ abstract class AppLocalizations {
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
+    Locale('tr'),
     Locale('zh'),
     Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
     Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
@@ -663,6 +665,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Spanish'**
   String get languageDisplaySpanish;
+
+  /// No description provided for @languageDisplayTurkish.
+  ///
+  /// In en, this message translates to:
+  /// **'Turkish'**
+  String get languageDisplayTurkish;
 
   /// No description provided for @languageSelectSheetTitle.
   ///
@@ -8072,7 +8080,7 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) =>
-      <String>['en', 'zh'].contains(locale.languageCode);
+      <String>['en', 'tr', 'zh'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
@@ -8097,6 +8105,8 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   switch (locale.languageCode) {
     case 'en':
       return AppLocalizationsEn();
+    case 'tr':
+      return AppLocalizationsTr();
     case 'zh':
       return AppLocalizationsZh();
   }

@@ -1,0 +1,1793 @@
+{
+  "helloWorld": "Selam Dünya!",
+  "settingsPageBackButton": "Geri",
+  "settingsPageTitle": "Ayarlar",
+  "settingsPageDarkMode": "Karanlık",
+  "settingsPageLightMode": "Işık",
+  "settingsPageSystemMode": "Sistem",
+  "settingsPageWarningMessage": "Bazı hizmetler yapılandırılmamıştır; özellikler sınırlı olabilir.",
+  "settingsPageGeneralSection": "Genel",
+  "settingsPageColorMode": "Renk Modu",
+  "settingsPageDisplay": "Görüntülemek",
+  "settingsPageDisplaySubtitle": "Görünüm ve metin boyutu",
+  "settingsPageAssistant": "Asistan",
+  "settingsPageAssistantSubtitle": "Varsayılan yardımcı ve stil",
+  "settingsPageModelsServicesSection": "Modeller ve Hizmetler",
+  "settingsPageDefaultModel": "Varsayılan Model",
+  "settingsPageProviders": "Sağlayıcılar",
+  "settingsPageHotkeys": "Kısayol tuşları",
+  "settingsPageSearch": "Aramak",
+  "settingsPageTts": "TTS",
+  "settingsPageMcp": "MCP",
+  "settingsPageQuickPhrase": "Hızlı İfade",
+  "settingsPageInstructionInjection": "Talimat Enjeksiyonu",
+  "settingsPageDataSection": "Veri",
+  "settingsPageBackup": "Yedekleme",
+  "settingsPageChatStorage": "Sohbet Depolama Alanı",
+  "settingsPageCalculating": "Hesaplanıyor…",
+  "settingsPageFilesCount": "{count} dosyalar · {size}",
+  "@settingsPageFilesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpacePageTitle": "Depolama Alanı",
+  "storageSpaceRefreshTooltip": "Yenile",
+  "storageSpaceLoadFailed": "Depolama alanı kullanımı yüklenemedi",
+  "storageSpaceTotalLabel": "Kullanılmış",
+  "storageSpaceClearableLabel": "Temizlenebilir: {size}",
+  "@storageSpaceClearableLabel": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpaceClearableHint": "Temizlemesi güvenli: {size}",
+  "@storageSpaceClearableHint": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpaceCategoryImages": "Görseller",
+  "storageSpaceCategoryFiles": "Dosyalar",
+  "storageSpaceCategoryChatData": "Sohbet Kayıtları",
+  "storageSpaceCategoryAssistantData": "Asistanlar",
+  "storageSpaceCategoryCache": "Önbellek",
+  "storageSpaceCategoryLogs": "Günlükler",
+  "storageSpaceCategoryOther": "Uygulama",
+  "storageSpaceFilesCount": "{count} dosya",
+  "@storageSpaceFilesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageSpaceSafeToClearHint": "Temizlemesi güvenli. Bu, sohbet geçmişinizi etkilemeyecektir.",
+  "storageSpaceNotSafeToClearHint": "Sohbet geçmişinizi etkileyebilir. Dikkatlice silin.",
+  "storageSpaceBreakdownTitle": "Bozulma",
+  "storageSpaceSubChatMessages": "Mesajlar",
+  "storageSpaceSubChatConversations": "Konuşmalar",
+  "storageSpaceSubChatToolEvents": "Araç etkinlikleri",
+  "storageSpaceSubAssistantAvatars": "Avatarlar",
+  "storageSpaceSubAssistantImages": "Görseller",
+  "storageSpaceSubCacheAvatars": "Avatar önbelleği",
+  "storageSpaceSubCacheOther": "Diğer önbellek",
+  "storageSpaceSubCacheSystem": "Sistem önbelleği",
+  "storageSpaceSubLogsFlutter": "Çarpıntı günlükleri",
+  "storageSpaceSubLogsRequests": "Ağ günlükleri",
+  "storageSpaceSubLogsOther": "Diğer günlükler",
+  "storageSpaceClearConfirmTitle": "Temizlemeyi onayla",
+  "storageSpaceClearConfirmMessage": "{targetName} silinsin mi?",
+  "@storageSpaceClearConfirmMessage": {
+    "placeholders": {
+      "targetName": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpaceClearButton": "Temizlemek",
+  "storageSpaceClearDone": "{targetName} temizlendi",
+  "@storageSpaceClearDone": {
+    "placeholders": {
+      "targetName": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpaceClearFailed": "Temizleme başarısız oldu: {error}",
+  "@storageSpaceClearFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpaceClearAvatarCacheButton": "Avatar Önbelleğini Temizle",
+  "storageSpaceClearCacheButton": "Önbelleği Temizle",
+  "storageSpaceClearLogsButton": "Günlükleri Temizle",
+  "storageSpaceViewLogsButton": "Günlükleri Görüntüle",
+  "storageSpaceDeleteConfirmTitle": "Silmeyi onayla",
+  "storageSpaceDeleteUploadsConfirmMessage": "{count} öğe silinsin mi? Sohbet geçmişindeki ekler kullanılamayabilir.",
+  "@storageSpaceDeleteUploadsConfirmMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageSpaceDeletedUploadsDone": "{count} öğe silindi",
+  "@storageSpaceDeletedUploadsDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageSpaceNoUploads": "Öğe yok",
+  "storageSpaceSelectAll": "Tümünü seç",
+  "storageSpaceClearSelection": "Seçimi temizle",
+  "storageSpaceSelectedCount": "{count} seçildi",
+  "@storageSpaceSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageSpaceUploadsCount": "{count} öğe",
+  "@storageSpaceUploadsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsPageAboutSection": "Hakkında",
+  "settingsPageAbout": "Hakkında",
+  "settingsPageDocs": "Dokümanlar",
+  "settingsPageLogs": "Günlükler",
+  "settingsPageSponsor": "Sponsor",
+  "settingsPageShare": "Paylaşmak",
+  "sponsorPageMethodsSectionTitle": "Sponsorluk Yöntemleri",
+  "sponsorPageSponsorsSectionTitle": "Sponsorlar",
+  "sponsorPageEmpty": "Henüz sponsor yok",
+  "sponsorPageAfdianTitle": "Afdiyen",
+  "sponsorPageAfdianSubtitle": "afdian.com/a/kelivo",
+  "sponsorPageWeChatTitle": "WeChat Sponsoru",
+  "sponsorPageWeChatSubtitle": "WeChat sponsor kodu",
+  "languageDisplaySimplifiedChinese": "Basitleştirilmiş Çince",
+  "languageDisplayEnglish": "İngilizce",
+  "languageDisplayTraditionalChinese": "Geleneksel Çince",
+  "languageDisplayJapanese": "Japonca",
+  "languageDisplayKorean": "Korece",
+  "languageDisplayFrench": "Fransızca",
+  "languageDisplayGerman": "Almanca",
+  "languageDisplayItalian": "İtalyan",
+  "languageDisplaySpanish": "İspanyol",
+  "languageDisplayTurkish": "Türkçe",
+  "languageSelectSheetTitle": "Çeviri Dilini Seçin",
+  "languageSelectSheetClearButton": "Çeviriyi Temizle",
+  "homePageClearContext": "İçeriği Temizle",
+  "homePageClearContextWithCount": "İçeriği Temizle ({actual}/{configured})",
+  "@homePageClearContextWithCount": {
+    "placeholders": {
+      "actual": {
+        "type": "String"
+      },
+      "configured": {
+        "type": "String"
+      }
+    }
+  },
+  "homePageDefaultAssistant": "Varsayılan Asistan",
+  "mermaidExportPng": "PNG'yi dışa aktar",
+  "mermaidExportFailed": "Dışa aktarma başarısız oldu",
+  "mermaidPreviewOpen": "Önizlemeyi Aç",
+  "mermaidPreviewOpenFailed": "Önizleme açılamıyor",
+  "assistantProviderDefaultAssistantName": "Varsayılan Asistan",
+  "assistantProviderSampleAssistantName": "Örnek Asistan",
+  "assistantProviderNewAssistantName": "Yeni Asistan",
+  "assistantProviderSampleAssistantSystemPrompt": "Siz {model_name}, memnuniyetle doğru ve yararlı yardım sağlayan bir yapay zeka asistanısınız. Geçerli saat {cur_datetime}, cihazın dili {locale}, saat dilimi {timezone}, kullanıcı {device_info}, sürüm {system_version} kullanıyor. Kullanıcı aksini açıkça belirtmediği takdirde lütfen yanıt verirken kullanıcının cihazının dilini kullanın.",
+  "@assistantProviderSampleAssistantSystemPrompt": {
+    "placeholders": {
+      "model_name": {
+        "type": "String"
+      },
+      "cur_datetime": {
+        "type": "String"
+      },
+      "locale": {
+        "type": "String"
+      },
+      "timezone": {
+        "type": "String"
+      },
+      "device_info": {
+        "type": "String"
+      },
+      "system_version": {
+        "type": "String"
+      }
+    }
+  },
+  "displaySettingsPageLanguageTitle": "Uygulama Dili",
+  "displaySettingsPageLanguageSubtitle": "Arayüz dilini seçin",
+  "assistantTagsManageTitle": "Etiketleri Yönet",
+  "assistantTagsCreateButton": "Yaratmak",
+  "assistantTagsCreateDialogTitle": "Etiket Oluştur",
+  "assistantTagsCreateDialogOk": "Yaratmak",
+  "assistantTagsCreateDialogCancel": "İptal etmek",
+  "assistantTagsNameHint": "Etiket adı",
+  "assistantTagsRenameButton": "Yeniden isimlendirmek",
+  "assistantTagsRenameDialogTitle": "Etiketi Yeniden Adlandır",
+  "assistantTagsRenameDialogOk": "Yeniden isimlendirmek",
+  "assistantTagsDeleteButton": "Silmek",
+  "assistantTagsDeleteConfirmTitle": "Etiketi Sil",
+  "assistantTagsDeleteConfirmContent": "Bu etiketi silmek istediğinizden emin misiniz?",
+  "assistantTagsDeleteConfirmOk": "Silmek",
+  "assistantTagsDeleteConfirmCancel": "İptal etmek",
+  "assistantTagsContextMenuEditAssistant": "Asistanı Düzenle",
+  "assistantTagsContextMenuManageTags": "Etiketleri Yönet",
+  "mcpTransportOptionStdio": "STDIO",
+  "mcpTransportTagStdio": "STDIO",
+  "mcpTransportTagInmemory": "Yerleşik",
+  "mcpServerEditSheetStdioOnlyDesktop": "STDIO yalnızca masaüstünde kullanılabilir",
+  "mcpServerEditSheetStdioCommandLabel": "Emretmek",
+  "mcpServerEditSheetStdioArgumentsLabel": "Argümanlar",
+  "mcpServerEditSheetStdioWorkingDirectoryLabel": "Çalışma Dizini (isteğe bağlı)",
+  "mcpServerEditSheetStdioEnvironmentTitle": "Çevre",
+  "mcpServerEditSheetStdioEnvNameLabel": "İsim",
+  "mcpServerEditSheetStdioEnvValueLabel": "Değer",
+  "mcpServerEditSheetStdioAddEnv": "Zarf Ekle",
+  "mcpServerEditSheetStdioCommandRequired": "STDIO için komut gereklidir",
+  "assistantTagsContextMenuDeleteAssistant": "Asistanı Sil",
+  "assistantTagsClearTag": "Etiketi Temizle",
+  "displaySettingsPageLanguageChineseLabel": "Basitleştirilmiş Çince",
+  "displaySettingsPageLanguageEnglishLabel": "İngilizce",
+  "homePagePleaseSelectModel": "Lütfen önce bir model seçin",
+  "homePageAudioAttachmentUnsupported": "Mevcut model ses eklerini desteklemiyor. Ses girişini destekleyen bir modele geçin veya ses dosyasını kaldırıp tekrar deneyin.",
+  "homePagePleaseSetupTranslateModel": "Lütfen önce bir çeviri modeli ayarlayın",
+  "homePageTranslating": "Çeviri...",
+  "homePageTranslateFailed": "Çeviri başarısız oldu: {error}",
+  "@homePageTranslateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "chatServiceDefaultConversationTitle": "Yeni Sohbet",
+  "userProviderDefaultUserName": "Kullanıcı",
+  "homePageDeleteMessage": "Mesajı Sil",
+  "homePageDeleteMessageConfirm": "Bu mesajı silmek istediğinizden emin misiniz? Bu geri alınamaz.",
+  "homePageCancel": "İptal etmek",
+  "homePageDelete": "Silmek",
+  "homePageSelectMessagesToShare": "Lütfen paylaşılacak mesajları seçin",
+  "homePageDone": "Tamamlamak",
+  "homePageDropToUpload": "Yüklenecek dosyaları bırakın",
+  "assistantEditPageTitle": "Asistan",
+  "assistantEditPageNotFound": "Asistan bulunamadı",
+  "assistantEditPageBasicTab": "Temel",
+  "assistantEditPagePromptsTab": "İstemler",
+  "assistantEditPageMcpTab": "MCP",
+  "assistantEditPageQuickPhraseTab": "Hızlı İfade",
+  "assistantEditPageCustomTab": "Gelenek",
+  "assistantEditPageRegexTab": "Regex'i Değiştir",
+  "assistantEditRegexDescription": "Kullanıcı/asistan mesajlarını yeniden yazmak veya görsel olarak ayarlamak için normal ifade kuralları oluşturun.",
+  "assistantEditAddRegexButton": "Regex Kuralı Ekle",
+  "assistantRegexAddTitle": "Regex Kuralı Ekle",
+  "assistantRegexEditTitle": "Regex Kuralını Düzenle",
+  "assistantRegexNameLabel": "Kural Adı",
+  "assistantRegexPatternLabel": "Normal İfade",
+  "assistantRegexReplacementLabel": "Yedek Dize",
+  "assistantRegexScopeLabel": "Kapsamı Etkileyen",
+  "assistantRegexScopeUser": "Kullanıcı",
+  "assistantRegexScopeAssistant": "Asistan",
+  "assistantRegexScopeVisualOnly": "Yalnızca Görsel",
+  "assistantRegexScopeReplaceOnly": "Yalnızca Değiştir",
+  "assistantRegexAddAction": "Eklemek",
+  "assistantRegexSaveAction": "Kaydetmek",
+  "assistantRegexDeleteButton": "Silmek",
+  "assistantRegexValidationError": "Lütfen adı ve normal ifadeyi girin ve en az bir kapsam seçin.",
+  "assistantRegexInvalidPattern": "Geçersiz normal ifade",
+  "assistantRegexCancelButton": "İptal etmek",
+  "assistantRegexUntitled": "Başlıksız Kural",
+  "assistantEditCustomHeadersTitle": "Özel Başlıklar",
+  "assistantEditCustomHeadersAdd": "Başlık Ekle",
+  "assistantEditCustomHeadersEmpty": "Başlık eklenmedi",
+  "assistantEditCustomBodyTitle": "Özel Gövde",
+  "assistantEditCustomBodyAdd": "Gövde Ekle",
+  "assistantEditCustomBodyEmpty": "Hiçbir gövde öğesi eklenmedi",
+  "assistantEditHeaderNameLabel": "Başlık Adı",
+  "assistantEditHeaderValueLabel": "Başlık Değeri",
+  "assistantEditBodyKeyLabel": "Gövde Anahtarı",
+  "assistantEditBodyValueLabel": "Beden Değeri (JSON)",
+  "assistantEditDeleteTooltip": "Silmek",
+  "assistantEditAssistantNameLabel": "Asistan Adı",
+  "assistantEditUseAssistantAvatarTitle": "Asistan Avatarını Kullan",
+  "assistantEditUseAssistantAvatarSubtitle": "Model avatarı yerine asistan avatarını kullan",
+  "assistantEditUseAssistantNameTitle": "Asistan Adını Kullan",
+  "assistantEditChatModelTitle": "Sohbet Modeli",
+  "assistantEditChatModelSubtitle": "Bu asistan için varsayılan sohbet modeli (genel sürüme geri dönüş)",
+  "assistantEditTemperatureDescription": "Rastgeleliği kontrol eder, aralık 0–2",
+  "assistantEditTopPDescription": "Ne yaptığınızı bilmiyorsanız değişmeyin",
+  "assistantEditParameterDisabled": "Devre Dışı (sağlayıcı varsayılanını kullanır)",
+  "assistantEditParameterDisabled2": "Devre dışı (kısıtlama yok)",
+  "assistantEditContextMessagesTitle": "Bağlam Mesajları",
+  "assistantEditContextMessagesDescription": "Bağlamda kaç tane yeni mesajın saklanacağı",
+  "assistantEditStreamOutputTitle": "Akış Çıkışı",
+  "assistantEditStreamOutputDescription": "Akış yanıtlarını etkinleştir",
+  "assistantEditThinkingBudgetTitle": "Bütçeyi Düşünmek",
+  "assistantEditConfigureButton": "Yapılandır",
+  "assistantEditMaxTokensTitle": "Maksimum Jeton",
+  "assistantEditMaxTokensDescription": "Sınırsız kullanım için boş bırakın",
+  "assistantEditMaxTokensHint": "Sınırsız",
+  "assistantEditChatBackgroundTitle": "Sohbet Arka Planı",
+  "assistantEditChatBackgroundDescription": "Bu asistan için bir arka plan resmi ayarlayın",
+  "assistantEditChooseImageButton": "Resim Seç",
+  "assistantEditClearButton": "Temizlemek",
+  "desktopNavChatTooltip": "Sohbet",
+  "desktopNavTranslateTooltip": "Çevir",
+  "desktopNavStorageTooltip": "Depolamak",
+  "desktopNavGlobalSearchTooltip": "Küresel Arama",
+  "desktopNavThemeToggleTooltip": "Tema",
+  "desktopNavSettingsTooltip": "Ayarlar",
+  "desktopAvatarMenuUseEmoji": "Emoji kullan",
+  "cameraPermissionDeniedMessage": "Kamera kullanılamıyor: izin verilmedi.",
+  "openSystemSettings": "Ayarları Aç",
+  "desktopAvatarMenuChangeFromImage": "Resimden değiştir…",
+  "desktopAvatarMenuReset": "Avatarı sıfırla",
+  "assistantEditAvatarChooseImage": "Resim Seç",
+  "assistantEditAvatarChooseEmoji": "Emoji'yi seçin",
+  "assistantEditAvatarEnterLink": "Bağlantıyı Girin",
+  "assistantEditAvatarImportQQ": "QQ'dan içe aktar",
+  "assistantEditAvatarReset": "Sıfırla",
+  "displaySettingsPageChatMessageBackgroundTitle": "Sohbet Mesajı Arka Planı",
+  "displaySettingsPageChatMessageBackgroundDefault": "Varsayılan",
+  "displaySettingsPageChatMessageBackgroundFrosted": "Buzlu cam",
+  "displaySettingsPageChatMessageBackgroundSolid": "Düz Renk",
+  "displaySettingsPageAndroidBackgroundChatTitle": "Arka Plan Oluşturma (Android)",
+  "androidBackgroundStatusOn": "Açık",
+  "androidBackgroundStatusOff": "Kapalı",
+  "androidBackgroundStatusOther": "Açık ve bildir",
+  "androidBackgroundOptionOn": "Açık",
+  "androidBackgroundOptionOnNotify": "Açık ve tamamlandığında bildir",
+  "androidBackgroundOptionOff": "Kapalı",
+  "notificationChatCompletedTitle": "Üretim tamamlandı",
+  "notificationChatCompletedBody": "Asistan yanıtı oluşturuldu",
+  "androidBackgroundNotificationTitle": "Kelivo koşuyor",
+  "androidBackgroundNotificationText": "Arka planda sohbet oluşturmayı canlı tutmak",
+  "assistantEditEmojiDialogTitle": "Emoji'yi seçin",
+  "assistantEditEmojiDialogHint": "Herhangi bir emojiyi yazın veya yapıştırın",
+  "assistantEditEmojiDialogCancel": "İptal etmek",
+  "assistantEditEmojiDialogSave": "Kaydetmek",
+  "assistantEditImageUrlDialogTitle": "Resim URL'sini girin",
+  "assistantEditImageUrlDialogHint": "örneğin https://example.com/avatar.png",
+  "assistantEditImageUrlDialogCancel": "İptal etmek",
+  "assistantEditImageUrlDialogSave": "Kaydetmek",
+  "assistantEditQQAvatarDialogTitle": "QQ'dan içe aktar",
+  "assistantEditQQAvatarDialogHint": "QQ numarasını girin (5-12 haneli)",
+  "assistantEditQQAvatarRandomButton": "Rastgele Bir",
+  "assistantEditQQAvatarFailedMessage": "Rastgele QQ avatarı getirilemedi. Lütfen tekrar deneyin.",
+  "assistantEditQQAvatarDialogCancel": "İptal etmek",
+  "assistantEditQQAvatarDialogSave": "Kaydetmek",
+  "assistantEditGalleryErrorMessage": "Galeri açılamıyor. Bir resim URL'si girmeyi deneyin.",
+  "assistantEditGeneralErrorMessage": "Bir şeyler ters gitti. Bir resim URL'si girmeyi deneyin.",
+  "providerDetailPageMultiKeyModeTitle": "Çoklu Tuş Modu",
+  "providerDetailPageManageKeysButton": "Anahtarları Yönet",
+  "multiKeyPageTitle": "Çoklu Tuş Yöneticisi",
+  "multiKeyPageDetect": "Tespit etmek",
+  "multiKeyPageAdd": "Eklemek",
+  "multiKeyPageAddHint": "API anahtarlarını virgül veya boşlukla ayırarak girin",
+  "multiKeyPageImportedSnackbar": "İçe aktarılan {n} anahtarlar",
+  "@multiKeyPageImportedSnackbar": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "multiKeyPagePleaseAddModel": "Lütfen önce bir model ekleyin",
+  "multiKeyPageTotal": "Toplam",
+  "multiKeyPageNormal": "Normal",
+  "multiKeyPageError": "Hata",
+  "multiKeyPageAccuracy": "Kesinlik",
+  "multiKeyPageStrategyTitle": "Yük Dengeleme Stratejisi",
+  "multiKeyPageStrategyRoundRobin": "Yuvarlak Robin",
+  "multiKeyPageStrategyPriority": "Öncelik",
+  "multiKeyPageStrategyLeastUsed": "En Az Kullanılan",
+  "multiKeyPageStrategyRandom": "Rastgele",
+  "multiKeyPageNoKeys": "API anahtarı yok",
+  "multiKeyPageStatusActive": "Aktif",
+  "multiKeyPageStatusDisabled": "Engelli",
+  "multiKeyPageStatusError": "Hata",
+  "multiKeyPageStatusRateLimited": "Oran Sınırlı",
+  "multiKeyPageEditAlias": "Takma Adı Düzenle",
+  "multiKeyPageEdit": "Düzenlemek",
+  "multiKeyPageKey": "API Anahtarı",
+  "multiKeyPagePriority": "Öncelik (1–10)",
+  "multiKeyPageDuplicateKeyWarning": "Bu anahtar zaten mevcut",
+  "multiKeyPageAlias": "Takma ad",
+  "multiKeyPageCancel": "İptal etmek",
+  "multiKeyPageSave": "Kaydetmek",
+  "multiKeyPageDelete": "Silmek",
+  "assistantEditSystemPromptTitle": "Sistem İstemi",
+  "assistantEditSystemPromptHint": "Sistem istemini girin…",
+  "assistantEditSystemPromptImportButton": "Dosyayı içe aktar",
+  "assistantEditSystemPromptImportSuccess": "Sistem istemi dosyadan güncellendi",
+  "assistantEditSystemPromptImportFailed": "Dosya içe aktarılamadı",
+  "assistantEditSystemPromptImportEmpty": "Dosya boş",
+  "assistantEditAvailableVariables": "Mevcut değişkenler:",
+  "assistantEditVariableDate": "Tarih",
+  "assistantEditVariableTime": "Zaman",
+  "assistantEditVariableDatetime": "Tarihsaat",
+  "assistantEditVariableModelId": "Model Kimliği",
+  "assistantEditVariableModelName": "Model Adı",
+  "assistantEditVariableLocale": "Yerel ayar",
+  "assistantEditVariableTimezone": "Saat dilimi",
+  "assistantEditVariableSystemVersion": "Sistem Sürümü",
+  "assistantEditVariableDeviceInfo": "Cihaz Bilgisi",
+  "assistantEditVariableBatteryLevel": "Pil Seviyesi",
+  "assistantEditVariableNickname": "Takma ad",
+  "assistantEditVariableAssistantName": "Asistan Adı",
+  "assistantEditMessageTemplateTitle": "Mesaj Şablonu",
+  "assistantEditVariableRole": "Rol",
+  "assistantEditVariableMessage": "Mesaj",
+  "assistantEditPreviewTitle": "Önizleme",
+  "codeBlockPreviewButton": "Önizleme",
+  "codeBlockCollapsedLines": "… {n} satır katlanmış",
+  "@codeBlockCollapsedLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "htmlPreviewNotSupportedOnLinux": "HTML önizlemesi Linux'ta desteklenmiyor",
+  "assistantEditSampleUser": "Kullanıcı",
+  "assistantEditSampleMessage": "Selamlar",
+  "assistantEditSampleReply": "Merhaba, size nasıl yardımcı olabilirim?",
+  "assistantEditMcpNoServersMessage": "Çalışan MCP sunucusu yok",
+  "assistantEditMcpConnectedTag": "Bağlı",
+  "assistantEditMcpToolsCountTag": "Araçlar: {enabled}/{total}",
+  "@assistantEditMcpToolsCountTag": {
+    "placeholders": {
+      "enabled": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "assistantEditModelUseGlobalDefault": "Genel varsayılanı kullan",
+  "assistantSettingsPageTitle": "Asistan Ayarları",
+  "assistantSettingsDefaultTag": "Varsayılan",
+  "assistantSettingsCopyButton": "Kopyala",
+  "assistantSettingsCopySuccess": "Asistan kopyalandı",
+  "assistantSettingsCopySuffix": "Kopyala",
+  "assistantSettingsDeleteButton": "Silmek",
+  "assistantSettingsEditButton": "Düzenlemek",
+  "assistantSettingsAddSheetTitle": "Asistan Adı",
+  "assistantSettingsAddSheetHint": "Bir ad girin",
+  "assistantSettingsAddSheetCancel": "İptal etmek",
+  "assistantSettingsAddSheetSave": "Kaydetmek",
+  "desktopAssistantsListTitle": "Asistanlar",
+  "desktopSidebarTabAssistants": "Asistanlar",
+  "desktopSidebarTabTopics": "Konular",
+  "desktopTrayMenuShowWindow": "Pencereyi Göster",
+  "desktopTrayMenuExit": "Çıkış",
+  "hotkeyToggleAppVisibility": "Uygulamayı Göster/Gizle",
+  "hotkeyCloseWindow": "Pencereyi Kapat",
+  "hotkeyOpenSettings": "Ayarları Aç",
+  "hotkeyNewTopic": "Yeni Konu",
+  "hotkeySwitchModel": "Modeli Değiştir",
+  "hotkeyToggleAssistantPanel": "Asistanları Değiştir",
+  "hotkeyToggleTopicPanel": "Konuları Değiştir",
+  "hotkeysPressShortcut": "Bir kısayola basın",
+  "hotkeysResetDefault": "Varsayılana sıfırla",
+  "hotkeysClearShortcut": "Kısayolu temizle",
+  "hotkeysResetAll": "Tümünü varsayılanlara sıfırla",
+  "assistantEditTemperatureTitle": "Sıcaklık",
+  "assistantEditTopPTitle": "Üst-p",
+  "assistantSettingsDeleteDialogTitle": "Asistanı Sil",
+  "assistantSettingsDeleteDialogContent": "Bu asistanı silmek istediğinizden emin misiniz? Bu eylem geri alınamaz.",
+  "assistantSettingsDeleteDialogCancel": "İptal etmek",
+  "assistantSettingsDeleteDialogConfirm": "Silmek",
+  "assistantSettingsAtLeastOneAssistantRequired": "En az bir asistan gereklidir",
+  "mcpAssistantSheetTitle": "MCP Sunucuları",
+  "mcpAssistantSheetSubtitle": "Bu asistan için etkinleştirilen sunucular",
+  "mcpAssistantSheetSelectAll": "Tümünü Seç",
+  "mcpAssistantSheetClearAll": "Temizlemek",
+  "backupPageTitle": "Yedekleme ve Geri Yükleme",
+  "backupPageWebDavTab": "WebDAV",
+  "backupPageImportExportTab": "İçe/Dışa Aktarma",
+  "backupPageWebDavServerUrl": "WebDAV Sunucusu URL'si",
+  "backupPageUsername": "Kullanıcı adı",
+  "backupPagePassword": "Şifre",
+  "backupPagePath": "Yol",
+  "backupPageChatsLabel": "Sohbetler",
+  "backupPageFilesLabel": "Dosyalar",
+  "backupPageTestDone": "Test tamamlandı",
+  "backupPageTestConnection": "Test",
+  "backupPageRestartRequired": "Yeniden Başlatma Gerekli",
+  "backupPageRestartContent": "Geri yükleme tamamlandı. Lütfen uygulamayı yeniden başlatın.",
+  "backupPageOK": "TAMAM",
+  "backupPageCancel": "İptal etmek",
+  "backupPageSelectImportMode": "İçe Aktarma Modunu Seçin",
+  "backupPageSelectImportModeDescription": "Yedekleme verilerinin nasıl içe aktarılacağını seçin:",
+  "backupPageOverwriteMode": "Üzerine Yazmayı Tamamla",
+  "backupPageOverwriteModeDescription": "Tüm yerel verileri temizleyin ve yedekten geri yükleyin",
+  "backupPageMergeMode": "Akıllı Birleştirme",
+  "backupPageMergeModeDescription": "Yalnızca mevcut olmayan verileri ekleyin (akıllı veri tekilleştirme)",
+  "backupPageRestore": "Eski haline getirmek",
+  "backupPageBackupUploaded": "Yedekleme yüklendi",
+  "backupPageBackup": "Yedekleme",
+  "backupPageExporting": "Dışa aktarılıyor...",
+  "backupPageExportToFile": "Dosyaya Aktar",
+  "backupPageExportToFileSubtitle": "Uygulama verilerini bir dosyaya aktarın",
+  "backupPageImportBackupFile": "Yedekleme Dosyasını İçe Aktar",
+  "backupPageImportBackupFileSubtitle": "Yerel bir yedekleme dosyasını içe aktarın",
+  "backupPageImportFromOtherApps": "Diğer Uygulamalardan İçe Aktar",
+  "backupPageImportFromRikkaHub": "RikkaHub'tan içe aktar",
+  "backupPageNotSupportedYet": "Henüz desteklenmiyor",
+  "backupPageRemoteBackups": "Uzaktan Yedeklemeler",
+  "backupPageNoBackups": "Yedekleme yok",
+  "backupPageRestoreTooltip": "Eski haline getirmek",
+  "backupPageDeleteTooltip": "Silmek",
+  "backupPageDeleteConfirmTitle": "Silmeyi Onayla",
+  "backupPageDeleteConfirmContent": "\"{name}\" uzaktan yedeklemesini silmek istediğinizden emin misiniz? Bu eylem geri alınamaz.",
+  "backupPageBackupManagement": "Yedekleme Yönetimi",
+  "backupPageWebDavBackup": "WebDAV Yedekleme",
+  "backupPageWebDavServerSettings": "WebDAV Sunucu Ayarları",
+  "backupPageS3Backup": "S3 Yedekleme",
+  "backupPageS3ServerSettings": "S3 Ayarları",
+  "backupPageS3Endpoint": "Uç nokta",
+  "backupPageS3Region": "Bölge",
+  "backupPageS3Bucket": "Kova",
+  "backupPageS3AccessKeyId": "Erişim Anahtarı Kimliği",
+  "backupPageS3SecretAccessKey": "Gizli Erişim Anahtarı",
+  "backupPageS3SessionToken": "Oturum Jetonu (İsteğe Bağlı)",
+  "backupPageS3Prefix": "Önek",
+  "backupPageS3PathStyle": "Yol stili adresleme",
+  "backupPageSave": "Kaydetmek",
+  "backupPageBackupNow": "Şimdi Yedekle",
+  "backupPageLocalBackup": "Yerel Yedekleme",
+  "backupPageImportFromCherryStudio": "Cherry Studio'dan içe aktar",
+  "backupPageImportFromChatbox": "Chatbox'tan içe aktar",
+  "chatHistoryPageTitle": "Sohbet Geçmişi",
+  "chatHistoryPageSearchTooltip": "Aramak",
+  "chatHistoryPageDeleteAllTooltip": "Sabitlenmemişleri Sil",
+  "chatHistoryPageDeleteAllDialogTitle": "Sabitlenmemiş Konuşmaları Sil",
+  "chatHistoryPageDeleteAllDialogContent": "Bu asistandaki sabitlenmemiş tüm görüşmeler silinsin mi? Sabitlenmiş sohbetler yerinde kalır.",
+  "chatHistoryPageCancel": "İptal etmek",
+  "chatHistoryPageDelete": "Silmek",
+  "chatHistoryPageDeletedAllSnackbar": "Sabitlenmeyen görüşmeler silindi",
+  "chatHistoryPageSearchHint": "Konuşmaları arayın",
+  "chatHistoryPageNoConversations": "Konuşma yok",
+  "chatHistoryPagePinnedSection": "Sabitlendi",
+  "chatHistoryPagePin": "Sabitle",
+  "chatHistoryPagePinned": "Sabitlendi",
+  "messageEditPageTitle": "Mesajı Düzenle",
+  "messageEditPageSave": "Kaydetmek",
+  "messageEditPageSaveAndSend": "Kaydet ve Gönder",
+  "messageEditPageHint": "Mesajı girin…",
+  "selectCopyPageTitle": "Seç ve Kopyala",
+  "selectCopyPageCopyAll": "Tümünü Kopyala",
+  "selectCopyPageCopiedAll": "Tümü kopyalandı",
+  "bottomToolsSheetCamera": "Kamera",
+  "bottomToolsSheetPhotos": "Fotoğraflar",
+  "bottomToolsSheetUpload": "Yüklemek",
+  "bottomToolsSheetClearContext": "İçeriği Temizle",
+  "compressContext": "İçeriği Sıkıştır",
+  "compressContextDesc": "Özetleyin ve yeni bir sohbet başlatın",
+  "clearContextDesc": "Bağlam sınırını işaretleme",
+  "contextManagement": "Bağlam Yönetimi",
+  "compressingContext": "Bağlam sıkıştırılıyor...",
+  "compressContextFailed": "Bağlam sıkıştırılamadı",
+  "compressContextNoMessages": "Sıkıştırılacak mesaj yok",
+  "bottomToolsSheetLearningMode": "Öğrenme Modu",
+  "bottomToolsSheetLearningModeDescription": "Adım adım öğrenmenize yardımcı olun",
+  "bottomToolsSheetConfigurePrompt": "İstemi yapılandır",
+  "bottomToolsSheetPrompt": "Çabuk",
+  "bottomToolsSheetPromptHint": "Enjekte edilecek bilgi istemi metnini girin",
+  "bottomToolsSheetResetDefault": "Varsayılana sıfırla",
+  "bottomToolsSheetSave": "Kaydetmek",
+  "bottomToolsSheetOcr": "Görüntü OCR'si",
+  "messageMoreSheetTitle": "Daha Fazla Eylem",
+  "messageMoreSheetSelectCopy": "Seç ve Kopyala",
+  "messageMoreSheetRenderWebView": "Web Görünümünü Oluştur",
+  "messageMoreSheetNotImplemented": "Henüz uygulanmadı",
+  "messageMoreSheetEdit": "Düzenlemek",
+  "messageMoreSheetShare": "Paylaşmak",
+  "messageMoreSheetCreateBranch": "Şube Oluştur",
+  "messageMoreSheetDelete": "Silmek",
+  "reasoningBudgetSheetOff": "Kapalı",
+  "reasoningBudgetSheetAuto": "Otomatik",
+  "reasoningBudgetSheetLight": "Hafif Muhakeme",
+  "reasoningBudgetSheetMedium": "Orta Muhakeme",
+  "reasoningBudgetSheetHeavy": "Ağır Muhakeme",
+  "reasoningBudgetSheetXhigh": "Aşırı Muhakeme",
+  "reasoningBudgetSheetTitle": "Muhakeme Zinciri Gücü",
+  "reasoningBudgetSheetCurrentLevel": "Mevcut Seviye: {level}",
+  "@reasoningBudgetSheetCurrentLevel": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "reasoningBudgetSheetOffSubtitle": "Mantık yürütmeyi kapatın, doğrudan yanıtlayın",
+  "reasoningBudgetSheetAutoSubtitle": "Modelin muhakeme düzeyine otomatik olarak karar vermesine izin verin",
+  "reasoningBudgetSheetLightSubtitle": "Soruları yanıtlamak için hafif mantık kullanın",
+  "reasoningBudgetSheetMediumSubtitle": "Soruları yanıtlarken orta düzeyde akıl yürütme kullanın",
+  "reasoningBudgetSheetHeavySubtitle": "Karmaşık sorular için ağır muhakeme kullanın",
+  "reasoningBudgetSheetXhighSubtitle": "En zorlu problemler için maksimum muhakeme derinliğini kullanın",
+  "reasoningBudgetSheetCustomLabel": "Özel Muhakeme Bütçesi (jetonlar)",
+  "reasoningBudgetSheetCustomHint": "örneğin 2048 (-1 otomatik, 0 kapalı)",
+  "chatMessageWidgetFileNotFound": "Dosya bulunamadı: {fileName}",
+  "@chatMessageWidgetFileNotFound": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "chatMessageWidgetCannotOpenFile": "Dosya açılamıyor: {message}",
+  "@chatMessageWidgetCannotOpenFile": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "chatMessageWidgetOpenFileError": "Dosya açılamadı: {error}",
+  "@chatMessageWidgetOpenFileError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "chatMessageWidgetCopiedToClipboard": "Panoya kopyalandı",
+  "chatMessageWidgetResendTooltip": "Yeniden gönder",
+  "chatMessageWidgetMoreTooltip": "Daha",
+  "chatMessageWidgetThinking": "Düşünüyorum...",
+  "chatMessageWidgetTranslation": "Çeviri",
+  "chatMessageWidgetTranslating": "Çeviri...",
+  "chatMessageWidgetCitationNotFound": "Alıntı kaynağı bulunamadı",
+  "chatMessageWidgetCannotOpenUrl": "Bağlantı açılamıyor: {url}",
+  "@chatMessageWidgetCannotOpenUrl": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "chatMessageWidgetOpenLinkError": "Bağlantı açılamadı",
+  "chatMessageWidgetCitationsTitle": "Alıntılar ({count})",
+  "@chatMessageWidgetCitationsTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatMessageWidgetRegenerateTooltip": "Yenile",
+  "chatMessageWidgetRegenerateConfirmTitle": "Yeniden Oluşturmayı Onayla",
+  "chatMessageWidgetRegenerateConfirmContent": "Yeniden oluşturma işlemi bundan sonraki tüm mesajların üzerine yazılacaktır ve bu işlem geri alınamaz. Emin misin?",
+  "chatMessageWidgetRegenerateConfirmCancel": "İptal etmek",
+  "chatMessageWidgetRegenerateConfirmOk": "Yenile",
+  "chatMessageWidgetStopTooltip": "Durmak",
+  "chatMessageWidgetSpeakTooltip": "Konuşmak",
+  "chatMessageWidgetTranslateTooltip": "Çevir",
+  "chatMessageWidgetBuiltinSearchHideNote": "Yerleşik arama aracı kartlarını gizle",
+  "chatMessageWidgetDeepThinking": "Derin Düşünme",
+  "chatMessageWidgetCreateMemory": "Bellek Oluştur",
+  "chatMessageWidgetEditMemory": "Belleği Düzenle",
+  "chatMessageWidgetDeleteMemory": "Belleği Sil",
+  "chatMessageWidgetWebSearch": "Web Araması: {query}",
+  "@chatMessageWidgetWebSearch": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "chatMessageWidgetBuiltinSearch": "Dahili Arama",
+  "chatMessageWidgetToolCall": "Araç Çağrısı: {name}",
+  "@chatMessageWidgetToolCall": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "chatMessageWidgetToolResult": "Araç Sonucu: {name}",
+  "@chatMessageWidgetToolResult": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "chatMessageWidgetNoResultYet": "(Henüz sonuç yok)",
+  "chatMessageWidgetArguments": "Argümanlar",
+  "chatMessageWidgetResult": "Sonuç",
+  "chatMessageWidgetImages": "Görseller",
+  "chatMessageWidgetCitationsCount": "Alıntılar ({count})",
+  "@chatMessageWidgetCitationsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatSelectionSelectedCountTitle": "Seçilen {count} mesaj(lar)",
+  "@chatSelectionSelectedCountTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatSelectionExportTxt": "TXT",
+  "chatSelectionExportMd": "MD",
+  "chatSelectionExportImage": "Resim",
+  "chatSelectionThinkingTools": "Düşünme araçları",
+  "chatSelectionThinkingContent": "İçerik düşünme",
+  "messageExportSheetAssistant": "Asistan",
+  "messageExportSheetDefaultTitle": "Yeni Sohbet",
+  "messageExportSheetExporting": "Dışa aktarılıyor…",
+  "messageExportSheetExportFailed": "Dışa aktarma başarısız oldu: {error}",
+  "@messageExportSheetExportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "messageExportSheetExportedAs": "{filename} olarak dışa aktarıldı",
+  "@messageExportSheetExportedAs": {
+    "placeholders": {
+      "filename": {
+        "type": "String"
+      }
+    }
+  },
+  "displaySettingsPageEnableDollarLatexTitle": "Satır içi $...$ İşleme",
+  "displaySettingsPageEnableDollarLatexSubtitle": "Satır içi matematiği $...$ içinde işle",
+  "displaySettingsPageEnableMathTitle": "Matematik Formülü Oluşturma",
+  "displaySettingsPageEnableMathSubtitle": "LaTeX matematiğini işleme (satır içi ve blok)",
+  "displaySettingsPageEnableUserMarkdownTitle": "Markdown ile kullanıcı mesajlarını işleme",
+  "displaySettingsPageEnableReasoningMarkdownTitle": "Markdown ile muhakeme (düşünme) oluşturma",
+  "displaySettingsPageEnableAssistantMarkdownTitle": "Markdown ile asistan mesajlarını işleme",
+  "displaySettingsPageMobileCodeBlockWrapTitle": "Mobil Kod Bloğu Kelime Kaydırma",
+  "displaySettingsPageAutoCollapseCodeBlockTitle": "Kod Bloklarını Otomatik Daralt",
+  "displaySettingsPageAutoCollapseCodeBlockLinesTitle": "Otomatik daraltma eşiği",
+  "displaySettingsPageAutoCollapseCodeBlockLinesUnit": "çizgiler",
+  "messageExportSheetFormatTitle": "Dışa Aktarma Formatı",
+  "messageExportSheetMarkdown": "İndirim",
+  "messageExportSheetSingleMarkdownSubtitle": "Bu mesajı Markdown dosyası olarak dışa aktarın",
+  "messageExportSheetBatchMarkdownSubtitle": "Seçilen mesajları Markdown dosyası olarak dışa aktar",
+  "messageExportSheetPlainText": "Düz Metin",
+  "messageExportSheetSingleTxtSubtitle": "Bu mesajı TXT dosyası olarak dışa aktarın",
+  "messageExportSheetBatchTxtSubtitle": "Seçilen mesajları TXT dosyası olarak dışa aktar",
+  "messageExportSheetExportImage": "Resim Olarak Dışa Aktar",
+  "messageExportSheetSingleExportImageSubtitle": "Bu mesajı PNG resmine dönüştürün",
+  "messageExportSheetBatchExportImageSubtitle": "Seçili mesajları PNG resmine dönüştür",
+  "messageExportSheetShowThinkingAndToolCards": "Derin Düşünme ve araç kartlarını gösterin",
+  "messageExportSheetShowThinkingContent": "Düşünme içeriğini göster",
+  "messageExportThinkingContentLabel": "İçerik düşünme",
+  "messageExportSheetDateTimeWithSecondsPattern": "yyyy-AA-gg SS:dd:ss",
+  "exportDisclaimerAiGenerated": "Yapay zeka tarafından oluşturulan içerik. Lütfen dikkatlice doğrulayın.",
+  "imagePreviewSheetSaveImage": "Resmi Kaydet",
+  "imagePreviewSheetSaveSuccess": "Galeriye kaydedildi",
+  "imagePreviewSheetSaveFailed": "Kaydetme başarısız oldu: {error}",
+  "@imagePreviewSheetSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "sideDrawerMenuRename": "Yeniden isimlendirmek",
+  "sideDrawerMenuPin": "Sabitle",
+  "sideDrawerMenuUnpin": "Sabitlemeyi kaldır",
+  "sideDrawerMenuRegenerateTitle": "Başlığı Yeniden Oluştur",
+  "sideDrawerMenuMoveTo": "Şuraya taşı:",
+  "sideDrawerMenuDelete": "Silmek",
+  "sideDrawerDeleteSnackbar": "\"{title}\" silindi",
+  "@sideDrawerDeleteSnackbar": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "sideDrawerRenameHint": "Yeni adı girin",
+  "sideDrawerCancel": "İptal etmek",
+  "sideDrawerOK": "TAMAM",
+  "sideDrawerSave": "Kaydetmek",
+  "sideDrawerGreetingMorning": "Günaydın 👋",
+  "sideDrawerGreetingNoon": "İyi günler 👋",
+  "sideDrawerGreetingAfternoon": "İyi günler 👋",
+  "sideDrawerGreetingEvening": "İyi akşamlar 👋",
+  "sideDrawerDateToday": "Bugün",
+  "sideDrawerDateYesterday": "Dün",
+  "sideDrawerDateShortPattern": "MMM d",
+  "sideDrawerDateFullPattern": "MMM d, yyyy",
+  "sideDrawerSearchHint": "Mevcut asistanı ara",
+  "sideDrawerSearchAssistantsHint": "Arama asistanları",
+  "sideDrawerTopicSearchModeLabel": "Konu modu",
+  "sideDrawerGlobalSearchModeLabel": "Küresel mod",
+  "sideDrawerSearchModeSwipeToTopicHint": "Konu aramak için arama çubuğunu kaydırın",
+  "sideDrawerSearchModeSwipeToGlobalHint": "Genel arama için arama çubuğunu kaydırın",
+  "sideDrawerGlobalSearchHint": "Tüm oturumları ara",
+  "sideDrawerGlobalSearchEmptyHint": "Başlıklar ve mesajlar arasında arama yapın",
+  "sideDrawerGlobalSearchNoResults": "Eşleşen oturum yok",
+  "sideDrawerGlobalSearchResultCount": "{count} sonuçlar",
+  "@sideDrawerGlobalSearchResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sideDrawerUpdateTitle": "Yeni sürüm: {version}",
+  "@sideDrawerUpdateTitle": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "sideDrawerUpdateTitleWithBuild": "Yeni sürüm: {version} ({build})",
+  "@sideDrawerUpdateTitleWithBuild": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "build": {
+        "type": "int"
+      }
+    }
+  },
+  "sideDrawerLinkCopied": "Bağlantı kopyalandı",
+  "sideDrawerPinnedLabel": "Sabitlendi",
+  "sideDrawerHistory": "Tarih",
+  "sideDrawerSettings": "Ayarlar",
+  "sideDrawerChooseAssistantTitle": "Asistan'ı seçin",
+  "sideDrawerChooseImage": "Resim Seç",
+  "sideDrawerChooseEmoji": "Emoji'yi seçin",
+  "sideDrawerEnterLink": "Bağlantıyı Girin",
+  "sideDrawerImportFromQQ": "QQ'dan içe aktar",
+  "sideDrawerReset": "Sıfırla",
+  "sideDrawerEmojiDialogTitle": "Emoji'yi seçin",
+  "sideDrawerEmojiDialogHint": "Herhangi bir emojiyi yazın veya yapıştırın",
+  "sideDrawerImageUrlDialogTitle": "Resim URL'sini girin",
+  "sideDrawerImageUrlDialogHint": "örneğin https://example.com/avatar.png",
+  "sideDrawerQQAvatarDialogTitle": "QQ'dan içe aktar",
+  "sideDrawerQQAvatarInputHint": "QQ numarasını girin (5-12 haneli)",
+  "sideDrawerQQAvatarFetchFailed": "Rastgele QQ avatarı getirilemedi. Lütfen tekrar deneyin.",
+  "sideDrawerRandomQQ": "Rastgele QQ",
+  "sideDrawerGalleryOpenError": "Galeri açılamıyor. Bir resim URL'si girmeyi deneyin.",
+  "sideDrawerGeneralImageError": "Bir şeyler ters gitti. Bir resim URL'si girmeyi deneyin.",
+  "sideDrawerSetNicknameTitle": "Takma Ad Belirle",
+  "sideDrawerNicknameLabel": "Takma ad",
+  "sideDrawerNicknameHint": "Yeni takma adı girin",
+  "sideDrawerRename": "Yeniden isimlendirmek",
+  "chatInputBarHint": "AI için bir mesaj yazın",
+  "chatInputBarSelectModelTooltip": "Modeli Seçin",
+  "chatInputBarOnlineSearchTooltip": "Çevrimiçi Arama",
+  "chatInputBarReasoningStrengthTooltip": "Muhakeme Gücü",
+  "chatInputBarMcpServersTooltip": "MCP Sunucuları",
+  "chatInputBarMoreTooltip": "Eklemek",
+  "chatInputBarInsertNewline": "Yeni satır",
+  "chatInputBarExpand": "Genişletmek",
+  "chatInputBarCollapse": "Yıkılmak",
+  "mcpPageBackTooltip": "Geri",
+  "mcpPageAddMcpTooltip": "MCP ekle",
+  "mcpPageNoServers": "MCP sunucusu yok",
+  "mcpPageErrorDialogTitle": "Bağlantı Hatası",
+  "mcpPageErrorNoDetails": "Ayrıntı yok",
+  "mcpPageClose": "Kapalı",
+  "mcpPageReconnect": "Yeniden bağlan",
+  "mcpPageStatusConnected": "Bağlı",
+  "mcpPageStatusConnecting": "Bağlanıyor…",
+  "mcpPageStatusDisconnected": "Bağlantı kesildi",
+  "mcpPageStatusDisabled": "Engelli",
+  "mcpPageToolsCount": "Araçlar: {enabled}/{total}",
+  "@mcpPageToolsCount": {
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpPageConnectionFailed": "Bağlantı başarısız oldu",
+  "mcpPageDetails": "Detaylar",
+  "mcpPageDelete": "Silmek",
+  "mcpPageConfirmDeleteTitle": "Silmeyi Onayla",
+  "mcpPageConfirmDeleteContent": "Bu, Geri Al aracılığıyla geri alınabilir. Silmek?",
+  "mcpPageServerDeleted": "Sunucu silindi",
+  "mcpPageUndo": "Geri al",
+  "mcpPageCancel": "İptal etmek",
+  "mcpConversationSheetTitle": "MCP Sunucuları",
+  "mcpConversationSheetSubtitle": "Bu görüşme için etkinleştirilen sunucuları seçin",
+  "mcpConversationSheetSelectAll": "Tümünü Seç",
+  "mcpConversationSheetClearAll": "Temizlemek",
+  "mcpConversationSheetNoRunning": "Çalışan MCP sunucusu yok",
+  "mcpConversationSheetConnected": "Bağlı",
+  "mcpConversationSheetToolsCount": "Araçlar: {enabled}/{total}",
+  "@mcpConversationSheetToolsCount": {
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpServerEditSheetEnabledLabel": "Etkinleştirilmiş",
+  "mcpServerEditSheetNameLabel": "İsim",
+  "mcpServerEditSheetTransportLabel": "Taşıma",
+  "mcpServerEditSheetSseRetryHint": "SSE başarısız olursa birkaç kez deneyin",
+  "mcpServerEditSheetUrlLabel": "Sunucu URL'si",
+  "mcpServerEditSheetCustomHeadersTitle": "Özel Başlıklar",
+  "mcpServerEditSheetHeaderNameLabel": "Başlık Adı",
+  "mcpServerEditSheetHeaderNameHint": "örneğin Yetkilendirme",
+  "mcpServerEditSheetHeaderValueLabel": "Başlık Değeri",
+  "mcpServerEditSheetHeaderValueHint": "örneğin Taşıyıcı xxxxxx",
+  "mcpServerEditSheetRemoveHeaderTooltip": "Kaldırmak",
+  "mcpServerEditSheetAddHeader": "Başlık Ekle",
+  "mcpServerEditSheetTitleEdit": "MCP'yi düzenle",
+  "mcpServerEditSheetTitleAdd": "MCP ekle",
+  "mcpServerEditSheetSyncToolsTooltip": "Senkronizasyon Araçları",
+  "mcpServerEditSheetTabBasic": "Temel",
+  "mcpServerEditSheetTabTools": "Aletler",
+  "mcpServerEditSheetNoToolsHint": "Araç yok, senkronize etmek için yenile'ye dokunun",
+  "mcpServerEditSheetCancel": "İptal etmek",
+  "mcpServerEditSheetSave": "Kaydetmek",
+  "mcpServerEditSheetUrlRequired": "Lütfen sunucu URL'sini girin",
+  "defaultModelPageBackTooltip": "Geri",
+  "defaultModelPageTitle": "Varsayılan Model",
+  "defaultModelPageChatModelTitle": "Sohbet Modeli",
+  "defaultModelPageChatModelSubtitle": "Küresel varsayılan sohbet modeli",
+  "defaultModelPageTitleModelTitle": "Başlık Özeti Modeli",
+  "defaultModelPageTitleModelSubtitle": "Konuşma başlıklarını özetlemek için kullanılır; hızlı ve ucuz modelleri tercih edin",
+  "defaultModelPageSummaryModelTitle": "Özet Modeli",
+  "defaultModelPageSummaryModelSubtitle": "Konuşma özetleri oluşturmak için kullanılır; hızlı ve ucuz modelleri tercih edin",
+  "assistantEditRecentChatsSummaryFrequencyTitle": "Özet Yenileme Sıklığı",
+  "assistantEditRecentChatsSummaryFrequencyDescription": "Seçilen sayıda yeni mesajdan sonra son sohbet özetlerini yenileyin.",
+  "assistantEditRecentChatsSummaryFrequencyOption": "Her {count}",
+  "@assistantEditRecentChatsSummaryFrequencyOption": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "assistantEditRecentChatsSummaryFrequencyCustomButton": "Gelenek",
+  "assistantEditRecentChatsSummaryFrequencyCustomTitle": "Özel Özet Sıklığı",
+  "assistantEditRecentChatsSummaryFrequencyCustomDescription": "Son sohbet özetini yenilemeden önce kaç yeni mesajın birikmesi gerektiğini girin.",
+  "assistantEditRecentChatsSummaryFrequencyCustomLabel": "Yeni mesaj sayısı",
+  "assistantEditRecentChatsSummaryFrequencyCustomHint": "0'dan büyük bir sayı girin",
+  "assistantEditRecentChatsSummaryFrequencyCustomInvalid": "Lütfen 0'dan büyük bir tam sayı girin",
+  "defaultModelPageTranslateModelTitle": "Çeviri Modeli",
+  "defaultModelPageTranslateModelSubtitle": "Mesaj içeriğini çevirmek için kullanılır; hızlı ve doğru modelleri tercih edin",
+  "defaultModelPageOcrModelTitle": "OCR Modeli",
+  "defaultModelPageOcrModelSubtitle": "Resimlerden metin ve açıklamalar çıkarmak için kullanılır",
+  "defaultModelPagePromptLabel": "Çabuk",
+  "defaultModelPageTitlePromptHint": "Başlık özeti için bilgi istemi şablonunu girin",
+  "defaultModelPageSummaryPromptHint": "Özet oluşturmak için bilgi istemi şablonunu girin",
+  "defaultModelPageTranslatePromptHint": "Çeviri için bilgi istemi şablonunu girin",
+  "defaultModelPageOcrPromptHint": "OCR görüntüsünün anlaşılması için bilgi istemi şablonunu girin",
+  "defaultModelPageResetDefault": "Varsayılana sıfırla",
+  "defaultModelPageSave": "Kaydetmek",
+  "defaultModelPageTitleVars": "Değişkenler: içerik: {contentVar}, yerel ayar: {localeVar}",
+  "@defaultModelPageTitleVars": {
+    "placeholders": {
+      "contentVar": {
+        "type": "String"
+      },
+      "localeVar": {
+        "type": "String"
+      }
+    }
+  },
+  "defaultModelPageSummaryVars": "Değişkenler: önceki özet: {previousSummaryVar}, yeni mesajlar: {userMessagesVar}",
+  "@defaultModelPageSummaryVars": {
+    "placeholders": {
+      "previousSummaryVar": {
+        "type": "String"
+      },
+      "userMessagesVar": {
+        "type": "String"
+      }
+    }
+  },
+  "defaultModelPageCompressModelTitle": "Modeli Sıkıştır",
+  "defaultModelPageCompressModelSubtitle": "Konuşma içeriğini sıkıştırmak için kullanılır; hızlı modelleri tercih edin",
+  "defaultModelPageCompressPromptHint": "Bağlam sıkıştırması için bilgi istemi şablonunu girin",
+  "defaultModelPageCompressVars": "Değişkenler: konuşma: {contentVar}, dil: {localeVar}",
+  "@defaultModelPageCompressVars": {
+    "placeholders": {
+      "contentVar": {
+        "type": "String"
+      },
+      "localeVar": {
+        "type": "String"
+      }
+    }
+  },
+  "defaultModelPageTranslateVars": "Değişkenler: kaynak metin: {sourceVar}, hedef dil: {targetVar}",
+  "@defaultModelPageTranslateVars": {
+    "placeholders": {
+      "sourceVar": {
+        "type": "String"
+      },
+      "targetVar": {
+        "type": "String"
+      }
+    }
+  },
+  "defaultModelPageUseCurrentModel": "Mevcut sohbet modelini kullan",
+  "translatePagePasteButton": "Yapıştır",
+  "translatePageCopyResult": "Sonucu kopyala",
+  "translatePageClearAll": "Tümünü Temizle",
+  "translatePageInputHint": "Çevrilecek metni girin…",
+  "translatePageOutputHint": "Çevrilmiş sonuç burada görünür…",
+  "modelDetailSheetAddModel": "Model Ekle",
+  "modelDetailSheetEditModel": "Modeli Düzenle",
+  "modelDetailSheetBasicTab": "Temel",
+  "modelDetailSheetAdvancedTab": "Gelişmiş",
+  "modelDetailSheetBuiltinToolsTab": "Yerleşik Araçlar",
+  "modelDetailSheetModelIdLabel": "Model Kimliği",
+  "modelDetailSheetModelIdHint": "Gerekli, küçük harf/rakam/tire önerin",
+  "modelDetailSheetModelIdDisabledHint": "{modelId}",
+  "@modelDetailSheetModelIdDisabledHint": {
+    "placeholders": {
+      "modelId": {
+        "type": "String"
+      }
+    }
+  },
+  "modelDetailSheetModelNameLabel": "Model Adı",
+  "modelDetailSheetModelTypeLabel": "Modeli Türü",
+  "modelDetailSheetChatType": "Sohbet",
+  "modelDetailSheetEmbeddingType": "Gömme",
+  "modelDetailSheetInputModesLabel": "Giriş Modları",
+  "modelDetailSheetOutputModesLabel": "Çıkış Modları",
+  "modelDetailSheetAbilitiesLabel": "Yetenekler",
+  "modelDetailSheetTextMode": "Metin",
+  "modelDetailSheetImageMode": "Resim",
+  "modelDetailSheetToolsAbility": "Aletler",
+  "modelDetailSheetReasoningAbility": "muhakeme",
+  "modelDetailSheetProviderOverrideDescription": "Sağlayıcı geçersiz kılmaları: sağlayıcıyı belirli bir model için özelleştirin.",
+  "modelDetailSheetAddProviderOverride": "Sağlayıcıyı Geçersiz Kılma Ekle",
+  "modelDetailSheetCustomHeadersTitle": "Özel Başlıklar",
+  "modelDetailSheetAddHeader": "Başlık Ekle",
+  "modelDetailSheetCustomBodyTitle": "Özel Gövde",
+  "modelFetchInvertTooltip": "Ters çevir",
+  "modelDetailSheetSaveFailedMessage": "Kaydetme başarısız oldu. Lütfen tekrar deneyin.",
+  "modelDetailSheetAddBody": "Gövde Ekle",
+  "modelDetailSheetBuiltinToolsDescription": "Yerleşik araçlar yalnızca resmi API'leri destekler.",
+  "modelDetailSheetGeminiCodeExecutionMutuallyExclusiveHint": "Kod yürütme, Arama/URL Bağlamı/MCP araçlarıyla bir arada bulunamaz.",
+  "modelDetailSheetBuiltinToolsUnsupportedHint": "Mevcut sağlayıcı bu yerleşik araçları desteklemiyor.",
+  "modelDetailSheetSearchTool": "Aramak",
+  "modelDetailSheetSearchToolDescription": "Google Arama entegrasyonunu etkinleştirin",
+  "modelDetailSheetUrlContextTool": "URL İçeriği",
+  "modelDetailSheetUrlContextToolDescription": "URL içeriği beslemeyi etkinleştir",
+  "modelDetailSheetCodeExecutionTool": "Kod Yürütme",
+  "modelDetailSheetCodeExecutionToolDescription": "Kod yürütme aracını etkinleştir",
+  "modelDetailSheetYoutubeTool": "YouTube",
+  "modelDetailSheetYoutubeToolDescription": "YouTube URL alımını etkinleştirin (istemlerdeki bağlantıları otomatik olarak algıla)",
+  "modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint": "OpenAI Responses API'sini gerektirir.",
+  "modelDetailSheetOpenaiCodeInterpreterTool": "Kod Yorumlayıcı",
+  "modelDetailSheetOpenaiCodeInterpreterToolDescription": "Kod yorumlama aracını etkinleştirin (konteyner otomatik, bellek sınırı 4g)",
+  "modelDetailSheetOpenaiImageGenerationTool": "Görüntü Üretimi",
+  "modelDetailSheetOpenaiImageGenerationToolDescription": "Görüntü oluşturma aracını etkinleştir",
+  "modelDetailSheetCancelButton": "İptal etmek",
+  "modelDetailSheetAddButton": "Eklemek",
+  "modelDetailSheetConfirmButton": "Onaylamak",
+  "modelDetailSheetInvalidIdError": "Lütfen geçerli bir model kimliği girin (>=2 karakter)",
+  "modelDetailSheetModelIdExistsError": "Model Kimliği zaten mevcut",
+  "modelDetailSheetHeaderKeyHint": "Başlık Anahtarı",
+  "modelDetailSheetHeaderValueHint": "Başlık Değeri",
+  "modelDetailSheetBodyKeyHint": "Gövde Anahtarı",
+  "modelDetailSheetBodyJsonHint": "Gövde JSON'u",
+  "modelSelectSheetSearchHint": "Modelleri veya sağlayıcıları arayın",
+  "modelSelectSheetFavoritesSection": "Favoriler",
+  "modelSelectSheetFavoriteTooltip": "Favori",
+  "modelSelectSheetChatType": "Sohbet",
+  "modelSelectSheetEmbeddingType": "Gömme",
+  "providerDetailPageShareTooltip": "Paylaşmak",
+  "providerDetailPageDeleteProviderTooltip": "Sağlayıcıyı Sil",
+  "providerDetailPageDeleteProviderTitle": "Sağlayıcıyı Sil",
+  "providerDetailPageDeleteProviderContent": "Bu sağlayıcıyı silmek istediğinizden emin misiniz? Bu geri alınamaz.",
+  "providerDetailPageCancelButton": "İptal etmek",
+  "providerDetailPageDeleteButton": "Silmek",
+  "providerDetailPageProviderDeletedSnackbar": "Sağlayıcı silindi",
+  "providerDetailPageConfigTab": "Yapılandırma",
+  "providerDetailPageModelsTab": "Modeller",
+  "providerDetailPageNetworkTab": "Ağ",
+  "providerDetailPageEnabledTitle": "Etkinleştirilmiş",
+  "providerDetailPageManageSectionTitle": "Üstesinden gelmek",
+  "providerDetailPageNameLabel": "İsim",
+  "providerDetailPageApiKeyHint": "Varsayılanı kullanmak için boş bırakın",
+  "providerDetailPageHideTooltip": "Saklamak",
+  "providerDetailPageShowTooltip": "Göstermek",
+  "providerDetailPageApiPathLabel": "API Yolu",
+  "providerDetailPageResponseApiTitle": "Yanıt API'si (/yanıtlar)",
+  "providerDetailPageAihubmixAppCodeLabel": "APP Kodu (%10 indirim)",
+  "providerDetailPageAihubmixAppCodeHelp": "%10 indirim almak için başlık APP Kodu isteklerini ekler. Yalnızca AIhubmix'i etkiler.",
+  "providerDetailPageVertexAiTitle": "Vertex AI",
+  "providerDetailPageLocationLabel": "Konum",
+  "providerDetailPageProjectIdLabel": "Proje Kimliği",
+  "providerDetailPageServiceAccountJsonLabel": "Hizmet Hesabı JSON (yapıştır veya içe aktar)",
+  "providerDetailPageImportJsonButton": "JSON'u içe aktar",
+  "providerDetailPageImportJsonReadFailedMessage": "Dosya okunamadı",
+  "providerDetailPageTestButton": "Test",
+  "providerDetailPageSaveButton": "Kaydetmek",
+  "providerDetailPageProviderRemovedMessage": "Sağlayıcı kaldırıldı",
+  "providerDetailPageNoModelsTitle": "Model Yok",
+  "providerDetailPageNoModelsSubtitle": "Model eklemek için aşağıdaki düğmelere dokunun",
+  "providerDetailPageDeleteModelButton": "Silmek",
+  "providerDetailPageConfirmDeleteTitle": "Silmeyi Onayla",
+  "providerDetailPageConfirmDeleteContent": "Bu, Geri Al aracılığıyla geri alınabilir. Silmek?",
+  "providerDetailPageModelDeletedSnackbar": "Model silindi",
+  "providerDetailPageUndoButton": "Geri al",
+  "providerDetailPageAddNewModelButton": "Model Ekle",
+  "providerDetailPageFetchModelsButton": "Gidip getirmek",
+  "providerDetailPageEnableProxyTitle": "Proxy'yi Etkinleştir",
+  "providerDetailPageHostLabel": "Ev sahibi",
+  "providerDetailPagePortLabel": "Liman",
+  "providerDetailPageUsernameOptionalLabel": "Kullanıcı adı (isteğe bağlı)",
+  "providerDetailPagePasswordOptionalLabel": "Şifre (isteğe bağlı)",
+  "providerDetailPageSavedSnackbar": "Kaydedildi",
+  "providerDetailPageEmbeddingsGroupTitle": "Gömmeler",
+  "providerDetailPageOtherModelsGroupTitle": "Diğer",
+  "providerDetailPageRemoveGroupTooltip": "Grubu kaldır",
+  "providerDetailPageAddGroupTooltip": "Grup ekle",
+  "providerDetailPageFilterHint": "Filtrelenecek model adını yazın",
+  "providerDetailPageDeleteText": "Silmek",
+  "providerDetailPageEditTooltip": "Düzenlemek",
+  "providerDetailPageTestConnectionTitle": "Bağlantıyı Test Et",
+  "providerDetailPageSelectModelButton": "Modeli Seçin",
+  "providerDetailPageChangeButton": "Değiştirmek",
+  "providerDetailPageUseStreamingLabel": "Akışı Kullan",
+  "providerDetailPageTestingMessage": "Test…",
+  "providerDetailPageTestSuccessMessage": "Başarı",
+  "providersPageTitle": "Sağlayıcılar",
+  "providersPageImportTooltip": "İçe aktarmak",
+  "providersPageAddTooltip": "Eklemek",
+  "providersPageSearchHint": "Sağlayıcıları veya grupları arayın",
+  "providersPageProviderAddedSnackbar": "Sağlayıcı eklendi",
+  "providerGroupsGroupLabel": "Grup",
+  "providerGroupsOther": "Diğer",
+  "providerGroupsOtherUngroupedOption": "Diğer (Gruplanmamış)",
+  "providerGroupsPickerTitle": "Grup seç",
+  "providerGroupsManageTitle": "Grupları yönet",
+  "providerGroupsManageAction": "Grupları yönet",
+  "providerGroupsCreateNewGroupAction": "Yeni grup…",
+  "providerGroupsCreateDialogTitle": "Yeni grup",
+  "providerGroupsNameHint": "Grup adı",
+  "providerGroupsCreateDialogCancel": "İptal etmek",
+  "providerGroupsCreateDialogOk": "Yaratmak",
+  "providerGroupsCreateFailedToast": "Grup oluşturulamadı",
+  "providerGroupsDeleteConfirmTitle": "Grup silinsin mi?",
+  "providerGroupsDeleteConfirmContent": "Bu gruptaki sağlayıcılar \"Diğer\" bölümüne taşınacaktır.",
+  "providerGroupsDeleteConfirmCancel": "İptal etmek",
+  "providerGroupsDeleteConfirmOk": "Silmek",
+  "providerGroupsDeletedToast": "Grup silindi",
+  "providerGroupsEmptyState": "Henüz grup yok.",
+  "providerGroupsExpandToMoveToast": "Lütfen önce grubu genişletin.",
+  "providersPageSiliconFlowName": "Silikon Akışı",
+  "providersPageAliyunName": "Aliyun",
+  "providersPageZhipuName": "Zhipu AI",
+  "providersPageByteDanceName": "ByteDance",
+  "providersPageEnabledStatus": "AÇIK",
+  "providersPageDisabledStatus": "KAPALI",
+  "providersPageModelsCountSuffix": "modeller",
+  "providersPageModelsCountSingleSuffix": "modeller",
+  "addProviderSheetTitle": "Sağlayıcı Ekle",
+  "addProviderSheetEnabledLabel": "Etkinleştirilmiş",
+  "addProviderSheetNameLabel": "İsim",
+  "addProviderSheetApiPathLabel": "API Yolu",
+  "addProviderSheetVertexAiLocationLabel": "Konum",
+  "addProviderSheetVertexAiProjectIdLabel": "Proje Kimliği",
+  "addProviderSheetVertexAiServiceAccountJsonLabel": "Hizmet Hesabı JSON (yapıştır veya içe aktar)",
+  "addProviderSheetImportJsonButton": "JSON'u içe aktar",
+  "addProviderSheetCancelButton": "İptal etmek",
+  "addProviderSheetAddButton": "Eklemek",
+  "importProviderSheetTitle": "İthalat Sağlayıcısı",
+  "importProviderSheetScanQrTooltip": "QR'yi tara",
+  "importProviderSheetFromGalleryTooltip": "Galeriden",
+  "importProviderSheetImportSuccessMessage": "İçe aktarılan {count} sağlayıcı(lar)",
+  "@importProviderSheetImportSuccessMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importProviderSheetImportFailedMessage": "İçe aktarma başarısız oldu: {error}",
+  "@importProviderSheetImportFailedMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "importProviderSheetDescription": "Paylaşım dizelerini (çok satırlı desteklenir) veya ChatBox JSON'u yapıştırın",
+  "importProviderSheetInputHint": "ai-provider:v1:... veya JSON",
+  "importProviderSheetCancelButton": "İptal etmek",
+  "importProviderSheetImportButton": "İçe aktarmak",
+  "shareProviderSheetTitle": "Paylaşım Sağlayıcı",
+  "shareProviderSheetDescription": "QR koduyla kopyalayın veya paylaşın.",
+  "shareProviderSheetCopiedMessage": "Kopyalandı",
+  "shareProviderSheetCopyButton": "Kopyala",
+  "shareProviderSheetShareButton": "Paylaşmak",
+  "desktopProviderContextMenuShare": "Paylaşmak",
+  "desktopProviderShareCopyText": "Kodu kopyala",
+  "desktopProviderShareCopyQr": "QR'yi kopyala",
+  "providerDetailPageApiBaseUrlLabel": "API Temel URL'si",
+  "providerDetailPageModelsTitle": "Modeller",
+  "providerModelsGetButton": "Elde etmek",
+  "providerDetailPageCapsVision": "Görüş",
+  "providerDetailPageCapsImage": "Resim",
+  "providerDetailPageCapsTool": "Alet",
+  "providerDetailPageCapsReasoning": "muhakeme",
+  "qrScanPageTitle": "QR'yi tara",
+  "qrScanPageInstruction": "QR kodunu çerçevenin içine hizalayın",
+  "searchServicesPageBackTooltip": "Geri",
+  "searchServicesPageTitle": "Arama Hizmetleri",
+  "searchServicesPageDone": "Tamamlamak",
+  "searchServicesPageEdit": "Düzenlemek",
+  "searchServicesPageAddProvider": "Sağlayıcı Ekle",
+  "searchServicesPageSearchProviders": "Arama Sağlayıcıları",
+  "searchServicesPageGeneralOptions": "Genel Seçenekler",
+  "searchServicesPageAutoTestTitle": "Başlatma sırasında bağlantıları otomatik olarak test edin",
+  "searchServicesPageMaxResults": "Maksimum Sonuçlar",
+  "searchServicesPageTimeoutSeconds": "Zaman aşımı (saniye)",
+  "searchServicesPageAtLeastOneServiceRequired": "En az bir arama hizmeti gerekli",
+  "searchServicesPageTestingStatus": "Test…",
+  "searchServicesPageConnectedStatus": "Bağlı",
+  "searchServicesPageFailedStatus": "Arızalı",
+  "searchServicesPageNotTestedStatus": "Test edilmedi",
+  "searchServicesPageEditServiceTooltip": "Hizmeti Düzenle",
+  "searchServicesPageTestConnectionTooltip": "Bağlantıyı Test Et",
+  "searchServicesPageDeleteServiceTooltip": "Hizmeti Sil",
+  "searchServicesPageConfiguredStatus": "Yapılandırılmış",
+  "miniMapTitle": "Mini harita",
+  "miniMapTooltip": "Mini harita",
+  "miniMapScrollToBottomTooltip": "Aşağıya doğru kaydır",
+  "searchServicesPageApiKeyRequiredStatus": "API Anahtarı Gerekli",
+  "searchServicesPageUrlRequiredStatus": "URL Gerekli",
+  "searchServicesAddDialogTitle": "Arama Hizmeti Ekle",
+  "searchServicesAddDialogServiceType": "Hizmet Türü",
+  "searchServicesAddDialogBingLocal": "Yerel",
+  "searchServicesAddDialogCancel": "İptal etmek",
+  "searchServicesAddDialogAdd": "Eklemek",
+  "searchServicesAddDialogApiKeyRequired": "API Anahtarı gerekli",
+  "searchServicesFieldCustomUrlOptional": "Özel URL (isteğe bağlı)",
+  "searchServicesAddDialogInstanceUrl": "Örnek URL'si",
+  "searchServicesAddDialogUrlRequired": "URL gerekli",
+  "searchServicesAddDialogEnginesOptional": "Motorlar (isteğe bağlı)",
+  "searchServicesAddDialogLanguageOptional": "Dil (isteğe bağlı)",
+  "searchServicesAddDialogUsernameOptional": "Kullanıcı adı (isteğe bağlı)",
+  "searchServicesAddDialogPasswordOptional": "Şifre (isteğe bağlı)",
+  "searchServicesAddDialogRegionOptional": "Bölge (isteğe bağlı, varsayılan: us-en)",
+  "searchServicesEditDialogEdit": "Düzenlemek",
+  "searchServicesEditDialogCancel": "İptal etmek",
+  "searchServicesEditDialogSave": "Kaydetmek",
+  "searchServicesEditDialogBingLocalNoConfig": "Bing Yerel arama için yapılandırma gerekmez.",
+  "searchServicesEditDialogApiKeyRequired": "API Anahtarı gerekli",
+  "searchServicesEditDialogInstanceUrl": "Örnek URL'si",
+  "searchServicesEditDialogUrlRequired": "URL gerekli",
+  "searchServicesEditDialogEnginesOptional": "Motorlar (isteğe bağlı)",
+  "searchServicesEditDialogLanguageOptional": "Dil (isteğe bağlı)",
+  "searchServicesEditDialogUsernameOptional": "Kullanıcı adı (isteğe bağlı)",
+  "searchServicesEditDialogPasswordOptional": "Şifre (isteğe bağlı)",
+  "searchServicesEditDialogRegionOptional": "Bölge (isteğe bağlı, varsayılan: us-en)",
+  "searchSettingsSheetTitle": "Arama Ayarları",
+  "searchSettingsSheetBuiltinSearchTitle": "Dahili Arama",
+  "searchSettingsSheetBuiltinSearchDescription": "Modelin yerleşik aramasını etkinleştir",
+  "searchSettingsSheetWebSearchTitle": "Web Araması",
+  "searchSettingsSheetWebSearchDescription": "Sohbette web aramasını etkinleştir",
+  "searchSettingsSheetOpenSearchServicesTooltip": "Arama hizmetlerini aç",
+  "searchSettingsSheetNoServicesMessage": "Hizmet yok. Arama Hizmetleri'nden ekleyin.",
+  "aboutPageEasterEggMessage": "Keşfettiğiniz için teşekkürler! \n (Henüz yumurta yok)",
+  "aboutPageEasterEggButton": "Güzel!",
+  "aboutPageAppDescription": "Açık kaynaklı AI Asistanı",
+  "aboutPageNoQQGroup": "Henüz QQ grubu yok",
+  "aboutPageVersion": "Sürüm",
+  "aboutPageSystem": "Sistem",
+  "aboutPageWebsite": "Web sitesi",
+  "aboutPageLicense": "Lisans",
+  "aboutPageJoinQQGroup": "QQ Grubumuza katılın",
+  "aboutPageJoinDiscord": "Discord'da bize katılın",
+  "displaySettingsPageShowUserAvatarTitle": "Kullanıcı Avatarını Göster",
+  "displaySettingsPageShowUserAvatarSubtitle": "Kullanıcı avatarını sohbet mesajlarında görüntüle",
+  "displaySettingsPageShowUserNameTimestampTitle": "Kullanıcı Adını ve Zaman Damgasını Göster",
+  "displaySettingsPageShowUserNameTimestampSubtitle": "Sohbet mesajlarında kullanıcı adını ve altındaki zaman damgasını göster",
+  "displaySettingsPageShowUserMessageActionsTitle": "Kullanıcı Mesajı Eylemlerini Göster",
+  "displaySettingsPageShowUserMessageActionsSubtitle": "Mesajlarınızın altında kopyala, yeniden gönder ve daha fazla düğme görüntüleyin",
+  "displaySettingsPageShowModelNameTimestampTitle": "Model Adını ve Zaman Damgasını Göster",
+  "displaySettingsPageShowModelNameTimestampSubtitle": "Sohbet mesajlarında model adını ve altındaki zaman damgasını göster",
+  "displaySettingsPageShowProviderInChatMessageTitle": "Model Adından Sonra Sağlayıcıyı Göster",
+  "displaySettingsPageShowProviderInChatMessageSubtitle": "Sohbet mesajlarında model kimliğinden sonra sağlayıcı adını görüntüle (ör. model | sağlayıcı)",
+  "displaySettingsPageChatModelIconTitle": "Sohbet Modeli Simgesi",
+  "displaySettingsPageChatModelIconSubtitle": "Sohbet mesajlarında model simgesini göster",
+  "displaySettingsPageShowTokenStatsTitle": "Token ve İçerik İstatistiklerini Göster",
+  "displaySettingsPageShowTokenStatsSubtitle": "Belirteç kullanımını ve mesaj sayısını göster",
+  "displaySettingsPageAutoCollapseThinkingTitle": "Otomatik Çöküşü Düşünme",
+  "displaySettingsPageAutoCollapseThinkingSubtitle": "Bitirdikten sonra mantığı daralt",
+  "displaySettingsPageShowChatListDateTitle": "Sohbet Listesi Tarihlerini Göster",
+  "displaySettingsPageShowChatListDateSubtitle": "Görüşme listesinde tarih grubu etiketlerini görüntüle",
+  "displaySettingsPageKeepSidebarOpenOnAssistantTapTitle": "Asistanı seçerken kenar çubuğunu açık tutun",
+  "displaySettingsPageKeepSidebarOpenOnTopicTapTitle": "Konu seçerken kenar çubuğunu açık tutun",
+  "displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle": "Kenar çubuğunu kapatırken asistan listesini daraltmayın",
+  "displaySettingsPageShowUpdatesTitle": "Güncellemeleri Göster",
+  "displaySettingsPageShowUpdatesSubtitle": "Uygulama güncelleme bildirimlerini göster",
+  "displaySettingsPageMessageNavButtonsTitle": "Mesaj Gezinme Düğmeleri",
+  "displaySettingsPageMessageNavButtonsSubtitle": "Kaydırırken hızlı atlama düğmelerini göster",
+  "displaySettingsPageHapticsOnSidebarTitle": "Kenar Çubuğundaki Dokunma",
+  "displaySettingsPageHapticsOnSidebarSubtitle": "Kenar çubuğunu açarken/kapatırken dokunsal geri bildirimi etkinleştirin",
+  "displaySettingsPageHapticsGlobalTitle": "Küresel Dokunuş",
+  "displaySettingsPageHapticsIosSwitchTitle": "Switch'te Dokunma",
+  "displaySettingsPageHapticsOnListItemTapTitle": "Liste Öğelerinde Dokunma",
+  "displaySettingsPageHapticsOnCardTapTitle": "Kartlardaki Dokunma",
+  "displaySettingsPageHapticsOnGenerateTitle": "Generate'de Haptikler",
+  "displaySettingsPageHapticsOnGenerateSubtitle": "Oluşturma sırasında dokunsal geri bildirimi etkinleştirin",
+  "displaySettingsPageNewChatAfterDeleteTitle": "Konuyu sildikten sonra yeni sohbet",
+  "displaySettingsPageNewChatOnAssistantSwitchTitle": "Asistanları değiştirirken yeni sohbet",
+  "displaySettingsPageNewChatOnLaunchTitle": "Lansmanda Yeni Sohbet",
+  "displaySettingsPageEnterToSendTitle": "Gönderilecek Anahtarı Girin",
+  "displaySettingsPageSendShortcutTitle": "Kısayol Gönder",
+  "displaySettingsPageSendShortcutEnter": "Girmek",
+  "displaySettingsPageSendShortcutCtrlEnter": "Ctrl/Cmd + Enter",
+  "displaySettingsPageAutoSwitchTopicsTitle": "Konulara otomatik geçiş",
+  "desktopDisplaySettingsTopicPositionTitle": "Konu konumu",
+  "desktopDisplaySettingsTopicPositionLeft": "Sol",
+  "desktopDisplaySettingsTopicPositionRight": "Sağ",
+  "displaySettingsPageNewChatOnLaunchSubtitle": "Başlatıldığında otomatik olarak yeni bir sohbet oluştur",
+  "displaySettingsPageChatFontSizeTitle": "Sohbet Yazı Tipi Boyutu",
+  "displaySettingsPageAutoScrollEnableTitle": "Otomatik olarak aşağıya kaydır",
+  "displaySettingsPageAutoScrollIdleTitle": "Otomatik Geri Kaydırma Gecikmesi",
+  "displaySettingsPageAutoScrollIdleSubtitle": "Aşağıya atlamadan önce kullanıcı kaydırdıktan sonra bekleme süresi",
+  "displaySettingsPageAutoScrollDisabledLabel": "Kapalı",
+  "displaySettingsPageChatFontSampleText": "Bu örnek bir sohbet metnidir",
+  "displaySettingsPageChatBackgroundMaskTitle": "Sohbet Arka Planı Yer Paylaşımı Opaklığı",
+  "displaySettingsPageThemeSettingsTitle": "Tema Ayarları",
+  "displaySettingsPageThemeColorTitle": "Tema Rengi",
+  "desktopSettingsFontsTitle": "Yazı tipleri",
+  "displaySettingsPageTrayTitle": "Sistem Tepsisi",
+  "displaySettingsPageTrayShowTrayTitle": "Tepsi simgesini göster",
+  "displaySettingsPageTrayMinimizeOnCloseTitle": "Kapatıldığında tepsiye küçült",
+  "desktopFontAppLabel": "Uygulama Yazı Tipi",
+  "desktopFontCodeLabel": "Kod Yazı Tipi",
+  "desktopFontFamilySystemDefault": "Sistem Varsayılanı",
+  "desktopFontFamilyMonospaceDefault": "Tek uzay",
+  "desktopFontFilterHint": "Yazı tiplerini filtrele...",
+  "displaySettingsPageAppFontTitle": "Uygulama Yazı Tipi",
+  "displaySettingsPageCodeFontTitle": "Kod Yazı Tipi",
+  "fontPickerChooseLocalFile": "Yerel Dosyayı Seçin",
+  "fontPickerGetFromGoogleFonts": "Google Fonts'a Göz Atın",
+  "fontPickerFilterHint": "Yazı tiplerini filtrele...",
+  "desktopFontLoading": "Yazı tipleri yükleniyor…",
+  "displaySettingsPageFontLocalFileLabel": "Yerel dosya",
+  "displaySettingsPageFontResetLabel": "Yazı tipi ayarlarını sıfırla",
+  "displaySettingsPageOtherSettingsTitle": "Diğer Ayarlar",
+  "themeSettingsPageDynamicColorSection": "Dinamik Renk",
+  "themeSettingsPageUseDynamicColorTitle": "Sistem Dinamik Renkleri",
+  "themeSettingsPageUseDynamicColorSubtitle": "Sistem paletini eşleştir (Android 12+)",
+  "themeSettingsPageUsePureBackgroundTitle": "Saf Arka Plan",
+  "themeSettingsPageUsePureBackgroundSubtitle": "Baloncuklar ve vurgular temayı takip ediyor.",
+  "themeSettingsPageColorPalettesSection": "Renk Paletleri",
+  "ttsServicesPageBackButton": "Geri",
+  "ttsServicesPageTitle": "Metinden Konuşmaya",
+  "ttsServicesPageAddTooltip": "Eklemek",
+  "ttsServicesPageAddNotImplemented": "TTS ekleme hizmeti uygulanmadı",
+  "ttsServicesPageSystemTtsTitle": "Sistem TTS'si",
+  "ttsServicesPageSystemTtsAvailableSubtitle": "Sistemin yerleşik TTS'sini kullanın",
+  "ttsServicesPageSystemTtsUnavailableSubtitle": "Kullanılamıyor: {error}",
+  "@ttsServicesPageSystemTtsUnavailableSubtitle": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "ttsServicesPageSystemTtsUnavailableNotInitialized": "başlatılmadı",
+  "ttsServicesPageTestSpeechText": "Merhaba bu bir deneme konuşmasıdır.",
+  "ttsServicesPageConfigureTooltip": "Yapılandır",
+  "ttsServicesPageTestVoiceTooltip": "Sesi test et",
+  "ttsServicesPageStopTooltip": "Durmak",
+  "ttsServicesPageDeleteTooltip": "Silmek",
+  "ttsServicesPageSystemTtsSettingsTitle": "Sistem TTS Ayarları",
+  "ttsServicesPageEngineLabel": "Motor",
+  "ttsServicesPageAutoLabel": "Otomatik",
+  "ttsServicesPageLanguageLabel": "Dil",
+  "ttsServicesPageSpeechRateLabel": "Konuşma hızı",
+  "ttsServicesPagePitchLabel": "Saha",
+  "ttsServicesPageSettingsSavedMessage": "Ayarlar kaydedildi.",
+  "ttsServicesPageDoneButton": "Tamamlamak",
+  "ttsServicesPageNetworkSectionTitle": "Ağ TTS'si",
+  "ttsServicesPageNoNetworkServices": "TTS hizmeti yok.",
+  "ttsServicesDialogAddTitle": "TTS Hizmeti Ekle",
+  "ttsServicesDialogEditTitle": "TTS Hizmetini Düzenle",
+  "ttsServicesDialogProviderType": "sağlayıcı",
+  "ttsServicesDialogCancelButton": "İptal etmek",
+  "ttsServicesDialogAddButton": "Eklemek",
+  "ttsServicesDialogSaveButton": "Kaydetmek",
+  "ttsServicesFieldNameLabel": "İsim",
+  "ttsServicesFieldApiKeyLabel": "API Anahtarı",
+  "ttsServicesFieldBaseUrlLabel": "API Temel URL'si",
+  "ttsServicesFieldModelLabel": "Modeli",
+  "ttsServicesFieldVoiceLabel": "Ses",
+  "ttsServicesFieldVoiceIdLabel": "Ses Kimliği",
+  "ttsServicesFieldEmotionLabel": "Duygu",
+  "ttsServicesFieldSpeedLabel": "Hız",
+  "ttsServicesViewDetailsButton": "Ayrıntıları görüntüle",
+  "ttsServicesDialogErrorTitle": "Hata Ayrıntıları",
+  "ttsServicesCloseButton": "Kapalı",
+  "imageViewerPageShareFailedOpenFile": "Paylaşılamadı, dosya açılmaya çalışıldı: {message}",
+  "@imageViewerPageShareFailedOpenFile": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "imageViewerPageShareFailed": "Paylaşım başarısız oldu: {error}",
+  "@imageViewerPageShareFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "imageViewerPageShareButton": "Resmi Paylaş",
+  "imageViewerPageSaveButton": "Resmi Kaydet",
+  "imageViewerPageSaveSuccess": "Galeriye kaydedildi",
+  "imageViewerPageSaveFailed": "Kaydetme başarısız oldu: {error}",
+  "@imageViewerPageSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsShare": "Kelivo - Açık Kaynak Yapay Zeka Asistanı",
+  "searchProviderBingLocalDescription": "Bing sonuçlarını getirmek için web kazımayı kullanır. API anahtarı gerekmez; istikrarsız olabilir.",
+  "searchProviderDuckDuckGoDescription": "DDGS aracılığıyla gizlilik odaklı DuckDuckGo araması. API anahtarı gerekmez; bölge seçimini destekler.",
+  "searchProviderBraveDescription": "Brave'den bağımsız arama motoru. İzleme veya profil oluşturma olmadan gizlilik odaklı.",
+  "searchProviderExaDescription": "Semantik anlayışla sinirsel arama. Araştırma yapmak ve belirli içerikleri bulmak için idealdir.",
+  "searchProviderLinkUpDescription": "Kaynaklı yanıtlarla arama API'si. Hem sonuçları hem de yapay zeka tarafından oluşturulan özetleri sağlar.",
+  "searchProviderMetasoDescription": "Metaso'nun Çince araması. Yapay zeka yetenekleriyle Çince içerik için optimize edilmiştir.",
+  "searchProviderSearXNGDescription": "Gizliliğe saygılı meta arama motoru. Kendi kendine barındırılan örnek gereklidir; izleme yok.",
+  "searchProviderTavilyDescription": "Yüksek Lisans'lar için optimize edilmiş AI arama API'si. Yüksek kaliteli, alakalı sonuçlar sağlar.",
+  "searchProviderZhipuDescription": "Zhipu AI tarafından Çin AI araması. Çince içerik ve sorgular için optimize edilmiştir.",
+  "searchProviderOllamaDescription": "Ollama web arama API'si. Modelleri güncel bilgilerle zenginleştirir.",
+  "searchProviderJinaDescription": "Yerleştirmeler, yeniden sıralamalar, web okuyucu, derin arama ve küçük dil modelleriyle yapay zeka arama temeli. Çok dilli ve çok modlu.",
+  "searchServiceNameBingLocal": "Bing (Yerel)",
+  "searchServiceNameDuckDuckGo": "ÖrdekDuckGo",
+  "searchServiceNameTavily": "Tavily",
+  "searchServiceNameExa": "Exa",
+  "searchServiceNameZhipu": "Zhipu AI",
+  "searchServiceNameSearXNG": "SearXNG",
+  "searchServiceNameLinkUp": "Bağlantı Kur",
+  "searchServiceNameBrave": "Cesur Arama",
+  "searchServiceNameMetaso": "Metaso",
+  "searchServiceNameOllama": "Ollama",
+  "searchServiceNameJina": "Jina",
+  "searchServiceNamePerplexity": "Şaşkınlık",
+  "searchProviderPerplexityDescription": "Şaşkınlık Arama API'si. Bölge ve etki alanı filtreleriyle sıralanmış web sonuçları.",
+  "searchServiceNameBocha": "Bocha",
+  "searchProviderBochaDescription": "Bocha web arama API'si. İsteğe bağlı özetlerle doğru web sonuçları.",
+  "generationInterrupted": "Üretim kesintiye uğradı",
+  "titleForLocale": "Yeni Sohbet",
+  "quickPhraseBackTooltip": "Geri",
+  "quickPhraseGlobalTitle": "Hızlı İfade",
+  "quickPhraseAssistantTitle": "Asistan Hızlı İfadesi",
+  "quickPhraseAddTooltip": "Hızlı İfade Ekle",
+  "quickPhraseEmptyMessage": "Henüz kısa ifade yok",
+  "quickPhraseAddTitle": "Hızlı İfade Ekle",
+  "quickPhraseEditTitle": "Hızlı İfadeyi Düzenle",
+  "quickPhraseTitleLabel": "Başlık",
+  "quickPhraseContentLabel": "İçerik",
+  "quickPhraseCancelButton": "İptal etmek",
+  "quickPhraseSaveButton": "Kaydetmek",
+  "instructionInjectionTitle": "Talimat Enjeksiyonu",
+  "instructionInjectionBackTooltip": "Geri",
+  "instructionInjectionAddTooltip": "Talimat Ekle",
+  "instructionInjectionImportTooltip": "Dosyalardan içe aktar",
+  "instructionInjectionEmptyMessage": "Henüz talimat enjeksiyon kartı yok",
+  "instructionInjectionDefaultTitle": "Öğrenme Modu",
+  "instructionInjectionAddTitle": "Talimat Ekleme Ekle",
+  "instructionInjectionEditTitle": "Talimat Eklemeyi Düzenle",
+  "instructionInjectionNameLabel": "İsim",
+  "instructionInjectionPromptLabel": "Çabuk",
+  "instructionInjectionUngroupedGroup": "Gruplandırılmamış",
+  "instructionInjectionGroupLabel": "Grup",
+  "instructionInjectionGroupHint": "İsteğe bağlı",
+  "instructionInjectionImportSuccess": "{count} talimat(lar)ı içe aktarıldı",
+  "@instructionInjectionImportSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "instructionInjectionSheetSubtitle": "Sohbet etmeden önce uygulanacak istemi seçin",
+  "mcpJsonEditButtonTooltip": "JSON'u düzenle",
+  "mcpJsonEditTitle": "JSON'u düzenle",
+  "mcpJsonEditParseFailed": "JSON ayrıştırması başarısız oldu",
+  "mcpJsonEditSavedApplied": "Kaydedildi ve uygulandı",
+  "mcpTimeoutSettingsTooltip": "Araç çağrısı zaman aşımını ayarla",
+  "mcpTimeoutDialogTitle": "Araç çağrısı zaman aşımı",
+  "mcpTimeoutSecondsLabel": "Araç çağrısı zaman aşımı (saniye)",
+  "mcpTimeoutInvalid": "Pozitif bir saniye sayısı girin",
+  "quickPhraseEditButton": "Düzenlemek",
+  "quickPhraseDeleteButton": "Silmek",
+  "quickPhraseMenuTitle": "Hızlı İfade",
+  "chatInputBarQuickPhraseTooltip": "Hızlı İfade",
+  "assistantEditQuickPhraseDescription": "Bu asistan için kısa ifadeleri yönetin. İfade eklemek için aşağıdaki düğmeyi tıklayın.",
+  "assistantEditManageQuickPhraseButton": "Hızlı İfadeleri Yönet",
+  "assistantEditPageMemoryTab": "Hafıza",
+  "assistantEditMemorySwitchTitle": "Hafıza",
+  "assistantEditMemorySwitchDescription": "Asistanın sohbetler arasında anılar oluşturmasına ve kullanmasına izin verin.",
+  "assistantEditRecentChatsSwitchTitle": "Son Sohbetler Referansı",
+  "assistantEditRecentChatsSwitchDescription": "Bağlama yardımcı olması için en son konuşma başlıklarını ekleyin.",
+  "assistantEditManageMemoryTitle": "Anıları Yönet",
+  "assistantEditAddMemoryButton": "Bellek Ekle",
+  "assistantEditMemoryEmpty": "Henüz anı yok",
+  "assistantEditMemoryDialogTitle": "Hafıza",
+  "assistantEditMemoryDialogHint": "Bellek içeriğini girin",
+  "assistantEditAddQuickPhraseButton": "Hızlı İfade Ekle",
+  "multiKeyPageDeleteSnackbarDeletedOne": "1 anahtar silindi",
+  "multiKeyPageUndo": "Geri al",
+  "multiKeyPageUndoRestored": "Geri yüklendi",
+  "multiKeyPageDeleteErrorsTooltip": "Hataları sil",
+  "multiKeyPageDeleteErrorsConfirmTitle": "Tüm hata anahtarları silinsin mi?",
+  "multiKeyPageDeleteErrorsConfirmContent": "Bu, hata olarak işaretlenen tüm anahtarları kaldıracaktır.",
+  "multiKeyPageDeletedErrorsSnackbar": "{n} hata anahtarları silindi",
+  "@multiKeyPageDeletedErrorsSnackbar": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "providerDetailPageProviderTypeTitle": "Sağlayıcı Türü",
+  "displaySettingsPageChatItemDisplayTitle": "Sohbet öğesi ekranı",
+  "displaySettingsPageRenderingSettingsTitle": "Oluşturma ayarları",
+  "displaySettingsPageBehaviorStartupTitle": "Davranış ve başlangıç",
+  "displaySettingsPageHapticsSettingsTitle": "Dokunsal",
+  "assistantSettingsNoPromptPlaceholder": "Henüz istem yok",
+  "providersPageMultiSelectTooltip": "Çoklu seçim",
+  "providersPageDeleteSelectedConfirmContent": "Seçilen sağlayıcılar silinsin mi? Bu geri alınamaz.",
+  "providersPageDeleteSelectedSnackbar": "Seçilen sağlayıcılar silindi",
+  "providersPageExportSelectedTitle": "{count} sağlayıcıyı dışa aktar",
+  "@providersPageExportSelectedTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "providersPageExportCopyButton": "Kopyala",
+  "providersPageExportShareButton": "Paylaşmak",
+  "providersPageExportCopiedSnackbar": "Kopyalanan dışa aktarma kodu",
+  "providersPageDeleteAction": "Silmek",
+  "providersPageExportAction": "İhracat",
+  "assistantEditPresetTitle": "Önceden ayarlanmış konuşma",
+  "assistantEditPresetAddUser": "Kullanıcı ön ayarı ekle",
+  "assistantEditPresetAddAssistant": "Asistan ön ayarı ekle",
+  "assistantEditPresetInputHintUser": "Kullanıcı mesajını girin…",
+  "assistantEditPresetInputHintAssistant": "Asistan mesajını girin…",
+  "assistantEditPresetEmpty": "Henüz önceden ayarlanmış mesaj yok",
+  "assistantEditPresetEditDialogTitle": "Önceden ayarlanmış mesajı düzenleyin",
+  "assistantEditPresetRoleUser": "Kullanıcı",
+  "assistantEditPresetRoleAssistant": "Asistan",
+  "desktopTtsPleaseAddProvider": "Lütfen önce bir TTS sağlayıcısı ekleyin",
+  "settingsPageNetworkProxy": "Ağ Proxy'si",
+  "networkProxyEnableLabel": "Proxy'yi Etkinleştir",
+  "networkProxySettingsHeader": "Proxy Ayarları",
+  "networkProxyType": "Vekil Türü",
+  "networkProxyTypeHttp": "HTTP",
+  "networkProxyTypeHttps": "HTTPS",
+  "networkProxyTypeSocks5": "ÇORAP5",
+  "networkProxyServerHost": "Sunucu",
+  "networkProxyPort": "Liman",
+  "networkProxyUsername": "Kullanıcı adı",
+  "networkProxyPassword": "Şifre",
+  "networkProxyBypassLabel": "Proxy bypass'ı",
+  "networkProxyBypassHint": "Virgülle ayrılmış ana bilgisayarlar/CIDR, ör. localhost,127.0.0.1,192.168.0.0/16,*.local",
+  "networkProxyOptionalHint": "İsteğe bağlı",
+  "networkProxyTestHeader": "Bağlantı Testi",
+  "networkProxyTestUrlHint": "URL'yi test edin",
+  "networkProxyTestButton": "Test",
+  "networkProxyTesting": "Test…",
+  "networkProxyTestSuccess": "Bağlantı başarılı",
+  "networkProxyTestFailed": "Test başarısız oldu: {error}",
+  "@networkProxyTestFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "networkProxyNoUrl": "Lütfen bir URL girin",
+  "networkProxyPriorityNote": "Hem genel hem de sağlayıcı proxy'leri etkinleştirildiğinde, sağlayıcı düzeyindeki proxy öncelikli olur.",
+  "desktopShowProviderInModelCapsule": "Sağlayıcıyı model kapsülünde göster",
+  "messageWebViewOpenInBrowser": "Tarayıcıda Aç",
+  "messageWebViewConsoleLogs": "Konsol Günlükleri",
+  "messageWebViewNoConsoleMessages": "Konsol mesajı yok",
+  "messageWebViewRefreshTooltip": "Yenile",
+  "messageWebViewForwardTooltip": "İleri",
+  "chatInputBarOcrTooltip": "Görüntü OCR'si",
+  "providerDetailPageBatchDetectButton": "Tespit etmek",
+  "providerDetailPageBatchDetecting": "Algılanıyor...",
+  "providerDetailPageBatchDetectStart": "Algılamayı Başlat",
+  "providerDetailPageDetectSuccess": "Algılama başarılı",
+  "providerDetailPageDetectFailed": "Algılama başarısız oldu",
+  "providerDetailPageDeleteAllModelsWarning": "Bu eylem geri alınamaz.",
+  "requestLogSettingTitle": "Günlük Kaydı İste",
+  "requestLogSettingSubtitle": "Etkinleştirildiğinde, istek/yanıt ayrıntıları logs/logs.txt dosyasına yazılır (günlük olarak dönüşümlü olarak).",
+  "flutterLogSettingTitle": "Çarpıntı Günlüğü",
+  "flutterLogSettingSubtitle": "Etkinleştirildiğinde, Flutter hataları ve yazdırma çıktısı logs/flutter_logs.txt dosyasına yazılır (günlük olarak döndürülür).",
+  "logViewerTitle": "Günlük Talep Et",
+  "logViewerEmpty": "Henüz günlük yok",
+  "logViewerCurrentLog": "Mevcut Günlük",
+  "logViewerExport": "İhracat",
+  "logViewerOpenFolder": "Günlükler Klasörünü Aç",
+  "logViewerRequestsCount": "{count} istek",
+  "@logViewerRequestsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "logViewerFieldId": "İD",
+  "logViewerFieldMethod": "Yöntem",
+  "logViewerFieldStatus": "Durum",
+  "logViewerFieldStarted": "Başlatıldı",
+  "logViewerFieldEnded": "Sona erdi",
+  "logViewerFieldDuration": "Süre",
+  "logViewerSectionSummary": "Özet",
+  "logViewerSectionParameters": "Parametreler",
+  "logViewerSectionRequestHeaders": "Başlıkları Talep Et",
+  "logViewerSectionRequestBody": "Talep Gövdesi",
+  "logViewerSectionResponseHeaders": "Yanıt Başlıkları",
+  "logViewerSectionResponseBody": "Yanıt Gövdesi",
+  "logViewerSectionWarnings": "Uyarılar",
+  "logViewerErrorTitle": "Hata",
+  "logViewerMoreCount": "+{count} daha",
+  "@logViewerMoreCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "logSettingsTitle": "Günlük Ayarları",
+  "logSettingsSaveOutput": "Yanıt Çıkışını Kaydet",
+  "logSettingsSaveOutputSubtitle": "Yanıt gövdesi içeriğini günlüğe kaydet (önemli miktarda depolama alanı kullanabilir)",
+  "logSettingsAutoDelete": "Otomatik sil",
+  "logSettingsAutoDeleteSubtitle": "Belirtilen günlerden daha eski olan günlükleri silin",
+  "logSettingsAutoDeleteDisabled": "Engelli",
+  "logSettingsAutoDeleteDays": "{count} gün",
+  "@logSettingsAutoDeleteDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "logSettingsMaxSize": "Maksimum Günlük Boyutu",
+  "logSettingsMaxSizeSubtitle": "En eski günlükler aşıldığında silinir",
+  "logSettingsMaxSizeUnlimited": "Sınırsız",
+  "assistantEditManageSummariesTitle": "Özetleri Yönet",
+  "assistantEditSummaryEmpty": "Henüz özet yok",
+  "assistantEditSummaryDialogTitle": "Özeti Düzenle",
+  "assistantEditSummaryDialogHint": "Özet içeriğini girin",
+  "assistantEditDeleteSummaryTitle": "Özeti Temizle",
+  "assistantEditDeleteSummaryContent": "Bu özeti temizlemek istediğinizden emin misiniz?",
+  "homePageProcessingFiles": "Dosyalar işleniyor...",
+  "fileUploadDuplicateTitle": "Dosya zaten mevcut",
+  "fileUploadDuplicateContent": "{fileName} adlı bir dosya zaten mevcut. Mevcut dosya kullanılsın mı?",
+  "@fileUploadDuplicateContent": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "fileUploadDuplicateUseExisting": "Mevcut olanı kullan",
+  "fileUploadDuplicateUploadNew": "Yenisini yükle",
+  "settingsPageWorldBook": "Dünya Kitabı",
+  "worldBookTitle": "Dünya Kitabı",
+  "worldBookAdd": "Dünya Kitabı Ekle",
+  "worldBookEmptyMessage": "Henüz dünya kitabı yok",
+  "worldBookUnnamed": "İsimsiz Dünya Kitabı",
+  "worldBookDisabledTag": "Engelli",
+  "worldBookAlwaysOnTag": "Daima Açık",
+  "worldBookAddEntry": "Giriş Ekle",
+  "worldBookExport": "Paylaş / Dışa Aktar",
+  "worldBookConfig": "Yapılandır",
+  "worldBookDeleteTitle": "Dünya Kitabını Sil",
+  "worldBookDeleteMessage": "“{name}” silinsin mi? Bu geri alınamaz.",
+  "@worldBookDeleteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "worldBookCancel": "İptal etmek",
+  "worldBookDelete": "Silmek",
+  "worldBookExportFailed": "Dışa aktarma başarısız oldu: {error}",
+  "@worldBookExportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "worldBookNoEntriesHint": "Giriş yok",
+  "worldBookUnnamedEntry": "İsimsiz Giriş",
+  "worldBookKeywordsLine": "Anahtar kelimeler: {keywords}",
+  "@worldBookKeywordsLine": {
+    "placeholders": {
+      "keywords": {
+        "type": "String"
+      }
+    }
+  },
+  "worldBookEditEntry": "Girişi Düzenle",
+  "worldBookDeleteEntry": "Girişi Sil",
+  "worldBookNameLabel": "İsim",
+  "worldBookDescriptionLabel": "Tanım",
+  "worldBookEnabledLabel": "Etkinleştirilmiş",
+  "worldBookSave": "Kaydetmek",
+  "worldBookEntryNameLabel": "Giriş adı",
+  "worldBookEntryEnabledLabel": "Giriş etkinleştirildi",
+  "worldBookEntryPriorityLabel": "Öncelik",
+  "worldBookEntryKeywordsLabel": "Anahtar Kelimeler",
+  "worldBookEntryKeywordsHint": "Bir anahtar kelime yazın ve eklemek için +'ya dokunun.",
+  "worldBookEntryKeywordInputHint": "Bir anahtar kelime yazın",
+  "worldBookEntryKeywordAddTooltip": "Anahtar kelime ekle",
+  "worldBookEntryUseRegexLabel": "Normal ifadeyi kullan",
+  "worldBookEntryCaseSensitiveLabel": "Harfe duyarlı",
+  "worldBookEntryAlwaysOnLabel": "Her zaman aktif",
+  "worldBookEntryAlwaysOnHint": "Her zaman anahtar kelime eşleşmesi olmadan enjekte edin",
+  "worldBookEntryScanDepthLabel": "Tarama derinliği",
+  "worldBookEntryContentLabel": "İçerik",
+  "worldBookEntryInjectionPositionLabel": "Enjeksiyon konumu",
+  "worldBookEntryInjectionRoleLabel": "Enjeksiyon rolü",
+  "worldBookEntryInjectDepthLabel": "Enjeksiyon derinliği",
+  "worldBookInjectionPositionBeforeSystemPrompt": "Sistem isteminden önce",
+  "worldBookInjectionPositionAfterSystemPrompt": "Sistem isteminden sonra",
+  "worldBookInjectionPositionTopOfChat": "Sohbetin zirvesi",
+  "worldBookInjectionPositionBottomOfChat": "Sohbetin alt kısmı",
+  "worldBookInjectionPositionAtDepth": "Derinlikte",
+  "worldBookInjectionRoleUser": "Kullanıcı",
+  "worldBookInjectionRoleAssistant": "Asistan"
+}
