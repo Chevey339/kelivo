@@ -2175,12 +2175,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   for (int i = 0; i < items.length; i++)
-                                    _SourceRow(
+                                    _SearchResultCard(
                                       index: (items[i]['index'] ?? (i + 1))
                                           .toString(),
                                       title: (items[i]['title'] ?? '')
                                           .toString(),
                                       url: (items[i]['url'] ?? '').toString(),
+                                      text: (items[i]['text'] ?? '')
+                                          .toString(),
                                     ),
                                 ],
                               ),
@@ -2241,11 +2243,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             for (int i = 0; i < items.length; i++)
-                              _SourceRow(
+                              _SearchResultCard(
                                 index: (items[i]['index'] ?? (i + 1))
                                     .toString(),
                                 title: (items[i]['title'] ?? '').toString(),
                                 url: (items[i]['url'] ?? '').toString(),
+                                text: (items[i]['text'] ?? '').toString(),
                               ),
                           ],
                         ),
@@ -2834,6 +2837,17 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     );
   }
 
+  /// Try to pretty-format a string as indented JSON.
+  /// Returns the original string if it is not valid JSON.
+  static String _prettyJson(String raw) {
+    try {
+      final obj = jsonDecode(raw);
+      return const JsonEncoder.withIndent('  ').convert(obj);
+    } catch (_) {
+      return raw;
+    }
+  }
+
   void _showDetail(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
@@ -2842,7 +2856,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     ).convert(widget.part.arguments);
     final (cleanText, images) = _parseMcpImagePaths(widget.part.content);
     final resultText = cleanText.isNotEmpty
-        ? cleanText
+        ? _prettyJson(cleanText)
         : l10n.chatMessageWidgetNoResultYet;
 
     final bool isDesktop =
@@ -2964,24 +2978,25 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                 ),
                                 const SizedBox(height: 6),
                                 Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? Colors.white10
-                                        : const Color(0xFFF7F7F9),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: cs.outlineVariant.withOpacity(0.2),
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Theme.of(context).brightness ==
+                                                  Brightness.dark
+                                              ? Colors.white10
+                                              : const Color(0xFFF7F7F9),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color:
+                                            cs.outlineVariant.withOpacity(0.2),
+                                      ),
+                                    ),
+                                    child: SelectableText(
+                                      resultText,
+                                      style: const TextStyle(fontSize: 12),
                                     ),
                                   ),
-                                  child: SelectableText(
-                                    resultText,
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                ),
                                 // Show images if available
                                 if (images.isNotEmpty) ...[
                                   const SizedBox(height: 12),
@@ -3108,22 +3123,23 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                     ),
                     const SizedBox(height: 6),
                     Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white10
-                            : const Color(0xFFF7F7F9),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: cs.outlineVariant.withOpacity(0.2),
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color:
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.white10
+                                  : const Color(0xFFF7F7F9),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: cs.outlineVariant.withOpacity(0.2),
+                          ),
+                        ),
+                        child: SelectableText(
+                          resultText,
+                          style: const TextStyle(fontSize: 12),
                         ),
                       ),
-                      child: SelectableText(
-                        resultText,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
                     // Show images if available
                     if (images.isNotEmpty) ...[
                       const SizedBox(height: 12),
@@ -3190,98 +3206,170 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   }
 }
 
-class _SourcesList extends StatelessWidget {
-  const _SourcesList({required this.items});
-  final List<Map<String, dynamic>> items;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    if (items.isEmpty) return const SizedBox.shrink();
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
-      ),
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              l10n.chatMessageWidgetCitationsTitle(items.length),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface.withOpacity(0.75),
-              ),
-            ),
-          ),
-          for (int i = 0; i < items.length; i++)
-            _SourceRow(
-              index: (items[i]['index'] ?? (i + 1)).toString(),
-              title: (items[i]['title'] ?? '').toString(),
-              url: (items[i]['url'] ?? '').toString(),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SourceRow extends StatelessWidget {
-  const _SourceRow({
-    required this.index,
+/// Card-style search result item for tool detail view.
+/// Shows favicon, title, text snippet, and URL in a tappable card.
+class _SearchResultCard extends StatelessWidget {
+  const _SearchResultCard({
     required this.title,
     required this.url,
+    this.text = '',
+    this.index,
   });
-  final String index;
   final String title;
   final String url;
+  final String text;
+  final String? index;
+
+  static final _pureNumber = RegExp(r'^\d+$');
+
+  String _domain(String url) {
+    try {
+      return Uri.parse(url).host;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// A title is "real" if it is non-empty and not a pure number like "1","2".
+  bool _hasRealTitle() =>
+      title.isNotEmpty && !_pureNumber.hasMatch(title.trim());
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final domain = _domain(url);
+    final faviconUrl = domain.isNotEmpty
+        ? 'https://www.google.com/s2/favicons?domain=$domain&sz=32'
+        : '';
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 18,
-            height: 18,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: cs.primary.withOpacity(0.20),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            margin: const EdgeInsets.only(top: 2),
-            child: Text(index, style: const TextStyle(fontSize: 11)),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: InkWell(
-              onTap: () async {
-                try {
-                  await launchUrl(
-                    Uri.parse(url),
-                    mode: LaunchMode.externalApplication,
-                  );
-                } catch (_) {}
-              },
-              child: Text(
-                title.isNotEmpty ? title : url,
-                style: TextStyle(color: cs.primary),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+      padding: const EdgeInsets.only(bottom: 8),
+      child: IosCardPress(
+        borderRadius: BorderRadius.circular(12),
+        baseColor: isDark
+            ? cs.surfaceContainerHighest.withOpacity(0.5)
+            : cs.surfaceContainerHighest.withOpacity(0.45),
+        pressedScale: 1.0,
+        duration: const Duration(milliseconds: 200),
+        onTap: () async {
+          try {
+            await launchUrl(
+              Uri.parse(url),
+              mode: LaunchMode.externalApplication,
+            );
+          } catch (_) {}
+        },
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Favicon with optional index badge
+            SizedBox(
+              width: 36,
+              height: 36,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        color: cs.surfaceContainerHigh,
+                        child: faviconUrl.isNotEmpty
+                            ? Image.network(
+                                faviconUrl,
+                                width: 32,
+                                height: 32,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => Icon(
+                                  Lucide.Globe,
+                                  size: 18,
+                                  color: cs.onSurface.withOpacity(0.5),
+                                ),
+                              )
+                            : Icon(
+                                Lucide.Globe,
+                                size: 18,
+                                color: cs.onSurface.withOpacity(0.5),
+                              ),
+                      ),
+                    ),
+                  ),
+                  if (index != null)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: cs.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          index!,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: cs.onPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 10),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title
+                  Text(
+                    _hasRealTitle() ? title : domain,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  // Text snippet
+                  if (text.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      text,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withOpacity(0.6),
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  // URL
+                  const SizedBox(height: 3),
+                  Text(
+                    url,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: cs.onSurface.withOpacity(0.4),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

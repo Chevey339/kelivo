@@ -62,12 +62,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   bool _vertexAI = false; // google
   bool _showApiKey = false; // toggle visibility
   bool _multiKeyEnabled = false; // single/multi key mode
-  // network proxy (per provider)
-  bool _proxyEnabled = false;
-  final _proxyHostCtrl = TextEditingController();
-  final _proxyPortCtrl = TextEditingController(text: '8080');
-  final _proxyUserCtrl = TextEditingController();
-  final _proxyPassCtrl = TextEditingController();
 
   // 模型选择模式相关
   bool _isSelectionMode = false;
@@ -102,12 +96,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     _locationCtrl.text = _cfg.location ?? '';
     _projectCtrl.text = _cfg.projectId ?? '';
     _saJsonCtrl.text = _cfg.serviceAccountJson ?? '';
-    // proxy
-    _proxyEnabled = _cfg.proxyEnabled ?? false;
-    _proxyHostCtrl.text = _cfg.proxyHost ?? '';
-    _proxyPortCtrl.text = _cfg.proxyPort ?? '8080';
-    _proxyUserCtrl.text = _cfg.proxyUsername ?? '';
-    _proxyPassCtrl.text = _cfg.proxyPassword ?? '';
     _multiKeyEnabled = _cfg.multiKeyEnabled ?? false;
     _aihubmixAppCodeEnabled = _cfg.aihubmixAppCodeEnabled ?? false;
   }
@@ -122,10 +110,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     _locationCtrl.dispose();
     _projectCtrl.dispose();
     _saJsonCtrl.dispose();
-    _proxyHostCtrl.dispose();
-    _proxyPortCtrl.dispose();
-    _proxyUserCtrl.dispose();
-    _proxyPassCtrl.dispose();
     super.dispose();
   }
 
@@ -133,7 +117,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    bool _isUserAdded(String key) {
+    bool isUserAdded(String key) {
       const fixed = {
         'KelivoIN',
         'OpenAI',
@@ -243,7 +227,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               },
             ),
           ),
-          if (_isUserAdded(widget.keyName))
+          if (isUserAdded(widget.keyName))
             Tooltip(
               message: l10n.providerDetailPageDeleteProviderTooltip,
               child: _TactileIconButton(
@@ -252,6 +236,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 semanticLabel: l10n.providerDetailPageDeleteProviderTooltip,
                 size: 22,
                 onTap: () async {
+                  final assistantProvider = context.read<AssistantProvider>();
+                  final settings = context.read<SettingsProvider>();
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
@@ -277,10 +263,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   if (confirm == true) {
                     // Clear assistant-level model selections that reference this provider
                     try {
-                      final ap = context.read<AssistantProvider>();
-                      for (final a in ap.assistants) {
+                      for (final a in assistantProvider.assistants) {
                         if (a.chatModelProvider == widget.keyName) {
-                          await ap.updateAssistant(
+                          await assistantProvider.updateAssistant(
                             a.copyWith(clearChatModel: true),
                           );
                         }
@@ -288,16 +273,14 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     } catch (_) {}
 
                     // Remove provider config and related selections/pins
-                    await context.read<SettingsProvider>().removeProviderConfig(
-                      widget.keyName,
-                    );
-                    if (!mounted) return;
-                    Navigator.of(context).maybePop();
+                    await settings.removeProviderConfig(widget.keyName);
+                    if (!context.mounted) return;
                     showAppSnackBar(
                       context,
                       message: l10n.providerDetailPageProviderDeletedSnackbar,
                       type: NotificationType.success,
                     );
+                    Navigator.of(context).maybePop();
                   }
                 },
               ),
@@ -398,7 +381,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: cs.onSurface.withOpacity(0.2),
+                          color: cs.onSurface.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -406,23 +389,22 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     const SizedBox(height: 10),
                     row(l10n.sideDrawerChooseImage, () async {
                       try {
+                        final settings = context.read<SettingsProvider>();
                         final ImagePicker picker = ImagePicker();
                         final XFile? img = await picker.pickImage(
                           source: ImageSource.gallery,
                           requestFullMetadata: false,
                         );
                         if (img != null && img.path.isNotEmpty) {
-                          await context
-                              .read<SettingsProvider>()
-                              .setProviderAvatarFilePath(
-                                widget.keyName,
-                                img.path,
-                              );
+                          await settings.setProviderAvatarFilePath(
+                            widget.keyName,
+                            img.path,
+                          );
                         }
                       } catch (_) {}
                     }),
                     row(l10n.sideDrawerEnterLink, () async {
-                      await _inputProviderAvatarUrl(context);
+                      await _inputProviderAvatarUrl();
                     }),
                     row(l10n.sideDrawerReset, () async {
                       await context
@@ -440,8 +422,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     );
   }
 
-  Future<void> _inputProviderAvatarUrl(BuildContext context) async {
+  Future<void> _inputProviderAvatarUrl() async {
     final l10n = AppLocalizations.of(context)!;
+    final settings = context.read<SettingsProvider>();
     final controller = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
@@ -477,7 +460,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
+                    borderSide: BorderSide(
+                      color: cs.primary.withValues(alpha: 0.4),
+                    ),
                   ),
                 ),
                 onChanged: (v) => setLocal(() => value = v),
@@ -499,7 +484,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     style: TextStyle(
                       color: valid(value)
                           ? cs.primary
-                          : cs.onSurface.withOpacity(0.38),
+                          : cs.onSurface.withValues(alpha: 0.38),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -513,10 +498,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     if (ok == true) {
       final url = controller.text.trim();
       if (url.isNotEmpty) {
-        await context.read<SettingsProvider>().setProviderAvatarUrl(
-          widget.keyName,
-          url,
-        );
+        await settings.setProviderAvatarUrl(widget.keyName, url);
       }
     }
   }
@@ -539,14 +521,14 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: cs.primary.withOpacity(0.08),
+              color: cs.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: cs.primary.withOpacity(0.35)),
+              border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
             ),
             child: Text.rich(
               TextSpan(
                 text: 'Powered by ',
-                style: TextStyle(color: cs.onSurface.withOpacity(0.8)),
+                style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
                 children: [
                   TextSpan(
                     text: 'Pollinations AI',
@@ -580,22 +562,24 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: cs.primary.withOpacity(0.08),
+              color: cs.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: cs.primary.withOpacity(0.35)),
+              border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   '革命性竞价 AI MaaS 平台，价格由市场供需决定，告别高成本固定定价。',
-                  style: TextStyle(color: cs.onSurface.withOpacity(0.8)),
+                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
                 ),
                 const SizedBox(height: 6),
                 Text.rich(
                   TextSpan(
                     text: '官网：',
-                    style: TextStyle(color: cs.onSurface.withOpacity(0.8)),
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.8),
+                    ),
                     children: [
                       TextSpan(
                         text: 'https://dashboard.x-aio.com',
@@ -633,22 +617,24 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: cs.primary.withOpacity(0.08),
+              color: cs.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: cs.primary.withOpacity(0.35)),
+              border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   '已内置硅基流动的免费模型，无需 API Key。若需更强大的模型，请申请并在此配置你自己的 API Key。',
-                  style: TextStyle(color: cs.onSurface.withOpacity(0.8)),
+                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
                 ),
                 const SizedBox(height: 6),
                 Text.rich(
                   TextSpan(
                     text: '官网：',
-                    style: TextStyle(color: cs.onSurface.withOpacity(0.8)),
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.8),
+                    ),
                     children: [
                       TextSpan(
                         text: 'https://siliconflow.cn',
@@ -687,7 +673,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             l10n.providerDetailPageManageSectionTitle,
             style: TextStyle(
               fontSize: 13,
-              color: cs.onSurface.withOpacity(0.8),
+              color: cs.onSurface.withValues(alpha: 0.8),
             ),
           ),
         ),
@@ -819,16 +805,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     ),
                   ),
                 );
-                final settings = context.read<SettingsProvider>();
-                final latest = settings.getProviderConfig(
-                  widget.keyName,
-                  defaultName: widget.displayName,
-                );
-                setState(() {
-                  _proxyEnabled = latest.proxyEnabled ?? false;
-                  _proxyHostCtrl.text = latest.proxyHost ?? '';
-                  _proxyPortCtrl.text = latest.proxyPort ?? '8080';
-                });
               },
               builder: (pressed) {
                 final cs2 = Theme.of(context).colorScheme;
@@ -896,7 +872,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     : l10n.providerDetailPageShowTooltip,
                 icon: Icon(
                   _showApiKey ? Lucide.EyeOff : Lucide.Eye,
-                  color: cs.onSurface.withOpacity(0.7),
+                  color: cs.onSurface.withValues(alpha: 0.7),
                   size: 18,
                 ),
                 onPressed: () => setState(() => _showApiKey = !_showApiKey),
@@ -998,7 +974,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       return Center(
         child: Text(
           l10n.providerDetailPageProviderRemovedMessage,
-          style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+          style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
         ),
       );
     }
@@ -1093,11 +1069,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                               color:
                                   Theme.of(context).brightness ==
                                       Brightness.dark
-                                  ? cs.error.withOpacity(0.22)
-                                  : cs.error.withOpacity(0.14),
+                                  ? cs.error.withValues(alpha: 0.22)
+                                  : cs.error.withValues(alpha: 0.14),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: cs.error.withOpacity(0.35),
+                                color: cs.error.withValues(alpha: 0.35),
                               ),
                             ),
                             padding: const EdgeInsets.symmetric(
@@ -1128,6 +1104,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                             ),
                           ),
                           onPressed: (_) async {
+                            final settings = context.read<SettingsProvider>();
+                            final assistantProvider = context
+                                .read<AssistantProvider>();
                             final ok = await showDialog<bool>(
                               context: context,
                               builder: (dctx) => AlertDialog(
@@ -1157,7 +1136,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                               ),
                             );
                             if (ok != true) return;
-                            final settings = context.read<SettingsProvider>();
                             final old = settings.getProviderConfig(
                               widget.keyName,
                               defaultName: widget.displayName,
@@ -1187,18 +1165,17 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                               id,
                             );
                             try {
-                              final ap = context.read<AssistantProvider>();
-                              for (final a in ap.assistants) {
+                              for (final a in assistantProvider.assistants) {
                                 if (a.chatModelProvider == widget.keyName &&
                                     a.chatModelId == id) {
-                                  await ap.updateAssistant(
+                                  await assistantProvider.updateAssistant(
                                     a.copyWith(clearChatModel: true),
                                   );
                                 }
                               }
                             } catch (_) {}
 
-                            if (!mounted) return;
+                            if (!context.mounted) return;
                             showAppSnackBar(
                               context,
                               message:
@@ -1207,12 +1184,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                               actionLabel: l10n.providerDetailPageUndoButton,
                               onAction: () {
                                 Future(() async {
-                                  final cfg2 = context
-                                      .read<SettingsProvider>()
-                                      .getProviderConfig(
-                                        widget.keyName,
-                                        defaultName: widget.displayName,
-                                      );
+                                  final cfg2 = settings.getProviderConfig(
+                                    widget.keyName,
+                                    defaultName: widget.displayName,
+                                  );
                                   final restoredList = List<String>.from(
                                     cfg2.models,
                                   );
@@ -1280,7 +1255,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 decoration: BoxDecoration(
                   color: Theme.of(context).brightness == Brightness.dark
                       ? Color.alphaBlend(
-                          Colors.white.withOpacity(0.12),
+                          Colors.white.withValues(alpha: 0.12),
                           cs.surface,
                         )
                       : const Color(0xFFF2F3F5),
@@ -1316,10 +1291,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(
-                              color: cs.onSurface.withOpacity(0.2),
+                              color: cs.onSurface.withValues(alpha: 0.2),
                             ),
                             color: pressed
-                                ? cs.onSurface.withOpacity(0.06)
+                                ? cs.onSurface.withValues(alpha: 0.06)
                                 : null,
                           ),
                           padding: const EdgeInsets.symmetric(
@@ -1371,12 +1346,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(
-                              color: cs.onSurface.withOpacity(0.2),
+                              color: cs.onSurface.withValues(alpha: 0.2),
                             ),
                             color: pressed
-                                ? cs.onSurface.withOpacity(0.06)
+                                ? cs.onSurface.withValues(alpha: 0.06)
                                 : (_detectUseStream
-                                      ? cs.onSurface.withOpacity(0.08)
+                                      ? cs.onSurface.withValues(alpha: 0.08)
                                       : Colors.transparent),
                           ),
                           child: AnimatedSwitcher(
@@ -1404,8 +1379,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                         return Container(
                           decoration: BoxDecoration(
                             color: _selectedModels.isEmpty
-                                ? cs.onSurface.withOpacity(0.1)
-                                : cs.primary.withOpacity(0.12),
+                                ? cs.onSurface.withValues(alpha: 0.1)
+                                : cs.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           padding: const EdgeInsets.symmetric(
@@ -1421,7 +1396,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                     : Lucide.HeartPulse,
                                 size: 20,
                                 color: _selectedModels.isEmpty
-                                    ? cs.onSurface.withOpacity(0.5)
+                                    ? cs.onSurface.withValues(alpha: 0.5)
                                     : cs.primary,
                               ),
                               const SizedBox(width: 8),
@@ -1431,7 +1406,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                     : l10n.providerDetailPageBatchDetectButton,
                                 style: TextStyle(
                                   color: _selectedModels.isEmpty
-                                      ? cs.onSurface.withOpacity(0.5)
+                                      ? cs.onSurface.withValues(alpha: 0.5)
                                       : cs.primary,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
@@ -1458,7 +1433,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   // Solid color: dark theme uses an opaque lightened surface; light uses input-like gray
                   color: Theme.of(context).brightness == Brightness.dark
                       ? Color.alphaBlend(
-                          Colors.white.withOpacity(0.12),
+                          Colors.white.withValues(alpha: 0.12),
                           cs.surface,
                         )
                       : const Color(0xFFF2F3F5),
@@ -1480,7 +1455,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(
-                              color: cs.primary.withOpacity(0.35),
+                              color: cs.primary.withValues(alpha: 0.35),
                             ),
                           ),
                           padding: const EdgeInsets.symmetric(
@@ -1518,7 +1493,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       builder: (pressed) {
                         return Container(
                           decoration: BoxDecoration(
-                            color: cs.primary.withOpacity(0.12),
+                            color: cs.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           padding: const EdgeInsets.symmetric(
@@ -1551,7 +1526,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                         builder: (pressed) {
                           return Container(
                             decoration: BoxDecoration(
-                              color: cs.error.withOpacity(0.1),
+                              color: cs.error.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(999),
                             ),
                             padding: const EdgeInsets.symmetric(
@@ -1579,32 +1554,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
 
   // Legacy network tab removed (replaced by ProviderNetworkPage)
 
-  Widget _switchRow({
-    required IconData icon,
-    required String title,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: cs.primary.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          alignment: Alignment.center,
-          margin: const EdgeInsets.only(right: 12),
-          child: Icon(icon, size: 20, color: cs.primary),
-        ),
-        Expanded(child: Text(title, style: const TextStyle(fontSize: 15))),
-        IosSwitch(value: value, onChanged: onChanged),
-      ],
-    );
-  }
-
   Widget _inputRow(
     BuildContext context, {
     required String label,
@@ -1626,7 +1575,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             label,
             style: TextStyle(
               fontSize: 13,
-              color: cs.onSurface.withOpacity(0.8),
+              color: cs.onSurface.withValues(alpha: 0.8),
             ),
           ),
         ),
@@ -1642,15 +1591,19 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             fillColor: isDark ? Colors.white10 : Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+              borderSide: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+              borderSide: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+              borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
@@ -1660,25 +1613,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _checkboxRow(
-    BuildContext context, {
-    required String title,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: () => onChanged(!value),
-      child: Row(
-        children: [
-          // iOS-style circular checkbox
-          IosCheckbox(value: value, onChanged: onChanged),
-          Text(title, style: TextStyle(fontSize: 14, color: cs.onSurface)),
-        ],
-      ),
     );
   }
 
@@ -1697,11 +1631,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         color: bg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
           width: 0.6,
         ),
         // boxShadow: [
-        //   if (!isDark) BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 1)),
+        //   if (!isDark) BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 6, offset: const Offset(0, 1)),
         // ],
       ),
       clipBehavior: Clip.antiAlias,
@@ -1793,7 +1727,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                             child: Icon(
                               Icons.help_outline,
                               size: 18,
-                              color: cs.onSurface.withOpacity(0.6),
+                              color: cs.onSurface.withValues(alpha: 0.6),
                             ),
                           ),
                         ),
@@ -1824,7 +1758,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         case ProviderKind.claude:
           return 'Claude';
         case ProviderKind.openai:
-        default:
           return 'OpenAI';
       }
     }
@@ -1953,7 +1886,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: cs.onSurface.withOpacity(0.2),
+                    color: cs.onSurface.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -2019,6 +1952,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
 
   Future<void> _save() async {
     final settings = context.read<SettingsProvider>();
+    final assistantProvider = context.read<AssistantProvider>();
     final old = settings.getProviderConfig(
       widget.keyName,
       defaultName: widget.displayName,
@@ -2063,10 +1997,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       await settings.clearSelectionsForProvider(widget.keyName);
       // Also clear assistant-level model selections referencing this provider
       try {
-        final ap = context.read<AssistantProvider>();
-        for (final a in ap.assistants) {
+        for (final a in assistantProvider.assistants) {
           if (a.chatModelProvider == widget.keyName) {
-            await ap.updateAssistant(a.copyWith(clearChatModel: true));
+            await assistantProvider.updateAssistant(
+              a.copyWith(clearChatModel: true),
+            );
           }
         }
       } catch (_) {}
@@ -2098,7 +2033,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   label,
                   style: TextStyle(
                     fontSize: 13,
-                    color: cs.onSurface.withOpacity(0.8),
+                    color: cs.onSurface.withValues(alpha: 0.8),
                   ),
                 ),
               ),
@@ -2119,15 +2054,19 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             fillColor: isDark ? Colors.white10 : Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+              borderSide: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+              borderSide: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+              borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
@@ -2211,23 +2150,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     setState(() {
       _selectedModels.clear();
       _selectedModels.addAll(cfg.models);
-    });
-  }
-
-  void _invertSelection() {
-    final cfg = context.read<SettingsProvider>().getProviderConfig(
-      widget.keyName,
-      defaultName: widget.displayName,
-    );
-    setState(() {
-      final newSelection = <String>{};
-      for (final model in cfg.models) {
-        if (!_selectedModels.contains(model)) {
-          newSelection.add(model);
-        }
-      }
-      _selectedModels.clear();
-      _selectedModels.addAll(newSelection);
     });
   }
 
@@ -2349,145 +2271,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
 
   // _saveNetwork moved to ProviderNetworkPage
 
-  Widget _buildProviderTypeSelector(
-    BuildContext context,
-    ColorScheme cs,
-    AppLocalizations l10n,
-  ) {
-    return Row(
-      children: [
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _kind = ProviderKind.openai;
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              decoration: BoxDecoration(
-                color: _kind == ProviderKind.openai
-                    ? cs.primary.withOpacity(0.15)
-                    : Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white10
-                    : const Color(0xFFF7F7F9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _kind == ProviderKind.openai
-                      ? cs.primary.withOpacity(0.5)
-                      : cs.outlineVariant.withOpacity(0.2),
-                  width: _kind == ProviderKind.openai ? 2 : 1,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    'OpenAI',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: _kind == ProviderKind.openai
-                          ? FontWeight.w600
-                          : FontWeight.w500,
-                      color: _kind == ProviderKind.openai
-                          ? cs.primary
-                          : cs.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _kind = ProviderKind.google;
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              decoration: BoxDecoration(
-                color: _kind == ProviderKind.google
-                    ? cs.primary.withOpacity(0.15)
-                    : Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white10
-                    : const Color(0xFFF7F7F9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _kind == ProviderKind.google
-                      ? cs.primary.withOpacity(0.5)
-                      : cs.outlineVariant.withOpacity(0.2),
-                  width: _kind == ProviderKind.google ? 2 : 1,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    'Gemini',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: _kind == ProviderKind.google
-                          ? FontWeight.w600
-                          : FontWeight.w500,
-                      color: _kind == ProviderKind.google
-                          ? cs.primary
-                          : cs.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _kind = ProviderKind.claude;
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              decoration: BoxDecoration(
-                color: _kind == ProviderKind.claude
-                    ? cs.primary.withOpacity(0.15)
-                    : Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white10
-                    : const Color(0xFFF7F7F9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _kind == ProviderKind.claude
-                      ? cs.primary.withOpacity(0.5)
-                      : cs.outlineVariant.withOpacity(0.2),
-                  width: _kind == ProviderKind.claude ? 2 : 1,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    'Claude',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: _kind == ProviderKind.claude
-                          ? FontWeight.w600
-                          : FontWeight.w500,
-                      color: _kind == ProviderKind.claude
-                          ? cs.primary
-                          : cs.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Future<void> _showModelPicker(BuildContext context) async {
     final cs = Theme.of(context).colorScheme;
     final settings = context.read<SettingsProvider>();
@@ -2495,12 +2278,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       widget.keyName,
       defaultName: widget.displayName,
     );
-    final bool _isDefaultSilicon =
-        widget.keyName.toLowerCase() == 'siliconflow';
-    final bool _hasUserKey =
+    final bool isDefaultSilicon = widget.keyName.toLowerCase() == 'siliconflow';
+    final bool hasUserKey =
         (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) ||
         cfg.apiKey.trim().isNotEmpty;
-    final bool _restrictToFree = _isDefaultSilicon && !_hasUserKey;
+    final bool restrictToFree = isDefaultSilicon && !hasUserKey;
     final controller = TextEditingController();
     List<dynamic> items = const [];
     bool loading = true;
@@ -2519,9 +2301,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         return StatefulBuilder(
           builder: (ctx, setLocal) {
             final l10n = AppLocalizations.of(ctx)!;
-            Future<void> _load() async {
+            Future<void> loadModels() async {
               try {
-                if (_restrictToFree) {
+                if (restrictToFree) {
                   final list = <ModelInfo>[
                     ModelRegistry.infer(
                       ModelInfo(
@@ -2558,7 +2340,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
 
             if (loading) {
               // kick off loading once
-              Future.microtask(_load);
+              Future.microtask(loadModels);
             }
 
             final selected = settings
@@ -2578,7 +2360,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   m,
             ];
 
-            String _groupFor(ModelInfo m) {
+            String groupFor(ModelInfo m) {
               return ModelGrouping.groupFor(
                 m,
                 embeddingsLabel: l10n.providerDetailPageEmbeddingsGroupTitle,
@@ -2588,7 +2370,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
 
             final Map<String, List<ModelInfo>> grouped = {};
             for (final m in filtered) {
-              final g = _groupFor(m);
+              final g = groupFor(m);
               (grouped[g] ??= []).add(m);
             }
             final groupKeys = grouped.keys.toList()
@@ -2617,7 +2399,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                           width: 40,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: cs.onSurface.withOpacity(0.2),
+                            color: cs.onSurface.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),
@@ -2637,7 +2419,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                               prefixIcon: Icon(
                                 Lucide.Search,
                                 size: 20,
-                                color: cs.onSurface.withOpacity(0.7),
+                                color: cs.onSurface.withValues(alpha: 0.7),
                               ),
                               suffixIcon: ExcludeSemantics(
                                 child: Row(
@@ -2662,8 +2444,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                                 ? Lucide.Square
                                                 : Lucide.CheckSquare,
                                             size: 22,
-                                            color: cs.onSurface.withOpacity(
-                                              0.7,
+                                            color: cs.onSurface.withValues(
+                                              alpha: 0.7,
                                             ),
                                           ),
                                           tooltip: allSelected
@@ -2719,7 +2501,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                       icon: Icon(
                                         Lucide.Repeat,
                                         size: 22,
-                                        color: cs.onSurface.withOpacity(0.7),
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.7,
+                                        ),
                                       ),
                                       tooltip: l10n.modelFetchInvertTooltip,
                                       onPressed: () async {
@@ -2778,7 +2562,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                  color: cs.primary.withOpacity(0.4),
+                                  color: cs.primary.withValues(alpha: 0.4),
                                 ),
                               ),
                             ),
@@ -2858,8 +2642,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                                             Lucide.ChevronRight,
                                                             size: 20,
                                                             color: cs.onSurface
-                                                                .withOpacity(
-                                                                  0.7,
+                                                                .withValues(
+                                                                  alpha: 0.7,
                                                                 ),
                                                           ),
                                                         ),
@@ -2968,8 +2752,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                                                     (m) => m.id,
                                                                   )
                                                                   .toList();
-                                                              if (toAdd.isEmpty)
+                                                              if (toAdd
+                                                                  .isEmpty) {
                                                                 return;
+                                                              }
                                                               final set =
                                                                   old.models
                                                                       .toSet()
@@ -3172,32 +2958,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   }
 }
 
-Widget _buildDismissBg(BuildContext context, {required bool alignStart}) {
-  final cs = Theme.of(context).colorScheme;
-  final l10n = AppLocalizations.of(context)!;
-  return Container(
-    decoration: BoxDecoration(
-      color: cs.error.withOpacity(0.12),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    padding: const EdgeInsets.symmetric(horizontal: 16),
-    alignment: alignStart ? Alignment.centerLeft : Alignment.centerRight,
-    child: Row(
-      mainAxisAlignment: alignStart
-          ? MainAxisAlignment.start
-          : MainAxisAlignment.end,
-      children: [
-        Icon(Lucide.Trash2, color: cs.error, size: 20),
-        const SizedBox(width: 6),
-        Text(
-          l10n.providerDetailPageDeleteText,
-          style: TextStyle(color: cs.error, fontWeight: FontWeight.w600),
-        ),
-      ],
-    ),
-  );
-}
-
 class _ModelCard extends StatelessWidget {
   const _ModelCard({
     required this.providerKey,
@@ -3292,7 +3052,7 @@ class _ModelCard extends StatelessWidget {
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: cs.onSurface.withOpacity(0.3),
+                                  color: cs.onSurface.withValues(alpha: 0.3),
                                   width: 2,
                                 ),
                               ),
@@ -3329,7 +3089,7 @@ class _ModelCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   _TactileIconButton(
                     icon: Lucide.Settings2,
-                    color: cs.onSurface.withOpacity(0.7),
+                    color: cs.onSurface.withValues(alpha: 0.7),
                     size: 18,
                     semanticLabel: l10n.providerDetailPageEditTooltip,
                     haptics: false,
@@ -3451,7 +3211,7 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
                     style: TextButton.styleFrom(
                       foregroundColor: canTest
                           ? cs.primary
-                          : cs.onSurface.withOpacity(0.4),
+                          : cs.onSurface.withValues(alpha: 0.4),
                     ),
                     child: Text(l10n.providerDetailPageTestButton),
                   ),
@@ -3537,7 +3297,7 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
                 l10n.providerDetailPageUseStreamingLabel,
                 style: TextStyle(
                   fontSize: 14,
-                  color: cs.onSurface.withOpacity(0.9),
+                  color: cs.onSurface.withValues(alpha: 0.9),
                 ),
               ),
               const SizedBox(width: 8),
@@ -3582,7 +3342,7 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
         const SizedBox(height: 12),
         Text(
           l10n.providerDetailPageTestingMessage,
-          style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+          style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
         ),
       ],
     );
@@ -3627,7 +3387,7 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
                     Icon(
                       Lucide.ChevronDown,
                       size: 16,
-                      color: cs.onSurface.withOpacity(0.7),
+                      color: cs.onSurface.withValues(alpha: 0.7),
                     ),
                   ],
                 ),
@@ -3745,7 +3505,9 @@ class _BrandAvatar extends StatelessWidget {
             RegExp(r'openrouter').hasMatch(lower));
     return CircleAvatar(
       radius: size / 2,
-      backgroundColor: isDark ? Colors.white10 : cs.primary.withOpacity(0.1),
+      backgroundColor: isDark
+          ? Colors.white10
+          : cs.primary.withValues(alpha: 0.1),
       child: asset == null
           ? Text(
               name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
@@ -3798,7 +3560,6 @@ class _TactileIconButton extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    this.onLongPress,
     this.semanticLabel,
     this.size = 22,
     this.haptics = true,
@@ -3807,7 +3568,6 @@ class _TactileIconButton extends StatefulWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
   final String? semanticLabel;
   final double size;
   final bool haptics;
@@ -3822,7 +3582,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
       size: widget.size,
@@ -3842,12 +3602,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
           // if (widget.haptics) Haptics.light();
           widget.onTap();
         },
-        onLongPress: widget.onLongPress == null
-            ? null
-            : () {
-                if (widget.haptics) Haptics.light();
-                widget.onLongPress!.call();
-              },
         child: AnimatedScale(
           scale: _pressed ? 0.95 : 1.0,
           duration: const Duration(milliseconds: 100),
@@ -3879,8 +3633,9 @@ class _TactileRowState extends State<_TactileRow> {
           ? null
           : () {
               if (widget.haptics &&
-                  context.read<SettingsProvider>().hapticsOnListItemTap)
+                  context.read<SettingsProvider>().hapticsOnListItemTap) {
                 Haptics.soft();
+              }
               widget.onTap!.call();
             },
       child: AnimatedScale(
@@ -3919,7 +3674,7 @@ class _BottomTabs extends StatelessWidget {
         color: isDark ? Colors.transparent : cs.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: cs.outlineVariant.withOpacity(isDark ? 0.18 : 0.12),
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.18 : 0.12),
           width: 0.8,
         ),
       ),
@@ -3970,7 +3725,7 @@ class _BottomTabItemState extends State<_BottomTabItem> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final baseColor = cs.onSurface.withOpacity(0.7);
+    final baseColor = cs.onSurface.withValues(alpha: 0.7);
     final selColor = cs.primary;
     final target = widget.selected ? selColor : baseColor;
 
