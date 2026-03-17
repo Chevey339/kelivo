@@ -32,25 +32,13 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
     final l10n = AppLocalizations.of(context)!;
     context.watch<SettingsProvider>();
 
-    String _paletteName() {
+    String paletteName() {
       final settings = context.read<SettingsProvider>();
       final palette = ThemePalettes.byId(settings.themePaletteId);
       return Localizations.localeOf(context).languageCode == 'zh'
           ? palette.displayNameZh
           : palette.displayNameEn;
     }
-
-    Widget header(String text) => Padding(
-      padding: const EdgeInsets.fromLTRB(12, 18, 12, 6),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: cs.onSurface.withOpacity(0.8),
-        ),
-      ),
-    );
 
     return Scaffold(
       appBar: AppBar(
@@ -75,7 +63,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                 context,
                 icon: Lucide.Palette,
                 label: l10n.displaySettingsPageThemeSettingsTitle,
-                detailText: _paletteName(),
+                detailText: paletteName(),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ThemeSettingsPage()),
                 ),
@@ -89,8 +77,9 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   final settings = ctx.watch<SettingsProvider>();
                   String labelFor(Locale l) {
                     if (l.languageCode == 'zh') {
-                      if ((l.scriptCode ?? '').toLowerCase() == 'hant')
+                      if ((l.scriptCode ?? '').toLowerCase() == 'hant') {
                         return l10n.languageDisplayTraditionalChinese;
+                      }
                       return l10n.displaySettingsPageLanguageChineseLabel;
                     }
                     return l10n.displaySettingsPageLanguageEnglishLabel;
@@ -101,7 +90,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                         ? l10n.settingsPageSystemMode
                         : labelFor(settings.appLocale),
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
                   );
@@ -171,7 +160,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                           overflow: TextOverflow.ellipsis,
                           softWrap: false,
                           style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.6),
+                            color: cs.onSurface.withValues(alpha: 0.6),
                             fontSize: 13,
                           ),
                         );
@@ -182,7 +171,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                           overflow: TextOverflow.ellipsis,
                           softWrap: false,
                           style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.6),
+                            color: cs.onSurface.withValues(alpha: 0.6),
                             fontSize: 13,
                           ),
                         );
@@ -193,7 +182,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                           overflow: TextOverflow.ellipsis,
                           softWrap: false,
                           style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.6),
+                            color: cs.onSurface.withValues(alpha: 0.6),
                             fontSize: 13,
                           ),
                         );
@@ -217,7 +206,6 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                         return l10n
                             .displaySettingsPageChatMessageBackgroundSolid;
                       case ChatMessageBackgroundStyle.defaultStyle:
-                      default:
                         return l10n
                             .displaySettingsPageChatMessageBackgroundDefault;
                     }
@@ -226,7 +214,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   return Text(
                     labelOf(),
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
                   );
@@ -253,7 +241,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                     overflow: TextOverflow.ellipsis,
                     softWrap: false,
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
                   );
@@ -283,7 +271,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                     overflow: TextOverflow.ellipsis,
                     softWrap: false,
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
                   );
@@ -303,7 +291,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   return Text(
                     '${(scale * 100).round()}%',
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
                   );
@@ -321,7 +309,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                     return Text(
                       l10n.displaySettingsPageAutoScrollDisabledLabel,
                       style: TextStyle(
-                        color: cs.onSurface.withOpacity(0.5),
+                        color: cs.onSurface.withValues(alpha: 0.5),
                         fontSize: 13,
                       ),
                     );
@@ -330,7 +318,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   return Text(
                     '${seconds.round()}s',
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
                   );
@@ -349,7 +337,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   return Text(
                     '${(v * 100).round()}%',
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
                   );
@@ -405,6 +393,9 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
       ),
     );
     if (choice == null) return;
+    if (!context.mounted) return;
+
+    final settings = context.read<SettingsProvider>();
     if (choice == 'local') {
       final res = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -412,10 +403,11 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
       );
       final path = res?.files.singleOrNull?.path;
       if (path == null) return;
+      if (!context.mounted) return;
       if (target == _FontTarget.app) {
-        await context.read<SettingsProvider>().setAppFontFromLocal(path: path);
+        await settings.setAppFontFromLocal(path: path);
       } else {
-        await context.read<SettingsProvider>().setCodeFontFromLocal(path: path);
+        await settings.setCodeFontFromLocal(path: path);
       }
       return;
     }
@@ -427,18 +419,19 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
         MaterialPageRoute(builder: (_) => GoogleFontsPickerPage(title: title)),
       );
       if (selected == null || selected.isEmpty) return;
+      if (!context.mounted) return;
       if (target == _FontTarget.app) {
-        await context.read<SettingsProvider>().setAppFontFromGoogle(selected);
+        await settings.setAppFontFromGoogle(selected);
       } else {
-        await context.read<SettingsProvider>().setCodeFontFromGoogle(selected);
+        await settings.setCodeFontFromGoogle(selected);
       }
       return;
     }
     if (choice == 'reset') {
       if (target == _FontTarget.app) {
-        await context.read<SettingsProvider>().clearAppFont();
+        await settings.clearAppFont();
       } else {
-        await context.read<SettingsProvider>().clearCodeFont();
+        await settings.clearCodeFont();
       }
     }
   }
@@ -481,6 +474,8 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
       ),
     );
     if (choice == null) return;
+    if (!context.mounted) return;
+
     final sp = context.read<SettingsProvider>();
     switch (choice) {
       case 'frosted':
@@ -538,7 +533,11 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
       ),
     );
     if (choice == null) return;
+    if (!context.mounted) return;
+
     final sp = context.read<SettingsProvider>();
+    final notificationTitle = l10n.androidBackgroundNotificationTitle;
+    final notificationText = l10n.androidBackgroundNotificationText;
     switch (choice) {
       case 'on_notify':
         await sp.setAndroidBackgroundChatMode(
@@ -546,12 +545,8 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
         );
         try {
           await AndroidBackgroundManager.ensureInitialized(
-            notificationTitle: AppLocalizations.of(
-              context,
-            )!.androidBackgroundNotificationTitle,
-            notificationText: AppLocalizations.of(
-              context,
-            )!.androidBackgroundNotificationText,
+            notificationTitle: notificationTitle,
+            notificationText: notificationText,
           );
           await AndroidBackgroundManager.setEnabled(true);
           await NotificationService.ensureInitialized();
@@ -562,12 +557,8 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
         await sp.setAndroidBackgroundChatMode(AndroidBackgroundChatMode.on);
         try {
           await AndroidBackgroundManager.ensureInitialized(
-            notificationTitle: AppLocalizations.of(
-              context,
-            )!.androidBackgroundNotificationTitle,
-            notificationText: AppLocalizations.of(
-              context,
-            )!.androidBackgroundNotificationText,
+            notificationTitle: notificationTitle,
+            notificationText: notificationText,
           );
           await AndroidBackgroundManager.setEnabled(true);
           // Prepare notification channel as well to avoid FGS notification issues on some ROMs
@@ -628,25 +619,24 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
       },
     );
     if (selected == null) return;
+    if (!context.mounted) return;
+
+    final settings = context.read<SettingsProvider>();
     switch (selected) {
       case 'system':
-        await context.read<SettingsProvider>().setAppLocaleFollowSystem();
+        await settings.setAppLocaleFollowSystem();
         break;
       case 'zh_CN':
-        await context.read<SettingsProvider>().setAppLocale(
-          const Locale('zh', 'CN'),
-        );
+        await settings.setAppLocale(const Locale('zh', 'CN'));
         break;
       case 'zh_Hant':
-        await context.read<SettingsProvider>().setAppLocale(
+        await settings.setAppLocale(
           const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
         );
         break;
       case 'en_US':
       default:
-        await context.read<SettingsProvider>().setAppLocale(
-          const Locale('en', 'US'),
-        );
+        await settings.setAppLocale(const Locale('en', 'US'));
     }
   }
 
@@ -679,7 +669,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                         Text(
                           '50%',
                           style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.7),
+                            color: cs.onSurface.withValues(alpha: 0.7),
                             fontSize: 12,
                           ),
                         ),
@@ -691,25 +681,25 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                               inactiveTrackHeight: 8,
                               overlayRadius: 14,
                               activeTrackColor: cs.primary,
-                              inactiveTrackColor: cs.onSurface.withOpacity(
-                                isDark ? 0.25 : 0.20,
+                              inactiveTrackColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.25 : 0.20,
                               ),
                               tooltipBackgroundColor: cs.primary,
                               tooltipTextStyle: TextStyle(
                                 color: cs.onPrimary,
                                 fontWeight: FontWeight.w600,
                               ),
-                              activeTickColor: cs.onSurface.withOpacity(
-                                isDark ? 0.45 : 0.35,
+                              activeTickColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.45 : 0.35,
                               ),
-                              inactiveTickColor: cs.onSurface.withOpacity(
-                                isDark ? 0.30 : 0.25,
+                              inactiveTickColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.30 : 0.25,
                               ),
-                              activeMinorTickColor: cs.onSurface.withOpacity(
-                                isDark ? 0.34 : 0.28,
+                              activeMinorTickColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.34 : 0.28,
                               ),
-                              inactiveMinorTickColor: cs.onSurface.withOpacity(
-                                isDark ? 0.24 : 0.20,
+                              inactiveMinorTickColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.24 : 0.20,
                               ),
                             ),
                             child: SfSlider(
@@ -736,8 +726,8 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                                       ? []
                                       : [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.08,
+                                            color: Colors.black.withValues(
+                                              alpha: 0.08,
                                             ),
                                             blurRadius: 8,
                                             offset: Offset(0, 2),
@@ -836,7 +826,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                         Text(
                           '2s',
                           style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.7),
+                            color: cs.onSurface.withValues(alpha: 0.7),
                             fontSize: 12,
                           ),
                         ),
@@ -848,25 +838,25 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                               inactiveTrackHeight: 8,
                               overlayRadius: 14,
                               activeTrackColor: cs.primary,
-                              inactiveTrackColor: cs.onSurface.withOpacity(
-                                isDark ? 0.25 : 0.20,
+                              inactiveTrackColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.25 : 0.20,
                               ),
                               tooltipBackgroundColor: cs.primary,
                               tooltipTextStyle: TextStyle(
                                 color: cs.onPrimary,
                                 fontWeight: FontWeight.w600,
                               ),
-                              activeTickColor: cs.onSurface.withOpacity(
-                                isDark ? 0.45 : 0.35,
+                              activeTickColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.45 : 0.35,
                               ),
-                              inactiveTickColor: cs.onSurface.withOpacity(
-                                isDark ? 0.30 : 0.25,
+                              inactiveTickColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.30 : 0.25,
                               ),
-                              activeMinorTickColor: cs.onSurface.withOpacity(
-                                isDark ? 0.34 : 0.28,
+                              activeMinorTickColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.34 : 0.28,
                               ),
-                              inactiveMinorTickColor: cs.onSurface.withOpacity(
-                                isDark ? 0.24 : 0.20,
+                              inactiveMinorTickColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.24 : 0.20,
                               ),
                             ),
                             child: SfSlider(
@@ -893,8 +883,8 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                                       ? []
                                       : [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.08,
+                                            color: Colors.black.withValues(
+                                              alpha: 0.08,
                                             ),
                                             blurRadius: 8,
                                             offset: Offset(0, 2),
@@ -918,8 +908,8 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                               ? '${seconds.round()}s'
                               : l10n.displaySettingsPageAutoScrollDisabledLabel,
                           style: TextStyle(
-                            color: cs.onSurface.withOpacity(
-                              enabled ? 1.0 : 0.5,
+                            color: cs.onSurface.withValues(
+                              alpha: enabled ? 1.0 : 0.5,
                             ),
                             fontSize: 12,
                           ),
@@ -931,7 +921,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                       l10n.displaySettingsPageAutoScrollIdleSubtitle,
                       style: TextStyle(
                         fontSize: 12,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -974,7 +964,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                         Text(
                           '0%',
                           style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.7),
+                            color: cs.onSurface.withValues(alpha: 0.7),
                             fontSize: 12,
                           ),
                         ),
@@ -986,25 +976,25 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                               inactiveTrackHeight: 8,
                               overlayRadius: 14,
                               activeTrackColor: cs.primary,
-                              inactiveTrackColor: cs.onSurface.withOpacity(
-                                isDark ? 0.25 : 0.20,
+                              inactiveTrackColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.25 : 0.20,
                               ),
                               tooltipBackgroundColor: cs.primary,
                               tooltipTextStyle: TextStyle(
                                 color: cs.onPrimary,
                                 fontWeight: FontWeight.w600,
                               ),
-                              activeTickColor: cs.onSurface.withOpacity(
-                                isDark ? 0.45 : 0.35,
+                              activeTickColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.45 : 0.35,
                               ),
-                              inactiveTickColor: cs.onSurface.withOpacity(
-                                isDark ? 0.30 : 0.25,
+                              inactiveTickColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.30 : 0.25,
                               ),
-                              activeMinorTickColor: cs.onSurface.withOpacity(
-                                isDark ? 0.34 : 0.28,
+                              activeMinorTickColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.34 : 0.28,
                               ),
-                              inactiveMinorTickColor: cs.onSurface.withOpacity(
-                                isDark ? 0.24 : 0.20,
+                              inactiveMinorTickColor: cs.onSurface.withValues(
+                                alpha: isDark ? 0.24 : 0.20,
                               ),
                             ),
                             child: SfSlider(
@@ -1031,8 +1021,8 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                                       ? []
                                       : [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.08,
+                                            color: Colors.black.withValues(
+                                              alpha: 0.08,
                                             ),
                                             blurRadius: 8,
                                             offset: Offset(0, 2),
@@ -1074,13 +1064,15 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+      final Color bg = isDark
+          ? Colors.white10
+          : Colors.white.withValues(alpha: 0.96);
       return Container(
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
             width: 0.6,
           ),
         ),
@@ -1101,7 +1093,7 @@ Widget _iosDivider(BuildContext context) {
     thickness: 0.6,
     indent: 54,
     endIndent: 12,
-    color: cs.outlineVariant.withOpacity(0.18),
+    color: cs.outlineVariant.withValues(alpha: 0.18),
   );
 }
 
@@ -1155,8 +1147,9 @@ class _TactileRowState extends State<_TactileRow> {
           ? null
           : () {
               if (widget.haptics &&
-                  context.read<SettingsProvider>().hapticsOnListItemTap)
+                  context.read<SettingsProvider>().hapticsOnListItemTap) {
                 Haptics.soft();
+              }
               widget.onTap!.call();
             },
       child: widget.builder(_pressed),
@@ -1169,18 +1162,12 @@ class _TactileIconButton extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    this.onLongPress,
-    this.semanticLabel,
     this.size = 22,
-    this.haptics = true,
   });
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final String? semanticLabel;
   final double size;
-  final bool haptics;
   @override
   State<_TactileIconButton> createState() => _TactileIconButtonState();
 }
@@ -1190,31 +1177,23 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
       size: widget.size,
       color: _pressed ? pressColor : base,
-      semanticLabel: widget.semanticLabel,
     );
     return Semantics(
       button: true,
-      label: widget.semanticLabel,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
         onTap: () {
-          if (widget.haptics) Haptics.light();
+          Haptics.light();
           widget.onTap();
         },
-        onLongPress: widget.onLongPress == null
-            ? null
-            : () {
-                if (widget.haptics) Haptics.light();
-                widget.onLongPress!.call();
-              },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           child: icon,
@@ -1238,7 +1217,7 @@ Widget _iosNavRow(
     onTap: onTap,
     haptics: true,
     builder: (pressed) {
-      final baseColor = cs.onSurface.withOpacity(0.9);
+      final baseColor = cs.onSurface.withValues(alpha: 0.9);
       return _AnimatedPressColor(
         pressed: pressed,
         base: baseColor,
@@ -1266,7 +1245,7 @@ Widget _iosNavRow(
                         child: DefaultTextStyle.merge(
                           style: TextStyle(
                             fontSize: 13,
-                            color: cs.onSurface.withOpacity(0.6),
+                            color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                           child: detailBuilder(context),
                         ),
@@ -1287,7 +1266,7 @@ Widget _iosNavRow(
                           textAlign: TextAlign.right,
                           style: TextStyle(
                             fontSize: 13,
-                            color: cs.onSurface.withOpacity(0.6),
+                            color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
                       ),
@@ -1314,7 +1293,7 @@ Widget _iosSwitchRow(
   return _TactileRow(
     onTap: () => onChanged(!value),
     builder: (pressed) {
-      final baseColor = cs.onSurface.withOpacity(0.9);
+      final baseColor = cs.onSurface.withValues(alpha: 0.9);
       return _AnimatedPressColor(
         pressed: pressed,
         base: baseColor,
@@ -1358,8 +1337,8 @@ Widget _sheetOption(
           : base;
       final bgTarget = pressed
           ? (isDark
-                ? Colors.white.withOpacity(0.06)
-                : Colors.black.withOpacity(0.05))
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.black.withValues(alpha: 0.05))
           : Colors.transparent;
       return TweenAnimationBuilder<Color?>(
         tween: ColorTween(end: target),
@@ -1390,17 +1369,6 @@ Widget _sheetOption(
   );
 }
 
-Widget _sheetDivider(BuildContext context) {
-  final cs = Theme.of(context).colorScheme;
-  return Divider(
-    height: 1,
-    thickness: 0.6,
-    indent: 52,
-    endIndent: 16,
-    color: cs.outlineVariant.withOpacity(0.18),
-  );
-}
-
 Widget _sheetDividerNoIcon(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
   return Divider(
@@ -1408,7 +1376,7 @@ Widget _sheetDividerNoIcon(BuildContext context) {
     thickness: 0.6,
     indent: 16,
     endIndent: 16,
-    color: cs.outlineVariant.withOpacity(0.18),
+    color: cs.outlineVariant.withValues(alpha: 0.18),
   );
 }
 
@@ -1678,11 +1646,11 @@ class _AutoCollapseCodeBlockLinesRowState
       if (_controller.text != t) _controller.text = t;
     }
 
-    final baseColor = cs.onSurface.withOpacity(0.9);
+    final baseColor = cs.onSurface.withValues(alpha: 0.9);
     final baseBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.28),
+        color: cs.outlineVariant.withValues(alpha: 0.28),
         width: 0.8,
       ),
     );
@@ -1738,7 +1706,7 @@ class _AutoCollapseCodeBlockLinesRowState
             l10n.displaySettingsPageAutoCollapseCodeBlockLinesUnit,
             style: TextStyle(
               fontSize: 13,
-              color: cs.onSurface.withOpacity(0.6),
+              color: cs.onSurface.withValues(alpha: 0.6),
             ),
           ),
         ],
