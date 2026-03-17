@@ -93,6 +93,9 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                         return l10n.languageDisplayTraditionalChinese;
                       return l10n.displaySettingsPageLanguageChineseLabel;
                     }
+                    if (l.languageCode == 'tr') {
+                      return l10n.languageDisplayTurkish;
+                    }
                     return l10n.displaySettingsPageLanguageEnglishLabel;
                   }
 
@@ -621,6 +624,12 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                   label: l10n.displaySettingsPageLanguageEnglishLabel,
                   onTap: () => Navigator.of(ctx).pop('en_US'),
                 ),
+                _sheetDividerNoIcon(ctx),
+                _sheetOption(
+                  ctx,
+                  label: l10n.languageDisplayTurkish,
+                  onTap: () => Navigator.of(ctx).pop('tr_TR'),
+                ),
               ],
             ),
           ),
@@ -643,6 +652,15 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
         );
         break;
       case 'en_US':
+        await context.read<SettingsProvider>().setAppLocale(
+          const Locale('en', 'US'),
+        );
+        break;
+      case 'tr_TR':
+        await context.read<SettingsProvider>().setAppLocale(
+          const Locale('tr', 'TR'),
+        );
+        break;
       default:
         await context.read<SettingsProvider>().setAppLocale(
           const Locale('en', 'US'),

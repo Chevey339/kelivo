@@ -316,6 +316,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageDisplaySpanish => 'Spanish';
 
   @override
+  String get languageDisplayTurkish => 'Turkish';
+
+  @override
   String get languageSelectSheetTitle => 'Select Translation Language';
 
   @override

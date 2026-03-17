@@ -95,6 +95,7 @@
   "languageDisplayGerman": "Deutsch",
   "languageDisplayItalian": "Italiano",
   "languageDisplaySpanish": "Español",
+  "languageDisplayTurkish": "土耳其语",
   "languageSelectSheetTitle": "选择翻译语言",
   "languageSelectSheetClearButton": "清空翻译",
   "assistantEditPageTitle": "助手",
@@ -207,7 +208,9 @@
   "providersPageExportSelectedTitle": "导出 {count} 个供应商",
   "@providersPageExportSelectedTitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "providersPageExportCopyButton": "复制",
@@ -1255,8 +1258,7 @@
   "assistantEditPresetEmpty": "暂无预设消息",
   "assistantEditPresetEditDialogTitle": "编辑预设消息",
   "assistantEditPresetRoleUser": "用户",
-  "assistantEditPresetRoleAssistant": "助手"
-  ,
+  "assistantEditPresetRoleAssistant": "助手",
   "assistantTagsManageTitle": "管理标签",
   "assistantTagsCreateButton": "创建",
   "assistantTagsCreateDialogTitle": "创建标签",
@@ -1285,8 +1287,7 @@
   "mcpServerEditSheetStdioEnvValueLabel": "值",
   "mcpServerEditSheetStdioAddEnv": "添加环境变量",
   "mcpServerEditSheetStdioCommandRequired": "STDIO 需要填写命令",
-  "assistantTagsContextMenuDeleteAssistant": "删除助手"
-  ,
+  "assistantTagsContextMenuDeleteAssistant": "删除助手",
   "assistantTagsClearTag": "清除标签",
   "desktopTtsPleaseAddProvider": "请先在设置中添加语音服务商",
   "settingsPageNetworkProxy": "网络代理",
@@ -1310,7 +1311,11 @@
   "networkProxyTestSuccess": "连接成功",
   "networkProxyTestFailed": "测试失败：{error}",
   "@networkProxyTestFailed": {
-    "placeholders": { "error": { "type": "String" } }
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "networkProxyNoUrl": "请输入测试地址",
   "networkProxyPriorityNote": "当同时开启全局代理与供应商代理时，将优先使用供应商代理。",
@@ -1326,7 +1331,6 @@
   "providerDetailPageDetectSuccess": "检测成功",
   "providerDetailPageDetectFailed": "检测失败",
   "providerDetailPageDeleteAllModelsWarning": "此操作不可撤回",
-  "displaySettingsPageOtherSettingsTitle": "其他设置",
   "requestLogSettingTitle": "请求日志打印",
   "requestLogSettingSubtitle": "开启后会将请求/响应详情写入 logs/logs.txt",
   "flutterLogSettingTitle": "应用日志打印",

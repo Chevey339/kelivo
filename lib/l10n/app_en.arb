@@ -173,6 +173,7 @@
   "languageDisplayGerman": "German",
   "languageDisplayItalian": "Italian",
   "languageDisplaySpanish": "Spanish",
+  "languageDisplayTurkish": "Turkish",
   "languageSelectSheetTitle": "Select Translation Language",
   "languageSelectSheetClearButton": "Clear Translation",
   "homePageClearContext": "Clear Context",
@@ -1391,7 +1392,7 @@
   "desktopFontLoading": "Loading fonts…",
   "displaySettingsPageFontLocalFileLabel": "Local file",
   "displaySettingsPageFontResetLabel": "Reset font settings",
-  "displaySettingsPageOtherSettingsTitle": "Other",
+  "displaySettingsPageOtherSettingsTitle": "Other Settings",
   "themeSettingsPageDynamicColorSection": "Dynamic Color",
   "themeSettingsPageUseDynamicColorTitle": "System Dynamic Colors",
   "themeSettingsPageUseDynamicColorSubtitle": "Match system palette (Android 12+)",
@@ -1579,14 +1580,15 @@
   "displaySettingsPageBehaviorStartupTitle": "Behavior & startup",
   "displaySettingsPageHapticsSettingsTitle": "Haptics",
   "assistantSettingsNoPromptPlaceholder": "No prompt yet",
-  "providersPageMultiSelectTooltip": "Multi-select"
-  ,
+  "providersPageMultiSelectTooltip": "Multi-select",
   "providersPageDeleteSelectedConfirmContent": "Delete selected providers? This cannot be undone.",
   "providersPageDeleteSelectedSnackbar": "Deleted selected providers",
   "providersPageExportSelectedTitle": "Export {count} providers",
   "@providersPageExportSelectedTitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "providersPageExportCopyButton": "Copy",
@@ -1626,7 +1628,9 @@
   "networkProxyTestFailed": "Test failed: {error}",
   "@networkProxyTestFailed": {
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "networkProxyNoUrl": "Please enter a URL",
@@ -1644,7 +1648,6 @@
   "providerDetailPageDetectSuccess": "Detection successful",
   "providerDetailPageDetectFailed": "Detection failed",
   "providerDetailPageDeleteAllModelsWarning": "This action cannot be undone.",
-  "displaySettingsPageOtherSettingsTitle": "Other Settings",
   "requestLogSettingTitle": "Request Logging",
   "requestLogSettingSubtitle": "When enabled, request/response details are written to logs/logs.txt (rotated daily).",
   "flutterLogSettingTitle": "Flutter Logging",
