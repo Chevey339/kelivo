@@ -209,11 +209,12 @@ Future<void> showModelSelectSheet(
   BuildContext context, {
   bool updateAssistant = true,
 }) async {
+  final assistantProvider = context.read<AssistantProvider>();
+  final settings = context.read<SettingsProvider>();
   final sel = await showModelSelector(context);
   if (sel != null) {
     if (updateAssistant) {
       // Update assistant's model instead of global default
-      final assistantProvider = context.read<AssistantProvider>();
       final assistant = assistantProvider.currentAssistant;
       if (assistant != null) {
         await assistantProvider.updateAssistant(
@@ -225,7 +226,6 @@ Future<void> showModelSelectSheet(
       }
     } else {
       // Only update global default when explicitly requested (e.g., from settings)
-      final settings = context.read<SettingsProvider>();
       await settings.setCurrentModel(sel.providerKey, sel.modelId);
     }
   }
@@ -262,7 +262,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   // Async loading state
   bool _isLoading = true;
   Map<String, _ProviderGroup> _groups = {};
-  List<_ModelItem> _favItems = [];
   List<String> _orderedKeys = [];
   bool _autoScrolled = false; // ensure we only auto-scroll once per open
 
@@ -351,7 +350,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       if (mounted) {
         setState(() {
           _groups = result.groups;
-          _favItems = result.favItems;
           _orderedKeys = result.orderedKeys;
           _isLoading = false;
         });
@@ -409,7 +407,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
     setState(() {
       _groups = result.groups;
-      _favItems = result.favItems;
       _orderedKeys = result.orderedKeys;
       _isLoading = false;
     });
@@ -449,7 +446,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     );
 
     // If current model is pinned and favorites section is visible, jump there first
-    final currentKey = '${pk}::${mid}';
+    final currentKey = '$pk::$mid';
     final bool showFavorites =
         widget.limitProviderKey == null && (_search.text.isEmpty);
     final bool isPinned = settings.pinnedModels.contains(currentKey);
@@ -603,7 +600,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                             width: 40,
                             height: 4,
                             decoration: BoxDecoration(
-                              color: cs.onSurface.withOpacity(0.2),
+                              color: cs.onSurface.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(999),
                             ),
                           ),
@@ -644,8 +641,8 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                             prefixIcon: Icon(
                               Lucide.Search,
                               size: 18,
-                              color: cs.onSurface.withOpacity(
-                                _isLoading ? 0.35 : 0.6,
+                              color: cs.onSurface.withValues(
+                                alpha: _isLoading ? 0.35 : 0.6,
                               ),
                             ),
                             // Use IconButton for reliable alignment at the far right
@@ -660,8 +657,8 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                                       icon: Icon(
                                         Lucide.Bookmark,
                                         size: 18,
-                                        color: cs.onSurface.withOpacity(
-                                          _isLoading ? 0.35 : 0.7,
+                                        color: cs.onSurface.withValues(
+                                          alpha: _isLoading ? 0.35 : 0.7,
                                         ),
                                       ),
                                       onPressed: _isLoading
@@ -687,30 +684,32 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                             filled: true,
                             fillColor:
                                 Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white.withOpacity(0.10)
-                                : Colors.white.withOpacity(0.64),
+                                ? Colors.white.withValues(alpha: 0.10)
+                                : Colors.white.withValues(alpha: 0.64),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                               borderSide: BorderSide(
-                                color: cs.outlineVariant.withOpacity(0.4),
+                                color: cs.outlineVariant.withValues(alpha: 0.4),
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                               borderSide: BorderSide(
-                                color: cs.outlineVariant.withOpacity(0.4),
+                                color: cs.outlineVariant.withValues(alpha: 0.4),
                               ),
                             ),
                             disabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                               borderSide: BorderSide(
-                                color: cs.outlineVariant.withOpacity(0.25),
+                                color: cs.outlineVariant.withValues(
+                                  alpha: 0.25,
+                                ),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                               borderSide: BorderSide(
-                                color: cs.primary.withOpacity(0.5),
+                                color: cs.primary.withValues(alpha: 0.5),
                               ),
                             ),
                           ),
@@ -888,7 +887,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: cs.onSurface.withOpacity(0.6),
+          color: cs.onSurface.withValues(alpha: 0.6),
         ),
       ),
     );
@@ -904,7 +903,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     final settings = context.read<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = m.selected
-        ? (isDark ? cs.primary.withOpacity(0.12) : cs.primary.withOpacity(0.08))
+        ? (isDark
+              ? cs.primary.withValues(alpha: 0.12)
+              : cs.primary.withValues(alpha: 0.08))
         : cs.surface;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -958,9 +959,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                             ),
                             children: [
                               TextSpan(
-                                text: ' | ${m.providerName}',
+                                text: ' | $m.providerName',
                                 style: TextStyle(
-                                  color: cs.onSurface.withOpacity(0.6),
+                                  color: cs.onSurface.withValues(alpha: 0.6),
                                   fontSize: 12,
                                 ),
                               ),
@@ -1017,7 +1018,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         avatar: ProviderAvatar(providerKey: key, displayName: name, size: 18),
         label: name,
         selected: selected,
-        borderColor: cs.outlineVariant.withOpacity(0.25),
+        borderColor: cs.outlineVariant.withValues(alpha: 0.25),
         onTap: () async {
           await _jumpToProvider(key);
         },
@@ -1120,15 +1121,17 @@ class _ProviderChipState extends State<_ProviderChip> {
     final bool isSelected = widget.selected;
     // Subtle background tint when selected (less conspicuous)
     final Color baseBg = isSelected
-        ? (isDark ? cs.primary.withOpacity(0.08) : cs.primary.withOpacity(0.05))
+        ? (isDark
+              ? cs.primary.withValues(alpha: 0.08)
+              : cs.primary.withValues(alpha: 0.05))
         : cs.surface;
     final Color overlay = isDark
-        ? Colors.white.withOpacity(0.06)
-        : Colors.black.withOpacity(0.05);
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.05);
     final Color bg = _pressed ? Color.alphaBlend(overlay, baseBg) : baseBg;
     // Slightly stronger border when selected; keep label color unchanged for subtlety
     final Color borderColor =
-        widget.borderColor ?? cs.outlineVariant.withOpacity(0.25);
+        widget.borderColor ?? cs.outlineVariant.withValues(alpha: 0.25);
     final Color labelColor = cs.onSurface;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1263,7 +1266,7 @@ class _BrandAvatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : cs.primary.withOpacity(0.1),
+        color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
@@ -1282,7 +1285,7 @@ Future<ModelSelection?> _showDesktopModelSelector(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'model-select-desktop',
-    barrierColor: Colors.black.withOpacity(0.25),
+    barrierColor: Colors.black.withValues(alpha: 0.25),
     pageBuilder: (ctx, _, __) =>
         _DesktopModelSelectDialogBody(limitProviderKey: limitProviderKey),
     transitionBuilder: (ctx, anim, _, child) {
@@ -1312,7 +1315,6 @@ class _DesktopModelSelectDialogBodyState
   final FocusNode _searchFocusNode = FocusNode();
   bool _loading = true;
   Map<String, _ProviderGroup> _groups = const {};
-  List<_ModelItem> _favItems = const [];
   List<String> _orderedKeys = const [];
   // Flattened rows and precise index mapping for jump
   final ItemScrollController _itemScrollController = ItemScrollController();
@@ -1409,7 +1411,6 @@ class _DesktopModelSelectDialogBodyState
     if (!mounted) return;
     setState(() {
       _groups = result.groups;
-      _favItems = result.favItems;
       _orderedKeys = result.orderedKeys;
       _loading = false;
     });
@@ -1551,8 +1552,8 @@ class _DesktopModelSelectDialogBodyState
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(
               color: isDark
-                  ? Colors.white.withOpacity(0.08)
-                  : cs.outlineVariant.withOpacity(0.25),
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : cs.outlineVariant.withValues(alpha: 0.25),
               width: 1,
             ),
           ),
@@ -1584,7 +1585,7 @@ class _DesktopModelSelectDialogBodyState
                               prefixIcon: Icon(
                                 Lucide.Search,
                                 size: 16,
-                                color: cs.onSurface.withOpacity(0.7),
+                                color: cs.onSurface.withValues(alpha: 0.7),
                               ),
                               suffixIcon:
                                   (widget.limitProviderKey == null &&
@@ -1599,7 +1600,9 @@ class _DesktopModelSelectDialogBodyState
                                         icon: Icon(
                                           Lucide.Bookmark,
                                           size: 16,
-                                          color: cs.onSurface.withOpacity(0.7),
+                                          color: cs.onSurface.withValues(
+                                            alpha: 0.7,
+                                          ),
                                         ),
                                         onPressed: _jumpToFavorites,
                                       ),
@@ -1620,7 +1623,7 @@ class _DesktopModelSelectDialogBodyState
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                  color: cs.primary.withOpacity(0.4),
+                                  color: cs.primary.withValues(alpha: 0.4),
                                 ),
                               ),
                               contentPadding: const EdgeInsets.symmetric(
@@ -1763,7 +1766,9 @@ class _DesktopModelSelectDialogBodyState
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     final bg = m.selected
-        ? (isDark ? cs.primary.withOpacity(0.12) : cs.primary.withOpacity(0.08))
+        ? (isDark
+              ? cs.primary.withValues(alpha: 0.12)
+              : cs.primary.withValues(alpha: 0.08))
         : cs.surface;
 
     return Padding(
@@ -1787,10 +1792,10 @@ class _DesktopModelSelectDialogBodyState
                   children: [
                     if (showProviderLabel)
                       TextSpan(
-                        text: ' | ${m.providerName}',
+                        text: ' | $m.providerName',
                         style: TextStyle(
                           fontSize: 11.5,
-                          color: cs.onSurface.withOpacity(0.6),
+                          color: cs.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                   ],
@@ -1846,14 +1851,18 @@ class _DesktopModelSelectDialogBodyState
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
       child: Row(
         children: [
-          Icon(Lucide.Bookmark, size: 14, color: cs.onSurface.withOpacity(0.6)),
+          Icon(
+            Lucide.Bookmark,
+            size: 14,
+            color: cs.onSurface.withValues(alpha: 0.6),
+          ),
           const SizedBox(width: 6),
           Text(
             title,
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w600,
-              color: cs.onSurface.withOpacity(0.6),
+              color: cs.onSurface.withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -1878,7 +1887,7 @@ class _DesktopModelSelectDialogBodyState
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w600,
-              color: cs.onSurface.withOpacity(0.6),
+              color: cs.onSurface.withValues(alpha: 0.6),
             ),
           ),
           const Spacer(),
@@ -1888,7 +1897,7 @@ class _DesktopModelSelectDialogBodyState
               child: IosIconButton(
                 icon: Lucide.Settings2,
                 size: 16,
-                color: cs.onSurface.withOpacity(0.8),
+                color: cs.onSurface.withValues(alpha: 0.8),
                 onTap: () async {
                   final nav = Navigator.of(context);
                   // Close model dialog first
