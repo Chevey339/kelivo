@@ -75,6 +75,7 @@ dependencies:
   mcp_client: # ^1.0.2
     path: ./dependencies/mcp_client
   flutter_highlight: ^0.7.0
+  highlight: ^0.7.0
   syncfusion_flutter_core: ^31.2.5
   syncfusion_flutter_sliders: ^31.2.5
   syncfusion_flutter_pdf: ^31.2.5
