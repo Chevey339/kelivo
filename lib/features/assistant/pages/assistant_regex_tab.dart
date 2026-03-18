@@ -64,9 +64,9 @@ class _AssistantRegexTabState extends State<AssistantRegexTab> {
   }
 
   Future<void> _addOrEdit({AssistantRegex? rule}) async {
+    final ap = context.read<AssistantProvider>();
     final data = await _showRegexEditor(context, rule: rule);
     if (data == null) return;
-    final ap = context.read<AssistantProvider>();
     final assistant = ap.getById(widget.assistantId);
     if (assistant == null) return;
     final list = List<AssistantRegex>.of(assistant.regexRules);
@@ -111,14 +111,18 @@ class _AssistantRegexTabState extends State<AssistantRegexTab> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Lucide.Wand2, size: 64, color: cs.primary.withOpacity(0.6)),
+              Icon(
+                Lucide.Wand2,
+                size: 64,
+                color: cs.primary.withValues(alpha: 0.6),
+              ),
               const SizedBox(height: 16),
               Text(
                 l10n.assistantEditRegexDescription,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
-                  color: cs.onSurface.withOpacity(0.7),
+                  color: cs.onSurface.withValues(alpha: 0.7),
                 ),
               ),
               const SizedBox(height: 24),
@@ -129,7 +133,7 @@ class _AssistantRegexTabState extends State<AssistantRegexTab> {
                   borderRadius: BorderRadius.circular(12),
                   baseColor: isDark
                       ? Colors.white10
-                      : cs.primary.withOpacity(0.12),
+                      : cs.primary.withValues(alpha: 0.12),
                   pressedBlendStrength: 0.18,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -263,9 +267,9 @@ class _AssistantRegexDesktopPaneState extends State<AssistantRegexDesktopPane> {
   }
 
   Future<void> _addOrEdit({AssistantRegex? rule}) async {
+    final ap = context.read<AssistantProvider>();
     final data = await _showRegexEditor(context, rule: rule);
     if (data == null) return;
-    final ap = context.read<AssistantProvider>();
     final assistant = ap.getById(widget.assistantId);
     if (assistant == null) return;
     final list = List<AssistantRegex>.of(assistant.regexRules);
@@ -328,7 +332,7 @@ class _AssistantRegexDesktopPaneState extends State<AssistantRegexDesktopPane> {
                         l10n.assistantEditRegexDescription,
                         style: TextStyle(
                           fontSize: 13,
-                          color: cs.onSurface.withOpacity(0.65),
+                          color: cs.onSurface.withValues(alpha: 0.65),
                         ),
                       ),
                     ],
@@ -339,7 +343,7 @@ class _AssistantRegexDesktopPaneState extends State<AssistantRegexDesktopPane> {
                   borderRadius: BorderRadius.circular(12),
                   baseColor: isDark
                       ? Colors.white10
-                      : cs.primary.withOpacity(0.12),
+                      : cs.primary.withValues(alpha: 0.12),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 10,
@@ -371,7 +375,7 @@ class _AssistantRegexDesktopPaneState extends State<AssistantRegexDesktopPane> {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   )
@@ -446,10 +450,12 @@ class _RegexRuleCardState extends State<_RegexRuleCard> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-    final bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
-    final borderBase = cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06);
+    final bg = isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96);
+    final borderBase = cs.outlineVariant.withValues(
+      alpha: isDark ? 0.08 : 0.06,
+    );
     final borderColor = widget.desktop && _hovered
-        ? cs.primary.withOpacity(0.55)
+        ? cs.primary.withValues(alpha: 0.55)
         : borderBase;
 
     return MouseRegion(
@@ -561,10 +567,10 @@ class _RegexRuleCardState extends State<_RegexRuleCard> {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: isDark
-                  ? Colors.white.withOpacity(0.06)
-                  : cs.primary.withOpacity(0.10),
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : cs.primary.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: cs.primary.withOpacity(0.35)),
+              border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
             ),
             child: Text(
               p,
@@ -585,12 +591,10 @@ class _GlassCircleButton extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    this.size = 48,
   });
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final double size;
 
   @override
   State<_GlassCircleButton> createState() => _GlassCircleButtonState();
@@ -604,19 +608,19 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final glassBase = isDark
-        ? Colors.black.withOpacity(0.06)
-        : Colors.white.withOpacity(0.06);
+        ? Colors.black.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.06);
     final overlay = isDark
-        ? Colors.white.withOpacity(0.06)
-        : Colors.black.withOpacity(0.05);
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.05);
     final tileColor = _pressed
         ? Color.alphaBlend(overlay, glassBase)
         : glassBase;
-    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.10 : 0.10);
+    final borderColor = cs.outlineVariant.withValues(alpha: 0.10);
 
     final child = SizedBox(
-      width: widget.size,
-      height: widget.size,
+      width: 48,
+      height: 48,
       child: Center(child: Icon(widget.icon, size: 18, color: widget.color)),
     );
 
@@ -1126,7 +1130,7 @@ Future<_RegexFormData?> _showRegexDialog(
                             child: Text(
                               l10n.assistantRegexCancelButton,
                               style: TextStyle(
-                                color: cs.onSurface.withOpacity(0.8),
+                                color: cs.onSurface.withValues(alpha: 0.8),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -1135,7 +1139,7 @@ Future<_RegexFormData?> _showRegexDialog(
                           IosCardPress(
                             onTap: submit,
                             borderRadius: BorderRadius.circular(12),
-                            baseColor: cs.primary.withOpacity(0.12),
+                            baseColor: cs.primary.withValues(alpha: 0.12),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,
                               vertical: 10,
@@ -1202,11 +1206,13 @@ class _RegexTextField extends StatelessWidget {
         fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+          borderSide: BorderSide(
+            color: cs.outlineVariant.withValues(alpha: 0.4),
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+          borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
         ),
       ),
     );
@@ -1238,13 +1244,15 @@ class _ScopeChoiceCardState extends State<_ScopeChoiceCard> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final base = widget.selected
-        ? cs.primary.withOpacity(0.16)
+        ? cs.primary.withValues(alpha: 0.16)
         : (isDark ? Colors.white10 : const Color(0xFFF2F3F5));
     final borderBase = widget.selected
-        ? cs.primary.withOpacity(0.55)
-        : cs.outlineVariant.withOpacity(isDark ? 0.14 : 0.12);
+        ? cs.primary.withValues(alpha: 0.55)
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.14 : 0.12);
     final borderColor = (widget.desktop && _hovered) ? cs.primary : borderBase;
-    final fg = widget.selected ? cs.primary : cs.onSurface.withOpacity(0.8);
+    final fg = widget.selected
+        ? cs.primary
+        : cs.onSurface.withValues(alpha: 0.8);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
