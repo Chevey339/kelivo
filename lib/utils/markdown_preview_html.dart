@@ -7,7 +7,16 @@ class MarkdownPreviewHtmlBuilder {
     BuildContext context,
     String markdown,
   ) async {
-    final cs = Theme.of(context).colorScheme;
+    return buildFromMarkdownWithColorScheme(
+      Theme.of(context).colorScheme,
+      markdown,
+    );
+  }
+
+  static Future<String> buildFromMarkdownWithColorScheme(
+    ColorScheme cs,
+    String markdown,
+  ) async {
     final template = await rootBundle.loadString('assets/html/mark.html');
     return template
         .replaceAll('{{MARKDOWN_BASE64}}', base64Encode(utf8.encode(markdown)))
