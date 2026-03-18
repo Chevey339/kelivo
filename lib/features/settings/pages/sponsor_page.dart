@@ -61,21 +61,10 @@ class _SponsorPageState extends State<SponsorPage> {
         style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: cs.onSurface.withOpacity(0.8),
+          color: cs.onSurface.withValues(alpha: 0.8),
         ),
       ),
     );
-  }
-
-  Future<void> _openUrl(String url) async {
-    final uri = Uri.parse(url);
-    try {
-      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        await launchUrl(uri, mode: LaunchMode.platformDefault);
-      }
-    } catch (_) {
-      await launchUrl(uri);
-    }
   }
 
   @override
@@ -162,7 +151,9 @@ class _SponsorPageState extends State<SponsorPage> {
                   child: Center(
                     child: Text(
                       l10n.sponsorPageEmpty,
-                      style: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+                      style: TextStyle(
+                        color: cs.onSurface.withValues(alpha: 0.6),
+                      ),
                     ),
                   ),
                 );
@@ -236,7 +227,7 @@ class _SponsorTile extends StatelessWidget {
           height: 52,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
           ),
           child: ClipOval(
             child: Image.network(
@@ -247,7 +238,10 @@ class _SponsorTile extends StatelessWidget {
               errorBuilder: (_, __, ___) => Container(
                 color: cs.surface,
                 alignment: Alignment.center,
-                child: Icon(Icons.person, color: cs.onSurface.withOpacity(0.5)),
+                child: Icon(
+                  Icons.person,
+                  color: cs.onSurface.withValues(alpha: 0.5),
+                ),
               ),
             ),
           ),
@@ -261,7 +255,7 @@ class _SponsorTile extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 12,
-              color: cs.onSurface.withOpacity(0.9),
+              color: cs.onSurface.withValues(alpha: 0.9),
             ),
             textAlign: TextAlign.center,
           ),
@@ -279,13 +273,15 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+      final Color bg = isDark
+          ? Colors.white10
+          : Colors.white.withValues(alpha: 0.96);
       return Container(
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
             width: 0.6,
           ),
         ),
@@ -306,7 +302,7 @@ Widget _iosDivider(BuildContext context) {
     thickness: 0.6,
     indent: 54,
     endIndent: 12,
-    color: cs.outlineVariant.withOpacity(0.18),
+    color: cs.outlineVariant.withValues(alpha: 0.18),
   );
 }
 
@@ -352,7 +348,9 @@ class _TactileRow extends StatefulWidget {
 class _TactileRowState extends State<_TactileRow> {
   bool _pressed = false;
   void _setPressed(bool v) {
-    if (_pressed != v) setState(() => _pressed = v);
+    if (_pressed != v) {
+      setState(() => _pressed = v);
+    }
   }
 
   @override
@@ -367,8 +365,9 @@ class _TactileRowState extends State<_TactileRow> {
           ? null
           : () {
               if (widget.haptics &&
-                  context.read<SettingsProvider>().hapticsOnListItemTap)
+                  context.read<SettingsProvider>().hapticsOnListItemTap) {
                 Haptics.soft();
+              }
               widget.onTap!.call();
             },
       child: widget.pressedScale == 1.0
@@ -398,7 +397,7 @@ Widget _iosNavRow(
     pressedScale: 1.00,
     haptics: false,
     builder: (pressed) {
-      final baseColor = cs.onSurface.withOpacity(0.9);
+      final baseColor = cs.onSurface.withValues(alpha: 0.9);
       return _AnimatedPressColor(
         pressed: pressed,
         base: baseColor,
@@ -423,7 +422,7 @@ Widget _iosNavRow(
                     child: DefaultTextStyle(
                       style: TextStyle(
                         fontSize: 13,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                       child: detailBuilder(context),
                     ),
@@ -435,7 +434,7 @@ Widget _iosNavRow(
                       detailText,
                       style: TextStyle(
                         fontSize: 13,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ),
@@ -454,18 +453,12 @@ class _TactileIconButton extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    this.onLongPress,
-    this.semanticLabel,
     this.size = 22,
-    this.haptics = true,
   });
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final String? semanticLabel;
   final double size;
-  final bool haptics;
   @override
   State<_TactileIconButton> createState() => _TactileIconButtonState();
 }
@@ -475,16 +468,14 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
       size: widget.size,
       color: _pressed ? pressColor : base,
-      semanticLabel: widget.semanticLabel,
     );
     return Semantics(
       button: true,
-      label: widget.semanticLabel,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => setState(() => _pressed = true),
@@ -494,12 +485,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
           /* no haptics on tap to match provider */
           widget.onTap();
         },
-        onLongPress: widget.onLongPress == null
-            ? null
-            : () {
-                if (widget.haptics) Haptics.light();
-                widget.onLongPress!.call();
-              },
         child: AnimatedScale(
           scale: _pressed ? 0.95 : 1.0,
           duration: const Duration(milliseconds: 100),
