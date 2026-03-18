@@ -15,7 +15,7 @@ Future<String?> showDesktopAddProviderDialog(BuildContext context) async {
     context: context,
     barrierDismissible: true,
     barrierLabel: 'add-provider-dialog',
-    barrierColor: Colors.black.withOpacity(0.25),
+    barrierColor: Colors.black.withValues(alpha: 0.25),
     pageBuilder: (ctx, _, __) => const _AddProviderDialogBody(),
     transitionBuilder: (ctx, anim, _, child) {
       final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
@@ -111,20 +111,23 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(
-          color: cs.outlineVariant.withOpacity(0.12),
+          color: cs.outlineVariant.withValues(alpha: 0.12),
           width: 0.6,
         ),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(
-          color: cs.outlineVariant.withOpacity(0.12),
+          color: cs.outlineVariant.withValues(alpha: 0.12),
           width: 0.6,
         ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8),
+        borderSide: BorderSide(
+          color: cs.primary.withValues(alpha: 0.35),
+          width: 0.8,
+        ),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     );
@@ -136,7 +139,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
       text,
       style: TextStyle(
         fontSize: 13,
-        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
       ),
     ),
   );
@@ -146,7 +149,6 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    final cs = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark
@@ -179,8 +181,9 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
       try {
         final obj = jsonDecode(text) as Map<String, dynamic>;
         final pid = (obj['project_id'] as String?)?.trim();
-        if ((pid ?? '').isNotEmpty && _googleProject.text.trim().isEmpty)
+        if ((pid ?? '').isNotEmpty && _googleProject.text.trim().isEmpty) {
           _googleProject.text = pid!;
+        }
       } catch (_) {}
       if (mounted) setState(() {});
     } catch (_) {}
@@ -189,11 +192,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
   Future<void> _onAdd() async {
     final settings = context.read<SettingsProvider>();
     String uniqueKey(String prefix, String display) {
-      final existing = context
-          .read<SettingsProvider>()
-          .providerConfigs
-          .keys
-          .toSet();
+      final existing = settings.providerConfigs.keys.toSet();
       if (display.toLowerCase() == prefix.toLowerCase()) {
         int i = 1;
         String candidate = '$prefix - $i';
@@ -312,14 +311,13 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
       createdKey = keyName;
     }
 
-    final order = List<String>.of(
-      context.read<SettingsProvider>().providersOrder,
-    );
+    final order = List<String>.of(settings.providersOrder);
     order.remove(createdKey);
     order.insert(0, createdKey);
-    await context.read<SettingsProvider>().setProvidersOrder(order);
+    await settings.setProvidersOrder(order);
 
-    if (mounted) Navigator.of(context).pop(createdKey);
+    if (!mounted) return;
+    Navigator.of(context).pop(createdKey);
   }
 
   @override
@@ -337,7 +335,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
           color: cs.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: cs.outlineVariant.withOpacity(0.25)),
+            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.25)),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
@@ -367,7 +365,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
                         icon: Icon(
                           lucide.Lucide.X,
                           size: 20,
-                          color: cs.onSurface.withOpacity(0.9),
+                          color: cs.onSurface.withValues(alpha: 0.9),
                         ),
                         onPressed: () => Navigator.of(context).maybePop(),
                       ),
@@ -428,7 +426,6 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
   }
 
   Widget _openaiForm(AppLocalizations l10n) {
-    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -477,7 +474,6 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
   }
 
   Widget _googleForm(AppLocalizations l10n) {
-    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -629,22 +625,22 @@ class _SmallSegTabBarState extends State<_SmallSegTabBar> {
             final double rowWidth =
                 segWidth * widget.tabs.length + gap * (widget.tabs.length - 1);
             final Color shellBg = isDark
-                ? Colors.white.withOpacity(0.08)
+                ? Colors.white.withValues(alpha: 0.08)
                 : Colors.white;
             List<Widget> children = [];
             for (int index = 0; index < widget.tabs.length; index++) {
               final bool selected = widget.controller.index == index;
               final bool hovered = _hover == index;
               final Color bg = selected
-                  ? cs.primary.withOpacity(0.14)
+                  ? cs.primary.withValues(alpha: 0.14)
                   : hovered
                   ? (isDark
-                        ? Colors.white.withOpacity(0.06)
-                        : Colors.black.withOpacity(0.03))
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.black.withValues(alpha: 0.03))
                   : Colors.transparent;
               final Color fg = selected
                   ? cs.primary
-                  : cs.onSurface.withOpacity(0.82);
+                  : cs.onSurface.withValues(alpha: 0.82);
               children.add(
                 SizedBox(
                   width: segWidth < minSegWidth ? minSegWidth : segWidth,
@@ -681,8 +677,9 @@ class _SmallSegTabBarState extends State<_SmallSegTabBar> {
                   ),
                 ),
               );
-              if (index != widget.tabs.length - 1)
+              if (index != widget.tabs.length - 1) {
                 children.add(const SizedBox(width: gap));
+              }
             }
             return Container(
               height: outerHeight,
@@ -733,8 +730,8 @@ class _PrimaryDeskButtonState extends State<_PrimaryDeskButton> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final bg = _pressed
-        ? cs.primary.withOpacity(0.85)
-        : (_hover ? cs.primary.withOpacity(0.92) : cs.primary);
+        ? cs.primary.withValues(alpha: 0.85)
+        : (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
