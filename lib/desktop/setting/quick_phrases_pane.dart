@@ -53,7 +53,7 @@ class _DesktopQuickPhrasesPaneState extends State<DesktopQuickPhrasesPane> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w400,
-                              color: cs.onSurface.withOpacity(0.9),
+                              color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
                         ),
@@ -79,13 +79,13 @@ class _DesktopQuickPhrasesPaneState extends State<DesktopQuickPhrasesPane> {
                           Icon(
                             lucide.Lucide.Zap,
                             size: 56,
-                            color: cs.onSurface.withOpacity(0.28),
+                            color: cs.onSurface.withValues(alpha: 0.28),
                           ),
                           const SizedBox(height: 12),
                           Text(
                             l10n.quickPhraseEmptyMessage,
                             style: TextStyle(
-                              color: cs.onSurface.withOpacity(0.65),
+                              color: cs.onSurface.withValues(alpha: 0.65),
                               fontSize: 14,
                             ),
                           ),
@@ -142,6 +142,7 @@ class _DesktopQuickPhrasesPaneState extends State<DesktopQuickPhrasesPane> {
     QuickPhrase? phrase,
   }) async {
     final l10n = AppLocalizations.of(context)!;
+    final provider = context.read<QuickPhraseProvider>();
     final result = await showDialog<Map<String, String>?>(
       context: context,
       builder: (ctx) => _QuickPhraseEditDialog(
@@ -157,7 +158,6 @@ class _DesktopQuickPhrasesPaneState extends State<DesktopQuickPhrasesPane> {
     final content = (result['content'] ?? '').trim();
     if (title.isEmpty || content.isEmpty) return;
 
-    final provider = context.read<QuickPhraseProvider>();
     if (phrase == null) {
       final newPhrase = QuickPhrase(
         id: const Uuid().v4(),
@@ -194,10 +194,12 @@ class _QuickPhraseCardState extends State<_QuickPhraseCard> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    final baseBg = isDark
+        ? Colors.white10
+        : Colors.white.withValues(alpha: 0.96);
     final borderColor = _hover
-        ? cs.primary.withOpacity(isDark ? 0.35 : 0.45)
-        : cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08);
+        ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -239,7 +241,7 @@ class _QuickPhraseCardState extends State<_QuickPhraseCard> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 13,
-                        color: cs.onSurface.withOpacity(0.75),
+                        color: cs.onSurface.withValues(alpha: 0.75),
                       ),
                     ),
                   ],
@@ -381,8 +383,8 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -429,17 +431,17 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = widget.filled
         ? cs.onPrimary
-        : cs.onSurface.withOpacity(0.9);
+        : cs.onSurface.withValues(alpha: 0.9);
     final bg = widget.filled
-        ? (_hover ? cs.primary.withOpacity(0.92) : cs.primary)
+        ? (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary)
         : (_hover
               ? (isDark
-                    ? Colors.white.withOpacity(0.06)
-                    : Colors.black.withOpacity(0.05))
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.05))
               : Colors.transparent);
     final borderColor = widget.filled
         ? Colors.transparent
-        : cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18);
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.22 : 0.18);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -490,20 +492,23 @@ InputDecoration _deskInputDecoration(BuildContext context) {
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.2),
+        color: cs.outlineVariant.withValues(alpha: 0.2),
         width: 0.8,
       ),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.2),
+        color: cs.outlineVariant.withValues(alpha: 0.2),
         width: 0.8,
       ),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: cs.primary.withOpacity(0.45), width: 1.0),
+      borderSide: BorderSide(
+        color: cs.primary.withValues(alpha: 0.45),
+        width: 1.0,
+      ),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
   );
