@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:socks5_proxy/socks_client.dart' as socks;
 
@@ -215,7 +214,7 @@ class _NetworkProxyPageState extends State<NetworkProxyPage> {
                   l10n.networkProxyPriorityNote,
                   style: TextStyle(
                     fontSize: 12,
-                    color: cs.onSurface.withOpacity(0.6),
+                    color: cs.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
               ),
@@ -423,7 +422,7 @@ class _ProxyTypeSheetField extends StatelessWidget {
           color: fillColor,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: cs.outlineVariant.withOpacity(0.12),
+            color: cs.outlineVariant.withValues(alpha: 0.12),
             width: 0.6,
           ),
         ),
@@ -434,7 +433,7 @@ class _ProxyTypeSheetField extends StatelessWidget {
                 labelOf(value),
                 style: TextStyle(
                   fontSize: 14,
-                  color: cs.onSurface.withOpacity(0.88),
+                  color: cs.onSurface.withValues(alpha: 0.88),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -443,7 +442,7 @@ class _ProxyTypeSheetField extends StatelessWidget {
             Icon(
               Icons.keyboard_arrow_down_rounded,
               size: 18,
-              color: cs.onSurface.withOpacity(0.55),
+              color: cs.onSurface.withValues(alpha: 0.55),
             ),
           ],
         ),
@@ -458,7 +457,6 @@ class _ProxyTypeSheetField extends StatelessWidget {
     required bool selected,
   }) {
     final cs = Theme.of(ctx).colorScheme;
-    final isDark = Theme.of(ctx).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: SizedBox(
@@ -496,7 +494,7 @@ class _ProxyTypeSheetField extends StatelessWidget {
       thickness: 0.6,
       indent: 12,
       endIndent: 12,
-      color: cs.outlineVariant.withOpacity(isDark ? 0.10 : 0.08),
+      color: cs.outlineVariant.withValues(alpha: isDark ? 0.10 : 0.08),
     );
   }
 }
@@ -541,13 +539,15 @@ Widget _sectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+      final Color bg = isDark
+          ? Colors.white10
+          : Colors.white.withValues(alpha: 0.96);
       return Container(
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
             width: 0.6,
           ),
         ),
@@ -558,17 +558,6 @@ Widget _sectionCard({required List<Widget> children}) {
         ),
       );
     },
-  );
-}
-
-Widget _divider(BuildContext context) {
-  final cs = Theme.of(context).colorScheme;
-  return Divider(
-    height: 6,
-    thickness: 0.6,
-    indent: 12,
-    endIndent: 12,
-    color: cs.outlineVariant.withOpacity(0.18),
   );
 }
 
@@ -589,7 +578,7 @@ Widget _labeledField(
             label,
             style: TextStyle(
               fontSize: 12.5,
-              color: cs.onSurface.withOpacity(0.7),
+              color: cs.onSurface.withValues(alpha: 0.7),
             ),
           ),
         ),
@@ -607,24 +596,30 @@ InputDecoration _deskInputDecoration(BuildContext context) {
     isDense: true,
     filled: true,
     fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
-    hintStyle: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.5)),
+    hintStyle: TextStyle(
+      fontSize: 14,
+      color: cs.onSurface.withValues(alpha: 0.5),
+    ),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.12),
+        color: cs.outlineVariant.withValues(alpha: 0.12),
         width: 0.6,
       ),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.12),
+        color: cs.outlineVariant.withValues(alpha: 0.12),
         width: 0.6,
       ),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8),
+      borderSide: BorderSide(
+        color: cs.primary.withValues(alpha: 0.35),
+        width: 0.8,
+      ),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
   );
@@ -653,15 +648,15 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = widget.filled
         ? Colors.white
-        : cs.onSurface.withOpacity(0.9);
+        : cs.onSurface.withValues(alpha: 0.9);
     final bg = widget.filled
         ? cs.primary
         : (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05));
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05));
     final borderColor = widget.filled
         ? Colors.transparent
-        : cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18);
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.22 : 0.18);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => setState(() => _pressed = true),
