@@ -145,7 +145,7 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final label = _labelForValue(widget.value);
 
-    final baseBorder = cs.outlineVariant.withOpacity(0.18);
+    final baseBorder = cs.outlineVariant.withValues(alpha: 0.18);
     final hoverBorder = cs.primary;
     final borderColor = _open || _hover ? hoverBorder : baseBorder;
 
@@ -177,7 +177,7 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
               boxShadow: _open
                   ? [
                       BoxShadow(
-                        color: cs.primary.withOpacity(0.10),
+                        color: cs.primary.withValues(alpha: 0.10),
                         blurRadius: 0,
                         spreadRadius: 2,
                       ),
@@ -199,7 +199,7 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 14,
-                          color: cs.onSurface.withOpacity(0.88),
+                          color: cs.onSurface.withValues(alpha: 0.88),
                         ),
                       ),
                     ),
@@ -216,7 +216,7 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
                       child: Icon(
                         lucide.Lucide.ChevronDown,
                         size: 16,
-                        color: cs.onSurface.withOpacity(0.7),
+                        color: cs.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                   ),
@@ -281,7 +281,7 @@ class _DesktopSelectOverlayState<T> extends State<_DesktopSelectOverlay<T>>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderColor = cs.outlineVariant.withOpacity(0.12);
+    final borderColor = cs.outlineVariant.withValues(alpha: 0.12);
 
     return FadeTransition(
       opacity: _opacity,
@@ -300,7 +300,7 @@ class _DesktopSelectOverlayState<T> extends State<_DesktopSelectOverlay<T>>
               border: Border.all(color: borderColor, width: 0.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.32 : 0.08),
+                  color: Colors.black.withValues(alpha: isDark ? 0.32 : 0.08),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
@@ -350,11 +350,11 @@ class _DesktopSelectOptionTileState extends State<_DesktopSelectOptionTile> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = widget.selected
-        ? cs.primary.withOpacity(0.12)
+        ? cs.primary.withValues(alpha: 0.12)
         : (_hover
               ? (isDark
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.black.withOpacity(0.04))
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.04))
               : Colors.transparent);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -388,7 +388,7 @@ class _DesktopSelectOptionTileState extends State<_DesktopSelectOptionTile> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 14,
-                      color: cs.onSurface.withOpacity(0.88),
+                      color: cs.onSurface.withValues(alpha: 0.88),
                       fontWeight: widget.selected
                           ? FontWeight.w600
                           : FontWeight.w400,
