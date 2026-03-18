@@ -276,7 +276,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: cs.onSurface.withOpacity(0.2),
+                        color: cs.onSurface.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -313,6 +313,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                               );
                               if (code == null || code.isEmpty) return;
                               try {
+                                if (!ctx.mounted) return;
                                 final settings = ctx.read<SettingsProvider>();
                                 final results = <_ImportResult>[];
                                 // Support combined multi-provider QR content: newline-separated share strings or JSON
@@ -362,6 +363,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                   order.insert(0, r.key);
                                   await settings.setProvidersOrder(order);
                                 }
+                                if (!ctx.mounted || !context.mounted) return;
                                 Navigator.of(ctx).pop();
                                 showAppSnackBar(
                                   context,
@@ -372,6 +374,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                   type: NotificationType.success,
                                 );
                               } catch (e) {
+                                if (!ctx.mounted) return;
                                 showAppSnackBar(
                                   ctx,
                                   message: l10n
@@ -422,11 +425,15 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                     }
                                   } catch (_) {}
                                 }
-                                if (code == null || code!.isEmpty)
+                                final scannedCode = code;
+                                if (scannedCode == null ||
+                                    scannedCode.isEmpty) {
                                   throw 'QR not detected';
+                                }
+                                if (!ctx.mounted) return;
                                 final settings = ctx.read<SettingsProvider>();
                                 final results = <_ImportResult>[];
-                                final parts = code!
+                                final parts = scannedCode
                                     .split(RegExp(r'\r?\n+'))
                                     .map((e) => e.trim())
                                     .where((e) => e.isNotEmpty)
@@ -443,8 +450,9 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                       }
                                     } catch (_) {}
                                   }
-                                  if (results.isEmpty)
+                                  if (results.isEmpty) {
                                     throw 'Unsupported content';
+                                  }
                                 } else {
                                   final p = parts.first;
                                   if (p.startsWith('ai-provider:v1:')) {
@@ -467,6 +475,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                   order.insert(0, r.key);
                                   await settings.setProvidersOrder(order);
                                 }
+                                if (!ctx.mounted || !context.mounted) return;
                                 Navigator.of(ctx).pop();
                                 showAppSnackBar(
                                   context,
@@ -477,6 +486,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                   type: NotificationType.success,
                                 );
                               } catch (e) {
+                                if (!ctx.mounted) return;
                                 showAppSnackBar(
                                   ctx,
                                   message: l10n
@@ -513,19 +523,19 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: cs.outlineVariant.withOpacity(0.4),
+                                color: cs.outlineVariant.withValues(alpha: 0.4),
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: cs.outlineVariant.withOpacity(0.4),
+                                color: cs.outlineVariant.withValues(alpha: 0.4),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: cs.primary.withOpacity(0.5),
+                                color: cs.primary.withValues(alpha: 0.5),
                               ),
                             ),
                           ),
@@ -606,6 +616,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                 order.insert(0, r.key);
                                 await settings.setProvidersOrder(order);
                               }
+                              if (!ctx.mounted || !context.mounted) return;
                               Navigator.of(ctx).pop();
                               showAppSnackBar(
                                 context,
@@ -616,6 +627,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                                 type: NotificationType.success,
                               );
                             } catch (e) {
+                              if (!ctx.mounted) return;
                               showAppSnackBar(
                                 ctx,
                                 message: l10n
@@ -648,7 +660,6 @@ class _TactileIconButton extends StatefulWidget {
     required this.onTap,
     this.semanticLabel,
     this.size = 22,
-    this.haptics = true,
   });
 
   final IconData icon;
@@ -656,7 +667,6 @@ class _TactileIconButton extends StatefulWidget {
   final VoidCallback onTap;
   final String? semanticLabel;
   final double size;
-  final bool haptics;
 
   @override
   State<_TactileIconButton> createState() => _TactileIconButtonState();
@@ -667,7 +677,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
       size: widget.size,
@@ -684,7 +694,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
         onTap: () {
-          if (widget.haptics) Haptics.light();
+          Haptics.light();
           widget.onTap();
         },
         child: AnimatedScale(
