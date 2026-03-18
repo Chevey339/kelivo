@@ -13,7 +13,7 @@ Future<void> showDesktopMcpServersPopover(
   required GlobalKey anchorKey,
   required String assistantId,
 }) async {
-  final overlay = Overlay.of(context);
+  final overlay = Overlay.maybeOf(context);
   if (overlay == null) return;
   final keyContext = anchorKey.currentContext;
   if (keyContext == null) return;
@@ -174,20 +174,20 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: (isDark ? Colors.black : Colors.white).withOpacity(
-              isDark ? 0.28 : 0.56,
+            color: (isDark ? Colors.black : Colors.white).withValues(
+              alpha: isDark ? 0.28 : 0.56,
             ),
             border: Border(
               top: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.06 : 0.18),
+                color: Colors.white.withValues(alpha: isDark ? 0.06 : 0.18),
                 width: 0.7,
               ),
               left: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
               right: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
             ),
@@ -245,10 +245,11 @@ class _McpServersContent extends StatelessWidget {
           selected: isSelected,
           onTap: () async {
             final set = a.mcpServerIds.toSet();
-            if (isSelected)
+            if (isSelected) {
               set.remove(s.id);
-            else
+            } else {
               set.add(s.id);
+            }
             await context.read<AssistantProvider>().updateAssistant(
               a.copyWith(mcpServerIds: set.toList()),
             );
@@ -307,8 +308,8 @@ class _RowItemState extends State<_RowItem> {
     final isDark = theme.brightness == Brightness.dark;
     final onColor = widget.selected ? cs.primary : cs.onSurface;
     final baseBg = Colors.transparent;
-    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(
-      isDark ? 0.12 : 0.10,
+    final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
+      alpha: isDark ? 0.12 : 0.10,
     );
     return MouseRegion(
       cursor: SystemMouseCursors.click,
