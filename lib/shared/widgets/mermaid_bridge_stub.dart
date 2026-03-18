@@ -28,11 +28,11 @@ class _MermaidInlineWindowsView extends StatefulWidget {
   final bool dark;
   final Map<String, String>? themeVars;
   const _MermaidInlineWindowsView({
-    Key? key,
+    super.key,
     required this.code,
     required this.dark,
     this.themeVars,
-  }) : super(key: key);
+  });
 
   @override
   State<_MermaidInlineWindowsView> createState() =>
@@ -225,7 +225,7 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
       final entries = themeVars.entries
           .map((e) => '"${e.key}": "${e.value}"')
           .join(',');
-      themeVarsJson = '{' + entries + '}';
+      themeVarsJson = '{$entries}';
     }
     return '''
 <!DOCTYPE html>
@@ -234,16 +234,16 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=5.0">
     <title>Mermaid</title>
-    <script>${mermaidJs}</script>
+    <script>$mermaidJs</script>
     <style>
-      html,body{margin:0;padding:0;background:${bg};color:${fg};}
+      html,body{margin:0;padding:0;background:$bg;color:$fg;}
       .wrap{padding:8px;}
       .mermaid{width:100%; text-align:center;}
     </style>
   </head>
   <body>
     <div class="wrap">
-      <div class="mermaid">${escaped}</div>
+      <div class="mermaid">$escaped</div>
     </div>
     <script>
       function postHeight(){
@@ -288,7 +288,7 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
           const xml = new XMLSerializer().serializeToString(svg);
           const img = new Image();
           img.onload = function(){
-            ctx.fillStyle = '${bg}';
+            ctx.fillStyle = '$bg';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             const data = canvas.toDataURL('image/png');
@@ -316,7 +316,7 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
           } catch (_) {}
         });
       }
-      mermaid.initialize({ startOnLoad:false, theme: '${dark ? 'dark' : 'default'}', securityLevel:'loose', fontFamily: 'inherit', themeVariables: ${themeVarsJson} });
+      mermaid.initialize({ startOnLoad:false, theme: '${dark ? 'dark' : 'default'}', securityLevel:'loose', fontFamily: 'inherit', themeVariables: $themeVarsJson });
       mermaid.run({ querySelector: '.mermaid' }).then(postHeight).catch(postHeight);
       window.addEventListener('resize', postHeight);
       document.addEventListener('DOMContentLoaded', postHeight);
@@ -432,11 +432,11 @@ class _MermaidInlineWebView extends StatefulWidget {
   final bool dark;
   final Map<String, String>? themeVars;
   const _MermaidInlineWebView({
-    Key? key,
+    super.key,
     required this.code,
     required this.dark,
     this.themeVars,
-  }) : super(key: key);
+  });
 
   @override
   State<_MermaidInlineWebView> createState() => _MermaidInlineWebViewState();
@@ -551,7 +551,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
       final entries = themeVars.entries
           .map((e) => '"${e.key}": "${e.value}"')
           .join(',');
-      themeVarsJson = '{' + entries + '}';
+      themeVarsJson = '{$entries}';
     }
     return '''
 <!DOCTYPE html>
@@ -560,16 +560,16 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=5.0">
     <title>Mermaid</title>
-    <script>${mermaidJs}</script>
+    <script>$mermaidJs</script>
     <style>
-      html,body{margin:0;padding:0;background:${bg};color:${fg};}
+      html,body{margin:0;padding:0;background:$bg;color:$fg;}
       .wrap{padding:8px;}
       .mermaid{width:100%; text-align:center;}
     </style>
   </head>
   <body>
     <div class="wrap">
-      <div class="mermaid">${escaped}</div>
+      <div class="mermaid">$escaped</div>
     </div>
     <script>
       function postHeight(){
@@ -612,7 +612,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
           const xml = new XMLSerializer().serializeToString(svg);
           const img = new Image();
           img.onload = function(){
-            ctx.fillStyle = '${bg}';
+            ctx.fillStyle = '$bg';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             const data = canvas.toDataURL('image/png');
@@ -625,7 +625,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
           ExportChannel.postMessage('');
         }
       };
-      mermaid.initialize({ startOnLoad:false, theme: '${dark ? 'dark' : 'default'}', securityLevel:'loose', fontFamily: 'inherit', themeVariables: ${themeVarsJson} });
+      mermaid.initialize({ startOnLoad:false, theme: '${dark ? 'dark' : 'default'}', securityLevel:'loose', fontFamily: 'inherit', themeVariables: $themeVarsJson });
       mermaid.run({ querySelector: '.mermaid' }).then(postHeight).catch(postHeight);
       window.addEventListener('resize', postHeight);
       document.addEventListener('DOMContentLoaded', postHeight);
