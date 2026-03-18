@@ -105,7 +105,10 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.8)),
+          style: TextStyle(
+            fontSize: 13,
+            color: cs.onSurface.withValues(alpha: 0.8),
+          ),
         ),
         const SizedBox(height: 6),
         TextField(
@@ -118,15 +121,19 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
             fillColor: isDark ? Colors.white10 : Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+              borderSide: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+              borderSide: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+              borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
@@ -135,35 +142,6 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _switchTile({
-    required String label,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Colors.white10
-            : const Color(0xFFF7F7F9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-          ),
-          IosSwitch(value: value, onChanged: onChanged),
-        ],
-      ),
     );
   }
 
@@ -190,10 +168,10 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
+        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
           width: 0.6,
         ),
       ),
@@ -206,7 +184,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                 Divider(
                   height: 10,
                   thickness: 0.6,
-                  color: cs.outlineVariant.withOpacity(0.18),
+                  color: cs.outlineVariant.withValues(alpha: 0.18),
                 ),
               children[i],
             ],
@@ -343,11 +321,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     final settings = context.read<SettingsProvider>();
     String uniqueKey(String prefix, String display) {
       // Ensure the generated key is truly unique among existing keys
-      final existing = context
-          .read<SettingsProvider>()
-          .providerConfigs
-          .keys
-          .toSet();
+      final existing = settings.providerConfigs.keys.toSet();
 
       // Case 1: display equals prefix (user used default name), use: "<prefix> - <n>"
       if (display.toLowerCase() == prefix.toLowerCase()) {
@@ -472,13 +446,11 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     }
 
     // Ensure providers appear in order list at least once
-    final order = List<String>.of(
-      context.read<SettingsProvider>().providersOrder,
-    );
+    final order = List<String>.of(settings.providersOrder);
     // Put the newly created provider at the front
     order.remove(createdKey);
     order.insert(0, createdKey);
-    await context.read<SettingsProvider>().setProvidersOrder(order);
+    await settings.setProvidersOrder(order);
 
     if (mounted) Navigator.of(context).pop(createdKey);
   }
@@ -505,7 +477,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: cs.onSurface.withOpacity(0.2),
+                  color: cs.onSurface.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -611,7 +583,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  color: cs.onSurface.withOpacity(0.8),
+                  color: cs.onSurface.withValues(alpha: 0.8),
                 ),
               ),
             ),
@@ -637,7 +609,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
+              borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.4)),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
@@ -708,7 +680,7 @@ class _SegTabBar extends StatelessWidget {
             segWidth * tabs.length + gap * (tabs.length - 1);
 
         final Color shellBg = isDark
-            ? Colors.white.withOpacity(0.08)
+            ? Colors.white.withValues(alpha: 0.08)
             : Colors.white;
 
         List<Widget> children = [];
@@ -723,14 +695,14 @@ class _SegTabBar extends StatelessWidget {
                 builder: (pressed) {
                   // Background does not change on press; only selected shows subtle tint
                   final Color baseBg = selected
-                      ? cs.primary.withOpacity(0.14)
+                      ? cs.primary.withValues(alpha: 0.14)
                       : Colors.transparent;
                   final Color bg = baseBg;
 
                   // Text color lightens slightly on press
                   final Color baseTextColor = selected
                       ? cs.primary
-                      : cs.onSurface.withOpacity(0.82);
+                      : cs.onSurface.withValues(alpha: 0.82);
                   final Color targetTextColor = pressed
                       ? Color.lerp(baseTextColor, Colors.white, 0.22) ??
                             baseTextColor
@@ -768,8 +740,9 @@ class _SegTabBar extends StatelessWidget {
               ),
             ),
           );
-          if (index != tabs.length - 1)
+          if (index != tabs.length - 1) {
             children.add(const SizedBox(width: gap));
+          }
         }
 
         return Container(
@@ -847,7 +820,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final press = base.withOpacity(0.7);
+    final press = base.withValues(alpha: 0.7);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => setState(() => _pressed = true),
