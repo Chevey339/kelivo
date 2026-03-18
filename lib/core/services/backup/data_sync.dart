@@ -4,7 +4,6 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:archive/archive_io.dart';
-import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -57,9 +56,9 @@ class DataSync {
           .toList();
       String acc = url;
       for (final seg in segments) {
-        acc = acc + '/' + seg;
+        acc = '$acc/$seg';
         // PROPFIND depth 0 on this collection (with trailing slash)
-        final u = Uri.parse(acc + '/');
+        final u = Uri.parse('$acc/');
         final req = http.Request('PROPFIND', u);
         req.headers.addAll({
           'Depth': '0',
@@ -592,7 +591,7 @@ class DataSync {
                     if (a is Map && a.containsKey('id')) {
                       // Store as mutable map<String, dynamic>
                       assistantMap[a['id'].toString()] =
-                          Map<String, dynamic>.from(a as Map);
+                          Map<String, dynamic>.from(a);
                     }
                   }
 
@@ -600,7 +599,7 @@ class DataSync {
                   for (final a in newAssistants) {
                     if (a is Map && a.containsKey('id')) {
                       final id = a['id'].toString();
-                      final incoming = Map<String, dynamic>.from(a as Map);
+                      final incoming = Map<String, dynamic>.from(a);
 
                       if (!assistantMap.containsKey(id)) {
                         // New assistant entirely
@@ -715,7 +714,7 @@ class DataSync {
                     if (e is Map && e['id'] != null) {
                       final id = e['id'].toString();
                       existingOrder.add(id);
-                      tagById[id] = Map<String, dynamic>.from(e as Map);
+                      tagById[id] = Map<String, dynamic>.from(e);
                     }
                   }
                   // Add new tags that don't exist yet
@@ -723,7 +722,7 @@ class DataSync {
                     if (e is Map && e['id'] != null) {
                       final id = e['id'].toString();
                       if (!tagById.containsKey(id)) {
-                        tagById[id] = Map<String, dynamic>.from(e as Map);
+                        tagById[id] = Map<String, dynamic>.from(e);
                         existingOrder.add(id);
                       }
                     }
@@ -784,14 +783,14 @@ class DataSync {
                     if (e is Map && e['id'] != null) {
                       final id = e['id'].toString();
                       existingOrder.add(id);
-                      groupById[id] = Map<String, dynamic>.from(e as Map);
+                      groupById[id] = Map<String, dynamic>.from(e);
                     }
                   }
                   for (final e in newList) {
                     if (e is Map && e['id'] != null) {
                       final id = e['id'].toString();
                       if (!groupById.containsKey(id)) {
-                        groupById[id] = Map<String, dynamic>.from(e as Map);
+                        groupById[id] = Map<String, dynamic>.from(e);
                         existingOrder.add(id);
                       }
                     }
@@ -1137,15 +1136,15 @@ class SharedPreferencesAsync {
       final k = entry.key;
       final v = entry.value;
       if (_localOnlyKeys.contains(k)) continue;
-      if (v is bool)
+      if (v is bool) {
         await prefs.setBool(k, v);
-      else if (v is int)
+      } else if (v is int) {
         await prefs.setInt(k, v);
-      else if (v is double)
+      } else if (v is double) {
         await prefs.setDouble(k, v);
-      else if (v is String)
+      } else if (v is String) {
         await prefs.setString(k, v);
-      else if (v is List) {
+      } else if (v is List) {
         await prefs.setStringList(k, v.whereType<String>().toList());
       }
     }
@@ -1154,15 +1153,15 @@ class SharedPreferencesAsync {
   Future<void> restoreSingle(String key, dynamic value) async {
     if (_localOnlyKeys.contains(key)) return;
     final prefs = await SharedPreferences.getInstance();
-    if (value is bool)
+    if (value is bool) {
       await prefs.setBool(key, value);
-    else if (value is int)
+    } else if (value is int) {
       await prefs.setInt(key, value);
-    else if (value is double)
+    } else if (value is double) {
       await prefs.setDouble(key, value);
-    else if (value is String)
+    } else if (value is String) {
       await prefs.setString(key, value);
-    else if (value is List) {
+    } else if (value is List) {
       await prefs.setStringList(key, value.whereType<String>().toList());
     }
   }
