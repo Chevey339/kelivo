@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -9,7 +7,6 @@ import '../core/providers/model_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart' as lucide;
 import '../utils/brand_assets.dart';
-import 'package:characters/characters.dart';
 import '../utils/model_grouping.dart';
 import '../shared/widgets/model_tag_wrap.dart';
 
@@ -22,7 +19,7 @@ Future<void> showModelFetchDialog(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'model-fetch-dialog',
-    barrierColor: Colors.black.withOpacity(0.25),
+    barrierColor: Colors.black.withValues(alpha: 0.25),
     pageBuilder: (ctx, _, __) {
       return _ModelFetchDialogBody(
         providerKey: providerKey,
@@ -172,8 +169,8 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(
               color: isDark
-                  ? Colors.white.withOpacity(0.08)
-                  : cs.outlineVariant.withOpacity(0.25),
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : cs.outlineVariant.withValues(alpha: 0.25),
               width: 1,
             ),
           ),
@@ -207,7 +204,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                           icon: Icon(
                             lucide.Lucide.X,
                             size: 20,
-                            color: cs.onSurface.withOpacity(0.9),
+                            color: cs.onSurface.withValues(alpha: 0.9),
                           ),
                         ),
                       ],
@@ -236,7 +233,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                               prefixIcon: Icon(
                                 lucide.Lucide.Search,
                                 size: 18,
-                                color: cs.onSurface.withOpacity(0.7),
+                                color: cs.onSurface.withValues(alpha: 0.7),
                               ),
                               suffixIcon: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -273,7 +270,9 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                                               ? lucide.Lucide.Square
                                               : lucide.Lucide.CheckSquare,
                                           size: 18,
-                                          color: cs.onSurface.withOpacity(0.7),
+                                          color: cs.onSurface.withValues(
+                                            alpha: 0.7,
+                                          ),
                                         ),
                                         padding: EdgeInsets.zero,
                                         constraints: const BoxConstraints(
@@ -343,7 +342,9 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                                       icon: Icon(
                                         lucide.Lucide.Repeat,
                                         size: 18,
-                                        color: cs.onSurface.withOpacity(0.7),
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.7,
+                                        ),
                                       ),
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(
@@ -408,7 +409,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(
-                                  color: cs.primary.withOpacity(0.4),
+                                  color: cs.primary.withValues(alpha: 0.4),
                                 ),
                               ),
                               contentPadding: const EdgeInsets.symmetric(
@@ -514,7 +515,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                               child: Icon(
                                 lucide.Lucide.ChevronRight,
                                 size: 18,
-                                color: cs.onSurface.withOpacity(0.7),
+                                color: cs.onSurface.withValues(alpha: 0.7),
                               ),
                             ),
                           ),
@@ -548,7 +549,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                           icon: Icon(
                             allAdded ? lucide.Lucide.Minus : lucide.Lucide.Plus,
                             size: 18,
-                            color: cs.onSurface.withOpacity(0.75),
+                            color: cs.onSurface.withValues(alpha: 0.75),
                           ),
                           onPressed: () async {
                             final old = context
@@ -676,7 +677,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                   icon: Icon(
                     added ? lucide.Lucide.Minus : lucide.Lucide.Plus,
                     size: 18,
-                    color: cs.onSurface.withOpacity(0.75),
+                    color: cs.onSurface.withValues(alpha: 0.75),
                   ),
                 ),
               ],
@@ -703,14 +704,16 @@ class _TactileRowState extends State<_TactileRow> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final overlay = () {
-      if (_pressed)
+      if (_pressed) {
         return isDark
-            ? Colors.white.withOpacity(0.08)
-            : Colors.black.withOpacity(0.06);
-      if (_hovered)
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.black.withValues(alpha: 0.06);
+      }
+      if (_hovered) {
         return isDark
-            ? Colors.white.withOpacity(0.04)
-            : Colors.black.withOpacity(0.03);
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.black.withValues(alpha: 0.03);
+      }
       return Colors.transparent;
     }();
     return MouseRegion(
@@ -793,7 +796,7 @@ class _BrandAvatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : cs.primary.withOpacity(0.1),
+        color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
