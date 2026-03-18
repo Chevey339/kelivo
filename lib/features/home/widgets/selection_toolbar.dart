@@ -96,15 +96,17 @@ class _GlassCapsuleButtonState extends State<GlassCapsuleButton> {
     final isDark = theme.brightness == Brightness.dark;
     // Glass background, match providers' capsule taste
     final glassBase = isDark
-        ? Colors.black.withOpacity(0.06)
-        : Colors.white.withOpacity(0.65);
+        ? Colors.black.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.65);
     final overlay = isDark
-        ? Colors.black.withOpacity(0.06)
-        : Colors.black.withOpacity(0.05);
+        ? Colors.black.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.05);
     final tileColor = _pressed
         ? Color.alphaBlend(overlay, glassBase)
         : glassBase;
-    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.35 : 0.40);
+    final borderColor = cs.outlineVariant.withValues(
+      alpha: isDark ? 0.35 : 0.40,
+    );
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -184,15 +186,17 @@ class _GlassCircleButtonSmallState extends State<GlassCircleButtonSmall> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final glassBase = isDark
-        ? Colors.black.withOpacity(0.06)
-        : Colors.white.withOpacity(0.06);
+        ? Colors.black.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.06);
     final overlay = isDark
-        ? Colors.white.withOpacity(0.06)
-        : Colors.black.withOpacity(0.05);
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.05);
     final tileColor = _pressed
         ? Color.alphaBlend(overlay, glassBase)
         : glassBase;
-    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.10 : 0.10);
+    final borderColor = cs.outlineVariant.withValues(
+      alpha: isDark ? 0.10 : 0.10,
+    );
 
     final child = SizedBox(
       width: widget.size,
