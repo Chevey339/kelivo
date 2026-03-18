@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../icons/lucide_adapter.dart';
-import 'package:haptic_feedback/haptic_feedback.dart' as HF;
+import 'package:haptic_feedback/haptic_feedback.dart' as hf;
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
@@ -419,15 +419,15 @@ class _AboutPageState extends State<AboutPage> {
                                 alignment: WrapAlignment.center,
                                 children: [
                                   for (final e in [
-                                    ['success', HF.HapticsType.success],
-                                    ['warning', HF.HapticsType.warning],
-                                    ['error', HF.HapticsType.error],
-                                    ['light', HF.HapticsType.light],
-                                    ['medium', HF.HapticsType.medium],
-                                    ['heavy', HF.HapticsType.heavy],
-                                    ['rigid', HF.HapticsType.rigid],
-                                    ['soft', HF.HapticsType.soft],
-                                    ['selection', HF.HapticsType.selection],
+                                    ['success', hf.HapticsType.success],
+                                    ['warning', hf.HapticsType.warning],
+                                    ['error', hf.HapticsType.error],
+                                    ['light', hf.HapticsType.light],
+                                    ['medium', hf.HapticsType.medium],
+                                    ['heavy', hf.HapticsType.heavy],
+                                    ['rigid', hf.HapticsType.rigid],
+                                    ['soft', hf.HapticsType.soft],
+                                    ['selection', hf.HapticsType.selection],
                                   ])
                                     _TestButton(
                                       label: e[0] as String,
@@ -435,14 +435,15 @@ class _AboutPageState extends State<AboutPage> {
                                       onTap: () async {
                                         if (!context
                                             .read<SettingsProvider>()
-                                            .hapticsGlobalEnabled)
+                                            .hapticsGlobalEnabled) {
                                           return;
+                                        }
                                         try {
                                           final can =
-                                              await HF.Haptics.canVibrate();
+                                              await hf.Haptics.canVibrate();
                                           if (can) {
-                                            await HF.Haptics.vibrate(
-                                              e[1] as HF.HapticsType,
+                                            await hf.Haptics.vibrate(
+                                              e[1] as hf.HapticsType,
                                             );
                                           }
                                         } catch (_) {}
@@ -454,25 +455,26 @@ class _AboutPageState extends State<AboutPage> {
                                     onTap: () async {
                                       if (!context
                                           .read<SettingsProvider>()
-                                          .hapticsGlobalEnabled)
+                                          .hapticsGlobalEnabled) {
                                         return;
+                                      }
                                       try {
                                         final can =
-                                            await HF.Haptics.canVibrate();
+                                            await hf.Haptics.canVibrate();
                                         if (!can) return;
-                                        final types = <HF.HapticsType>[
-                                          HF.HapticsType.success,
-                                          HF.HapticsType.warning,
-                                          HF.HapticsType.error,
-                                          HF.HapticsType.light,
-                                          HF.HapticsType.medium,
-                                          HF.HapticsType.heavy,
-                                          HF.HapticsType.rigid,
-                                          HF.HapticsType.soft,
-                                          HF.HapticsType.selection,
+                                        final types = <hf.HapticsType>[
+                                          hf.HapticsType.success,
+                                          hf.HapticsType.warning,
+                                          hf.HapticsType.error,
+                                          hf.HapticsType.light,
+                                          hf.HapticsType.medium,
+                                          hf.HapticsType.heavy,
+                                          hf.HapticsType.rigid,
+                                          hf.HapticsType.soft,
+                                          hf.HapticsType.selection,
                                         ];
                                         for (final t in types) {
-                                          await HF.Haptics.vibrate(t);
+                                          await hf.Haptics.vibrate(t);
                                           await Future.delayed(
                                             const Duration(milliseconds: 180),
                                           );
@@ -604,7 +606,7 @@ class _AboutPageState extends State<AboutPage> {
                             l10n.aboutPageAppDescription,
                             style: TextStyle(
                               fontSize: 13,
-                              color: cs.onSurface.withOpacity(0.65),
+                              color: cs.onSurface.withValues(alpha: 0.65),
                               height: 1.2,
                             ),
                             maxLines: 2,
@@ -703,13 +705,15 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+      final Color bg = isDark
+          ? Colors.white10
+          : Colors.white.withValues(alpha: 0.96);
       return Container(
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
             width: 0.6,
           ),
         ),
@@ -730,7 +734,7 @@ Widget _iosDivider(BuildContext context) {
     thickness: 0.6,
     indent: 54,
     endIndent: 12,
-    color: cs.outlineVariant.withOpacity(0.18),
+    color: cs.outlineVariant.withValues(alpha: 0.18),
   );
 }
 
@@ -776,7 +780,9 @@ class _TactileRow extends StatefulWidget {
 class _TactileRowState extends State<_TactileRow> {
   bool _pressed = false;
   void _setPressed(bool v) {
-    if (_pressed != v) setState(() => _pressed = v);
+    if (_pressed != v) {
+      setState(() => _pressed = v);
+    }
   }
 
   @override
@@ -791,8 +797,9 @@ class _TactileRowState extends State<_TactileRow> {
           ? null
           : () {
               if (widget.haptics &&
-                  context.read<SettingsProvider>().hapticsOnListItemTap)
+                  context.read<SettingsProvider>().hapticsOnListItemTap) {
                 Haptics.soft();
+              }
               widget.onTap!.call();
             },
       child: widget.pressedScale == 1.0
@@ -822,7 +829,7 @@ Widget _iosNavRow(
     pressedScale: 1.00, // list rows: color shift only, no scale
     haptics: false,
     builder: (pressed) {
-      final baseColor = cs.onSurface.withOpacity(0.9);
+      final baseColor = cs.onSurface.withValues(alpha: 0.9);
       return _AnimatedPressColor(
         pressed: pressed,
         base: baseColor,
@@ -847,7 +854,7 @@ Widget _iosNavRow(
                     child: DefaultTextStyle(
                       style: TextStyle(
                         fontSize: 13,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                       child: detailBuilder(context),
                     ),
@@ -859,7 +866,7 @@ Widget _iosNavRow(
                       detailText,
                       style: TextStyle(
                         fontSize: 13,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ),
@@ -888,7 +895,7 @@ Widget _iosNavRowSvgLeading(
     pressedScale: 1.00,
     haptics: false,
     builder: (pressed) {
-      final baseColor = cs.onSurface.withOpacity(0.9);
+      final baseColor = cs.onSurface.withValues(alpha: 0.9);
       return _AnimatedPressColor(
         pressed: pressed,
         base: baseColor,
@@ -921,7 +928,7 @@ Widget _iosNavRowSvgLeading(
                     child: DefaultTextStyle(
                       style: TextStyle(
                         fontSize: 13,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                       child: detailBuilder(context),
                     ),
@@ -933,7 +940,7 @@ Widget _iosNavRowSvgLeading(
                       detailText,
                       style: TextStyle(
                         fontSize: 13,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ),
@@ -953,19 +960,13 @@ class _TactileIconButton extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    this.onLongPress,
-    this.semanticLabel,
     this.size = 22,
-    this.haptics = true,
   });
 
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final String? semanticLabel;
   final double size;
-  final bool haptics;
 
   @override
   State<_TactileIconButton> createState() => _TactileIconButtonState();
@@ -977,17 +978,15 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
       size: widget.size,
       color: _pressed ? pressColor : base,
-      semanticLabel: widget.semanticLabel,
     );
 
     return Semantics(
       button: true,
-      label: widget.semanticLabel,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => setState(() => _pressed = true),
@@ -997,12 +996,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
           // Follow provider detail: no haptics on tap
           widget.onTap();
         },
-        onLongPress: widget.onLongPress == null
-            ? null
-            : () {
-                if (widget.haptics) Haptics.light();
-                widget.onLongPress!.call();
-              },
         child: AnimatedScale(
           scale: _pressed ? 0.95 : 1.0,
           duration: const Duration(milliseconds: 100),
