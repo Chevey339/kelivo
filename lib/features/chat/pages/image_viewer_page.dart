@@ -2,13 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
-import 'package:vector_math/vector_math_64.dart' show Vector3;
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
@@ -129,8 +127,8 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       final x = fromTx + (toTx - fromTx) * t;
       final y = fromTy + (toTy - fromTy) * t;
       ctrl.value = Matrix4.identity()
-        ..translate(x, y)
-        ..scale(s);
+        ..translateByDouble(x, y, 0, 1)
+        ..scaleByDouble(s, s, s, 1);
     };
     _zoomCtrl.addListener(_zoomTick!);
     _zoomCtrl.forward(from: 0);
@@ -300,7 +298,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       Rect anchor;
       try {
         final overlay = Overlay.of(context);
-        final ro = overlay?.context.findRenderObject();
+        final ro = overlay.context.findRenderObject();
         if (ro is RenderBox && ro.hasSize) {
           final center = ro.size.center(Offset.zero);
           final global = ro.localToGlobal(center);
@@ -355,7 +353,9 @@ class _ImageViewerPageState extends State<ImageViewerPage>
         } else {
           if (!mounted) return;
           // fallback to sharing url as text
-          await Share.share(src, sharePositionOrigin: anchor);
+          await SharePlus.instance.share(
+            ShareParams(text: src, sharePositionOrigin: anchor),
+          );
           return;
         }
       } else {
@@ -367,13 +367,17 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       }
       if (pathToSave == null) {
         if (!mounted) return;
-        await Share.share('', sharePositionOrigin: anchor);
+        showAppSnackBar(
+          context,
+          message: l10n.imageViewerPageShareFailed('empty-source'),
+          type: NotificationType.error,
+        );
         return;
       }
       try {
-        await Share.shareXFiles([
-          XFile(pathToSave),
-        ], sharePositionOrigin: anchor);
+        await SharePlus.instance.share(
+          ShareParams(files: [XFile(pathToSave)], sharePositionOrigin: anchor),
+        );
       } on MissingPluginException catch (_) {
         // Fallback: open system chooser by opening file
         final res = await OpenFilex.open(pathToSave);
@@ -381,9 +385,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
         if (res.type != ResultType.done) {
           showAppSnackBar(
             context,
-            message: l10n.imageViewerPageShareFailedOpenFile(
-              res.message ?? res.type.name,
-            ),
+            message: l10n.imageViewerPageShareFailedOpenFile(res.message),
             type: NotificationType.error,
           );
         }
@@ -393,9 +395,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
         if (res.type != ResultType.done) {
           showAppSnackBar(
             context,
-            message: l10n.imageViewerPageShareFailedOpenFile(
-              res.message ?? res.type.name,
-            ),
+            message: l10n.imageViewerPageShareFailedOpenFile(res.message),
             type: NotificationType.error,
           );
         }
@@ -631,7 +631,6 @@ class _ImageViewerPageState extends State<ImageViewerPage>
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -647,7 +646,9 @@ class _ImageViewerPageState extends State<ImageViewerPage>
           children: [
             // Dim background behind image; becomes transparent while dragging down
             Positioned.fill(
-              child: Container(color: Colors.black.withOpacity(_bgOpacity)),
+              child: Container(
+                color: Colors.black.withValues(alpha: _bgOpacity),
+              ),
             ),
             // Drag-to-dismiss gesture layered over the PageView
             GestureDetector(
@@ -719,14 +720,15 @@ class _ImageViewerPageState extends State<ImageViewerPage>
                                             ));
                                   // Convert focal from viewport to child coordinates
                                   final inv = Matrix4.inverted(current);
-                                  final focalVector = inv.transform3(
-                                    Vector3(focal.dx, focal.dy, 0),
+                                  final focalPoint = MatrixUtils.transformPoint(
+                                    inv,
+                                    focal,
                                   );
                                   final double targetScale = 2; // 放大倍率
                                   final double tx =
-                                      focal.dx - targetScale * focalVector.x;
+                                      focal.dx - targetScale * focalPoint.dx;
                                   final double ty =
-                                      focal.dy - targetScale * focalVector.y;
+                                      focal.dy - targetScale * focalPoint.dy;
                                   _animateZoomTo(
                                     ctrl,
                                     toScale: targetScale,
@@ -915,11 +917,6 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     return brightness == Brightness.dark ? Colors.white : Colors.black;
   }
 
-  double _currentScale() {
-    if (_index < 0 || _index >= _zoomCtrls.length) return 1.0;
-    return _zoomCtrls[_index].value.getMaxScaleOnAxis();
-  }
-
   Color _smartIconColorForKey(BuildContext context, GlobalKey key) {
     final src = (_index >= 0 && _index < widget.images.length)
         ? widget.images[_index]
@@ -928,12 +925,14 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     final sample = _samples[src];
     final viewerCtx = _viewerKey.currentContext;
     final btnCtx = key.currentContext;
-    if (sample == null || viewerCtx == null || btnCtx == null)
+    if (sample == null || viewerCtx == null || btnCtx == null) {
       return _fallbackIconColor(context);
+    }
     final viewerBox = viewerCtx.findRenderObject();
     final btnBox = btnCtx.findRenderObject();
-    if (viewerBox is! RenderBox || btnBox is! RenderBox || !viewerBox.hasSize)
+    if (viewerBox is! RenderBox || btnBox is! RenderBox || !viewerBox.hasSize) {
       return _fallbackIconColor(context);
+    }
 
     try {
       final btnCenterGlobal = btnBox.localToGlobal(
@@ -944,8 +943,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       // Invert InteractiveViewer transform to get child-space point
       final m = _zoomCtrls[_index].value;
       final inv = Matrix4.inverted(m);
-      final p = inv.transform3(Vector3(viewerLocal.dx, viewerLocal.dy, 0));
-      final childPt = Offset(p.x, p.y);
+      final childPt = MatrixUtils.transformPoint(inv, viewerLocal);
 
       final childSize = viewerBox.size;
       final imgSize = Size(sample.w.toDouble(), sample.h.toDouble());
@@ -1042,14 +1040,15 @@ class _ImageViewerPageState extends State<ImageViewerPage>
         final mimeEnd = src.indexOf(';');
         if (mimeEnd != -1) {
           final mime = src.substring(5, mimeEnd);
-          if (mime.contains('png'))
+          if (mime.contains('png')) {
             ext = '.png';
-          else if (mime.contains('jpeg') || mime.contains('jpg'))
+          } else if (mime.contains('jpeg') || mime.contains('jpg')) {
             ext = '.jpg';
-          else if (mime.contains('gif'))
+          } else if (mime.contains('gif')) {
             ext = '.gif';
-          else if (mime.contains('webp'))
+          } else if (mime.contains('webp')) {
             ext = '.webp';
+          }
         }
       } else if (src.startsWith('http://') || src.startsWith('https://')) {
         final resp = await http.get(Uri.parse(src));
@@ -1138,24 +1137,6 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   }
 }
 
-Route _buildFancyRoute(Widget page) {
-  return PageRouteBuilder(
-    pageBuilder: (_, __, ___) => page,
-    transitionDuration: const Duration(milliseconds: 260),
-    reverseTransitionDuration: const Duration(milliseconds: 220),
-    transitionsBuilder: (context, anim, sec, child) {
-      final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-      return FadeTransition(
-        opacity: curved,
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.98, end: 1).animate(curved),
-          child: child,
-        ),
-      );
-    },
-  );
-}
-
 class _CopyPayload {
   _CopyPayload({
     required this.bytes,
@@ -1171,16 +1152,10 @@ class _CopyPayload {
 }
 
 class _GlassCircleButton extends StatefulWidget {
-  const _GlassCircleButton({
-    super.key,
-    required this.child,
-    this.onTap,
-    this.size = 48,
-  });
+  const _GlassCircleButton({super.key, required this.child, this.onTap});
 
   final Widget child;
   final VoidCallback? onTap;
-  final double size;
 
   @override
   State<_GlassCircleButton> createState() => _GlassCircleButtonState();
@@ -1197,10 +1172,12 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
   @override
   Widget build(BuildContext context) {
     final bool disabled = widget.onTap == null;
-    final Color baseFill = Colors.white.withOpacity(disabled ? 0.10 : 0.18);
-    final Color border = Colors.white.withOpacity(disabled ? 0.20 : 0.35);
+    final Color baseFill = Colors.white.withValues(
+      alpha: disabled ? 0.10 : 0.18,
+    );
+    final Color border = Colors.white.withValues(alpha: disabled ? 0.20 : 0.35);
     final Color fill = _pressed
-        ? Colors.white.withOpacity(disabled ? 0.12 : 0.24)
+        ? Colors.white.withValues(alpha: disabled ? 0.12 : 0.24)
         : baseFill;
 
     return GestureDetector(
@@ -1217,8 +1194,8 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
           child: BackdropFilter(
             filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
             child: Container(
-              width: widget.size,
-              height: widget.size,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: fill,
                 shape: BoxShape.circle,
