@@ -54,34 +54,18 @@ class _SearchSettingsSheet extends StatelessWidget {
     final cfg = (providerKey != null)
         ? settings.getProviderConfig(providerKey)
         : null;
-    final isGeminiProvider =
-        cfg != null && cfg.providerType == ProviderKind.google;
     final supportsBuiltInSearch =
         BuiltInToolsHelper.supportsBuiltInSearchForModel(
           cfg: cfg,
           modelId: modelId,
         );
 
-    // Read current built-in search/url_context toggle from modelOverrides
+    // Read current built-in search toggle from modelOverrides
     final hasBuiltInSearch = BuiltInToolsHelper.isBuiltInSearchEnabled(
       cfg: cfg,
       modelId: modelId,
     );
-    bool hasUrlContext = false;
-    if (cfg != null &&
-        isGeminiProvider &&
-        providerKey != null &&
-        (modelId ?? '').isNotEmpty) {
-      final mid = modelId!;
-      final rawOv = cfg.modelOverrides[mid];
-      final ov = rawOv is Map ? rawOv : null;
-      final builtInSet = BuiltInToolNames.parseAndNormalize(
-        ov?['builtInTools'],
-      );
-      hasUrlContext = builtInSet.contains(BuiltInToolNames.urlContext);
-    }
-    // When url_context is active, treat as built-in search mode (hide external search options)
-    final builtInMode = hasBuiltInSearch || hasUrlContext;
+    final builtInMode = hasBuiltInSearch;
 
     final maxHeight = MediaQuery.of(context).size.height * 0.8;
     return SafeArea(

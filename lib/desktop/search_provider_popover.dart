@@ -220,18 +220,6 @@ class _SearchContent extends StatelessWidget {
     );
   }
 
-  bool _hasUrlContextEnabled(SettingsProvider settings, AssistantProvider ap) {
-    final a = ap.currentAssistant;
-    final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
-    final modelId = a?.chatModelId ?? settings.currentModelId;
-    if (providerKey == null || (modelId ?? '').isEmpty) return false;
-    final cfg = settings.getProviderConfig(providerKey);
-    final rawOv = cfg.modelOverrides[modelId!];
-    final ov = rawOv is Map ? rawOv : null;
-    final tools = BuiltInToolNames.parseAndNormalize(ov?['builtInTools']);
-    return tools.contains(BuiltInToolNames.urlContext);
-  }
-
   bool _hasBuiltInSearchEnabled(
     SettingsProvider settings,
     AssistantProvider ap,
@@ -322,9 +310,7 @@ class _SearchContent extends StatelessWidget {
     final done = onDone;
     final supportsBuiltIn = _supportsBuiltInSearch(sp, ap);
     final builtInEnabled = _hasBuiltInSearchEnabled(sp, ap);
-    final hasUrlContext = _hasUrlContextEnabled(sp, ap);
-    // When url_context is active, treat as built-in mode (hide external search options)
-    final builtInMode = builtInEnabled || hasUrlContext;
+    final builtInMode = builtInEnabled;
 
     final rows = <Widget>[];
 
