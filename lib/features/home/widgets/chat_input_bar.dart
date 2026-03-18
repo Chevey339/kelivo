@@ -834,15 +834,6 @@ class _ChatInputBarState extends State<ChatInputBar>
           modelId: currentModelId,
         );
         final builtinSearchActive = toolsState.searchActive;
-        final codeExecutionActive = toolsState.codeExecutionActive;
-        // Only Gemini built-in tools conflict with MCP in the input bar UX.
-        // OpenAI/Claude built-in search should not hide MCP tools.
-        final kind = (cfg != null)
-            ? ProviderConfig.classify(cfg.id, explicitType: cfg.providerType)
-            : null;
-        final anyBuiltInConflictsWithMcp =
-            (kind == ProviderKind.google) &&
-            toolsState.anyMcpConflictingToolActive;
         final appSearchEnabled = settings.searchEnabled;
         final brandAsset = (() {
           if (!appSearchEnabled || builtinSearchActive) return null;
@@ -858,9 +849,8 @@ class _ChatInputBarState extends State<ChatInputBar>
           return BrandAssets.assetForName(svc.name);
         })();
 
-        // Search button (hidden when code_execution is active)
-        if (!codeExecutionActive) {
-          actions.add(
+        // Search button
+        actions.add(
             _OverflowAction(
               width: normalButtonW,
               builder: () {
@@ -944,7 +934,6 @@ class _ChatInputBarState extends State<ChatInputBar>
               }(),
             ),
           );
-        }
 
         if (widget.supportsReasoning) {
           actions.add(
@@ -971,8 +960,8 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        // MCP button (hidden only when conflicting Gemini built-in tools are active)
-        if (widget.showMcpButton && !anyBuiltInConflictsWithMcp) {
+        // MCP button
+        if (widget.showMcpButton) {
           actions.add(
             _OverflowAction(
               width: normalButtonW,

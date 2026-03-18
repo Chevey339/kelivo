@@ -785,19 +785,17 @@ class ChatApiService {
         };
 
         // Inject Gemini built-in tools (now supported for both official API and Vertex)
-        // code_execution is exclusive - cannot be used with other built-in tools
         final builtIns = _builtInTools(config, modelId);
         if (builtIns.isNotEmpty) {
           final toolsArr = <Map<String, dynamic>>[];
           if (builtIns.contains(BuiltInToolNames.codeExecution)) {
             toolsArr.add({'code_execution': {}});
-          } else {
-            if (builtIns.contains(BuiltInToolNames.search)) {
-              toolsArr.add({'google_search': {}});
-            }
-            if (builtIns.contains(BuiltInToolNames.urlContext)) {
-              toolsArr.add({'url_context': {}});
-            }
+          }
+          if (builtIns.contains(BuiltInToolNames.search)) {
+            toolsArr.add({'google_search': {}});
+          }
+          if (builtIns.contains(BuiltInToolNames.urlContext)) {
+            toolsArr.add({'url_context': {}});
           }
           if (toolsArr.isNotEmpty) {
             body['tools'] = toolsArr;

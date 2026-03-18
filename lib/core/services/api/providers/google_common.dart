@@ -220,19 +220,15 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
     }
 
-    // Built-in tools and function_declarations (MCP) are mutually exclusive in Gemini API
-    // code_execution = exclusive mode (cannot coexist with anything)
-    // search/url_context = can coexist, but exclude MCP
+    // Built-in tools can coexist with function_declarations (MCP) in Gemini API
     final toolsArr = <Map<String, dynamic>>[];
-    if (builtIns.contains(BuiltInToolNames.codeExecution)) {
+    if (builtIns.contains(BuiltInToolNames.codeExecution))
       toolsArr.add({'code_execution': {}});
-    } else if (builtIns.contains(BuiltInToolNames.search) ||
-        builtIns.contains(BuiltInToolNames.urlContext)) {
-      if (builtIns.contains(BuiltInToolNames.search))
-        toolsArr.add({'google_search': {}});
-      if (builtIns.contains(BuiltInToolNames.urlContext))
-        toolsArr.add({'url_context': {}});
-    } else if (geminiTools != null) {
+    if (builtIns.contains(BuiltInToolNames.search))
+      toolsArr.add({'google_search': {}});
+    if (builtIns.contains(BuiltInToolNames.urlContext))
+      toolsArr.add({'url_context': {}});
+    if (geminiTools != null) {
       toolsArr.addAll(geminiTools);
     }
     final shouldAttachToolConfig = shouldAttachGeminiFunctionCallingConfig(
@@ -560,19 +556,15 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         {'function_declarations': decls},
       ];
   }
-  // Built-in tools and function_declarations (MCP) are mutually exclusive in Gemini API
-  // code_execution = exclusive mode (cannot coexist with anything)
-  // search/url_context = can coexist, but exclude MCP
+  // Built-in tools can coexist with function_declarations (MCP) in Gemini API
   final toolsArr = <Map<String, dynamic>>[];
-  if (builtIns.contains(BuiltInToolNames.codeExecution)) {
+  if (builtIns.contains(BuiltInToolNames.codeExecution))
     toolsArr.add({'code_execution': {}});
-  } else if (builtIns.contains(BuiltInToolNames.search) ||
-      builtIns.contains(BuiltInToolNames.urlContext)) {
-    if (builtIns.contains(BuiltInToolNames.search))
-      toolsArr.add({'google_search': {}});
-    if (builtIns.contains(BuiltInToolNames.urlContext))
-      toolsArr.add({'url_context': {}});
-  } else if (geminiTools != null) {
+  if (builtIns.contains(BuiltInToolNames.search))
+    toolsArr.add({'google_search': {}});
+  if (builtIns.contains(BuiltInToolNames.urlContext))
+    toolsArr.add({'url_context': {}});
+  if (geminiTools != null) {
     toolsArr.addAll(geminiTools);
   }
   final shouldAttachToolConfig = shouldAttachGeminiFunctionCallingConfig(
