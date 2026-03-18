@@ -36,11 +36,11 @@ class ChatSelectionExportBar extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
 
     final bg = isDark
-        ? Colors.black.withOpacity(0.35)
-        : cs.surface.withOpacity(0.78);
+        ? Colors.black.withValues(alpha: 0.35)
+        : cs.surface.withValues(alpha: 0.78);
     final shadowColor = isDark
-        ? Colors.black.withOpacity(0.40)
-        : Colors.black.withOpacity(0.10);
+        ? Colors.black.withValues(alpha: 0.40)
+        : Colors.black.withValues(alpha: 0.10);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -170,8 +170,8 @@ class _ExportPillButton extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final bg = Color.alphaBlend(
-      (isDark ? Colors.white : Colors.black).withOpacity(0.04),
-      color.withOpacity(isDark ? 0.18 : 0.14),
+      (isDark ? Colors.white : Colors.black).withValues(alpha: 0.04),
+      color.withValues(alpha: isDark ? 0.18 : 0.14),
     );
 
     return IosCardPress(
@@ -230,16 +230,16 @@ class _ToggleCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final Color base = selected
-        ? cs.primary.withOpacity(isDark ? 0.22 : 0.14)
+        ? cs.primary.withValues(alpha: isDark ? 0.22 : 0.14)
         : (isDark
-              ? Colors.white.withOpacity(0.06)
-              : cs.surface.withOpacity(0.55));
+              ? Colors.white.withValues(alpha: 0.06)
+              : cs.surface.withValues(alpha: 0.55));
     final Color border = selected
-        ? cs.primary.withOpacity(isDark ? 0.52 : 0.36)
-        : cs.outlineVariant.withOpacity(isDark ? 0.18 : 0.14);
+        ? cs.primary.withValues(alpha: isDark ? 0.52 : 0.36)
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.18 : 0.14);
     final Color fg = selected
         ? cs.primary
-        : cs.onSurface.withOpacity(enabled ? 0.9 : 0.35);
+        : cs.onSurface.withValues(alpha: enabled ? 0.9 : 0.35);
 
     return IosCardPress(
       onTap: enabled ? onTap : null,
