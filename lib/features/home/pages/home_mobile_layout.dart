@@ -4,13 +4,11 @@ import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/interactive_drawer.dart';
-import '../widgets/chat_input_bar.dart';
 import '../widgets/side_drawer.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/user_provider.dart';
@@ -190,7 +188,7 @@ class HomeMobileScaffold extends StatelessWidget {
                     text: '$modelDisplay ($providerName)',
                     style: TextStyle(
                       fontSize: 11,
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontWeight: FontWeight.w500,
                     ),
                     maxLines: 1,
@@ -257,7 +255,7 @@ class MobileBackgroundLayer extends StatelessWidget {
                   image: provider,
                   fit: BoxFit.cover,
                   colorFilter: ColorFilter.mode(
-                    Colors.black.withOpacity(0.04),
+                    Colors.black.withValues(alpha: 0.04),
                     BlendMode.srcATop,
                   ),
                 ),
@@ -272,11 +270,11 @@ class MobileBackgroundLayer extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      cs.surface.withOpacity(
-                        (0.20 * maskStrength).clamp(0.0, 1.0),
+                      cs.surface.withValues(
+                        alpha: (0.20 * maskStrength).clamp(0.0, 1.0),
                       ),
-                      cs.surface.withOpacity(
-                        (0.50 * maskStrength).clamp(0.0, 1.0),
+                      cs.surface.withValues(
+                        alpha: (0.50 * maskStrength).clamp(0.0, 1.0),
                       ),
                     ],
                   ),
@@ -402,13 +400,15 @@ class _ScrollButton extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: isDark
-                ? Colors.white.withOpacity(0.06)
-                : Colors.white.withOpacity(0.07),
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.white.withValues(alpha: 0.07),
             shape: BoxShape.circle,
             border: Border.all(
               color: isDark
-                  ? Colors.white.withOpacity(0.10)
-                  : Theme.of(context).colorScheme.outline.withOpacity(0.20),
+                  ? Colors.white.withValues(alpha: 0.10)
+                  : Theme.of(
+                      context,
+                    ).colorScheme.outline.withValues(alpha: 0.20),
               width: 1,
             ),
           ),
@@ -501,14 +501,12 @@ class _GlassCircleButton extends StatefulWidget {
     required this.color,
     required this.onTap,
     this.semanticLabel,
-    this.size = 40,
   });
 
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
   final String? semanticLabel;
-  final double size;
 
   @override
   State<_GlassCircleButton> createState() => _GlassCircleButtonState();
@@ -523,15 +521,15 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final glassBase = isDark
-        ? Colors.black.withOpacity(0.06)
-        : Colors.white.withOpacity(0.06);
+        ? Colors.black.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.06);
     final overlay = isDark
-        ? Colors.white.withOpacity(0.06)
-        : Colors.black.withOpacity(0.05);
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.05);
     final tileColor = _pressed
         ? Color.alphaBlend(overlay, glassBase)
         : glassBase;
-    final borderColor = cs.outlineVariant.withOpacity(0.10);
+    final borderColor = cs.outlineVariant.withValues(alpha: 0.10);
 
     return Semantics(
       button: true,
@@ -550,8 +548,8 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
             child: BackdropFilter(
               filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
-                width: widget.size,
-                height: widget.size,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: tileColor,
                   shape: BoxShape.circle,
