@@ -2,7 +2,6 @@ import 'dart:io' show File;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:characters/characters.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 
@@ -16,12 +15,11 @@ import '../shared/widgets/snackbar.dart';
 import '../utils/sandbox_path_resolver.dart';
 
 Future<void> showUserProfileDialog(BuildContext context) async {
-  final l10n = AppLocalizations.of(context)!;
   await showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'user-profile-dialog',
-    barrierColor: Colors.black.withOpacity(0.25),
+    barrierColor: Colors.black.withValues(alpha: 0.25),
     pageBuilder: (ctx, _, __) {
       return const _UserProfileDialogBody();
     },
@@ -76,7 +74,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
         width: 84,
         height: 84,
         decoration: BoxDecoration(
-          color: cs.primary.withOpacity(0.15),
+          color: cs.primary.withValues(alpha: 0.15),
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
@@ -126,8 +124,8 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
             borderRadius: BorderRadius.circular(20),
             side: BorderSide(
               color: isDark
-                  ? Colors.white.withOpacity(0.08)
-                  : cs.outlineVariant.withOpacity(0.25),
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : cs.outlineVariant.withValues(alpha: 0.25),
               width: 1,
             ),
           ),
@@ -148,7 +146,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: cs.outlineVariant.withOpacity(0.35),
+                            color: cs.outlineVariant.withValues(alpha: 0.35),
                             width: 1,
                           ),
                         ),
@@ -221,7 +219,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.15),
+        color: cs.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
@@ -317,6 +315,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
   }
 
   Future<void> _inputAvatarUrl(BuildContext context) async {
+    final up = context.read<UserProvider>();
     final l10n = AppLocalizations.of(context)!;
     final controller = TextEditingController();
     final ok = await showDialog<bool>(
@@ -353,7 +352,9 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
+                    borderSide: BorderSide(
+                      color: cs.primary.withValues(alpha: 0.4),
+                    ),
                   ),
                 ),
                 onChanged: (v) => setLocal(() => value = v),
@@ -375,7 +376,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
                     style: TextStyle(
                       color: valid(value)
                           ? cs.primary
-                          : cs.onSurface.withOpacity(0.38),
+                          : cs.onSurface.withValues(alpha: 0.38),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -386,15 +387,17 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
         );
       },
     );
+    if (!mounted) return;
     if (ok == true) {
       final url = controller.text.trim();
       if (url.isNotEmpty) {
-        await context.read<UserProvider>().setAvatarUrl(url);
+        await up.setAvatarUrl(url);
       }
     }
   }
 
   Future<void> _inputQQAvatar(BuildContext context) async {
+    final up = context.read<UserProvider>();
     final l10n = AppLocalizations.of(context)!;
     final controller = TextEditingController();
     final ok = await showDialog<bool>(
@@ -473,7 +476,9 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
+                    borderSide: BorderSide(
+                      color: cs.primary.withValues(alpha: 0.4),
+                    ),
                   ),
                 ),
                 onChanged: (v) => setLocal(() => value = v),
@@ -487,25 +492,27 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
                     for (int i = 0; i < maxTries; i++) {
                       final qq = randomQQ();
                       final url =
-                          'https://q2.qlogo.cn/headimg_dl?dst_uin=' +
-                          qq +
-                          '&spec=100';
+                          'https://q2.qlogo.cn/headimg_dl?dst_uin=$qq&spec=100';
                       try {
                         final resp = await http
                             .get(Uri.parse(url))
                             .timeout(const Duration(seconds: 5));
                         if (resp.statusCode == 200 &&
                             resp.bodyBytes.isNotEmpty) {
-                          await context.read<UserProvider>().setAvatarUrl(url);
+                          if (!mounted) return;
+                          await up.setAvatarUrl(url);
                           applied = true;
                           break;
                         }
                       } catch (_) {}
                     }
                     if (applied) {
-                      if (Navigator.of(ctx).canPop())
+                      if (!ctx.mounted) return;
+                      if (Navigator.of(ctx).canPop()) {
                         Navigator.of(ctx).pop(false);
+                      }
                     } else {
+                      if (!context.mounted) return;
                       showAppSnackBar(
                         context,
                         message: l10n.sideDrawerQQAvatarFetchFailed,
@@ -531,7 +538,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
                         style: TextStyle(
                           color: valid(value)
                               ? cs.primary
-                              : cs.onSurface.withOpacity(0.38),
+                              : cs.onSurface.withValues(alpha: 0.38),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -544,12 +551,12 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
         );
       },
     );
+    if (!mounted) return;
     if (ok == true) {
       final qq = controller.text.trim();
       if (qq.isNotEmpty) {
-        final url =
-            'https://q2.qlogo.cn/headimg_dl?dst_uin=' + qq + '&spec=100';
-        await context.read<UserProvider>().setAvatarUrl(url);
+        final url = 'https://q2.qlogo.cn/headimg_dl?dst_uin=$qq&spec=100';
+        await up.setAvatarUrl(url);
       }
     }
   }
