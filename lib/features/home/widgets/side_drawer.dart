@@ -16,7 +16,6 @@ import '../../translate/pages/translate_page.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/update_provider.dart';
 import '../../../core/models/assistant.dart';
-import '../../assistant/pages/assistant_settings_edit_page.dart';
 import '../../chat/pages/chat_history_page.dart';
 import '../../../desktop/chat_history_dialog.dart';
 import 'package:flutter/services.dart';
@@ -38,12 +37,12 @@ import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
 import '../../../core/providers/tag_provider.dart';
-import '../../assistant/pages/tags_manager_page.dart';
-import '../../assistant/widgets/tags_manager_dialog.dart';
 import '../../assistant/widgets/assistant_select_sheet.dart';
 import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import 'dart:async';
 import '../../../features/search/services/global_session_search_service.dart';
+import 'assistant_avatar.dart';
+import 'assistant_entry_actions.dart';
 
 class SideDrawer extends StatefulWidget {
   const SideDrawer({
@@ -121,130 +120,6 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   String? _selectedResultConversationId;
   String? _hoveredResultConversationId;
   bool _globalSearchHasRun = false;
-
-  // Assistant avatar renderer shared across drawer views
-  Widget _assistantAvatar(
-    BuildContext context,
-    Assistant? a, {
-    double size = 28,
-    VoidCallback? onTap,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final av = a?.avatar?.trim() ?? '';
-    final name = a?.name ?? '';
-
-    Widget avatar;
-    if (av.isNotEmpty) {
-      if (av.startsWith('http')) {
-        avatar = FutureBuilder<String?>(
-          future: AvatarCache.getPath(av),
-          builder: (ctx, snap) {
-            final p = snap.data;
-            if (p != null && File(p).existsSync()) {
-              return ClipOval(
-                child: Image(
-                  image: FileImage(File(p)),
-                  width: size,
-                  height: size,
-                  fit: BoxFit.cover,
-                ),
-              );
-            }
-            return ClipOval(
-              child: Image.network(
-                av,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                errorBuilder: (c, e, s) =>
-                    _assistantInitialAvatar(cs, name, size),
-              ),
-            );
-          },
-        );
-      } else if (!kIsWeb && (av.startsWith('/') || av.contains(':'))) {
-        final fixed = SandboxPathResolver.fix(av);
-        final f = File(fixed);
-        if (f.existsSync()) {
-          avatar = ClipOval(
-            child: Image(
-              image: FileImage(f),
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-            ),
-          );
-        } else {
-          avatar = _assistantInitialAvatar(cs, name, size);
-        }
-      } else {
-        avatar = _assistantEmojiAvatar(cs, av, size);
-      }
-    } else {
-      avatar = _assistantInitialAvatar(cs, name, size);
-    }
-
-    // Add border
-    final child = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: isDark ? Colors.white24 : Colors.black12,
-          width: 0.5,
-        ),
-      ),
-      child: avatar,
-    );
-
-    if (onTap == null) return child;
-
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: child,
-    );
-  }
-
-  Widget _assistantInitialAvatar(ColorScheme cs, String name, double size) {
-    final letter = name.isNotEmpty ? name.characters.first : '?';
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: 0.15),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        letter,
-        style: TextStyle(
-          color: cs.primary,
-          fontSize: size * 0.42,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-
-  Widget _assistantEmojiAvatar(ColorScheme cs, String emoji, double size) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: 0.15),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: EmojiText(
-        emoji.characters.take(1).toString(),
-        fontSize: size * 0.5,
-        optimizeEmojiAlign: true,
-      ),
-    );
-  }
 
   @override
   void initState() {
@@ -1969,27 +1844,19 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                 onLongPress: _isDesktop
                                     ? null
                                     : () {
-                                        _closeAssistantPicker();
                                         final id = context
                                             .read<AssistantProvider>()
                                             .currentAssistantId;
                                         if (id != null) {
-                                          Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  AssistantSettingsEditPage(
-                                                    assistantId: id,
-                                                  ),
-                                            ),
-                                          );
+                                          _openAssistantSettings(id);
                                         }
                                       },
                                 padding: const EdgeInsets.fromLTRB(4, 6, 12, 6),
                                 child: Row(
                                   children: [
-                                    _assistantAvatar(
-                                      context,
-                                      ap.currentAssistant,
+                                    AssistantAvatar(
+                                      assistant: ap.currentAssistant,
+                                      fallbackName: widget.assistantName,
                                       size: 32,
                                     ),
                                     const SizedBox(width: 16),
@@ -2334,262 +2201,19 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   }
 
   void _openAssistantSettings(String id) {
-    _closeAssistantPicker();
-    final isDesktop =
-        defaultTargetPlatform == TargetPlatform.macOS ||
-        defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.linux;
-    if (isDesktop) {
-      // Use desktop modal dialog for assistant editing on desktop
-      showAssistantDesktopDialog(context, assistantId: id);
-      return;
-    }
-    // Fallback to mobile edit page on non-desktop platforms
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => AssistantSettingsEditPage(assistantId: id),
-      ),
-    );
-  }
-}
-
-extension on _SideDrawerState {
-  Future<void> _duplicateAssistantFromMenu(Assistant assistant) async {
-    final l10n = AppLocalizations.of(context)!;
-    final newId = await context.read<AssistantProvider>().duplicateAssistant(
-      assistant.id,
-      l10n: l10n,
-    );
-    if (!mounted) return;
-    if (newId != null) {
-      showAppSnackBar(
-        context,
-        message: l10n.assistantSettingsCopySuccess,
-        type: NotificationType.success,
-      );
-    }
-  }
-
-  Future<void> _showAssistantItemMenuDesktop(
-    Assistant a,
-    Offset globalPosition,
-  ) async {
-    if (!_isDesktop) return;
-    final l10n = AppLocalizations.of(context)!;
-    final tp = context.read<TagProvider>();
-    final hasTag = tp.tagOfAssistant(a.id) != null;
-    await showDesktopContextMenuAt(
+    AssistantEntryActions.openAssistantSettings(
       context,
-      globalPosition: globalPosition,
-      items: [
-        DesktopContextMenuItem(
-          icon: Lucide.Pencil,
-          label: l10n.assistantTagsContextMenuEditAssistant,
-          onTap: () => _openAssistantSettings(a.id),
-        ),
-        DesktopContextMenuItem(
-          icon: Lucide.Copy,
-          label: l10n.assistantSettingsCopyButton,
-          onTap: () async {
-            await _duplicateAssistantFromMenu(a);
-          },
-        ),
-        if (hasTag)
-          DesktopContextMenuItem(
-            icon: Lucide.Eraser,
-            label: l10n.assistantTagsClearTag,
-            onTap: () async {
-              await context.read<TagProvider>().unassignAssistant(a.id);
-            },
-          ),
-        DesktopContextMenuItem(
-          icon: Lucide.Bookmark,
-          label: l10n.assistantTagsContextMenuManageTags,
-          onTap: () async {
-            _closeAssistantPicker();
-            await showAssistantTagsManagerDialog(context, assistantId: a.id);
-          },
-        ),
-        DesktopContextMenuItem(
-          icon: Lucide.Trash2,
-          label: l10n.assistantTagsContextMenuDeleteAssistant,
-          danger: true,
-          onTap: () async {
-            final assistantProvider = context.read<AssistantProvider>();
-            final tagProvider = context.read<TagProvider>();
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text(l10n.assistantSettingsDeleteDialogTitle),
-                content: Text(l10n.assistantSettingsDeleteDialogContent),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(false),
-                    child: Text(l10n.assistantSettingsDeleteDialogCancel),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(true),
-                    child: Text(l10n.assistantSettingsDeleteDialogConfirm),
-                  ),
-                ],
-              ),
-            );
-            if (!mounted || confirmed != true) return;
-            final ok = await assistantProvider.deleteAssistant(a.id);
-            if (!mounted) return;
-            if (!ok) {
-              showAppSnackBar(
-                context,
-                message: l10n.assistantSettingsAtLeastOneAssistantRequired,
-                type: NotificationType.warning,
-              );
-            } else {
-              try {
-                await tagProvider.unassignAssistant(a.id);
-              } catch (_) {}
-            }
-          },
-        ),
-      ],
+      id,
+      beforeAction: _closeAssistantPicker,
     );
   }
 
-  Future<void> _showAssistantItemMenuMobile(Assistant a) async {
-    if (_isDesktop) return;
-    final l10n = AppLocalizations.of(context)!;
-    final tp = context.read<TagProvider>();
-    final hasTag = tp.tagOfAssistant(a.id) != null;
-    await showModalBottomSheet(
+  Future<void> _showAssistantItemMenu(Assistant assistant, {Offset? anchor}) {
+    return AssistantEntryActions.showAssistantItemMenu(
       context: context,
-      isScrollControlled: false,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        final cs = Theme.of(ctx).colorScheme;
-        Widget row(
-          String text,
-          IconData icon,
-          VoidCallback onTap, {
-          bool danger = false,
-        }) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: SizedBox(
-              height: 48,
-              child: IosCardPress(
-                borderRadius: BorderRadius.circular(14),
-                baseColor: cs.surface,
-                duration: const Duration(milliseconds: 220),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  onTap();
-                },
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    Icon(icon, size: 18, color: danger ? cs.error : cs.primary),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        text,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
-
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                row(
-                  l10n.assistantTagsContextMenuEditAssistant,
-                  Lucide.Pencil,
-                  () => _openAssistantSettings(a.id),
-                ),
-                row(l10n.assistantSettingsCopyButton, Lucide.Copy, () async {
-                  await _duplicateAssistantFromMenu(a);
-                }),
-                if (hasTag)
-                  row(l10n.assistantTagsClearTag, Lucide.Eraser, () async {
-                    await context.read<TagProvider>().unassignAssistant(a.id);
-                  }),
-                row(
-                  l10n.assistantTagsContextMenuManageTags,
-                  Lucide.Bookmark,
-                  () async {
-                    // Navigate to manage tags page
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => TagsManagerPage(assistantId: a.id),
-                      ),
-                    );
-                  },
-                ),
-                row(
-                  l10n.assistantTagsContextMenuDeleteAssistant,
-                  Lucide.Trash2,
-                  () async {
-                    final assistantProvider = context.read<AssistantProvider>();
-                    final tagProvider = context.read<TagProvider>();
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx2) => AlertDialog(
-                        title: Text(l10n.assistantSettingsDeleteDialogTitle),
-                        content: Text(
-                          l10n.assistantSettingsDeleteDialogContent,
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(ctx2).pop(false),
-                            child: Text(
-                              l10n.assistantSettingsDeleteDialogCancel,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.of(ctx2).pop(true),
-                            child: Text(
-                              l10n.assistantSettingsDeleteDialogConfirm,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (!mounted || confirmed != true) return;
-                    final ok = await assistantProvider.deleteAssistant(a.id);
-                    if (!mounted) return;
-                    if (!ok) {
-                      showAppSnackBar(
-                        context,
-                        message:
-                            l10n.assistantSettingsAtLeastOneAssistantRequired,
-                        type: NotificationType.warning,
-                      );
-                    } else {
-                      try {
-                        await tagProvider.unassignAssistant(a.id);
-                      } catch (_) {}
-                    }
-                  },
-                  danger: true,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      assistant: assistant,
+      globalPosition: anchor,
+      beforeAction: _closeAssistantPicker,
     );
   }
 
@@ -3396,15 +3020,15 @@ extension on _SideDrawerState {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: _AssistantInlineTile(
-          avatar: _assistantAvatar(context, a, size: _isDesktop ? 28 : 32),
+          avatar: AssistantAvatar(assistant: a, size: _isDesktop ? 28 : 32),
           name: a.name,
           textColor: textBase2,
           embedded: widget.embedded,
           selected: ap2.currentAssistantId == a.id,
           onTap: () => _handleSelectAssistant(a),
           onEditTap: () => _openAssistantSettings(a.id),
-          onLongPress: () => _showAssistantItemMenuMobile(a),
-          onSecondaryTapDown: (pos) => _showAssistantItemMenuDesktop(a, pos),
+          onLongPress: () => _showAssistantItemMenu(a),
+          onSecondaryTapDown: (pos) => _showAssistantItemMenu(a, anchor: pos),
         ),
       );
     }

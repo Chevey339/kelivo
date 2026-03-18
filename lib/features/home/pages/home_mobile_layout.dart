@@ -14,9 +14,12 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/services/haptics.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../widgets/assistant_avatar.dart';
+import '../widgets/assistant_entry_actions.dart';
 
 /// Mobile layout scaffold for the home page
 /// This widget handles only the structural layout - AppBar, drawer, body structure
@@ -165,38 +168,46 @@ class HomeMobileScaffold extends StatelessWidget {
         },
       ),
       titleSpacing: 2,
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+      title: Row(
         children: [
-          AnimatedTextSwap(
-            text: title,
-            style: TextStyle(
-              fontSize: isDesktopPlatform ? 14 : 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          if (providerName != null && modelDisplay != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(6),
-                onTap: onSelectModel,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 0),
-                  child: AnimatedTextSwap(
-                    text: '$modelDisplay ($providerName)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+          _buildAssistantTitleAvatar(context),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedTextSwap(
+                  text: title,
+                  style: TextStyle(
+                    fontSize: isDesktopPlatform ? 14 : 16,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              ),
+                if (providerName != null && modelDisplay != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(6),
+                      onTap: onSelectModel,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 0),
+                        child: AnimatedTextSwap(
+                          text: '$modelDisplay ($providerName)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: cs.onSurface.withValues(alpha: 0.6),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
+          ),
         ],
       ),
       actions: [
@@ -217,6 +228,37 @@ class HomeMobileScaffold extends StatelessWidget {
         ),
         const SizedBox(width: 4),
       ],
+    );
+  }
+
+  Widget _buildAssistantTitleAvatar(BuildContext context) {
+    final assistantProvider = context.watch<AssistantProvider>();
+    final currentAssistant = assistantProvider.currentAssistant;
+    final currentAssistantId = assistantProvider.currentAssistantId;
+
+    return IosCardPress(
+      borderRadius: BorderRadius.circular(999),
+      baseColor: Colors.transparent,
+      padding: const EdgeInsets.all(2),
+      longPressTimeout: const Duration(milliseconds: 280),
+      onTap: () {
+        onDismissKeyboard();
+        onToggleDrawer();
+      },
+      onLongPress: currentAssistantId == null
+          ? null
+          : () {
+              Haptics.light();
+              AssistantEntryActions.openAssistantSettings(
+                context,
+                currentAssistantId,
+              );
+            },
+      child: AssistantAvatar(
+        assistant: currentAssistant,
+        fallbackName: _getAssistantName(context),
+        size: 28,
+      ),
     );
   }
 }

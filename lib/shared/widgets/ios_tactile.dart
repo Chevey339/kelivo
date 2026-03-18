@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/haptics.dart';
@@ -165,6 +166,7 @@ class IosCardPress extends StatefulWidget {
     required this.child,
     this.onTap,
     this.onLongPress,
+    this.longPressTimeout,
     this.borderRadius,
     this.baseColor,
     this.pressedBlendStrength,
@@ -177,6 +179,7 @@ class IosCardPress extends StatefulWidget {
   final Widget child;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final Duration? longPressTimeout;
   final BorderRadius? borderRadius;
   final Color? baseColor;
   // 0..1; how much to blend towards surface tint on press
@@ -225,25 +228,51 @@ class _IosCardPressState extends State<IosCardPress> {
           : MouseCursor.defer,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
+      child: RawGestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTapDown: (widget.onTap != null || widget.onLongPress != null)
-            ? (_) => setState(() => _pressed = true)
-            : null,
-        onTapUp: (widget.onTap != null || widget.onLongPress != null)
-            ? (_) => setState(() => _pressed = false)
-            : null,
-        onTapCancel: (widget.onTap != null || widget.onLongPress != null)
-            ? () => setState(() => _pressed = false)
-            : null,
-        onTap: widget.onTap == null
-            ? null
-            : () {
-                final sp = context.read<SettingsProvider>();
-                if (widget.haptics && sp.hapticsOnCardTap) Haptics.soft();
-                widget.onTap!.call();
-              },
-        onLongPress: widget.onLongPress,
+        gestures: {
+          TapGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+                TapGestureRecognizer.new,
+                (recognizer) {
+                  recognizer
+                    ..onTapDown =
+                        (widget.onTap != null || widget.onLongPress != null)
+                        ? (_) => setState(() => _pressed = true)
+                        : null
+                    ..onTapUp =
+                        (widget.onTap != null || widget.onLongPress != null)
+                        ? (_) => setState(() => _pressed = false)
+                        : null
+                    ..onTapCancel =
+                        (widget.onTap != null || widget.onLongPress != null)
+                        ? () => setState(() => _pressed = false)
+                        : null
+                    ..onTap = widget.onTap == null
+                        ? null
+                        : () {
+                            final sp = context.read<SettingsProvider>();
+                            if (widget.haptics && sp.hapticsOnCardTap) {
+                              Haptics.soft();
+                            }
+                            widget.onTap!.call();
+                          };
+                },
+              ),
+          LongPressGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+                () => LongPressGestureRecognizer(
+                  duration: widget.longPressTimeout,
+                ),
+                (recognizer) {
+                  recognizer
+                    ..onLongPress = widget.onLongPress
+                    ..onLongPressEnd = (widget.onLongPress != null)
+                        ? (_) => setState(() => _pressed = false)
+                        : null;
+                },
+              ),
+        },
         child: AnimatedScale(
           scale: scale,
           duration: dur,

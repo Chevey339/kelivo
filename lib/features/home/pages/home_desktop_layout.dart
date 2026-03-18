@@ -10,6 +10,7 @@ import 'dart:ui' as ui;
 import '../../../l10n/app_localizations.dart';
 import '../widgets/side_drawer.dart';
 import '../../../icons/lucide_adapter.dart';
+import '../../../core/models/assistant.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -18,6 +19,9 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../desktop/hotkeys/chat_action_bus.dart';
+import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
+import '../widgets/assistant_avatar.dart';
+import '../widgets/assistant_entry_actions.dart';
 
 /// Desktop/Tablet layout scaffold for the home page
 /// Handles the overall structure: left sidebar, main content, optional right sidebar
@@ -305,6 +309,9 @@ class HomeDesktopScaffold extends StatelessWidget {
 
   Widget _buildTitle(BuildContext context, ColorScheme cs) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentAssistant = context
+        .watch<AssistantProvider>()
+        .currentAssistant;
     final String? brandAsset =
         (modelDisplay != null
             ? BrandAssets.assetForName(modelDisplay!)
@@ -393,6 +400,12 @@ class HomeDesktopScaffold extends StatelessWidget {
       mainAxisSize: MainAxisSize.max,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        _buildAssistantTitleAvatar(
+          context,
+          assistant: currentAssistant,
+          fallbackName: _getAssistantName(context),
+        ),
+        const SizedBox(width: 10),
         Flexible(
           fit: FlexFit.loose,
           child: AnimatedSize(
@@ -456,6 +469,62 @@ class HomeDesktopScaffold extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildAssistantTitleAvatar(
+    BuildContext context, {
+    required Assistant? assistant,
+    required String fallbackName,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTapDown: !_isDesktop || assistant == null
+          ? null
+          : (details) {
+              AssistantEntryActions.showAssistantItemMenu(
+                context: context,
+                assistant: assistant,
+                globalPosition: details.globalPosition,
+              );
+            },
+      child: IosCardPress(
+        borderRadius: BorderRadius.circular(999),
+        baseColor: Colors.transparent,
+        padding: const EdgeInsets.all(2),
+        onTap: _isDesktop
+            ? () => _revealAssistantTopics(context)
+            : onToggleSidebar,
+        onLongPress: !_isDesktop && assistant != null
+            ? () {
+                AssistantEntryActions.openAssistantSettings(
+                  context,
+                  assistant.id,
+                );
+              }
+            : null,
+        child: AssistantAvatar(
+          assistant: assistant,
+          fallbackName: fallbackName,
+          size: 28,
+        ),
+      ),
+    );
+  }
+
+  void _revealAssistantTopics(BuildContext context) {
+    final topicsOnRight =
+        context.read<SettingsProvider>().desktopTopicPosition ==
+        DesktopTopicPosition.right;
+    if (topicsOnRight) {
+      if (!rightSidebarOpen) {
+        onToggleRightSidebar();
+      }
+      return;
+    }
+    if (!tabletSidebarOpen) {
+      onToggleSidebar();
+    }
+    DesktopSidebarTabBus.instance.switchToTopics();
   }
 
   List<Widget> _buildActions(BuildContext context, bool topicsOnRight) {
