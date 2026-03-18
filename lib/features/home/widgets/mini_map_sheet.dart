@@ -122,7 +122,7 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: cs.onSurface.withOpacity(0.2),
+                      color: cs.onSurface.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -219,21 +219,10 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
     );
   }
 
-  Widget _legendDot(Color c) {
-    return Container(
-      width: 10,
-      height: 10,
-      decoration: BoxDecoration(
-        color: c.withOpacity(0.8),
-        shape: BoxShape.circle,
-      ),
-    );
-  }
-
   Widget _buildSearchToggle(BuildContext context, double maxWidth) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.5 : 0.8);
+    final borderColor = cs.outlineVariant.withValues(alpha: isDark ? 0.5 : 0.8);
 
     return AnimatedSize(
       duration: const Duration(milliseconds: 200),
@@ -275,8 +264,8 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
                               vertical: 8,
                             ),
                             filled: true,
-                            fillColor: cs.surfaceVariant.withOpacity(
-                              isDark ? 0.35 : 0.6,
+                            fillColor: cs.surfaceContainerHighest.withValues(
+                              alpha: isDark ? 0.35 : 0.6,
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
@@ -303,7 +292,7 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
                         icon: Icon(
                           Lucide.X,
                           size: 18,
-                          color: cs.onSurface.withOpacity(0.7),
+                          color: cs.onSurface.withValues(alpha: 0.7),
                         ),
                         onPressed: () => _clearOrCloseSearch(close: true),
                         tooltip: MaterialLocalizations.of(
@@ -418,18 +407,18 @@ class _MiniMapRow extends StatelessWidget {
         selectedMessageIds!.contains(pair.assistant!.id);
 
     final userBg = (isDark
-        ? cs.primary.withOpacity(0.15)
-        : cs.primary.withOpacity(0.08));
+        ? cs.primary.withValues(alpha: 0.15)
+        : cs.primary.withValues(alpha: 0.08));
     final userSelectedBg = (isDark
-        ? cs.primary.withOpacity(0.26)
-        : cs.primary.withOpacity(0.14));
-    final userBorder = cs.primary.withOpacity(isDark ? 0.45 : 0.35);
+        ? cs.primary.withValues(alpha: 0.26)
+        : cs.primary.withValues(alpha: 0.14));
+    final userBorder = cs.primary.withValues(alpha: isDark ? 0.45 : 0.35);
 
-    final assistantBg = cs.onSurface.withOpacity(isDark ? 0.06 : 0.04);
+    final assistantBg = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04);
     final assistantSelectedBg = (isDark
-        ? cs.primary.withOpacity(0.18)
-        : cs.primary.withOpacity(0.10));
-    final assistantBorder = cs.primary.withOpacity(isDark ? 0.38 : 0.28);
+        ? cs.primary.withValues(alpha: 0.18)
+        : cs.primary.withValues(alpha: 0.10));
+    final assistantBorder = cs.primary.withValues(alpha: isDark ? 0.38 : 0.28);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
