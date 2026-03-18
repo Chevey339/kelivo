@@ -43,7 +43,6 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
   // macOS uses webview_flutter; Windows uses webview_windows.
   WebViewController? _flutterCtrl;
   winweb.WebviewController? _winCtrl;
-  String? _tempFilePath; // for Windows loadUrl
   bool _ready = false;
   bool _loadedOnce = false;
   bool? _lastDark;
@@ -122,7 +121,7 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
     if (hasHtmlTag && hasBodyTag) return input;
     final bg = isDark ? '#111111' : '#ffffff';
     final fg = isDark ? '#eaeaea' : '#222222';
-    return '''<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><style>html,body{background:${bg};color:${fg};margin:0;padding:0}.container{padding:12px}img,video,canvas,iframe{max-width:100%;height:auto}pre,code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, \"Liberation Mono\", monospace;}</style></head><body><div class="container">${input}</div></body></html>''';
+    return '''<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><style>html,body{background:$bg;color:$fg;margin:0;padding:0}.container{padding:12px}img,video,canvas,iframe{max-width:100%;height:auto}pre,code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;}</style></head><body><div class="container">$input</div></body></html>''';
   }
 
   Future<String> _writeTempHtml(String html) async {
@@ -142,13 +141,34 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
     final html = _wrapWithTheme(widget.html, isDark: isDark);
     if (Platform.isWindows) {
       final path = await _writeTempHtml(html);
-      _tempFilePath = path;
       await _winCtrl?.loadUrl(Uri.file(path).toString());
     } else {
       await _flutterCtrl?.loadHtmlString(html);
     }
     _loadedOnce = true;
     if (mounted) setState(() {});
+  }
+
+  void _pushConsole({
+    required String level,
+    required String message,
+    String? source,
+    int? line,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      _console.add(
+        _ConsoleMessage(
+          level: level,
+          message: message,
+          source: source,
+          line: line,
+        ),
+      );
+      if (_console.length > 128) {
+        _console.removeRange(0, _console.length - 128);
+      }
+    });
   }
 
   @override
@@ -256,7 +276,7 @@ extension _ConsoleDialogExt on _HtmlPreviewDialogState {
     showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.25),
+      barrierColor: Colors.black.withValues(alpha: 0.25),
       barrierLabel: 'console-logs',
       pageBuilder: (ctx, _, __) => _ConsoleDialog(
         title: l10n.messageWebViewConsoleLogs,
@@ -383,30 +403,6 @@ class _ConsoleMessage {
   final String message;
   final String? source;
   final int? line;
-}
-
-extension on _HtmlPreviewDialogState {
-  void _pushConsole({
-    required String level,
-    required String message,
-    String? source,
-    int? line,
-  }) {
-    if (!mounted) return;
-    setState(() {
-      _console.add(
-        _ConsoleMessage(
-          level: level,
-          message: message,
-          source: source,
-          line: line,
-        ),
-      );
-      if (_console.length > 128) {
-        _console.removeRange(0, _console.length - 128);
-      }
-    });
-  }
 }
 
 // (Bottom sheet version removed; desktop uses custom dialog.)
