@@ -184,20 +184,20 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: (isDark ? Colors.black : Colors.white).withOpacity(
-              isDark ? 0.28 : 0.56,
+            color: (isDark ? Colors.black : Colors.white).withValues(
+              alpha: isDark ? 0.28 : 0.56,
             ),
             border: Border(
               top: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.06 : 0.18),
+                color: Colors.white.withValues(alpha: isDark ? 0.06 : 0.18),
                 width: 0.7,
               ),
               left: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
               right: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
             ),
@@ -354,8 +354,8 @@ class _GroupHeaderRowState extends State<_GroupHeaderRow> {
     final cs = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(
-      isDark ? 0.10 : 0.06,
+    final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
+      alpha: isDark ? 0.10 : 0.06,
     );
 
     return MouseRegion(
@@ -386,7 +386,7 @@ class _GroupHeaderRowState extends State<_GroupHeaderRow> {
                     child: Icon(
                       Lucide.ChevronRight,
                       size: 16,
-                      color: cs.onSurface.withOpacity(0.7),
+                      color: cs.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                 ),
@@ -400,7 +400,7 @@ class _GroupHeaderRowState extends State<_GroupHeaderRow> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: cs.onSurface.withOpacity(0.85),
+                    color: cs.onSurface.withValues(alpha: 0.85),
                     decoration: TextDecoration.none,
                   ),
                 ),
@@ -435,8 +435,8 @@ class _CancelRowState extends State<_CancelRow> {
     final cs = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(
-      isDark ? 0.10 : 0.06,
+    final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
+      alpha: isDark ? 0.10 : 0.06,
     );
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -469,7 +469,7 @@ class _CancelRowState extends State<_CancelRow> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w400,
-                    color: cs.onSurface.withOpacity(0.75),
+                    color: cs.onSurface.withValues(alpha: 0.75),
                     decoration: TextDecoration.none,
                   ),
                 ),
@@ -507,8 +507,8 @@ class _RowItemState extends State<_RowItem> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final baseBg = Colors.transparent;
-    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(
-      isDark ? 0.12 : 0.10,
+    final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
+      alpha: isDark ? 0.12 : 0.10,
     );
 
     return MouseRegion(
@@ -533,7 +533,7 @@ class _RowItemState extends State<_RowItem> {
                 size: 16,
                 color: widget.active
                     ? cs.primary
-                    : cs.onSurface.withOpacity(0.7),
+                    : cs.onSurface.withValues(alpha: 0.7),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -565,7 +565,7 @@ class _RowItemState extends State<_RowItem> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w400,
-                          color: cs.onSurface.withOpacity(0.70),
+                          color: cs.onSurface.withValues(alpha: 0.70),
                           decoration: TextDecoration.none,
                         ),
                       ),
