@@ -99,6 +99,7 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
                   ],
                 ),
               );
+              if (!context.mounted) return;
               if (confirm == true) {
                 final svc = context.read<ChatService>();
                 final idsToDelete = svc
@@ -111,7 +112,7 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
                 for (final id in idsToDelete) {
                   await svc.deleteConversation(id);
                 }
-                if (!mounted) return;
+                if (!context.mounted) return;
                 showAppSnackBar(
                   context,
                   message: l10n.chatHistoryPageDeletedAllSnackbar,
@@ -173,12 +174,12 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(50),
                               borderSide: BorderSide(
-                                color: cs.primary.withOpacity(0.3),
+                                color: cs.primary.withValues(alpha: 0.3),
                               ),
                             ),
                             prefixIcon: Icon(
                               Lucide.Search,
-                              color: cs.onSurface.withOpacity(0.7),
+                              color: cs.onSurface.withValues(alpha: 0.7),
                               size: 18,
                             ),
                             suffixIcon: (q.isNotEmpty)
@@ -186,7 +187,9 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
                                     icon: Icon(
                                       Lucide.X,
                                       size: 16,
-                                      color: cs.onSurface.withOpacity(0.7),
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.7,
+                                      ),
                                     ),
                                     onPressed: () {
                                       _searchCtrl.clear();
@@ -206,7 +209,9 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
                   ? Center(
                       child: Text(
                         l10n.chatHistoryPageNoConversations,
-                        style: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+                        style: TextStyle(
+                          color: cs.onSurface.withValues(alpha: 0.6),
+                        ),
                       ),
                     )
                   : ListView(
@@ -281,7 +286,7 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
       ),
       onDismissed: (_) async {
         await context.read<ChatService>().deleteConversation(c.id);
-        if (!mounted) return;
+        if (!context.mounted) return;
         showAppSnackBar(
           context,
           message: l10n.sideDrawerDeleteSnackbar(c.title),
@@ -304,8 +309,7 @@ class _ConversationCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? Colors.white12 : const Color(0xFFF7F7F9);
-    final border = cs.outlineVariant.withOpacity(0.16);
-    final pinned = conversation.isPinned;
+    final border = cs.outlineVariant.withValues(alpha: 0.16);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -328,7 +332,7 @@ class _ConversationCard extends StatelessWidget {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: cs.primary.withOpacity(0.10),
+                    color: cs.primary.withValues(alpha: 0.10),
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
@@ -359,14 +363,14 @@ class _ConversationCard extends StatelessWidget {
                           Icon(
                             Lucide.History,
                             size: 14,
-                            color: cs.onSurface.withOpacity(0.6),
+                            color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                           const SizedBox(width: 6),
                           Text(
                             _format(context, conversation.updatedAt),
                             style: TextStyle(
                               fontSize: 12.5,
-                              color: cs.onSurface.withOpacity(0.7),
+                              color: cs.onSurface.withValues(alpha: 0.7),
                             ),
                           ),
                         ],
@@ -414,9 +418,9 @@ class _PinButton extends StatelessWidget {
         duration: kAnim,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: pinned ? cs.primary.withOpacity(0.12) : cs.surface,
+          color: pinned ? cs.primary.withValues(alpha: 0.12) : cs.surface,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.outlineVariant.withOpacity(0.18)),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.18)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -426,7 +430,9 @@ class _PinButton extends StatelessWidget {
                 pinned ? Lucide.PinOff : Lucide.Pin,
                 key: ValueKey(pinned ? 'pinOff' : 'pin'),
                 size: 16,
-                color: pinned ? cs.primary : cs.onSurface.withOpacity(0.7),
+                color: pinned
+                    ? cs.primary
+                    : cs.onSurface.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(width: 6),
@@ -437,7 +443,9 @@ class _PinButton extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
-                color: pinned ? cs.primary : cs.onSurface.withOpacity(0.8),
+                color: pinned
+                    ? cs.primary
+                    : cs.onSurface.withValues(alpha: 0.8),
               ),
             ),
           ],
