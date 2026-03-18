@@ -87,13 +87,13 @@ class _QuickPhraseTab extends StatelessWidget {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: cs.outlineVariant.withOpacity(0.4),
+                                color: cs.outlineVariant.withValues(alpha: 0.4),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: cs.primary.withOpacity(0.5),
+                                color: cs.primary.withValues(alpha: 0.5),
                               ),
                             ),
                           ),
@@ -114,13 +114,13 @@ class _QuickPhraseTab extends StatelessWidget {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: cs.outlineVariant.withOpacity(0.4),
+                                color: cs.outlineVariant.withValues(alpha: 0.4),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: cs.primary.withOpacity(0.5),
+                                color: cs.primary.withValues(alpha: 0.5),
                               ),
                             ),
                           ),
@@ -184,6 +184,7 @@ class _QuickPhraseTab extends StatelessWidget {
       );
       return;
     }
+    final quickPhraseProvider = context.read<QuickPhraseProvider>();
     final result = await showModalBottomSheet<Map<String, String>?>(
       context: context,
       isScrollControlled: true,
@@ -197,6 +198,7 @@ class _QuickPhraseTab extends StatelessWidget {
     );
 
     if (result != null) {
+      if (!context.mounted) return;
       final title = result['title']?.trim() ?? '';
       final content = result['content']?.trim() ?? '';
 
@@ -211,10 +213,10 @@ class _QuickPhraseTab extends StatelessWidget {
           isGlobal: false,
           assistantId: assistantId,
         );
-        await context.read<QuickPhraseProvider>().add(newPhrase);
+        await quickPhraseProvider.add(newPhrase);
       } else {
         // Update existing
-        await context.read<QuickPhraseProvider>().update(
+        await quickPhraseProvider.update(
           phrase.copyWith(title: title, content: content),
         );
       }
@@ -241,14 +243,18 @@ class _QuickPhraseTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Lucide.Zap, size: 64, color: cs.primary.withOpacity(0.6)),
+              Icon(
+                Lucide.Zap,
+                size: 64,
+                color: cs.primary.withValues(alpha: 0.6),
+              ),
               const SizedBox(height: 16),
               Text(
                 l10n.assistantEditQuickPhraseDescription,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
-                  color: cs.onSurface.withOpacity(0.7),
+                  color: cs.onSurface.withValues(alpha: 0.7),
                 ),
               ),
               const SizedBox(height: 24),
@@ -314,11 +320,11 @@ class _QuickPhraseTab extends StatelessWidget {
                             height: double.infinity,
                             decoration: BoxDecoration(
                               color: isDark
-                                  ? cs.error.withOpacity(0.22)
-                                  : cs.error.withOpacity(0.14),
+                                  ? cs.error.withValues(alpha: 0.22)
+                                  : cs.error.withValues(alpha: 0.14),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: cs.error.withOpacity(0.35),
+                                color: cs.error.withValues(alpha: 0.35),
                               ),
                             ),
                             padding: const EdgeInsets.symmetric(
@@ -358,18 +364,18 @@ class _QuickPhraseTab extends StatelessWidget {
                       builder: (pressed) {
                         final bg = isDark
                             ? Colors.white10
-                            : Colors.white.withOpacity(0.96);
+                            : Colors.white.withValues(alpha: 0.96);
                         final overlay = isDark
-                            ? Colors.white.withOpacity(0.06)
-                            : Colors.black.withOpacity(0.05);
+                            ? Colors.white.withValues(alpha: 0.06)
+                            : Colors.black.withValues(alpha: 0.05);
                         final pressedBg = Color.alphaBlend(overlay, bg);
                         return Container(
                           decoration: BoxDecoration(
                             color: pressed ? pressedBg : bg,
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: cs.outlineVariant.withOpacity(
-                                isDark ? 0.08 : 0.06,
+                              color: cs.outlineVariant.withValues(
+                                alpha: isDark ? 0.08 : 0.06,
                               ),
                               width: 0.6,
                             ),
@@ -402,7 +408,9 @@ class _QuickPhraseTab extends StatelessWidget {
                                     Icon(
                                       Lucide.ChevronRight,
                                       size: 18,
-                                      color: cs.onSurface.withOpacity(0.4),
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.4,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -413,7 +421,7 @@ class _QuickPhraseTab extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: cs.onSurface.withOpacity(0.7),
+                                    color: cs.onSurface.withValues(alpha: 0.7),
                                   ),
                                 ),
                               ],
@@ -452,12 +460,10 @@ class _GlassCircleButtonQP extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    this.size = 48,
   });
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final double size; // diameter
 
   @override
   State<_GlassCircleButtonQP> createState() => _GlassCircleButtonQPState();
@@ -471,19 +477,21 @@ class _GlassCircleButtonQPState extends State<_GlassCircleButtonQP> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final glassBase = isDark
-        ? Colors.black.withOpacity(0.06)
-        : Colors.white.withOpacity(0.06);
+        ? Colors.black.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.06);
     final overlay = isDark
-        ? Colors.white.withOpacity(0.06)
-        : Colors.black.withOpacity(0.05);
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.05);
     final tileColor = _pressed
         ? Color.alphaBlend(overlay, glassBase)
         : glassBase;
-    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.10 : 0.10);
+    final borderColor = cs.outlineVariant.withValues(
+      alpha: isDark ? 0.10 : 0.10,
+    );
 
     final child = SizedBox(
-      width: widget.size,
-      height: widget.size,
+      width: 48,
+      height: 48,
       child: Center(child: Icon(widget.icon, size: 18, color: widget.color)),
     );
 
@@ -575,7 +583,7 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: cs.onSurface.withOpacity(0.2),
+                  color: cs.onSurface.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -603,18 +611,20 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  borderSide: BorderSide(
+                    color: cs.primary.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
             ),
@@ -630,18 +640,20 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  borderSide: BorderSide(
+                    color: cs.primary.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
             ),
