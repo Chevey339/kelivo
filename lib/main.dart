@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'dart:async';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
 import 'features/home/pages/home_page.dart';
 import 'desktop/desktop_home_page.dart';
@@ -39,11 +38,8 @@ import 'utils/sandbox_path_resolver.dart';
 import 'shared/widgets/snackbar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:system_fonts/system_fonts.dart';
-import 'package:flutter/painting.dart' show PaintingBinding;
 import 'dart:io'
-    show
-        HttpOverrides,
-        Platform; // kept for global override usage inside provider
+    show Platform; // kept for global override usage inside provider
 import 'core/services/android_background.dart';
 import 'core/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -52,7 +48,6 @@ final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
 bool _didCheckUpdates = false; // one-time update check flag
 bool _didEnsureAssistants = false; // ensure defaults after l10n ready
-bool _didEnsureSystemFonts = false; // one-time system fonts load when needed
 
 Future<void> main() async {
   await runZoned(
@@ -245,18 +240,18 @@ class MyApp extends StatelessWidget {
                   if (Platform.isAndroid) {
                     final mode = settings.androidBackgroundChatMode;
                     if (mode != AndroidBackgroundChatMode.off) {
+                      final l10n = AppLocalizations.of(context);
+                      if (l10n == null) return;
                       // Enable only if currently disabled to avoid duplicate ROM prompts
                       try {
                         final already =
                             await AndroidBackgroundManager.isEnabled();
                         if (!already) {
                           await AndroidBackgroundManager.ensureInitialized(
-                            notificationTitle: AppLocalizations.of(
-                              context,
-                            )!.androidBackgroundNotificationTitle,
-                            notificationText: AppLocalizations.of(
-                              context,
-                            )!.androidBackgroundNotificationText,
+                            notificationTitle:
+                                l10n.androidBackgroundNotificationTitle,
+                            notificationText:
+                                l10n.androidBackgroundNotificationText,
                           );
                           await AndroidBackgroundManager.setEnabled(true);
                         }
@@ -284,7 +279,7 @@ class MyApp extends StatelessWidget {
                 pureBackground: settings.usePureBackground,
               );
               // Resolve effective app font family (system/Google/local alias)
-              String? _effectiveAppFontFamily() {
+              String? effectiveAppFontFamily() {
                 final fam = settings.appFontFamily;
                 if (fam == null || fam.isEmpty) return null;
                 if (settings.appFontIsGoogle) {
@@ -298,30 +293,31 @@ class MyApp extends StatelessWidget {
                 return fam;
               }
 
-              final effectiveAppFont = _effectiveAppFontFamily();
+              final effectiveAppFont = effectiveAppFontFamily();
 
               // Apply user-selected app font to theme text styles and app bar
-              ThemeData _applyAppFont(ThemeData base) {
-                if (effectiveAppFont == null || effectiveAppFont.isEmpty)
+              ThemeData applyAppFont(ThemeData base) {
+                if (effectiveAppFont == null || effectiveAppFont.isEmpty) {
                   return base;
-                TextStyle? _f(TextStyle? s) =>
+                }
+                TextStyle? withFamily(TextStyle? s) =>
                     s?.copyWith(fontFamily: effectiveAppFont);
-                TextTheme _apply(TextTheme t) => t.copyWith(
-                  displayLarge: _f(t.displayLarge),
-                  displayMedium: _f(t.displayMedium),
-                  displaySmall: _f(t.displaySmall),
-                  headlineLarge: _f(t.headlineLarge),
-                  headlineMedium: _f(t.headlineMedium),
-                  headlineSmall: _f(t.headlineSmall),
-                  titleLarge: _f(t.titleLarge),
-                  titleMedium: _f(t.titleMedium),
-                  titleSmall: _f(t.titleSmall),
-                  bodyLarge: _f(t.bodyLarge),
-                  bodyMedium: _f(t.bodyMedium),
-                  bodySmall: _f(t.bodySmall),
-                  labelLarge: _f(t.labelLarge),
-                  labelMedium: _f(t.labelMedium),
-                  labelSmall: _f(t.labelSmall),
+                TextTheme apply(TextTheme t) => t.copyWith(
+                  displayLarge: withFamily(t.displayLarge),
+                  displayMedium: withFamily(t.displayMedium),
+                  displaySmall: withFamily(t.displaySmall),
+                  headlineLarge: withFamily(t.headlineLarge),
+                  headlineMedium: withFamily(t.headlineMedium),
+                  headlineSmall: withFamily(t.headlineSmall),
+                  titleLarge: withFamily(t.titleLarge),
+                  titleMedium: withFamily(t.titleMedium),
+                  titleSmall: withFamily(t.titleSmall),
+                  bodyLarge: withFamily(t.bodyLarge),
+                  bodyMedium: withFamily(t.bodyMedium),
+                  bodySmall: withFamily(t.bodySmall),
+                  labelLarge: withFamily(t.labelLarge),
+                  labelMedium: withFamily(t.labelMedium),
+                  labelSmall: withFamily(t.labelSmall),
                 );
                 final bar = base.appBarTheme;
                 final appBar = bar.copyWith(
@@ -332,14 +328,14 @@ class MyApp extends StatelessWidget {
                 );
                 // Apply as default family to all text in ThemeData
                 return base.copyWith(
-                  textTheme: _apply(base.textTheme),
-                  primaryTextTheme: _apply(base.primaryTextTheme),
+                  textTheme: apply(base.textTheme),
+                  primaryTextTheme: apply(base.primaryTextTheme),
                   appBarTheme: appBar,
                 );
               }
 
-              final themedLight = _applyAppFont(light);
-              final themedDark = _applyAppFont(dark);
+              final themedLight = applyAppFont(light);
+              final themedDark = applyAppFont(dark);
               // Log top-level colors likely used by widgets (card/bg/shadow approximations)
               // debugPrint('[Theme/App] Light scaffoldBg=${light.colorScheme.surface.value.toRadixString(16)} card≈${light.colorScheme.surface.value.toRadixString(16)} shadow=${light.colorScheme.shadow.value.toRadixString(16)}');
               // debugPrint('[Theme/App] Dark scaffoldBg=${dark.colorScheme.surface.value.toRadixString(16)} card≈${dark.colorScheme.surface.value.toRadixString(16)} shadow=${dark.colorScheme.shadow.value.toRadixString(16)}');
