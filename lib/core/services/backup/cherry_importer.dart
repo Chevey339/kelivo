@@ -151,8 +151,7 @@ class CherryImporter {
         final code = (b['content'] ?? '').toString();
         final lang = (b['language'] ?? '').toString();
         if (code.isNotEmpty) {
-          final fenced =
-              '```' + (lang.isNotEmpty ? lang : '') + "\n" + code + "\n```";
+          final fenced = '```$lang\n$code\n```';
           final prev = blockTextByMessageId[messageId];
           blockTextByMessageId[messageId] = prev == null || prev.isEmpty
               ? fenced
@@ -161,7 +160,7 @@ class CherryImporter {
       } else if (type == 'error') {
         final err = (b['content'] ?? '').toString();
         if (err.isNotEmpty) {
-          final tagged = '> Error\n> ' + err.replaceAll('\n', '\n> ');
+          final tagged = '> Error\n> ${err.replaceAll('\n', '\n> ')}';
           final prev = blockTextByMessageId[messageId];
           blockTextByMessageId[messageId] = prev == null || prev.isEmpty
               ? tagged
@@ -171,7 +170,7 @@ class CherryImporter {
         // Optional: include as a collapsible-like section in plain text
         final think = (b['content'] ?? '').toString();
         if (think.isNotEmpty) {
-          final wrapped = '<think>\n' + think + '\n</think>';
+          final wrapped = '<think>\n$think\n</think>';
           final prev = blockTextByMessageId[messageId];
           blockTextByMessageId[messageId] = prev == null || prev.isEmpty
               ? wrapped
@@ -211,8 +210,9 @@ class CherryImporter {
       for (final m in entry.value) {
         final files = (m['files'] as List?) ?? const <dynamic>[];
         for (final rf in files) {
-          if (rf is Map && rf['id'] != null)
+          if (rf is Map && rf['id'] != null) {
             usedFileIds.add(rf['id'].toString());
+          }
         }
       }
     }
@@ -297,10 +297,8 @@ class CherryImporter {
   static Future<Map<String, dynamic>> _readCherryBackupFile(File file) async {
     final bytes = await file.readAsBytes();
 
-    Map<String, dynamic>? parsed;
-
     // Helper to verify structure looks like Cherry backup
-    Map<String, dynamic>? _tryParseBackupJson(String text) {
+    Map<String, dynamic>? tryParseBackupJson(String text) {
       try {
         final obj = jsonDecode(text) as Map<String, dynamic>;
         if (obj.containsKey('localStorage') && obj.containsKey('indexedDB')) {
@@ -313,7 +311,7 @@ class CherryImporter {
     // 1) Try as plain JSON text
     try {
       final content = await file.readAsString();
-      final obj = _tryParseBackupJson(content);
+      final obj = tryParseBackupJson(content);
       if (obj != null) return obj;
     } catch (_) {}
 
@@ -327,7 +325,7 @@ class CherryImporter {
             entry.content as List<int>,
             allowMalformed: true,
           );
-          final obj = _tryParseBackupJson(content);
+          final obj = tryParseBackupJson(content);
           if (obj != null) return obj;
         } catch (_) {
           // skip non-text entries
@@ -339,7 +337,7 @@ class CherryImporter {
     try {
       final gunzipped = GZipDecoder().decodeBytes(bytes, verify: false);
       final content = utf8.decode(gunzipped, allowMalformed: true);
-      final obj = _tryParseBackupJson(content);
+      final obj = tryParseBackupJson(content);
       if (obj != null) return obj;
     } catch (_) {}
 
@@ -579,8 +577,9 @@ class CherryImporter {
     List<dynamic> existing = const <dynamic>[];
     try {
       final raw = prefs.getString(_assistantsKey);
-      if (raw != null && raw.isNotEmpty)
+      if (raw != null && raw.isNotEmpty) {
         existing = jsonDecode(raw) as List<dynamic>;
+      }
     } catch (_) {}
     final byId = <String, Map<String, dynamic>>{
       for (final e in existing)
@@ -597,8 +596,9 @@ class CherryImporter {
         final incPrompt = (a['systemPrompt'] as String?)?.trim() ?? '';
         if (incPrompt.isNotEmpty) local['systemPrompt'] = incPrompt;
         // Update model fields if provided
-        if (a['chatModelProvider'] != null)
+        if (a['chatModelProvider'] != null) {
           local['chatModelProvider'] = a['chatModelProvider'];
+        }
         if (a['chatModelId'] != null) local['chatModelId'] = a['chatModelId'];
       }
     }
@@ -716,7 +716,6 @@ class CherryImporter {
       if (meta == null) continue;
       final name = (meta['origin_name'] ?? meta['name'] ?? 'file').toString();
       final ext = (meta['ext'] ?? '').toString();
-      final mime = (meta['type'] ?? '').toString();
       final safeName = name.replaceAll(RegExp(r'[/\\\0]'), '_');
       final fn = safeName.isNotEmpty
           ? safeName
@@ -840,7 +839,7 @@ class CherryImporter {
           if (b.contains('.')) ext = b.substring(b.lastIndexOf('.') + 1);
         }
         final extNoDot = ext.startsWith('.') ? ext.substring(1) : ext;
-        final idPlus = extNoDot.isNotEmpty ? '${id}.$extNoDot' : id;
+        final idPlus = extNoDot.isNotEmpty ? '$id.$extNoDot' : id;
         if (filesIndexById != null && filesIndexById.containsKey(id)) {
           final entry = filesIndexById[id]!;
           final bytes = entry.content as List<int>;
@@ -897,7 +896,9 @@ class CherryImporter {
     if (mode == RestoreMode.merge) {
       for (final c in existingConvs) {
         final msgs = chatService.getMessages(c.id);
-        for (final m in msgs) existingMsgIds.add(m.id);
+        for (final m in msgs) {
+          existingMsgIds.add(m.id);
+        }
       }
     }
 
@@ -933,8 +934,9 @@ class CherryImporter {
       for (final m in msgsRaw) {
         final msgId = (m['id'] ?? '').toString();
         if (msgId.isEmpty) continue;
-        if (mode == RestoreMode.merge && existingMsgIds.contains(msgId))
+        if (mode == RestoreMode.merge && existingMsgIds.contains(msgId)) {
           continue;
+        }
         final roleRaw = (m['role'] ?? 'user').toString();
         final role = (roleRaw == 'system')
             ? 'assistant'
