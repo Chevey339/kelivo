@@ -164,6 +164,7 @@
   "sponsorPageAfdianSubtitle": "afdian.com/a/kelivo",
   "sponsorPageWeChatTitle": "WeChat Sponsor",
   "sponsorPageWeChatSubtitle": "WeChat sponsor code",
+  "sponsorPageScanQrHint": "Scan the QR code to sponsor",
   "languageDisplaySimplifiedChinese": "Simplified Chinese",
   "languageDisplayEnglish": "English",
   "languageDisplayTraditionalChinese": "Traditional Chinese",
@@ -1314,11 +1315,39 @@
   "searchSettingsSheetNoServicesMessage": "No services. Add from Search Services.",
   "aboutPageEasterEggMessage": "Thanks for exploring! \n (No egg yet)",
   "aboutPageEasterEggButton": "Nice!",
+  "aboutPageAppName": "Kelivo",
   "aboutPageAppDescription": "Open-source AI Assistant",
   "aboutPageNoQQGroup": "No QQ group yet",
   "aboutPageVersion": "Version",
+  "aboutPageVersionDetail": "{version} / {buildNumber}",
+  "@aboutPageVersionDetail": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "buildNumber": {
+        "type": "String"
+      }
+    }
+  },
   "aboutPageSystem": "System",
+  "aboutPageLoadingPlaceholder": "...",
+  "aboutPageUnknownPlaceholder": "-",
+  "aboutPagePlatformMacos": "macOS",
+  "aboutPagePlatformWindows": "Windows",
+  "aboutPagePlatformLinux": "Linux",
+  "aboutPagePlatformAndroid": "Android",
+  "aboutPagePlatformIos": "iOS",
+  "aboutPagePlatformOther": "Other ({os})",
+  "@aboutPagePlatformOther": {
+    "placeholders": {
+      "os": {
+        "type": "String"
+      }
+    }
+  },
   "aboutPageWebsite": "Website",
+  "aboutPageGithub": "GitHub",
   "aboutPageLicense": "License",
   "aboutPageJoinQQGroup": "Join our QQ Group",
   "aboutPageJoinDiscord": "Join us on Discord",
