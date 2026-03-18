@@ -3,9 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'dart:math' as math;
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import '../icons/lucide_adapter.dart' as lucide;
@@ -27,9 +25,6 @@ import '../utils/avatar_cache.dart';
 import '../utils/sandbox_path_resolver.dart';
 import 'dart:io' show Directory, File, Platform;
 import '../utils/app_directories.dart';
-import 'package:characters/characters.dart';
-import '../features/provider/pages/multi_key_manager_page.dart';
-import '../features/model/widgets/model_detail_sheet.dart';
 import 'add_provider_dialog.dart' show showDesktopAddProviderDialog;
 import 'model_edit_dialog.dart'
     show showDesktopCreateModelDialog, showDesktopModelEditDialog;
@@ -67,7 +62,6 @@ import '../features/provider/widgets/share_provider_sheet.dart'
 import '../utils/clipboard_images.dart';
 import '../utils/provider_grouping_logic.dart';
 
-part 'setting/coming_soon_pane.dart';
 part 'setting/assistants_pane.dart';
 part 'setting/providers_pane.dart';
 part 'setting/display_pane.dart';
@@ -116,41 +110,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-
-    String titleFor(_SettingsMenuItem it) {
-      switch (it) {
-        case _SettingsMenuItem.assistant:
-          return l10n.settingsPageAssistant;
-        case _SettingsMenuItem.providers:
-          return l10n.settingsPageProviders;
-        case _SettingsMenuItem.display:
-          return l10n.settingsPageDisplay;
-        case _SettingsMenuItem.defaultModel:
-          return l10n.settingsPageDefaultModel;
-        case _SettingsMenuItem.search:
-          return l10n.settingsPageSearch;
-        case _SettingsMenuItem.mcp:
-          return l10n.settingsPageMcp;
-        case _SettingsMenuItem.quickPhrases:
-          return l10n.settingsPageQuickPhrase;
-        case _SettingsMenuItem.instructionInjection:
-          return l10n.settingsPageInstructionInjection;
-        case _SettingsMenuItem.worldBook:
-          return l10n.settingsPageWorldBook;
-        case _SettingsMenuItem.tts:
-          return l10n.settingsPageTts;
-        case _SettingsMenuItem.networkProxy:
-          return l10n.settingsPageNetworkProxy;
-        case _SettingsMenuItem.backup:
-          return l10n.settingsPageBackup;
-        case _SettingsMenuItem.hotkeys:
-          return l10n.settingsPageHotkeys;
-        case _SettingsMenuItem.about:
-          return l10n.settingsPageAbout;
-      }
-    }
 
     const double menuWidth = 250;
     final topBar = SizedBox(
@@ -190,7 +150,7 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                 VerticalDivider(
                   width: 1,
                   thickness: 0.5,
-                  color: cs.outlineVariant.withOpacity(0.12),
+                  color: cs.outlineVariant.withValues(alpha: 0.12),
                 ),
                 Expanded(
                   child: AnimatedSwitcher(
@@ -251,8 +211,6 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           );
                         case _SettingsMenuItem.about:
                           return const DesktopAboutPane(key: ValueKey('about'));
-                        default:
-                          return _ComingSoonBody(selected: _selected);
                       }
                     }(),
                   ),
@@ -352,11 +310,11 @@ class _SettingsMenu extends StatelessWidget {
               label: items[i].$3,
               selected: selected == items[i].$1,
               onTap: () => onSelect(items[i].$1),
-              color: cs.onSurface.withOpacity(0.9),
+              color: cs.onSurface.withValues(alpha: 0.9),
               selectedColor: cs.primary,
               hoverBg: isDark
-                  ? Colors.white.withOpacity(0.06)
-                  : Colors.black.withOpacity(0.04),
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : Colors.black.withValues(alpha: 0.04),
             ),
             if (i != items.length - 1) const SizedBox(height: 8),
           ],
@@ -395,7 +353,7 @@ class _MenuItemState extends State<_MenuItem> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final bg = widget.selected
-        ? cs.primary.withOpacity(0.10)
+        ? cs.primary.withValues(alpha: 0.10)
         : _hover
         ? widget.hoverBg
         : Colors.transparent;
