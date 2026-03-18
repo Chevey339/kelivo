@@ -875,6 +875,18 @@ abstract class AppLocalizations {
   /// **'Built-in'**
   String get mcpTransportTagInmemory;
 
+  /// No description provided for @mcpTransportTagSse.
+  ///
+  /// In en, this message translates to:
+  /// **'SSE'**
+  String get mcpTransportTagSse;
+
+  /// No description provided for @mcpTransportTagHttp.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP'**
+  String get mcpTransportTagHttp;
+
   /// No description provided for @mcpServerEditSheetStdioOnlyDesktop.
   ///
   /// In en, this message translates to:

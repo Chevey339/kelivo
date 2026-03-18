@@ -426,6 +426,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpTransportTagInmemory => '内置';
 
   @override
+  String get mcpTransportTagSse => 'SSE';
+
+  @override
+  String get mcpTransportTagHttp => 'HTTP';
+
+  @override
   String get mcpServerEditSheetStdioOnlyDesktop => 'STDIO 仅在桌面端可用';
 
   @override
@@ -4581,6 +4587,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpTransportTagInmemory => '内置';
 
   @override
+  String get mcpTransportTagSse => 'SSE';
+
+  @override
+  String get mcpTransportTagHttp => 'HTTP';
+
+  @override
   String get mcpServerEditSheetStdioOnlyDesktop => 'STDIO 仅在桌面端可用';
 
   @override
@@ -8682,6 +8694,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpTransportTagInmemory => '內建';
+
+  @override
+  String get mcpTransportTagSse => 'SSE';
+
+  @override
+  String get mcpTransportTagHttp => 'HTTP';
 
   @override
   String get mcpServerEditSheetStdioOnlyDesktop => 'STDIO 僅在桌面端可用';
