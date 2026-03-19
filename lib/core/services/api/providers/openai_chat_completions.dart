@@ -52,11 +52,11 @@ List<Map<String, dynamic>> _cleanToolsForCompatibility(
     final result = Map<String, dynamic>.from(tool);
     final fn = result['function'];
     if (fn is Map) {
-      final fnMap = Map<String, dynamic>.from(fn as Map);
+      final fnMap = Map<String, dynamic>.from(fn);
       final params = fnMap['parameters'];
       if (params is Map) {
         fnMap['parameters'] = _cleanSchemaForGemini(
-          params as Map<String, dynamic>,
+          Map<String, dynamic>.from(params),
         );
       }
       result['function'] = fnMap;

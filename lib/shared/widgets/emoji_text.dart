@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
-import 'package:characters/characters.dart';
 
 /// A single-emoji Text widget with cross‑platform alignment tweaks.
 class EmojiText extends StatelessWidget {

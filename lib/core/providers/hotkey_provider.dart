@@ -316,7 +316,7 @@ class HotkeyProvider extends ChangeNotifier {
     if (keyboardKey == null) return null;
     // Require at least one modifier (avoid single-key capture)
     if (modifiers.isEmpty) return null;
-    return HotKey(key: keyboardKey!, modifiers: modifiers, scope: scope);
+    return HotKey(key: keyboardKey, modifiers: modifiers, scope: scope);
   }
 
   LogicalKeyboardKey? _letterToLogicalKey(String ch) {
