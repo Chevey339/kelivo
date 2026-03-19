@@ -191,7 +191,7 @@ class MessageListView extends StatelessWidget {
       children: [
         Expanded(
           child: Divider(
-            color: cs.outlineVariant.withOpacity(0.6),
+            color: cs.outlineVariant.withValues(alpha: 0.6),
             height: 1,
             thickness: 1,
           ),
@@ -202,13 +202,13 @@ class MessageListView extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: cs.onSurface.withOpacity(0.6),
+              color: cs.onSurface.withValues(alpha: 0.6),
             ),
           ),
         ),
         Expanded(
           child: Divider(
-            color: cs.outlineVariant.withOpacity(0.6),
+            color: cs.outlineVariant.withValues(alpha: 0.6),
             height: 1,
             thickness: 1,
           ),
@@ -344,14 +344,15 @@ class MessageListView extends StatelessWidget {
               child: (() {
                 Widget content = Builder(
                   builder: (context) {
-                    final textScale = MediaQuery.textScaleFactorOf(context);
                     final baseMediaQuery = context
                         .getInheritedWidgetOfExactType<MediaQuery>();
                     final baseData = baseMediaQuery?.data;
+                    final data = baseData ?? MediaQuery.of(context);
+                    final textScale = data.textScaler.scale(1);
                     return MediaQuery(
                       // Keep chat font scaling without rebuilding on keyboard insets.
-                      data: (baseData ?? MediaQuery.of(context)).copyWith(
-                        textScaleFactor: textScale * chatScale,
+                      data: data.copyWith(
+                        textScaler: TextScaler.linear(textScale * chatScale),
                       ),
                       child: isStreaming
                           ? _buildStreamingMessageWidget(
@@ -435,7 +436,7 @@ class MessageListView extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: const Color(
                         0xFFFFA726,
-                      ).withOpacity(opacity * 0.30),
+                      ).withValues(alpha: opacity * 0.30),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
