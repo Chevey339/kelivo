@@ -106,18 +106,16 @@ class FlutterLogger {
         final fileDay = _dayOf(stat.modified.toLocal());
         if (fileDay != today) {
           final suffix = _formatDate(fileDay);
-          var rotated = File(
-            '${logsDir.path}/${_rotatedFilePrefix}$suffix.txt',
-          );
+          var rotated = File('${logsDir.path}/$_rotatedFilePrefix$suffix.txt');
           if (await rotated.exists()) {
             int i = 1;
             while (await File(
-              '${logsDir.path}/${_rotatedFilePrefix}${suffix}_$i.txt',
+              '${logsDir.path}/$_rotatedFilePrefix${suffix}_$i.txt',
             ).exists()) {
               i++;
             }
             rotated = File(
-              '${logsDir.path}/${_rotatedFilePrefix}${suffix}_$i.txt',
+              '${logsDir.path}/$_rotatedFilePrefix${suffix}_$i.txt',
             );
           }
           await active.rename(rotated.path);

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
-import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 
 class MessageEditPage extends StatefulWidget {
@@ -71,7 +70,9 @@ class _MessageEditPageState extends State<MessageEditPage> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: cs.primary.withOpacity(0.45)),
+                borderSide: BorderSide(
+                  color: cs.primary.withValues(alpha: 0.45),
+                ),
               ),
             ),
           ),

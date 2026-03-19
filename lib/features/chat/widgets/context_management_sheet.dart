@@ -34,7 +34,7 @@ class ContextManagementSheet extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 20,
             offset: const Offset(0, -6),
           ),
@@ -48,7 +48,7 @@ class ContextManagementSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: cs.onSurface.withOpacity(0.2),
+              color: cs.onSurface.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(999),
             ),
           ),
@@ -127,7 +127,7 @@ class _OptionRow extends StatelessWidget {
                   description,
                   style: TextStyle(
                     fontSize: 13,
-                    color: cs.onSurface.withOpacity(0.55),
+                    color: cs.onSurface.withValues(alpha: 0.55),
                   ),
                 ),
               ],

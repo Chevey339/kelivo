@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../models/chat_message.dart';
@@ -285,7 +284,7 @@ class ChatService extends ChangeNotifier {
       if (!await uploadDir.exists()) return;
 
       // Build the set of all referenced paths across all messages
-      String _canon(String pth) {
+      String canon(String pth) {
         // Normalize separators and resolve redundant segments to enable
         // reliable equality checks across platforms (esp. Windows).
         final normalized = p.normalize(pth);
@@ -296,7 +295,7 @@ class ChatService extends ChangeNotifier {
       final referenced = <String>{};
       for (final m in _messagesBox.values) {
         for (final pth in _extractAttachmentPaths(m.content)) {
-          referenced.add(_canon(pth));
+          referenced.add(canon(pth));
         }
       }
 
@@ -304,7 +303,7 @@ class ChatService extends ChangeNotifier {
       final entries = uploadDir.listSync(recursive: true, followLinks: false);
       for (final ent in entries) {
         if (ent is File) {
-          final filePath = _canon(ent.path);
+          final filePath = canon(ent.path);
           if (!referenced.contains(filePath)) {
             try {
               await ent.delete();

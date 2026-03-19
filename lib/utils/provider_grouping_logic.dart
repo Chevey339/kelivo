@@ -70,19 +70,22 @@ ProviderGroupingReorderAnalysis analyzeProviderGroupingReorder({
   bool disallowCrossGroupIntoCollapsedEmpty = true,
 }) {
   if (rows.isEmpty) return const ProviderGroupingReorderAnalysis.invalid();
-  if (oldIndex < 0 || oldIndex >= rows.length)
+  if (oldIndex < 0 || oldIndex >= rows.length) {
     return const ProviderGroupingReorderAnalysis.invalid();
+  }
 
   // Normalize newIndex because Flutter passes the index after removal.
   if (newIndex > oldIndex) newIndex -= 1;
   newIndex = newIndex.clamp(0, rows.length);
   if (disallowInsertBeforeFirstHeader && newIndex == 0) newIndex = 1;
-  if (newIndex == oldIndex)
+  if (newIndex == oldIndex) {
     return const ProviderGroupingReorderAnalysis.invalid();
+  }
 
   final moved = rows[oldIndex];
-  if (moved is! ProviderGroupingProviderVM)
+  if (moved is! ProviderGroupingProviderVM) {
     return const ProviderGroupingReorderAnalysis.invalid();
+  }
   final oldGroupKey = moved.groupKey;
 
   final sim = List<ProviderGroupingRowVM>.from(rows);

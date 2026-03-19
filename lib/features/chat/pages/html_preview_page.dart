@@ -52,7 +52,7 @@ class _HtmlPreviewPageState extends State<HtmlPreviewPage> {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      html, body { background: ${bg}; color: ${fg}; margin: 0; padding: 0; }
+      html, body { background: $bg; color: $fg; margin: 0; padding: 0; }
       .container { padding: 12px; }
       img, video, canvas, iframe { max-width: 100%; height: auto; }
       pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
@@ -60,7 +60,7 @@ class _HtmlPreviewPageState extends State<HtmlPreviewPage> {
   </head>
   <body>
     <div class="container">
-      ${input}
+      $input
     </div>
   </body>
 </html>''';
