@@ -11,7 +11,7 @@ class FileProcessingIndicator extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
 
     // Match _ReasoningSection styling from ChatMessageWidget
-    final bg = cs.primaryContainer.withOpacity(isDark ? 0.25 : 0.30);
+    final bg = cs.primaryContainer.withValues(alpha: isDark ? 0.25 : 0.30);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),

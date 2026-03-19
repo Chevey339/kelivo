@@ -58,7 +58,7 @@ class _GoogleFontsPickerPageState extends State<GoogleFontsPickerPage> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.28),
+                    color: cs.outlineVariant.withValues(alpha: 0.28),
                     width: 0.8,
                   ),
                 ),

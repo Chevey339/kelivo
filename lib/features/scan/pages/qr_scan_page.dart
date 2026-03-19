@@ -53,7 +53,7 @@ class _QrScanPageState extends State<QrScanPage> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: cs.surface.withOpacity(0.85),
+                  color: cs.surface.withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
