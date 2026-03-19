@@ -81,7 +81,7 @@ class _PlantUMLBlockState extends State<PlantUMLBlock> {
               highlightColor: Platform.isIOS ? Colors.transparent : null,
               hoverColor: Platform.isIOS ? Colors.transparent : null,
               overlayColor: Platform.isIOS
-                  ? const MaterialStatePropertyAll(Colors.transparent)
+                  ? const WidgetStatePropertyAll(Colors.transparent)
                   : null,
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -118,15 +118,14 @@ class _PlantUMLBlockState extends State<PlantUMLBlock> {
                           await Clipboard.setData(
                             ClipboardData(text: widget.code),
                           );
-                          if (mounted) {
-                            showAppSnackBar(
+                          if (!context.mounted) return;
+                          showAppSnackBar(
+                            context,
+                            message: AppLocalizations.of(
                               context,
-                              message: AppLocalizations.of(
-                                context,
-                              )!.chatMessageWidgetCopiedToClipboard,
-                              type: NotificationType.success,
-                            );
-                          }
+                            )!.chatMessageWidgetCopiedToClipboard,
+                            type: NotificationType.success,
+                          );
                         },
                         splashColor: Platform.isIOS ? Colors.transparent : null,
                         highlightColor: Platform.isIOS
@@ -134,7 +133,7 @@ class _PlantUMLBlockState extends State<PlantUMLBlock> {
                             : null,
                         hoverColor: Platform.isIOS ? Colors.transparent : null,
                         overlayColor: Platform.isIOS
-                            ? const MaterialStatePropertyAll(Colors.transparent)
+                            ? const WidgetStatePropertyAll(Colors.transparent)
                             : null,
                         borderRadius: BorderRadius.circular(6),
                         child: Padding(
@@ -175,7 +174,7 @@ class _PlantUMLBlockState extends State<PlantUMLBlock> {
                               mode: LaunchMode.externalApplication,
                             );
                           } catch (_) {
-                            if (!mounted) return;
+                            if (!context.mounted) return;
                             showAppSnackBar(
                               context,
                               message: AppLocalizations.of(
@@ -191,7 +190,7 @@ class _PlantUMLBlockState extends State<PlantUMLBlock> {
                             : null,
                         hoverColor: Platform.isIOS ? Colors.transparent : null,
                         overlayColor: Platform.isIOS
-                            ? const MaterialStatePropertyAll(Colors.transparent)
+                            ? const WidgetStatePropertyAll(Colors.transparent)
                             : null,
                         borderRadius: BorderRadius.circular(6),
                         child: Padding(
