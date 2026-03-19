@@ -361,6 +361,7 @@ class HomeViewModel extends ChangeNotifier {
   Future<void> createNewConversation() async {
     // Flush current conversation progress before creating new
     await _chatActions.flushConversationProgress(currentConversation);
+    if (!_contextProvider.mounted) return;
 
     // Reset processing state on create
     isProcessingFiles.value = false;
@@ -380,8 +381,7 @@ class HomeViewModel extends ChangeNotifier {
 
     // Inject assistant preset messages into new conversation (ordered)
     try {
-      final ap2 = _contextProvider.read<AssistantProvider>();
-      final presets = ap2.getPresetMessagesForAssistant(a?.id);
+      final presets = ap.getPresetMessagesForAssistant(a?.id);
       if (presets.isNotEmpty && currentConversation != null) {
         for (final pm in presets) {
           final role = (pm['role'] == 'assistant') ? 'assistant' : 'user';
@@ -678,8 +678,9 @@ class HomeViewModel extends ChangeNotifier {
     if (convo == null) return;
     if (!force &&
         convo.title.isNotEmpty &&
-        convo.title != getTitleForLocale(_contextProvider))
+        convo.title != getTitleForLocale(_contextProvider)) {
       return;
+    }
 
     final settings = _contextProvider.read<SettingsProvider>();
     final assistantProvider = _contextProvider.read<AssistantProvider>();

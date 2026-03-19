@@ -70,7 +70,7 @@ class InstructionInjectionSheet extends StatelessWidget {
                           child: Text(
                             l10n.instructionInjectionEmptyMessage,
                             style: TextStyle(
-                              color: cs.onSurface.withOpacity(0.6),
+                              color: cs.onSurface.withValues(alpha: 0.6),
                             ),
                           ),
                         ),
@@ -153,6 +153,7 @@ class InstructionInjectionSheet extends StatelessWidget {
                                                       ),
                                                 );
                                             if (result != null) {
+                                              if (!ctx.mounted) return;
                                               final title =
                                                   result['title']?.trim() ?? '';
                                               final prompt =
@@ -161,8 +162,9 @@ class InstructionInjectionSheet extends StatelessWidget {
                                               final group =
                                                   result['group']?.trim() ?? '';
                                               if (title.isEmpty ||
-                                                  prompt.isEmpty)
+                                                  prompt.isEmpty) {
                                                 return;
+                                              }
                                               await ctx
                                                   .read<
                                                     InstructionInjectionProvider
@@ -291,7 +293,7 @@ class _GroupHeader extends StatelessWidget {
                   child: Icon(
                     Lucide.ChevronRight,
                     size: 16,
-                    color: textBase.withOpacity(0.7),
+                    color: textBase.withValues(alpha: 0.7),
                   ),
                 ),
               ),

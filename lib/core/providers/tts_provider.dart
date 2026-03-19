@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:convert';
 import 'dart:io' as io;
 import 'package:path_provider/path_provider.dart';
@@ -524,8 +523,9 @@ class TtsProvider extends ChangeNotifier {
       }
     }
     if (buf.isNotEmpty) out.add(buf.toString().trim());
-    if (out.isEmpty)
+    if (out.isEmpty) {
       out.add(text.length > maxLen ? text.substring(0, maxLen) : text);
+    }
     return out;
   }
 
@@ -559,8 +559,7 @@ class TtsProvider extends ChangeNotifier {
     notifyListeners();
 
     final localCancel = Completer<void>();
-    var cancelled = false;
-    _cancelFlag = () async => cancelled;
+    _cancelFlag = () async => false;
 
     Future<void> doFetch() async {
       try {
@@ -569,7 +568,6 @@ class TtsProvider extends ChangeNotifier {
           text: content,
           cancelled: _cancelFlag,
         );
-        if (cancelled) return;
         await _playAudioBytes(res.bytes, mime: res.mime);
       } catch (e) {
         _error = e.toString();

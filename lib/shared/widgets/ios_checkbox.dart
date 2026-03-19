@@ -64,7 +64,7 @@ class _IosCheckboxState extends State<IosCheckbox> {
     // Dynamically compute check color similar to providers multi-select:
     // - If using theme primary, use `onPrimary` for best contrast.
     // - If a custom activeColor is provided, compute contrast by brightness.
-    Color _contrastOn(Color bg) {
+    Color contrastOn(Color bg) {
       final b = ThemeData.estimateBrightnessForColor(bg);
       return b == Brightness.dark
           ? CupertinoColors.white
@@ -75,9 +75,9 @@ class _IosCheckboxState extends State<IosCheckbox> {
     final Color computedOnPrimary = cs.onPrimary;
     final Color dynamicCheck = usesThemePrimary
         ? computedOnPrimary
-        : _contrastOn(activeColor);
-    final Color effectiveCheckColor = dynamicCheck.withOpacity(
-      (widget.onChanged != null) ? 1.0 : 0.5,
+        : contrastOn(activeColor);
+    final Color effectiveCheckColor = dynamicCheck.withValues(
+      alpha: (widget.onChanged != null) ? 1.0 : 0.5,
     );
 
     final double visualSize = widget.size;
@@ -112,12 +112,12 @@ class _IosCheckboxState extends State<IosCheckbox> {
                 width: visualSize,
                 height: visualSize,
                 decoration: BoxDecoration(
-                  color: enabled ? bgColor : bgColor.withOpacity(0.5),
+                  color: enabled ? bgColor : bgColor.withValues(alpha: 0.5),
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: enabled
                         ? effectiveBorderColor
-                        : effectiveBorderColor.withOpacity(0.5),
+                        : effectiveBorderColor.withValues(alpha: 0.5),
                     width: widget.borderWidth,
                   ),
                 ),

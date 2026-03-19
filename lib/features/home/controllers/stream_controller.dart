@@ -661,7 +661,7 @@ class StreamController {
         parts[idx] = ToolUIPart(
           id: parts[idx].id,
           toolName: parts[idx].toolName,
-          arguments: (r.arguments is Map && (r.arguments as Map).isNotEmpty)
+          arguments: r.arguments.isNotEmpty
               ? Map<String, dynamic>.from(r.arguments)
               : parts[idx].arguments,
           content: r.content,
@@ -679,9 +679,7 @@ class StreamController {
         );
       }
       try {
-        final args = (r.arguments is Map)
-            ? Map<String, dynamic>.from(r.arguments as Map)
-            : <String, dynamic>{};
+        final args = Map<String, dynamic>.from(r.arguments);
         await upsertToolEventInDb(
           messageId,
           id: r.id,
@@ -761,9 +759,7 @@ class StreamController {
     // Finish reasoning data
     final r = _reasoning[messageId];
     if (r != null) {
-      if (r.finishedAt == null) {
-        r.finishedAt = DateTime.now();
-      }
+      r.finishedAt ??= DateTime.now();
       final autoCollapse = getSettingsProvider().autoCollapseThinking;
       if (autoCollapse) {
         r.expanded = false;
