@@ -85,7 +85,7 @@ class LeaderBoardItem extends StatelessWidget {
         color: theme.colorScheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: cs.outline.withOpacity(0.12)),
+          side: BorderSide(color: cs.outline.withValues(alpha: 0.12)),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -103,7 +103,9 @@ class LeaderBoardItem extends StatelessWidget {
                 Text(
                   _hostOf(url),
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.textTheme.labelSmall?.color?.withOpacity(0.75),
+                    color: theme.textTheme.labelSmall?.color?.withValues(
+                      alpha: 0.75,
+                    ),
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,

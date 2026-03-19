@@ -82,7 +82,7 @@ class _SelectCopyDesktopDialog extends StatelessWidget {
                         icon: Icon(
                           Lucide.X,
                           size: 18,
-                          color: cs.onSurface.withOpacity(0.75),
+                          color: cs.onSurface.withValues(alpha: 0.75),
                         ),
                       ),
                     ],
@@ -99,7 +99,7 @@ class _SelectCopyDesktopDialog extends StatelessWidget {
                             : const Color(0xFFF2F3F5),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: cs.outlineVariant.withOpacity(0.18),
+                          color: cs.outlineVariant.withValues(alpha: 0.18),
                           width: 0.6,
                         ),
                       ),

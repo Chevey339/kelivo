@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' as System;
-import 'package:haptic_feedback/haptic_feedback.dart' as HFP;
+import 'package:flutter/services.dart' as system;
+import 'package:haptic_feedback/haptic_feedback.dart' as hfp;
 
 /// Centralized gentle haptics using the `haptic_feedback` plugin.
 ///
@@ -20,9 +20,9 @@ class Haptics {
   static void light() {
     if (!enabled) return;
     if (_isIOS) {
-      _safe(() => HFP.Haptics.vibrate(HFP.HapticsType.light));
+      _safe(() => hfp.Haptics.vibrate(hfp.HapticsType.light));
     } else if (_isAndroid) {
-      _safe(() => System.HapticFeedback.lightImpact());
+      _safe(() => system.HapticFeedback.lightImpact());
     }
   }
 
@@ -30,19 +30,19 @@ class Haptics {
   static void medium() {
     if (!enabled) return;
     if (_isIOS) {
-      _safe(() => HFP.Haptics.vibrate(HFP.HapticsType.medium));
+      _safe(() => hfp.Haptics.vibrate(hfp.HapticsType.medium));
     } else if (_isAndroid) {
-      _safe(() => System.HapticFeedback.mediumImpact());
+      _safe(() => system.HapticFeedback.mediumImpact());
     }
   }
 
   static void soft() {
     if (!enabled) return;
     if (_isIOS) {
-      _safe(() => HFP.Haptics.vibrate(HFP.HapticsType.soft));
+      _safe(() => hfp.Haptics.vibrate(hfp.HapticsType.soft));
     } else if (_isAndroid) {
       // Closest built-in equivalent to a very gentle tap
-      _safe(() => System.HapticFeedback.selectionClick());
+      _safe(() => system.HapticFeedback.selectionClick());
     }
   }
 
@@ -50,9 +50,9 @@ class Haptics {
   static void drawerPulse() {
     if (!enabled) return;
     if (_isIOS) {
-      _safe(() => HFP.Haptics.vibrate(HFP.HapticsType.soft));
+      _safe(() => hfp.Haptics.vibrate(hfp.HapticsType.soft));
     } else if (_isAndroid) {
-      _safe(() => System.HapticFeedback.selectionClick());
+      _safe(() => system.HapticFeedback.selectionClick());
     }
   }
 

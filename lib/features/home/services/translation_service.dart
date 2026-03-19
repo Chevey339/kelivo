@@ -68,6 +68,12 @@ class TranslationService {
     required void Function(String translation) onTranslationUpdate,
     required void Function() onTranslationCleared,
   }) async {
+    // This service holds a BuildContext; avoid using it across async gaps.
+    final settings = contextProvider.read<SettingsProvider>();
+    final assistant = contextProvider
+        .read<AssistantProvider>()
+        .currentAssistant;
+
     // 显示语言选择器
     final language = await showLanguageSelector(contextProvider);
     if (language == null) {
@@ -80,11 +86,6 @@ class TranslationService {
       await chatService.updateMessage(message.id, translation: '');
       return TranslationResult(type: TranslationResultType.cleared);
     }
-
-    final settings = contextProvider.read<SettingsProvider>();
-    final assistant = contextProvider
-        .read<AssistantProvider>()
-        .currentAssistant;
 
     // 获取翻译模型配置，回退顺序：翻译专用 -> 助手模型 -> 全局默认
     final translateProvider =
