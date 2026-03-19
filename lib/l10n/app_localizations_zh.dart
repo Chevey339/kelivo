@@ -3146,6 +3146,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageMessageNavButtonsSubtitle => '滚动时显示快速跳转按钮';
 
   @override
+  String get displaySettingsPageUseNewAssistantAvatarUxTitle => '聊天标题栏显示助手头像';
+
+  @override
   String get displaySettingsPageHapticsOnSidebarTitle => '侧边栏触觉反馈';
 
   @override
@@ -7314,6 +7317,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageMessageNavButtonsSubtitle => '滚动时显示快速跳转按钮';
+
+  @override
+  String get displaySettingsPageUseNewAssistantAvatarUxTitle => '聊天标题栏显示助手头像';
 
   @override
   String get displaySettingsPageHapticsOnSidebarTitle => '侧边栏触觉反馈';
@@ -11489,6 +11495,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageMessageNavButtonsSubtitle => '滾動時顯示快速跳轉按鈕';
+
+  @override
+  String get displaySettingsPageUseNewAssistantAvatarUxTitle => '聊天標題欄顯示助手頭像';
 
   @override
   String get displaySettingsPageHapticsOnSidebarTitle => '側邊欄觸覺回饋';

@@ -309,6 +309,9 @@ class HomeDesktopScaffold extends StatelessWidget {
 
   Widget _buildTitle(BuildContext context, ColorScheme cs) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final useNewAssistantAvatarUx = context
+        .watch<SettingsProvider>()
+        .useNewAssistantAvatarUx;
     final currentAssistant = context
         .watch<AssistantProvider>()
         .currentAssistant;
@@ -400,12 +403,14 @@ class HomeDesktopScaffold extends StatelessWidget {
       mainAxisSize: MainAxisSize.max,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        _buildAssistantTitleAvatar(
-          context,
-          assistant: currentAssistant,
-          fallbackName: _getAssistantName(context),
-        ),
-        const SizedBox(width: 10),
+        if (useNewAssistantAvatarUx) ...[
+          _buildAssistantTitleAvatar(
+            context,
+            assistant: currentAssistant,
+            fallbackName: _getAssistantName(context),
+          ),
+          const SizedBox(width: 10),
+        ],
         Flexible(
           fit: FlexFit.loose,
           child: AnimatedSize(

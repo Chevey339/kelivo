@@ -3264,6 +3264,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Show quick jump buttons when scrolling';
 
   @override
+  String get displaySettingsPageUseNewAssistantAvatarUxTitle =>
+      'Show assistant avatar in chat title bar';
+
+  @override
   String get displaySettingsPageHapticsOnSidebarTitle => 'Haptics on Sidebar';
 
   @override

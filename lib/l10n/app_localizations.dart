@@ -6110,6 +6110,12 @@ abstract class AppLocalizations {
   /// **'Show quick jump buttons when scrolling'**
   String get displaySettingsPageMessageNavButtonsSubtitle;
 
+  /// No description provided for @displaySettingsPageUseNewAssistantAvatarUxTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show assistant avatar in chat title bar'**
+  String get displaySettingsPageUseNewAssistantAvatarUxTitle;
+
   /// No description provided for @displaySettingsPageHapticsOnSidebarTitle.
   ///
   /// In en, this message translates to:

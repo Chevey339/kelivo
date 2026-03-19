@@ -1376,6 +1376,7 @@
   "displaySettingsPageShowUpdatesSubtitle": "Show app update notifications",
   "displaySettingsPageMessageNavButtonsTitle": "Message Navigation Buttons",
   "displaySettingsPageMessageNavButtonsSubtitle": "Show quick jump buttons when scrolling",
+  "displaySettingsPageUseNewAssistantAvatarUxTitle": "Show assistant avatar in chat title bar",
   "displaySettingsPageHapticsOnSidebarTitle": "Haptics on Sidebar",
   "displaySettingsPageHapticsOnSidebarSubtitle": "Enable haptic feedback when opening/closing sidebar",
   "displaySettingsPageHapticsGlobalTitle": "Global Haptics",

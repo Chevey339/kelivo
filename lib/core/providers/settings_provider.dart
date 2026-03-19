@@ -94,6 +94,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayAutoCollapseThinkingKey =
       'display_auto_collapse_thinking_v1';
   static const String _displayShowMessageNavKey = 'display_show_message_nav_v1';
+  static const String _displayUseNewAssistantAvatarUxKey =
+      'display_use_new_assistant_avatar_ux_v1';
   static const String _displayShowProviderInModelCapsuleKey =
       'display_show_provider_in_model_capsule_v1';
   static const String _displayShowProviderInChatMessageKey =
@@ -728,6 +730,8 @@ class SettingsProvider extends ChangeNotifier {
     _autoCollapseThinking =
         prefs.getBool(_displayAutoCollapseThinkingKey) ?? true;
     _showMessageNavButtons = prefs.getBool(_displayShowMessageNavKey) ?? true;
+    _useNewAssistantAvatarUx =
+        prefs.getBool(_displayUseNewAssistantAvatarUxKey) ?? true;
     _showProviderInModelCapsule =
         prefs.getBool(_displayShowProviderInModelCapsuleKey) ?? true;
     _showProviderInChatMessage =
@@ -2679,6 +2683,17 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_displayShowMessageNavKey, v);
   }
 
+  // Display: use the new assistant avatar UX in app bars.
+  bool _useNewAssistantAvatarUx = true;
+  bool get useNewAssistantAvatarUx => _useNewAssistantAvatarUx;
+  Future<void> setUseNewAssistantAvatarUx(bool v) async {
+    if (_useNewAssistantAvatarUx == v) return;
+    _useNewAssistantAvatarUx = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayUseNewAssistantAvatarUxKey, v);
+  }
+
   // Display: show provider name in model capsule (desktop header)
   bool _showProviderInModelCapsule = true;
   bool get showProviderInModelCapsule => _showProviderInModelCapsule;
@@ -3236,6 +3251,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._showUserMessageActions = _showUserMessageActions;
     copy._autoCollapseThinking = _autoCollapseThinking;
     copy._showMessageNavButtons = _showMessageNavButtons;
+    copy._useNewAssistantAvatarUx = _useNewAssistantAvatarUx;
     copy._showProviderInModelCapsule = _showProviderInModelCapsule;
     copy._showProviderInChatMessage = _showProviderInChatMessage;
     copy._hapticsOnGenerate = _hapticsOnGenerate;

@@ -131,6 +131,9 @@ class HomeMobileScaffold extends StatelessWidget {
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux;
+    final useNewAssistantAvatarUx = context
+        .watch<SettingsProvider>()
+        .useNewAssistantAvatarUx;
 
     return AppBar(
       systemOverlayStyle: (Theme.of(context).brightness == Brightness.dark)
@@ -168,12 +171,50 @@ class HomeMobileScaffold extends StatelessWidget {
         },
       ),
       titleSpacing: 2,
-      title: Row(
-        children: [
-          _buildAssistantTitleAvatar(context),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
+      title: useNewAssistantAvatarUx
+          ? Row(
+              children: [
+                _buildAssistantTitleAvatar(context),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedTextSwap(
+                        text: title,
+                        style: TextStyle(
+                          fontSize: isDesktopPlatform ? 14 : 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if (providerName != null && modelDisplay != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(6),
+                            onTap: onSelectModel,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 0),
+                              child: AnimatedTextSwap(
+                                text: '$modelDisplay ($providerName)',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: cs.onSurface.withOpacity(0.6),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -207,9 +248,6 @@ class HomeMobileScaffold extends StatelessWidget {
                   ),
               ],
             ),
-          ),
-        ],
-      ),
       actions: [
         IosIconButton(
           size: 20,

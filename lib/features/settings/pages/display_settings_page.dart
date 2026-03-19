@@ -1770,6 +1770,16 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.Bot,
+                label: l10n.displaySettingsPageUseNewAssistantAvatarUxTitle,
+                value: sp.useNewAssistantAvatarUx,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setUseNewAssistantAvatarUx(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.Calendar,
                 label: l10n.displaySettingsPageShowChatListDateTitle,
                 value: sp.showChatListDate,
