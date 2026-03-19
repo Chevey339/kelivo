@@ -4,7 +4,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
-import '../../../theme/design_tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
@@ -71,36 +70,18 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
     return 64000;
   }
 
-  String _bucketName(BuildContext context, int? n, {bool allowXhigh = true}) {
-    final l10n = AppLocalizations.of(context)!;
-    final b = _bucket(n, allowXhigh: allowXhigh);
-    switch (b) {
-      case 0:
-        return l10n.reasoningBudgetSheetOff;
-      case -1:
-        return l10n.reasoningBudgetSheetAuto;
-      case 1024:
-        return l10n.reasoningBudgetSheetLight;
-      case 16000:
-        return l10n.reasoningBudgetSheetMedium;
-      case 64000:
-        return l10n.reasoningBudgetSheetXhigh;
-      default:
-        return l10n.reasoningBudgetSheetHeavy;
-    }
-  }
-
   Widget _tile(
     IconData icon,
     String title,
     int value, {
-    String? subtitle,
     bool deepthink = false,
     required int selectedBucket,
   }) {
     final cs = Theme.of(context).colorScheme;
     final active = selectedBucket == value;
-    final Color iconColor = active ? cs.primary : cs.onSurface.withOpacity(0.7);
+    final Color iconColor = active
+        ? cs.primary
+        : cs.onSurface.withValues(alpha: 0.7);
     final Color onColor = active ? cs.primary : cs.onSurface;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -193,7 +174,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: cs.onSurface.withOpacity(0.2),
+                    color: cs.onSurface.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),

@@ -1,4 +1,4 @@
-// ignore_for_file: avoid_web_libraries_in_flutter
+// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:html' as html;
@@ -107,22 +107,23 @@ MermaidViewHandle? createMermaidView(
       final rect = svg.getBoundingClientRect();
       final w = rect.width.ceil();
       final h = rect.height.ceil();
-      final scale = (html.window.devicePixelRatio ?? 1) * 2;
+      final scale = html.window.devicePixelRatio * 2;
       final canvas = html.CanvasElement(
         width: (w * scale).floor(),
         height: (h * scale).floor(),
       );
       final ctx = canvas.context2D;
-      final cloned = (html.DocumentFragment.html(
-        '',
-      )..append(svg.clone(true))).children.first;
-      final xmlRaw = (cloned?.outerHtml ?? svg.outerHtml) ?? '';
+      final fragment = html.DocumentFragment.html('')..append(svg.clone(true));
+      final cloned = fragment.children.isNotEmpty
+          ? fragment.children.first
+          : null;
+      final xmlRaw = cloned?.outerHtml ?? svg.outerHtml ?? '';
       final img = html.ImageElement();
       final completer = Completer<void>();
       img.onLoad.listen((_) => completer.complete());
       img.onError.listen((_) => completer.complete());
       img.src =
-          'data:image/svg+xml;charset=utf-8,' + Uri.encodeComponent(xmlRaw);
+          'data:image/svg+xml;charset=utf-8,${Uri.encodeComponent(xmlRaw)}';
       await completer.future;
       final bg = (themeVars != null && themeVars['background'] != null)
           ? themeVars['background']!

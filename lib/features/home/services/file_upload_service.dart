@@ -45,6 +45,7 @@ class FileUploadService {
     final dir = await AppDirectories.getUploadDirectory();
     final out = <String>[];
     final context = _getContext();
+    if (!context.mounted) return out;
     for (final f in files) {
       final savedPath = await FileImportHelper.copyXFile(f, dir, context);
       if (savedPath != null) {
@@ -113,6 +114,7 @@ class FileUploadService {
           status = await Permission.camera.request();
         }
         if (!status.isGranted) {
+          if (!context.mounted) return;
           final l10n = AppLocalizations.of(context)!;
           showAppSnackBar(
             context,
@@ -134,11 +136,13 @@ class FileUploadService {
       if (file == null) return;
       final paths = await copyPickedFiles([file]);
       if (paths.isNotEmpty) {
+        if (!context.mounted) return;
         mediaController.addImages(paths);
         onScrollToBottom();
       }
     } catch (e) {
       try {
+        if (!context.mounted) return;
         final l10n = AppLocalizations.of(context)!;
         showAppSnackBar(
           context,
