@@ -87,7 +87,7 @@ class BottomToolsSheet extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 20,
               offset: const Offset(0, -6),
             ),
@@ -101,7 +101,9 @@ class BottomToolsSheet extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -257,7 +259,7 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
           trailing: Icon(
             Lucide.ChevronRight,
             size: 18,
-            color: cs.onSurface.withOpacity(0.55),
+            color: cs.onSurface.withValues(alpha: 0.55),
           ),
         ),
         if (hasWorldBooks) ...[
@@ -286,7 +288,7 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
             trailing: Icon(
               Lucide.ChevronRight,
               size: 18,
-              color: cs.onSurface.withOpacity(0.55),
+              color: cs.onSurface.withValues(alpha: 0.55),
             ),
           ),
         ],
@@ -300,9 +302,8 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
               Haptics.light();
               final sp = context.read<SettingsProvider>();
               await sp.setOcrEnabled(!sp.ocrEnabled);
-              if (Navigator.of(context).canPop()) {
-                Navigator.of(context).maybePop();
-              }
+              if (!context.mounted) return;
+              Navigator.of(context).maybePop();
             },
             onLongPress: () => showOcrPromptSheet(context),
           ),
@@ -318,7 +319,7 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
           trailing: Icon(
             Lucide.ChevronRight,
             size: 18,
-            color: cs.onSurface.withOpacity(0.55),
+            color: cs.onSurface.withValues(alpha: 0.55),
           ),
         ),
       ],
