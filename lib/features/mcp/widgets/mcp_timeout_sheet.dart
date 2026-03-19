@@ -55,7 +55,7 @@ Future<void> showMcpTimeoutSheet(BuildContext context) async {
                 width: 48,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: cs.outlineVariant.withOpacity(0.2),
+                  color: cs.outlineVariant.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -71,7 +71,7 @@ Future<void> showMcpTimeoutSheet(BuildContext context) async {
               l10n.mcpTimeoutSecondsLabel,
               style: TextStyle(
                 fontSize: 13,
-                color: cs.onSurface.withOpacity(0.8),
+                color: cs.onSurface.withValues(alpha: 0.8),
               ),
             ),
             const SizedBox(height: 6),
@@ -87,18 +87,20 @@ Future<void> showMcpTimeoutSheet(BuildContext context) async {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  borderSide: BorderSide(
+                    color: cs.primary.withValues(alpha: 0.5),
+                  ),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -115,7 +117,7 @@ Future<void> showMcpTimeoutSheet(BuildContext context) async {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     color: isDark
                         ? Colors.white10
-                        : cs.surfaceVariant.withOpacity(0.85),
+                        : cs.surfaceContainerHighest.withValues(alpha: 0.85),
                     borderRadius: BorderRadius.circular(12),
                     onPressed: () => Navigator.of(ctx).maybePop(),
                     child: Text(
