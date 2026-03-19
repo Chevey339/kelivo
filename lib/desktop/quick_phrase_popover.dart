@@ -12,7 +12,7 @@ Future<QuickPhrase?> showDesktopQuickPhrasePopover(
   required List<QuickPhrase> phrases,
 }) async {
   if (phrases.isEmpty) return null;
-  final overlay = Overlay.of(context);
+  final overlay = Overlay.maybeOf(context);
   if (overlay == null) return null;
   final keyContext = anchorKey.currentContext;
   if (keyContext == null) return null;
@@ -187,20 +187,20 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: (isDark ? Colors.black : Colors.white).withOpacity(
-              isDark ? 0.28 : 0.56,
+            color: (isDark ? Colors.black : Colors.white).withValues(
+              alpha: isDark ? 0.28 : 0.56,
             ),
             border: Border(
               top: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.06 : 0.18),
+                color: Colors.white.withValues(alpha: isDark ? 0.06 : 0.18),
                 width: 0.7,
               ),
               left: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
               right: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
             ),
@@ -270,8 +270,8 @@ class _RowItemState extends State<_RowItem> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final baseBg = Colors.transparent;
-    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(
-      isDark ? 0.12 : 0.10,
+    final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
+      alpha: isDark ? 0.12 : 0.10,
     );
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -294,7 +294,9 @@ class _RowItemState extends State<_RowItem> {
               Icon(
                 widget.isGlobal ? Lucide.Zap : Lucide.botMessageSquare,
                 size: 16,
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.8),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -322,7 +324,7 @@ class _RowItemState extends State<_RowItem> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
-                    color: cs.onSurface.withOpacity(0.70),
+                    color: cs.onSurface.withValues(alpha: 0.70),
                     decoration: TextDecoration.none,
                   ),
                 ),
