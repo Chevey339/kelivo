@@ -46,7 +46,7 @@ class WorldBookSheet extends StatelessWidget {
                           child: Text(
                             l10n.worldBookEmptyMessage,
                             style: TextStyle(
-                              color: cs.onSurface.withOpacity(0.6),
+                              color: cs.onSurface.withValues(alpha: 0.6),
                             ),
                           ),
                         ),
@@ -188,7 +188,7 @@ class _SelectableRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: onColor.withOpacity(opacity)),
+            Icon(icon, size: 20, color: onColor.withValues(alpha: opacity)),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -200,7 +200,7 @@ class _SelectableRow extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: onColor.withOpacity(opacity),
+                      color: onColor.withValues(alpha: opacity),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -211,7 +211,7 @@ class _SelectableRow extends StatelessWidget {
                       subtitle!,
                       style: TextStyle(
                         fontSize: 12.5,
-                        color: cs.onSurface.withOpacity(0.55 * opacity),
+                        color: cs.onSurface.withValues(alpha: 0.55 * opacity),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -224,7 +224,7 @@ class _SelectableRow extends StatelessWidget {
               Icon(
                 Lucide.Check,
                 size: 18,
-                color: cs.primary.withOpacity(opacity),
+                color: cs.primary.withValues(alpha: opacity),
               )
             else
               const SizedBox(width: 18),
@@ -239,9 +239,10 @@ Future<void> showWorldBookSheet(
   BuildContext context, {
   required String? assistantId,
 }) async {
-  final cs = Theme.of(context).colorScheme;
   final provider = context.read<WorldBookProvider>();
   await provider.initialize();
+  if (!context.mounted) return;
+  final cs = Theme.of(context).colorScheme;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
