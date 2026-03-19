@@ -56,7 +56,7 @@ class _LearningPromptSheetState extends State<LearningPromptSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: cs.onSurface.withOpacity(0.2),
+                  color: cs.onSurface.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -79,18 +79,20 @@ class _LearningPromptSheetState extends State<LearningPromptSheet> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  borderSide: BorderSide(
+                    color: cs.primary.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
             ),
@@ -126,6 +128,7 @@ class _LearningPromptSheetState extends State<LearningPromptSheet> {
 Future<void> showLearningPromptSheet(BuildContext context) async {
   final provider = context.read<InstructionInjectionProvider>();
   await provider.initialize();
+  if (!context.mounted) return;
   final items = provider.items;
   if (items.isEmpty) return;
   final target = provider.active ?? items.first;
