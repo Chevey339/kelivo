@@ -28,9 +28,10 @@ Future<void> showDesktopContextMenuAt(
   required Offset globalPosition,
   required List<DesktopContextMenuItem> items,
 }) async {
-  final overlay = Overlay.of(context);
-  final overlayBox = overlay?.context.findRenderObject() as RenderBox?;
-  if (overlay == null || overlayBox == null) return;
+  final overlay = Overlay.maybeOf(context);
+  if (overlay == null) return;
+  final overlayBox = overlay.context.findRenderObject() as RenderBox?;
+  if (overlayBox == null) return;
 
   const double minMenuWidth = 160;
   const double maxMenuWidth = 360;
@@ -67,7 +68,7 @@ Future<void> showDesktopContextMenuAt(
     context: context,
     barrierLabel: 'context-menu',
     barrierDismissible: true,
-    barrierColor: Colors.black.withOpacity(0.06),
+    barrierColor: Colors.black.withValues(alpha: 0.06),
     pageBuilder: (ctx, _, __) {
       return Material(
         type: MaterialType.transparency,
@@ -89,8 +90,8 @@ Future<void> showDesktopContextMenuAt(
                           borderRadius: BorderRadius.circular(16),
                           side: BorderSide(
                             color: isDark
-                                ? Colors.white.withOpacity(0.08)
-                                : cs.outlineVariant.withOpacity(0.2),
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : cs.outlineVariant.withValues(alpha: 0.2),
                             width: 1,
                           ),
                         ),
@@ -102,8 +103,10 @@ Future<void> showDesktopContextMenuAt(
                           child: DecoratedBox(
                             decoration: BoxDecoration(
                               color: isDark
-                                  ? const Color(0xFF1C1C1E).withOpacity(0.66)
-                                  : Colors.white.withOpacity(0.66),
+                                  ? const Color(
+                                      0xFF1C1C1E,
+                                    ).withValues(alpha: 0.66)
+                                  : Colors.white.withValues(alpha: 0.66),
                             ),
                             child: ConstrainedBox(
                               constraints: BoxConstraints(
@@ -258,11 +261,11 @@ class _GlassMenuItemState extends State<_GlassMenuItem> {
     final fg = widget.danger ? Colors.red.shade600 : cs.onSurface;
     final ic = widget.danger
         ? Colors.red.shade600
-        : cs.onSurface.withOpacity(0.9);
+        : cs.onSurface.withValues(alpha: 0.9);
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.08)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),

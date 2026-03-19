@@ -415,6 +415,7 @@ class ChatScrollController {
         final tKey = messageKeys[messages[target].id];
         final tCtx = tKey?.currentContext;
         if (tCtx != null) {
+          if (!tCtx.mounted) continue;
           await Scrollable.ensureVisible(
             tCtx,
             alignment: 0.08,
@@ -509,6 +510,7 @@ class ChatScrollController {
         final tKey = messageKeys[messages[target].id];
         final tCtx = tKey?.currentContext;
         if (tCtx != null) {
+          if (!tCtx.mounted) continue;
           await Scrollable.ensureVisible(
             tCtx,
             alignment: 0.08,
@@ -559,7 +561,7 @@ class ChatScrollController {
       // Try direct ensureVisible first
       final tKey = messageKeys[targetId];
       final tCtx = tKey?.currentContext;
-      if (tCtx != null) {
+      if (tCtx != null && tCtx.mounted) {
         await Scrollable.ensureVisible(
           tCtx,
           alignment: 0.1,
@@ -581,7 +583,7 @@ class ChatScrollController {
       _scrollController.jumpTo(coarse);
       await WidgetsBinding.instance.endOfFrame;
       final tCtxAfterCoarse = messageKeys[targetId]?.currentContext;
-      if (tCtxAfterCoarse != null) {
+      if (tCtxAfterCoarse != null && tCtxAfterCoarse.mounted) {
         await Scrollable.ensureVisible(
           tCtxAfterCoarse,
           alignment: 0.1,
@@ -600,6 +602,7 @@ class ChatScrollController {
         final key = messageKeys[messages[i].id];
         final ctx = key?.currentContext;
         if (ctx == null) continue;
+        if (!ctx.mounted) continue;
         final box = ctx.findRenderObject() as RenderBox?;
         if (box == null || !box.attached) continue;
         final top = box.localToGlobal(Offset.zero).dy;
@@ -618,6 +621,7 @@ class ChatScrollController {
       for (int attempt = 0; attempt < maxAttempts; attempt++) {
         final ctx2 = messageKeys[targetId]?.currentContext;
         if (ctx2 != null) {
+          if (!ctx2.mounted) continue;
           await Scrollable.ensureVisible(
             ctx2,
             alignment: 0.1,

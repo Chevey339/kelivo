@@ -71,7 +71,7 @@ class CurrentModelIcon extends StatelessWidget {
       decoration: BoxDecoration(
         color: withBackground
             ? (backgroundColor ??
-                  (isDark ? Colors.white10 : cs.primary.withOpacity(0.1)))
+                  (isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1)))
             : Colors.transparent,
         shape: BoxShape.circle,
       ),

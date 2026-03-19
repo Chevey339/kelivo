@@ -7,15 +7,27 @@ class MarkdownPreviewHtmlBuilder {
     BuildContext context,
     String markdown,
   ) async {
-    final cs = Theme.of(context).colorScheme;
+    return buildFromMarkdownWithColorScheme(
+      Theme.of(context).colorScheme,
+      markdown,
+    );
+  }
+
+  static Future<String> buildFromMarkdownWithColorScheme(
+    ColorScheme cs,
+    String markdown,
+  ) async {
     final template = await rootBundle.loadString('assets/html/mark.html');
     return template
         .replaceAll('{{MARKDOWN_BASE64}}', base64Encode(utf8.encode(markdown)))
-        .replaceAll('{{BACKGROUND_COLOR}}', _toCssHex(cs.background))
-        .replaceAll('{{ON_BACKGROUND_COLOR}}', _toCssHex(cs.onBackground))
+        .replaceAll('{{BACKGROUND_COLOR}}', _toCssHex(cs.surface))
+        .replaceAll('{{ON_BACKGROUND_COLOR}}', _toCssHex(cs.onSurface))
         .replaceAll('{{SURFACE_COLOR}}', _toCssHex(cs.surface))
         .replaceAll('{{ON_SURFACE_COLOR}}', _toCssHex(cs.onSurface))
-        .replaceAll('{{SURFACE_VARIANT_COLOR}}', _toCssHex(cs.surfaceVariant))
+        .replaceAll(
+          '{{SURFACE_VARIANT_COLOR}}',
+          _toCssHex(cs.surfaceContainerHighest),
+        )
         .replaceAll(
           '{{ON_SURFACE_VARIANT_COLOR}}',
           _toCssHex(cs.onSurfaceVariant),
@@ -26,10 +38,11 @@ class MarkdownPreviewHtmlBuilder {
   }
 
   static String _toCssHex(Color c) {
-    final a = c.alpha.toRadixString(16).padLeft(2, '0').toUpperCase();
-    final r = c.red.toRadixString(16).padLeft(2, '0').toUpperCase();
-    final g = c.green.toRadixString(16).padLeft(2, '0').toUpperCase();
-    final b = c.blue.toRadixString(16).padLeft(2, '0').toUpperCase();
+    int to255(double v) => (v * 255.0).round().clamp(0, 255);
+    final a = to255(c.a).toRadixString(16).padLeft(2, '0').toUpperCase();
+    final r = to255(c.r).toRadixString(16).padLeft(2, '0').toUpperCase();
+    final g = to255(c.g).toRadixString(16).padLeft(2, '0').toUpperCase();
+    final b = to255(c.b).toRadixString(16).padLeft(2, '0').toUpperCase();
     return '#$r$g$b$a';
   }
 }

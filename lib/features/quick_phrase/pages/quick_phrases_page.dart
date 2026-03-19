@@ -3,7 +3,6 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../theme/design_tokens.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -27,9 +26,8 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
   }
 
   Future<void> _showAddEditSheet({QuickPhrase? phrase}) async {
-    final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final quickPhraseProvider = context.read<QuickPhraseProvider>();
 
     final result = await showModalBottomSheet<Map<String, String>?>(
       context: context,
@@ -46,6 +44,8 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
       },
     );
 
+    if (!mounted) return;
+
     if (result != null) {
       final title = result['title']?.trim() ?? '';
       final content = result['content']?.trim() ?? '';
@@ -61,10 +61,10 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
           isGlobal: widget.assistantId == null,
           assistantId: widget.assistantId,
         );
-        await context.read<QuickPhraseProvider>().add(newPhrase);
+        await quickPhraseProvider.add(newPhrase);
       } else {
         // Update existing
-        await context.read<QuickPhraseProvider>().update(
+        await quickPhraseProvider.update(
           phrase.copyWith(title: title, content: content),
         );
       }
@@ -123,13 +123,13 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
                   Icon(
                     Lucide.Zap,
                     size: 64,
-                    color: cs.onSurface.withOpacity(0.3),
+                    color: cs.onSurface.withValues(alpha: 0.3),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     l10n.quickPhraseEmptyMessage,
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 14,
                     ),
                   ),
@@ -184,11 +184,11 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
                                 height: double.infinity,
                                 decoration: BoxDecoration(
                                   color: isDark
-                                      ? cs.error.withOpacity(0.22)
-                                      : cs.error.withOpacity(0.14),
+                                      ? cs.error.withValues(alpha: 0.22)
+                                      : cs.error.withValues(alpha: 0.14),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: cs.error.withOpacity(0.35),
+                                    color: cs.error.withValues(alpha: 0.35),
                                   ),
                                 ),
                                 padding: const EdgeInsets.symmetric(
@@ -228,14 +228,14 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
                           builder: (pressed, overlay) {
                             final baseBg = isDark
                                 ? Colors.white10
-                                : Colors.white.withOpacity(0.96);
+                                : Colors.white.withValues(alpha: 0.96);
                             return Container(
                               decoration: BoxDecoration(
                                 color: Color.alphaBlend(overlay, baseBg),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: cs.outlineVariant.withOpacity(
-                                    isDark ? 0.1 : 0.08,
+                                  color: cs.outlineVariant.withValues(
+                                    alpha: isDark ? 0.1 : 0.08,
                                   ),
                                   width: 0.6,
                                 ),
@@ -283,7 +283,7 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
                                               color: Theme.of(context)
                                                   .colorScheme
                                                   .onSurface
-                                                  .withOpacity(0.7),
+                                                  .withValues(alpha: 0.7),
                                             ),
                                           ),
                                         ],
@@ -293,9 +293,10 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
                                     Icon(
                                       Lucide.ChevronRight,
                                       size: 16,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface.withOpacity(0.5),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.5),
                                     ),
                                   ],
                                 ),
@@ -370,7 +371,7 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: cs.onSurface.withOpacity(0.2),
+                  color: cs.onSurface.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -398,18 +399,20 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  borderSide: BorderSide(
+                    color: cs.primary.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
             ),
@@ -425,18 +428,20 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  borderSide: BorderSide(
+                    color: cs.primary.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
             ),
@@ -492,7 +497,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final press = base.withOpacity(0.7);
+    final press = base.withValues(alpha: 0.7);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => setState(() => _pressed = true),
@@ -538,8 +543,8 @@ class _TactileCardState extends State<_TactileCard> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final overlay = _pressed
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -603,7 +608,7 @@ class _IosOutlineButtonState extends State<_IosOutlineButton> {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cs.primary.withOpacity(0.5)),
+            border: Border.all(color: cs.primary.withValues(alpha: 0.5)),
           ),
           child: Text(
             widget.label,

@@ -114,6 +114,7 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                         tooltip: l10n.chatHistoryPageDeleteAllTooltip,
                         icon: const Icon(Lucide.Trash2),
                         onPressed: () async {
+                          final svc = context.read<ChatService>();
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (ctx) => AlertDialog(
@@ -138,8 +139,8 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                               ],
                             ),
                           );
+                          if (!context.mounted) return;
                           if (confirm == true) {
-                            final svc = context.read<ChatService>();
                             final idsToDelete = svc
                                 .getAllConversations()
                                 .where(
@@ -152,7 +153,7 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                             for (final id in idsToDelete) {
                               await svc.deleteConversation(id);
                             }
-                            if (!mounted) return;
+                            if (!context.mounted) return;
                             showAppSnackBar(
                               context,
                               message: l10n.chatHistoryPageDeletedAllSnackbar,
@@ -210,12 +211,12 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(14),
                                 borderSide: BorderSide(
-                                  color: cs.primary.withOpacity(0.3),
+                                  color: cs.primary.withValues(alpha: 0.3),
                                 ),
                               ),
                               prefixIcon: Icon(
                                 Lucide.Search,
-                                color: cs.onSurface.withOpacity(0.7),
+                                color: cs.onSurface.withValues(alpha: 0.7),
                                 size: 18,
                               ),
                               suffixIcon: (q.isNotEmpty)
@@ -223,7 +224,9 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                                       icon: Icon(
                                         Lucide.X,
                                         size: 16,
-                                        color: cs.onSurface.withOpacity(0.7),
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.7,
+                                        ),
                                       ),
                                       onPressed: () {
                                         _searchCtrl.clear();
@@ -243,7 +246,7 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                           child: Text(
                             l10n.chatHistoryPageNoConversations,
                             style: TextStyle(
-                              color: cs.onSurface.withOpacity(0.6),
+                              color: cs.onSurface.withValues(alpha: 0.6),
                             ),
                           ),
                         )
@@ -315,8 +318,10 @@ class _ConversationTileDesktopState extends State<_ConversationTileDesktop> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? Colors.white12 : const Color(0xFFF7F7F9);
-    final border = cs.outlineVariant.withOpacity(0.16);
-    final hoveredBg = isDark ? Colors.white24 : cs.primary.withOpacity(0.06);
+    final border = cs.outlineVariant.withValues(alpha: 0.16);
+    final hoveredBg = isDark
+        ? Colors.white24
+        : cs.primary.withValues(alpha: 0.06);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -343,13 +348,13 @@ class _ConversationTileDesktopState extends State<_ConversationTileDesktop> {
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: cs.primary.withOpacity(0.10),
+                      color: cs.primary.withValues(alpha: 0.10),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Lucide.MessageSquare,
                       size: 16,
-                      color: cs.primary.withOpacity(0.9),
+                      color: cs.primary.withValues(alpha: 0.9),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -373,14 +378,14 @@ class _ConversationTileDesktopState extends State<_ConversationTileDesktop> {
                             Icon(
                               Lucide.History,
                               size: 14,
-                              color: cs.onSurface.withOpacity(0.6),
+                              color: cs.onSurface.withValues(alpha: 0.6),
                             ),
                             const SizedBox(width: 6),
                             Text(
                               _format(context, widget.conversation.updatedAt),
                               style: TextStyle(
                                 fontSize: 12.5,
-                                color: cs.onSurface.withOpacity(0.7),
+                                color: cs.onSurface.withValues(alpha: 0.7),
                               ),
                             ),
                           ],
@@ -428,9 +433,9 @@ class _PinButtonDesktop extends StatelessWidget {
         duration: kAnim,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: pinned ? cs.primary.withOpacity(0.12) : cs.surface,
+          color: pinned ? cs.primary.withValues(alpha: 0.12) : cs.surface,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.outlineVariant.withOpacity(0.18)),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.18)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -440,7 +445,9 @@ class _PinButtonDesktop extends StatelessWidget {
                 pinned ? Lucide.PinOff : Lucide.Pin,
                 key: ValueKey(pinned ? 'pinOff' : 'pin'),
                 size: 16,
-                color: pinned ? cs.primary : cs.onSurface.withOpacity(0.7),
+                color: pinned
+                    ? cs.primary
+                    : cs.onSurface.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(width: 6),
@@ -451,7 +458,9 @@ class _PinButtonDesktop extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
-                color: pinned ? cs.primary : cs.onSurface.withOpacity(0.8),
+                color: pinned
+                    ? cs.primary
+                    : cs.onSurface.withValues(alpha: 0.8),
               ),
             ),
           ],

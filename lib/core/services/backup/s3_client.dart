@@ -353,10 +353,12 @@ class S3BackupClient {
     if (cfg.endpoint.trim().isEmpty) throw Exception('S3 endpoint is required');
     if (cfg.region.trim().isEmpty) throw Exception('S3 region is required');
     if (cfg.bucket.trim().isEmpty) throw Exception('S3 bucket is required');
-    if (cfg.accessKeyId.trim().isEmpty)
+    if (cfg.accessKeyId.trim().isEmpty) {
       throw Exception('S3 accessKeyId is required');
-    if (cfg.secretAccessKey.isEmpty)
+    }
+    if (cfg.secretAccessKey.isEmpty) {
       throw Exception('S3 secretAccessKey is required');
+    }
   }
 
   Future<void> test(S3Config cfg) async {

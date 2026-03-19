@@ -6,7 +6,6 @@ import '../../core/providers/settings_provider.dart';
 import '../../features/model/widgets/model_select_sheet.dart';
 import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:characters/characters.dart';
 
 class DesktopDefaultModelPane extends StatelessWidget {
   const DesktopDefaultModelPane({super.key});
@@ -36,7 +35,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w400,
-                          color: cs.onSurface.withOpacity(0.9),
+                          color: cs.onSurface.withValues(alpha: 0.9),
                         ),
                       ),
                     ),
@@ -55,9 +54,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                           .resetCurrentModel();
                     },
                     onPick: () async {
+                      final settingsProvider = context.read<SettingsProvider>();
                       final sel = await showModelSelector(context);
                       if (sel != null) {
-                        await context.read<SettingsProvider>().setCurrentModel(
+                        await settingsProvider.setCurrentModel(
                           sel.providerKey,
                           sel.modelId,
                         );
@@ -78,9 +78,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       await context.read<SettingsProvider>().resetTitleModel();
                     },
                     onPick: () async {
+                      final settingsProvider = context.read<SettingsProvider>();
                       final sel = await showModelSelector(context);
                       if (sel != null) {
-                        await context.read<SettingsProvider>().setTitleModel(
+                        await settingsProvider.setTitleModel(
                           sel.providerKey,
                           sel.modelId,
                         );
@@ -107,9 +108,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                           .resetSummaryModel();
                     },
                     onPick: () async {
+                      final settingsProvider = context.read<SettingsProvider>();
                       final sel = await showModelSelector(context);
                       if (sel != null) {
-                        await context.read<SettingsProvider>().setSummaryModel(
+                        await settingsProvider.setSummaryModel(
                           sel.providerKey,
                           sel.modelId,
                         );
@@ -139,9 +141,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                           .resetCompressModel();
                     },
                     onPick: () async {
+                      final settingsProvider = context.read<SettingsProvider>();
                       final sel = await showModelSelector(context);
                       if (sel != null) {
-                        await context.read<SettingsProvider>().setCompressModel(
+                        await settingsProvider.setCompressModel(
                           sel.providerKey,
                           sel.modelId,
                         );
@@ -165,11 +168,13 @@ class DesktopDefaultModelPane extends StatelessWidget {
                           .resetTranslateModel();
                     },
                     onPick: () async {
+                      final settingsProvider = context.read<SettingsProvider>();
                       final sel = await showModelSelector(context);
                       if (sel != null) {
-                        await context
-                            .read<SettingsProvider>()
-                            .setTranslateModel(sel.providerKey, sel.modelId);
+                        await settingsProvider.setTranslateModel(
+                          sel.providerKey,
+                          sel.modelId,
+                        );
                       }
                     },
                     configAction: () => _showTranslatePromptDialog(context),
@@ -187,9 +192,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       await context.read<SettingsProvider>().resetOcrModel();
                     },
                     onPick: () async {
+                      final settingsProvider = context.read<SettingsProvider>();
                       final sel = await showModelSelector(context);
                       if (sel != null) {
-                        await context.read<SettingsProvider>().setOcrModel(
+                        await settingsProvider.setOcrModel(
                           sel.providerKey,
                           sel.modelId,
                         );
@@ -283,7 +289,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                   Text(
                     l10n.defaultModelPageTitleVars('{content}', '{locale}'),
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 12,
                     ),
                   ),
@@ -376,7 +382,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       '{target_lang}',
                     ),
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 12,
                     ),
                   ),
@@ -551,7 +557,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       '{user_messages}',
                     ),
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 12,
                     ),
                   ),
@@ -641,7 +647,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                   Text(
                     l10n.defaultModelPageCompressVars('{content}', '{locale}'),
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 12,
                     ),
                   ),
@@ -724,12 +730,16 @@ class _ModelCardState extends State<_ModelCard> {
       modelDisplay = l10n.defaultModelPageUseCurrentModel;
     }
 
-    final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
-    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06);
+    final baseBg = isDark
+        ? Colors.white10
+        : Colors.white.withValues(alpha: 0.96);
+    final borderColor = cs.outlineVariant.withValues(
+      alpha: isDark ? 0.08 : 0.06,
+    );
     final rowBase = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
     final hoverOverlay = isDark
-        ? Colors.white.withOpacity(0.06)
-        : Colors.black.withOpacity(0.05);
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.05);
 
     return Container(
       decoration: BoxDecoration(
@@ -777,7 +787,7 @@ class _ModelCardState extends State<_ModelCard> {
               widget.subtitle,
               style: TextStyle(
                 fontSize: 12,
-                color: cs.onSurface.withOpacity(0.7),
+                color: cs.onSurface.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 8),
@@ -855,18 +865,18 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final baseColor = widget.filled
         ? cs.primary
-        : cs.onSurface.withOpacity(0.8);
+        : cs.onSurface.withValues(alpha: 0.8);
     final textColor = widget.filled ? Colors.white : baseColor;
     final bg = widget.filled
-        ? (_hover ? cs.primary.withOpacity(0.92) : cs.primary)
+        ? (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary)
         : (_hover
               ? (isDark
-                    ? Colors.white.withOpacity(0.06)
-                    : Colors.black.withOpacity(0.05))
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.05))
               : Colors.transparent);
     final borderColor = widget.filled
         ? Colors.transparent
-        : cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18);
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.22 : 0.18);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -923,8 +933,8 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -985,7 +995,7 @@ class _BrandCircle extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : cs.primary.withOpacity(0.10),
+        color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.10),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
@@ -1027,20 +1037,23 @@ InputDecoration _deskInputDecoration(BuildContext context) {
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.2),
+        color: cs.outlineVariant.withValues(alpha: 0.2),
         width: 0.8,
       ),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.2),
+        color: cs.outlineVariant.withValues(alpha: 0.2),
         width: 0.8,
       ),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: cs.primary.withOpacity(0.45), width: 1.0),
+      borderSide: BorderSide(
+        color: cs.primary.withValues(alpha: 0.45),
+        width: 1.0,
+      ),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
   );

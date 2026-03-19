@@ -40,7 +40,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   }
 
   final upstreamModelId = _apiModelId(config, modelId);
-  final bool _persistGeminiThoughtSigs = upstreamModelId.toLowerCase().contains(
+  final bool persistGeminiThoughtSigs = upstreamModelId.toLowerCase().contains(
     'gemini-3',
   );
   final builtIns = _builtInTools(config, modelId);
@@ -70,7 +70,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       if (roleRaw == 'system') {
         final s = (msg['content'] ?? '').toString();
         if (s.isNotEmpty) {
-          systemPrompt = systemPrompt.isEmpty ? s : (systemPrompt + '\n\n' + s);
+          systemPrompt = systemPrompt.isEmpty ? s : '$systemPrompt\n\n$s';
         }
         continue;
       }
@@ -146,7 +146,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                 'inline_data': {'mime_type': mime, 'data': b64},
               });
             } else {
-              parts.add({'text': '(image) ${p}'});
+              parts.add({'text': '(image) $p'});
             }
           }
         }
@@ -174,14 +174,11 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         _applyGeminiThoughtSignatures(
           meta,
           parts,
-          attachDummyWhenMissing: _persistGeminiThoughtSigs,
+          attachDummyWhenMissing: persistGeminiThoughtSigs,
         );
       }
       contents.add({'role': role, 'parts': parts});
     }
-
-    final effective = _effectiveModelInfo(config, modelId);
-    final isReasoning = effective.abilities.contains(ModelAbility.reasoning);
 
     // Map OpenAI-style tools to Gemini functionDeclarations (MCP)
     List<Map<String, dynamic>>? geminiTools;
@@ -201,10 +198,11 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         if (params != null) d['parameters'] = _cleanSchemaForGemini(params);
         decls.add(d);
       }
-      if (decls.isNotEmpty)
+      if (decls.isNotEmpty) {
         geminiTools = [
           {'function_declarations': decls},
         ];
+      }
     }
 
     final headers = <String, String>{'Content-Type': 'application/json'};
@@ -319,7 +317,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           usage: totalUsage,
           toolCalls: [ToolCallInfo(id: 'fn_0', name: name, arguments: args)],
         );
-        final res = await onToolCall(name, args) ?? '';
+        final res = await onToolCall(name, args);
         yield ChatStreamChunk(
           content: '',
           isDone: false,
@@ -356,7 +354,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         if (p is Map && p['text'] is String) buf.write(p['text']);
       }
       var contentStr = buf.toString();
-      if (_persistGeminiThoughtSigs) {
+      if (persistGeminiThoughtSigs) {
         final metaComment = _collectThoughtSigCommentFromParts(parts);
         if (metaComment.isNotEmpty) contentStr += metaComment;
       }
@@ -403,7 +401,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     if (roleRaw == 'system') {
       final s = (msg['content'] ?? '').toString();
       if (s.isNotEmpty) {
-        systemPrompt = systemPrompt.isEmpty ? s : (systemPrompt + '\n\n' + s);
+        systemPrompt = systemPrompt.isEmpty ? s : '$systemPrompt\n\n$s';
       }
       continue;
     }
@@ -485,7 +483,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
             });
           } else {
             // http url fallback reference text
-            parts.add({'text': '(image) ${p}'});
+            parts.add({'text': '(image) $p'});
           }
         }
       }
@@ -514,7 +512,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       _applyGeminiThoughtSignatures(
         meta,
         parts,
-        attachDummyWhenMissing: _persistGeminiThoughtSigs,
+        attachDummyWhenMissing: persistGeminiThoughtSigs,
       );
     }
     contents.add({'role': role, 'parts': parts});
@@ -524,8 +522,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   final effective = _effectiveModelInfo(config, modelId);
   final isReasoning = effective.abilities.contains(ModelAbility.reasoning);
   final wantsImageOutput = effective.output.contains(Modality.image);
-  bool _expectImage = wantsImageOutput;
-  bool _receivedImage = false;
+  bool expectImage = wantsImageOutput;
+  bool receivedImage = false;
   final off = _isOff(thinkingBudget);
 
   // Map OpenAI-style tools to Gemini functionDeclarations (MCP)
@@ -551,10 +549,11 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
       decls.add(d);
     }
-    if (decls.isNotEmpty)
+    if (decls.isNotEmpty) {
       geminiTools = [
         {'function_declarations': decls},
       ];
+    }
   }
   // Built-in tools can coexist with function_declarations (MCP) in Gemini API
   final toolsArr = <Map<String, dynamic>>[];
@@ -577,9 +576,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   int totalTokens = 0;
 
   // Accumulate built-in search citations across stream rounds
-  final List<Map<String, dynamic>> _builtinCitations = <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> builtinCitations = <Map<String, dynamic>>[];
 
-  List<Map<String, dynamic>> _parseCitations(dynamic gm) {
+  List<Map<String, dynamic>> parseCitations(dynamic gm) {
     final out = <Map<String, dynamic>>[];
     if (gm is! Map) return out;
     final chunks = gm['groundingChunks'] as List? ?? const <dynamic>[];
@@ -638,10 +637,11 @@ Stream<ChatStreamChunk> _sendGoogleStream(
             if (off) {
               level = 'low';
             } else if (thinkingBudget != null && thinkingBudget > 0) {
-              if (thinkingBudget < 8000)
+              if (thinkingBudget < 8000) {
                 level = 'low';
-              else if (thinkingBudget < 24000)
+              } else if (thinkingBudget < 24000) {
                 level = 'medium'; // gemini 3.1 pro support medium
+              }
             }
             return {'includeThoughts': true, 'thinkingLevel': level};
           }
@@ -667,10 +667,11 @@ Stream<ChatStreamChunk> _sendGoogleStream(
               level = 'minimal';
             } else if (thinkingBudget != null && thinkingBudget > 0) {
               // Light (1024) → low, Medium (16000) → medium, Heavy (32000) → high
-              if (thinkingBudget < 8000)
+              if (thinkingBudget < 8000) {
                 level = 'low';
-              else if (thinkingBudget < 24000)
+              } else if (thinkingBudget < 24000) {
                 level = 'medium';
+              }
             }
             return {'includeThoughts': true, 'thinkingLevel': level};
           }
@@ -718,16 +719,17 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
     }
     headers.addAll(_customHeaders(config, modelId));
-    if (extraHeaders != null && extraHeaders.isNotEmpty)
+    if (extraHeaders != null && extraHeaders.isNotEmpty) {
       headers.addAll(extraHeaders);
+    }
     request.headers.addAll(headers);
     final extra = _customBody(config, modelId);
-    if (extra.isNotEmpty) (body as Map<String, dynamic>).addAll(extra);
+    if (extra.isNotEmpty) {
+      body.addAll(extra);
+    }
     if (extraBody != null && extraBody.isNotEmpty) {
       extraBody.forEach((k, v) {
-        (body as Map<String, dynamic>)[k] = (v is String)
-            ? _parseOverrideValue(v)
-            : v;
+        body[k] = (v is String) ? _parseOverrideValue(v) : v;
       });
     }
     request.body = jsonEncode(body);
@@ -754,12 +756,12 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         <Map<String, dynamic>>[];
 
     // Track a streaming inline image; buffer chunks and emit only the latest frame once finished
-    String _imageMime = 'image/png';
-    String _pendingImageData = '';
-    String _pendingImageTrailingText = '';
-    bool _bufferingInlineImage = false;
+    String imageMime = 'image/png';
+    String pendingImageData = '';
+    String pendingImageTrailingText = '';
+    bool bufferingInlineImage = false;
 
-    bool _looksLikeImageStart(String data) {
+    bool looksLikeImageStart(String data) {
       const prefixes = <String>[
         '/9j/', // jpeg
         'iVBOR', // png
@@ -774,7 +776,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       return false;
     }
 
-    Future<String> _sanitizeTextIfNeeded(String input) async {
+    Future<String> sanitizeTextIfNeeded(String input) async {
       if (input.isEmpty) return input;
       if (input.contains('data:image') && input.contains('base64,')) {
         try {
@@ -786,32 +788,32 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       return input;
     }
 
-    void _bufferInlineImageChunk(String mime, String data) {
-      _imageMime = mime.isNotEmpty ? mime : 'image/png';
-      final hasExisting = _pendingImageData.isNotEmpty;
+    void bufferInlineImageChunk(String mime, String data) {
+      imageMime = mime.isNotEmpty ? mime : 'image/png';
+      final hasExisting = pendingImageData.isNotEmpty;
       // Gemini image-preview streams often send full preview frames instead of deltas.
       // If the previous chunk already looks complete (padding) or a new frame header appears, replace it.
-      final prevLooksComplete = hasExisting && _pendingImageData.endsWith('=');
-      final newFrame = hasExisting && _looksLikeImageStart(data);
+      final prevLooksComplete = hasExisting && pendingImageData.endsWith('=');
+      final newFrame = hasExisting && looksLikeImageStart(data);
       if (prevLooksComplete || newFrame) {
-        _pendingImageData = data;
+        pendingImageData = data;
       } else {
-        _pendingImageData += data;
+        pendingImageData += data;
       }
-      _bufferingInlineImage = true;
-      _receivedImage = true;
+      bufferingInlineImage = true;
+      receivedImage = true;
     }
 
-    Future<String> _takeBufferedImageMarkdown() async {
-      if (!_bufferingInlineImage || _pendingImageData.isEmpty) return '';
-      final trailing = _pendingImageTrailingText;
+    Future<String> takeBufferedImageMarkdown() async {
+      if (!bufferingInlineImage || pendingImageData.isEmpty) return '';
+      final trailing = pendingImageTrailingText;
       final path = await AppDirectories.saveBase64Image(
-        _imageMime,
-        _pendingImageData,
+        imageMime,
+        pendingImageData,
       );
-      _bufferingInlineImage = false;
-      _pendingImageData = '';
-      _pendingImageTrailingText = '';
+      bufferingInlineImage = false;
+      pendingImageData = '';
+      pendingImageTrailingText = '';
       if (path == null || path.isEmpty) return '';
       final sb = StringBuffer()
         ..write('\n\n![image](')
@@ -845,7 +847,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                 totalTokens: (um['totalTokenCount'] ?? 0) as int,
               ),
             );
-            totalTokens = usage!.totalTokens;
+            totalTokens = usage.totalTokens;
           }
 
           final candidates = obj['candidates'];
@@ -880,7 +882,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                 }
 
                 // Capture thought signature for text part (Gemini 3 image/editing)
-                if (_persistGeminiThoughtSigs &&
+                if (persistGeminiThoughtSigs &&
                     !thought &&
                     partThoughtSigKey != null &&
                     partThoughtSigVal != null) {
@@ -893,8 +895,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                 if (t.isNotEmpty) {
                   if (thought) {
                     reasoningDelta += t;
-                  } else if (_bufferingInlineImage) {
-                    _pendingImageTrailingText += t;
+                  } else if (bufferingInlineImage) {
+                    pendingImageTrailingText += t;
                   } else {
                     textDelta += t;
                   }
@@ -908,7 +910,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                           .toString();
                   final data = (inline['data'] ?? '').toString();
                   if (data.isNotEmpty) {
-                    if (_persistGeminiThoughtSigs &&
+                    if (persistGeminiThoughtSigs &&
                         partThoughtSigKey != null &&
                         partThoughtSigVal != null) {
                       final exists = responseImageThoughtSigs.any(
@@ -916,13 +918,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                             e['k'] == partThoughtSigKey &&
                             e['v'] == partThoughtSigVal,
                       );
-                      if (!exists)
+                      if (!exists) {
                         responseImageThoughtSigs.add({
                           'k': partThoughtSigKey,
                           'v': partThoughtSigVal,
                         });
+                      }
                     }
-                    _bufferInlineImageChunk(mime, data);
+                    bufferInlineImageChunk(mime, data);
                   }
                 }
                 // Parse fileData: { fileUri: 'https://...', mimeType: 'image/png' }
@@ -946,7 +949,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                         config,
                         uri,
                       );
-                      if (_persistGeminiThoughtSigs &&
+                      if (persistGeminiThoughtSigs &&
                           partThoughtSigKey != null &&
                           partThoughtSigVal != null) {
                         final exists = responseImageThoughtSigs.any(
@@ -954,13 +957,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                               e['k'] == partThoughtSigKey &&
                               e['v'] == partThoughtSigVal,
                         );
-                        if (!exists)
+                        if (!exists) {
                           responseImageThoughtSigs.add({
                             'k': partThoughtSigKey,
                             'v': partThoughtSigVal,
                           });
+                        }
                       }
-                      _bufferInlineImageChunk(mime, b64);
+                      bufferInlineImageChunk(mime, b64);
                     } catch (_) {}
                   }
                 }
@@ -1010,7 +1014,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                   );
                   String resText = '';
                   if (onToolCall != null) {
-                    resText = await onToolCall(name, args) ?? '';
+                    resText = await onToolCall(name, args);
                     yield ChatStreamChunk(
                       content: '',
                       isDone: false,
@@ -1042,20 +1046,20 @@ Stream<ChatStreamChunk> _sendGoogleStream(
 
               // Parse grounding metadata for citations if present
               final gm = cand['groundingMetadata'] ?? obj['groundingMetadata'];
-              final cite = _parseCitations(gm);
+              final cite = parseCitations(gm);
               if (cite.isNotEmpty) {
                 // merge unique by url
-                final existingUrls = _builtinCitations
+                final existingUrls = builtinCitations
                     .map((e) => e['url']?.toString() ?? '')
                     .toSet();
                 for (final it in cite) {
                   final u = it['url']?.toString() ?? '';
                   if (u.isEmpty || existingUrls.contains(u)) continue;
-                  _builtinCitations.add(it);
+                  builtinCitations.add(it);
                   existingUrls.add(u);
                 }
                 // emit a tool result chunk so UI can render citations card
-                final payload = jsonEncode({'items': _builtinCitations});
+                final payload = jsonEncode({'items': builtinCitations});
                 yield ChatStreamChunk(
                   content: '',
                   isDone: false,
@@ -1075,7 +1079,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
 
             // When finishing, emit any buffered inline image (and trailing text) in one batch to avoid partial base64 during streaming.
             if (finishReason != null) {
-              final pendingImage = await _takeBufferedImageMarkdown();
+              final pendingImage = await takeBufferedImageMarkdown();
               if (pendingImage.isNotEmpty) {
                 textDelta += pendingImage;
               }
@@ -1091,7 +1095,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
               );
             }
             if (textDelta.isNotEmpty) {
-              textDelta = await _sanitizeTextIfNeeded(textDelta);
+              textDelta = await sanitizeTextIfNeeded(textDelta);
               yield ChatStreamChunk(
                 content: textDelta,
                 isDone: false,
@@ -1103,10 +1107,10 @@ Stream<ChatStreamChunk> _sendGoogleStream(
             // If server signaled finish, end stream immediately
             if (finishReason != null &&
                 calls.isEmpty &&
-                (!_expectImage || _receivedImage)) {
+                (!expectImage || receivedImage)) {
               // Emit final citations if any not emitted
-              if (_builtinCitations.isNotEmpty) {
-                final payload = jsonEncode({'items': _builtinCitations});
+              if (builtinCitations.isNotEmpty) {
+                final payload = jsonEncode({'items': builtinCitations});
                 yield ChatStreamChunk(
                   content: '',
                   isDone: false,
@@ -1122,7 +1126,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                   ],
                 );
               }
-              if (_persistGeminiThoughtSigs) {
+              if (persistGeminiThoughtSigs) {
                 final metaComment = _buildGeminiThoughtSigComment(
                   textKey: responseTextThoughtSigKey,
                   textValue: responseTextThoughtSigVal,
@@ -1153,9 +1157,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     }
 
     // Flush any buffered inline image (e.g., when stream ends without explicit finishReason)
-    final pendingImage = await _takeBufferedImageMarkdown();
+    final pendingImage = await takeBufferedImageMarkdown();
     if (pendingImage.isNotEmpty) {
-      final sanitized = await _sanitizeTextIfNeeded(pendingImage);
+      final sanitized = await sanitizeTextIfNeeded(pendingImage);
       yield ChatStreamChunk(
         content: sanitized,
         isDone: false,
@@ -1166,7 +1170,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
 
     if (calls.isEmpty) {
       // No tool calls; this round finished
-      if (_persistGeminiThoughtSigs) {
+      if (persistGeminiThoughtSigs) {
         final metaComment = _buildGeminiThoughtSigComment(
           textKey: responseTextThoughtSigKey,
           textValue: responseTextThoughtSigVal,

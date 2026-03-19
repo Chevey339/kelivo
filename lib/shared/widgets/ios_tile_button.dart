@@ -41,26 +41,26 @@ class _IosTileButtonState extends State<IosTileButton> {
     final Color tint = widget.backgroundColor ?? cs.primary;
     // Use a light primary-tinted background when tinted; otherwise the neutral grey tile
     final Color baseBg = tinted
-        ? (isDark ? tint.withOpacity(0.20) : tint.withOpacity(0.12))
+        ? (isDark ? tint.withValues(alpha: 0.20) : tint.withValues(alpha: 0.12))
         : (isDark ? Colors.white10 : const Color(0xFFF2F3F5));
     final overlay = isDark
-        ? Colors.white.withOpacity(0.06)
-        : Colors.black.withOpacity(0.05);
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.05);
     final pressedBg = Color.alphaBlend(overlay, baseBg);
     // Use primary (or provided foreground) for text/icon when tinted; otherwise neutral onSurface
     final Color defaultFg =
         widget.foregroundColor ??
         (tinted
             ? (widget.backgroundColor ?? cs.primary)
-            : cs.onSurface.withOpacity(0.9));
+            : cs.onSurface.withValues(alpha: 0.9));
     final iconColor = defaultFg;
     final textColor = defaultFg;
     // Keep a subtle same-hue border when tinted; otherwise use neutral outline
     final Color effectiveBorder =
         widget.borderColor ??
         (tinted
-            ? tint.withOpacity(isDark ? 0.55 : 0.45)
-            : cs.outlineVariant.withOpacity(0.35));
+            ? tint.withValues(alpha: isDark ? 0.55 : 0.45)
+            : cs.outlineVariant.withValues(alpha: 0.35));
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -89,7 +89,7 @@ class _IosTileButtonState extends State<IosTileButton> {
             border: Border.all(
               color: widget.enabled
                   ? effectiveBorder
-                  : effectiveBorder.withOpacity(0.45),
+                  : effectiveBorder.withValues(alpha: 0.45),
             ),
           ),
           child: Row(
@@ -103,7 +103,7 @@ class _IosTileButtonState extends State<IosTileButton> {
                   size: 18,
                   color: widget.enabled
                       ? iconColor
-                      : iconColor.withOpacity(0.45),
+                      : iconColor.withValues(alpha: 0.45),
                 ),
               ),
               const SizedBox(width: 8),
@@ -114,7 +114,7 @@ class _IosTileButtonState extends State<IosTileButton> {
                   fontWeight: FontWeight.w600,
                   color: widget.enabled
                       ? textColor
-                      : textColor.withOpacity(0.45),
+                      : textColor.withValues(alpha: 0.45),
                 ),
               ),
             ],

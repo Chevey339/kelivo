@@ -23,7 +23,7 @@ class _CustomRequestTab extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? Colors.white10 : cs.surface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: cs.outlineVariant.withOpacity(0.25)),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.25)),
           boxShadow: isDark ? [] : AppShadows.soft,
         ),
         child: Padding(padding: const EdgeInsets.all(12), child: child),
@@ -118,7 +118,7 @@ class _CustomRequestTab extends StatelessWidget {
                       pressedScale: 0.97,
                       builder: (pressed) {
                         final color = pressed
-                            ? cs.primary.withOpacity(0.7)
+                            ? cs.primary.withValues(alpha: 0.7)
                             : cs.primary;
                         return Row(
                           mainAxisSize: MainAxisSize.min,
@@ -154,7 +154,7 @@ class _CustomRequestTab extends StatelessWidget {
                 Text(
                   l10n.assistantEditCustomHeadersEmpty,
                   style: TextStyle(
-                    color: cs.onSurface.withOpacity(0.6),
+                    color: cs.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -185,7 +185,7 @@ class _CustomRequestTab extends StatelessWidget {
                       pressedScale: 0.97,
                       builder: (pressed) {
                         final color = pressed
-                            ? cs.primary.withOpacity(0.7)
+                            ? cs.primary.withValues(alpha: 0.7)
                             : cs.primary;
                         return Row(
                           mainAxisSize: MainAxisSize.min,
@@ -221,7 +221,7 @@ class _CustomRequestTab extends StatelessWidget {
                 Text(
                   l10n.assistantEditCustomBodyEmpty,
                   style: TextStyle(
-                    color: cs.onSurface.withOpacity(0.6),
+                    color: cs.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -304,7 +304,7 @@ class _HeaderRowState extends State<_HeaderRow> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
+        borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.4)),
       ),
     );
   }
@@ -418,7 +418,7 @@ class _BodyRowState extends State<_BodyRow> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
+        borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.4)),
       ),
       alignLabelWithHint: true,
     );

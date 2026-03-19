@@ -610,6 +610,12 @@ abstract class AppLocalizations {
   /// **'WeChat sponsor code'**
   String get sponsorPageWeChatSubtitle;
 
+  /// No description provided for @sponsorPageScanQrHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the QR code to sponsor'**
+  String get sponsorPageScanQrHint;
+
   /// No description provided for @languageDisplaySimplifiedChinese.
   ///
   /// In en, this message translates to:
@@ -874,6 +880,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Built-in'**
   String get mcpTransportTagInmemory;
+
+  /// No description provided for @mcpTransportTagSse.
+  ///
+  /// In en, this message translates to:
+  /// **'SSE'**
+  String get mcpTransportTagSse;
+
+  /// No description provided for @mcpTransportTagHttp.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP'**
+  String get mcpTransportTagHttp;
 
   /// No description provided for @mcpServerEditSheetStdioOnlyDesktop.
   ///
@@ -3002,7 +3020,7 @@ abstract class AppLocalizations {
   /// No description provided for @reasoningBudgetSheetCustomLabel.
   ///
   /// In en, this message translates to:
-  /// **'Custom Reasoning Budget (tokens)'**
+  /// **'Custom Reasoning Budget'**
   String get reasoningBudgetSheetCustomLabel;
 
   /// No description provided for @reasoningBudgetSheetCustomHint.
@@ -5822,6 +5840,12 @@ abstract class AppLocalizations {
   /// **'Nice!'**
   String get aboutPageEasterEggButton;
 
+  /// No description provided for @aboutPageAppName.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo'**
+  String get aboutPageAppName;
+
   /// No description provided for @aboutPageAppDescription.
   ///
   /// In en, this message translates to:
@@ -5840,17 +5864,77 @@ abstract class AppLocalizations {
   /// **'Version'**
   String get aboutPageVersion;
 
+  /// No description provided for @aboutPageVersionDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'{version} / {buildNumber}'**
+  String aboutPageVersionDetail(String version, String buildNumber);
+
   /// No description provided for @aboutPageSystem.
   ///
   /// In en, this message translates to:
   /// **'System'**
   String get aboutPageSystem;
 
+  /// No description provided for @aboutPageLoadingPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'...'**
+  String get aboutPageLoadingPlaceholder;
+
+  /// No description provided for @aboutPageUnknownPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'-'**
+  String get aboutPageUnknownPlaceholder;
+
+  /// No description provided for @aboutPagePlatformMacos.
+  ///
+  /// In en, this message translates to:
+  /// **'macOS'**
+  String get aboutPagePlatformMacos;
+
+  /// No description provided for @aboutPagePlatformWindows.
+  ///
+  /// In en, this message translates to:
+  /// **'Windows'**
+  String get aboutPagePlatformWindows;
+
+  /// No description provided for @aboutPagePlatformLinux.
+  ///
+  /// In en, this message translates to:
+  /// **'Linux'**
+  String get aboutPagePlatformLinux;
+
+  /// No description provided for @aboutPagePlatformAndroid.
+  ///
+  /// In en, this message translates to:
+  /// **'Android'**
+  String get aboutPagePlatformAndroid;
+
+  /// No description provided for @aboutPagePlatformIos.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS'**
+  String get aboutPagePlatformIos;
+
+  /// No description provided for @aboutPagePlatformOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other ({os})'**
+  String aboutPagePlatformOther(String os);
+
   /// No description provided for @aboutPageWebsite.
   ///
   /// In en, this message translates to:
   /// **'Website'**
   String get aboutPageWebsite;
+
+  /// No description provided for @aboutPageGithub.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub'**
+  String get aboutPageGithub;
 
   /// No description provided for @aboutPageLicense.
   ///

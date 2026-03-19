@@ -378,6 +378,12 @@ class ChatActions {
     required Conversation conversation,
     bool assistantAsNewReply = false,
   }) async {
+    // Avoid using BuildContext across async gaps (this class holds a BuildContext).
+    final settings = contextProvider.read<SettingsProvider>();
+    final assistant = contextProvider
+        .read<AssistantProvider>()
+        .currentAssistant;
+
     await cancelStreaming(conversation);
 
     final idx = _messages.indexWhere((m) => m.id == message.id);
@@ -396,10 +402,6 @@ class ChatActions {
     }
 
     // Get model config
-    final settings = contextProvider.read<SettingsProvider>();
-    final assistant = contextProvider
-        .read<AssistantProvider>()
-        .currentAssistant;
     final assistantId = assistant?.id;
     final modelConfig = messageGenerationService.getModelConfig(
       settings,
@@ -890,6 +892,10 @@ class ChatActions {
   ) async {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
+    final autoCollapseThinking =
+        (!state.ctx.streamOutput && state.bufferedReasoning.isNotEmpty)
+        ? contextProvider.read<SettingsProvider>().autoCollapseThinking
+        : null;
 
     if (chunkContent.isNotEmpty) {
       state.fullContentRaw += chunkContent;
@@ -931,14 +937,11 @@ class ChatActions {
         reasoningStartAt: startAt,
         reasoningFinishedAt: now,
       );
-      final autoCollapse = contextProvider
-          .read<SettingsProvider>()
-          .autoCollapseThinking;
       streamController.reasoning[messageId] = stream_ctrl.ReasoningData()
         ..text = state.bufferedReasoning
         ..startAt = startAt
         ..finishedAt = now
-        ..expanded = !autoCollapse;
+        ..expanded = !(autoCollapseThinking ?? false);
     }
 
     await _conversationStreams.remove(conversationId)?.cancel();

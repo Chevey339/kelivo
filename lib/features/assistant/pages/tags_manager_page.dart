@@ -16,6 +16,7 @@ class TagsManagerPage extends StatefulWidget {
 class _TagsManagerPageState extends State<TagsManagerPage> {
   Future<void> _createTag(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
+    final tp = context.read<TagProvider>();
     final TextEditingController c = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
@@ -39,9 +40,9 @@ class _TagsManagerPageState extends State<TagsManagerPage> {
       ),
     );
     if (ok == true) {
+      if (!context.mounted) return;
       final name = c.text.trim();
       if (name.isEmpty) return;
-      final tp = context.read<TagProvider>();
       if (tp.tags.any((t) => t.name == name)) return;
       await tp.createTag(name);
     }
@@ -53,6 +54,7 @@ class _TagsManagerPageState extends State<TagsManagerPage> {
     String oldName,
   ) async {
     final l10n = AppLocalizations.of(context)!;
+    final tp = context.read<TagProvider>();
     final TextEditingController c = TextEditingController(text: oldName);
     final ok = await showDialog<bool>(
       context: context,
@@ -76,9 +78,9 @@ class _TagsManagerPageState extends State<TagsManagerPage> {
       ),
     );
     if (ok == true) {
+      if (!context.mounted) return;
       final name = c.text.trim();
       if (name.isEmpty) return;
-      final tp = context.read<TagProvider>();
       if (tp.tags.any((t) => t.name == name && t.id != tagId)) return;
       await tp.renameTag(tagId, name);
     }
@@ -86,6 +88,7 @@ class _TagsManagerPageState extends State<TagsManagerPage> {
 
   Future<void> _deleteTag(BuildContext context, String tagId) async {
     final l10n = AppLocalizations.of(context)!;
+    final tp = context.read<TagProvider>();
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -104,7 +107,8 @@ class _TagsManagerPageState extends State<TagsManagerPage> {
       ),
     );
     if (ok == true) {
-      await context.read<TagProvider>().deleteTag(tagId);
+      if (!context.mounted) return;
+      await tp.deleteTag(tagId);
     }
   }
 
@@ -165,7 +169,8 @@ class _TagsManagerPageState extends State<TagsManagerPage> {
                       widget.assistantId,
                       t.id,
                     );
-                    if (mounted) Navigator.of(context).maybePop();
+                    if (!context.mounted) return;
+                    Navigator.of(context).maybePop();
                   },
                   onRename: () => _renameTag(context, t.id, t.name),
                   onDelete: () => _deleteTag(context, t.id),
@@ -195,7 +200,9 @@ class _MobileTagCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
-    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.10);
+    final borderColor = cs.outlineVariant.withValues(
+      alpha: isDark ? 0.12 : 0.10,
+    );
     Widget iconBtn(IconData icon, VoidCallback onPressed, {Color? color}) {
       return IosCardPress(
         baseColor: Colors.transparent,

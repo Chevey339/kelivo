@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import '../../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -22,7 +21,6 @@ import 'network_proxy_page.dart';
 import 'storage_space_page.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../../core/services/haptics.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -41,12 +39,12 @@ class SettingsPage extends StatelessWidget {
         case ThemeMode.light:
           return l10n.settingsPageLightMode;
         case ThemeMode.system:
-        default:
           return l10n.settingsPageSystemMode;
       }
     }
 
     Future<void> pickThemeMode() async {
+      final settingsProvider = context.read<SettingsProvider>();
       final selected = await showModalBottomSheet<ThemeMode>(
         context: context,
         backgroundColor: cs.surface,
@@ -87,7 +85,7 @@ class SettingsPage extends StatelessWidget {
         },
       );
       if (selected != null) {
-        await context.read<SettingsProvider>().setThemeMode(selected);
+        await settingsProvider.setThemeMode(selected);
       }
     }
 
@@ -99,7 +97,7 @@ class SettingsPage extends StatelessWidget {
         style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: cs.onSurface.withOpacity(0.8),
+          color: cs.onSurface.withValues(alpha: 0.8),
         ),
       ),
     );
@@ -122,7 +120,7 @@ class SettingsPage extends StatelessWidget {
         children: [
           if (!settings.hasAnyActiveModel)
             Material(
-              color: cs.errorContainer.withOpacity(0.30),
+              color: cs.errorContainer.withValues(alpha: 0.30),
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -139,7 +137,7 @@ class SettingsPage extends StatelessWidget {
                         l10n.settingsPageWarningMessage,
                         style: TextStyle(
                           fontSize: 12,
-                          color: cs.onSurface.withOpacity(0.8),
+                          color: cs.onSurface.withValues(alpha: 0.8),
                         ),
                       ),
                     ),
@@ -421,13 +419,15 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
       // Light: white with slight transparency; Dark: subtle translucent dark
-      final Color bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+      final Color bg = isDark
+          ? Colors.white10
+          : Colors.white.withValues(alpha: 0.96);
       return Container(
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
             width: 0.6,
           ),
         ),
@@ -449,7 +449,7 @@ Widget _iosDivider(BuildContext context) {
     thickness: 0.6,
     indent: 54,
     endIndent: 12,
-    color: cs.outlineVariant.withOpacity(0.18),
+    color: cs.outlineVariant.withValues(alpha: 0.18),
   );
 }
 
@@ -508,7 +508,10 @@ class _ChatStorageSummaryState extends State<_ChatStorageSummary> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final style = TextStyle(color: cs.onSurface.withOpacity(0.6), fontSize: 13);
+    final style = TextStyle(
+      color: cs.onSurface.withValues(alpha: 0.6),
+      fontSize: 13,
+    );
 
     return FutureBuilder<StorageUsageReport>(
       future: _future,
@@ -540,7 +543,7 @@ Widget _iosNavRow(
     pressedScale: 1.00,
     haptics: false,
     builder: (pressed) {
-      final baseColor = cs.onSurface.withOpacity(0.9);
+      final baseColor = cs.onSurface.withValues(alpha: 0.9);
       return _AnimatedPressColor(
         pressed: pressed,
         base: baseColor,
@@ -569,7 +572,7 @@ Widget _iosNavRow(
                     child: DefaultTextStyle.merge(
                       style: TextStyle(
                         fontSize: 13,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                       child: detailBuilder(context),
                     ),
@@ -581,7 +584,7 @@ Widget _iosNavRow(
                       detailText,
                       style: TextStyle(
                         fontSize: 13,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ),
@@ -643,19 +646,13 @@ class _TactileIconButton extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    this.onLongPress,
-    this.semanticLabel,
     this.size = 22,
-    this.haptics = true,
   });
 
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final String? semanticLabel;
   final double size;
-  final bool haptics;
 
   @override
   State<_TactileIconButton> createState() => _TactileIconButtonState();
@@ -667,32 +664,24 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
       size: widget.size,
       color: _pressed ? pressColor : base,
-      semanticLabel: widget.semanticLabel,
     );
 
     return Semantics(
       button: true,
-      label: widget.semanticLabel,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
         onTap: () {
-          if (widget.haptics) Haptics.light();
+          Haptics.light();
           widget.onTap();
         },
-        onLongPress: widget.onLongPress == null
-            ? null
-            : () {
-                if (widget.haptics) Haptics.light();
-                widget.onLongPress!.call();
-              },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           child: icon,
@@ -717,14 +706,10 @@ Widget _sheetOption(
     onTap: onTap,
     builder: (pressed) {
       final base = cs.onSurface;
-      final target = pressed
-          ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ??
-                base)
-          : base;
       final bgTarget = pressed
           ? (isDark
-                ? Colors.white.withOpacity(0.06)
-                : Colors.black.withOpacity(0.05))
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.black.withValues(alpha: 0.05))
           : Colors.transparent;
       return _AnimatedPressColor(
         pressed: pressed,
@@ -758,6 +743,6 @@ Widget _sheetDivider(BuildContext context) {
     thickness: 0.6,
     indent: 52,
     endIndent: 16,
-    color: cs.outlineVariant.withOpacity(0.18),
+    color: cs.outlineVariant.withValues(alpha: 0.18),
   );
 }

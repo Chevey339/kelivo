@@ -88,7 +88,7 @@ class ChatSelectionAppBar extends StatelessWidget
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: cs.onSurface.withOpacity(0.9),
+                      color: cs.onSurface.withValues(alpha: 0.9),
                     ),
                   ),
                 ),

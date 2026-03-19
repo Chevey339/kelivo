@@ -4,10 +4,9 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:gpt_markdown/custom_widgets/markdown_config.dart'
     show GptMarkdownConfig;
-import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
-import 'package:highlight/highlight.dart' show highlight, Node;
+import 'package:highlight/highlight_core.dart' show Node, highlight;
 import '../../icons/lucide_adapter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
@@ -51,7 +50,6 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
     final sanitizedText = _sanitizeImageLinks(text);
     final imageUrls = _extractImageUrls(sanitizedText);
@@ -160,7 +158,7 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     // Force rebuild of the markdown when key theme colors change to avoid stale styles
     final markdownWidget = GptMarkdown(
       key: ValueKey(
-        '${Theme.of(context).brightness.index}-${cs.surface.value}-${cs.onSurface.value}-${cs.primary.value}-${cs.outlineVariant.value}',
+        '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${cs.onSurface.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}',
       ),
       normalized,
       style: baseTextStyle,
@@ -171,9 +169,7 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
       components: components,
       inlineComponents: inlineComponents,
       imageBuilder: (ctx, url) {
-        final imgs = (imageUrls ?? const <String>[]).isNotEmpty
-            ? imageUrls!
-            : <String>[url];
+        final imgs = imageUrls.isNotEmpty ? imageUrls : <String>[url];
         final idx = imgs.indexOf(url);
         final initial = idx >= 0 ? idx : 0;
         final provider = _imageProviderFor(url);
@@ -181,10 +177,8 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
           onTap: () {
             Navigator.of(ctx).push(
               PageRouteBuilder(
-                pageBuilder: (_, __, ___) => ImageViewerPage(
-                  images: imgs ?? <String>[url],
-                  initialIndex: initial,
-                ),
+                pageBuilder: (_, __, ___) =>
+                    ImageViewerPage(images: imgs, initialIndex: initial),
                 transitionDuration: const Duration(milliseconds: 360),
                 reverseTransitionDuration: const Duration(milliseconds: 280),
                 transitionsBuilder: (context, anim, sec, child) {
@@ -251,7 +245,7 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
                 height: 20,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: cs.primary.withOpacity(0.20),
+                  color: cs.primary.withValues(alpha: 0.20),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -281,11 +275,12 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
         // list items don't visually feel larger/smaller than body text.
         final double kListComp =
             MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
-        final double s = MediaQuery.of(ctx).textScaleFactor;
+        final mediaQuery = MediaQuery.of(ctx);
+        final double s = mediaQuery.textScaler.scale(1);
         final double comp = math.pow(s == 0 ? 1.0 : s, -kListComp).toDouble();
         final double newScale = (s * comp).clamp(0.5, 3.0);
         return MediaQuery(
-          data: MediaQuery.of(ctx).copyWith(textScaleFactor: newScale),
+          data: mediaQuery.copyWith(textScaler: TextScaler.linear(newScale)),
           child: Directionality(
             textDirection: cfg.textDirection,
             child: Row(
@@ -313,11 +308,12 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
         );
         final double kListComp =
             MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
-        final double s = MediaQuery.of(ctx).textScaleFactor;
+        final mediaQuery = MediaQuery.of(ctx);
+        final double s = mediaQuery.textScaler.scale(1);
         final double comp = math.pow(s == 0 ? 1.0 : s, -kListComp).toDouble();
         final double newScale = (s * comp).clamp(0.5, 3.0);
         return MediaQuery(
-          data: MediaQuery.of(ctx).copyWith(textScaleFactor: newScale),
+          data: mediaQuery.copyWith(textScaler: TextScaler.linear(newScale)),
           child: Directionality(
             textDirection: cfg.textDirection,
             child: Row(
@@ -339,10 +335,12 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
       tableBuilder: (ctx, rows, style, cfg) {
         final cs = Theme.of(ctx).colorScheme;
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.28);
+        final borderColor = cs.outlineVariant.withValues(
+          alpha: isDark ? 0.22 : 0.28,
+        );
         // Blend header background with surface so it matches current theme tone
         final headerBg = Color.alphaBlend(
-          cs.primary.withOpacity(isDark ? 0.14 : 0.08),
+          cs.primary.withValues(alpha: isDark ? 0.14 : 0.08),
           cs.surface,
         );
         final headerStyle = (style).copyWith(
@@ -586,7 +584,9 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: csCtx.outlineVariant.withOpacity(0.22)),
+            border: Border.all(
+              color: csCtx.outlineVariant.withValues(alpha: 0.22),
+            ),
           ),
           child: Text(
             softened,
@@ -778,10 +778,13 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     out = out.replaceAllMapped(inlineDisplayMath, (m) {
       final body = (m.group(1) ?? '').trim();
       // Only normalize true display math (multi-line or clearly not inline literals)
-      if (body.isEmpty) return m[0]!;
+      if (body.isEmpty) {
+        return m[0]!;
+      }
       final hasNewline = body.contains('\n');
-      if (!hasNewline && body.length < 12)
+      if (!hasNewline && body.length < 12) {
         return m[0]!; // looks like inline literal, leave intact
+      }
       // Surround with blank lines to force a block; keep existing body trimmed
       final prefix = m.start == 0 || out.substring(0, m.start).endsWith('\n\n')
           ? ''
@@ -790,7 +793,7 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
           m.end == out.length || out.substring(m.end).startsWith('\n\n')
           ? ''
           : '\n';
-      return '${prefix}\$\$\n$body\n\$\$${suffix}';
+      return '$prefix\$\$\n$body\n\$\$$suffix';
     });
 
     // 1) Move fenced code from list lines to the next line: "* ```lang" -> "*\n```lang"
@@ -834,10 +837,7 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     //    citations as [[1]](url), where the inner [1] is the display text. The
     //    link regex cannot match nested brackets, so flatten them first.
     final doubleBracketLink = RegExp(r'\[\[([^\]]+)\]\]\(([^\s)]+)\)');
-    out = out.replaceAllMapped(
-      doubleBracketLink,
-      (m) => '[${m[1]}](${m[2]})',
-    );
+    out = out.replaceAllMapped(doubleBracketLink, (m) => '[${m[1]}](${m[2]})');
 
     // 8) Fix: when multiple markdown links are placed on separate lines using
     //    trailing double-spaces (hard line breaks), gpt_markdown may treat them
@@ -930,7 +930,7 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
   Uri _normalizeUrl(String url) {
     var u = url.trim();
     if (!RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:').hasMatch(u)) {
-      u = 'https://' + u;
+      u = 'https://$u';
     }
     return Uri.parse(u);
   }
@@ -985,7 +985,7 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
         safeUrl = url.replaceAll(' ', '%20');
       }
 
-      return '![${alt}](${safeUrl})';
+      return '![$alt]($safeUrl)';
     });
   }
 
@@ -1084,11 +1084,11 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
 
     // Use theme-tinted surfaces so headers follow the current theme color.
     final Color bodyBg = Color.alphaBlend(
-      cs.primary.withOpacity(isDark ? 0.06 : 0.03),
+      cs.primary.withValues(alpha: isDark ? 0.06 : 0.03),
       cs.surface,
     );
     final Color headerBg = Color.alphaBlend(
-      cs.primary.withOpacity(isDark ? 0.16 : 0.10),
+      cs.primary.withValues(alpha: isDark ? 0.16 : 0.10),
       cs.surface,
     );
 
@@ -1101,7 +1101,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
       // Draw the border on top so it remains visible at corners
       foregroundDecoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1122,7 +1122,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
               highlightColor: Platform.isIOS ? Colors.transparent : null,
               hoverColor: Platform.isIOS ? Colors.transparent : null,
               overlayColor: Platform.isIOS
-                  ? const MaterialStatePropertyAll(Colors.transparent)
+                  ? const WidgetStatePropertyAll(Colors.transparent)
                   : null,
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -1132,7 +1132,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                 decoration: BoxDecoration(
                   border: Border(
                     bottom: BorderSide(
-                      color: cs.outlineVariant.withOpacity(0.28),
+                      color: cs.outlineVariant.withValues(alpha: 0.28),
                       width: 1.0,
                     ),
                   ),
@@ -1155,7 +1155,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                     const Spacer(),
                     if (_isHtml(widget.language))
                       InkWell(
-                        onTap: () async {
+                        onTap: () {
                           final l10n = AppLocalizations.of(context)!;
                           if (Platform.isAndroid || Platform.isIOS) {
                             // Mobile: navigate to preview page
@@ -1192,14 +1192,10 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                             );
                           } else {
                             // Desktop (macOS/Windows): open dialog
-                            try {
-                              // Defer import to avoid cycle
-                              // ignore: use_build_context_synchronously
-                              await showHtmlPreviewDesktopDialog(
-                                context,
-                                html: widget.code,
-                              );
-                            } catch (_) {}
+                            showHtmlPreviewDesktopDialog(
+                              context,
+                              html: widget.code,
+                            );
                           }
                         },
                         splashColor: Platform.isIOS ? Colors.transparent : null,
@@ -1208,7 +1204,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                             : null,
                         hoverColor: Platform.isIOS ? Colors.transparent : null,
                         overlayColor: Platform.isIOS
-                            ? const MaterialStatePropertyAll(Colors.transparent)
+                            ? const WidgetStatePropertyAll(Colors.transparent)
                             : null,
                         borderRadius: BorderRadius.circular(6),
                         child: Padding(
@@ -1221,7 +1217,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                               Icon(
                                 Lucide.Eye,
                                 size: 14,
-                                color: cs.onSurface.withOpacity(0.6),
+                                color: cs.onSurface.withValues(alpha: 0.6),
                               ),
                               const SizedBox(width: 6),
                               Text(
@@ -1230,7 +1226,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                                 )!.codeBlockPreviewButton,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: cs.onSurface.withOpacity(0.6),
+                                  color: cs.onSurface.withValues(alpha: 0.6),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -1241,18 +1237,18 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                     // Copy action: icon + label ("复制"/localized)
                     InkWell(
                       onTap: () async {
+                        final copiedMessage = AppLocalizations.of(
+                          context,
+                        )!.chatMessageWidgetCopiedToClipboard;
                         await Clipboard.setData(
                           ClipboardData(text: widget.code),
                         );
-                        if (mounted) {
-                          showAppSnackBar(
-                            context,
-                            message: AppLocalizations.of(
-                              context,
-                            )!.chatMessageWidgetCopiedToClipboard,
-                            type: NotificationType.success,
-                          );
-                        }
+                        if (!context.mounted) return;
+                        showAppSnackBar(
+                          context,
+                          message: copiedMessage,
+                          type: NotificationType.success,
+                        );
                       },
                       splashColor: Platform.isIOS ? Colors.transparent : null,
                       highlightColor: Platform.isIOS
@@ -1260,7 +1256,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                           : null,
                       hoverColor: Platform.isIOS ? Colors.transparent : null,
                       overlayColor: Platform.isIOS
-                          ? const MaterialStatePropertyAll(Colors.transparent)
+                          ? const WidgetStatePropertyAll(Colors.transparent)
                           : null,
                       borderRadius: BorderRadius.circular(6),
                       child: Padding(
@@ -1273,7 +1269,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                             Icon(
                               Lucide.Copy,
                               size: 14,
-                              color: cs.onSurface.withOpacity(0.6),
+                              color: cs.onSurface.withValues(alpha: 0.6),
                             ),
                             const SizedBox(width: 6),
                             Text(
@@ -1282,7 +1278,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                               )!.shareProviderSheetCopyButton,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: cs.onSurface.withOpacity(0.6),
+                                color: cs.onSurface.withValues(alpha: 0.6),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -1298,7 +1294,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                       child: Icon(
                         Lucide.ChevronRight,
                         size: 16,
-                        color: cs.onSurface.withOpacity(0.7),
+                        color: cs.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -1464,7 +1460,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                                 style: TextStyle(
                                   fontSize: 12,
                                   height: 1.4,
-                                  color: cs.onSurface.withOpacity(0.55),
+                                  color: cs.onSurface.withValues(alpha: 0.55),
                                 ),
                                 softWrap: false,
                                 overflow: TextOverflow.ellipsis,
@@ -1549,17 +1545,17 @@ class _MermaidBlockState extends State<_MermaidBlock> {
 
     // Use theme-tinted surfaces so headers follow the current theme color.
     final Color bodyBg = Color.alphaBlend(
-      cs.primary.withOpacity(isDark ? 0.06 : 0.03),
+      cs.primary.withValues(alpha: isDark ? 0.06 : 0.03),
       cs.surface,
     );
     final Color headerBg = Color.alphaBlend(
-      cs.primary.withOpacity(isDark ? 0.16 : 0.10),
+      cs.primary.withValues(alpha: isDark ? 0.16 : 0.10),
       cs.surface,
     );
 
     // Build theme variables mapping for Mermaid from Material ColorScheme
     String hex(Color c) {
-      final v = c.value & 0xFFFFFFFF;
+      final v = c.toARGB32();
       final r = (v >> 16) & 0xFF;
       final g = (v >> 8) & 0xFF;
       final b = v & 0xFF;
@@ -1580,24 +1576,24 @@ class _MermaidBlockState extends State<_MermaidBlock> {
       'tertiaryColor': hex(cs.tertiary),
       'tertiaryTextColor': hex(cs.onTertiary),
       'tertiaryBorderColor': hex(cs.tertiary),
-      'background': hex(cs.background),
+      'background': hex(cs.surface),
       'mainBkg': hex(cs.primaryContainer),
       'secondBkg': hex(cs.secondaryContainer),
-      'lineColor': hex(cs.onBackground),
-      'textColor': hex(cs.onBackground),
+      'lineColor': hex(cs.onSurface),
+      'textColor': hex(cs.onSurface),
       'nodeBkg': hex(cs.surface),
       'nodeBorder': hex(cs.primary),
       'clusterBkg': hex(cs.surface),
       'clusterBorder': hex(cs.primary),
       'actorBorder': hex(cs.primary),
       'actorBkg': hex(cs.surface),
-      'actorTextColor': hex(cs.onBackground),
+      'actorTextColor': hex(cs.onSurface),
       'actorLineColor': hex(cs.primary),
       'taskBorderColor': hex(cs.primary),
       'taskBkgColor': hex(cs.primary),
       'taskTextLightColor': hex(cs.onPrimary),
-      'taskTextDarkColor': hex(cs.onBackground),
-      'labelColor': hex(cs.onBackground),
+      'taskTextDarkColor': hex(cs.onSurface),
+      'labelColor': hex(cs.onSurface),
       'errorBkgColor': hex(cs.error),
       'errorTextColor': hex(cs.onError),
     };
@@ -1630,7 +1626,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
       clipBehavior: Clip.antiAlias,
       foregroundDecoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1648,7 +1644,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
               highlightColor: Platform.isIOS ? Colors.transparent : null,
               hoverColor: Platform.isIOS ? Colors.transparent : null,
               overlayColor: Platform.isIOS
-                  ? const MaterialStatePropertyAll(Colors.transparent)
+                  ? const WidgetStatePropertyAll(Colors.transparent)
                   : null,
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -1660,7 +1656,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                     // Show divider only when expanded
                     bottom: _expanded
                         ? BorderSide(
-                            color: cs.outlineVariant.withOpacity(0.28),
+                            color: cs.outlineVariant.withValues(alpha: 0.28),
                             width: 1.0,
                           )
                         : BorderSide.none,
@@ -1683,18 +1679,18 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                       // Copy action
                       InkWell(
                         onTap: () async {
+                          final copiedMessage = AppLocalizations.of(
+                            context,
+                          )!.chatMessageWidgetCopiedToClipboard;
                           await Clipboard.setData(
                             ClipboardData(text: widget.code),
                           );
-                          if (mounted) {
-                            showAppSnackBar(
-                              context,
-                              message: AppLocalizations.of(
-                                context,
-                              )!.chatMessageWidgetCopiedToClipboard,
-                              type: NotificationType.success,
-                            );
-                          }
+                          if (!context.mounted) return;
+                          showAppSnackBar(
+                            context,
+                            message: copiedMessage,
+                            type: NotificationType.success,
+                          );
                         },
                         splashColor: Platform.isIOS ? Colors.transparent : null,
                         highlightColor: Platform.isIOS
@@ -1702,7 +1698,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                             : null,
                         hoverColor: Platform.isIOS ? Colors.transparent : null,
                         overlayColor: Platform.isIOS
-                            ? const MaterialStatePropertyAll(Colors.transparent)
+                            ? const WidgetStatePropertyAll(Colors.transparent)
                             : null,
                         borderRadius: BorderRadius.circular(6),
                         child: Padding(
@@ -1715,7 +1711,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                               Icon(
                                 Lucide.Copy,
                                 size: 14,
-                                color: cs.onSurface.withOpacity(0.6),
+                                color: cs.onSurface.withValues(alpha: 0.6),
                               ),
                               const SizedBox(width: 6),
                               Text(
@@ -1724,7 +1720,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                                 )!.shareProviderSheetCopyButton,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: cs.onSurface.withOpacity(0.6),
+                                  color: cs.onSurface.withValues(alpha: 0.6),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -1736,10 +1732,10 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                         const SizedBox(width: 6),
                         InkWell(
                           onTap: () async {
+                            final l10n = AppLocalizations.of(context)!;
                             final ok = await handle.exportPng();
-                            if (!mounted) return;
+                            if (!context.mounted) return;
                             if (!ok) {
-                              final l10n = AppLocalizations.of(context)!;
                               showAppSnackBar(
                                 context,
                                 message: l10n.mermaidExportFailed,
@@ -1748,9 +1744,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                             } else if (Platform.isAndroid || Platform.isIOS) {
                               showAppSnackBar(
                                 context,
-                                message: AppLocalizations.of(
-                                  context,
-                                )!.imageViewerPageSaveSuccess,
+                                message: l10n.imageViewerPageSaveSuccess,
                                 type: NotificationType.success,
                               );
                             }
@@ -1765,9 +1759,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                               ? Colors.transparent
                               : null,
                           overlayColor: Platform.isIOS
-                              ? const MaterialStatePropertyAll(
-                                  Colors.transparent,
-                                )
+                              ? const WidgetStatePropertyAll(Colors.transparent)
                               : null,
                           borderRadius: BorderRadius.circular(6),
                           child: Padding(
@@ -1775,7 +1767,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                             child: Icon(
                               Lucide.Download,
                               size: 14,
-                              color: cs.onSurface.withOpacity(0.6),
+                              color: cs.onSurface.withValues(alpha: 0.6),
                             ),
                           ),
                         ),
@@ -1788,7 +1780,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                         child: Icon(
                           Lucide.ChevronRight,
                           size: 16,
-                          color: cs.onSurface.withOpacity(0.7),
+                          color: cs.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -1945,6 +1937,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     bool dark,
   ) async {
     final htmlStr = _buildMermaidHtml(code, dark);
+    final l10n = AppLocalizations.of(context)!;
     final uri = Uri.dataFromString(
       htmlStr,
       mimeType: 'text/html',
@@ -1953,8 +1946,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {
-      if (!mounted) return;
-      final l10n = AppLocalizations.of(context)!;
+      if (!context.mounted) return;
       showAppSnackBar(
         context,
         message: l10n.mermaidPreviewOpenFailed,
@@ -1979,14 +1971,14 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     <title>Mermaid Preview</title>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <style>
-      body{ margin:0; padding:12px; background:${bg}; color:${fg}; }
+      body{ margin:0; padding:12px; background:$bg; color:$fg; }
       .wrap{ max-width: 1000px; margin: 0 auto; }
       .mermaid{ text-align:center; }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <div class="mermaid">${escaped}</div>
+      <div class="mermaid">$escaped</div>
     </div>
     <script>
       mermaid.initialize({ startOnLoad:false, theme: '${dark ? 'dark' : 'default'}', securityLevel:'loose' });
@@ -2006,7 +1998,7 @@ class SoftHrLine extends BlockMd {
   @override
   Widget build(BuildContext context, String text, GptMarkdownConfig config) {
     final cs = Theme.of(context).colorScheme;
-    final color = cs.outlineVariant.withOpacity(0.4);
+    final color = cs.outlineVariant.withValues(alpha: 0.4);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Container(
@@ -2260,7 +2252,6 @@ class AtxHeadingMd extends BlockMd {
     GptMarkdownConfig cfg,
     int level,
   ) {
-    final t = Theme.of(ctx).textTheme;
     final cs = Theme.of(ctx).colorScheme;
     final isZh = MarkdownWithCodeHighlight._isZh(ctx);
     final settings = ctx.read<SettingsProvider>();
@@ -2393,7 +2384,7 @@ class LabelValueLineMd extends InlineMd {
     );
     final valueStyle = base.copyWith(
       fontWeight: FontWeight.w400,
-      color: cs.onSurface.withOpacity(0.92),
+      color: cs.onSurface.withValues(alpha: 0.92),
     );
 
     // 将值部分继续按 markdown 解析，保证链接/引用等语法正常
@@ -2442,8 +2433,8 @@ class ModernBlockQuote extends InlineMd {
     final data = sb.toString().trim();
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = cs.primaryContainer.withOpacity(isDark ? 0.18 : 0.12);
-    final accent = cs.primary.withOpacity(isDark ? 0.90 : 0.80);
+    final bg = cs.primaryContainer.withValues(alpha: isDark ? 0.18 : 0.12);
+    final accent = cs.primary.withValues(alpha: isDark ? 0.90 : 0.80);
 
     final inner = TextSpan(
       children: MarkdownComponent.generate(context, data, config, true),
@@ -2486,8 +2477,8 @@ class ModernCheckBoxMd extends BlockMd {
 
     final contentStyle = (config.style ?? const TextStyle()).copyWith(
       decoration: checked ? TextDecoration.lineThrough : null,
-      color: (config.style?.color ?? cs.onSurface).withOpacity(
-        checked ? 0.75 : 1.0,
+      color: (config.style?.color ?? cs.onSurface).withValues(
+        alpha: checked ? 0.75 : 1.0,
       ),
     );
 
@@ -2513,11 +2504,11 @@ class ModernCheckBoxMd extends BlockMd {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(5),
                 border: Border.all(
-                  color: cs.outlineVariant.withOpacity(0.8),
+                  color: cs.outlineVariant.withValues(alpha: 0.8),
                   width: 1,
                 ),
                 color: checked
-                    ? cs.primary.withOpacity(0.12)
+                    ? cs.primary.withValues(alpha: 0.12)
                     : Colors.transparent,
               ),
               child: checked
@@ -2545,8 +2536,8 @@ class ModernRadioMd extends BlockMd {
     final cs = Theme.of(context).colorScheme;
 
     final contentStyle = (config.style ?? const TextStyle()).copyWith(
-      color: (config.style?.color ?? cs.onSurface).withOpacity(
-        selected ? 0.95 : 1.0,
+      color: (config.style?.color ?? cs.onSurface).withValues(
+        alpha: selected ? 0.95 : 1.0,
       ),
     );
 
@@ -2572,7 +2563,7 @@ class ModernRadioMd extends BlockMd {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: cs.outlineVariant.withOpacity(0.8),
+                  color: cs.outlineVariant.withValues(alpha: 0.8),
                   width: 1,
                 ),
               ),

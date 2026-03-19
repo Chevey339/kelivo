@@ -63,6 +63,7 @@ class FileImportHelper {
             srcModifiedSec == destModifiedSec;
 
         if (sameSize && sameModified) {
+          if (!context.mounted) return null;
           final useExisting = await FileDuplicateDialog.show(
             context,
             originalName,

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import 'dart:math' as math;
-import 'package:provider/provider.dart';
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/mcp_provider.dart';
@@ -120,10 +119,10 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
+        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
           width: 0.6,
         ),
       ),
@@ -136,7 +135,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                 Divider(
                   height: 10,
                   thickness: 0.6,
-                  color: cs.outlineVariant.withOpacity(0.18),
+                  color: cs.outlineVariant.withValues(alpha: 0.18),
                 ),
               children[i],
             ],
@@ -158,7 +157,10 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.8)),
+          style: TextStyle(
+            fontSize: 13,
+            color: cs.onSurface.withValues(alpha: 0.8),
+          ),
         ),
         const SizedBox(height: 6),
         TextField(
@@ -171,15 +173,19 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
             // Match provider sheet border styles
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+              borderSide: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+              borderSide: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+              borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
@@ -269,7 +275,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                 l10n.mcpServerEditSheetSseRetryHint,
                 style: TextStyle(
                   fontSize: 12,
-                  color: cs.onSurface.withOpacity(0.7),
+                  color: cs.onSurface.withValues(alpha: 0.7),
                 ),
               ),
             ),
@@ -308,7 +314,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                   ? Colors.white10
                   : const Color(0xFFF7F7F9),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
+              border: Border.all(
+                color: cs.outlineVariant.withValues(alpha: 0.2),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -428,7 +436,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: cs.onSurface.withOpacity(0.2),
+                  color: cs.onSurface.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -519,7 +527,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                                     child: Text(
                                       l10n.mcpServerEditSheetNoToolsHint,
                                       style: TextStyle(
-                                        color: cs.onSurface.withOpacity(0.6),
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.6,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -539,8 +549,8 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                                             : const Color(0xFFF7F7F9),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: cs.outlineVariant.withOpacity(
-                                            0.2,
+                                          color: cs.outlineVariant.withValues(
+                                            alpha: 0.2,
                                           ),
                                         ),
                                       ),
@@ -567,7 +577,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                                                     style: TextStyle(
                                                       fontSize: 12,
                                                       color: cs.onSurface
-                                                          .withOpacity(0.7),
+                                                          .withValues(
+                                                            alpha: 0.7,
+                                                          ),
                                                     ),
                                                   ),
                                                 ],
@@ -582,17 +594,17 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                                                       final color = p.required
                                                           ? cs.primary
                                                           : cs.onSurface
-                                                                .withOpacity(
-                                                                  0.5,
+                                                                .withValues(
+                                                                  alpha: 0.5,
                                                                 );
                                                       final bg = p.required
                                                           ? cs.primary
-                                                                .withOpacity(
-                                                                  0.12,
+                                                                .withValues(
+                                                                  alpha: 0.12,
                                                                 )
                                                           : cs.onSurface
-                                                                .withOpacity(
-                                                                  0.06,
+                                                                .withValues(
+                                                                  alpha: 0.06,
                                                                 );
                                                       return Container(
                                                         padding:
@@ -608,8 +620,8 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                                                               ),
                                                           border: Border.all(
                                                             color: color
-                                                                .withOpacity(
-                                                                  0.5,
+                                                                .withValues(
+                                                                  alpha: 0.5,
                                                                 ),
                                                           ),
                                                         ),
@@ -699,7 +711,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final press = base.withOpacity(0.7);
+    final press = base.withValues(alpha: 0.7);
     return Semantics(
       button: true,
       label: widget.semanticLabel,
@@ -726,14 +738,9 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
 }
 
 class _TactileRow extends StatefulWidget {
-  const _TactileRow({
-    required this.builder,
-    this.onTap,
-    this.pressedScale = 1.0,
-  });
+  const _TactileRow({required this.builder, this.onTap});
   final Widget Function(bool pressed) builder;
   final VoidCallback? onTap;
-  final double pressedScale;
   @override
   State<_TactileRow> createState() => _TactileRowState();
 }
@@ -758,99 +765,20 @@ class _TactileRowState extends State<_TactileRow> {
       onTap: widget.onTap == null
           ? null
           : () {
-              if (context.read<SettingsProvider>().hapticsOnListItemTap)
+              if (context.read<SettingsProvider>().hapticsOnListItemTap) {
                 Haptics.soft();
+              }
               widget.onTap!.call();
               Future.delayed(const Duration(milliseconds: 120), () {
                 if (mounted) _set(false);
               });
             },
       child: AnimatedScale(
-        scale: _pressed ? widget.pressedScale : 1.0,
+        scale: 1.0,
         duration: const Duration(milliseconds: 110),
         curve: Curves.easeOutCubic,
         child: widget.builder(_pressed),
       ),
-    );
-  }
-}
-
-class _IosOutlineButton extends StatelessWidget {
-  const _IosOutlineButton({required this.label, required this.onTap});
-  final String label;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return _TactileRow(
-      pressedScale: 0.98,
-      onTap: onTap,
-      builder: (pressed) {
-        final overlay = pressed
-            ? (Theme.of(context).brightness == Brightness.dark
-                  ? Colors.black.withOpacity(0.04)
-                  : Colors.white.withOpacity(0.04))
-            : Colors.transparent;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            color: overlay,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cs.primary.withOpacity(0.5)),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _IosFilledButton extends StatelessWidget {
-  const _IosFilledButton({required this.label, required this.onTap, this.icon});
-  final String label;
-  final VoidCallback onTap;
-  final IconData? icon;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return _TactileRow(
-      pressedScale: 0.98,
-      onTap: onTap,
-      builder: (pressed) {
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            color: cs.primary,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 18, color: cs.onPrimary),
-                const SizedBox(width: 6),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  color: cs.onPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
@@ -894,7 +822,7 @@ class _SegChoiceBar extends StatelessWidget {
             segWidth * labels.length + gap * (labels.length - 1);
 
         final Color shellBg = isDark
-            ? Colors.white.withOpacity(0.08)
+            ? Colors.white.withValues(alpha: 0.08)
             : Colors.white;
 
         List<Widget> children = [];
@@ -908,12 +836,12 @@ class _SegChoiceBar extends StatelessWidget {
                 onTap: () => onSelected(index),
                 builder: (pressed) {
                   final Color baseBg = selected
-                      ? cs.primary.withOpacity(0.14)
+                      ? cs.primary.withValues(alpha: 0.14)
                       : Colors.transparent;
                   final Color bg = baseBg;
                   final Color baseTextColor = selected
                       ? cs.primary
-                      : cs.onSurface.withOpacity(0.82);
+                      : cs.onSurface.withValues(alpha: 0.82);
                   final Color targetTextColor = pressed
                       ? Color.lerp(baseTextColor, Colors.white, 0.22) ??
                             baseTextColor
@@ -951,8 +879,9 @@ class _SegChoiceBar extends StatelessWidget {
               ),
             ),
           );
-          if (index != labels.length - 1)
+          if (index != labels.length - 1) {
             children.add(const SizedBox(width: gap));
+          }
         }
 
         return Container(
@@ -1016,7 +945,7 @@ class _SegTabBar extends StatelessWidget {
             segWidth * tabs.length + gap * (tabs.length - 1);
 
         final Color shellBg = isDark
-            ? Colors.white.withOpacity(0.08)
+            ? Colors.white.withValues(alpha: 0.08)
             : Colors.white;
 
         List<Widget> children = [];
@@ -1031,14 +960,14 @@ class _SegTabBar extends StatelessWidget {
                 builder: (pressed) {
                   // Background does not change on press; only selected shows subtle tint
                   final Color baseBg = selected
-                      ? cs.primary.withOpacity(0.14)
+                      ? cs.primary.withValues(alpha: 0.14)
                       : Colors.transparent;
                   final Color bg = baseBg;
 
                   // Text color lightens slightly on press
                   final Color baseTextColor = selected
                       ? cs.primary
-                      : cs.onSurface.withOpacity(0.82);
+                      : cs.onSurface.withValues(alpha: 0.82);
                   final Color targetTextColor = pressed
                       ? Color.lerp(baseTextColor, Colors.white, 0.22) ??
                             baseTextColor
@@ -1076,8 +1005,9 @@ class _SegTabBar extends StatelessWidget {
               ),
             ),
           );
-          if (index != tabs.length - 1)
+          if (index != tabs.length - 1) {
             children.add(const SizedBox(width: gap));
+          }
         }
 
         return Container(

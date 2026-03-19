@@ -143,8 +143,9 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
   }
 
   static Future<String> getPrompt() async {
-    if (_promptCache != null && _promptCache!.trim().isNotEmpty)
+    if (_promptCache != null && _promptCache!.trim().isNotEmpty) {
       return _promptCache!;
+    }
     final prefs = await SharedPreferences.getInstance();
     final p = prefs.getString(_promptKey);
     _promptCache = (p == null || p.trim().isEmpty) ? defaultPrompt : p;

@@ -13,9 +13,8 @@ Future<void> showAssistantTagsManagerDialog(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'tags-manager',
-    barrierColor: Colors.black.withOpacity(0.15),
+    barrierColor: Colors.black.withValues(alpha: 0.15),
     pageBuilder: (ctx, _, __) {
-      final l10n = AppLocalizations.of(ctx)!;
       // Use a full-screen tap area to allow closing by tapping outside the dialog.
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -38,8 +37,8 @@ Future<void> showAssistantTagsManagerDialog(
                       borderRadius: BorderRadius.circular(14),
                       side: BorderSide(
                         color: Theme.of(ctx).brightness == Brightness.dark
-                            ? Colors.white.withOpacity(0.08)
-                            : cs.outlineVariant.withOpacity(0.2),
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : cs.outlineVariant.withValues(alpha: 0.2),
                       ),
                     ),
                   ),
@@ -104,6 +103,7 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
     if (ok == true) {
       final name = c.text.trim();
       if (name.isEmpty) return; // invalid; ignore silently in dialog
+      if (!context.mounted) return;
       final tp = context.read<TagProvider>();
       // Prevent duplicates by name
       if (tp.tags.any((t) => t.name == name)) return;
@@ -142,6 +142,7 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
     if (ok == true) {
       final name = c.text.trim();
       if (name.isEmpty) return;
+      if (!context.mounted) return;
       final tp = context.read<TagProvider>();
       if (tp.tags.any((t) => t.name == name && t.id != tagId)) return;
       await tp.renameTag(tagId, name);
@@ -168,6 +169,7 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
       ),
     );
     if (ok == true) {
+      if (!context.mounted) return;
       await context.read<TagProvider>().deleteTag(tagId);
     }
   }
@@ -175,7 +177,6 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     final tp = context.watch<TagProvider>();
     final tags = tp.tags;
 
@@ -243,8 +244,9 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
                           widget.assistantId,
                           t.id,
                         );
-                        if (widget.isDialog && context.mounted)
+                        if (widget.isDialog && context.mounted) {
                           Navigator.of(context).pop();
+                        }
                       },
                       onRename: () => _renameTag(context, t.id, t.name),
                       onDelete: () => _deleteTag(context, t.id),
@@ -276,8 +278,8 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -321,10 +323,12 @@ class _TagCardState extends State<_TagCard> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    final baseBg = isDark
+        ? Colors.white10
+        : Colors.white.withValues(alpha: 0.96);
     final borderColor = _hover
-        ? cs.primary.withOpacity(isDark ? 0.35 : 0.45)
-        : cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08);
+        ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),

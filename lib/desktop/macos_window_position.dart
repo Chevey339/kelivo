@@ -1,7 +1,6 @@
 import 'dart:io' show Platform;
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/material.dart';
 
 /// Thin wrapper over a macOS-only MethodChannel that gets/sets
 /// the NSWindow frame origin (Cocoa coordinates; origin at bottom-left).

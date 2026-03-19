@@ -37,8 +37,7 @@ class DuckDuckGoSearchService extends SearchService<DuckDuckGoOptions> {
 
       final items = <SearchResultItem>[];
       for (final item in results) {
-        if (item is! Map) continue;
-        final map = Map<String, dynamic>.from(item as Map);
+        final map = Map<String, dynamic>.from(item);
         final title = map['title']?.toString() ?? '';
         final url = map['href']?.toString() ?? map['url']?.toString() ?? '';
         final snippet =

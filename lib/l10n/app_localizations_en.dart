@@ -289,6 +289,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sponsorPageWeChatSubtitle => 'WeChat sponsor code';
 
   @override
+  String get sponsorPageScanQrHint => 'Scan the QR code to sponsor';
+
+  @override
   String get languageDisplaySimplifiedChinese => 'Simplified Chinese';
 
   @override
@@ -428,6 +431,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpTransportTagInmemory => 'Built-in';
+
+  @override
+  String get mcpTransportTagSse => 'SSE';
+
+  @override
+  String get mcpTransportTagHttp => 'HTTP';
 
   @override
   String get mcpServerEditSheetStdioOnlyDesktop =>
@@ -1548,8 +1557,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Use maximum reasoning depth for the toughest problems';
 
   @override
-  String get reasoningBudgetSheetCustomLabel =>
-      'Custom Reasoning Budget (tokens)';
+  String get reasoningBudgetSheetCustomLabel => 'Custom Reasoning Budget';
 
   @override
   String get reasoningBudgetSheetCustomHint => 'e.g. 2048 (-1 auto, 0 off)';
@@ -3095,6 +3103,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageEasterEggButton => 'Nice!';
 
   @override
+  String get aboutPageAppName => 'Kelivo';
+
+  @override
   String get aboutPageAppDescription => 'Open-source AI Assistant';
 
   @override
@@ -3104,10 +3115,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageVersion => 'Version';
 
   @override
+  String aboutPageVersionDetail(String version, String buildNumber) {
+    return '$version / $buildNumber';
+  }
+
+  @override
   String get aboutPageSystem => 'System';
 
   @override
+  String get aboutPageLoadingPlaceholder => '...';
+
+  @override
+  String get aboutPageUnknownPlaceholder => '-';
+
+  @override
+  String get aboutPagePlatformMacos => 'macOS';
+
+  @override
+  String get aboutPagePlatformWindows => 'Windows';
+
+  @override
+  String get aboutPagePlatformLinux => 'Linux';
+
+  @override
+  String get aboutPagePlatformAndroid => 'Android';
+
+  @override
+  String get aboutPagePlatformIos => 'iOS';
+
+  @override
+  String aboutPagePlatformOther(String os) {
+    return 'Other ($os)';
+  }
+
+  @override
   String get aboutPageWebsite => 'Website';
+
+  @override
+  String get aboutPageGithub => 'GitHub';
 
   @override
   String get aboutPageLicense => 'License';

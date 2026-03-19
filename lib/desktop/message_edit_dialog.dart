@@ -117,7 +117,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                         icon: Icon(
                           Lucide.X,
                           size: 18,
-                          color: cs.onSurface.withOpacity(0.75),
+                          color: cs.onSurface.withValues(alpha: 0.75),
                         ),
                       ),
                     ],
@@ -143,21 +143,21 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
-                            color: cs.outlineVariant.withOpacity(0.18),
+                            color: cs.outlineVariant.withValues(alpha: 0.18),
                             width: 0.6,
                           ),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
-                            color: cs.outlineVariant.withOpacity(0.18),
+                            color: cs.outlineVariant.withValues(alpha: 0.18),
                             width: 0.6,
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
-                            color: cs.primary.withOpacity(0.35),
+                            color: cs.primary.withValues(alpha: 0.35),
                             width: 0.8,
                           ),
                         ),

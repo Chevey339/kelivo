@@ -4,10 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
-import '../../../theme/design_tokens.dart';
 import '../../../shared/widgets/ios_switch.dart';
-import '../../../shared/widgets/ios_tactile.dart';
-import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 
@@ -47,9 +44,9 @@ class _AssistantMcpSheet extends StatelessWidget {
     Widget tag(String text) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.10),
+        color: cs.primary.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: cs.primary.withOpacity(0.35)),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
       ),
       child: Text(
         text,
@@ -77,7 +74,7 @@ class _AssistantMcpSheet extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: cs.onSurface.withOpacity(0.2),
+                  color: cs.onSurface.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -152,7 +149,7 @@ class _AssistantMcpSheet extends StatelessWidget {
                           child: Text(
                             l10n.assistantEditMcpNoServersMessage,
                             style: TextStyle(
-                              color: cs.onSurface.withOpacity(0.6),
+                              color: cs.onSurface.withValues(alpha: 0.6),
                             ),
                           ),
                         ),
@@ -174,10 +171,11 @@ class _AssistantMcpSheet extends StatelessWidget {
                             onTap: () async {
                               Haptics.light();
                               final set = a.mcpServerIds.toSet();
-                              if (isSelected)
+                              if (isSelected) {
                                 set.remove(s.id);
-                              else
+                              } else {
                                 set.add(s.id);
+                              }
                               await context
                                   .read<AssistantProvider>()
                                   .updateAssistant(
@@ -221,10 +219,11 @@ class _AssistantMcpSheet extends StatelessWidget {
                                   value: isSelected,
                                   onChanged: (v) async {
                                     final set = a.mcpServerIds.toSet();
-                                    if (v)
+                                    if (v) {
                                       set.add(s.id);
-                                    else
+                                    } else {
                                       set.remove(s.id);
+                                    }
                                     await context
                                         .read<AssistantProvider>()
                                         .updateAssistant(

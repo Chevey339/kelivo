@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:characters/characters.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -61,7 +60,7 @@ Future<String?> showAssistantMoveSelector(
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: cs.onSurface.withOpacity(0.2),
+                          color: cs.onSurface.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -95,7 +94,7 @@ Future<String?> showAssistantMoveSelector(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'assistant-move-selector',
-    barrierColor: Colors.black.withOpacity(0.15),
+    barrierColor: Colors.black.withValues(alpha: 0.15),
     pageBuilder: (ctx, _, __) {
       final l10n = AppLocalizations.of(ctx)!;
       final cs = Theme.of(ctx).colorScheme;
@@ -122,8 +121,8 @@ Future<String?> showAssistantMoveSelector(
                       borderRadius: BorderRadius.circular(14),
                       side: BorderSide(
                         color: isDark
-                            ? Colors.white.withOpacity(0.08)
-                            : cs.outlineVariant.withOpacity(0.2),
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : cs.outlineVariant.withValues(alpha: 0.2),
                       ),
                     ),
                   ),
@@ -243,7 +242,7 @@ Widget _assistantAvatar(BuildContext context, Assistant a, {double size = 28}) {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: cs.primary.withOpacity(0.15),
+          color: cs.primary.withValues(alpha: 0.15),
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
@@ -259,12 +258,12 @@ Widget _assistantAvatar(BuildContext context, Assistant a, {double size = 28}) {
 }
 
 Widget _assistantInitial(ColorScheme cs, String name, double size) {
-  final letter = name.isNotEmpty ? name.characters.first : '?';
+  final letter = name.trim().isNotEmpty ? name.trim()[0] : '?';
   return Container(
     width: size,
     height: size,
     decoration: BoxDecoration(
-      color: cs.primary.withOpacity(0.15),
+      color: cs.primary.withValues(alpha: 0.15),
       shape: BoxShape.circle,
     ),
     alignment: Alignment.center,
@@ -330,8 +329,8 @@ class _SmallIconBtn2State extends State<_SmallIconBtn2> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -366,12 +365,11 @@ class _DeskAssistantRowState extends State<_DeskAssistantRow> {
   bool _hover = false;
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),

@@ -68,14 +68,6 @@ class _PromptTabState extends State<_PromptTab> {
     );
   }
 
-  void _insertNewlineAtCursor() {
-    _insertAtCursor(_sysCtrl, '\n');
-    final ap = context.read<AssistantProvider>();
-    final a = ap.getById(widget.assistantId)!;
-    ap.updateAssistant(a.copyWith(systemPrompt: _sysCtrl.text));
-    setState(() {});
-  }
-
   Future<void> _importSystemPrompt() async {
     final l10n = AppLocalizations.of(context)!;
     try {
@@ -128,6 +120,7 @@ class _PromptTabState extends State<_PromptTab> {
       if (a != null) {
         await ap.updateAssistant(a.copyWith(systemPrompt: _sysCtrl.text));
       }
+      if (!mounted) return;
       showAppSnackBar(
         context,
         message: l10n.assistantEditSystemPromptImportSuccess,
@@ -172,7 +165,7 @@ class _PromptTabState extends State<_PromptTab> {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'system-prompt-editor',
-      barrierColor: Colors.black.withOpacity(0.12),
+      barrierColor: Colors.black.withValues(alpha: 0.12),
       pageBuilder: (ctx, _, __) {
         return _SystemPromptDesktopDialog(initial: initial);
       },
@@ -215,100 +208,29 @@ class _PromptTabState extends State<_PromptTab> {
     final ap = context.watch<AssistantProvider>();
     final a = ap.getById(widget.assistantId)!;
 
-    Widget chips(List<String> items, void Function(String v) onPick) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final t in items)
-              ActionChip(
-                label: Text(t, style: const TextStyle(fontSize: 12)),
-                onPressed: () => onPick(t),
-              ),
-          ],
-        ),
-      );
-    }
-
-    final sysVars = const [
-      '{cur_date}',
-      '{cur_time}',
-      '{cur_datetime}',
-      '{model_id}',
-      '{model_name}',
-      '{locale}',
-      '{timezone}',
-      '{system_version}',
-      '{device_info}',
-      '{battery_level}',
-      '{nickname}',
-    ];
-    final tmplVars = const [
-      '{{ role }}',
-      '{{ message }}',
-      '{{ time }}',
-      '{{ date }}',
-    ];
-
-    // Helper to render link-like variable chips
-    Widget linkWrap(List<String> vars, void Function(String v) onPick) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 6),
-        child: Wrap(
-          spacing: 10,
-          runSpacing: 8,
-          children: [
-            for (final t in vars)
-              InkWell(
-                onTap: () => onPick(t),
-                child: Text(
-                  t,
-                  style: TextStyle(
-                    color: cs.primary,
-                    decoration: TextDecoration.underline,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      );
-    }
-
     // Sample preview for message template
     final now = DateTime.now();
     // final ts = zh
     //     ? DateFormat('yyyy年M月d日 a h:mm:ss', 'zh').format(now)
     //     : DateFormat('yyyy-MM-dd HH:mm:ss').format(now);
-    final sampleUser = l10n.assistantEditSampleUser;
     final sampleMsg = l10n.assistantEditSampleMessage;
     final sampleReply = l10n.assistantEditSampleReply;
 
     String processed(String tpl) {
       final t = (tpl.trim().isEmpty ? '{{ message }}' : tpl);
-      // Simple replacements consistent with PromptTransformer
-      final locale = Localizations.localeOf(context);
-      final dateStr = locale.languageCode == 'zh'
-          ? DateFormat('yyyy年M月d日', 'zh').format(now)
-          : DateFormat('yyyy-MM-dd').format(now);
-      final timeStr = locale.languageCode == 'zh'
-          ? DateFormat('a h:mm:ss', 'zh').format(now)
-          : DateFormat('HH:mm:ss').format(now);
-      return t
-          .replaceAll('{{ role }}', 'user')
-          .replaceAll('{{ message }}', sampleMsg)
-          .replaceAll('{{ time }}', timeStr)
-          .replaceAll('{{ date }}', dateStr);
+      return PromptTransformer.applyMessageTemplate(
+        t,
+        role: 'user',
+        message: sampleMsg,
+        now: now,
+      );
     }
 
     // System Prompt Card (no border, iOS style)
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final sysCard = Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
+        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Padding(
@@ -366,12 +288,14 @@ class _PromptTabState extends State<_PromptTab> {
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.35),
+                    color: cs.outlineVariant.withValues(alpha: 0.35),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  borderSide: BorderSide(
+                    color: cs.primary.withValues(alpha: 0.5),
+                  ),
                 ),
                 contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
               ),
@@ -414,7 +338,7 @@ class _PromptTabState extends State<_PromptTab> {
     // Template Card with preview (no border, iOS style)
     final tmplCard = Container(
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
+        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Padding(
@@ -445,12 +369,14 @@ class _PromptTabState extends State<_PromptTab> {
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.35),
+                    color: cs.outlineVariant.withValues(alpha: 0.35),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  borderSide: BorderSide(
+                    color: cs.primary.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
             ),
@@ -482,7 +408,7 @@ class _PromptTabState extends State<_PromptTab> {
               l10n.assistantEditPreviewTitle,
               style: TextStyle(
                 fontSize: 12,
-                color: cs.onSurface.withOpacity(0.7),
+                color: cs.onSurface.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 6),
@@ -596,7 +522,7 @@ class _PromptTabState extends State<_PromptTab> {
           key: _presetHeaderKey,
           child: LayoutBuilder(
             builder: (ctx, constraints) {
-              final textScale = MediaQuery.of(ctx).textScaleFactor;
+              final textScale = MediaQuery.textScalerOf(ctx).scale(1);
               final narrow = constraints.maxWidth < 420 || textScale > 1.15;
               if (narrow) {
                 return Column(
@@ -633,7 +559,9 @@ class _PromptTabState extends State<_PromptTab> {
         );
       }
 
-      final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+      final baseBg = isDark
+          ? Colors.white10
+          : Colors.white.withValues(alpha: 0.96);
 
       return Container(
         decoration: BoxDecoration(
@@ -652,7 +580,7 @@ class _PromptTabState extends State<_PromptTab> {
                 Text(
                   l10n.assistantEditPresetEmpty,
                   style: TextStyle(
-                    color: cs.onSurface.withOpacity(0.6),
+                    color: cs.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -735,15 +663,15 @@ class _PromptTabState extends State<_PromptTab> {
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                     borderSide: BorderSide(
-                                      color: cs.outlineVariant.withOpacity(
-                                        0.35,
+                                      color: cs.outlineVariant.withValues(
+                                        alpha: 0.35,
                                       ),
                                     ),
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                     borderSide: BorderSide(
-                                      color: cs.primary.withOpacity(0.5),
+                                      color: cs.primary.withValues(alpha: 0.5),
                                     ),
                                   ),
                                   contentPadding: const EdgeInsets.fromLTRB(
@@ -870,10 +798,12 @@ class _PresetMessageCardState extends State<_PresetMessageCard> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    final baseBg = isDark
+        ? Colors.white10
+        : Colors.white.withValues(alpha: 0.96);
     final borderColor = _hover
-        ? cs.primary.withOpacity(isDark ? 0.35 : 0.45)
-        : cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08);
+        ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
     final icon = widget.role == 'assistant' ? Lucide.Bot : Lucide.User;
     final badgeColor = widget.role == 'assistant' ? cs.secondary : cs.primary;
 
@@ -899,7 +829,7 @@ class _PresetMessageCardState extends State<_PresetMessageCard> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13.5,
-                  color: cs.onSurface.withOpacity(0.9),
+                  color: cs.onSurface.withValues(alpha: 0.9),
                 ),
               ),
             ),
@@ -945,13 +875,15 @@ class _HoverIconButtonState extends State<_HoverIconButton> {
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: _hover ? cs.primary.withOpacity(0.10) : Colors.transparent,
+            color: _hover
+                ? cs.primary.withValues(alpha: 0.10)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             widget.icon,
             size: 16,
-            color: _hover ? cs.primary : cs.onSurface.withOpacity(0.9),
+            color: _hover ? cs.primary : cs.onSurface.withValues(alpha: 0.9),
           ),
         ),
       ),
@@ -987,15 +919,15 @@ class _HoverTextButtonState extends State<_HoverTextButton> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final Color textColor = _press
-        ? (widget.color ?? cs.primary).withOpacity(0.8)
+        ? (widget.color ?? cs.primary).withValues(alpha: 0.8)
         : (widget.color ?? cs.primary);
     final EdgeInsets padding = widget.dense
         ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
         : const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
     final Color bg = (_hover || _press)
         ? (isDark
-              ? Colors.white.withOpacity(_press ? 0.12 : 0.08)
-              : Colors.black.withOpacity(_press ? 0.08 : 0.06))
+              ? Colors.white.withValues(alpha: _press ? 0.12 : 0.08)
+              : Colors.black.withValues(alpha: _press ? 0.08 : 0.06))
         : Colors.transparent;
 
     return MouseRegion(
@@ -1088,7 +1020,9 @@ class _SystemPromptMobileSheetState extends State<_SystemPromptMobileSheet> {
                 decoration: BoxDecoration(
                   color: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: cs.outlineVariant.withOpacity(0.2)),
+                  border: Border.all(
+                    color: cs.outlineVariant.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: TextField(
                   controller: _controller,
@@ -1150,7 +1084,9 @@ class _SystemPromptDesktopDialogState
               color: cs.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18),
+                color: cs.outlineVariant.withValues(
+                  alpha: isDark ? 0.22 : 0.18,
+                ),
               ),
             ),
             child: ClipRRect(
@@ -1187,7 +1123,7 @@ class _SystemPromptDesktopDialogState
                   Divider(
                     height: 1,
                     thickness: 0.6,
-                    color: cs.outlineVariant.withOpacity(0.14),
+                    color: cs.outlineVariant.withValues(alpha: 0.14),
                   ),
                   Expanded(
                     child: Padding(
@@ -1199,7 +1135,7 @@ class _SystemPromptDesktopDialogState
                               : const Color(0xFFF7F7F9),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: cs.outlineVariant.withOpacity(0.2),
+                            color: cs.outlineVariant.withValues(alpha: 0.2),
                           ),
                         ),
                         child: TextField(
@@ -1280,8 +1216,8 @@ class _HoverPillButtonState extends State<_HoverPillButton> {
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: widget.color.withOpacity(
-              _press
+            color: widget.color.withValues(
+              alpha: _press
                   ? 0.18
                   : _hover
                   ? 0.14
@@ -1386,7 +1322,7 @@ Future<void> _showEditPresetDialog(
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.primary.withOpacity(0.5),
+                        color: cs.primary.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -1470,12 +1406,14 @@ Future<void> _showEditPresetDialog(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(
-                      color: cs.outlineVariant.withOpacity(0.2),
+                      color: cs.outlineVariant.withValues(alpha: 0.2),
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                    borderSide: BorderSide(
+                      color: cs.primary.withValues(alpha: 0.5),
+                    ),
                   ),
                 ),
               ),
@@ -1534,7 +1472,7 @@ class _VarExplainList extends StatelessWidget {
                 '${it.$1}: ',
                 style: TextStyle(
                   fontSize: 12,
-                  color: cs.onSurface.withOpacity(0.75),
+                  color: cs.onSurface.withValues(alpha: 0.75),
                 ),
               ),
               InkWell(

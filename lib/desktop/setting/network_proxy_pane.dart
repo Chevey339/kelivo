@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:socks5_proxy/socks_client.dart' as socks;
 import 'package:provider/provider.dart';
@@ -89,7 +88,6 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     return Container(
       alignment: Alignment.topCenter,
@@ -108,7 +106,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
-                      color: cs.onSurface.withOpacity(0.9),
+                      color: cs.onSurface.withValues(alpha: 0.9),
                     ),
                   ),
                 ),
@@ -126,7 +124,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
-                              color: cs.onSurface.withOpacity(0.95),
+                              color: cs.onSurface.withValues(alpha: 0.95),
                             ),
                           ),
                         ),
@@ -263,7 +261,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                       l10n.networkProxyPriorityNote,
                       style: TextStyle(
                         fontSize: 12,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ),
@@ -403,7 +401,7 @@ Widget _rowDivider(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   return Container(
     height: 1,
-    color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+    color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
   );
 }
 
@@ -424,7 +422,7 @@ class _ItemRow extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 14,
-                color: cs.onSurface.withOpacity(0.88),
+                color: cs.onSurface.withValues(alpha: 0.88),
               ),
             ),
           ),
@@ -460,17 +458,17 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = widget.filled
         ? Colors.white
-        : cs.onSurface.withOpacity(0.9);
+        : cs.onSurface.withValues(alpha: 0.9);
     final bg = widget.filled
-        ? (_hover ? cs.primary.withOpacity(0.92) : cs.primary)
+        ? (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary)
         : (_hover
               ? (isDark
-                    ? Colors.white.withOpacity(0.06)
-                    : Colors.black.withOpacity(0.05))
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.05))
               : Colors.transparent);
     final borderColor = widget.filled
         ? Colors.transparent
-        : cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18);
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.22 : 0.18);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -516,13 +514,15 @@ Widget _sectionCard({required List<Widget> children}) {
     builder: (context) {
       final cs = Theme.of(context).colorScheme;
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+      final baseBg = isDark
+          ? Colors.white10
+          : Colors.white.withValues(alpha: 0.96);
       return Container(
         decoration: BoxDecoration(
           color: baseBg,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08),
+            color: cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08),
             width: 0.8,
           ),
         ),
@@ -543,24 +543,30 @@ InputDecoration _deskInputDecoration(BuildContext context) {
     isDense: true,
     filled: true,
     fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
-    hintStyle: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.5)),
+    hintStyle: TextStyle(
+      fontSize: 14,
+      color: cs.onSurface.withValues(alpha: 0.5),
+    ),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.12),
+        color: cs.outlineVariant.withValues(alpha: 0.12),
         width: 0.6,
       ),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.12),
+        color: cs.outlineVariant.withValues(alpha: 0.12),
         width: 0.6,
       ),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8),
+      borderSide: BorderSide(
+        color: cs.primary.withValues(alpha: 0.35),
+        width: 0.8,
+      ),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
   );
@@ -595,7 +601,6 @@ class _ProxyTypeDropdownState extends State<_ProxyTypeDropdown> {
     final size = rb.size;
     _entry = OverlayEntry(
       builder: (ctx) {
-        final cs = Theme.of(ctx).colorScheme;
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final bgColor = isDark ? const Color(0xFF1C1C1E) : Colors.white;
         return Stack(
@@ -625,7 +630,7 @@ class _ProxyTypeDropdownState extends State<_ProxyTypeDropdown> {
         );
       },
     );
-    Overlay.of(context)?.insert(_entry!);
+    Overlay.of(context).insert(_entry!);
     setState(() => _open = true);
   }
 
@@ -634,7 +639,7 @@ class _ProxyTypeDropdownState extends State<_ProxyTypeDropdown> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBorder = cs.outlineVariant.withOpacity(0.18);
+    final baseBorder = cs.outlineVariant.withValues(alpha: 0.18);
     final hoverBorder = cs.primary;
     final borderColor = _open || _hover ? hoverBorder : baseBorder;
 
@@ -673,7 +678,7 @@ class _ProxyTypeDropdownState extends State<_ProxyTypeDropdown> {
               boxShadow: _open
                   ? [
                       BoxShadow(
-                        color: cs.primary.withOpacity(0.10),
+                        color: cs.primary.withValues(alpha: 0.10),
                         blurRadius: 0,
                         spreadRadius: 2,
                       ),
@@ -693,7 +698,7 @@ class _ProxyTypeDropdownState extends State<_ProxyTypeDropdown> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 14,
-                          color: cs.onSurface.withOpacity(0.88),
+                          color: cs.onSurface.withValues(alpha: 0.88),
                         ),
                       ),
                     ),
@@ -710,7 +715,7 @@ class _ProxyTypeDropdownState extends State<_ProxyTypeDropdown> {
                       child: Icon(
                         Icons.keyboard_arrow_down_rounded,
                         size: 18,
-                        color: cs.onSurface.withOpacity(0.6),
+                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ),
@@ -753,12 +758,12 @@ class _ProxyTypeOverlay extends StatelessWidget {
           color: backgroundColor,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: cs.outlineVariant.withOpacity(0.18),
+            color: cs.outlineVariant.withValues(alpha: 0.18),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 16,
               offset: const Offset(0, 4),
             ),
@@ -802,11 +807,11 @@ class _ProxyTypeTileState extends State<_ProxyTypeTile> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = widget.selected
-        ? cs.primary.withOpacity(0.12)
+        ? cs.primary.withValues(alpha: 0.12)
         : (_hover
               ? (isDark
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.black.withOpacity(0.04))
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.04))
               : Colors.transparent);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -840,7 +845,7 @@ class _ProxyTypeTileState extends State<_ProxyTypeTile> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 14,
-                      color: cs.onSurface.withOpacity(0.88),
+                      color: cs.onSurface.withValues(alpha: 0.88),
                       fontWeight: widget.selected
                           ? FontWeight.w600
                           : FontWeight.w400,

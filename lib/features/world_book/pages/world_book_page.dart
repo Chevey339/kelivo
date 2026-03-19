@@ -370,7 +370,7 @@ class _WorldBookPageState extends State<WorldBookPage> {
                 Haptics.light();
                 final result = await _showBookConfigSheet();
                 if (result == null) return;
-                await context.read<WorldBookProvider>().addBook(result);
+                await provider.addBook(result);
               },
             ),
           ),
@@ -385,13 +385,13 @@ class _WorldBookPageState extends State<WorldBookPage> {
                   Icon(
                     Lucide.BookOpen,
                     size: 64,
-                    color: cs.onSurface.withOpacity(0.3),
+                    color: cs.onSurface.withValues(alpha: 0.3),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     l10n.worldBookEmptyMessage,
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 14,
                     ),
                   ),
@@ -450,9 +450,7 @@ class _WorldBookPageState extends State<WorldBookPage> {
                         final next = book.copyWith(
                           entries: [...book.entries, edited],
                         );
-                        await context.read<WorldBookProvider>().updateBook(
-                          next,
-                        );
+                        await provider.updateBook(next);
                       },
                       onExport: () async {
                         Haptics.light();
@@ -462,17 +460,13 @@ class _WorldBookPageState extends State<WorldBookPage> {
                         Haptics.light();
                         final updated = await _showBookConfigSheet(book: book);
                         if (updated == null) return;
-                        await context.read<WorldBookProvider>().updateBook(
-                          updated,
-                        );
+                        await provider.updateBook(updated);
                       },
                       onDelete: () async {
                         Haptics.light();
                         final confirm = await _confirmDeleteBook(book);
                         if (!confirm) return;
-                        await context.read<WorldBookProvider>().deleteBook(
-                          book.id,
-                        );
+                        await provider.deleteBook(book.id);
                       },
                       onEditEntry: (entry) async {
                         Haptics.light();
@@ -481,7 +475,7 @@ class _WorldBookPageState extends State<WorldBookPage> {
                         final nextEntries = book.entries
                             .map((e) => e.id == entry.id ? edited : e)
                             .toList(growable: false);
-                        await context.read<WorldBookProvider>().updateBook(
+                        await provider.updateBook(
                           book.copyWith(entries: nextEntries),
                         );
                       },
@@ -573,7 +567,7 @@ class _WorldBookSection extends StatelessWidget {
             Color? color,
             required VoidCallback onTap,
           }) {
-            final c = color ?? localCs.onSurface.withOpacity(0.9);
+            final c = color ?? localCs.onSurface.withValues(alpha: 0.9);
             return IosCardPress(
               baseColor: Colors.transparent,
               borderRadius: BorderRadius.zero,
@@ -611,7 +605,7 @@ class _WorldBookSection extends StatelessWidget {
             thickness: 0.6,
             indent: 12,
             endIndent: 12,
-            color: localCs.outlineVariant.withOpacity(0.18),
+            color: localCs.outlineVariant.withValues(alpha: 0.18),
           );
 
           return SafeArea(
@@ -625,7 +619,7 @@ class _WorldBookSection extends StatelessWidget {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: localCs.onSurface.withOpacity(0.2),
+                        color: localCs.onSurface.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -709,7 +703,7 @@ class _WorldBookSection extends StatelessWidget {
                         child: Icon(
                           Lucide.ChevronRight,
                           size: 16,
-                          color: cs.onSurface.withOpacity(0.62),
+                          color: cs.onSurface.withValues(alpha: 0.62),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -747,7 +741,7 @@ class _WorldBookSection extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 12.5,
-                                  color: cs.onSurface.withOpacity(0.65),
+                                  color: cs.onSurface.withValues(alpha: 0.65),
                                 ),
                               ),
                             ],
@@ -911,7 +905,7 @@ class _IosEntryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final opacity = enabled ? 1.0 : 0.55;
-    final baseColor = cs.onSurface.withOpacity(0.9 * opacity);
+    final baseColor = cs.onSurface.withValues(alpha: 0.9 * opacity);
     final interactive = onTap != null || onLongPress != null;
     final leading = leadingBuilder == null
         ? Icon(icon, size: 20, color: baseColor)
@@ -950,7 +944,7 @@ class _IosEntryRow extends StatelessWidget {
                   detailText!,
                   style: TextStyle(
                     fontSize: 13,
-                    color: cs.onSurface.withOpacity(0.6 * opacity),
+                    color: cs.onSurface.withValues(alpha: 0.6 * opacity),
                   ),
                 ),
               ),
@@ -973,13 +967,13 @@ class _IosSectionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    final bg = isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96);
     return Container(
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
           width: 0.6,
         ),
       ),
@@ -999,7 +993,7 @@ Widget _iosDivider(BuildContext context) {
     thickness: 0.6,
     indent: 54,
     endIndent: 12,
-    color: cs.outlineVariant.withOpacity(0.18),
+    color: cs.outlineVariant.withValues(alpha: 0.18),
   );
 }
 
@@ -1025,7 +1019,7 @@ class _HeaderIconButton extends StatelessWidget {
         icon: icon,
         size: 18,
         padding: const EdgeInsets.all(8),
-        color: color ?? cs.onSurface.withOpacity(0.9),
+        color: color ?? cs.onSurface.withValues(alpha: 0.9),
         onTap: onTap,
       ),
     );
@@ -1040,13 +1034,13 @@ class _TagPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bg = color.withOpacity(0.14);
+    final bg = color.withValues(alpha: 0.14);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.35)),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Text(
         text,
@@ -1123,7 +1117,7 @@ class _WorldBookEditSheetState extends State<_WorldBookEditSheet> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: cs.onSurface.withOpacity(0.9),
+                        color: cs.onSurface.withValues(alpha: 0.9),
                       ),
                     ),
                     if (hint != null && hint.trim().isNotEmpty) ...[
@@ -1132,7 +1126,7 @@ class _WorldBookEditSheetState extends State<_WorldBookEditSheet> {
                         hint,
                         style: TextStyle(
                           fontSize: 12.5,
-                          color: cs.onSurface.withOpacity(0.6),
+                          color: cs.onSurface.withValues(alpha: 0.6),
                           height: 1.2,
                         ),
                       ),
@@ -1165,7 +1159,7 @@ class _WorldBookEditSheetState extends State<_WorldBookEditSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: cs.onSurface.withOpacity(0.2),
+                  color: cs.onSurface.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -1401,7 +1395,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: cs.onSurface.withOpacity(0.9),
+                        color: cs.onSurface.withValues(alpha: 0.9),
                       ),
                     ),
                     if (hint != null && hint.trim().isNotEmpty) ...[
@@ -1410,7 +1404,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                         hint,
                         style: TextStyle(
                           fontSize: 12.5,
-                          color: cs.onSurface.withOpacity(0.6),
+                          color: cs.onSurface.withValues(alpha: 0.6),
                           height: 1.2,
                         ),
                       ),
@@ -1447,7 +1441,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
-                    color: cs.onSurface.withOpacity(0.9),
+                    color: cs.onSurface.withValues(alpha: 0.9),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1457,14 +1451,14 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                 valueText,
                 style: TextStyle(
                   fontSize: 13,
-                  color: cs.onSurface.withOpacity(0.62),
+                  color: cs.onSurface.withValues(alpha: 0.62),
                 ),
               ),
               const SizedBox(width: 6),
               Icon(
                 Lucide.ChevronRight,
                 size: 16,
-                color: cs.onSurface.withOpacity(0.55),
+                color: cs.onSurface.withValues(alpha: 0.55),
               ),
             ],
           ),
@@ -1474,8 +1468,8 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
 
     Widget keywordChip(String keyword) {
       final color = cs.primary;
-      final bg = color.withOpacity(isDark ? 0.22 : 0.12);
-      final border = color.withOpacity(isDark ? 0.36 : 0.26);
+      final bg = color.withValues(alpha: isDark ? 0.22 : 0.12);
+      final border = color.withValues(alpha: isDark ? 0.36 : 0.26);
       return Container(
         decoration: BoxDecoration(
           color: bg,
@@ -1500,7 +1494,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: cs.onSurface.withOpacity(0.9),
+                    color: cs.onSurface.withValues(alpha: 0.9),
                   ),
                 ),
               ),
@@ -1509,7 +1503,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
               icon: Lucide.X,
               size: 14,
               padding: const EdgeInsets.all(6),
-              color: cs.onSurface.withOpacity(0.65),
+              color: cs.onSurface.withValues(alpha: 0.65),
               onTap: () => setState(() => _keywords.remove(keyword)),
             ),
             const SizedBox(width: 2),
@@ -1551,7 +1545,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: localCs.onSurface.withOpacity(0.9),
+                          color: localCs.onSurface.withValues(alpha: 0.9),
                         ),
                       ),
                     ),
@@ -1568,7 +1562,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
             thickness: 0.6,
             indent: 12,
             endIndent: 12,
-            color: localCs.outlineVariant.withOpacity(0.18),
+            color: localCs.outlineVariant.withValues(alpha: 0.18),
           );
 
           final options = <WorldBookInjectionPosition>[
@@ -1646,7 +1640,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: localCs.onSurface.withOpacity(0.9),
+                          color: localCs.onSurface.withValues(alpha: 0.9),
                         ),
                       ),
                     ),
@@ -1663,7 +1657,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
             thickness: 0.6,
             indent: 12,
             endIndent: 12,
-            color: localCs.outlineVariant.withOpacity(0.18),
+            color: localCs.outlineVariant.withValues(alpha: 0.18),
           );
 
           final options = <WorldBookInjectionRole>[
@@ -1723,7 +1717,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: cs.onSurface.withOpacity(0.2),
+                  color: cs.onSurface.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -1793,7 +1787,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  color: cs.onSurface.withOpacity(0.85),
+                                  color: cs.onSurface.withValues(alpha: 0.85),
                                 ),
                               ),
                               const SizedBox(height: 10),
@@ -1837,8 +1831,8 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                           style: TextStyle(
                                             fontSize: 15,
                                             fontWeight: FontWeight.w500,
-                                            color: cs.onSurface.withOpacity(
-                                              0.92,
+                                            color: cs.onSurface.withValues(
+                                              alpha: 0.92,
                                             ),
                                             height: 1.15,
                                           ),
@@ -1850,8 +1844,8 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                             hintStyle: TextStyle(
                                               fontSize: 15,
                                               fontWeight: FontWeight.w500,
-                                              color: cs.onSurface.withOpacity(
-                                                isDark ? 0.42 : 0.46,
+                                              color: cs.onSurface.withValues(
+                                                alpha: isDark ? 0.42 : 0.46,
                                               ),
                                               height: 1.15,
                                             ),
@@ -1889,8 +1883,9 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                           child: Icon(
                                             Lucide.Plus,
                                             size: 18,
-                                            color: cs.onSurface.withOpacity(
-                                              _keywordInputController.text
+                                            color: cs.onSurface.withValues(
+                                              alpha:
+                                                  _keywordInputController.text
                                                       .trim()
                                                       .isEmpty
                                                   ? 0.35
@@ -1908,7 +1903,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                 l10n.worldBookEntryKeywordsHint,
                                 style: TextStyle(
                                   fontSize: 12.5,
-                                  color: cs.onSurface.withOpacity(0.6),
+                                  color: cs.onSurface.withValues(alpha: 0.6),
                                   height: 1.2,
                                 ),
                               ),
@@ -2061,7 +2056,7 @@ class _IosOutlineButtonState extends State<_IosOutlineButton> {
         decoration: BoxDecoration(
           color: Color.alphaBlend(overlay, bg),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: cs.outlineVariant.withOpacity(0.35)),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
         ),
         alignment: Alignment.center,
         child: Text(
@@ -2097,9 +2092,9 @@ class _IosFilledButtonState extends State<_IosFilledButton> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bg = widget.enabled ? cs.primary : cs.primary.withOpacity(0.4);
+    final bg = widget.enabled ? cs.primary : cs.primary.withValues(alpha: 0.4);
     final overlay = _pressed
-        ? Colors.black.withOpacity(0.12)
+        ? Colors.black.withValues(alpha: 0.12)
         : Colors.transparent;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -2128,7 +2123,7 @@ class _IosFilledButtonState extends State<_IosFilledButton> {
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w700,
-            color: cs.onPrimary.withOpacity(widget.enabled ? 1 : 0.6),
+            color: cs.onPrimary.withValues(alpha: widget.enabled ? 1 : 0.6),
           ),
         ),
       ),

@@ -56,6 +56,7 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
 
   Future<void> _showAddEditSheet({InstructionInjection? item}) async {
     final cs = Theme.of(context).colorScheme;
+    final provider = context.read<InstructionInjectionProvider>();
 
     final result = await showModalBottomSheet<Map<String, String>?>(
       context: context,
@@ -69,26 +70,26 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
       },
     );
 
-    if (result != null) {
-      final title = result['title']?.trim() ?? '';
-      final prompt = result['prompt']?.trim() ?? '';
-      final group = result['group']?.trim() ?? '';
-      if (title.isEmpty || prompt.isEmpty) return;
+    if (!mounted) return;
+    if (result == null) return;
 
-      final provider = context.read<InstructionInjectionProvider>();
-      if (item == null) {
-        final newItem = InstructionInjection(
-          id: const Uuid().v4(),
-          title: title,
-          prompt: prompt,
-          group: group,
-        );
-        await provider.add(newItem);
-      } else {
-        await provider.update(
-          item.copyWith(title: title, prompt: prompt, group: group),
-        );
-      }
+    final title = result['title']?.trim() ?? '';
+    final prompt = result['prompt']?.trim() ?? '';
+    final group = result['group']?.trim() ?? '';
+    if (title.isEmpty || prompt.isEmpty) return;
+
+    if (item == null) {
+      final newItem = InstructionInjection(
+        id: const Uuid().v4(),
+        title: title,
+        prompt: prompt,
+        group: group,
+      );
+      await provider.add(newItem);
+    } else {
+      await provider.update(
+        item.copyWith(title: title, prompt: prompt, group: group),
+      );
     }
   }
 
@@ -128,6 +129,7 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
     } catch (_) {
       return;
     }
+    if (!mounted) return;
     if (result == null || result.files.isEmpty) return;
 
     final l10n = AppLocalizations.of(context)!;
@@ -229,13 +231,13 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                   Icon(
                     Lucide.Layers,
                     size: 64,
-                    color: cs.onSurface.withOpacity(0.3),
+                    color: cs.onSurface.withValues(alpha: 0.3),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     l10n.instructionInjectionEmptyMessage,
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.6),
+                      color: cs.onSurface.withValues(alpha: 0.6),
                       fontSize: 14,
                     ),
                   ),
@@ -317,15 +319,17 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                                               height: double.infinity,
                                               decoration: BoxDecoration(
                                                 color: isDark
-                                                    ? cs.error.withOpacity(0.22)
-                                                    : cs.error.withOpacity(
-                                                        0.14,
+                                                    ? cs.error.withValues(
+                                                        alpha: 0.22,
+                                                      )
+                                                    : cs.error.withValues(
+                                                        alpha: 0.14,
                                                       ),
                                                 borderRadius:
                                                     BorderRadius.circular(14),
                                                 border: Border.all(
-                                                  color: cs.error.withOpacity(
-                                                    0.35,
+                                                  color: cs.error.withValues(
+                                                    alpha: 0.35,
                                                   ),
                                                 ),
                                               ),
@@ -370,7 +374,9 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                                         builder: (pressed, overlay) {
                                           final baseBg = isDark
                                               ? Colors.white10
-                                              : Colors.white.withOpacity(0.96);
+                                              : Colors.white.withValues(
+                                                  alpha: 0.96,
+                                                );
                                           return Container(
                                             decoration: BoxDecoration(
                                               color: Color.alphaBlend(
@@ -381,8 +387,10 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                                                   BorderRadius.circular(14),
                                               border: Border.all(
                                                 color: cs.outlineVariant
-                                                    .withOpacity(
-                                                      isDark ? 0.1 : 0.08,
+                                                    .withValues(
+                                                      alpha: isDark
+                                                          ? 0.1
+                                                          : 0.08,
                                                     ),
                                                 width: 0.6,
                                               ),
@@ -444,8 +452,9 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                                                                     )
                                                                     .colorScheme
                                                                     .onSurface
-                                                                    .withOpacity(
-                                                                      0.7,
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.7,
                                                                     ),
                                                           ),
                                                         ),
@@ -459,7 +468,7 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                                                     color: Theme.of(context)
                                                         .colorScheme
                                                         .onSurface
-                                                        .withOpacity(0.5),
+                                                        .withValues(alpha: 0.5),
                                                   ),
                                                 ],
                                               ),
@@ -514,7 +523,7 @@ class _GroupHeader extends StatelessWidget {
                   child: Icon(
                     Lucide.ChevronRight,
                     size: 16,
-                    color: textBase.withOpacity(0.7),
+                    color: textBase.withValues(alpha: 0.7),
                   ),
                 ),
               ),
@@ -595,7 +604,7 @@ class _InstructionInjectionEditSheetState
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: cs.onSurface.withOpacity(0.2),
+                  color: cs.onSurface.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -623,18 +632,20 @@ class _InstructionInjectionEditSheetState
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  borderSide: BorderSide(
+                    color: cs.primary.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
             ),
@@ -649,18 +660,20 @@ class _InstructionInjectionEditSheetState
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  borderSide: BorderSide(
+                    color: cs.primary.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
             ),
@@ -676,18 +689,20 @@ class _InstructionInjectionEditSheetState
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: cs.primary.withOpacity(0.5)),
+                  borderSide: BorderSide(
+                    color: cs.primary.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
             ),
@@ -744,7 +759,7 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final press = base.withOpacity(0.7);
+    final press = base.withValues(alpha: 0.7);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => setState(() => _pressed = true),
@@ -792,8 +807,8 @@ class _TactileCardState extends State<_TactileCard> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final overlay = _pressed
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -859,7 +874,7 @@ class _IosOutlineButtonState extends State<_IosOutlineButton> {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
           ),
           child: Text(
             widget.label,

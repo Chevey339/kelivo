@@ -1,7 +1,6 @@
 import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:characters/characters.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/settings_provider.dart';
@@ -42,7 +41,7 @@ class ProviderAvatar extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: cs.primary.withOpacity(0.15),
+          color: cs.primary.withValues(alpha: 0.15),
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
@@ -135,7 +134,7 @@ class ProviderAvatar extends StatelessWidget {
     if (asset == null) {
       return Container(
         decoration: BoxDecoration(
-          color: cs.primary.withOpacity(0.1),
+          color: cs.primary.withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
@@ -156,7 +155,9 @@ class ProviderAvatar extends StatelessWidget {
             RegExp(r'grok|xai').hasMatch(lower) ||
             RegExp(r'openrouter').hasMatch(lower));
     return CircleAvatar(
-      backgroundColor: isDark ? Colors.white10 : cs.primary.withOpacity(0.1),
+      backgroundColor: isDark
+          ? Colors.white10
+          : cs.primary.withValues(alpha: 0.1),
       child: asset.endsWith('.svg')
           ? SvgPicture.asset(
               asset,

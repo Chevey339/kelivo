@@ -48,7 +48,7 @@ Future<bool?> _openDialog(
   await showGeneralDialog<bool>(
     context: context,
     barrierDismissible: true,
-    barrierColor: Colors.black.withOpacity(0.25),
+    barrierColor: Colors.black.withValues(alpha: 0.25),
     barrierLabel: 'model-edit-dialog',
     pageBuilder: (ctx, _, __) => _ModelEditDialogBody(
       providerKey: providerKey,
@@ -146,14 +146,16 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
 
     // Resolve display model id from per-model overrides when present (apiModelId),
     // falling back to the logical key for backwards compatibility.
-    Map<String, dynamic>? _initialOv;
+    Map<String, dynamic>? initialOv;
     if (!widget.isNew) {
       final raw = cfg.modelOverrides[widget.modelId];
-      if (raw is Map) _initialOv = raw.map((k, v) => MapEntry(k.toString(), v));
+      if (raw is Map) {
+        initialOv = raw.map((k, v) => MapEntry(k.toString(), v));
+      }
     }
     String displayModelId = widget.modelId;
-    if (_initialOv != null) {
-      final raw = (_initialOv['apiModelId'] ?? _initialOv['api_model_id'])
+    if (initialOv != null) {
+      final raw = (initialOv['apiModelId'] ?? initialOv['api_model_id'])
           ?.toString()
           .trim();
       if (raw != null && raw.isNotEmpty) displayModelId = raw;
@@ -165,7 +167,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
         displayName: displayModelId.isEmpty ? '' : displayModelId,
       ),
     );
-    final ov = _initialOv;
+    final ov = initialOv;
     final effective = ov == null
         ? base
         : ModelOverrideResolver.applyModelOverride(
@@ -282,20 +284,23 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(
-          color: cs.outlineVariant.withOpacity(0.12),
+          color: cs.outlineVariant.withValues(alpha: 0.12),
           width: 0.6,
         ),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(
-          color: cs.outlineVariant.withOpacity(0.12),
+          color: cs.outlineVariant.withValues(alpha: 0.12),
           width: 0.6,
         ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8),
+        borderSide: BorderSide(
+          color: cs.primary.withValues(alpha: 0.35),
+          width: 0.8,
+        ),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     );
@@ -334,8 +339,8 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(
               color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white.withOpacity(0.08)
-                  : cs.outlineVariant.withOpacity(0.25),
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : cs.outlineVariant.withValues(alpha: 0.25),
             ),
           ),
           child: ClipRRect(
@@ -371,7 +376,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                           icon: Icon(
                             lucide.Lucide.X,
                             size: 20,
-                            color: cs.onSurface.withOpacity(0.9),
+                            color: cs.onSurface.withValues(alpha: 0.9),
                           ),
                         ),
                       ],
@@ -482,7 +487,9 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
               readOnly: !widget.isNew,
               enableInteractiveSelection: widget.isNew,
               style: TextStyle(
-                color: widget.isNew ? null : cs.onSurface.withOpacity(0.6),
+                color: widget.isNew
+                    ? null
+                    : cs.onSurface.withValues(alpha: 0.6),
               ),
               onChanged: widget.isNew
                   ? (v) {
@@ -515,9 +522,9 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                           },
                           tooltip: l10n.shareProviderSheetCopyButton,
                           icon: lucide.Lucide.Copy,
-                          color: cs.onSurface.withOpacity(0.9),
-                          hoverColor: cs.onSurface.withOpacity(0.08),
-                          pressedColor: cs.onSurface.withOpacity(0.12),
+                          color: cs.onSurface.withValues(alpha: 0.9),
+                          hoverColor: cs.onSurface.withValues(alpha: 0.08),
+                          pressedColor: cs.onSurface.withValues(alpha: 0.12),
                         ),
                       ),
               ),
@@ -598,10 +605,11 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                   final ab = idx == 0
                       ? ModelAbility.tool
                       : ModelAbility.reasoning;
-                  if (_abilities.contains(ab))
+                  if (_abilities.contains(ab)) {
                     _abilities.remove(ab);
-                  else
+                  } else {
                     _abilities.add(ab);
+                  }
                 }),
               ),
             ],
@@ -705,7 +713,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
             Text(
               l10n.modelDetailSheetBuiltinToolsDescription,
               style: TextStyle(
-                color: cs.onSurface.withOpacity(0.8),
+                color: cs.onSurface.withValues(alpha: 0.8),
                 fontSize: 13,
               ),
             ),
@@ -715,7 +723,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
               Text(
                 l10n.modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint,
                 style: TextStyle(
-                  color: cs.onSurface.withOpacity(0.65),
+                  color: cs.onSurface.withValues(alpha: 0.65),
                   fontSize: 12,
                 ),
               ),
@@ -724,7 +732,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
               Text(
                 l10n.modelDetailSheetBuiltinToolsUnsupportedHint,
                 style: TextStyle(
-                  color: cs.onSurface.withOpacity(0.65),
+                  color: cs.onSurface.withValues(alpha: 0.65),
                   fontSize: 12,
                 ),
               ),
@@ -790,7 +798,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
     text,
     style: TextStyle(
       fontSize: 13,
-      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
     ),
   );
 
@@ -845,17 +853,24 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
       builtInSet.remove(BuiltInToolNames.urlContext);
       builtInSet.remove(BuiltInToolNames.codeExecution);
       builtInSet.remove(BuiltInToolNames.youtube);
-      if (_googleUrlContextTool) builtInSet.add(BuiltInToolNames.urlContext);
-      if (_googleCodeExecutionTool)
+      if (_googleUrlContextTool) {
+        builtInSet.add(BuiltInToolNames.urlContext);
+      }
+      if (_googleCodeExecutionTool) {
         builtInSet.add(BuiltInToolNames.codeExecution);
-      if (_googleYoutubeTool) builtInSet.add(BuiltInToolNames.youtube);
+      }
+      if (_googleYoutubeTool) {
+        builtInSet.add(BuiltInToolNames.youtube);
+      }
     } else if (_providerKind == ProviderKind.openai) {
       builtInSet.remove(BuiltInToolNames.codeInterpreter);
       builtInSet.remove(BuiltInToolNames.imageGeneration);
-      if (_openaiCodeInterpreterTool)
+      if (_openaiCodeInterpreterTool) {
         builtInSet.add(BuiltInToolNames.codeInterpreter);
-      if (_openaiImageGenerationTool)
+      }
+      if (_openaiImageGenerationTool) {
         builtInSet.add(BuiltInToolNames.imageGeneration);
+      }
     }
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
 
@@ -933,8 +948,8 @@ class _PrimaryDeskButtonState extends State<_PrimaryDeskButton> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final bg = _pressed
-        ? cs.primary.withOpacity(0.85)
-        : (_hover ? cs.primary.withOpacity(0.92) : cs.primary);
+        ? cs.primary.withValues(alpha: 0.85)
+        : (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -987,8 +1002,8 @@ class _SegmentedSingle extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final selBg = isDark
-        ? cs.primary.withOpacity(0.20)
-        : cs.primary.withOpacity(0.12);
+        ? cs.primary.withValues(alpha: 0.20)
+        : cs.primary.withValues(alpha: 0.12);
     final baseBg = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
     final children = <Widget>[];
     for (int i = 0; i < options.length; i++) {
@@ -1009,8 +1024,8 @@ class _SegmentedSingle extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: selected
-                      ? cs.primary.withOpacity(0.35)
-                      : cs.outlineVariant.withOpacity(0.35),
+                      ? cs.primary.withValues(alpha: 0.35)
+                      : cs.outlineVariant.withValues(alpha: 0.35),
                 ),
               ),
               alignment: Alignment.center,
@@ -1019,7 +1034,9 @@ class _SegmentedSingle extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: selected ? cs.primary : cs.onSurface.withOpacity(0.82),
+                  color: selected
+                      ? cs.primary
+                      : cs.onSurface.withValues(alpha: 0.82),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1047,8 +1064,8 @@ class _SegmentedMulti extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final selBg = isDark
-        ? cs.primary.withOpacity(0.20)
-        : cs.primary.withOpacity(0.12);
+        ? cs.primary.withValues(alpha: 0.20)
+        : cs.primary.withValues(alpha: 0.12);
     final baseBg = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
     final children = <Widget>[];
     for (int i = 0; i < options.length; i++) {
@@ -1069,8 +1086,8 @@ class _SegmentedMulti extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: selected
-                      ? cs.primary.withOpacity(0.35)
-                      : cs.outlineVariant.withOpacity(0.35),
+                      ? cs.primary.withValues(alpha: 0.35)
+                      : cs.outlineVariant.withValues(alpha: 0.35),
                 ),
               ),
               alignment: Alignment.center,
@@ -1079,7 +1096,9 @@ class _SegmentedMulti extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: selected ? cs.primary : cs.onSurface.withOpacity(0.82),
+                  color: selected
+                      ? cs.primary
+                      : cs.onSurface.withValues(alpha: 0.82),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1106,7 +1125,7 @@ class _OutlinedAddButtonState extends State<_OutlinedAddButton> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final border = BorderSide(color: cs.primary.withOpacity(0.5));
+    final border = BorderSide(color: cs.primary.withValues(alpha: 0.5));
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -1117,7 +1136,9 @@ class _OutlinedAddButtonState extends State<_OutlinedAddButton> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: _hover ? cs.primary.withOpacity(0.06) : Colors.transparent,
+            color: _hover
+                ? cs.primary.withValues(alpha: 0.06)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: Border.fromBorderSide(border),
           ),
@@ -1168,21 +1189,21 @@ class _HeaderRow extends StatelessWidget {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.12),
+                    color: cs.outlineVariant.withValues(alpha: 0.12),
                     width: 0.6,
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.12),
+                    color: cs.outlineVariant.withValues(alpha: 0.12),
                     width: 0.6,
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide(
-                    color: cs.primary.withOpacity(0.35),
+                    color: cs.primary.withValues(alpha: 0.35),
                     width: 0.8,
                   ),
                 ),
@@ -1205,21 +1226,21 @@ class _HeaderRow extends StatelessWidget {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.12),
+                    color: cs.outlineVariant.withValues(alpha: 0.12),
                     width: 0.6,
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide(
-                    color: cs.outlineVariant.withOpacity(0.12),
+                    color: cs.outlineVariant.withValues(alpha: 0.12),
                     width: 0.6,
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide(
-                    color: cs.primary.withOpacity(0.35),
+                    color: cs.primary.withValues(alpha: 0.35),
                     width: 0.8,
                   ),
                 ),
@@ -1235,7 +1256,7 @@ class _HeaderRow extends StatelessWidget {
             icon: Icon(
               lucide.Lucide.Trash2,
               size: 18,
-              color: cs.onSurface.withOpacity(0.8),
+              color: cs.onSurface.withValues(alpha: 0.8),
             ),
             onPressed: onDelete,
           ),
@@ -1272,21 +1293,21 @@ class _BodyRow extends StatelessWidget {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.12),
+                        color: cs.outlineVariant.withValues(alpha: 0.12),
                         width: 0.6,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.12),
+                        color: cs.outlineVariant.withValues(alpha: 0.12),
                         width: 0.6,
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(
-                        color: cs.primary.withOpacity(0.35),
+                        color: cs.primary.withValues(alpha: 0.35),
                         width: 0.8,
                       ),
                     ),
@@ -1302,7 +1323,7 @@ class _BodyRow extends StatelessWidget {
                 icon: Icon(
                   lucide.Lucide.Trash2,
                   size: 18,
-                  color: cs.onSurface.withOpacity(0.8),
+                  color: cs.onSurface.withValues(alpha: 0.8),
                 ),
                 onPressed: onDelete,
               ),
@@ -1320,21 +1341,21 @@ class _BodyRow extends StatelessWidget {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(
-                  color: cs.outlineVariant.withOpacity(0.12),
+                  color: cs.outlineVariant.withValues(alpha: 0.12),
                   width: 0.6,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(
-                  color: cs.outlineVariant.withOpacity(0.12),
+                  color: cs.outlineVariant.withValues(alpha: 0.12),
                   width: 0.6,
                 ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(
-                  color: cs.primary.withOpacity(0.35),
+                  color: cs.primary.withValues(alpha: 0.35),
                   width: 0.8,
                 ),
               ),
@@ -1376,19 +1397,19 @@ class _ToolTileState extends State<_ToolTile> {
     final bool isDisabled = widget.onChanged == null;
     final baseBg = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
     final hoverBg = Color.alphaBlend(
-      cs.primary.withOpacity(isDark ? 0.10 : 0.06),
+      cs.primary.withValues(alpha: isDark ? 0.10 : 0.06),
       baseBg,
     );
     final pressedBg = Color.alphaBlend(
-      cs.primary.withOpacity(isDark ? 0.16 : 0.10),
+      cs.primary.withValues(alpha: isDark ? 0.16 : 0.10),
       baseBg,
     );
     final bg = isDisabled
         ? baseBg
         : (_pressed ? pressedBg : (_hover ? hoverBg : baseBg));
     final borderColor = (!isDisabled && _hover)
-        ? cs.primary.withOpacity(isDark ? 0.28 : 0.22)
-        : cs.outlineVariant.withOpacity(0.35);
+        ? cs.primary.withValues(alpha: isDark ? 0.28 : 0.22)
+        : cs.outlineVariant.withValues(alpha: 0.35);
     return Opacity(
       opacity: isDisabled ? 0.45 : 1.0,
       child: MouseRegion(
@@ -1442,7 +1463,7 @@ class _ToolTileState extends State<_ToolTile> {
                           widget.desc,
                           style: TextStyle(
                             fontSize: 12,
-                            color: cs.onSurface.withOpacity(0.7),
+                            color: cs.onSurface.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -1460,30 +1481,26 @@ class _ToolTileState extends State<_ToolTile> {
 }
 
 class _DeskCard extends StatelessWidget {
-  const _DeskCard({
-    required this.child,
-    this.padding = const EdgeInsets.all(12),
-  });
+  const _DeskCard({required this.child});
   final Widget child;
-  final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark
-        ? Colors.white.withOpacity(0.06)
+        ? Colors.white.withValues(alpha: 0.06)
         : const Color(0xFFF2F3F5);
     return Container(
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18),
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.22 : 0.18),
           width: 0.8,
         ),
       ),
-      padding: padding,
+      padding: const EdgeInsets.all(12),
       child: child,
     );
   }
@@ -1530,7 +1547,7 @@ class _SegTabBarState extends State<_SegTabBar> {
             final double rowWidth =
                 segWidth * tabs.length + gap * (tabs.length - 1);
             final Color shellBg = isDark
-                ? Colors.white.withOpacity(0.08)
+                ? Colors.white.withValues(alpha: 0.08)
                 : Colors.white;
 
             List<Widget> children = [];
@@ -1538,15 +1555,15 @@ class _SegTabBarState extends State<_SegTabBar> {
               final bool selected = controller.index == index;
               final bool hovered = _hover == index;
               final Color bg = selected
-                  ? cs.primary.withOpacity(0.14)
+                  ? cs.primary.withValues(alpha: 0.14)
                   : hovered
                   ? (isDark
-                        ? Colors.white.withOpacity(0.06)
-                        : Colors.black.withOpacity(0.03))
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.black.withValues(alpha: 0.03))
                   : Colors.transparent;
               final Color fg = selected
                   ? cs.primary
-                  : cs.onSurface.withOpacity(0.82);
+                  : cs.onSurface.withValues(alpha: 0.82);
 
               children.add(
                 SizedBox(
@@ -1581,8 +1598,9 @@ class _SegTabBarState extends State<_SegTabBar> {
                   ),
                 ),
               );
-              if (index != tabs.length - 1)
+              if (index != tabs.length - 1) {
                 children.add(const SizedBox(width: gap));
+              }
             }
 
             return Container(

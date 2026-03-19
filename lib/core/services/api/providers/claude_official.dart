@@ -36,7 +36,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     if (role == 'system') {
       final s = (m['content'] ?? '').toString();
       if (s.isNotEmpty) {
-        systemPrompt = systemPrompt.isEmpty ? s : (systemPrompt + '\n\n' + s);
+        systemPrompt = systemPrompt.isEmpty ? s : '$systemPrompt\n\n$s';
       }
       continue;
     }
@@ -101,13 +101,13 @@ Stream<ChatStreamChunk> _sendClaudeStream(
 
   // Collect final tools list: client + server + built-in web_search
   final List<Map<String, dynamic>> allTools = [];
-  if (anthropicTools != null && anthropicTools.isNotEmpty)
+  if (anthropicTools != null && anthropicTools.isNotEmpty) {
     allTools.addAll(anthropicTools);
+  }
   if (tools != null && tools.isNotEmpty) {
     for (final t in tools) {
-      if (t is Map &&
-          t['type'] is String &&
-          (t['type'] as String).startsWith('web_search_')) {
+      final type = (t['type'] ?? '').toString();
+      if (type.startsWith('web_search_')) {
         allTools.add(t);
       }
     }
@@ -125,19 +125,23 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       'type': 'web_search_20250305',
       'name': 'web_search',
     };
-    if (ws['max_uses'] is int && (ws['max_uses'] as int) > 0)
+    if (ws['max_uses'] is int && (ws['max_uses'] as int) > 0) {
       entry['max_uses'] = ws['max_uses'];
-    if (ws['allowed_domains'] is List)
+    }
+    if (ws['allowed_domains'] is List) {
       entry['allowed_domains'] = List<String>.from(
         (ws['allowed_domains'] as List).map((e) => e.toString()),
       );
-    if (ws['blocked_domains'] is List)
+    }
+    if (ws['blocked_domains'] is List) {
       entry['blocked_domains'] = List<String>.from(
         (ws['blocked_domains'] as List).map((e) => e.toString()),
       );
-    if (ws['user_location'] is Map)
+    }
+    if (ws['user_location'] is Map) {
       entry['user_location'] = (ws['user_location'] as Map)
           .cast<String, dynamic>();
+    }
     allTools.add(entry);
   }
 
@@ -149,8 +153,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     'Accept': stream ? 'text/event-stream' : 'application/json',
   };
   baseHeaders.addAll(_customHeaders(config, modelId));
-  if (extraHeaders != null && extraHeaders.isNotEmpty)
+  if (extraHeaders != null && extraHeaders.isNotEmpty) {
     baseHeaders.addAll(extraHeaders);
+  }
 
   // Running conversation across rounds
   List<Map<String, dynamic>> convo = List<Map<String, dynamic>>.from(
@@ -186,13 +191,12 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         },
     };
     final extraClaude = _customBody(config, modelId);
-    if (extraClaude.isNotEmpty)
-      (body as Map<String, dynamic>).addAll(extraClaude);
+    if (extraClaude.isNotEmpty) {
+      body.addAll(extraClaude);
+    }
     if (extraBody != null && extraBody.isNotEmpty) {
       extraBody.forEach((k, v) {
-        (body as Map<String, dynamic>)[k] = (v is String)
-            ? _parseOverrideValue(v)
-            : v;
+        body[k] = (v is String) ? _parseOverrideValue(v) : v;
       });
     }
 
@@ -289,7 +293,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         for (final e in toolUses.entries) {
           final name = (e.value['name'] ?? '').toString();
           final args = (e.value['args'] as Map<String, dynamic>);
-          final res = await onToolCall(name, args) ?? '';
+          final res = await onToolCall(name, args);
           results.add({
             'type': 'tool_result',
             'tool_use_id': e.key,
@@ -333,32 +337,32 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     String buffer = '';
     int roundTokens = 0;
     TokenUsage? usage;
-    String? _lastStopReason;
+    String? lastStopReason;
 
     // Per-round accumulation
-    final Map<String, Map<String, dynamic>> _anthToolUse =
+    final Map<String, Map<String, dynamic>> anthToolUse =
         <String, Map<String, dynamic>>{}; // id -> {name, args}
-    final Map<int, String> _cliIndexToId =
+    final Map<int, String> cliIndexToId =
         <int, String>{}; // client tool: index -> id
-    final Map<String, String> _toolResultsContent =
+    final Map<String, String> toolResultsContent =
         <String, String>{}; // id -> result text
     final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
     final StringBuffer textBuf = StringBuffer();
 
     // Track thinking blocks so they can be sent back for tool-use continuation.
-    final Map<int, int> _thinkingIndexToAssistantBlock = <int, int>{};
-    final Map<int, StringBuffer> _thinkingText = <int, StringBuffer>{};
-    final Map<int, StringBuffer> _thinkingSig = <int, StringBuffer>{};
-    final Map<int, int> _redactedThinkingIndexToAssistantBlock = <int, int>{};
-    final Map<int, StringBuffer> _redactedThinkingData = <int, StringBuffer>{};
+    final Map<int, int> thinkingIndexToAssistantBlock = <int, int>{};
+    final Map<int, StringBuffer> thinkingText = <int, StringBuffer>{};
+    final Map<int, StringBuffer> thinkingSig = <int, StringBuffer>{};
+    final Map<int, int> redactedThinkingIndexToAssistantBlock = <int, int>{};
+    final Map<int, StringBuffer> redactedThinkingData = <int, StringBuffer>{};
 
-    int? _parseIndex(dynamic raw) {
+    int? parseIndex(dynamic raw) {
       if (raw == null) return null;
       if (raw is int) return raw;
       return int.tryParse(raw.toString());
     }
 
-    void _flushTextBlock() {
+    void flushTextBlock() {
       final t = textBuf.toString();
       if (t.isNotEmpty) {
         assistantBlocks.add({'type': 'text', 'text': t});
@@ -367,9 +371,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     }
 
     // Server tool helpers (web_search)
-    final Map<int, String> _srvIndexToId = <int, String>{};
-    final Map<String, String> _srvArgsStr = <String, String>{};
-    final Map<String, Map<String, dynamic>> _srvArgs =
+    final Map<int, String> srvIndexToId = <int, String>{};
+    final Map<String, String> srvArgsStr = <String, String>{};
+    final Map<String, Map<String, dynamic>> srvArgs =
         <String, Map<String, dynamic>>{};
 
     bool messageStopped = false;
@@ -390,44 +394,43 @@ Stream<ChatStreamChunk> _sendClaudeStream(
 
           if (type == 'content_block_start') {
             final cb = obj['content_block'];
-            final idx = _parseIndex(obj['index']);
+            final idx = parseIndex(obj['index']);
             if (cb is Map && (cb['type'] == 'thinking')) {
               // Preserve thinking blocks (with signature) for tool-use continuation.
-              _flushTextBlock();
+              flushTextBlock();
               if (idx != null) {
                 assistantBlocks.add({
                   'type': 'thinking',
                   'thinking': '',
                   'signature': '',
                 });
-                _thinkingIndexToAssistantBlock[idx] =
-                    assistantBlocks.length - 1;
-                _thinkingText[idx] = StringBuffer();
-                _thinkingSig[idx] = StringBuffer();
+                thinkingIndexToAssistantBlock[idx] = assistantBlocks.length - 1;
+                thinkingText[idx] = StringBuffer();
+                thinkingSig[idx] = StringBuffer();
               }
             } else if (cb is Map && (cb['type'] == 'redacted_thinking')) {
-              _flushTextBlock();
+              flushTextBlock();
               if (idx != null) {
                 assistantBlocks.add({'type': 'redacted_thinking', 'data': ''});
-                _redactedThinkingIndexToAssistantBlock[idx] =
+                redactedThinkingIndexToAssistantBlock[idx] =
                     assistantBlocks.length - 1;
-                _redactedThinkingData[idx] = StringBuffer();
+                redactedThinkingData[idx] = StringBuffer();
               }
             } else if (cb is Map && (cb['type'] == 'tool_use')) {
               // Flush text block before tool_use
-              _flushTextBlock();
+              flushTextBlock();
               final id = (cb['id'] ?? '').toString();
               final name = (cb['name'] ?? '').toString();
               final idx2 = idx ?? -1;
               if (id.isNotEmpty) {
-                _anthToolUse.putIfAbsent(id, () => {'name': name, 'args': ''});
+                anthToolUse.putIfAbsent(id, () => {'name': name, 'args': ''});
                 assistantBlocks.add({
                   'type': 'tool_use',
                   'id': id,
                   'name': name,
                   'input': {},
                 });
-                if (idx2 >= 0) _cliIndexToId[idx2] = id;
+                if (idx2 >= 0) cliIndexToId[idx2] = id;
                 // Emit placeholder tool-call card immediately
                 yield ChatStreamChunk(
                   content: '',
@@ -447,8 +450,8 @@ Stream<ChatStreamChunk> _sendClaudeStream(
               final id = (cb['id'] ?? '').toString();
               final idx2 = idx ?? -1;
               if (id.isNotEmpty && idx2 >= 0) {
-                _srvIndexToId[idx2] = id;
-                _srvArgsStr[id] = '';
+                srvIndexToId[idx2] = id;
+                srvArgsStr[id] = '';
               }
               // Emit placeholder for server tool to show card (e.g., built-in web_search)
               if (id.isNotEmpty) {
@@ -490,7 +493,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                 errorCode = (contentBlock['error_code'] ?? '').toString();
               }
               Map<String, dynamic> args = const <String, dynamic>{};
-              if (_srvArgs.containsKey(toolUseId)) args = _srvArgs[toolUseId]!;
+              if (srvArgs.containsKey(toolUseId)) args = srvArgs[toolUseId]!;
               final payload = jsonEncode({
                 'items': items,
                 if ((errorCode ?? '').isNotEmpty) 'error': errorCode,
@@ -524,7 +527,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                   );
                 }
               } else if (delta['type'] == 'thinking_delta') {
-                final idx = _parseIndex(obj['index']);
+                final idx = parseIndex(obj['index']);
                 final thinking =
                     (delta['thinking'] ?? delta['text'] ?? '') as String;
                 if (thinking.isNotEmpty) {
@@ -534,33 +537,33 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                     isDone: false,
                     totalTokens: roundTokens,
                   );
-                  if (idx != null && _thinkingText.containsKey(idx)) {
-                    _thinkingText[idx]!.write(thinking);
+                  if (idx != null && thinkingText.containsKey(idx)) {
+                    thinkingText[idx]!.write(thinking);
                   }
                 }
               } else if (delta['type'] == 'signature_delta') {
-                final idx = _parseIndex(obj['index']);
+                final idx = parseIndex(obj['index']);
                 final sig = (delta['signature'] ?? '').toString();
                 if (sig.isNotEmpty &&
                     idx != null &&
-                    _thinkingSig.containsKey(idx)) {
-                  _thinkingSig[idx]!.write(sig);
+                    thinkingSig.containsKey(idx)) {
+                  thinkingSig[idx]!.write(sig);
                 }
               } else if (delta['type'] == 'redacted_thinking_delta') {
-                final idx = _parseIndex(obj['index']);
+                final idx = parseIndex(obj['index']);
                 final data = (delta['data'] ?? '').toString();
                 if (data.isNotEmpty &&
                     idx != null &&
-                    _redactedThinkingData.containsKey(idx)) {
-                  _redactedThinkingData[idx]!.write(data);
+                    redactedThinkingData.containsKey(idx)) {
+                  redactedThinkingData[idx]!.write(data);
                 }
               } else if (delta['type'] == 'tool_use_delta') {
                 // Client tool input fragments stream under the same content_block index
                 final idx = (obj['index'] is int)
                     ? obj['index'] as int
                     : int.tryParse((obj['index'] ?? '').toString());
-                final id = (idx != null && _cliIndexToId.containsKey(idx))
-                    ? _cliIndexToId[idx]!
+                final id = (idx != null && cliIndexToId.containsKey(idx))
+                    ? cliIndexToId[idx]!
                     : '';
                 if (id.isNotEmpty) {
                   final argsDelta =
@@ -569,12 +572,13 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                               delta['text'] ??
                               '')
                           .toString();
-                  final entry = _anthToolUse.putIfAbsent(
+                  final entry = anthToolUse.putIfAbsent(
                     id,
                     () => {'name': '', 'args': ''},
                   );
-                  if (argsDelta.isNotEmpty)
+                  if (argsDelta.isNotEmpty) {
                     entry['args'] = (entry['args'] ?? '') + argsDelta;
+                  }
                 }
               } else if (delta['type'] == 'input_json_delta') {
                 final idxRaw = obj['index'];
@@ -583,28 +587,27 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                     : int.tryParse((idxRaw ?? '').toString());
                 final part = (delta['partial_json'] ?? '').toString();
                 if (index != null && part.isNotEmpty) {
-                  if (_cliIndexToId.containsKey(index)) {
-                    final id = _cliIndexToId[index]!;
-                    final entry = _anthToolUse.putIfAbsent(
+                  if (cliIndexToId.containsKey(index)) {
+                    final id = cliIndexToId[index]!;
+                    final entry = anthToolUse.putIfAbsent(
                       id,
                       () => {'name': '', 'args': ''},
                     );
                     entry['args'] = (entry['args'] ?? '') + part;
-                  } else if (_srvIndexToId.containsKey(index)) {
-                    final id = _srvIndexToId[index]!;
-                    _srvArgsStr[id] = (_srvArgsStr[id] ?? '') + part;
+                  } else if (srvIndexToId.containsKey(index)) {
+                    final id = srvIndexToId[index]!;
+                    srvArgsStr[id] = (srvArgsStr[id] ?? '') + part;
                   }
                 }
               }
             }
           } else if (type == 'content_block_stop') {
-            final idx = _parseIndex(obj['index']);
+            final idx = parseIndex(obj['index']);
             // Finalize thinking blocks so they can be sent back unmodified.
-            if (idx != null &&
-                _thinkingIndexToAssistantBlock.containsKey(idx)) {
-              final pos = _thinkingIndexToAssistantBlock.remove(idx)!;
-              final t = _thinkingText.remove(idx)?.toString() ?? '';
-              final sig = _thinkingSig.remove(idx)?.toString() ?? '';
+            if (idx != null && thinkingIndexToAssistantBlock.containsKey(idx)) {
+              final pos = thinkingIndexToAssistantBlock.remove(idx)!;
+              final t = thinkingText.remove(idx)?.toString() ?? '';
+              final sig = thinkingSig.remove(idx)?.toString() ?? '';
               assistantBlocks[pos] = {
                 'type': 'thinking',
                 'thinking': t,
@@ -612,9 +615,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
               };
             }
             if (idx != null &&
-                _redactedThinkingIndexToAssistantBlock.containsKey(idx)) {
-              final pos = _redactedThinkingIndexToAssistantBlock.remove(idx)!;
-              final data = _redactedThinkingData.remove(idx)?.toString() ?? '';
+                redactedThinkingIndexToAssistantBlock.containsKey(idx)) {
+              final pos = redactedThinkingIndexToAssistantBlock.remove(idx)!;
+              final data = redactedThinkingData.remove(idx)?.toString() ?? '';
               assistantBlocks[pos] = {
                 'type': 'redacted_thinking',
                 'data': data,
@@ -622,15 +625,15 @@ Stream<ChatStreamChunk> _sendClaudeStream(
             }
             String id = (obj['content_block']?['id'] ?? obj['id'] ?? '')
                 .toString();
-            if (id.isEmpty && idx != null && _cliIndexToId.containsKey(idx)) {
-              id = _cliIndexToId[idx]!;
+            if (id.isEmpty && idx != null && cliIndexToId.containsKey(idx)) {
+              id = cliIndexToId[idx]!;
             }
-            if (id.isNotEmpty && _anthToolUse.containsKey(id)) {
-              final name = (_anthToolUse[id]!['name'] ?? '').toString();
+            if (id.isNotEmpty && anthToolUse.containsKey(id)) {
+              final name = (anthToolUse[id]!['name'] ?? '').toString();
               Map<String, dynamic> args;
               try {
                 args =
-                    (jsonDecode((_anthToolUse[id]!['args'] ?? '{}') as String)
+                    (jsonDecode((anthToolUse[id]!['args'] ?? '{}') as String)
                             as Map)
                         .cast<String, dynamic>();
               } catch (_) {
@@ -652,8 +655,8 @@ Stream<ChatStreamChunk> _sendClaudeStream(
               }
               // Emit tool result to UI (placeholder was emitted at start)
               if (onToolCall != null) {
-                final res = await onToolCall(name, args) ?? '';
-                _toolResultsContent[id] = res;
+                final res = await onToolCall(name, args);
+                toolResultsContent[id] = res;
                 yield ChatStreamChunk(
                   content: '',
                   isDone: false,
@@ -670,16 +673,17 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                 );
               }
             } else {
-              if (idx != null && _srvIndexToId.containsKey(idx)) {
-                final sid = _srvIndexToId[idx]!;
+              if (idx != null && srvIndexToId.containsKey(idx)) {
+                final sid = srvIndexToId[idx]!;
                 Map<String, dynamic> args;
                 try {
-                  args = (jsonDecode((_srvArgsStr[sid] ?? '{}')) as Map)
-                      .cast<String, dynamic>();
+                  args = jsonDecode(
+                    srvArgsStr[sid] ?? '{}',
+                  ).cast<String, dynamic>();
                 } catch (_) {
                   args = <String, dynamic>{};
                 }
-                _srvArgs[sid] = args;
+                srvArgs[sid] = args;
                 yield ChatStreamChunk(
                   content: '',
                   isDone: false,
@@ -699,7 +703,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
               usage = (usage ?? const TokenUsage()).merge(
                 TokenUsage(promptTokens: inTok, completionTokens: outTok),
               );
-              roundTokens = usage!.totalTokens;
+              roundTokens = usage.totalTokens;
             }
             // Capture stop reason to handle pause_turn for server tools
             try {
@@ -708,35 +712,39 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                   ? (d['stop_reason'] ?? d['stopReason'])
                   : null;
               if (sr is String && sr.isNotEmpty) {
-                _lastStopReason = sr;
+                lastStopReason = sr;
               }
             } catch (_) {}
           } else if (type == 'message_stop') {
             // Flush remaining text
             final t = textBuf.toString();
-            if (t.isNotEmpty) assistantBlocks.add({'type': 'text', 'text': t});
+            if (t.isNotEmpty) {
+              assistantBlocks.add({'type': 'text', 'text': t});
+            }
             messageStopped = true;
           }
         } catch (_) {
           // ignore malformed chunk
         }
       }
-      if (messageStopped) break; // break await-for
+      if (messageStopped) {
+        break; // break await-for
+      }
     }
 
     // Merge usage across rounds for final token count
-    if (usage != null)
-      totalUsage = (totalUsage ?? const TokenUsage()).merge(usage!);
+    if (usage != null) {
+      totalUsage = (totalUsage ?? const TokenUsage()).merge(usage);
+    }
 
     // If no client tool calls, decide whether to continue (pause_turn/server tool) or finalize
-    if (_anthToolUse.isEmpty) {
+    if (anthToolUse.isEmpty) {
       final hadServerTool =
           assistantBlocks.any(
-            (b) =>
-                (b is Map) && (b['type'] == 'tool_use' || b['type'] == 'text'),
+            (b) => b['type'] == 'tool_use' || b['type'] == 'text',
           ) &&
-          _srvIndexToId.isNotEmpty;
-      final sr = _lastStopReason ?? '';
+          srvIndexToId.isNotEmpty;
+      final sr = lastStopReason ?? '';
       if (sr == 'pause_turn' || hadServerTool) {
         // Continue this turn with assistant content only
         convo = [
@@ -758,7 +766,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
 
     // Build tool_result blocks in a single user message (parallel-safe)
     final toolResultsBlocks = <Map<String, dynamic>>[];
-    for (final entry in _anthToolUse.entries) {
+    for (final entry in anthToolUse.entries) {
       final id = entry.key;
       final name = (entry.value['name'] ?? '').toString();
       Map<String, dynamic> args;
@@ -768,9 +776,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       } catch (_) {
         args = <String, dynamic>{};
       }
-      String res = _toolResultsContent[id] ?? '';
+      String res = toolResultsContent[id] ?? '';
       if (res.isEmpty && onToolCall != null) {
-        res = await onToolCall(name, args) ?? '';
+        res = await onToolCall(name, args);
       }
       toolResultsBlocks.add({
         'type': 'tool_result',

@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
-import 'package:intl/intl.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/models/chat_message.dart';
-import 'package:provider/provider.dart';
-import '../../../core/providers/settings_provider.dart';
-import '../../../core/providers/model_provider.dart';
 // import '../pages/select_copy_page.dart';
 import 'select_copy_sheet.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -49,6 +45,7 @@ Future<MessageMoreAction?> showMessageMoreSheet(
   // Desktop: show anchored glass menu near the clicked button
   final l10n = AppLocalizations.of(context)!;
   MessageMoreAction? selected;
+  Future<void> Function()? afterClose;
   await showDesktopContextMenuAt(
     context,
     globalPosition: DesktopMenuAnchor.positionOrCenter(context),
@@ -57,36 +54,39 @@ Future<MessageMoreAction?> showMessageMoreSheet(
         icon: Lucide.TextSelect,
         label: l10n.messageMoreSheetSelectCopy,
         onTap: () {
-          // Open desktop dialog after closing menu
-          Future.delayed(const Duration(milliseconds: 40), () {
+          afterClose = () async {
+            if (!context.mounted) return;
             showSelectCopyDesktopDialog(context, message: message);
-          });
+          };
         },
       ),
       DesktopContextMenuItem(
         icon: Lucide.BookOpenText,
         label: l10n.messageMoreSheetRenderWebView,
-        onTap: () async {
-          try {
-            final raw = message.content.trim();
-            if (raw.isEmpty) return;
-            final processed =
-                await MarkdownMediaSanitizer.inlineLocalImagesToBase64(raw);
-            final html = await MarkdownPreviewHtmlBuilder.buildFromMarkdown(
-              context,
-              processed,
-            );
-            // After menu close, open as desktop dialog
-            Future.delayed(const Duration(milliseconds: 40), () {
+        onTap: () {
+          afterClose = () async {
+            try {
+              final raw = message.content.trim();
+              if (raw.isEmpty) return;
+              final scheme = Theme.of(context).colorScheme;
+              final processed =
+                  await MarkdownMediaSanitizer.inlineLocalImagesToBase64(raw);
+              final html =
+                  await MarkdownPreviewHtmlBuilder.buildFromMarkdownWithColorScheme(
+                    scheme,
+                    processed,
+                  );
+              if (!context.mounted) return;
               showHtmlPreviewDesktopDialog(context, html: html);
-            });
-          } catch (e) {
-            showAppSnackBar(
-              context,
-              message: e.toString(),
-              type: NotificationType.error,
-            );
-          }
+            } catch (e) {
+              if (!context.mounted) return;
+              showAppSnackBar(
+                context,
+                message: e.toString(),
+                type: NotificationType.error,
+              );
+            }
+          };
         },
       ),
       if (message.role != 'user')
@@ -121,6 +121,9 @@ Future<MessageMoreAction?> showMessageMoreSheet(
       ),
     ],
   );
+  if (afterClose != null) {
+    await afterClose!();
+  }
   return selected;
 }
 
@@ -135,50 +138,6 @@ class _MessageMoreSheet extends StatefulWidget {
 
 class _MessageMoreSheetState extends State<_MessageMoreSheet> {
   // Draggable sheet removed; use auto height with max constraint.
-
-  String _formatTime(BuildContext context, DateTime time) {
-    final locale = Localizations.localeOf(context);
-    final fmt = locale.languageCode == 'zh'
-        ? DateFormat('yyyy年M月d日 HH:mm:ss')
-        : DateFormat('yyyy-MM-dd HH:mm:ss');
-    return fmt.format(time);
-  }
-
-  String? _modelDisplayName(BuildContext context) {
-    final msg = widget.message;
-    if (msg.role != 'assistant') return null;
-    if (msg.providerId == null || msg.modelId == null) return null;
-    final settings = context.read<SettingsProvider>();
-    final modelId = msg.modelId!;
-    String? name;
-    String baseId = modelId;
-    if (msg.providerId!.isNotEmpty) {
-      try {
-        final cfg = settings.getProviderConfig(msg.providerId!);
-        final ov = cfg.modelOverrides[modelId] as Map?;
-        if (ov != null) {
-          final overrideName = (ov['name'] as String?)?.trim();
-          if (overrideName != null && overrideName.isNotEmpty) {
-            name = overrideName;
-          }
-          final apiId = (ov['apiModelId'] ?? ov['api_model_id'])
-              ?.toString()
-              .trim();
-          if (apiId != null && apiId.isNotEmpty) {
-            baseId = apiId;
-          }
-        }
-      } catch (_) {
-        // Ignore lookup issues; fall back to inference below.
-      }
-    }
-
-    final inferred = ModelRegistry.infer(
-      ModelInfo(id: baseId, displayName: baseId),
-    );
-    final fallback = inferred.displayName.trim();
-    return name ?? (fallback.isNotEmpty ? fallback : baseId);
-  }
 
   Widget _actionItem({
     required IconData icon,
@@ -251,7 +210,7 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: cs.onSurface.withOpacity(0.2),
+                    color: cs.onSurface.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -265,13 +224,15 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                     _actionItem(
                       icon: Lucide.TextSelect,
                       label: l10n.messageMoreSheetSelectCopy,
-                      onTap: () async {
+                      onTap: () {
                         // Close current sheet, then open iOS-style select-copy sheet
                         Navigator.of(context).pop();
                         // Schedule next frame with parent context to avoid stacking sheets
-                        Future.delayed(const Duration(milliseconds: 40), () {
+                        final parentCtx = widget.parentContext;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!parentCtx.mounted) return;
                           showSelectCopySheet(
-                            widget.parentContext,
+                            parentCtx,
                             message: widget.message,
                           );
                         });
@@ -281,6 +242,9 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                       icon: Lucide.BookOpenText,
                       label: l10n.messageMoreSheetRenderWebView,
                       onTap: () async {
+                        final parentCtx = widget.parentContext;
+                        final navigator = Navigator.of(parentCtx);
+                        final scheme = Theme.of(parentCtx).colorScheme;
                         Navigator.of(context).pop();
                         try {
                           final raw = widget.message.content.trim();
@@ -290,19 +254,21 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                                 raw,
                               );
                           final html =
-                              await MarkdownPreviewHtmlBuilder.buildFromMarkdown(
-                                widget.parentContext,
+                              await MarkdownPreviewHtmlBuilder.buildFromMarkdownWithColorScheme(
+                                scheme,
                                 processed,
                               );
                           final b64 = base64Encode(utf8.encode(html));
-                          Navigator.of(widget.parentContext).push(
+                          if (!parentCtx.mounted) return;
+                          navigator.push(
                             MaterialPageRoute(
                               builder: (_) => WebViewPage(contentBase64: b64),
                             ),
                           );
                         } catch (e) {
+                          if (!parentCtx.mounted) return;
                           showAppSnackBar(
-                            context,
+                            parentCtx,
                             message: e.toString(),
                             type: NotificationType.error,
                           );

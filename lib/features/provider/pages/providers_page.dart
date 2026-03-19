@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import '../../../utils/brand_assets.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'provider_detail_page.dart';
 import '../widgets/import_provider_sheet.dart';
@@ -32,7 +30,6 @@ class ProvidersPage extends StatefulWidget {
 }
 
 class _ProvidersPageState extends State<ProvidersPage> {
-  List<_Provider>? _items;
   final Set<String> _settleKeys = {};
   bool _selectMode = false;
   final Set<String> _selected = {};
@@ -43,6 +40,20 @@ class _ProvidersPageState extends State<ProvidersPage> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleAddProvider() async {
+    final l10n = AppLocalizations.of(context)!;
+    final createdKey = await showAddProviderSheet(context);
+    if (!mounted || createdKey == null || createdKey.isEmpty) {
+      return;
+    }
+    setState(() {});
+    showAppSnackBar(
+      context,
+      message: l10n.providersPageProviderAddedSnackbar,
+      type: NotificationType.success,
+    );
   }
 
   @override
@@ -155,19 +166,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
               icon: Lucide.Plus,
               color: cs.onSurface,
               size: 22,
-              onTap: () async {
-                final createdKey = await showAddProviderSheet(context);
-                if (!mounted) return;
-                if (createdKey != null && createdKey.isNotEmpty) {
-                  setState(() {});
-                  final msg = l10n.providersPageProviderAddedSnackbar;
-                  showAppSnackBar(
-                    context,
-                    message: msg,
-                    type: NotificationType.success,
-                  );
-                }
-              },
+              onTap: _handleAddProvider,
             ),
           ),
           const SizedBox(width: 12),
@@ -534,6 +533,8 @@ class _ProvidersPageState extends State<ProvidersPage> {
   Future<void> _onDeleteSelected() async {
     if (_selected.isEmpty) return;
     final l10n = AppLocalizations.of(context)!;
+    final assistantProvider = context.read<AssistantProvider>();
+    final settingsProvider = context.read<SettingsProvider>();
     // Skip built-in providers (default ones)
     final builtInKeys = {for (final p in _providers(l10n: l10n)) p.keyName};
     final keysToDelete = _selected
@@ -567,32 +568,29 @@ class _ProvidersPageState extends State<ProvidersPage> {
         ],
       ),
     );
-    if (confirmed != true) return;
-    try {
-      // 尽可能复用 ProviderDetailPage 删除前的清理逻辑：清理引用该 provider 的助手模型选择
-      try {
-        final ap = context.read<AssistantProvider>();
-        for (final a in ap.assistants) {
-          if (keysToDelete.contains(a.chatModelProvider)) {
-            await ap.updateAssistant(a.copyWith(clearChatModel: true));
-          }
-        }
-      } catch (_) {}
-      final sp = context.read<SettingsProvider>();
-      for (final k in keysToDelete) {
-        await sp.removeProviderConfig(k);
+    if (!mounted || confirmed != true) return;
+
+    // 尽可能复用 ProviderDetailPage 删除前的清理逻辑：清理引用该 provider 的助手模型选择
+    for (final assistant in assistantProvider.assistants) {
+      if (keysToDelete.contains(assistant.chatModelProvider)) {
+        await assistantProvider.updateAssistant(
+          assistant.copyWith(clearChatModel: true),
+        );
       }
-      if (!mounted) return;
-      setState(() {
-        _selected.clear();
-        _selectMode = false;
-      });
-      showAppSnackBar(
-        context,
-        message: l10n.providersPageDeleteSelectedSnackbar,
-        type: NotificationType.success,
-      );
-    } catch (_) {}
+    }
+    for (final key in keysToDelete) {
+      await settingsProvider.removeProviderConfig(key);
+    }
+    if (!mounted) return;
+    setState(() {
+      _selected.clear();
+      _selectMode = false;
+    });
+    showAppSnackBar(
+      context,
+      message: l10n.providersPageDeleteSelectedSnackbar,
+      type: NotificationType.success,
+    );
   }
 }
 
@@ -651,8 +649,10 @@ class _ProvidersList extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
-    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06);
+    final bg = isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96);
+    final borderColor = cs.outlineVariant.withValues(
+      alpha: isDark ? 0.08 : 0.06,
+    );
 
     // Adapt height: wrap to content if short; flush to bottom if long
     return Padding(
@@ -765,8 +765,10 @@ class _GroupedProvidersList extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
-    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06);
+    final bg = isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96);
+    final borderColor = cs.outlineVariant.withValues(
+      alpha: isDark ? 0.08 : 0.06,
+    );
 
     // Adapt height: wrap to content if short; flush to bottom if long
     return Padding(
@@ -788,8 +790,9 @@ class _GroupedProvidersList extends StatelessWidget {
 
           final collapsedByGroupKey = <String, bool>{};
           for (final r in rows) {
-            if (r is _ProviderGroupingHeaderVM)
+            if (r is _ProviderGroupingHeaderVM) {
               collapsedByGroupKey[r.groupKey] = r.collapsed;
+            }
           }
 
           double baseContentH = 0.0;
@@ -941,7 +944,7 @@ class _ProvidersSearchField extends StatelessWidget {
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: TextStyle(
-            color: cs.onSurface.withOpacity(0.5),
+            color: cs.onSurface.withValues(alpha: 0.5),
             fontSize: 13.5,
           ),
           isDense: true,
@@ -952,7 +955,7 @@ class _ProvidersSearchField extends StatelessWidget {
           prefixIcon: Icon(
             Lucide.Search,
             size: 16,
-            color: cs.onSurface.withOpacity(0.5),
+            color: cs.onSurface.withValues(alpha: 0.5),
           ),
           prefixIconConstraints: const BoxConstraints(
             minWidth: 34,
@@ -964,7 +967,7 @@ class _ProvidersSearchField extends StatelessWidget {
                   icon: Icon(
                     Lucide.X,
                     size: 14,
-                    color: cs.onSurface.withOpacity(0.48),
+                    color: cs.onSurface.withValues(alpha: 0.48),
                   ),
                   tooltip: hintText,
                   splashColor: Colors.transparent,
@@ -978,7 +981,7 @@ class _ProvidersSearchField extends StatelessWidget {
           ),
           filled: true,
           fillColor: isDark
-              ? Colors.white.withOpacity(0.12)
+              ? Colors.white.withValues(alpha: 0.12)
               : const Color(0xFFEBEBEB),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -1016,8 +1019,8 @@ class _ProviderGroupHeaderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final base = cs.onSurface.withOpacity(0.8);
-    final pillBg = cs.primary.withOpacity(0.12);
+    final base = cs.onSurface.withValues(alpha: 0.8);
+    final pillBg = cs.primary.withValues(alpha: 0.12);
     final pillFg = cs.primary;
 
     return _TactileRow(
@@ -1042,7 +1045,7 @@ class _ProviderGroupHeaderRow extends StatelessWidget {
                 child: Icon(
                   Lucide.ChevronRight,
                   size: 16,
-                  color: color.withOpacity(0.75),
+                  color: color.withValues(alpha: 0.75),
                 ),
               ),
               const SizedBox(width: 6),
@@ -1096,8 +1099,8 @@ class _ProviderRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
 
     final statusBg = enabled
-        ? Colors.green.withOpacity(0.12)
-        : Colors.orange.withOpacity(0.15);
+        ? Colors.green.withValues(alpha: 0.12)
+        : Colors.orange.withValues(alpha: 0.15);
     final statusFg = enabled ? Colors.green : Colors.orange;
 
     final row = _TactileRow(
@@ -1119,7 +1122,7 @@ class _ProviderRow extends StatelessWidget {
       pressedScale: 1.00, // no scale per spec
       haptics: false,
       builder: (pressed) {
-        final base = cs.onSurface.withOpacity(0.9);
+        final base = cs.onSurface.withValues(alpha: 0.9);
         return _AnimatedPressColor(
           pressed: pressed,
           base: base,
@@ -1147,7 +1150,7 @@ class _ProviderRow extends StatelessWidget {
                             hitTestSize: 22,
                             borderWidth: 1.6,
                             activeColor: cs.primary,
-                            borderColor: cs.onSurface.withOpacity(0.35),
+                            borderColor: cs.onSurface.withValues(alpha: 0.35),
                             onChanged: (_) => onToggleSelect(provider.keyName),
                           ),
                         ),
@@ -1320,106 +1323,16 @@ class _SelectionBar extends StatelessWidget {
   }
 }
 
-class _CapsuleButton extends StatefulWidget {
-  const _CapsuleButton({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-    this.outlined = false,
-  });
-  final String label;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-  final bool outlined;
-  @override
-  State<_CapsuleButton> createState() => _CapsuleButtonState();
-}
-
-class _CapsuleButtonState extends State<_CapsuleButton> {
-  bool _pressed = false;
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    // iOS glass style: grey border + frosted background; keep icon/label tinted by provided color
-    final glassBase = isDark
-        ? Colors.black.withOpacity(0.06)
-        : Colors.white.withOpacity(0.65);
-    final overlay = isDark
-        ? Colors.black.withOpacity(0.06)
-        : Colors.black.withOpacity(0.05);
-    final tileColor = _pressed
-        ? Color.alphaBlend(overlay, glassBase)
-        : glassBase;
-    final borderColor = cs.outlineVariant.withOpacity(
-      isDark ? 0.35 : 0.40,
-    ); // subtle grey border
-    final fg = widget.color; // use provided color for content only
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTap: () {
-        Haptics.light();
-        widget.onTap();
-      },
-      child: AnimatedScale(
-        scale: _pressed ? 0.96 : 1.0,
-        duration: const Duration(milliseconds: 110),
-        curve: Curves.easeOutCubic,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: tileColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: borderColor, width: 1.0),
-              ),
-              alignment: Alignment.center,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(widget.icon, size: 16, color: fg),
-                  const SizedBox(width: 6),
-                  Text(
-                    widget.label,
-                    style: TextStyle(
-                      color: fg,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _GlassCircleButton extends StatefulWidget {
   const _GlassCircleButton({
     required this.icon,
     required this.color,
     required this.onTap,
-    this.size = 46,
     this.semanticLabel,
   });
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final double size; // diameter
   final String? semanticLabel;
 
   @override
@@ -1434,19 +1347,19 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final glassBase = isDark
-        ? Colors.black.withOpacity(0.06)
-        : Colors.white.withOpacity(0.06);
+        ? Colors.black.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.06);
     final overlay = isDark
-        ? Colors.white.withOpacity(0.06)
-        : Colors.black.withOpacity(0.05);
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.05);
     final tileColor = _pressed
         ? Color.alphaBlend(overlay, glassBase)
         : glassBase;
-    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.10 : 0.10);
+    final borderColor = cs.outlineVariant.withValues(alpha: 0.10);
 
     final child = SizedBox(
-      width: widget.size,
-      height: widget.size,
+      width: 46,
+      height: 46,
       child: Center(child: Icon(widget.icon, size: 18, color: widget.color)),
     );
 
@@ -1549,7 +1462,7 @@ Future<void> _showMultiExportSheet(
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: cs.onSurface.withOpacity(0.2),
+                    color: cs.onSurface.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -1574,14 +1487,18 @@ Future<void> _showMultiExportSheet(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: cs.outlineVariant.withOpacity(0.2),
+                        color: cs.outlineVariant.withValues(alpha: 0.2),
                       ),
                     ),
-                    child: PrettyQr(
-                      data: text,
-                      size: 180,
-                      roundEdges: true,
-                      errorCorrectLevel: QrErrorCorrectLevel.M,
+                    child: SizedBox.square(
+                      dimension: 180,
+                      child: PrettyQrView.data(
+                        data: text,
+                        errorCorrectLevel: QrErrorCorrectLevel.M,
+                        decoration: const PrettyQrDecoration(
+                          shape: PrettyQrSmoothSymbol(roundFactor: 1),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1623,10 +1540,14 @@ Future<void> _showMultiExportSheet(
                       label: l10n.providersPageExportShareButton,
                       onTap: () async {
                         final rect = shareAnchorRect(ctx);
-                        await Share.share(
-                          text,
-                          subject: 'AI Providers',
-                          sharePositionOrigin: rect,
+                        await SharePlus.instance.share(
+                          ShareParams(
+                            text: text,
+                            subject: l10n.providersPageExportSelectedTitle(
+                              keys.length,
+                            ),
+                            sharePositionOrigin: rect,
+                          ),
                         );
                       },
                     ),
@@ -1687,89 +1608,6 @@ class _Pill extends StatelessWidget {
   }
 }
 
-class _BrandAvatar extends StatelessWidget {
-  const _BrandAvatar({required this.name, this.size = 40});
-  final String name;
-  final double size;
-
-  bool _preferMonochromeWhite(String n) {
-    final k = n.toLowerCase();
-    if (RegExp(r'openai|gpt|o\d').hasMatch(k)) return true;
-    if (RegExp(r'grok|xai').hasMatch(k)) return true;
-    if (RegExp(r'openrouter').hasMatch(k)) return true;
-    return false;
-  }
-
-  bool _tintPurpleSilicon(String n) {
-    final k = n.toLowerCase();
-    return RegExp(r'silicon|硅基').hasMatch(k);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final asset = BrandAssets.assetForName(name);
-    final circle = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : cs.primary.withOpacity(0.1),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: asset == null
-          ? Text(
-              name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-              style: TextStyle(
-                color: cs.primary,
-                fontWeight: FontWeight.w700,
-                fontSize: size * 0.42,
-              ),
-            )
-          : _IconAsset(
-              asset: asset,
-              size: size * 0.62,
-              monochromeWhite: isDark && _preferMonochromeWhite(name),
-            ),
-    );
-    return circle;
-  }
-}
-
-class _IconAsset extends StatelessWidget {
-  const _IconAsset({
-    required this.asset,
-    required this.size,
-    this.monochromeWhite = false,
-  });
-  final String asset;
-  final double size;
-  final bool monochromeWhite;
-  @override
-  Widget build(BuildContext context) {
-    if (asset.endsWith('.svg')) {
-      return SvgPicture.asset(
-        asset,
-        width: size,
-        height: size,
-        fit: BoxFit.contain,
-        colorFilter: monochromeWhite
-            ? const ColorFilter.mode(Colors.white, BlendMode.srcIn)
-            : null,
-      );
-    }
-    return Image.asset(
-      asset,
-      width: size,
-      height: size,
-      fit: BoxFit.contain,
-      color: monochromeWhite ? Colors.white : null,
-      colorBlendMode: monochromeWhite ? BlendMode.srcIn : null,
-    );
-  }
-}
-
 class _Provider {
   final String name;
   final String keyName;
@@ -1783,67 +1621,19 @@ class _Provider {
   });
 }
 
-class _DragHandle extends StatelessWidget {
-  const _DragHandle({
-    required this.onDragStarted,
-    required this.onDragEnd,
-    required this.feedback,
-    required this.data,
-  });
-  final VoidCallback onDragStarted;
-  final VoidCallback onDragEnd;
-  final Widget feedback;
-  final int data;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return LongPressDraggable<int>(
-      data: data,
-      dragAnchorStrategy: pointerDragAnchorStrategy,
-      onDragStarted: onDragStarted,
-      onDragEnd: (_) => onDragEnd(),
-      feedback: Material(
-        color: Colors.transparent,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 200),
-          child: Opacity(opacity: 0.95, child: feedback),
-        ),
-      ),
-      child: Container(
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
-        child: Icon(
-          Lucide.GripHorizontal,
-          size: 24,
-          color: cs.onSurface.withOpacity(0.7),
-        ),
-      ),
-      childWhenDragging: const SizedBox(width: 40, height: 40),
-    );
-  }
-}
-
 // Icon-only tactile icon button for AppBar: no ripple, scale + color on press, no haptics
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,
     required this.color,
     required this.onTap,
-    this.onLongPress,
-    this.semanticLabel,
     this.size = 22,
-    this.haptics = true,
   });
 
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final String? semanticLabel;
   final double size;
-  final bool haptics;
 
   @override
   State<_TactileIconButton> createState() => _TactileIconButtonState();
@@ -1855,32 +1645,24 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
       size: widget.size,
       color: _pressed ? pressColor : base,
-      semanticLabel: widget.semanticLabel,
     );
 
     return Semantics(
       button: true,
-      label: widget.semanticLabel,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
         onTap: () {
-          if (widget.haptics) Haptics.light();
+          Haptics.light();
           widget.onTap();
         },
-        onLongPress: widget.onLongPress == null
-            ? null
-            : () {
-                if (widget.haptics) Haptics.light();
-                widget.onLongPress!.call();
-              },
         child: AnimatedScale(
           scale: _pressed ? 0.95 : 1.0,
           duration: const Duration(milliseconds: 100),
@@ -1928,8 +1710,9 @@ class _TactileRowState extends State<_TactileRow> {
           ? null
           : () {
               if (widget.haptics &&
-                  context.read<SettingsProvider>().hapticsOnListItemTap)
+                  context.read<SettingsProvider>().hapticsOnListItemTap) {
                 Haptics.soft();
+              }
               widget.onTap!.call();
             },
       child: widget.builder(_pressed),
@@ -1968,6 +1751,6 @@ Widget _iosDivider(BuildContext context) {
     thickness: 0.6,
     indent: 54,
     endIndent: 12,
-    color: cs.outlineVariant.withOpacity(0.18),
+    color: cs.outlineVariant.withValues(alpha: 0.18),
   );
 }

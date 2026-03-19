@@ -57,9 +57,9 @@ class IosFormTextField extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final fieldBg = isDark ? Colors.white12 : const Color(0xFFF2F3F5);
-    final labelColor = cs.onSurface.withOpacity(0.85);
-    final valueColor = cs.onSurface.withOpacity(enabled ? 0.92 : 0.55);
-    final hintColor = cs.onSurface.withOpacity(isDark ? 0.42 : 0.46);
+    final labelColor = cs.onSurface.withValues(alpha: 0.85);
+    final valueColor = cs.onSurface.withValues(alpha: enabled ? 0.92 : 0.55);
+    final hintColor = cs.onSurface.withValues(alpha: isDark ? 0.42 : 0.46);
     final resolvedOuterPadding =
         outerPadding ??
         const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
@@ -153,7 +153,7 @@ class IosFormTextField extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 40),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: enabled ? fieldBg : fieldBg.withOpacity(0.55),
+          color: enabled ? fieldBg : fieldBg.withValues(alpha: 0.55),
           borderRadius: BorderRadius.circular(10),
         ),
         padding: EdgeInsets.symmetric(
@@ -200,7 +200,7 @@ class IosFormTextField extends StatelessWidget {
                 : null,
             alignment: maxLines == 1 ? Alignment.centerLeft : Alignment.topLeft,
             decoration: BoxDecoration(
-              color: enabled ? fieldBg : fieldBg.withOpacity(0.55),
+              color: enabled ? fieldBg : fieldBg.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(12),
             ),
             padding: EdgeInsets.symmetric(

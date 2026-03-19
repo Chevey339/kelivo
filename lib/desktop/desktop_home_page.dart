@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
-import '../shared/responsive/breakpoints.dart';
 import 'desktop_nav_rail.dart';
 import 'desktop_chat_page.dart';
 import 'window_title_bar.dart';
 import 'desktop_settings_page.dart';
 import 'desktop_translate_page.dart';
 import '../features/settings/pages/storage_space_page.dart';
+import '../l10n/app_localizations.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:async';
 import 'hotkeys/hotkey_event_bus.dart';
@@ -95,22 +95,24 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
           } catch (_) {}
           break;
         case HotkeyAction.newTopic:
-          if (_tabIndex == 0) ChatActionBus.instance.fire(ChatAction.newTopic);
+          if (_tabIndex == 0) {
+            ChatActionBus.instance.fire(ChatAction.newTopic);
+          }
           break;
         case HotkeyAction.switchModel:
-          if (_tabIndex == 0)
+          if (_tabIndex == 0) {
             ChatActionBus.instance.fire(ChatAction.switchModel);
+          }
           break;
         case HotkeyAction.toggleLeftPanelAssistants:
-          if (_tabIndex == 0)
+          if (_tabIndex == 0) {
             ChatActionBus.instance.fire(ChatAction.toggleLeftPanelAssistants);
+          }
           break;
         case HotkeyAction.toggleLeftPanelTopics:
-          if (_tabIndex == 0)
+          if (_tabIndex == 0) {
             ChatActionBus.instance.fire(ChatAction.toggleLeftPanelTopics);
-          break;
-        default:
-          // Other actions handled in page-specific widgets
+          }
           break;
       }
     });
@@ -277,10 +279,11 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
 // No extra router/shim; we import DesktopSettingsPage directly above.
 
 class _TitleBarLeading extends StatelessWidget {
-  const _TitleBarLeading({super.key});
+  const _TitleBarLeading();
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -295,11 +298,11 @@ class _TitleBarLeading extends StatelessWidget {
         const SizedBox(width: 8),
         // App name
         Text(
-          'Kelivo',
+          l10n.aboutPageAppName,
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: cs.onSurface.withOpacity(0.8),
+            color: cs.onSurface.withValues(alpha: 0.8),
             // Avoid accidental underline when not under a Material ancestor in edge cases
             decoration: TextDecoration.none,
           ),

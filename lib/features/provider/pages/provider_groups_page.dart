@@ -15,7 +15,7 @@ class ProviderGroupsPage extends StatefulWidget {
 }
 
 class _ProviderGroupsPageState extends State<ProviderGroupsPage> {
-  Future<void> _createGroup(BuildContext context) async {
+  Future<void> _createGroup() async {
     final l10n = AppLocalizations.of(context)!;
     final TextEditingController c = TextEditingController();
     final ok = await showDialog<bool>(
@@ -39,11 +39,13 @@ class _ProviderGroupsPageState extends State<ProviderGroupsPage> {
         ],
       ),
     );
+    if (!mounted) return;
     if (ok == true) {
       final name = c.text.trim();
       if (name.isEmpty) return;
       final id = await context.read<SettingsProvider>().createGroup(name);
-      if (id.isEmpty && mounted) {
+      if (!mounted) return;
+      if (id.isEmpty) {
         showAppSnackBar(
           context,
           message: l10n.providerGroupsCreateFailedToast,
@@ -53,11 +55,7 @@ class _ProviderGroupsPageState extends State<ProviderGroupsPage> {
     }
   }
 
-  Future<void> _renameGroup(
-    BuildContext context,
-    String groupId,
-    String oldName,
-  ) async {
+  Future<void> _renameGroup(String groupId, String oldName) async {
     final l10n = AppLocalizations.of(context)!;
     final TextEditingController c = TextEditingController(text: oldName);
     final ok = await showDialog<bool>(
@@ -81,6 +79,7 @@ class _ProviderGroupsPageState extends State<ProviderGroupsPage> {
         ],
       ),
     );
+    if (!mounted) return;
     if (ok == true) {
       final name = c.text.trim();
       if (name.isEmpty) return;
@@ -88,7 +87,7 @@ class _ProviderGroupsPageState extends State<ProviderGroupsPage> {
     }
   }
 
-  Future<void> _deleteGroup(BuildContext context, String groupId) async {
+  Future<void> _deleteGroup(String groupId) async {
     final l10n = AppLocalizations.of(context)!;
     final ok = await showDialog<bool>(
       context: context,
@@ -110,15 +109,15 @@ class _ProviderGroupsPageState extends State<ProviderGroupsPage> {
         ],
       ),
     );
+    if (!mounted) return;
     if (ok == true) {
       await context.read<SettingsProvider>().deleteGroup(groupId);
-      if (mounted) {
-        showAppSnackBar(
-          context,
-          message: l10n.providerGroupsDeletedToast,
-          type: NotificationType.success,
-        );
-      }
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.providerGroupsDeletedToast,
+        type: NotificationType.success,
+      );
     }
   }
 
@@ -154,7 +153,7 @@ class _ProviderGroupsPageState extends State<ProviderGroupsPage> {
             child: IosIconButton(
               icon: Lucide.Plus,
               minSize: 44,
-              onTap: () => _createGroup(context),
+              onTap: _createGroup,
             ),
           ),
         ],
@@ -166,7 +165,7 @@ class _ProviderGroupsPageState extends State<ProviderGroupsPage> {
                 style: TextStyle(
                   color: Theme.of(
                     context,
-                  ).colorScheme.onSurface.withOpacity(0.7),
+                  ).colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
               ),
             )
@@ -202,8 +201,8 @@ class _ProviderGroupsPageState extends State<ProviderGroupsPage> {
                       child: _ProviderGroupCard(
                         title: g.name,
                         count: count,
-                        onEdit: () => _renameGroup(context, g.id, g.name),
-                        onDelete: () => _deleteGroup(context, g.id),
+                        onEdit: () => _renameGroup(g.id, g.name),
+                        onDelete: () => _deleteGroup(g.id),
                       ),
                     ),
                   ),
@@ -231,7 +230,9 @@ class _ProviderGroupCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? Colors.white10 : const Color(0xFFF7F7F9);
-    final borderColor = cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.10);
+    final borderColor = cs.outlineVariant.withValues(
+      alpha: isDark ? 0.12 : 0.10,
+    );
     return Container(
       decoration: BoxDecoration(
         color: bg,
@@ -278,7 +279,7 @@ class _CountPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bg = cs.primary.withOpacity(0.12);
+    final bg = cs.primary.withValues(alpha: 0.12);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(

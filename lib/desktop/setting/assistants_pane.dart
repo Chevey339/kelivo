@@ -30,7 +30,7 @@ class _DesktopAssistantsBody extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w400,
-                            color: cs.onSurface.withOpacity(0.9),
+                            color: cs.onSurface.withValues(alpha: 0.9),
                           ),
                         ),
                       ),
@@ -43,7 +43,7 @@ class _DesktopAssistantsBody extends StatelessWidget {
               Expanded(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor.withOpacity(0.0),
+                    color: Theme.of(context).cardColor.withValues(alpha: 0.0),
                   ),
                   child: ReorderableListView.builder(
                     buildDefaultDragHandles: false,
@@ -119,8 +119,8 @@ class _AddAssistantButtonState extends State<_AddAssistantButton> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -128,9 +128,11 @@ class _AddAssistantButtonState extends State<_AddAssistantButton> {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () async {
+          final assistantProvider = context.read<AssistantProvider>();
           final name = await _showAddAssistantDesktopDialog(context);
           if (name == null || name.trim().isEmpty) return;
-          await context.read<AssistantProvider>().addAssistant(
+          if (!context.mounted) return;
+          await assistantProvider.addAssistant(
             name: name.trim(),
             context: context,
           );
@@ -211,13 +213,13 @@ Future<String?> _showAddAssistantDesktopDialog(BuildContext context) async {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
-                            color: cs.outlineVariant.withOpacity(0.2),
+                            color: cs.outlineVariant.withValues(alpha: 0.2),
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
-                            color: cs.primary.withOpacity(0.4),
+                            color: cs.primary.withValues(alpha: 0.4),
                           ),
                         ),
                       ),
@@ -272,7 +274,9 @@ class _DeleteAssistantIconState extends State<_DeleteAssistantIcon> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark ? cs.error.withOpacity(0.18) : cs.error.withOpacity(0.14))
+        ? (isDark
+              ? cs.error.withValues(alpha: 0.18)
+              : cs.error.withValues(alpha: 0.14))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -307,7 +311,9 @@ class _CopyAssistantIconState extends State<_CopyAssistantIcon> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
-        ? (isDark ? cs.primary.withOpacity(0.16) : cs.primary.withOpacity(0.12))
+        ? (isDark
+              ? cs.primary.withValues(alpha: 0.16)
+              : cs.primary.withValues(alpha: 0.12))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -335,7 +341,7 @@ Future<bool?> _confirmDeleteDesktop(BuildContext context) async {
     context: context,
     barrierDismissible: true,
     barrierLabel: 'assistant-delete',
-    barrierColor: Colors.black.withOpacity(0.15),
+    barrierColor: Colors.black.withValues(alpha: 0.15),
     transitionDuration: const Duration(milliseconds: 160),
     pageBuilder: (ctx, _, __) {
       final dialog = Material(
@@ -350,8 +356,8 @@ Future<bool?> _confirmDeleteDesktop(BuildContext context) async {
                   borderRadius: BorderRadius.circular(14),
                   side: BorderSide(
                     color: Theme.of(ctx).brightness == Brightness.dark
-                        ? Colors.white.withOpacity(0.08)
-                        : cs.outlineVariant.withOpacity(0.25),
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : cs.outlineVariant.withValues(alpha: 0.25),
                   ),
                 ),
               ),
@@ -391,7 +397,7 @@ Future<bool?> _confirmDeleteDesktop(BuildContext context) async {
                   Divider(
                     height: 1,
                     thickness: 0.5,
-                    color: cs.outlineVariant.withOpacity(0.12),
+                    color: cs.outlineVariant.withValues(alpha: 0.12),
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
@@ -401,7 +407,7 @@ Future<bool?> _confirmDeleteDesktop(BuildContext context) async {
                         Text(
                           l10n.assistantSettingsDeleteDialogContent,
                           style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.9),
+                            color: cs.onSurface.withValues(alpha: 0.9),
                             fontSize: 13.5,
                           ),
                         ),
@@ -481,14 +487,14 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
         ? baseColor
         : (isDark ? Colors.white10 : Colors.transparent);
     final hoverBg = widget.filled
-        ? baseColor.withOpacity(0.92)
+        ? baseColor.withValues(alpha: 0.92)
         : (isDark
-              ? Colors.white.withOpacity(0.08)
-              : Colors.black.withOpacity(0.04));
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.04));
     final bg = _hover ? hoverBg : baseBg;
     final borderColor = widget.filled
         ? Colors.transparent
-        : baseColor.withOpacity(isDark ? 0.6 : 0.5);
+        : baseColor.withValues(alpha: isDark ? 0.6 : 0.5);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -543,10 +549,12 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    final baseBg = isDark
+        ? Colors.white10
+        : Colors.white.withValues(alpha: 0.96);
     final borderColor = _hover
-        ? cs.primary.withOpacity(isDark ? 0.35 : 0.45)
-        : cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08);
+        ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -592,10 +600,10 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: cs.primary.withOpacity(0.12),
+                                color: cs.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(999),
                                 border: Border.all(
-                                  color: cs.primary.withOpacity(0.35),
+                                  color: cs.primary.withValues(alpha: 0.35),
                                 ),
                               ),
                               child: Text(
@@ -611,14 +619,15 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                             ),
                           _CopyAssistantIcon(
                             onCopy: () async {
+                              final assistantProvider = context
+                                  .read<AssistantProvider>();
                               final l10n = AppLocalizations.of(context)!;
-                              final newId = await context
-                                  .read<AssistantProvider>()
+                              final newId = await assistantProvider
                                   .duplicateAssistant(
                                     widget.item.id,
                                     l10n: l10n,
                                   );
-                              if (!mounted) return;
+                              if (!context.mounted) return;
                               if (newId != null) {
                                 showAppSnackBar(
                                   context,
@@ -630,11 +639,10 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                           ),
                           _DeleteAssistantIcon(
                             onConfirm: () async {
+                              final assistantProvider = context
+                                  .read<AssistantProvider>();
                               final l10n = AppLocalizations.of(context)!;
-                              final count = context
-                                  .read<AssistantProvider>()
-                                  .assistants
-                                  .length;
+                              final count = assistantProvider.assistants.length;
                               if (count <= 1) {
                                 showAppSnackBar(
                                   context,
@@ -646,9 +654,10 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                               }
                               final ok = await _confirmDeleteDesktop(context);
                               if (ok == true) {
-                                final success = await context
-                                    .read<AssistantProvider>()
+                                if (!context.mounted) return;
+                                final success = await assistantProvider
                                     .deleteAssistant(widget.item.id);
+                                if (!context.mounted) return;
                                 if (success != true) {
                                   showAppSnackBar(
                                     context,
@@ -673,7 +682,7 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13,
-                          color: cs.onSurface.withOpacity(0.7),
+                          color: cs.onSurface.withValues(alpha: 0.7),
                           height: 1.25,
                         ),
                       ),
@@ -751,7 +760,7 @@ class _AssistantAvatarDesktop extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.15),
+        color: cs.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
@@ -771,7 +780,7 @@ class _AssistantAvatarDesktop extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.15),
+        color: cs.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,

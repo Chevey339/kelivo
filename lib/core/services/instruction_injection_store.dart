@@ -16,7 +16,6 @@ class InstructionInjectionStore {
 
   static List<InstructionInjection>? _cache;
   static String? _activeIdCache;
-  static List<String>? _activeIdsCache;
   static Map<String, List<String>>? _activeIdsByAssistantCache;
 
   static String assistantKey(String? assistantId) {
@@ -90,7 +89,6 @@ class InstructionInjectionStore {
     _cache = list;
     if (enabled) {
       final active = <String>[id];
-      _activeIdsCache = active;
       _activeIdCache = id;
       _activeIdsByAssistantCache = <String, List<String>>{
         _defaultAssistantKey: active,
@@ -170,7 +168,6 @@ class InstructionInjectionStore {
   static Future<void> clear() async {
     _cache = const <InstructionInjection>[];
     _activeIdCache = null;
-    _activeIdsCache = const <String>[];
     _activeIdsByAssistantCache = const <String, List<String>>{};
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_itemsKey);
@@ -321,7 +318,6 @@ class InstructionInjectionStore {
       await prefs.setString(_activeIdsByAssistantKey, jsonEncode(map));
     } catch (_) {}
     final defaultList = map[_defaultAssistantKey] ?? const <String>[];
-    _activeIdsCache = defaultList;
     _activeIdCache = defaultList.isNotEmpty ? defaultList.first : null;
     if (defaultList.isEmpty) {
       await prefs.remove(_activeIdKey);

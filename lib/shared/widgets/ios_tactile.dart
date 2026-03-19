@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/haptics.dart';
@@ -52,11 +51,14 @@ class _IosIconButtonState extends State<IosIconButton> {
     // Respect provided color opacity when enabled; only dim when disabled.
     final Color base = () {
       if (widget.color != null) {
+        final alpha = (widget.color!.a * 0.45).clamp(0.0, 1.0).toDouble();
         return widget.enabled
             ? widget.color!
-            : widget.color!.withOpacity(widget.color!.opacity * 0.45);
+            : widget.color!.withValues(alpha: alpha);
       }
-      return theme.colorScheme.onSurface.withOpacity(widget.enabled ? 1 : 0.45);
+      return theme.colorScheme.onSurface.withValues(
+        alpha: widget.enabled ? 1 : 0.45,
+      );
     }();
     // On press, shift icon color toward white (light theme) or black (dark theme)
     // to get a subtle lighter/gray look, unless overridden via pressedColor.
@@ -91,12 +93,12 @@ class _IosIconButtonState extends State<IosIconButton> {
     // Subtle hover background for desktop/web
     final Color bgTarget = _pressed
         ? (isDark
-              ? Colors.white.withOpacity(0.12)
-              : Colors.black.withOpacity(0.08))
+              ? Colors.white.withValues(alpha: 0.12)
+              : Colors.black.withValues(alpha: 0.08))
         : (_hovered
               ? (isDark
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.black.withOpacity(0.06))
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.06))
               : Colors.transparent);
 
     final content = Semantics(

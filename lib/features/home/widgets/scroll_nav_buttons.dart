@@ -130,13 +130,13 @@ class _GlassyCircleButton extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.black.withOpacity(0.4)
-            : Colors.white.withOpacity(0.85),
+            ? Colors.black.withValues(alpha: 0.4)
+            : Colors.white.withValues(alpha: 0.85),
         shape: BoxShape.circle,
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.12)
-              : Theme.of(context).colorScheme.outline.withOpacity(0.20),
+              ? Colors.white.withValues(alpha: 0.12)
+              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.20),
           width: 1,
         ),
         //  boxShadow: [

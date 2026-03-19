@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
-import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../widgets/model_select_sheet.dart';
 import '../widgets/ocr_prompt_sheet.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:characters/characters.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../core/services/haptics.dart';
@@ -20,33 +17,6 @@ class DefaultModelPage extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
-
-    String displayText({
-      String? providerKey,
-      String? modelId,
-      String? fbProvider,
-      String? fbModel,
-    }) {
-      // If not explicitly set, use current model text
-      if (providerKey == null || modelId == null)
-        return l10n.defaultModelPageUseCurrentModel;
-      try {
-        final cfg = settings.getProviderConfig(providerKey);
-        final ov = cfg.modelOverrides[modelId] as Map?;
-        if (ov != null) {
-          final overrideName = (ov['name'] as String?)?.trim();
-          if (overrideName != null && overrideName.isNotEmpty)
-            return overrideName;
-          final apiId = (ov['apiModelId'] ?? ov['api_model_id'])
-              ?.toString()
-              .trim();
-          if (apiId != null && apiId.isNotEmpty) return apiId;
-        }
-        return modelId;
-      } catch (_) {
-        return fbModel ?? providerKey;
-      }
-    }
 
     return Scaffold(
       backgroundColor: cs.surface,
@@ -73,15 +43,12 @@ class DefaultModelPage extends StatelessWidget {
             modelProvider: settings.currentModelProvider,
             modelId: settings.currentModelId,
             onReset: () async {
-              await context.read<SettingsProvider>().resetCurrentModel();
+              await settings.resetCurrentModel();
             },
             onPick: () async {
               final sel = await showModelSelector(context);
               if (sel != null) {
-                await context.read<SettingsProvider>().setCurrentModel(
-                  sel.providerKey,
-                  sel.modelId,
-                );
+                await settings.setCurrentModel(sel.providerKey, sel.modelId);
               }
             },
           ),
@@ -95,15 +62,12 @@ class DefaultModelPage extends StatelessWidget {
             fallbackProvider: settings.currentModelProvider,
             fallbackModelId: settings.currentModelId,
             onReset: () async {
-              await context.read<SettingsProvider>().resetTitleModel();
+              await settings.resetTitleModel();
             },
             onPick: () async {
               final sel = await showModelSelector(context);
               if (sel != null) {
-                await context.read<SettingsProvider>().setTitleModel(
-                  sel.providerKey,
-                  sel.modelId,
-                );
+                await settings.setTitleModel(sel.providerKey, sel.modelId);
               }
             },
             configAction: () => _showTitlePromptSheet(context),
@@ -119,15 +83,12 @@ class DefaultModelPage extends StatelessWidget {
                 settings.titleModelProvider ?? settings.currentModelProvider,
             fallbackModelId: settings.titleModelId ?? settings.currentModelId,
             onReset: () async {
-              await context.read<SettingsProvider>().resetSummaryModel();
+              await settings.resetSummaryModel();
             },
             onPick: () async {
               final sel = await showModelSelector(context);
               if (sel != null) {
-                await context.read<SettingsProvider>().setSummaryModel(
-                  sel.providerKey,
-                  sel.modelId,
-                );
+                await settings.setSummaryModel(sel.providerKey, sel.modelId);
               }
             },
             configAction: () => _showSummaryPromptSheet(context),
@@ -148,15 +109,12 @@ class DefaultModelPage extends StatelessWidget {
                 settings.titleModelId ??
                 settings.currentModelId,
             onReset: () async {
-              await context.read<SettingsProvider>().resetCompressModel();
+              await settings.resetCompressModel();
             },
             onPick: () async {
               final sel = await showModelSelector(context);
               if (sel != null) {
-                await context.read<SettingsProvider>().setCompressModel(
-                  sel.providerKey,
-                  sel.modelId,
-                );
+                await settings.setCompressModel(sel.providerKey, sel.modelId);
               }
             },
             configAction: () => _showCompressPromptSheet(context),
@@ -171,15 +129,12 @@ class DefaultModelPage extends StatelessWidget {
             fallbackProvider: settings.currentModelProvider,
             fallbackModelId: settings.currentModelId,
             onReset: () async {
-              await context.read<SettingsProvider>().resetTranslateModel();
+              await settings.resetTranslateModel();
             },
             onPick: () async {
               final sel = await showModelSelector(context);
               if (sel != null) {
-                await context.read<SettingsProvider>().setTranslateModel(
-                  sel.providerKey,
-                  sel.modelId,
-                );
+                await settings.setTranslateModel(sel.providerKey, sel.modelId);
               }
             },
             configAction: () => _showTranslatePromptSheet(context),
@@ -194,15 +149,12 @@ class DefaultModelPage extends StatelessWidget {
             fallbackProvider: settings.currentModelProvider,
             fallbackModelId: settings.currentModelId,
             onReset: () async {
-              await context.read<SettingsProvider>().resetOcrModel();
+              await settings.resetOcrModel();
             },
             onPick: () async {
               final sel = await showModelSelector(context);
               if (sel != null) {
-                await context.read<SettingsProvider>().setOcrModel(
-                  sel.providerKey,
-                  sel.modelId,
-                );
+                await settings.setOcrModel(sel.providerKey, sel.modelId);
               }
             },
             configAction: () => showOcrPromptSheet(context),
@@ -243,7 +195,7 @@ class DefaultModelPage extends StatelessWidget {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: cs.onSurface.withOpacity(0.2),
+                      color: cs.onSurface.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -269,19 +221,19 @@ class DefaultModelPage extends StatelessWidget {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.primary.withOpacity(0.5),
+                        color: cs.primary.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -310,7 +262,7 @@ class DefaultModelPage extends StatelessWidget {
                 Text(
                   l10n.defaultModelPageTitleVars('{content}', '{locale}'),
                   style: TextStyle(
-                    color: cs.onSurface.withOpacity(0.6),
+                    color: cs.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -353,7 +305,7 @@ class DefaultModelPage extends StatelessWidget {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: cs.onSurface.withOpacity(0.2),
+                      color: cs.onSurface.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -379,19 +331,19 @@ class DefaultModelPage extends StatelessWidget {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.primary.withOpacity(0.5),
+                        color: cs.primary.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -425,7 +377,7 @@ class DefaultModelPage extends StatelessWidget {
                     '{target_lang}',
                   ),
                   style: TextStyle(
-                    color: cs.onSurface.withOpacity(0.6),
+                    color: cs.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -468,7 +420,7 @@ class DefaultModelPage extends StatelessWidget {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: cs.onSurface.withOpacity(0.2),
+                      color: cs.onSurface.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -494,19 +446,19 @@ class DefaultModelPage extends StatelessWidget {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.primary.withOpacity(0.5),
+                        color: cs.primary.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -538,7 +490,7 @@ class DefaultModelPage extends StatelessWidget {
                     '{user_messages}',
                   ),
                   style: TextStyle(
-                    color: cs.onSurface.withOpacity(0.6),
+                    color: cs.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -581,7 +533,7 @@ class DefaultModelPage extends StatelessWidget {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: cs.onSurface.withOpacity(0.2),
+                      color: cs.onSurface.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -607,19 +559,19 @@ class DefaultModelPage extends StatelessWidget {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.primary.withOpacity(0.5),
+                        color: cs.primary.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -650,7 +602,7 @@ class DefaultModelPage extends StatelessWidget {
                 Text(
                   l10n.defaultModelPageCompressVars('{content}', '{locale}'),
                   style: TextStyle(
-                    color: cs.onSurface.withOpacity(0.6),
+                    color: cs.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -729,13 +681,15 @@ class _ModelCard extends StatelessWidget {
     if (usingFallback) {
       modelDisplay = l10n.defaultModelPageUseCurrentModel;
     }
-    final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    final baseBg = isDark
+        ? Colors.white10
+        : Colors.white.withValues(alpha: 0.96);
     return Container(
       decoration: BoxDecoration(
         color: baseBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
           width: 0.6,
         ),
       ),
@@ -784,7 +738,7 @@ class _ModelCard extends StatelessWidget {
               subtitle,
               style: TextStyle(
                 fontSize: 12,
-                color: cs.onSurface.withOpacity(0.7),
+                color: cs.onSurface.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 4),
@@ -794,8 +748,8 @@ class _ModelCard extends StatelessWidget {
               builder: (pressed) {
                 final bg = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
                 final overlay = isDark
-                    ? Colors.white.withOpacity(0.06)
-                    : Colors.black.withOpacity(0.05);
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.05);
                 final pressedBg = Color.alphaBlend(overlay, bg);
                 return AnimatedScale(
                   scale: pressed ? 0.98 : 1.0,
@@ -889,74 +843,11 @@ class _BrandAvatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: isDark ? Colors.white10 : cs.primary.withOpacity(0.1),
+        color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
       child: inner,
-    );
-  }
-}
-
-// --- iOS-style helpers ---
-
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
-}
-
-Widget _iosDivider(BuildContext context) {
-  final cs = Theme.of(context).colorScheme;
-  return Divider(
-    height: 6,
-    thickness: 0.6,
-    indent: 54,
-    endIndent: 12,
-    color: cs.outlineVariant.withOpacity(0.18),
-  );
-}
-
-class _AnimatedPressColor extends StatelessWidget {
-  const _AnimatedPressColor({
-    required this.pressed,
-    required this.base,
-    required this.builder,
-  });
-  final bool pressed;
-  final Color base;
-  final Widget Function(Color color) builder;
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final target = pressed
-        ? (Color.lerp(base, isDark ? Colors.black : Colors.white, 0.55) ?? base)
-        : base;
-    return TweenAnimationBuilder<Color?>(
-      tween: ColorTween(end: target),
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-      builder: (context, color, _) => builder(color ?? base),
     );
   }
 }
@@ -966,18 +857,12 @@ class _TactileIconButton extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    this.onLongPress,
-    this.semanticLabel,
     this.size = 22,
-    this.haptics = true,
   });
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final String? semanticLabel;
   final double size;
-  final bool haptics;
   @override
   State<_TactileIconButton> createState() => _TactileIconButtonState();
 }
@@ -987,31 +872,23 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
       size: widget.size,
       color: _pressed ? pressColor : base,
-      semanticLabel: widget.semanticLabel,
     );
     return Semantics(
       button: true,
-      label: widget.semanticLabel,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
         onTap: () {
-          if (widget.haptics) Haptics.light();
+          Haptics.light();
           widget.onTap();
         },
-        onLongPress: widget.onLongPress == null
-            ? null
-            : () {
-                if (widget.haptics) Haptics.light();
-                widget.onLongPress!.call();
-              },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           child: icon,
@@ -1021,68 +898,10 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   }
 }
 
-Widget _iosNavRow(
-  BuildContext context, {
-  required IconData icon,
-  required String label,
-  String? detailText,
-  Widget? accessory,
-  VoidCallback? onTap,
-}) {
-  final cs = Theme.of(context).colorScheme;
-  final interactive = onTap != null;
-  return _TactileRow(
-    onTap: onTap,
-    haptics: true,
-    builder: (pressed) {
-      final baseColor = cs.onSurface.withOpacity(0.8);
-      return _AnimatedPressColor(
-        pressed: pressed,
-        base: baseColor,
-        builder: (c) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            child: Row(
-              children: [
-                SizedBox(width: 36, child: Icon(icon, size: 20, color: c)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(fontSize: 15, color: c),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (detailText != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: Text(
-                      detailText,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurface.withOpacity(0.6),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                if (accessory != null) accessory,
-                if (interactive) Icon(Lucide.ChevronRight, size: 16, color: c),
-              ],
-            ),
-          );
-        },
-      );
-    },
-  );
-}
-
 class _TactileRow extends StatefulWidget {
-  const _TactileRow({required this.builder, this.onTap, this.haptics = true});
+  const _TactileRow({required this.builder, this.onTap});
   final Widget Function(bool pressed) builder;
   final VoidCallback? onTap;
-  final bool haptics;
   @override
   State<_TactileRow> createState() => _TactileRowState();
 }
@@ -1109,9 +928,9 @@ class _TactileRowState extends State<_TactileRow> {
       onTap: widget.onTap == null
           ? null
           : () {
-              if (widget.haptics &&
-                  context.read<SettingsProvider>().hapticsOnListItemTap)
+              if (context.read<SettingsProvider>().hapticsOnListItemTap) {
                 Haptics.soft();
+              }
               widget.onTap!.call();
             },
       child: widget.builder(_pressed),

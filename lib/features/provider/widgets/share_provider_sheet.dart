@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
@@ -22,7 +21,6 @@ String encodeProviderConfig(ProviderConfig cfg) {
       type = 'claude';
       break;
     case ProviderKind.openai:
-    default:
       type = 'openai';
   }
   final map = <String, dynamic>{
@@ -94,7 +92,7 @@ Future<void> showShareProviderSheet(
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: cs.onSurface.withOpacity(0.2),
+                      color: cs.onSurface.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -122,14 +120,18 @@ Future<void> showShareProviderSheet(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: cs.outlineVariant.withOpacity(0.2),
+                              color: cs.outlineVariant.withValues(alpha: 0.2),
                             ),
                           ),
-                          child: PrettyQr(
-                            data: code,
-                            size: 180,
-                            roundEdges: true,
-                            errorCorrectLevel: QrErrorCorrectLevel.M,
+                          child: SizedBox.square(
+                            dimension: 180,
+                            child: PrettyQrView.data(
+                              data: code,
+                              errorCorrectLevel: QrErrorCorrectLevel.M,
+                              decoration: const PrettyQrDecoration(
+                                shape: PrettyQrSmoothSymbol(roundFactor: 1),
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -165,10 +167,8 @@ Future<void> showShareProviderSheet(
                         label: l10n.shareProviderSheetShareButton,
                         onTap: () async {
                           final rect = shareAnchorRect(ctx);
-                          await Share.share(
-                            code,
-                            subject: 'AI Provider',
-                            sharePositionOrigin: rect,
+                          await SharePlus.instance.share(
+                            ShareParams(text: code, sharePositionOrigin: rect),
                           );
                         },
                       ),

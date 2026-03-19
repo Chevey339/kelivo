@@ -171,7 +171,7 @@ ThemeData buildLightTheme(ColorScheme? dynamicScheme) {
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       actionTextColor: scheme.primary,
-      disabledActionTextColor: scheme.onInverseSurface.withOpacity(0.5),
+      disabledActionTextColor: scheme.onInverseSurface.withValues(alpha: 0.5),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: scheme.surface,
@@ -213,7 +213,6 @@ ThemeData buildLightThemeForScheme(
   if (pureBackground) {
     scheme = scheme.copyWith(
       surface: const Color(0xFFFFFFFF),
-      background: const Color(0xFFFFFFFF),
       inverseSurface: const Color(0xFF000000),
       onInverseSurface: const Color(0xFFFFFFFF),
     );
@@ -236,8 +235,9 @@ ThemeData buildLightThemeForScheme(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       actionTextColor: scheme.primary,
-      disabledActionTextColor: scheme.onInverseSurface.withOpacity(0.5),
+      disabledActionTextColor: scheme.onInverseSurface.withValues(alpha: 0.5),
     ),
+    dialogTheme: DialogThemeData(backgroundColor: scheme.surface),
     appBarTheme: AppBarTheme(
       backgroundColor: scheme.surface,
       surfaceTintColor: scheme.surface,
@@ -263,7 +263,6 @@ ThemeData buildLightThemeForScheme(
     textTheme: _withFontFallback(theme.textTheme, fontFallback),
     primaryTextTheme: _withFontFallback(theme.primaryTextTheme, fontFallback),
     canvasColor: scheme.surface,
-    dialogBackgroundColor: scheme.surface,
   );
 }
 
@@ -322,7 +321,7 @@ ThemeData buildDarkTheme(ColorScheme? dynamicScheme) {
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       actionTextColor: scheme.primary,
-      disabledActionTextColor: scheme.onInverseSurface.withOpacity(0.6),
+      disabledActionTextColor: scheme.onInverseSurface.withValues(alpha: 0.6),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: scheme.surface,
@@ -363,7 +362,6 @@ ThemeData buildDarkThemeForScheme(
   if (pureBackground) {
     scheme = scheme.copyWith(
       surface: const Color(0xFF000000),
-      background: const Color(0xFF000000),
       inverseSurface: const Color(0xFFFFFFFF),
       onInverseSurface: const Color(0xFF000000),
     );
@@ -386,8 +384,9 @@ ThemeData buildDarkThemeForScheme(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       actionTextColor: scheme.primary,
-      disabledActionTextColor: scheme.onInverseSurface.withOpacity(0.6),
+      disabledActionTextColor: scheme.onInverseSurface.withValues(alpha: 0.6),
     ),
+    dialogTheme: DialogThemeData(backgroundColor: scheme.surface),
     appBarTheme: AppBarTheme(
       backgroundColor: scheme.surface,
       surfaceTintColor: scheme.surface,
@@ -413,6 +412,5 @@ ThemeData buildDarkThemeForScheme(
     textTheme: _withFontFallback(theme.textTheme, fontFallback),
     primaryTextTheme: _withFontFallback(theme.primaryTextTheme, fontFallback),
     canvasColor: scheme.surface,
-    dialogBackgroundColor: scheme.surface,
   );
 }

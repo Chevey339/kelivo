@@ -28,32 +28,32 @@ abstract class SearchService<T extends SearchServiceOptions> {
 
   // Factory method to get service instance based on options type
   static SearchService getService(SearchServiceOptions options) {
-    switch (options.runtimeType) {
-      case BingLocalOptions:
+    switch (options) {
+      case BingLocalOptions _:
         return BingSearchService() as SearchService;
-      case TavilyOptions:
+      case TavilyOptions _:
         return TavilySearchService() as SearchService;
-      case ExaOptions:
+      case ExaOptions _:
         return ExaSearchService() as SearchService;
-      case ZhipuOptions:
+      case ZhipuOptions _:
         return ZhipuSearchService() as SearchService;
-      case SearXNGOptions:
+      case SearXNGOptions _:
         return SearXNGSearchService() as SearchService;
-      case LinkUpOptions:
+      case LinkUpOptions _:
         return LinkUpSearchService() as SearchService;
-      case BraveOptions:
+      case BraveOptions _:
         return BraveSearchService() as SearchService;
-      case MetasoOptions:
+      case MetasoOptions _:
         return MetasoSearchService() as SearchService;
-      case OllamaOptions:
+      case OllamaOptions _:
         return OllamaSearchService() as SearchService;
-      case JinaOptions:
+      case JinaOptions _:
         return JinaSearchService() as SearchService;
-      case BochaOptions:
+      case BochaOptions _:
         return BochaSearchService() as SearchService;
-      case PerplexityOptions:
+      case PerplexityOptions _:
         return PerplexitySearchService() as SearchService;
-      case DuckDuckGoOptions:
+      case DuckDuckGoOptions _:
         return DuckDuckGoSearchService() as SearchService;
       default:
         return BingSearchService() as SearchService;
@@ -184,8 +184,7 @@ abstract class SearchServiceOptions {
 class BingLocalOptions extends SearchServiceOptions {
   final String acceptLanguage;
 
-  BingLocalOptions({required String id, this.acceptLanguage = 'en-US,en;q=0.9'})
-    : super(id: id);
+  BingLocalOptions({required super.id, this.acceptLanguage = 'en-US,en;q=0.9'});
 
   @override
   Map<String, dynamic> toJson() => {
@@ -207,8 +206,7 @@ class TavilyOptions extends SearchServiceOptions {
   final String apiKey;
   final String url;
 
-  TavilyOptions({required String id, required this.apiKey, this.url = ''})
-    : super(id: id);
+  TavilyOptions({required super.id, required this.apiKey, this.url = ''});
 
   String get resolvedUrl {
     final trimmed = url.trim();
@@ -236,8 +234,7 @@ class ExaOptions extends SearchServiceOptions {
   final String apiKey;
   final String url;
 
-  ExaOptions({required String id, required this.apiKey, this.url = ''})
-    : super(id: id);
+  ExaOptions({required super.id, required this.apiKey, this.url = ''});
 
   String get resolvedUrl {
     final trimmed = url.trim();
@@ -262,7 +259,7 @@ class ExaOptions extends SearchServiceOptions {
 class ZhipuOptions extends SearchServiceOptions {
   final String apiKey;
 
-  ZhipuOptions({required String id, required this.apiKey}) : super(id: id);
+  ZhipuOptions({required super.id, required this.apiKey});
 
   @override
   Map<String, dynamic> toJson() => {
@@ -283,13 +280,13 @@ class SearXNGOptions extends SearchServiceOptions {
   final String password;
 
   SearXNGOptions({
-    required String id,
+    required super.id,
     required this.url,
     this.engines = '',
     this.language = '',
     this.username = '',
     this.password = '',
-  }) : super(id: id);
+  });
 
   @override
   Map<String, dynamic> toJson() => {
@@ -315,7 +312,7 @@ class SearXNGOptions extends SearchServiceOptions {
 class LinkUpOptions extends SearchServiceOptions {
   final String apiKey;
 
-  LinkUpOptions({required String id, required this.apiKey}) : super(id: id);
+  LinkUpOptions({required super.id, required this.apiKey});
 
   @override
   Map<String, dynamic> toJson() => {
@@ -331,7 +328,7 @@ class LinkUpOptions extends SearchServiceOptions {
 class BraveOptions extends SearchServiceOptions {
   final String apiKey;
 
-  BraveOptions({required String id, required this.apiKey}) : super(id: id);
+  BraveOptions({required super.id, required this.apiKey});
 
   @override
   Map<String, dynamic> toJson() => {
@@ -347,7 +344,7 @@ class BraveOptions extends SearchServiceOptions {
 class MetasoOptions extends SearchServiceOptions {
   final String apiKey;
 
-  MetasoOptions({required String id, required this.apiKey}) : super(id: id);
+  MetasoOptions({required super.id, required this.apiKey});
 
   @override
   Map<String, dynamic> toJson() => {
@@ -363,7 +360,7 @@ class MetasoOptions extends SearchServiceOptions {
 class OllamaOptions extends SearchServiceOptions {
   final String apiKey;
 
-  OllamaOptions({required String id, required this.apiKey}) : super(id: id);
+  OllamaOptions({required super.id, required this.apiKey});
 
   @override
   Map<String, dynamic> toJson() => {
@@ -379,7 +376,7 @@ class OllamaOptions extends SearchServiceOptions {
 class JinaOptions extends SearchServiceOptions {
   final String apiKey;
 
-  JinaOptions({required String id, required this.apiKey}) : super(id: id);
+  JinaOptions({required super.id, required this.apiKey});
 
   @override
   Map<String, dynamic> toJson() => {'type': 'jina', 'id': id, 'apiKey': apiKey};
@@ -391,8 +388,7 @@ class JinaOptions extends SearchServiceOptions {
 class DuckDuckGoOptions extends SearchServiceOptions {
   final String region;
 
-  DuckDuckGoOptions({required String id, this.region = 'us-en'})
-    : super(id: id);
+  DuckDuckGoOptions({required super.id, this.region = 'us-en'});
 
   @override
   Map<String, dynamic> toJson() => {
@@ -412,12 +408,12 @@ class PerplexityOptions extends SearchServiceOptions {
   final int? maxTokensPerPage; // default 1024
 
   PerplexityOptions({
-    required String id,
+    required super.id,
     required this.apiKey,
     this.country,
     this.searchDomainFilter,
     this.maxTokensPerPage,
-  }) : super(id: id);
+  });
 
   @override
   Map<String, dynamic> toJson() => {
@@ -450,13 +446,13 @@ class BochaOptions extends SearchServiceOptions {
   final String? exclude; // e.g., 'qq.com|m.163.com'
 
   BochaOptions({
-    required String id,
+    required super.id,
     required this.apiKey,
     this.freshness,
     this.summary = true,
     this.include,
     this.exclude,
-  }) : super(id: id);
+  });
 
   @override
   Map<String, dynamic> toJson() => {

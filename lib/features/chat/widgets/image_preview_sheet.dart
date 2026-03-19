@@ -73,19 +73,25 @@ class _ImagePreviewDesktopDialogState
     return Rect.fromCenter(center: center, width: 1, height: 1);
   }
 
-  Future<void> _onShare(BuildContext context) async {
+  Future<void> _onShare(BuildContext anchorContext) async {
+    final l10n = AppLocalizations.of(context)!;
     final filename = widget.file.uri.pathSegments.isNotEmpty
         ? widget.file.uri.pathSegments.last
         : 'image.png';
     try {
-      final result = await Share.shareXFiles([
-        XFile(widget.file.path, mimeType: 'image/png', name: filename),
-      ], sharePositionOrigin: _shareAnchorRect(context));
-      if (result.status == ShareResultStatus.success && mounted) {
+      final result = await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(widget.file.path, mimeType: 'image/png')],
+          fileNameOverrides: [filename],
+          sharePositionOrigin: _shareAnchorRect(anchorContext),
+        ),
+      );
+      if (!mounted) return;
+      if (result.status == ShareResultStatus.success) {
         Navigator.of(context).maybePop();
       }
     } catch (e) {
-      final l10n = AppLocalizations.of(context)!;
+      if (!mounted) return;
       showAppSnackBar(
         context,
         message: l10n.messageExportSheetExportFailed('$e'),
@@ -97,9 +103,10 @@ class _ImagePreviewDesktopDialogState
   Future<void> _onSaveDesktop() async {
     if (_saving) return;
     setState(() => _saving = true);
+    final l10n = AppLocalizations.of(context)!;
     try {
-      final l10n = AppLocalizations.of(context)!;
       final Uint8List bytes = await widget.file.readAsBytes();
+      if (!mounted) return;
       if (bytes.isEmpty) {
         showAppSnackBar(
           context,
@@ -120,6 +127,7 @@ class _ImagePreviewDesktopDialogState
         type: FileType.custom,
         allowedExtensions: allowed,
       );
+      if (!mounted) return;
       if (savePath == null) {
         return; // cancelled
       }
@@ -136,7 +144,6 @@ class _ImagePreviewDesktopDialogState
       Navigator.of(context).maybePop();
     } catch (e) {
       if (!mounted) return;
-      final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
         context,
         message: l10n.imageViewerPageSaveFailed(e.toString()),
@@ -216,8 +223,8 @@ class _ImagePreviewDesktopDialogState
         ok = await ClipboardImages.setImagePath(widget.file.path);
       } catch (_) {}
     }
-    final l10n = AppLocalizations.of(context)!;
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
     if (ok) {
       showAppSnackBar(
         context,
@@ -322,7 +329,7 @@ class _ImagePreviewDesktopDialogState
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                             side: BorderSide(
-                              color: cs.outline.withOpacity(0.08),
+                              color: cs.outline.withValues(alpha: 0.08),
                             ),
                           ),
                           clipBehavior: Clip.antiAlias,
@@ -354,13 +361,11 @@ class _DesktopIconButton extends StatefulWidget {
     required this.icon,
     required this.tooltip,
     required this.onTap,
-    this.size = 36,
   });
 
   final Widget icon;
   final String tooltip;
   final VoidCallback? onTap;
-  final double size;
 
   @override
   State<_DesktopIconButton> createState() => _DesktopIconButtonState();
@@ -384,9 +389,9 @@ class _DesktopIconButtonState extends State<_DesktopIconButton> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final bool disabled = widget.onTap == null;
-    final Color baseBorder = cs.outline.withOpacity(0.16);
-    final Color hoverFill = cs.onSurface.withOpacity(
-      Theme.of(context).brightness == Brightness.dark ? 0.10 : 0.06,
+    final Color baseBorder = cs.outline.withValues(alpha: 0.16);
+    final Color hoverFill = cs.onSurface.withValues(
+      alpha: Theme.of(context).brightness == Brightness.dark ? 0.10 : 0.06,
     );
     final Color bg = _hovered ? hoverFill : Colors.transparent;
     final Color border = _hovered ? baseBorder : Colors.transparent;
@@ -414,8 +419,8 @@ class _DesktopIconButtonState extends State<_DesktopIconButton> {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 120),
               curve: Curves.easeOutCubic,
-              width: widget.size,
-              height: widget.size,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: disabled ? Colors.transparent : bg,
                 borderRadius: BorderRadius.circular(8),
@@ -427,7 +432,7 @@ class _DesktopIconButtonState extends State<_DesktopIconButton> {
               child: Center(
                 child: IconTheme(
                   data: IconTheme.of(context).copyWith(
-                    color: cs.onSurface.withOpacity(disabled ? 0.4 : 0.9),
+                    color: cs.onSurface.withValues(alpha: disabled ? 0.4 : 0.9),
                   ),
                   child: widget.icon,
                 ),
@@ -463,20 +468,26 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
     return Rect.fromCenter(center: center, width: 1, height: 1);
   }
 
-  Future<void> _onShare(BuildContext context) async {
+  Future<void> _onShare(BuildContext anchorContext) async {
+    final l10n = AppLocalizations.of(context)!;
     final filename = widget.file.uri.pathSegments.isNotEmpty
         ? widget.file.uri.pathSegments.last
         : 'image.png';
     try {
-      final result = await Share.shareXFiles([
-        XFile(widget.file.path, mimeType: 'image/png', name: filename),
-      ], sharePositionOrigin: _shareAnchorRect(context));
+      final result = await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(widget.file.path, mimeType: 'image/png')],
+          fileNameOverrides: [filename],
+          sharePositionOrigin: _shareAnchorRect(anchorContext),
+        ),
+      );
+      if (!mounted) return;
       // Close only if sharing succeeds (when the platform reports it)
-      if (result.status == ShareResultStatus.success && mounted) {
+      if (result.status == ShareResultStatus.success) {
         Navigator.of(context).pop();
       }
     } catch (e) {
-      final l10n = AppLocalizations.of(context)!;
+      if (!mounted) return;
       showAppSnackBar(
         context,
         message: l10n.messageExportSheetExportFailed('$e'),
@@ -488,15 +499,17 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
   Future<void> _onSave() async {
     if (_saving) return;
     setState(() => _saving = true);
+    final l10n = AppLocalizations.of(context)!;
     try {
-      final l10n = AppLocalizations.of(context)!;
       final Uint8List bytes = await widget.file.readAsBytes();
+      if (!mounted) return;
       final name = 'kelivo-${DateTime.now().millisecondsSinceEpoch}';
       final result = await ImageGallerySaverPlus.saveImage(
         bytes,
         quality: 100,
         name: name,
       );
+      if (!mounted) return;
       bool success = false;
       if (result is Map) {
         final isSuccess =
@@ -511,9 +524,8 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
           type: NotificationType.success,
         );
         // Auto-close the preview sheet after successful save
-        if (mounted) {
-          Navigator.of(context).pop();
-        }
+        if (!mounted) return;
+        Navigator.of(context).pop();
       } else {
         showAppSnackBar(
           context,
@@ -522,7 +534,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
         );
       }
     } catch (e) {
-      final l10n = AppLocalizations.of(context)!;
+      if (!mounted) return;
       showAppSnackBar(
         context,
         message: l10n.imagePreviewSheetSaveFailed('$e'),
@@ -556,7 +568,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: cs.onSurface.withOpacity(0.2),
+                        color: cs.onSurface.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
@@ -577,7 +589,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                     side: BorderSide(
-                                      color: cs.outline.withOpacity(0.08),
+                                      color: cs.outline.withValues(alpha: 0.08),
                                     ),
                                   ),
                                   clipBehavior: Clip.antiAlias,
@@ -613,7 +625,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withValues(alpha: 0.06),
                         blurRadius: 16,
                         offset: const Offset(0, -2),
                       ),
@@ -639,13 +651,13 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: cs.outline.withOpacity(0.25),
+                                  color: cs.outline.withValues(alpha: 0.25),
                                 ),
                               ),
                               child: Center(
                                 child: Icon(
                                   Lucide.MoreVertical,
-                                  color: cs.onSurface.withOpacity(0.9),
+                                  color: cs.onSurface.withValues(alpha: 0.9),
                                 ),
                               ),
                             ),

@@ -435,9 +435,12 @@ class _PlainLogContentPageState extends State<_PlainLogContentPage> {
 
   Future<void> _exportFile() async {
     try {
-      await Share.shareXFiles([
-        XFile(widget.file.path),
-      ], subject: widget.file.path.split('/').last);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(widget.file.path)],
+          subject: widget.file.path.split('/').last,
+        ),
+      );
     } catch (e) {
       if (mounted) {
         showAppSnackBar(
@@ -539,9 +542,12 @@ class _RequestLogFilePageState extends State<_RequestLogFilePage> {
 
   Future<void> _exportFile() async {
     try {
-      await Share.shareXFiles([
-        XFile(widget.file.path),
-      ], subject: widget.file.path.split('/').last);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(widget.file.path)],
+          subject: widget.file.path.split('/').last,
+        ),
+      );
     } catch (e) {
       if (!mounted) {
         return;

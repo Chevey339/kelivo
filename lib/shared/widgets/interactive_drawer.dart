@@ -270,7 +270,7 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
               IgnorePointer(
                 ignoring: !widget.barrierDismissible,
                 child: Container(
-                  color: widget.scrimColor.withOpacity(scrimOpacity),
+                  color: widget.scrimColor.withValues(alpha: scrimOpacity),
                 ),
               ),
           ],
@@ -354,7 +354,7 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Material(
-      color: cs.background,
+      color: cs.surface,
       child: LayoutBuilder(
         builder: (context, constraints) {
           if (widget.tabletMode) {
@@ -365,13 +365,13 @@ class _InteractiveDrawerState extends State<InteractiveDrawer>
                 math.max(300.0, constraints.maxWidth * 0.80);
           }
 
-          return WillPopScope(
-            onWillPop: () async {
+          return PopScope(
+            canPop: !_controllerProxy.isOpen,
+            onPopInvokedWithResult: (didPop, _) {
+              if (didPop) return;
               if (_controllerProxy.isOpen) {
                 _controllerProxy.close();
-                return false;
               }
-              return true;
             },
             child: AnimatedBuilder(
               animation: _anim,

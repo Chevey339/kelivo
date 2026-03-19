@@ -57,28 +57,8 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
     final ap = context.watch<AssistantProvider>();
     final a = ap.getById(widget.assistantId)!;
 
-    Widget titleDesc(String title, String? desc) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-        ),
-        if (desc != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            desc,
-            style: TextStyle(
-              fontSize: 12,
-              color: cs.onSurface.withOpacity(0.7),
-            ),
-          ),
-        ],
-      ],
-    );
-
     Widget avatarWidget({double size = 56}) {
-      final bg = cs.primary.withOpacity(isDark ? 0.18 : 0.12);
+      final bg = cs.primary.withValues(alpha: isDark ? 0.18 : 0.12);
       Widget inner;
       final av = a.avatar?.trim();
       if (av != null && av.isNotEmpty) {
@@ -156,10 +136,12 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
         // Identity card (avatar + name) - iOS style
         Container(
           decoration: BoxDecoration(
-            color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
+            color: isDark
+                ? Colors.white10
+                : Colors.white.withValues(alpha: 0.96),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+              color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
               width: 0.6,
             ),
           ),
@@ -229,21 +211,20 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 label: l10n.assistantEditThinkingBudgetTitle,
                 detailText: a.thinkingBudget?.toString() ?? '-',
                 onTap: () async {
+                  final settingsProvider = context.read<SettingsProvider>();
+                  final assistantProvider = context.read<AssistantProvider>();
                   final currentBudget = a.thinkingBudget;
                   if (currentBudget != null) {
-                    context.read<SettingsProvider>().setThinkingBudget(
-                      currentBudget,
-                    );
+                    settingsProvider.setThinkingBudget(currentBudget);
                   }
                   await showReasoningBudgetSheet(
                     context,
                     modelProvider: a.chatModelProvider,
                     modelId: a.chatModelId,
                   );
-                  final chosen = context
-                      .read<SettingsProvider>()
-                      .thinkingBudget;
-                  await context.read<AssistantProvider>().updateAssistant(
+                  if (!context.mounted) return;
+                  final chosen = settingsProvider.thinkingBudget;
+                  await assistantProvider.updateAssistant(
                     a.copyWith(thinkingBudget: chosen),
                   );
                 },
@@ -298,10 +279,12 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
         // Chat model card (moved down, styled like DefaultModelPage)
         Container(
           decoration: BoxDecoration(
-            color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
+            color: isDark
+                ? Colors.white10
+                : Colors.white.withValues(alpha: 0.96),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+              color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
               width: 0.6,
             ),
           ),
@@ -348,21 +331,21 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                   l10n.assistantEditChatModelSubtitle,
                   style: TextStyle(
                     fontSize: 12,
-                    color: cs.onSurface.withOpacity(0.7),
+                    color: cs.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
                 const SizedBox(height: 8),
                 _TactileRow(
                   onTap: () async {
+                    final assistantProvider = context.read<AssistantProvider>();
                     final sel = await showModelSelector(context);
-                    if (sel != null) {
-                      await context.read<AssistantProvider>().updateAssistant(
-                        a.copyWith(
-                          chatModelProvider: sel.providerKey,
-                          chatModelId: sel.modelId,
-                        ),
-                      );
-                    }
+                    if (!context.mounted || sel == null) return;
+                    await assistantProvider.updateAssistant(
+                      a.copyWith(
+                        chatModelProvider: sel.providerKey,
+                        chatModelId: sel.modelId,
+                      ),
+                    );
                   },
                   pressedScale: 0.98,
                   builder: (pressed) {
@@ -370,22 +353,18 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                         ? Colors.white10
                         : const Color(0xFFF2F3F5);
                     final overlay = isDark
-                        ? Colors.white.withOpacity(0.06)
-                        : Colors.black.withOpacity(0.05);
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : Colors.black.withValues(alpha: 0.05);
                     final pressedBg = Color.alphaBlend(overlay, bg);
                     final l10n = AppLocalizations.of(context)!;
                     final settings = context.read<SettingsProvider>();
                     String display = l10n.assistantEditModelUseGlobalDefault;
-                    String brandName = display;
                     if (a.chatModelProvider != null && a.chatModelId != null) {
                       try {
                         final cfg = settings.getProviderConfig(
                           a.chatModelProvider!,
                         );
                         final ov = cfg.modelOverrides[a.chatModelId] as Map?;
-                        brandName = cfg.name.isNotEmpty
-                            ? cfg.name
-                            : a.chatModelProvider!;
                         final mdl =
                             (ov != null &&
                                 (ov['name'] as String?)?.isNotEmpty == true)
@@ -393,7 +372,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                             : a.chatModelId!;
                         display = mdl;
                       } catch (_) {
-                        brandName = a.chatModelProvider ?? '';
                         display = a.chatModelId ?? '';
                       }
                     }
@@ -437,10 +415,12 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
         // Chat background (separate iOS card)
         Container(
           decoration: BoxDecoration(
-            color: isDark ? Colors.white10 : Colors.white.withOpacity(0.96),
+            color: isDark
+                ? Colors.white10
+                : Colors.white.withValues(alpha: 0.96),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+              color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
               width: 0.6,
             ),
           ),
@@ -469,7 +449,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                   l10n.assistantEditChatBackgroundDescription,
                   style: TextStyle(
                     fontSize: 12,
-                    color: cs.onSurface.withOpacity(0.7),
+                    color: cs.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -483,11 +463,11 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                           ? Colors.white10
                           : const Color(0xFFF2F3F5);
                       final overlay = isDark
-                          ? Colors.white.withOpacity(0.06)
-                          : Colors.black.withOpacity(0.05);
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.black.withValues(alpha: 0.05);
                       final pressedBg = Color.alphaBlend(overlay, bg);
-                      final iconColor = cs.onSurface.withOpacity(0.75);
-                      final textColor = cs.onSurface.withOpacity(0.9);
+                      final iconColor = cs.onSurface.withValues(alpha: 0.75);
+                      final textColor = cs.onSurface.withValues(alpha: 0.9);
                       return AnimatedContainer(
                         duration: const Duration(milliseconds: 160),
                         curve: Curves.easeOutCubic,
@@ -499,7 +479,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                           color: pressed ? pressedBg : bg,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: cs.outlineVariant.withOpacity(0.35),
+                            color: cs.outlineVariant.withValues(alpha: 0.35),
                           ),
                         ),
                         child: Row(
@@ -628,7 +608,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: cs.onSurface.withOpacity(0.2),
+                          color: cs.onSurface.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -639,12 +619,13 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                       () async => _pickLocalImage(context, a),
                     ),
                     row(l10n.assistantEditAvatarChooseEmoji, () async {
+                      final assistantProvider = context
+                          .read<AssistantProvider>();
                       final emoji = await _pickEmoji(context);
-                      if (emoji != null) {
-                        await context.read<AssistantProvider>().updateAssistant(
-                          a.copyWith(avatar: emoji),
-                        );
-                      }
+                      if (!context.mounted || emoji == null) return;
+                      await assistantProvider.updateAssistant(
+                        a.copyWith(avatar: emoji),
+                      );
                     }),
                     row(
                       l10n.assistantEditAvatarEnterLink,
@@ -672,17 +653,17 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
 
   Future<void> _pickBackground(BuildContext context, Assistant a) async {
     try {
+      final assistantProvider = context.read<AssistantProvider>();
       final picker = ImagePicker();
       final XFile? file = await picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 1920,
         imageQuality: 85,
       );
-      if (file != null) {
-        await context.read<AssistantProvider>().updateAssistant(
-          a.copyWith(background: file.path),
-        );
-      }
+      if (!context.mounted || file == null) return;
+      await assistantProvider.updateAssistant(
+        a.copyWith(background: file.path),
+      );
     } catch (_) {}
   }
 
@@ -704,7 +685,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
               builder: (context) {
                 final theme = Theme.of(context);
                 final cs = theme.colorScheme;
-                final isDark = theme.brightness == Brightness.dark;
                 final value =
                     context
                         .watch<AssistantProvider>()
@@ -721,7 +701,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: cs.onSurface.withOpacity(0.2),
+                          color: cs.onSurface.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -741,21 +721,19 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                         IosSwitch(
                           value: a.temperature != null,
                           onChanged: (v) async {
+                            final assistantProvider = context
+                                .read<AssistantProvider>();
+                            final navigator = Navigator.of(ctx);
                             if (v) {
-                              await context
-                                  .read<AssistantProvider>()
-                                  .updateAssistant(
-                                    a.copyWith(temperature: 0.6),
-                                  );
+                              await assistantProvider.updateAssistant(
+                                a.copyWith(temperature: 0.6),
+                              );
                             } else {
-                              await context
-                                  .read<AssistantProvider>()
-                                  .updateAssistant(
-                                    a.copyWith(clearTemperature: true),
-                                  );
+                              await assistantProvider.updateAssistant(
+                                a.copyWith(clearTemperature: true),
+                              );
                             }
-                            // Close the bottom sheet after toggle
-                            Navigator.of(ctx).pop();
+                            if (navigator.mounted) navigator.pop();
                           },
                         ),
                       ],
@@ -777,7 +755,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                         l10n.assistantEditTemperatureDescription,
                         style: TextStyle(
                           fontSize: 12,
-                          color: cs.onSurface.withOpacity(0.6),
+                          color: cs.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ] else ...[
@@ -787,7 +765,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                           l10n.assistantEditParameterDisabled,
                           style: TextStyle(
                             fontSize: 13,
-                            color: cs.onSurface.withOpacity(0.6),
+                            color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
                       ),
@@ -820,7 +798,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
               builder: (context) {
                 final theme = Theme.of(context);
                 final cs = theme.colorScheme;
-                final isDark = theme.brightness == Brightness.dark;
                 final value =
                     context
                         .watch<AssistantProvider>()
@@ -837,7 +814,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: cs.onSurface.withOpacity(0.2),
+                          color: cs.onSurface.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -857,17 +834,19 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                         IosSwitch(
                           value: a.topP != null,
                           onChanged: (v) async {
+                            final assistantProvider = context
+                                .read<AssistantProvider>();
+                            final navigator = Navigator.of(ctx);
                             if (v) {
-                              await context
-                                  .read<AssistantProvider>()
-                                  .updateAssistant(a.copyWith(topP: 1.0));
+                              await assistantProvider.updateAssistant(
+                                a.copyWith(topP: 1.0),
+                              );
                             } else {
-                              await context
-                                  .read<AssistantProvider>()
-                                  .updateAssistant(a.copyWith(clearTopP: true));
+                              await assistantProvider.updateAssistant(
+                                a.copyWith(clearTopP: true),
+                              );
                             }
-                            // Close the bottom sheet after toggle
-                            Navigator.of(ctx).pop();
+                            if (navigator.mounted) navigator.pop();
                           },
                         ),
                       ],
@@ -889,7 +868,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                         l10n.assistantEditTopPDescription,
                         style: TextStyle(
                           fontSize: 12,
-                          color: cs.onSurface.withOpacity(0.6),
+                          color: cs.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ] else ...[
@@ -899,7 +878,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                           l10n.assistantEditParameterDisabled,
                           style: TextStyle(
                             fontSize: 13,
-                            color: cs.onSurface.withOpacity(0.6),
+                            color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
                       ),
@@ -951,7 +930,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: cs.onSurface.withOpacity(0.2),
+                          color: cs.onSurface.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -971,6 +950,9 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                         IosSwitch(
                           value: a.limitContextMessages,
                           onChanged: (v) async {
+                            final assistantProvider = context
+                                .read<AssistantProvider>();
+                            final navigator = Navigator.of(ctx);
                             final next =
                                 v && a.contextMessageSize < _contextMessageMin
                                 ? a.copyWith(
@@ -978,11 +960,8 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                                     contextMessageSize: _contextMessageMin,
                                   )
                                 : a.copyWith(limitContextMessages: v);
-                            await context
-                                .read<AssistantProvider>()
-                                .updateAssistant(next);
-                            // Close the bottom sheet after toggle
-                            Navigator.of(ctx).pop();
+                            await assistantProvider.updateAssistant(next);
+                            if (navigator.mounted) navigator.pop();
                           },
                         ),
                       ],
@@ -1004,17 +983,16 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                           1024.0,
                         ],
                         onLabelTap: () async {
+                          final assistantProvider = context
+                              .read<AssistantProvider>();
                           final chosen = await _showContextMessageInputDialog(
                             context,
                             initialValue: value,
                           );
-                          if (chosen != null) {
-                            await context
-                                .read<AssistantProvider>()
-                                .updateAssistant(
-                                  a.copyWith(contextMessageSize: chosen),
-                                );
-                          }
+                          if (!context.mounted || chosen == null) return;
+                          await assistantProvider.updateAssistant(
+                            a.copyWith(contextMessageSize: chosen),
+                          );
                         },
                         onChanged: (v) =>
                             context.read<AssistantProvider>().updateAssistant(
@@ -1028,7 +1006,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                         l10n.assistantEditContextMessagesDescription,
                         style: TextStyle(
                           fontSize: 12,
-                          color: cs.onSurface.withOpacity(0.6),
+                          color: cs.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ] else ...[
@@ -1038,7 +1016,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                           l10n.assistantEditParameterDisabled2,
                           style: TextStyle(
                             fontSize: 13,
-                            color: cs.onSurface.withOpacity(0.6),
+                            color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
                       ),
@@ -1086,7 +1064,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: cs.onSurface.withOpacity(0.2),
+                      color: cs.onSurface.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -1126,7 +1104,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                       pressedScale: 0.95,
                       builder: (pressed) {
                         final color = pressed
-                            ? cs.primary.withOpacity(0.7)
+                            ? cs.primary.withValues(alpha: 0.7)
                             : cs.primary;
                         return Text(
                           l10n.assistantSettingsAddSheetSave, // "Save"
@@ -1154,19 +1132,19 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
-                        color: cs.primary.withOpacity(0.5),
+                        color: cs.primary.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -1175,7 +1153,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 Text(
                   l10n.assistantEditMaxTokensDescription,
                   style: TextStyle(
-                    color: cs.onSurface.withOpacity(0.6),
+                    color: cs.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),
@@ -1306,7 +1284,7 @@ class _SliderTileNew extends StatelessWidget {
         : const <double>[];
 
     final active = cs.primary;
-    final inactive = cs.onSurface.withOpacity(isDark ? 0.25 : 0.20);
+    final inactive = cs.onSurface.withValues(alpha: isDark ? 0.25 : 0.20);
     final double clamped = value.clamp(min, max);
     final double? step = (divisions != null && divisions! > 0)
         ? (max - min) / divisions!
@@ -1356,17 +1334,17 @@ class _SliderTileNew extends StatelessWidget {
                       ),
                       thumbStrokeColor: Colors.transparent,
                       thumbStrokeWidth: 0,
-                      activeTickColor: cs.onSurface.withOpacity(
-                        isDark ? 0.45 : 0.35,
+                      activeTickColor: cs.onSurface.withValues(
+                        alpha: isDark ? 0.45 : 0.35,
                       ),
-                      inactiveTickColor: cs.onSurface.withOpacity(
-                        isDark ? 0.30 : 0.25,
+                      inactiveTickColor: cs.onSurface.withValues(
+                        alpha: isDark ? 0.30 : 0.25,
                       ),
-                      activeMinorTickColor: cs.onSurface.withOpacity(
-                        isDark ? 0.34 : 0.28,
+                      activeMinorTickColor: cs.onSurface.withValues(
+                        alpha: isDark ? 0.34 : 0.28,
                       ),
-                      inactiveMinorTickColor: cs.onSurface.withOpacity(
-                        isDark ? 0.24 : 0.20,
+                      inactiveMinorTickColor: cs.onSurface.withValues(
+                        alpha: isDark ? 0.24 : 0.20,
                       ),
                     ),
                     child: SfSlider(
@@ -1388,8 +1366,9 @@ class _SliderTileNew extends StatelessWidget {
                       labelFormatterCallback: (actual, formattedText) {
                         // Prefer integers for wide ranges, keep 2 decimals for 0..1
                         if (total <= 2.0) return actual.toStringAsFixed(2);
-                        if (actual == actual.roundToDouble())
+                        if (actual == actual.roundToDouble()) {
                           return actual.toStringAsFixed(0);
+                        }
                         return actual.toStringAsFixed(1);
                       },
                       thumbIcon: Container(
@@ -1402,7 +1381,7 @@ class _SliderTileNew extends StatelessWidget {
                               ? []
                               : [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
+                                    color: Colors.black.withValues(alpha: 0.08),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -1434,7 +1413,7 @@ class _SliderTileNew extends StatelessWidget {
                                       : v.toStringAsFixed(1),
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: cs.onSurface.withOpacity(0.65),
+                                    color: cs.onSurface.withValues(alpha: 0.65),
                                   ),
                                 ),
                               );
@@ -1472,10 +1451,10 @@ class _ValuePill extends StatelessWidget {
           : HitTestBehavior.deferToChild,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: isDark ? Colors.white10 : cs.primary.withOpacity(0.10),
+          color: isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: cs.primary.withOpacity(isDark ? 0.28 : 0.22),
+            color: cs.primary.withValues(alpha: isDark ? 0.28 : 0.22),
           ),
           boxShadow: isDark ? [] : AppShadows.soft,
         ),
@@ -1645,7 +1624,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                       width: 72,
                       height: 72,
                       decoration: BoxDecoration(
-                        color: cs.primary.withOpacity(0.08),
+                        color: cs.primary.withValues(alpha: 0.08),
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
@@ -1664,10 +1643,11 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                       autofocus: true,
                       onChanged: (v) => setLocal(() => value = v),
                       onSubmitted: (_) {
-                        if (validGrapheme(value))
+                        if (validGrapheme(value)) {
                           Navigator.of(
                             ctx,
                           ).pop(value.characters.take(1).toString());
+                        }
                       },
                       decoration: InputDecoration(
                         hintText: l10n.assistantEditEmojiDialogHint,
@@ -1686,7 +1666,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
-                            color: cs.primary.withOpacity(0.4),
+                            color: cs.primary.withValues(alpha: 0.4),
                           ),
                         ),
                       ),
@@ -1711,7 +1691,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                             onTap: () => Navigator.of(ctx).pop(e),
                             child: Container(
                               decoration: BoxDecoration(
-                                color: cs.primary.withOpacity(0.08),
+                                color: cs.primary.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               alignment: Alignment.center,
@@ -1746,7 +1726,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                     style: TextStyle(
                       color: validGrapheme(value)
                           ? cs.primary
-                          : cs.onSurface.withOpacity(0.38),
+                          : cs.onSurface.withValues(alpha: 0.38),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1796,7 +1776,9 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
+                    borderSide: BorderSide(
+                      color: cs.primary.withValues(alpha: 0.4),
+                    ),
                   ),
                 ),
                 onChanged: (v) => setLocal(() => value = v),
@@ -1818,7 +1800,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                     style: TextStyle(
                       color: valid(value)
                           ? cs.primary
-                          : cs.onSurface.withOpacity(0.38),
+                          : cs.onSurface.withValues(alpha: 0.38),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1831,11 +1813,9 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
     );
     if (ok == true) {
       final url = controller.text.trim();
-      if (url.isNotEmpty) {
-        await context.read<AssistantProvider>().updateAssistant(
-          a.copyWith(avatar: url),
-        );
-      }
+      if (!context.mounted || url.isEmpty) return;
+      final assistantProvider = context.read<AssistantProvider>();
+      await assistantProvider.updateAssistant(a.copyWith(avatar: url));
     }
   }
 
@@ -1846,6 +1826,8 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
       context: context,
       builder: (ctx) {
         final cs = Theme.of(ctx).colorScheme;
+        final assistantProvider = context.read<AssistantProvider>();
+        final dialogNavigator = Navigator.of(ctx);
         String value = '';
         bool valid(String s) => RegExp(r'^[0-9]{5,12}$').hasMatch(s.trim());
         String randomQQ() {
@@ -1918,7 +1900,9 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: cs.primary.withOpacity(0.4)),
+                    borderSide: BorderSide(
+                      color: cs.primary.withValues(alpha: 0.4),
+                    ),
                   ),
                 ),
                 onChanged: (v) => setLocal(() => value = v),
@@ -1935,27 +1919,27 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                     for (int i = 0; i < maxTries; i++) {
                       final qq = randomQQ();
                       final url =
-                          'https://q2.qlogo.cn/headimg_dl?dst_uin=' +
-                          qq +
-                          '&spec=100';
+                          'https://q2.qlogo.cn/headimg_dl?dst_uin=$qq&spec=100';
                       try {
                         final resp = await http
                             .get(Uri.parse(url))
                             .timeout(const Duration(seconds: 5));
                         if (resp.statusCode == 200 &&
                             resp.bodyBytes.isNotEmpty) {
-                          await context
-                              .read<AssistantProvider>()
-                              .updateAssistant(a.copyWith(avatar: url));
+                          await assistantProvider.updateAssistant(
+                            a.copyWith(avatar: url),
+                          );
                           applied = true;
                           break;
                         }
                       } catch (_) {}
                     }
                     if (applied) {
-                      if (Navigator.of(ctx).canPop())
-                        Navigator.of(ctx).pop(false);
+                      if (dialogNavigator.mounted && dialogNavigator.canPop()) {
+                        dialogNavigator.pop(false);
+                      }
                     } else {
+                      if (!context.mounted) return;
                       showAppSnackBar(
                         context,
                         message: l10n.assistantEditQQAvatarFailedMessage,
@@ -1981,7 +1965,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
                         style: TextStyle(
                           color: valid(value)
                               ? cs.primary
-                              : cs.onSurface.withOpacity(0.38),
+                              : cs.onSurface.withValues(alpha: 0.38),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -1996,13 +1980,10 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
     );
     if (ok == true) {
       final qq = controller.text.trim();
-      if (qq.isNotEmpty) {
-        final url =
-            'https://q2.qlogo.cn/headimg_dl?dst_uin=' + qq + '&spec=100';
-        await context.read<AssistantProvider>().updateAssistant(
-          a.copyWith(avatar: url),
-        );
-      }
+      if (!context.mounted || qq.isEmpty) return;
+      final assistantProvider = context.read<AssistantProvider>();
+      final url = 'https://q2.qlogo.cn/headimg_dl?dst_uin=$qq&spec=100';
+      await assistantProvider.updateAssistant(a.copyWith(avatar: url));
     }
   }
 
@@ -2012,21 +1993,18 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
       return;
     }
     try {
+      final assistantProvider = context.read<AssistantProvider>();
       final picker = ImagePicker();
       final XFile? file = await picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 1024,
         imageQuality: 90,
       );
-      if (!mounted) return;
-      if (file != null) {
-        await context.read<AssistantProvider>().updateAssistant(
-          a.copyWith(avatar: file.path),
-        );
-        return;
-      }
-    } on PlatformException catch (e) {
-      if (!mounted) return;
+      if (!context.mounted || file == null) return;
+      await assistantProvider.updateAssistant(a.copyWith(avatar: file.path));
+      return;
+    } on PlatformException {
+      if (!context.mounted) return;
       final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
         context,
@@ -2036,7 +2014,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
       await _inputAvatarUrl(context, a);
       return;
     } catch (_) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
         context,

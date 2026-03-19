@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../theme/design_tokens.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
@@ -21,11 +20,10 @@ class QuickPhraseMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final size = MediaQuery.of(context).size;
-    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+    AppLocalizations.of(context); // keep localization wired; no new strings
 
     // Calculate menu position anchored to the input bar's global left and bottom inset
     final double menuWidth = 250;
@@ -35,10 +33,15 @@ class QuickPhraseMenu extends StatelessWidget {
     final double margin = 16;
     double left = anchorPosition.dx;
     // Clamp within screen margins
-    if (left.isNaN || !left.isFinite) left = margin;
-    if (left < margin) left = margin;
-    if (left + menuWidth > size.width - margin)
+    if (left.isNaN || !left.isFinite) {
+      left = margin;
+    }
+    if (left < margin) {
+      left = margin;
+    }
+    if (left + menuWidth > size.width - margin) {
       left = size.width - menuWidth - margin;
+    }
 
     // Place menu above input bar + keyboard with a small gap
     final double bottom = 72 + 12 + 38;
@@ -59,13 +62,13 @@ class QuickPhraseMenu extends StatelessWidget {
                   constraints: BoxConstraints(maxHeight: maxMenuHeight),
                   decoration: BoxDecoration(
                     color: isDark
-                        ? const Color(0xFF1C1C1E).withOpacity(0.66)
-                        : Colors.white.withOpacity(0.66),
+                        ? const Color(0xFF1C1C1E).withValues(alpha: 0.66)
+                        : Colors.white.withValues(alpha: 0.66),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: isDark
-                          ? Colors.white.withOpacity(0.08)
-                          : cs.outlineVariant.withOpacity(0.2),
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : cs.outlineVariant.withValues(alpha: 0.2),
                       width: 1,
                     ),
                   ),
@@ -125,7 +128,9 @@ class QuickPhraseMenu extends StatelessWidget {
                                               ? Lucide.Zap
                                               : Lucide.botMessageSquare,
                                           size: 14,
-                                          color: cs.primary.withOpacity(0.7),
+                                          color: cs.primary.withValues(
+                                            alpha: 0.7,
+                                          ),
                                         ),
                                         const SizedBox(width: 6),
                                         Expanded(
@@ -146,7 +151,9 @@ class QuickPhraseMenu extends StatelessWidget {
                                       phrase.content,
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: cs.onSurface.withOpacity(0.6),
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.6,
+                                        ),
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,

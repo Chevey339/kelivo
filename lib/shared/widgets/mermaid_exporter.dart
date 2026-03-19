@@ -20,7 +20,7 @@ List<String> extractMermaidCodes(String md) {
 
 Map<String, String> buildThemeVarsFromColorScheme(ColorScheme cs) {
   String hex(Color c) {
-    final v = c.value & 0xFFFFFFFF;
+    final v = c.toARGB32();
     final r = (v >> 16) & 0xFF;
     final g = (v >> 8) & 0xFF;
     final b = v & 0xFF;
@@ -41,24 +41,24 @@ Map<String, String> buildThemeVarsFromColorScheme(ColorScheme cs) {
     'tertiaryColor': hex(cs.tertiary),
     'tertiaryTextColor': hex(cs.onTertiary),
     'tertiaryBorderColor': hex(cs.tertiary),
-    'background': hex(cs.background),
+    'background': hex(cs.surface),
     'mainBkg': hex(cs.primaryContainer),
     'secondBkg': hex(cs.secondaryContainer),
-    'lineColor': hex(cs.onBackground),
-    'textColor': hex(cs.onBackground),
+    'lineColor': hex(cs.onSurface),
+    'textColor': hex(cs.onSurface),
     'nodeBkg': hex(cs.surface),
     'nodeBorder': hex(cs.primary),
     'clusterBkg': hex(cs.surface),
     'clusterBorder': hex(cs.primary),
     'actorBorder': hex(cs.primary),
     'actorBkg': hex(cs.surface),
-    'actorTextColor': hex(cs.onBackground),
+    'actorTextColor': hex(cs.onSurface),
     'actorLineColor': hex(cs.primary),
     'taskBorderColor': hex(cs.primary),
     'taskBkgColor': hex(cs.primary),
     'taskTextLightColor': hex(cs.onPrimary),
-    'taskTextDarkColor': hex(cs.onBackground),
-    'labelColor': hex(cs.onBackground),
+    'taskTextDarkColor': hex(cs.onSurface),
+    'labelColor': hex(cs.onSurface),
     'errorBkgColor': hex(cs.error),
     'errorTextColor': hex(cs.onError),
   };
@@ -80,7 +80,7 @@ Future<void> preRenderMermaidCodesForExport(
       .toList();
   if (distinct.isEmpty) return;
 
-  final overlay = Overlay.of(context);
+  final overlay = Overlay.maybeOf(context);
   if (overlay == null) return;
 
   // Sequentially render codes with a single offscreen overlay to avoid heavy composites

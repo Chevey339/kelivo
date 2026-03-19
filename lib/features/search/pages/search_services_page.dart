@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/services/search/search_service.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -98,16 +96,9 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     _saveChanges();
   }
 
-  void _selectService(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-    _saveChanges();
-  }
-
   void _saveChanges() {
     final settings = context.read<SettingsProvider>();
-    context.read<SettingsProvider>().updateSettings(
+    settings.updateSettings(
       settings.copyWith(
         searchServices: _services,
         searchServiceSelected: _selectedIndex,
@@ -119,12 +110,12 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     if (index < 0 || index >= _services.length) return;
     final s = _services[index];
     final id = s.id;
+    final settings = context.read<SettingsProvider>();
     setState(() {
       _testing[id] = true;
     });
     try {
       final svc = SearchService.getService(s);
-      final settings = context.read<SettingsProvider>();
       // Use a tiny search to validate connectivity
       final common = SearchCommonOptions(
         resultSize: 1,
@@ -137,11 +128,13 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
       );
       settings.setSearchConnection(id, true);
     } catch (_) {
-      context.read<SettingsProvider>().setSearchConnection(id, false);
+      settings.setSearchConnection(id, false);
     } finally {
-      setState(() {
-        _testing[id] = false;
-      });
+      if (mounted) {
+        setState(() {
+          _testing[id] = false;
+        });
+      }
     }
   }
 
@@ -209,7 +202,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: cs.onSurface.withOpacity(0.8),
+            color: cs.onSurface.withValues(alpha: 0.8),
           ),
         ),
       );
@@ -236,7 +229,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
             unit == null ? '$value' : '$value$unit',
             style: TextStyle(
               fontSize: 14,
-              color: cs.onSurface.withOpacity(0.8),
+              color: cs.onSurface.withValues(alpha: 0.8),
             ),
           ),
           const SizedBox(width: 8),
@@ -253,7 +246,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
               .setSearchAutoTestOnLaunch(!autoTestOnLaunch),
           pressedScale: 0.995,
           builder: (pressed) {
-            final baseColor = cs.onSurface.withOpacity(0.9);
+            final baseColor = cs.onSurface.withValues(alpha: 0.9);
             return _AnimatedPressColor(
               pressed: pressed,
               base: baseColor,
@@ -300,7 +293,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
           pressedScale: 1.00,
           haptics: false,
           builder: (pressed) {
-            final baseColor = cs.onSurface.withOpacity(0.9);
+            final baseColor = cs.onSurface.withValues(alpha: 0.9);
             return _AnimatedPressColor(
               pressed: pressed,
               base: baseColor,
@@ -363,7 +356,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
           pressedScale: 1.00,
           haptics: false,
           builder: (pressed) {
-            final baseColor = cs.onSurface.withOpacity(0.9);
+            final baseColor = cs.onSurface.withValues(alpha: 0.9);
             return _AnimatedPressColor(
               pressed: pressed,
               base: baseColor,
@@ -428,7 +421,6 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     final s = _services[index];
     final cs = Theme.of(context).colorScheme;
     final name = SearchService.getService(s).name;
-    final selected = index == _selectedIndex;
     // Connection/testing status for capsule
     final l10n = AppLocalizations.of(context)!;
     final testing = _testing[s.id] == true;
@@ -438,20 +430,20 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     Color statusFg;
     if (testing) {
       statusText = l10n.searchServicesPageTestingStatus;
-      statusBg = cs.primary.withOpacity(0.12);
+      statusBg = cs.primary.withValues(alpha: 0.12);
       statusFg = cs.primary;
     } else if (conn == true) {
       statusText = l10n.searchServicesPageConnectedStatus;
-      statusBg = Colors.green.withOpacity(0.12);
+      statusBg = Colors.green.withValues(alpha: 0.12);
       statusFg = Colors.green;
     } else if (conn == false) {
       statusText = l10n.searchServicesPageFailedStatus;
-      statusBg = Colors.orange.withOpacity(0.12);
+      statusBg = Colors.orange.withValues(alpha: 0.12);
       statusFg = Colors.orange;
     } else {
       statusText = l10n.searchServicesPageNotTestedStatus;
-      statusBg = cs.onSurface.withOpacity(0.06);
-      statusFg = cs.onSurface.withOpacity(0.7);
+      statusBg = cs.onSurface.withValues(alpha: 0.06);
+      statusFg = cs.onSurface.withValues(alpha: 0.7);
     }
     return _TactileRow(
       onTap: () {
@@ -461,7 +453,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
       pressedScale: 1.00,
       haptics: false,
       builder: (pressed) {
-        final base = cs.onSurface.withOpacity(0.9);
+        final base = cs.onSurface.withValues(alpha: 0.9);
         return _AnimatedPressColor(
           pressed: pressed,
           base: base,
@@ -566,75 +558,6 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
       },
     );
   }
-
-  IconData _getServiceIcon(SearchServiceOptions service) {
-    if (service is BingLocalOptions) return Lucide.Search;
-    if (service is DuckDuckGoOptions) return Lucide.Search;
-    if (service is TavilyOptions) return Lucide.Sparkles;
-    if (service is ExaOptions) return Lucide.Brain;
-    if (service is ZhipuOptions) return Lucide.Languages;
-    if (service is SearXNGOptions) return Lucide.Shield;
-    if (service is LinkUpOptions) return Lucide.Link2;
-    if (service is BraveOptions) return Lucide.Shield;
-    if (service is MetasoOptions) return Lucide.Compass;
-    if (service is JinaOptions) return Lucide.Sparkles;
-    if (service is PerplexityOptions) return Lucide.Search;
-    if (service is BochaOptions) return Lucide.Search;
-    return Lucide.Search;
-  }
-
-  String? _getServiceStatus(SearchServiceOptions service) {
-    final l10n = AppLocalizations.of(context)!;
-    if (service is BingLocalOptions) return null;
-    if (service is DuckDuckGoOptions)
-      return l10n.searchServicesPageConfiguredStatus;
-    if (service is TavilyOptions)
-      return service.apiKey.isNotEmpty
-          ? l10n.searchServicesPageConfiguredStatus
-          : l10n.searchServicesPageApiKeyRequiredStatus;
-    if (service is ExaOptions)
-      return service.apiKey.isNotEmpty
-          ? l10n.searchServicesPageConfiguredStatus
-          : l10n.searchServicesPageApiKeyRequiredStatus;
-    if (service is ZhipuOptions)
-      return service.apiKey.isNotEmpty
-          ? l10n.searchServicesPageConfiguredStatus
-          : l10n.searchServicesPageApiKeyRequiredStatus;
-    if (service is SearXNGOptions)
-      return service.url.isNotEmpty
-          ? l10n.searchServicesPageConfiguredStatus
-          : l10n.searchServicesPageUrlRequiredStatus;
-    if (service is LinkUpOptions)
-      return service.apiKey.isNotEmpty
-          ? l10n.searchServicesPageConfiguredStatus
-          : l10n.searchServicesPageApiKeyRequiredStatus;
-    if (service is BraveOptions)
-      return service.apiKey.isNotEmpty
-          ? l10n.searchServicesPageConfiguredStatus
-          : l10n.searchServicesPageApiKeyRequiredStatus;
-    if (service is MetasoOptions)
-      return service.apiKey.isNotEmpty
-          ? l10n.searchServicesPageConfiguredStatus
-          : l10n.searchServicesPageApiKeyRequiredStatus;
-    if (service is OllamaOptions)
-      return service.apiKey.isNotEmpty
-          ? l10n.searchServicesPageConfiguredStatus
-          : l10n.searchServicesPageApiKeyRequiredStatus;
-    if (service is JinaOptions)
-      return service.apiKey.isNotEmpty
-          ? l10n.searchServicesPageConfiguredStatus
-          : l10n.searchServicesPageApiKeyRequiredStatus;
-    if (service is BochaOptions)
-      return service.apiKey.isNotEmpty
-          ? l10n.searchServicesPageConfiguredStatus
-          : l10n.searchServicesPageApiKeyRequiredStatus;
-    return null;
-  }
-
-  // Brand badge for known services using assets/icons; falls back to letter if unknown
-  // ignore: unused_element
-  Widget _brandBadgeForName(String name, {double size = 20}) =>
-      _BrandBadge(name: name, size: size);
 }
 
 class _BrandBadge extends StatelessWidget {
@@ -670,10 +593,10 @@ class _BrandBadge extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     // Use BrandAssets to get the icon path
     final asset = BrandAssets.assetForName(name);
-    final bg = isDark ? Colors.white10 : cs.primary.withOpacity(0.1);
+    final bg = isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1);
     if (asset != null) {
-      if (asset!.endsWith('.svg')) {
-        final isColorful = asset!.contains('color');
+      if (asset.endsWith('.svg')) {
+        final isColorful = asset.contains('color');
         final ColorFilter? tint = (isDark && !isColorful)
             ? const ColorFilter.mode(Colors.white, BlendMode.srcIn)
             : null;
@@ -683,7 +606,7 @@ class _BrandBadge extends StatelessWidget {
           decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
           alignment: Alignment.center,
           child: SvgPicture.asset(
-            asset!,
+            asset,
             width: size * 0.62,
             height: size * 0.62,
             colorFilter: tint,
@@ -696,7 +619,7 @@ class _BrandBadge extends StatelessWidget {
           decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
           alignment: Alignment.center,
           child: Image.asset(
-            asset!,
+            asset,
             width: size * 0.62,
             height: size * 0.62,
             fit: BoxFit.contain,
@@ -748,7 +671,6 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -772,7 +694,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: cs.onSurface.withOpacity(0.3),
+                    color: cs.onSurface.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -947,7 +869,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    Widget _buildTextField({
+    Widget buildTextField({
       required String key,
       required String label,
       String? hint,
@@ -958,7 +880,9 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
       _controllers[key] ??= TextEditingController(text: initialValue);
       return Container(
         decoration: BoxDecoration(
-          color: cs.surfaceVariant.withOpacity(isDark ? 0.18 : 0.5),
+          color: cs.surfaceContainerHighest.withValues(
+            alpha: isDark ? 0.18 : 0.5,
+          ),
           borderRadius: BorderRadius.circular(12),
         ),
         child: TextFormField(
@@ -988,7 +912,9 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: cs.surfaceVariant.withOpacity(isDark ? 0.18 : 0.5),
+              color: cs.surfaceContainerHighest.withValues(
+                alpha: isDark ? 0.18 : 0.5,
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -1000,7 +926,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
                     l10n.searchServiceNameBingLocal,
                     style: TextStyle(
                       fontSize: 14,
-                      color: cs.onSurface.withOpacity(0.8),
+                      color: cs.onSurface.withValues(alpha: 0.8),
                     ),
                   ),
                 ),
@@ -1010,7 +936,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
         ];
       case 'duckduckgo':
         return [
-          _buildTextField(
+          buildTextField(
             key: 'region',
             label: l10n.searchServicesAddDialogRegionOptional,
             hint: 'us-en',
@@ -1019,7 +945,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
         ];
       case 'tavily':
         return [
-          _buildTextField(
+          buildTextField(
             key: 'apiKey',
             label: 'API Key',
             validator: (value) {
@@ -1030,7 +956,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
             },
           ),
           const SizedBox(height: 12),
-          _buildTextField(
+          buildTextField(
             key: 'tavilyUrl',
             label: l10n.searchServicesFieldCustomUrlOptional,
             hint: TavilyOptions.defaultUrl,
@@ -1038,7 +964,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
         ];
       case 'exa':
         return [
-          _buildTextField(
+          buildTextField(
             key: 'apiKey',
             label: 'API Key',
             validator: (value) {
@@ -1049,7 +975,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
             },
           ),
           const SizedBox(height: 12),
-          _buildTextField(
+          buildTextField(
             key: 'exaUrl',
             label: l10n.searchServicesFieldCustomUrlOptional,
             hint: ExaOptions.defaultUrl,
@@ -1064,7 +990,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
       case 'perplexity':
       case 'bocha':
         return [
-          _buildTextField(
+          buildTextField(
             key: 'apiKey',
             label: 'API Key',
             validator: (value) {
@@ -1077,7 +1003,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
         ];
       case 'searxng':
         return [
-          _buildTextField(
+          buildTextField(
             key: 'url',
             label: l10n.searchServicesAddDialogInstanceUrl,
             validator: (value) {
@@ -1088,24 +1014,24 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
             },
           ),
           const SizedBox(height: 12),
-          _buildTextField(
+          buildTextField(
             key: 'engines',
             label: l10n.searchServicesAddDialogEnginesOptional,
             hint: 'google,duckduckgo',
           ),
           const SizedBox(height: 12),
-          _buildTextField(
+          buildTextField(
             key: 'language',
             label: l10n.searchServicesAddDialogLanguageOptional,
             hint: 'en-US',
           ),
           const SizedBox(height: 12),
-          _buildTextField(
+          buildTextField(
             key: 'username',
             label: l10n.searchServicesAddDialogUsernameOptional,
           ),
           const SizedBox(height: 12),
-          _buildTextField(
+          buildTextField(
             key: 'password',
             label: l10n.searchServicesAddDialogPasswordOptional,
             obscureText: true,
@@ -1257,7 +1183,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: cs.onSurface.withOpacity(0.2),
+                  color: cs.onSurface.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -1322,7 +1248,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    Widget _buildTextField({
+    Widget buildTextField({
       required String key,
       required String label,
       String? hint,
@@ -1332,7 +1258,9 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       _controllers[key] = _controllers[key] ?? TextEditingController();
       return Container(
         decoration: BoxDecoration(
-          color: cs.surfaceVariant.withOpacity(isDark ? 0.18 : 0.5),
+          color: cs.surfaceContainerHighest.withValues(
+            alpha: isDark ? 0.18 : 0.5,
+          ),
           borderRadius: BorderRadius.circular(12),
         ),
         child: TextFormField(
@@ -1360,7 +1288,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       return [Text(l10n.searchServicesEditDialogBingLocalNoConfig)];
     } else if (service is DuckDuckGoOptions) {
       return [
-        _buildTextField(
+        buildTextField(
           key: 'region',
           label: l10n.searchServicesEditDialogRegionOptional,
           hint: 'us-en',
@@ -1368,7 +1296,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       ];
     } else if (service is TavilyOptions) {
       return [
-        _buildTextField(
+        buildTextField(
           key: 'apiKey',
           label: 'API Key',
           validator: (value) {
@@ -1379,7 +1307,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
           },
         ),
         const SizedBox(height: 12),
-        _buildTextField(
+        buildTextField(
           key: 'url',
           label: l10n.searchServicesFieldCustomUrlOptional,
           hint: TavilyOptions.defaultUrl,
@@ -1387,7 +1315,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       ];
     } else if (service is ExaOptions) {
       return [
-        _buildTextField(
+        buildTextField(
           key: 'apiKey',
           label: 'API Key',
           validator: (value) {
@@ -1398,7 +1326,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
           },
         ),
         const SizedBox(height: 12),
-        _buildTextField(
+        buildTextField(
           key: 'url',
           label: l10n.searchServicesFieldCustomUrlOptional,
           hint: ExaOptions.defaultUrl,
@@ -1412,7 +1340,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
         service is JinaOptions ||
         service is BochaOptions) {
       return [
-        _buildTextField(
+        buildTextField(
           key: 'apiKey',
           label: 'API Key',
           validator: (value) {
@@ -1425,7 +1353,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       ];
     } else if (service is SearXNGOptions) {
       return [
-        _buildTextField(
+        buildTextField(
           key: 'url',
           label: l10n.searchServicesEditDialogInstanceUrl,
           validator: (value) {
@@ -1436,24 +1364,24 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
           },
         ),
         const SizedBox(height: 12),
-        _buildTextField(
+        buildTextField(
           key: 'engines',
           label: l10n.searchServicesEditDialogEnginesOptional,
           hint: 'google,duckduckgo',
         ),
         const SizedBox(height: 12),
-        _buildTextField(
+        buildTextField(
           key: 'language',
           label: l10n.searchServicesEditDialogLanguageOptional,
           hint: 'en-US',
         ),
         const SizedBox(height: 12),
-        _buildTextField(
+        buildTextField(
           key: 'username',
           label: l10n.searchServicesEditDialogUsernameOptional,
         ),
         const SizedBox(height: 12),
-        _buildTextField(
+        buildTextField(
           key: 'password',
           label: l10n.searchServicesEditDialogPasswordOptional,
           obscureText: true,
@@ -1553,7 +1481,7 @@ class _ServiceIcon extends StatelessWidget {
     // Use type for matching, not the localized name
     final matchName = _getMatchName(type);
     final asset = BrandAssets.assetForName(matchName);
-    final bg = isDark ? Colors.white10 : cs.primary.withOpacity(0.1);
+    final bg = isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1);
 
     return Container(
       width: size,
@@ -1641,18 +1569,12 @@ class _TactileIconButton extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    this.onLongPress,
-    this.semanticLabel,
     this.size = 22,
-    this.haptics = true,
   });
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final String? semanticLabel;
   final double size;
-  final bool haptics;
   @override
   State<_TactileIconButton> createState() => _TactileIconButtonState();
 }
@@ -1662,31 +1584,23 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
       size: widget.size,
       color: _pressed ? pressColor : base,
-      semanticLabel: widget.semanticLabel,
     );
     return Semantics(
       button: true,
-      label: widget.semanticLabel,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
         onTap: () {
-          if (widget.haptics) Haptics.light();
+          Haptics.light();
           widget.onTap();
         },
-        onLongPress: widget.onLongPress == null
-            ? null
-            : () {
-                if (widget.haptics) Haptics.light();
-                widget.onLongPress!.call();
-              },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           child: icon,
@@ -1728,8 +1642,9 @@ class _TactileRowState extends State<_TactileRow> {
           ? null
           : () {
               if (widget.haptics &&
-                  context.read<SettingsProvider>().hapticsOnListItemTap)
+                  context.read<SettingsProvider>().hapticsOnListItemTap) {
                 Haptics.soft();
+              }
               widget.onTap!.call();
             },
       child: widget.builder(_pressed),
@@ -1767,13 +1682,15 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      final Color bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+      final Color bg = isDark
+          ? Colors.white10
+          : Colors.white.withValues(alpha: 0.96);
       return Container(
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
             width: 0.6,
           ),
         ),
@@ -1794,7 +1711,7 @@ Widget _iosDivider(BuildContext context) {
     thickness: 0.6,
     indent: 54,
     endIndent: 12,
-    color: cs.outlineVariant.withOpacity(0.18),
+    color: cs.outlineVariant.withValues(alpha: 0.18),
   );
 }
 
@@ -1817,8 +1734,8 @@ Widget _sheetOption(
       final base = cs.onSurface;
       final bgTarget = (bgOnPress && pressed)
           ? (isDark
-                ? Colors.white.withOpacity(0.06)
-                : Colors.black.withOpacity(0.05))
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.black.withValues(alpha: 0.05))
           : Colors.transparent;
       return _AnimatedPressColor(
         pressed: pressed,
@@ -1859,7 +1776,7 @@ Widget _sheetDivider(BuildContext context) {
     thickness: 0.6,
     indent: 56,
     endIndent: 16,
-    color: cs.outlineVariant.withOpacity(0.18),
+    color: cs.outlineVariant.withValues(alpha: 0.18),
   );
 }
 
@@ -1882,8 +1799,8 @@ class _SmallTactileIconState extends State<_SmallTactileIcon> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final c = widget.enabled
-        ? cs.onSurface.withOpacity(_pressed ? 0.6 : 0.9)
-        : cs.onSurface.withOpacity(0.3);
+        ? cs.onSurface.withValues(alpha: _pressed ? 0.6 : 0.9)
+        : cs.onSurface.withValues(alpha: 0.3);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: widget.enabled ? (_) => setState(() => _pressed = true) : null,

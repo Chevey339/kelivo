@@ -311,7 +311,9 @@ class ChatboxImporter {
     if (mode == RestoreMode.merge) {
       for (final c in existingConvs) {
         final msgs = chatService.getMessages(c.id);
-        for (final m in msgs) existingMsgIds.add(m.id);
+        for (final m in msgs) {
+          existingMsgIds.add(m.id);
+        }
       }
     }
 
@@ -401,18 +403,24 @@ class ChatboxImporter {
         final incPrompt =
             (assistantJson['systemPrompt'] as String?)?.trim() ?? '';
         if (incPrompt.isNotEmpty) local['systemPrompt'] = incPrompt;
-        if (assistantJson['chatModelProvider'] != null)
+        if (assistantJson['chatModelProvider'] != null) {
           local['chatModelProvider'] = assistantJson['chatModelProvider'];
-        if (assistantJson['chatModelId'] != null)
+        }
+        if (assistantJson['chatModelId'] != null) {
           local['chatModelId'] = assistantJson['chatModelId'];
-        if (assistantJson['temperature'] != null)
+        }
+        if (assistantJson['temperature'] != null) {
           local['temperature'] = assistantJson['temperature'];
-        if (assistantJson['topP'] != null)
+        }
+        if (assistantJson['topP'] != null) {
           local['topP'] = assistantJson['topP'];
-        if (assistantJson['maxTokens'] != null)
+        }
+        if (assistantJson['maxTokens'] != null) {
           local['maxTokens'] = assistantJson['maxTokens'];
-        if (assistantJson['thinkingBudget'] != null)
+        }
+        if (assistantJson['thinkingBudget'] != null) {
           local['thinkingBudget'] = assistantJson['thinkingBudget'];
+        }
         // Do not overwrite local avatar/background in merge mode.
         existingAssistantsById[id] = local;
         importedAssistantIds.add(id); // still tag it as chatbox source
@@ -512,8 +520,9 @@ class ChatboxImporter {
           final msg = rawMsg.map((k, v) => MapEntry(k.toString(), v));
           final msgId = (msg['id'] ?? '').toString();
           if (msgId.isEmpty) continue;
-          if (mode == RestoreMode.merge && existingMsgIds.contains(msgId))
+          if (mode == RestoreMode.merge && existingMsgIds.contains(msgId)) {
             continue;
+          }
 
           final roleRaw = (msg['role'] ?? '').toString();
           final content = _extractMessageContent(msg, roleHint: roleRaw);

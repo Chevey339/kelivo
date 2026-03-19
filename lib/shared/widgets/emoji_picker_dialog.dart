@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:characters/characters.dart';
 import '../../l10n/app_localizations.dart';
 import 'emoji_text.dart';
 
@@ -160,7 +159,7 @@ Future<String?> showEmojiPickerDialog(
                     width: 72,
                     height: 72,
                     decoration: BoxDecoration(
-                      color: cs.primary.withOpacity(0.08),
+                      color: cs.primary.withValues(alpha: 0.08),
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
@@ -202,7 +201,7 @@ Future<String?> showEmojiPickerDialog(
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
-                          color: cs.primary.withOpacity(0.4),
+                          color: cs.primary.withValues(alpha: 0.4),
                         ),
                       ),
                     ),
@@ -227,7 +226,7 @@ Future<String?> showEmojiPickerDialog(
                           onTap: () => Navigator.of(ctx).pop(e),
                           child: Container(
                             decoration: BoxDecoration(
-                              color: cs.primary.withOpacity(0.08),
+                              color: cs.primary.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             alignment: Alignment.center,
@@ -261,7 +260,7 @@ Future<String?> showEmojiPickerDialog(
                   style: TextStyle(
                     color: validGrapheme(value)
                         ? cs.primary
-                        : cs.onSurface.withOpacity(0.38),
+                        : cs.onSurface.withValues(alpha: 0.38),
                     fontWeight: FontWeight.w600,
                   ),
                 ),

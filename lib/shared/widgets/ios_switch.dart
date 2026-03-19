@@ -96,7 +96,7 @@ class _IosSwitchState extends State<IosSwitch> {
             (brightness == Brightness.dark
                     ? CupertinoColors.systemGrey3
                     : CupertinoColors.systemGrey4)
-                .withOpacity(enabled ? 0.65 : 0.35),
+                .withValues(alpha: enabled ? 0.65 : 0.35),
         width: 1,
       ),
     );
@@ -157,7 +157,7 @@ class _IosSwitchState extends State<IosSwitch> {
                           : Alignment.centerLeft,
                       child: _Thumb(
                         size: thumbSize,
-                        color: enabled ? thumb : thumb.withOpacity(0.7),
+                        color: enabled ? thumb : thumb.withValues(alpha: 0.7),
                       ),
                     ),
                   ],

@@ -1,7 +1,6 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import '../../models/assistant.dart';
-import '../../providers/settings_provider.dart';
 
 class PromptTransformer {
   static Map<String, String> buildPlaceholders({

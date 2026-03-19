@@ -65,7 +65,7 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: cs.onSurface.withOpacity(0.2),
+                    color: cs.onSurface.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -174,7 +174,7 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
                         borderSide: BorderSide(
-                          color: cs.primary.withOpacity(0.45),
+                          color: cs.primary.withValues(alpha: 0.45),
                         ),
                       ),
                     ),

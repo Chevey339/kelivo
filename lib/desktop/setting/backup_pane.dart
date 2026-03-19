@@ -24,10 +24,6 @@ class DesktopBackupPane extends StatefulWidget {
 }
 
 class _DesktopBackupPaneState extends State<DesktopBackupPane> {
-  // Remote list state
-  List<BackupFileItem> _remote = const [];
-  bool _loadingRemote = false;
-
   // Local form controllers
   late TextEditingController _url;
   late TextEditingController _username;
@@ -65,8 +61,6 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     _s3SessionToken = TextEditingController(text: s3.sessionToken);
     _s3Prefix = TextEditingController(text: s3.prefix);
     _s3PathStyle = s3.pathStyle;
-    // Prefetch remote list with saved config
-    _reloadRemote();
   }
 
   @override
@@ -85,18 +79,6 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     super.dispose();
   }
 
-  Future<void> _reloadRemote() async {
-    setState(() => _loadingRemote = true);
-    try {
-      final items = await context.read<BackupProvider>().listRemote();
-      if (mounted) setState(() => _remote = items);
-    } catch (_) {
-      if (mounted) setState(() => _remote = const []);
-    } finally {
-      if (mounted) setState(() => _loadingRemote = false);
-    }
-  }
-
   WebDavConfig _buildConfigFromForm() {
     return WebDavConfig(
       url: _url.text.trim(),
@@ -110,8 +92,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
   Future<void> _saveConfig() async {
     final cfg = _buildConfigFromForm();
-    await context.read<SettingsProvider>().setWebDavConfig(cfg);
-    context.read<BackupProvider>().updateConfig(cfg);
+    final settings = context.read<SettingsProvider>();
+    final backupProvider = context.read<BackupProvider>();
+    await settings.setWebDavConfig(cfg);
+    backupProvider.updateConfig(cfg);
   }
 
   Future<void> _applyPartial({
@@ -122,6 +106,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     bool? includeChats,
     bool? includeFiles,
   }) async {
+    final settings = context.read<SettingsProvider>();
+    final backupProvider = context.read<BackupProvider>();
     final cfg = WebDavConfig(
       url: url ?? _url.text.trim(),
       username: username ?? _username.text.trim(),
@@ -132,8 +118,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       includeChats: includeChats ?? _includeChats,
       includeFiles: includeFiles ?? _includeFiles,
     );
-    await context.read<SettingsProvider>().setWebDavConfig(cfg);
-    context.read<BackupProvider>().updateConfig(cfg);
+    await settings.setWebDavConfig(cfg);
+    backupProvider.updateConfig(cfg);
   }
 
   S3Config _buildS3ConfigFromForm() {
@@ -157,8 +143,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
   Future<void> _saveS3Config() async {
     final cfg = _buildS3ConfigFromForm();
-    await context.read<SettingsProvider>().setS3Config(cfg);
-    context.read<S3BackupProvider>().updateConfig(cfg);
+    final settings = context.read<SettingsProvider>();
+    final s3BackupProvider = context.read<S3BackupProvider>();
+    await settings.setS3Config(cfg);
+    s3BackupProvider.updateConfig(cfg);
   }
 
   Future<void> _applyS3Partial({
@@ -173,6 +161,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     bool? includeChats,
     bool? includeFiles,
   }) async {
+    final settings = context.read<SettingsProvider>();
+    final s3BackupProvider = context.read<S3BackupProvider>();
     final cfg = S3Config(
       endpoint: endpoint ?? _s3Endpoint.text.trim(),
       region:
@@ -191,14 +181,14 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       includeChats: includeChats ?? _includeChats,
       includeFiles: includeFiles ?? _includeFiles,
     );
-    await context.read<SettingsProvider>().setS3Config(cfg);
-    context.read<S3BackupProvider>().updateConfig(cfg);
+    await settings.setS3Config(cfg);
+    s3BackupProvider.updateConfig(cfg);
   }
 
   Future<void> _chooseRestoreModeAndRun(
     Future<void> Function(RestoreMode) action,
   ) async {
-    final l10n = AppLocalizations.of(context)!;
+    final rootCtx = Navigator.of(context, rootNavigator: true).context;
     final mode = await showDialog<RestoreMode>(
       context: context,
       builder: (ctx) => _RestoreModeDialog(),
@@ -207,18 +197,19 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     try {
       await action(mode);
     } catch (e) {
-      if (!mounted) return;
+      if (!rootCtx.mounted) return;
       showAppSnackBar(
-        context,
+        rootCtx,
         message: e.toString(),
         type: NotificationType.error,
       );
       return;
     }
-    if (!mounted) return;
+    if (!rootCtx.mounted) return;
+    final l10n = AppLocalizations.of(rootCtx)!;
     // Inform restart requirement
     await showDialog(
-      context: context,
+      context: rootCtx,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(ctx).colorScheme.surface,
@@ -241,7 +232,6 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     final webdavVm = context.watch<BackupProvider>();
     final s3Vm = context.watch<S3BackupProvider>();
@@ -269,7 +259,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w400,
-                              color: cs.onSurface.withOpacity(0.9),
+                              color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
                         ),
@@ -304,7 +294,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
-                                color: cs.onSurface.withOpacity(0.95),
+                                color: cs.onSurface.withValues(alpha: 0.95),
                               ),
                             ),
                           ),
@@ -360,7 +350,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
-                                color: cs.onSurface.withOpacity(0.95),
+                                color: cs.onSurface.withValues(alpha: 0.95),
                               ),
                             ),
                           ),
@@ -445,12 +435,12 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             onTap: busy
                                 ? () {}
                                 : () async {
+                                    final backupProvider = context
+                                        .read<BackupProvider>();
                                     await _saveConfig();
-                                    await context.read<BackupProvider>().test();
-                                    if (!mounted) return;
-                                    final rawMessage = context
-                                        .read<BackupProvider>()
-                                        .message;
+                                    await backupProvider.test();
+                                    if (!context.mounted) return;
+                                    final rawMessage = backupProvider.message;
                                     final message =
                                         rawMessage ?? l10n.backupPageTestDone;
                                     showAppSnackBar(
@@ -471,30 +461,27 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             onTap: busy
                                 ? () {}
                                 : () async {
+                                    final backupProvider = context
+                                        .read<BackupProvider>();
                                     await _saveConfig();
-                                    if (!mounted) return;
+                                    if (!context.mounted) return;
                                     _showRemoteBackupsDialog(
                                       context,
                                       title:
                                           '${l10n.backupPageRemoteBackups} (WebDAV)',
-                                      listRemote: () => context
-                                          .read<BackupProvider>()
-                                          .listRemote(),
+                                      listRemote: backupProvider.listRemote,
                                       restoreFromItem: (it, mode) async {
-                                        final vm = context
-                                            .read<BackupProvider>();
-                                        await vm.restoreFromItem(
+                                        await backupProvider.restoreFromItem(
                                           it,
                                           mode: mode,
                                         );
-                                        final msg = vm.message;
+                                        final msg = backupProvider.message;
                                         if (msg != null && msg != 'Restored') {
                                           throw Exception(msg);
                                         }
                                       },
-                                      deleteAndReload: (it) => context
-                                          .read<BackupProvider>()
-                                          .deleteAndReload(it),
+                                      deleteAndReload:
+                                          backupProvider.deleteAndReload,
                                     );
                                   },
                           ),
@@ -505,14 +492,12 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             onTap: busy
                                 ? () {}
                                 : () async {
+                                    final backupProvider = context
+                                        .read<BackupProvider>();
                                     await _saveConfig();
-                                    await context
-                                        .read<BackupProvider>()
-                                        .backup();
-                                    if (!mounted) return;
-                                    final rawMessage = context
-                                        .read<BackupProvider>()
-                                        .message;
+                                    await backupProvider.backup();
+                                    if (!context.mounted) return;
+                                    final rawMessage = backupProvider.message;
                                     final message =
                                         rawMessage ??
                                         l10n.backupPageBackupUploaded;
@@ -546,7 +531,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
-                                color: cs.onSurface.withOpacity(0.95),
+                                color: cs.onSurface.withValues(alpha: 0.95),
                               ),
                             ),
                           ),
@@ -692,14 +677,12 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             onTap: busy
                                 ? () {}
                                 : () async {
+                                    final s3BackupProvider = context
+                                        .read<S3BackupProvider>();
                                     await _saveS3Config();
-                                    await context
-                                        .read<S3BackupProvider>()
-                                        .test();
-                                    if (!mounted) return;
-                                    final rawMessage = context
-                                        .read<S3BackupProvider>()
-                                        .message;
+                                    await s3BackupProvider.test();
+                                    if (!context.mounted) return;
+                                    final rawMessage = s3BackupProvider.message;
                                     final message =
                                         rawMessage ?? l10n.backupPageTestDone;
                                     showAppSnackBar(
@@ -720,30 +703,27 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             onTap: busy
                                 ? () {}
                                 : () async {
+                                    final s3BackupProvider = context
+                                        .read<S3BackupProvider>();
                                     await _saveS3Config();
-                                    if (!mounted) return;
+                                    if (!context.mounted) return;
                                     _showRemoteBackupsDialog(
                                       context,
                                       title:
                                           '${l10n.backupPageRemoteBackups} (S3)',
-                                      listRemote: () => context
-                                          .read<S3BackupProvider>()
-                                          .listRemote(),
+                                      listRemote: s3BackupProvider.listRemote,
                                       restoreFromItem: (it, mode) async {
-                                        final vm = context
-                                            .read<S3BackupProvider>();
-                                        await vm.restoreFromItem(
+                                        await s3BackupProvider.restoreFromItem(
                                           it,
                                           mode: mode,
                                         );
-                                        final msg = vm.message;
+                                        final msg = s3BackupProvider.message;
                                         if (msg != null && msg != 'Restored') {
                                           throw Exception(msg);
                                         }
                                       },
-                                      deleteAndReload: (it) => context
-                                          .read<S3BackupProvider>()
-                                          .deleteAndReload(it),
+                                      deleteAndReload:
+                                          s3BackupProvider.deleteAndReload,
                                     );
                                   },
                           ),
@@ -754,14 +734,12 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             onTap: busy
                                 ? () {}
                                 : () async {
+                                    final s3BackupProvider = context
+                                        .read<S3BackupProvider>();
                                     await _saveS3Config();
-                                    await context
-                                        .read<S3BackupProvider>()
-                                        .backup();
-                                    if (!mounted) return;
-                                    final rawMessage = context
-                                        .read<S3BackupProvider>()
-                                        .message;
+                                    await s3BackupProvider.backup();
+                                    if (!context.mounted) return;
+                                    final rawMessage = s3BackupProvider.message;
                                     final message =
                                         rawMessage ??
                                         l10n.backupPageBackupUploaded;
@@ -808,10 +786,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           filled: false,
                           dense: true,
                           onTap: () async {
+                            final backupProvider = context
+                                .read<BackupProvider>();
                             await _saveConfig();
-                            final file = await context
-                                .read<BackupProvider>()
-                                .exportToFile();
+                            final file = await backupProvider.exportToFile();
                             String? savePath = await FilePicker.platform
                                 .saveFile(
                                   dialogTitle: l10n.backupPageExportToFile,
@@ -834,6 +812,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           filled: false,
                           dense: true,
                           onTap: () async {
+                            final backupProvider = context
+                                .read<BackupProvider>();
                             final result = await FilePicker.platform.pickFiles(
                               type: FileType.any,
                               allowMultiple: false,
@@ -842,9 +822,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             if (path == null) return;
                             final f = File(path);
                             await _chooseRestoreModeAndRun((mode) async {
-                              await context
-                                  .read<BackupProvider>()
-                                  .restoreFromLocalFile(f, mode: mode);
+                              await backupProvider.restoreFromLocalFile(
+                                f,
+                                mode: mode,
+                              );
                             });
                           },
                         ),
@@ -853,6 +834,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           filled: false,
                           dense: true,
                           onTap: () async {
+                            final rootCtx = Navigator.of(
+                              context,
+                              rootNavigator: true,
+                            ).context;
                             final result = await FilePicker.platform.pickFiles(
                               type: FileType.any,
                               allowMultiple: false,
@@ -860,11 +845,13 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             final path = result?.files.single.path;
                             if (path == null) return;
                             final f = File(path);
+                            if (!context.mounted) return;
                             final mode = await showDialog<RestoreMode>(
                               context: context,
                               builder: (_) => _RestoreModeDialog(),
                             );
                             if (mode == null) return;
+                            if (!context.mounted) return;
                             final settings = context.read<SettingsProvider>();
                             final chat = context.read<ChatService>();
                             try {
@@ -874,9 +861,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                 settings: settings,
                                 chatService: chat,
                               );
+                              if (!rootCtx.mounted) return;
                               await showDialog(
-                                context: context,
-                                builder: (_) => AlertDialog(
+                                context: rootCtx,
+                                builder: (dctx) => AlertDialog(
                                   backgroundColor: cs.surface,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
@@ -886,7 +874,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                   actions: [
                                     TextButton(
                                       onPressed: () async {
-                                        Navigator.of(context).pop();
+                                        Navigator.of(rootCtx).pop();
                                         PlatformUtils.restartApp();
                                       },
                                       child: Text(l10n.backupPageOK),
@@ -895,9 +883,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                 ),
                               );
                             } catch (e) {
+                              if (!rootCtx.mounted) return;
                               await showDialog(
-                                context: context,
-                                builder: (_) => AlertDialog(
+                                context: rootCtx,
+                                builder: (dctx) => AlertDialog(
                                   backgroundColor: cs.surface,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
@@ -906,8 +895,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                   content: Text(e.toString()),
                                   actions: [
                                     TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
+                                      onPressed: () => Navigator.of(dctx).pop(),
                                       child: Text(l10n.backupPageOK),
                                     ),
                                   ],
@@ -921,6 +909,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           filled: false,
                           dense: true,
                           onTap: () async {
+                            final rootCtx = Navigator.of(
+                              context,
+                              rootNavigator: true,
+                            ).context;
                             final result = await FilePicker.platform.pickFiles(
                               type: FileType.custom,
                               allowedExtensions: ['json'],
@@ -929,11 +921,13 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             final path = result?.files.single.path;
                             if (path == null) return;
                             final f = File(path);
+                            if (!context.mounted) return;
                             final mode = await showDialog<RestoreMode>(
                               context: context,
                               builder: (_) => _RestoreModeDialog(),
                             );
                             if (mode == null) return;
+                            if (!context.mounted) return;
                             final settings = context.read<SettingsProvider>();
                             final chat = context.read<ChatService>();
                             try {
@@ -944,9 +938,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                     settings: settings,
                                     chatService: chat,
                                   );
+                              if (!rootCtx.mounted) return;
                               await showDialog(
-                                context: context,
-                                builder: (_) => AlertDialog(
+                                context: rootCtx,
+                                builder: (dctx) => AlertDialog(
                                   backgroundColor: cs.surface,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
@@ -963,7 +958,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                   actions: [
                                     TextButton(
                                       onPressed: () async {
-                                        Navigator.of(context).pop();
+                                        Navigator.of(rootCtx).pop();
                                         PlatformUtils.restartApp();
                                       },
                                       child: Text(l10n.backupPageOK),
@@ -972,9 +967,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                 ),
                               );
                             } catch (e) {
+                              if (!rootCtx.mounted) return;
                               await showDialog(
-                                context: context,
-                                builder: (_) => AlertDialog(
+                                context: rootCtx,
+                                builder: (dctx) => AlertDialog(
                                   backgroundColor: cs.surface,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
@@ -983,8 +979,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                   content: Text(e.toString()),
                                   actions: [
                                     TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
+                                      onPressed: () => Navigator.of(dctx).pop(),
                                       child: Text(l10n.backupPageOK),
                                     ),
                                   ],
@@ -1025,10 +1020,12 @@ class _RemoteItemCardState extends State<_RemoteItemCard> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    final baseBg = isDark
+        ? Colors.white10
+        : Colors.white.withValues(alpha: 0.96);
     final borderColor = _hover
-        ? cs.primary.withOpacity(isDark ? 0.35 : 0.45)
-        : cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08);
+        ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
     final l10n = AppLocalizations.of(context)!;
     final dateStr =
         widget.item.lastModified?.toLocal().toString().split('.').first ?? '';
@@ -1078,7 +1075,7 @@ class _RemoteItemCardState extends State<_RemoteItemCard> {
                     '${prettySize(widget.item.size)}${dateStr.isNotEmpty ? ' · $dateStr' : ''}',
                     style: TextStyle(
                       fontSize: 12.5,
-                      color: cs.onSurface.withOpacity(0.7),
+                      color: cs.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                 ],
@@ -1152,20 +1149,23 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
         final aTime = a.lastModified;
         final bTime = b.lastModified;
         if (aTime != null && bTime != null) return bTime.compareTo(aTime);
-        if (aTime == null && bTime == null)
+        if (aTime == null && bTime == null) {
           return b.displayName.compareTo(a.displayName);
+        }
         if (aTime == null) return 1; // items with time go first
         return -1;
       });
-      if (mounted)
+      if (mounted) {
         setState(() {
           _items = list;
         });
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _items = const [];
         });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1186,6 +1186,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     try {
       await action(mode);
     } catch (e) {
+      if (!rootCtx.mounted) return;
       showAppSnackBar(
         rootCtx,
         message: e.toString(),
@@ -1195,6 +1196,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    if (!rootCtx.mounted) return;
     final l10n = AppLocalizations.of(rootCtx)!;
     final cs = Theme.of(rootCtx).colorScheme;
     await showDialog(
@@ -1270,7 +1272,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
                         child: Text(
                           l10n.backupPageNoBackups,
                           style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.7),
+                            color: cs.onSurface.withValues(alpha: 0.7),
                           ),
                         ),
                       )
@@ -1335,12 +1337,14 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
                                   next.sort((a, b) {
                                     final aTime = a.lastModified;
                                     final bTime = b.lastModified;
-                                    if (aTime != null && bTime != null)
+                                    if (aTime != null && bTime != null) {
                                       return bTime.compareTo(aTime);
-                                    if (aTime == null && bTime == null)
+                                    }
+                                    if (aTime == null && bTime == null) {
                                       return b.displayName.compareTo(
                                         a.displayName,
                                       );
+                                    }
                                     if (aTime == null) return 1;
                                     return -1;
                                   });
@@ -1387,7 +1391,7 @@ Widget _rowDivider(BuildContext context) {
   final isDark = Theme.of(context).brightness == Brightness.dark;
   return Container(
     height: 1,
-    color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+    color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
   );
 }
 
@@ -1408,48 +1412,13 @@ class _ItemRow extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 14,
-                color: cs.onSurface.withOpacity(0.88),
+                color: cs.onSurface.withValues(alpha: 0.88),
               ),
             ),
           ),
           const SizedBox(width: 12),
           Align(alignment: Alignment.centerRight, child: trailing),
         ],
-      ),
-    );
-  }
-}
-
-class _LabeledCheckbox extends StatelessWidget {
-  const _LabeledCheckbox({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-  final String label;
-  final bool value;
-  final ValueChanged<bool>? onChanged;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return MouseRegion(
-      cursor: onChanged != null
-          ? SystemMouseCursors.click
-          : SystemMouseCursors.basic,
-      child: GestureDetector(
-        onTap: onChanged != null ? () => onChanged!(!value) : null,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Checkbox(
-              value: value,
-              onChanged: onChanged == null
-                  ? null
-                  : (bool? v) => onChanged!(v ?? false),
-            ),
-            Text(label, style: TextStyle(color: cs.onSurface.withOpacity(0.9))),
-          ],
-        ),
       ),
     );
   }
@@ -1483,7 +1452,7 @@ class _RestoreModeDialog extends StatelessWidget {
                 l10n.backupPageSelectImportModeDescription,
                 style: TextStyle(
                   fontSize: 13,
-                  color: cs.onSurface.withOpacity(0.8),
+                  color: cs.onSurface.withValues(alpha: 0.8),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1536,8 +1505,8 @@ class _RestoreModeTileState extends State<_RestoreModeTile> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.04))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.04))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1558,7 +1527,7 @@ class _RestoreModeTileState extends State<_RestoreModeTile> {
               color: bg,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: cs.outlineVariant.withOpacity(0.12),
+                color: cs.outlineVariant.withValues(alpha: 0.12),
                 width: 0.6,
               ),
             ),
@@ -1574,7 +1543,7 @@ class _RestoreModeTileState extends State<_RestoreModeTile> {
                   widget.subtitle,
                   style: TextStyle(
                     fontSize: 13,
-                    color: cs.onSurface.withOpacity(0.8),
+                    color: cs.onSurface.withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -1602,8 +1571,8 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -1650,17 +1619,17 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = widget.filled
         ? Colors.white
-        : cs.onSurface.withOpacity(0.9);
+        : cs.onSurface.withValues(alpha: 0.9);
     final bg = widget.filled
-        ? (_hover ? cs.primary.withOpacity(0.92) : cs.primary)
+        ? (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary)
         : (_hover
               ? (isDark
-                    ? Colors.white.withOpacity(0.06)
-                    : Colors.black.withOpacity(0.05))
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.05))
               : Colors.transparent);
     final borderColor = widget.filled
         ? Colors.transparent
-        : cs.outlineVariant.withOpacity(isDark ? 0.22 : 0.18);
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.22 : 0.18);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -1706,13 +1675,15 @@ Widget _sectionCard({required List<Widget> children}) {
     builder: (context) {
       final cs = Theme.of(context).colorScheme;
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+      final baseBg = isDark
+          ? Colors.white10
+          : Colors.white.withValues(alpha: 0.96);
       return Container(
         decoration: BoxDecoration(
           color: baseBg,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08),
+            color: cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08),
             width: 0.8,
           ),
         ),
@@ -1734,24 +1705,30 @@ InputDecoration _deskInputDecoration(BuildContext context) {
     isDense: true,
     filled: true,
     fillColor: isDark ? Colors.white10 : const Color(0xFFF7F7F9),
-    hintStyle: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.5)),
+    hintStyle: TextStyle(
+      fontSize: 14,
+      color: cs.onSurface.withValues(alpha: 0.5),
+    ),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.12),
+        color: cs.outlineVariant.withValues(alpha: 0.12),
         width: 0.6,
       ),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
       borderSide: BorderSide(
-        color: cs.outlineVariant.withOpacity(0.12),
+        color: cs.outlineVariant.withValues(alpha: 0.12),
         width: 0.6,
       ),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: cs.primary.withOpacity(0.35), width: 0.8),
+      borderSide: BorderSide(
+        color: cs.primary.withValues(alpha: 0.35),
+        width: 0.8,
+      ),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
   );

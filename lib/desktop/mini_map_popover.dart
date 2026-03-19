@@ -18,7 +18,7 @@ Future<String?> showDesktopMiniMapPopover(
     !selecting || (selectedMessageIds != null && onToggleSelection != null),
     'Mini map selection mode requires selectedMessageIds and onToggleSelection.',
   );
-  final overlay = Overlay.of(context);
+  final overlay = Overlay.maybeOf(context);
   if (overlay == null) return null;
   final keyContext = anchorKey.currentContext;
   if (keyContext == null) return null;
@@ -219,20 +219,20 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: (isDark ? Colors.black : Colors.white).withOpacity(
-              isDark ? 0.28 : 0.56,
+            color: (isDark ? Colors.black : Colors.white).withValues(
+              alpha: isDark ? 0.28 : 0.56,
             ),
             border: Border(
               top: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.06 : 0.18),
+                color: Colors.white.withValues(alpha: isDark ? 0.06 : 0.18),
                 width: 0.7,
               ),
               left: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
               right: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
             ),
@@ -277,8 +277,9 @@ class _MiniMapList extends StatelessWidget {
     ChatMessage? pendingUser;
     for (final m in items) {
       if (m.role == 'user') {
-        if (pendingUser != null)
+        if (pendingUser != null) {
           pairs.add(_QaPair(user: pendingUser, assistant: null));
+        }
         pendingUser = m;
       } else if (m.role == 'assistant') {
         if (pendingUser != null) {
@@ -289,8 +290,9 @@ class _MiniMapList extends StatelessWidget {
         }
       }
     }
-    if (pendingUser != null)
+    if (pendingUser != null) {
       pairs.add(_QaPair(user: pendingUser, assistant: null));
+    }
     return pairs;
   }
 
@@ -409,12 +411,12 @@ class _MiniMapRowState extends State<_MiniMapRow> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final userText = widget.user?.content ?? '';
     final asstText = widget.assistant?.content ?? '';
-    final userBorder = cs.primary.withOpacity(isDark ? 0.45 : 0.35);
+    final userBorder = cs.primary.withValues(alpha: isDark ? 0.45 : 0.35);
 
     final assistantSelectedBg = (isDark
-        ? cs.primary.withOpacity(0.18)
-        : cs.primary.withOpacity(0.10));
-    final assistantBorder = cs.primary.withOpacity(isDark ? 0.38 : 0.28);
+        ? cs.primary.withValues(alpha: 0.18)
+        : cs.primary.withValues(alpha: 0.10));
+    final assistantBorder = cs.primary.withValues(alpha: isDark ? 0.38 : 0.28);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -440,8 +442,8 @@ class _MiniMapRowState extends State<_MiniMapRow> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: cs.primary.withOpacity(
-                    _hoverUser
+                  color: cs.primary.withValues(
+                    alpha: _hoverUser
                         ? (widget.userSelected
                               ? (isDark ? 0.32 : 0.18)
                               : (isDark ? 0.22 : 0.14))
@@ -493,8 +495,8 @@ class _MiniMapRowState extends State<_MiniMapRow> {
                 decoration: BoxDecoration(
                   color: widget.assistantSelected
                       ? assistantSelectedBg
-                      : cs.onSurface.withOpacity(
-                          _hoverAssistant
+                      : cs.onSurface.withValues(
+                          alpha: _hoverAssistant
                               ? (isDark ? 0.07 : 0.05)
                               : (isDark ? 0.05 : 0.03),
                         ),

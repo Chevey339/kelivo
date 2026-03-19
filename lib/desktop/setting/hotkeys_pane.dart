@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -42,7 +41,7 @@ class _DesktopHotkeysPaneState extends State<DesktopHotkeysPane> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w400,
-                              color: cs.onSurface.withOpacity(0.9),
+                              color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
                         ),
@@ -89,7 +88,7 @@ class _DesktopHotkeysPaneState extends State<DesktopHotkeysPane> {
         borderRadius: BorderRadius.circular(16),
         // Match TTS card's lighter border when unselected
         border: Border.all(
-          color: cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08),
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08),
           width: 0.6,
         ),
       ),
@@ -103,7 +102,7 @@ class _DesktopHotkeysPaneState extends State<DesktopHotkeysPane> {
   Widget _rowDivider(BuildContext context) => Divider(
     height: 1,
     thickness: 0.5,
-    color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.25),
+    color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.25),
   );
 }
 
@@ -129,7 +128,6 @@ class _HotkeyRowState extends State<_HotkeyRow> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    final hk = context.watch<HotkeyProvider>();
     final item = widget.item;
 
     String displayLabel() {
@@ -169,7 +167,7 @@ class _HotkeyRowState extends State<_HotkeyRow> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: cs.onSurface.withOpacity(0.92),
+                color: cs.onSurface.withValues(alpha: 0.92),
               ),
             ),
           ),
@@ -268,21 +266,20 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final border = cs.outlineVariant.withOpacity(0.35);
+    final border = cs.outlineVariant.withValues(alpha: 0.35);
     final bg = isDark
-        ? Colors.white.withOpacity(0.04)
-        : Colors.black.withOpacity(0.03);
-    return RawKeyboardListener(
+        ? Colors.white.withValues(alpha: 0.04)
+        : Colors.black.withValues(alpha: 0.03);
+    return KeyboardListener(
       focusNode: widget.focusNode,
-      onKey: (RawKeyEvent e) {
+      onKeyEvent: (KeyEvent e) {
         if (!widget.recording) return;
-        final isDown = e is RawKeyDownEvent;
-        final data = e.data;
-        // Logical modifiers cross-platform
-        _ctrl = e.isControlPressed;
-        _meta = e.isMetaPressed; // Cmd on macOS
-        _alt = e.isAltPressed;
-        _shift = e.isShiftPressed;
+        final isDown = e is KeyDownEvent;
+        // Modifiers cross-platform (Cmd on macOS = Meta)
+        _ctrl = HardwareKeyboard.instance.isControlPressed;
+        _meta = HardwareKeyboard.instance.isMetaPressed;
+        _alt = HardwareKeyboard.instance.isAltPressed;
+        _shift = HardwareKeyboard.instance.isShiftPressed;
 
         // Identify non-modifier key on key down
         if (isDown) {
@@ -302,13 +299,13 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
 
           // Map some punctuation/letters
           String? keyToken;
-          if (key == LogicalKeyboardKey.comma)
+          if (key == LogicalKeyboardKey.comma) {
             keyToken = 'comma';
-          else if (key == LogicalKeyboardKey.bracketLeft)
+          } else if (key == LogicalKeyboardKey.bracketLeft) {
             keyToken = 'bracketleft';
-          else if (key == LogicalKeyboardKey.bracketRight)
+          } else if (key == LogicalKeyboardKey.bracketRight) {
             keyToken = 'bracketright';
-          else if (key.keyLabel.length == 1) {
+          } else if (key.keyLabel.length == 1) {
             final ch = key.keyLabel.toLowerCase();
             if (RegExp(r'^[a-z0-9]$').hasMatch(ch)) {
               if (RegExp(r'^[a-z]$').hasMatch(ch)) {
@@ -344,7 +341,9 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
             color: bg,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: widget.recording ? cs.primary.withOpacity(0.5) : border,
+              color: widget.recording
+                  ? cs.primary.withValues(alpha: 0.5)
+                  : border,
             ),
           ),
           alignment: Alignment.centerLeft,
@@ -355,7 +354,7 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
             style: TextStyle(
               fontSize: 13.5,
               fontWeight: FontWeight.w500,
-              color: cs.onSurface.withOpacity(0.9),
+              color: cs.onSurface.withValues(alpha: 0.9),
             ),
           ),
         ),
@@ -398,8 +397,9 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
               case 'bracketright':
                 return ']';
               default:
-                if (_key!.startsWith('key') && _key!.length == 4)
+                if (_key!.startsWith('key') && _key!.length == 4) {
                   return _key!.substring(3).toUpperCase();
+                }
                 return _key!.toUpperCase();
             }
           }();
@@ -426,8 +426,8 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -446,7 +446,7 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
           child: Icon(
             widget.icon,
             size: 16,
-            color: cs.onSurface.withOpacity(0.9),
+            color: cs.onSurface.withValues(alpha: 0.9),
           ),
         ),
       ),

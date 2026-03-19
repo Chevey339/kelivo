@@ -45,11 +45,14 @@ Future<String> _downloadRemoteAsBase64(
   if (config.vertexAI == true) {
     try {
       final token = await _maybeVertexAccessToken(config);
-      if (token != null && token.isNotEmpty)
+      if (token != null && token.isNotEmpty) {
         req.headers['Authorization'] = 'Bearer $token';
+      }
     } catch (_) {}
     final proj = (config.projectId ?? '').trim();
-    if (proj.isNotEmpty) req.headers['X-Goog-User-Project'] = proj;
+    if (proj.isNotEmpty) {
+      req.headers['X-Goog-User-Project'] = proj;
+    }
   }
   final resp = await client.send(req);
   if (resp.statusCode < 200 || resp.statusCode >= 300) {
@@ -124,7 +127,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
   bool stream = true,
 }) async* {
   final upstreamId = _apiModelId(config, modelId);
-  bool _supportsAdaptiveThinking(String id) {
+  bool supportsAdaptiveThinking(String id) {
     final lower = id.toLowerCase();
     if (!lower.contains('claude-')) return false;
     final m = RegExp(
@@ -141,7 +144,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     return lower.contains('4-6') || lower.contains('4.6');
   }
 
-  String _adaptiveEffort(int? budget) {
+  String adaptiveEffort(int? budget) {
     final effort = _effortForBudget(budget);
     if (effort == 'auto') return 'medium';
     return effort;
@@ -175,8 +178,9 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     if (effectiveThinkingBudget >= effectiveMaxTokens) {
       // Reserve at least 1k tokens for response content
       effectiveThinkingBudget = effectiveMaxTokens - 1024;
-      if (effectiveThinkingBudget < 1024)
+      if (effectiveThinkingBudget < 1024) {
         effectiveThinkingBudget = 1024; // floor
+      }
     }
   }
 
@@ -185,7 +189,9 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
   if (token != null && token.isNotEmpty) {
     headers['Authorization'] = 'Bearer $token';
   }
-  if (extraHeaders != null) headers.addAll(extraHeaders);
+  if (extraHeaders != null) {
+    headers.addAll(extraHeaders);
+  }
 
   // Extract system prompt
   String systemPrompt = '';
@@ -195,7 +201,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     if (role == 'system') {
       final s = (m['content'] ?? '').toString();
       if (s.isNotEmpty) {
-        systemPrompt = systemPrompt.isEmpty ? s : (systemPrompt + '\n\n' + s);
+        systemPrompt = systemPrompt.isEmpty ? s : '$systemPrompt\n\n$s';
       }
       continue;
     }
@@ -226,10 +232,15 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
             b64 = await _downloadRemoteAsBase64(client, config, p);
             mime = 'image/png'; // TODO: detect mime from response or url
             if (p.toLowerCase().endsWith('.jpg') ||
-                p.toLowerCase().endsWith('.jpeg'))
+                p.toLowerCase().endsWith('.jpeg')) {
               mime = 'image/jpeg';
-            if (p.toLowerCase().endsWith('.webp')) mime = 'image/webp';
-            if (p.toLowerCase().endsWith('.gif')) mime = 'image/gif';
+            }
+            if (p.toLowerCase().endsWith('.webp')) {
+              mime = 'image/webp';
+            }
+            if (p.toLowerCase().endsWith('.gif')) {
+              mime = 'image/gif';
+            }
           } catch (_) {
             parts.add({
               'type': 'text',
@@ -286,12 +297,12 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     }
   }
   final List<Map<String, dynamic>> allTools = [];
-  if (anthropicTools != null && anthropicTools.isNotEmpty)
+  if (anthropicTools != null && anthropicTools.isNotEmpty) {
     allTools.addAll(anthropicTools);
+  }
   if (tools != null && tools.isNotEmpty) {
     for (final t in tools) {
-      if (t is Map &&
-          t['type'] is String &&
+      if (t['type'] is String &&
           (t['type'] as String).startsWith('web_search_')) {
         allTools.add(t);
       }
@@ -311,19 +322,23 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       'type': 'web_search_20250305',
       'name': 'web_search',
     };
-    if (ws['max_uses'] is int && (ws['max_uses'] as int) > 0)
+    if (ws['max_uses'] is int && (ws['max_uses'] as int) > 0) {
       entry['max_uses'] = ws['max_uses'];
-    if (ws['allowed_domains'] is List)
+    }
+    if (ws['allowed_domains'] is List) {
       entry['allowed_domains'] = List<String>.from(
         (ws['allowed_domains'] as List).map((e) => e.toString()),
       );
-    if (ws['blocked_domains'] is List)
+    }
+    if (ws['blocked_domains'] is List) {
       entry['blocked_domains'] = List<String>.from(
         (ws['blocked_domains'] as List).map((e) => e.toString()),
       );
-    if (ws['user_location'] is Map)
+    }
+    if (ws['user_location'] is Map) {
       entry['user_location'] = (ws['user_location'] as Map)
           .cast<String, dynamic>();
+    }
     allTools.add(entry);
   }
 
@@ -344,7 +359,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       if (allTools.isNotEmpty) 'tools': allTools,
       if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
       if (isReasoning)
-        if (_supportsAdaptiveThinking(upstreamId))
+        if (supportsAdaptiveThinking(upstreamId))
           'thinking': {
             'type': (effectiveThinkingBudget == 0) ? 'disabled' : 'adaptive',
           }
@@ -355,15 +370,13 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
               'budget_tokens': effectiveThinkingBudget,
           },
       if (isReasoning &&
-          _supportsAdaptiveThinking(upstreamId) &&
+          supportsAdaptiveThinking(upstreamId) &&
           effectiveThinkingBudget != 0)
-        'output_config': {'effort': _adaptiveEffort(effectiveThinkingBudget)},
+        'output_config': {'effort': adaptiveEffort(effectiveThinkingBudget)},
     };
     if (extraBody != null) {
       extraBody.forEach((k, v) {
-        (body as Map<String, dynamic>)[k] = (v is String)
-            ? _parseOverrideValue(v)
-            : v;
+        body[k] = (v is String) ? _parseOverrideValue(v) : v;
       });
     }
 
@@ -457,7 +470,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
         for (final e in toolUses.entries) {
           final name = (e.value['name'] ?? '').toString();
           final args = (e.value['args'] as Map<String, dynamic>);
-          final res = await onToolCall(name, args) ?? '';
+          final res = await onToolCall(name, args);
           results.add({
             'type': 'tool_result',
             'tool_use_id': e.key,
@@ -502,34 +515,34 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     String buffer = '';
     int roundTokens = 0;
     TokenUsage? usage;
-    String? _lastStopReason;
+    String? lastStopReason;
 
-    final Map<String, Map<String, dynamic>> _anthToolUse =
+    final Map<String, Map<String, dynamic>> anthToolUse =
         <String, Map<String, dynamic>>{};
-    final Map<int, String> _cliIndexToId = <int, String>{};
-    final Map<String, String> _toolResultsContent = <String, String>{};
+    final Map<int, String> cliIndexToId = <int, String>{};
+    final Map<String, String> toolResultsContent = <String, String>{};
     final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
     final StringBuffer textBuf = StringBuffer();
 
     // Server tool helpers (web_search)
-    final Map<int, String> _srvIndexToId = <int, String>{};
-    final Map<String, String> _srvArgsStr = <String, String>{};
-    final Map<String, Map<String, dynamic>> _srvArgs =
+    final Map<int, String> srvIndexToId = <int, String>{};
+    final Map<String, String> srvArgsStr = <String, String>{};
+    final Map<String, Map<String, dynamic>> srvArgs =
         <String, Map<String, dynamic>>{};
 
-    final Map<int, int> _thinkingIndexToAssistantBlock = <int, int>{};
-    final Map<int, StringBuffer> _thinkingText = <int, StringBuffer>{};
-    final Map<int, StringBuffer> _thinkingSig = <int, StringBuffer>{};
-    final Map<int, int> _redactedThinkingIndexToAssistantBlock = <int, int>{};
-    final Map<int, StringBuffer> _redactedThinkingData = <int, StringBuffer>{};
+    final Map<int, int> thinkingIndexToAssistantBlock = <int, int>{};
+    final Map<int, StringBuffer> thinkingText = <int, StringBuffer>{};
+    final Map<int, StringBuffer> thinkingSig = <int, StringBuffer>{};
+    final Map<int, int> redactedThinkingIndexToAssistantBlock = <int, int>{};
+    final Map<int, StringBuffer> redactedThinkingData = <int, StringBuffer>{};
 
-    int? _parseIndex(dynamic raw) {
+    int? parseIndex(dynamic raw) {
       if (raw == null) return null;
       if (raw is int) return raw;
       return int.tryParse(raw.toString());
     }
 
-    void _flushTextBlock() {
+    void flushTextBlock() {
       final t = textBuf.toString();
       if (t.isNotEmpty) {
         assistantBlocks.add({'type': 'text', 'text': t});
@@ -555,42 +568,43 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
 
           if (type == 'content_block_start') {
             final cb = obj['content_block'];
-            final idx = _parseIndex(obj['index']);
+            final idx = parseIndex(obj['index']);
             if (cb is Map && (cb['type'] == 'thinking')) {
-              _flushTextBlock();
+              flushTextBlock();
               if (idx != null) {
                 assistantBlocks.add({
                   'type': 'thinking',
                   'thinking': '',
                   'signature': '',
                 });
-                _thinkingIndexToAssistantBlock[idx] =
-                    assistantBlocks.length - 1;
-                _thinkingText[idx] = StringBuffer();
-                _thinkingSig[idx] = StringBuffer();
+                thinkingIndexToAssistantBlock[idx] = assistantBlocks.length - 1;
+                thinkingText[idx] = StringBuffer();
+                thinkingSig[idx] = StringBuffer();
               }
             } else if (cb is Map && (cb['type'] == 'redacted_thinking')) {
-              _flushTextBlock();
+              flushTextBlock();
               if (idx != null) {
                 assistantBlocks.add({'type': 'redacted_thinking', 'data': ''});
-                _redactedThinkingIndexToAssistantBlock[idx] =
+                redactedThinkingIndexToAssistantBlock[idx] =
                     assistantBlocks.length - 1;
-                _redactedThinkingData[idx] = StringBuffer();
+                redactedThinkingData[idx] = StringBuffer();
               }
             } else if (cb is Map && (cb['type'] == 'tool_use')) {
-              _flushTextBlock();
+              flushTextBlock();
               final id = (cb['id'] ?? '').toString();
               final name = (cb['name'] ?? '').toString();
               final idx2 = idx ?? -1;
               if (id.isNotEmpty) {
-                _anthToolUse.putIfAbsent(id, () => {'name': name, 'args': ''});
+                anthToolUse.putIfAbsent(id, () => {'name': name, 'args': ''});
                 assistantBlocks.add({
                   'type': 'tool_use',
                   'id': id,
                   'name': name,
                   'input': {},
                 });
-                if (idx2 >= 0) _cliIndexToId[idx2] = id;
+                if (idx2 >= 0) {
+                  cliIndexToId[idx2] = id;
+                }
                 yield ChatStreamChunk(
                   content: '',
                   isDone: false,
@@ -609,8 +623,8 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
               final id = (cb['id'] ?? '').toString();
               final idx2 = idx ?? -1;
               if (id.isNotEmpty && idx2 >= 0) {
-                _srvIndexToId[idx2] = id;
-                _srvArgsStr[id] = '';
+                srvIndexToId[idx2] = id;
+                srvArgsStr[id] = '';
               }
               // Emit placeholder for server tool to show card (e.g., built-in web_search)
               if (id.isNotEmpty) {
@@ -652,7 +666,9 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
                 errorCode = (contentBlock['error_code'] ?? '').toString();
               }
               Map<String, dynamic> args = const <String, dynamic>{};
-              if (_srvArgs.containsKey(toolUseId)) args = _srvArgs[toolUseId]!;
+              if (srvArgs.containsKey(toolUseId)) {
+                args = srvArgs[toolUseId]!;
+              }
               final payload = jsonEncode({
                 'items': items,
                 if ((errorCode ?? '').isNotEmpty) 'error': errorCode,
@@ -686,7 +702,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
                   );
                 }
               } else if (delta['type'] == 'thinking_delta') {
-                final idx = _parseIndex(obj['index']);
+                final idx = parseIndex(obj['index']);
                 final thinking =
                     (delta['thinking'] ?? delta['text'] ?? '') as String;
                 if (thinking.isNotEmpty) {
@@ -696,32 +712,32 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
                     isDone: false,
                     totalTokens: roundTokens,
                   );
-                  if (idx != null && _thinkingText.containsKey(idx)) {
-                    _thinkingText[idx]!.write(thinking);
+                  if (idx != null && thinkingText.containsKey(idx)) {
+                    thinkingText[idx]!.write(thinking);
                   }
                 }
               } else if (delta['type'] == 'signature_delta') {
-                final idx = _parseIndex(obj['index']);
+                final idx = parseIndex(obj['index']);
                 final sig = (delta['signature'] ?? '').toString();
                 if (sig.isNotEmpty &&
                     idx != null &&
-                    _thinkingSig.containsKey(idx)) {
-                  _thinkingSig[idx]!.write(sig);
+                    thinkingSig.containsKey(idx)) {
+                  thinkingSig[idx]!.write(sig);
                 }
               } else if (delta['type'] == 'redacted_thinking_delta') {
-                final idx = _parseIndex(obj['index']);
+                final idx = parseIndex(obj['index']);
                 final data = (delta['data'] ?? '').toString();
                 if (data.isNotEmpty &&
                     idx != null &&
-                    _redactedThinkingData.containsKey(idx)) {
-                  _redactedThinkingData[idx]!.write(data);
+                    redactedThinkingData.containsKey(idx)) {
+                  redactedThinkingData[idx]!.write(data);
                 }
               } else if (delta['type'] == 'tool_use_delta') {
                 final idx = (obj['index'] is int)
                     ? obj['index'] as int
                     : int.tryParse((obj['index'] ?? '').toString());
-                final id = (idx != null && _cliIndexToId.containsKey(idx))
-                    ? _cliIndexToId[idx]!
+                final id = (idx != null && cliIndexToId.containsKey(idx))
+                    ? cliIndexToId[idx]!
                     : '';
                 if (id.isNotEmpty) {
                   final argsDelta =
@@ -730,12 +746,13 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
                               delta['text'] ??
                               '')
                           .toString();
-                  final entry = _anthToolUse.putIfAbsent(
+                  final entry = anthToolUse.putIfAbsent(
                     id,
                     () => {'name': '', 'args': ''},
                   );
-                  if (argsDelta.isNotEmpty)
+                  if (argsDelta.isNotEmpty) {
                     entry['args'] = (entry['args'] ?? '') + argsDelta;
+                  }
                 }
               } else if (delta['type'] == 'input_json_delta') {
                 final idxRaw = obj['index'];
@@ -744,27 +761,26 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
                     : int.tryParse((idxRaw ?? '').toString());
                 final part = (delta['partial_json'] ?? '').toString();
                 if (index != null && part.isNotEmpty) {
-                  if (_cliIndexToId.containsKey(index)) {
-                    final id = _cliIndexToId[index]!;
-                    final entry = _anthToolUse.putIfAbsent(
+                  if (cliIndexToId.containsKey(index)) {
+                    final id = cliIndexToId[index]!;
+                    final entry = anthToolUse.putIfAbsent(
                       id,
                       () => {'name': '', 'args': ''},
                     );
                     entry['args'] = (entry['args'] ?? '') + part;
-                  } else if (_srvIndexToId.containsKey(index)) {
-                    final id = _srvIndexToId[index]!;
-                    _srvArgsStr[id] = (_srvArgsStr[id] ?? '') + part;
+                  } else if (srvIndexToId.containsKey(index)) {
+                    final id = srvIndexToId[index]!;
+                    srvArgsStr[id] = (srvArgsStr[id] ?? '') + part;
                   }
                 }
               }
             }
           } else if (type == 'content_block_stop') {
-            final idx = _parseIndex(obj['index']);
-            if (idx != null &&
-                _thinkingIndexToAssistantBlock.containsKey(idx)) {
-              final pos = _thinkingIndexToAssistantBlock.remove(idx)!;
-              final t = _thinkingText.remove(idx)?.toString() ?? '';
-              final sig = _thinkingSig.remove(idx)?.toString() ?? '';
+            final idx = parseIndex(obj['index']);
+            if (idx != null && thinkingIndexToAssistantBlock.containsKey(idx)) {
+              final pos = thinkingIndexToAssistantBlock.remove(idx)!;
+              final t = thinkingText.remove(idx)?.toString() ?? '';
+              final sig = thinkingSig.remove(idx)?.toString() ?? '';
               assistantBlocks[pos] = {
                 'type': 'thinking',
                 'thinking': t,
@@ -772,9 +788,9 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
               };
             }
             if (idx != null &&
-                _redactedThinkingIndexToAssistantBlock.containsKey(idx)) {
-              final pos = _redactedThinkingIndexToAssistantBlock.remove(idx)!;
-              final data = _redactedThinkingData.remove(idx)?.toString() ?? '';
+                redactedThinkingIndexToAssistantBlock.containsKey(idx)) {
+              final pos = redactedThinkingIndexToAssistantBlock.remove(idx)!;
+              final data = redactedThinkingData.remove(idx)?.toString() ?? '';
               assistantBlocks[pos] = {
                 'type': 'redacted_thinking',
                 'data': data,
@@ -782,15 +798,15 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
             }
             String id = (obj['content_block']?['id'] ?? obj['id'] ?? '')
                 .toString();
-            if (id.isEmpty && idx != null && _cliIndexToId.containsKey(idx)) {
-              id = _cliIndexToId[idx]!;
+            if (id.isEmpty && idx != null && cliIndexToId.containsKey(idx)) {
+              id = cliIndexToId[idx]!;
             }
-            if (id.isNotEmpty && _anthToolUse.containsKey(id)) {
-              final name = (_anthToolUse[id]!['name'] ?? '').toString();
+            if (id.isNotEmpty && anthToolUse.containsKey(id)) {
+              final name = (anthToolUse[id]!['name'] ?? '').toString();
               Map<String, dynamic> args;
               try {
                 args =
-                    (jsonDecode((_anthToolUse[id]!['args'] ?? '{}') as String)
+                    (jsonDecode((anthToolUse[id]!['args'] ?? '{}') as String)
                             as Map)
                         .cast<String, dynamic>();
               } catch (_) {
@@ -811,8 +827,8 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
                 }
               }
               if (onToolCall != null) {
-                final res = await onToolCall(name, args) ?? '';
-                _toolResultsContent[id] = res;
+                final res = await onToolCall(name, args);
+                toolResultsContent[id] = res;
                 yield ChatStreamChunk(
                   content: '',
                   isDone: false,
@@ -829,16 +845,16 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
                 );
               }
             } else {
-              if (idx != null && _srvIndexToId.containsKey(idx)) {
-                final sid = _srvIndexToId[idx]!;
+              if (idx != null && srvIndexToId.containsKey(idx)) {
+                final sid = srvIndexToId[idx]!;
                 Map<String, dynamic> args;
                 try {
-                  args = (jsonDecode((_srvArgsStr[sid] ?? '{}')) as Map)
+                  args = (jsonDecode((srvArgsStr[sid] ?? '{}')) as Map)
                       .cast<String, dynamic>();
                 } catch (_) {
                   args = <String, dynamic>{};
                 }
-                _srvArgs[sid] = args;
+                srvArgs[sid] = args;
                 yield ChatStreamChunk(
                   content: '',
                   isDone: false,
@@ -858,7 +874,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
               usage = (usage ?? const TokenUsage()).merge(
                 TokenUsage(promptTokens: inTok, completionTokens: outTok),
               );
-              roundTokens = usage!.totalTokens;
+              roundTokens = usage.totalTokens;
             }
             try {
               final d = obj['delta'];
@@ -866,11 +882,11 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
                   ? (d['stop_reason'] ?? d['stopReason'])
                   : null;
               if (sr is String && sr.isNotEmpty) {
-                _lastStopReason = sr;
+                lastStopReason = sr;
               }
             } catch (_) {}
           } else if (type == 'message_stop') {
-            _flushTextBlock();
+            flushTextBlock();
             messageStopped = true;
           }
         } catch (_) {}
@@ -878,17 +894,17 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       if (messageStopped) break;
     }
 
-    if (usage != null)
-      totalUsage = (totalUsage ?? const TokenUsage()).merge(usage!);
+    if (usage != null) {
+      totalUsage = (totalUsage ?? const TokenUsage()).merge(usage);
+    }
 
-    if (_anthToolUse.isEmpty) {
+    if (anthToolUse.isEmpty) {
       final hadServerTool =
           assistantBlocks.any(
-            (b) =>
-                (b is Map) && (b['type'] == 'tool_use' || b['type'] == 'text'),
+            (b) => b['type'] == 'tool_use' || b['type'] == 'text',
           ) &&
-          _srvIndexToId.isNotEmpty;
-      final sr = _lastStopReason ?? '';
+          srvIndexToId.isNotEmpty;
+      final sr = lastStopReason ?? '';
       if (sr == 'pause_turn' || hadServerTool) {
         // Continue this turn with assistant content only (not fully supported by Vertex streamRawPredict yet, but good for future proofing)
         convo = [
@@ -909,7 +925,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
 
     // Build tool_result blocks
     final toolResultsBlocks = <Map<String, dynamic>>[];
-    for (final entry in _anthToolUse.entries) {
+    for (final entry in anthToolUse.entries) {
       final id = entry.key;
       final name = (entry.value['name'] ?? '').toString();
       Map<String, dynamic> args;
@@ -919,9 +935,9 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       } catch (_) {
         args = <String, dynamic>{};
       }
-      String res = _toolResultsContent[id] ?? '';
+      String res = toolResultsContent[id] ?? '';
       if (res.isEmpty && onToolCall != null) {
-        res = await onToolCall(name, args) ?? '';
+        res = await onToolCall(name, args);
       }
       toolResultsBlocks.add({
         'type': 'tool_result',

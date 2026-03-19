@@ -177,20 +177,20 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: (isDark ? Colors.black : Colors.white).withOpacity(
-              isDark ? 0.28 : 0.56,
+            color: (isDark ? Colors.black : Colors.white).withValues(
+              alpha: isDark ? 0.28 : 0.56,
             ),
             border: Border(
               top: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.06 : 0.18),
+                color: Colors.white.withValues(alpha: isDark ? 0.06 : 0.18),
                 width: 0.7,
               ),
               left: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
               right: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
             ),
@@ -306,8 +306,8 @@ class _CancelRowState extends State<_CancelRow> {
     final cs = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(
-      isDark ? 0.10 : 0.06,
+    final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
+      alpha: isDark ? 0.10 : 0.06,
     );
 
     return MouseRegion(
@@ -341,7 +341,7 @@ class _CancelRowState extends State<_CancelRow> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w400,
-                    color: cs.onSurface.withOpacity(0.75),
+                    color: cs.onSurface.withValues(alpha: 0.75),
                     decoration: TextDecoration.none,
                   ),
                 ),
@@ -382,8 +382,8 @@ class _RowItemState extends State<_RowItem> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final baseBg = Colors.transparent;
-    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(
-      isDark ? 0.12 : 0.10,
+    final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
+      alpha: isDark ? 0.12 : 0.10,
     );
 
     final opacity = widget.disabled ? 0.55 : 1.0;
@@ -410,8 +410,8 @@ class _RowItemState extends State<_RowItem> {
                 Lucide.BookOpen,
                 size: 16,
                 color: widget.active
-                    ? cs.primary.withOpacity(opacity)
-                    : cs.onSurface.withOpacity(0.7 * opacity),
+                    ? cs.primary.withValues(alpha: opacity)
+                    : cs.onSurface.withValues(alpha: 0.7 * opacity),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -424,8 +424,8 @@ class _RowItemState extends State<_RowItem> {
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: widget.active
-                        ? cs.primary.withOpacity(opacity)
-                        : cs.onSurface.withOpacity(opacity),
+                        ? cs.primary.withValues(alpha: opacity)
+                        : cs.onSurface.withValues(alpha: opacity),
                     decoration: TextDecoration.none,
                   ),
                 ),
@@ -451,7 +451,7 @@ class _RowItemState extends State<_RowItem> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w400,
-                          color: cs.onSurface.withOpacity(0.70 * opacity),
+                          color: cs.onSurface.withValues(alpha: 0.70 * opacity),
                           decoration: TextDecoration.none,
                         ),
                       ),
@@ -461,7 +461,7 @@ class _RowItemState extends State<_RowItem> {
                       Icon(
                         Lucide.Check,
                         size: 14,
-                        color: cs.primary.withOpacity(opacity),
+                        color: cs.primary.withValues(alpha: opacity),
                       ),
                     ],
                   ],

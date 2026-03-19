@@ -397,7 +397,10 @@ abstract class BuiltInToolsHelper {
     final rawOv = cfg.modelOverrides[modelId];
     final builtInSet = BuiltInToolNames.parseFromOverride(rawOv);
 
-    final bool searchActive = isBuiltInSearchEnabled(cfg: cfg, modelId: modelId);
+    final bool searchActive = isBuiltInSearchEnabled(
+      cfg: cfg,
+      modelId: modelId,
+    );
     bool codeExecutionActive = false;
     bool urlContextActive = false;
     bool youtubeActive = false;

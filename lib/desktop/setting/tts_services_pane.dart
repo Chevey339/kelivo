@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
 
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
@@ -21,11 +19,24 @@ class DesktopTtsServicesPane extends StatefulWidget {
 }
 
 class _DesktopTtsServicesPaneState extends State<DesktopTtsServicesPane> {
+  Future<void> _handleAddNetworkService() async {
+    final settingsProvider = context.read<SettingsProvider>();
+    final created = await _showAddNetworkDialog(context);
+    if (created == null) {
+      return;
+    }
+    final list = List<TtsServiceOptions>.from(settingsProvider.ttsServices)
+      ..add(created);
+    await settingsProvider.setTtsServices(list);
+    if (settingsProvider.usingSystemTts) {
+      await settingsProvider.setTtsServiceSelected(list.length - 1);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    final tts = context.watch<TtsProvider>();
 
     return Container(
       alignment: Alignment.topCenter,
@@ -48,26 +59,14 @@ class _DesktopTtsServicesPaneState extends State<DesktopTtsServicesPane> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w400,
-                              color: cs.onSurface.withOpacity(0.9),
+                              color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
                         ),
                       ),
                       _SmallIconBtn(
                         icon: lucide.Lucide.Plus,
-                        onTap: () async {
-                          final created = await _showAddNetworkDialog(context);
-                          if (created != null) {
-                            final sp = context.read<SettingsProvider>();
-                            final list = List<TtsServiceOptions>.from(
-                              sp.ttsServices,
-                            )..add(created);
-                            await sp.setTtsServices(list);
-                            if (sp.usingSystemTts) {
-                              await sp.setTtsServiceSelected(list.length - 1);
-                            }
-                          }
-                        },
+                        onTap: _handleAddNetworkService,
                       ),
                     ],
                   ),
@@ -102,7 +101,7 @@ class _NetworkTtsList extends StatelessWidget {
         alignment: Alignment.center,
         child: Text(
           l10n.ttsServicesPageNoNetworkServices,
-          style: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+          style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6)),
         ),
       );
     }
@@ -118,16 +117,17 @@ class _NetworkTtsList extends StatelessWidget {
               onTap: () async =>
                   context.read<SettingsProvider>().setTtsServiceSelected(i),
               onEdit: () async {
+                final settingsProvider = context.read<SettingsProvider>();
                 final updated = await _showEditNetworkDialog(
                   context,
                   services[i],
                 );
                 if (updated != null) {
                   final list = List<TtsServiceOptions>.from(
-                    context.read<SettingsProvider>().ttsServices,
+                    settingsProvider.ttsServices,
                   );
                   list[i] = updated;
-                  await context.read<SettingsProvider>().setTtsServices(list);
+                  await settingsProvider.setTtsServices(list);
                 }
               },
               onDelete: () async {
@@ -136,8 +136,9 @@ class _NetworkTtsList extends StatelessWidget {
                 list.removeAt(i);
                 await sp.setTtsServices(list);
                 var idx = sp.ttsServiceSelected;
-                if (idx >= list.length)
+                if (idx >= list.length) {
                   idx = list.isEmpty ? -1 : list.length - 1;
+                }
                 await sp.setTtsServiceSelected(idx);
               },
             ),
@@ -172,10 +173,12 @@ class _NetworkServiceCardState extends State<_NetworkServiceCard> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    final baseBg = isDark
+        ? Colors.white10
+        : Colors.white.withValues(alpha: 0.96);
     final borderColor = _hover || widget.selected
-        ? cs.primary.withOpacity(isDark ? 0.35 : 0.45)
-        : cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08);
+        ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -266,19 +269,6 @@ class _NetworkServiceCardState extends State<_NetworkServiceCard> {
       ),
     );
   }
-
-  IconData _iconForKind(NetworkTtsKind k) {
-    switch (k) {
-      case NetworkTtsKind.openai:
-        return lucide.Lucide.Bot;
-      case NetworkTtsKind.gemini:
-        return lucide.Lucide.Bot;
-      case NetworkTtsKind.minimax:
-        return lucide.Lucide.Bot;
-      case NetworkTtsKind.elevenlabs:
-        return lucide.Lucide.Bot;
-    }
-  }
 }
 
 class _ErrorInline extends StatelessWidget {
@@ -291,9 +281,9 @@ class _ErrorInline extends StatelessWidget {
     final oneLine = message.replaceAll('\n', ' ');
     return Container(
       decoration: BoxDecoration(
-        color: cs.error.withOpacity(0.08),
+        color: cs.error.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: cs.error.withOpacity(0.3), width: 0.6),
+        border: Border.all(color: cs.error.withValues(alpha: 0.3), width: 0.6),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Row(
@@ -360,7 +350,7 @@ void _showErrorDialog(BuildContext context, String message) {
                   child: SelectableText(
                     message,
                     style: TextStyle(
-                      color: cs.onSurface.withOpacity(0.9),
+                      color: cs.onSurface.withValues(alpha: 0.9),
                       fontSize: 13,
                     ),
                   ),
@@ -390,7 +380,7 @@ class _BrandIconBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? Colors.white12 : Colors.black.withOpacity(0.06);
+    final bg = isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.06);
     final asset =
         BrandAssets.assetForName(nameHint) ??
         BrandAssets.assetForName(nameHint.split(' ').first);
@@ -434,12 +424,13 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     final tts = context.watch<TtsProvider>();
-    final sp = context.watch<SettingsProvider>();
 
-    final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    final baseBg = isDark
+        ? Colors.white10
+        : Colors.white.withValues(alpha: 0.96);
     final borderColor = _hover
-        ? cs.primary.withOpacity(isDark ? 0.35 : 0.45)
-        : cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08);
+        ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
 
     final available = tts.isAvailable && (tts.error == null);
     final titleText = l10n.ttsServicesPageSystemTtsTitle;
@@ -493,7 +484,7 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 12,
-                        color: cs.onSurface.withOpacity(0.7),
+                        color: cs.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -632,7 +623,7 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
                     l10n.ttsServicesPageSpeechRateLabel,
                     style: TextStyle(
                       fontSize: 12,
-                      color: cs.onSurface.withOpacity(0.7),
+                      color: cs.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                   Slider(
@@ -650,7 +641,7 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
                     l10n.ttsServicesPagePitchLabel,
                     style: TextStyle(
                       fontSize: 12,
-                      color: cs.onSurface.withOpacity(0.7),
+                      color: cs.onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                   Slider(
@@ -692,7 +683,7 @@ class _CircleIconBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? Colors.white12 : Colors.black.withOpacity(0.06);
+    final bg = isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.06);
     return Container(
       width: size,
       height: size,
@@ -701,7 +692,7 @@ class _CircleIconBadge extends StatelessWidget {
       child: Icon(
         icon,
         size: size * 0.62,
-        color: cs.onSurface.withOpacity(0.9),
+        color: cs.onSurface.withValues(alpha: 0.9),
       ),
     );
   }
@@ -723,8 +714,8 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -747,31 +738,6 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
   }
 }
 
-Widget _sectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final cs = Theme.of(context).colorScheme;
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final Color bg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
-}
-
 Widget _deskDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
   return Divider(
@@ -779,7 +745,7 @@ Widget _deskDivider(BuildContext context) {
     thickness: 0.6,
     indent: 12,
     endIndent: 12,
-    color: cs.outlineVariant.withOpacity(0.18),
+    color: cs.outlineVariant.withValues(alpha: 0.18),
   );
 }
 
@@ -806,7 +772,7 @@ class _SelectRow extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 15,
-                color: cs.onSurface.withOpacity(0.9),
+                color: cs.onSurface.withValues(alpha: 0.9),
               ),
             ),
           ),
@@ -838,8 +804,8 @@ class _SelectButtonState extends State<_SelectButton> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.04))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.04))
         : Colors.transparent;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -860,7 +826,7 @@ class _SelectButtonState extends State<_SelectButton> {
             color: bg,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: cs.outlineVariant.withOpacity(0.12),
+              color: cs.outlineVariant.withValues(alpha: 0.12),
               width: 0.6,
             ),
           ),
@@ -871,14 +837,14 @@ class _SelectButtonState extends State<_SelectButton> {
                 widget.value,
                 style: TextStyle(
                   fontSize: 14,
-                  color: cs.onSurface.withOpacity(0.9),
+                  color: cs.onSurface.withValues(alpha: 0.9),
                 ),
               ),
               const SizedBox(width: 6),
               Icon(
                 lucide.Lucide.ChevronDown,
                 size: 16,
-                color: cs.onSurface.withOpacity(0.8),
+                color: cs.onSurface.withValues(alpha: 0.8),
               ),
             ],
           ),
@@ -928,7 +894,7 @@ Future<String?> _showOptionsDialog(
                           thickness: 0.6,
                           indent: 4,
                           endIndent: 4,
-                          color: cs.outlineVariant.withOpacity(0.12),
+                          color: cs.outlineVariant.withValues(alpha: 0.12),
                         ),
                     ],
                   ],
@@ -963,11 +929,11 @@ class _DialogOptionState extends State<_DialogOption> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = widget.selected
-        ? cs.primary.withOpacity(0.08)
+        ? cs.primary.withValues(alpha: 0.08)
         : (_hover
               ? (isDark
-                    ? Colors.white.withOpacity(0.06)
-                    : Colors.black.withOpacity(0.04))
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.04))
               : Colors.transparent);
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -989,7 +955,7 @@ class _DialogOptionState extends State<_DialogOption> {
                   widget.label,
                   style: TextStyle(
                     fontSize: 14,
-                    color: cs.onSurface.withOpacity(0.9),
+                    color: cs.onSurface.withValues(alpha: 0.9),
                   ),
                 ),
               ),
@@ -1141,23 +1107,27 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                   if (picked ==
                                       networkTtsKindDisplayName(
                                         NetworkTtsKind.openai,
-                                      ))
+                                      )) {
                                     kind = NetworkTtsKind.openai;
+                                  }
                                   if (picked ==
                                       networkTtsKindDisplayName(
                                         NetworkTtsKind.gemini,
-                                      ))
+                                      )) {
                                     kind = NetworkTtsKind.gemini;
+                                  }
                                   if (picked ==
                                       networkTtsKindDisplayName(
                                         NetworkTtsKind.minimax,
-                                      ))
+                                      )) {
                                     kind = NetworkTtsKind.minimax;
+                                  }
                                   if (picked ==
                                       networkTtsKindDisplayName(
                                         NetworkTtsKind.elevenlabs,
-                                      ))
+                                      )) {
                                     kind = NetworkTtsKind.elevenlabs;
+                                  }
                                 });
                               },
                             ),
@@ -1400,7 +1370,7 @@ class _InputRow extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: cs.onSurface.withOpacity(0.7),
+              color: cs.onSurface.withValues(alpha: 0.7),
             ),
           ),
           const SizedBox(height: 6),

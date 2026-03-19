@@ -4,7 +4,6 @@ import '../../../core/providers/settings_provider.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/mcp_provider.dart';
-import '../../../theme/design_tokens.dart';
 import '../widgets/mcp_server_edit_sheet.dart';
 import '../widgets/mcp_json_edit_sheet.dart';
 import '../widgets/mcp_timeout_sheet.dart';
@@ -24,7 +23,6 @@ class McpPage extends StatelessWidget {
         return cs.primary;
       case McpStatus.error:
       case McpStatus.idle:
-      default:
         return Colors.red;
     }
   }
@@ -36,24 +34,7 @@ class McpPage extends StatelessWidget {
     final mcp = context.watch<McpProvider>();
     final servers = mcp.servers.toList();
 
-    Widget tag(String text) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.green.withOpacity(0.4)),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 11,
-          color: Colors.green,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-
-    Future<void> _showErrorDetails(
+    Future<void> showErrorDetails(
       String serverId,
       String? message,
       String name,
@@ -84,7 +65,9 @@ class McpPage extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     name,
-                    style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.7),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Container(
@@ -96,7 +79,7 @@ class McpPage extends StatelessWidget {
                           : const Color(0xFFF7F7F9),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: cs.outlineVariant.withOpacity(0.2),
+                        color: cs.outlineVariant.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Text(
@@ -123,7 +106,7 @@ class McpPage extends StatelessWidget {
                                 ? Colors.white10
                                 : const Color(0xFFF2F3F5),
                             side: BorderSide(
-                              color: cs.outlineVariant.withOpacity(0.35),
+                              color: cs.outlineVariant.withValues(alpha: 0.35),
                             ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -135,8 +118,11 @@ class McpPage extends StatelessWidget {
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () async {
-                            await ctx.read<McpProvider>().reconnect(serverId);
-                            if (context.mounted) Navigator.of(ctx).pop();
+                            final mcpProvider = ctx.read<McpProvider>();
+                            await mcpProvider.reconnect(serverId);
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
                           },
                           icon: const Icon(Lucide.RefreshCw, size: 18),
                           label: Text(l10n.mcpPageReconnect),
@@ -172,7 +158,7 @@ class McpPage extends StatelessWidget {
             onTap: () => Navigator.of(context).maybePop(),
           ),
         ),
-        title: const Text('MCP'),
+        title: Text(l10n.mcpAssistantSheetTitle),
         actions: [
           Tooltip(
             message: l10n.mcpTimeoutSettingsTooltip,
@@ -216,7 +202,7 @@ class McpPage extends StatelessWidget {
           ? Center(
               child: Text(
                 l10n.mcpPageNoServers,
-                style: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+                style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6)),
               ),
             )
           : ListView.builder(
@@ -233,10 +219,10 @@ class McpPage extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: (color ?? cs.primary).withOpacity(0.12),
+                    color: (color ?? cs.primary).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(
-                      color: (color ?? cs.primary).withOpacity(0.35),
+                      color: (color ?? cs.primary).withValues(alpha: 0.35),
                     ),
                   ),
                   child: Text(
@@ -257,26 +243,26 @@ class McpPage extends StatelessWidget {
                     await showMcpServerEditSheet(context, serverId: s.id);
                   },
                   builder: (pressed) {
-                    final base = cs.onSurface.withOpacity(0.9);
+                    final base = cs.onSurface.withValues(alpha: 0.9);
                     return _AnimatedPressColor(
                       pressed: pressed,
                       base: base,
                       builder: (c) {
                         final overlay = pressed
                             ? (isDark
-                                  ? Colors.black.withOpacity(0.06)
-                                  : Colors.white.withOpacity(0.05))
+                                  ? Colors.black.withValues(alpha: 0.06)
+                                  : Colors.white.withValues(alpha: 0.05))
                             : Colors.transparent;
                         return Container(
                           decoration: BoxDecoration(
                             color: isDark
                                 ? Colors.white10
-                                : Colors.white.withOpacity(0.96),
+                                : Colors.white.withValues(alpha: 0.96),
                             // Soften the list card corners a bit
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: cs.outlineVariant.withOpacity(
-                                isDark ? 0.1 : 0.08,
+                              color: cs.outlineVariant.withValues(
+                                alpha: isDark ? 0.1 : 0.08,
                               ),
                               width: 0.6,
                             ),
@@ -389,8 +375,8 @@ class McpPage extends StatelessWidget {
                                                 ? l10n.mcpTransportTagInmemory
                                                 : (s.transport ==
                                                           McpTransportType.sse
-                                                      ? 'SSE'
-                                                      : 'HTTP'),
+                                                      ? l10n.mcpTransportTagSse
+                                                      : l10n.mcpTransportTagHttp),
                                           ),
                                           tagStyled(
                                             l10n.mcpPageToolsCount(
@@ -403,8 +389,8 @@ class McpPage extends StatelessWidget {
                                           if (!s.enabled)
                                             tagStyled(
                                               l10n.mcpPageStatusDisabled,
-                                              color: cs.onSurface.withOpacity(
-                                                0.7,
+                                              color: cs.onSurface.withValues(
+                                                alpha: 0.7,
                                               ),
                                             ),
                                         ],
@@ -430,12 +416,11 @@ class McpPage extends StatelessWidget {
                                               ),
                                             ),
                                             TextButton(
-                                              onPressed: () =>
-                                                  _showErrorDetails(
-                                                    s.id,
-                                                    err,
-                                                    s.name,
-                                                  ),
+                                              onPressed: () => showErrorDetails(
+                                                s.id,
+                                                err,
+                                                s.name,
+                                              ),
                                               child: Text(l10n.mcpPageDetails),
                                             ),
                                           ],
@@ -473,12 +458,12 @@ class McpPage extends StatelessWidget {
                               color:
                                   Theme.of(context).brightness ==
                                       Brightness.dark
-                                  ? cs.error.withOpacity(0.22)
-                                  : cs.error.withOpacity(0.14),
+                                  ? cs.error.withValues(alpha: 0.22)
+                                  : cs.error.withValues(alpha: 0.14),
                               // Match list card radius for consistency
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: cs.error.withOpacity(0.35),
+                                color: cs.error.withValues(alpha: 0.35),
                               ),
                             ),
                             padding: const EdgeInsets.symmetric(
@@ -509,6 +494,8 @@ class McpPage extends StatelessWidget {
                             ),
                           ),
                           onPressed: (_) async {
+                            final prov = context.read<McpProvider>();
+                            final prev = prov.getById(s.id);
                             final ok = await showDialog<bool>(
                               context: context,
                               builder: (dctx) => AlertDialog(
@@ -530,8 +517,6 @@ class McpPage extends StatelessWidget {
                               ),
                             );
                             if (ok != true) return;
-                            final prov = context.read<McpProvider>();
-                            final prev = prov.getById(s.id);
                             await prov.removeServer(s.id);
                             if (!context.mounted) return;
                             showAppSnackBar(
@@ -576,18 +561,12 @@ class _TactileIconButton extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onTap,
-    this.onLongPress,
-    this.semanticLabel,
     this.size = 22,
-    this.haptics = true,
   });
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final String? semanticLabel;
   final double size;
-  final bool haptics;
   @override
   State<_TactileIconButton> createState() => _TactileIconButtonState();
 }
@@ -597,31 +576,23 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
       size: widget.size,
       color: _pressed ? pressColor : base,
-      semanticLabel: widget.semanticLabel,
     );
     return Semantics(
       button: true,
-      label: widget.semanticLabel,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
         onTap: () {
-          if (widget.haptics) Haptics.light();
+          Haptics.light();
           widget.onTap();
         },
-        onLongPress: widget.onLongPress == null
-            ? null
-            : () {
-                if (widget.haptics) Haptics.light();
-                widget.onLongPress!.call();
-              },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           child: icon,
@@ -663,8 +634,9 @@ class _TactileRowState extends State<_TactileRow> {
           ? null
           : () {
               if (widget.haptics &&
-                  context.read<SettingsProvider>().hapticsOnListItemTap)
+                  context.read<SettingsProvider>().hapticsOnListItemTap) {
                 Haptics.soft();
+              }
               widget.onTap!.call();
             },
       child: widget.builder(_pressed),

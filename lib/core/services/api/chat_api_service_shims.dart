@@ -15,9 +15,6 @@ String _effectiveApiKey(ProviderConfig cfg) =>
 Set<String> _builtInTools(ProviderConfig cfg, String modelId) =>
     ChatApiService._builtInTools(cfg, modelId);
 
-Map<String, dynamic> _modelOverride(ProviderConfig cfg, String modelId) =>
-    ChatApiService._modelOverride(cfg, modelId);
-
 Map<String, String> _customHeaders(ProviderConfig cfg, String modelId) =>
     ChatApiService._customHeaders(cfg, modelId);
 
@@ -33,9 +30,6 @@ String _mimeFromPath(String path) => ChatApiService._mimeFromPath(path);
 
 String _mimeFromDataUrl(String dataUrl) =>
     ChatApiService._mimeFromDataUrl(dataUrl);
-
-Future<bool> _isValidRemoteImageUrl(String url) =>
-    ChatApiService._isValidRemoteImageUrl(url);
 
 Future<_ParsedTextAndImages> _parseTextAndImages(
   String raw, {

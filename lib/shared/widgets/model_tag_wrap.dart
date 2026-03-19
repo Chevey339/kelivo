@@ -32,11 +32,11 @@ class ModelTagWrap extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               color: isDark
-                  ? baseColor.withOpacity(darkBgAlpha)
-                  : baseColor.withOpacity(lightBgAlpha),
+                  ? baseColor.withValues(alpha: darkBgAlpha)
+                  : baseColor.withValues(alpha: lightBgAlpha),
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                color: baseColor.withOpacity(borderAlpha),
+                color: baseColor.withValues(alpha: borderAlpha),
                 width: 0.5,
               ),
             ),
@@ -68,17 +68,20 @@ class ModelTagWrap extends StatelessWidget {
       Container(
         decoration: BoxDecoration(
           color: isDark
-              ? cs.primary.withOpacity(0.25)
-              : cs.primary.withOpacity(0.15),
+              ? cs.primary.withValues(alpha: 0.25)
+              : cs.primary.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.primary.withOpacity(0.2), width: 0.5),
+          border: Border.all(
+            color: cs.primary.withValues(alpha: 0.2),
+            width: 0.5,
+          ),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Text(
           model.type == ModelType.chat ? chatLabel : embeddingLabel,
           style: TextStyle(
             fontSize: 11,
-            color: isDark ? cs.primary : cs.primary.withOpacity(0.9),
+            color: isDark ? cs.primary : cs.primary.withValues(alpha: 0.9),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -117,11 +120,11 @@ class ModelTagWrap extends StatelessWidget {
             child: Container(
               decoration: BoxDecoration(
                 color: isDark
-                    ? cs.tertiary.withOpacity(0.25)
-                    : cs.tertiary.withOpacity(0.15),
+                    ? cs.tertiary.withValues(alpha: 0.25)
+                    : cs.tertiary.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
-                  color: cs.tertiary.withOpacity(0.2),
+                  color: cs.tertiary.withValues(alpha: 0.2),
                   width: 0.5,
                 ),
               ),
@@ -137,13 +140,15 @@ class ModelTagWrap extends StatelessWidget {
                         size: 12,
                         color: isDark
                             ? cs.tertiary
-                            : cs.tertiary.withOpacity(0.9),
+                            : cs.tertiary.withValues(alpha: 0.9),
                       ),
                     ),
                   Icon(
                     Lucide.ChevronRight,
                     size: 12,
-                    color: isDark ? cs.tertiary : cs.tertiary.withOpacity(0.9),
+                    color: isDark
+                        ? cs.tertiary
+                        : cs.tertiary.withValues(alpha: 0.9),
                   ),
                   for (final mod in outputModsUnique)
                     Padding(
@@ -153,7 +158,7 @@ class ModelTagWrap extends StatelessWidget {
                         size: 12,
                         color: isDark
                             ? cs.tertiary
-                            : cs.tertiary.withOpacity(0.9),
+                            : cs.tertiary.withValues(alpha: 0.9),
                       ),
                     ),
                 ],
@@ -177,7 +182,7 @@ class ModelTagWrap extends StatelessWidget {
               child: Icon(
                 Lucide.Hammer,
                 size: 12,
-                color: isDark ? cs.primary : cs.primary.withOpacity(0.9),
+                color: isDark ? cs.primary : cs.primary.withValues(alpha: 0.9),
               ),
               darkBgAlpha: 0.25,
               lightBgAlpha: 0.15,
@@ -196,7 +201,7 @@ class ModelTagWrap extends StatelessWidget {
                 width: 12,
                 height: 12,
                 colorFilter: ColorFilter.mode(
-                  isDark ? cs.secondary : cs.secondary.withOpacity(0.9),
+                  isDark ? cs.secondary : cs.secondary.withValues(alpha: 0.9),
                   BlendMode.srcIn,
                 ),
                 errorBuilder: (_, __, ___) {
@@ -210,7 +215,7 @@ class ModelTagWrap extends StatelessWidget {
                     size: 12,
                     color: isDark
                         ? cs.secondary
-                        : cs.secondary.withOpacity(0.9),
+                        : cs.secondary.withValues(alpha: 0.9),
                   );
                 },
                 placeholderBuilder: (_) {
@@ -219,7 +224,7 @@ class ModelTagWrap extends StatelessWidget {
                     size: 12,
                     color: isDark
                         ? cs.secondary
-                        : cs.secondary.withOpacity(0.9),
+                        : cs.secondary.withValues(alpha: 0.9),
                   );
                 },
               ),
@@ -276,9 +281,9 @@ class ModelCapsulesRow extends StatelessWidget {
 
     Widget pillCapsule(Widget icon, Color color) {
       final bg = isDark
-          ? color.withOpacity(bgOpacityDark)
-          : color.withOpacity(bgOpacityLight);
-      final bd = color.withOpacity(borderOpacity);
+          ? color.withValues(alpha: bgOpacityDark)
+          : color.withValues(alpha: bgOpacityLight);
+      final bd = color.withValues(alpha: borderOpacity);
       return Container(
         padding: pillPadding,
         decoration: BoxDecoration(

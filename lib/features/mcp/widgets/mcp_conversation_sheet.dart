@@ -42,9 +42,9 @@ class _ConversationMcpSheet extends StatelessWidget {
     Widget tag(String text) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.10),
+        color: cs.primary.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: cs.primary.withOpacity(0.35)),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
       ),
       child: Text(
         text,
@@ -70,7 +70,7 @@ class _ConversationMcpSheet extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: cs.onSurface.withOpacity(0.2),
+                color: cs.onSurface.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -95,7 +95,7 @@ class _ConversationMcpSheet extends StatelessWidget {
                           l10n.mcpConversationSheetSubtitle,
                           style: TextStyle(
                             fontSize: 12,
-                            color: cs.onSurface.withOpacity(0.6),
+                            color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
                       ],
@@ -140,7 +140,7 @@ class _ConversationMcpSheet extends StatelessWidget {
                         child: Text(
                           l10n.mcpConversationSheetNoRunning,
                           style: TextStyle(
-                            color: cs.onSurface.withOpacity(0.6),
+                            color: cs.onSurface.withValues(alpha: 0.6),
                           ),
                         ),
                       )
@@ -154,8 +154,9 @@ class _ConversationMcpSheet extends StatelessWidget {
                               .length;
                           final isSelected = selected.contains(s.id);
                           final bg = isSelected
-                              ? cs.primary.withOpacity(
-                                  Theme.of(context).brightness ==
+                              ? cs.primary.withValues(
+                                  alpha:
+                                      Theme.of(context).brightness ==
                                           Brightness.dark
                                       ? 0.12
                                       : 0.10,
@@ -164,8 +165,8 @@ class _ConversationMcpSheet extends StatelessWidget {
                                     ? Colors.white10
                                     : cs.surface);
                           final borderColor = isSelected
-                              ? cs.primary.withOpacity(0.45)
-                              : cs.outlineVariant.withOpacity(0.25);
+                              ? cs.primary.withValues(alpha: 0.45)
+                              : cs.outlineVariant.withValues(alpha: 0.25);
 
                           return Material(
                             color: Colors.transparent,

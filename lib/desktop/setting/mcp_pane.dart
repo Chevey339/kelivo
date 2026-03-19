@@ -40,7 +40,7 @@ class DesktopMcpPane extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w400,
-                              color: cs.onSurface.withOpacity(0.9),
+                              color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
                         ),
@@ -81,7 +81,9 @@ class DesktopMcpPane extends StatelessWidget {
                     alignment: Alignment.center,
                     child: Text(
                       l10n.mcpPageNoServers,
-                      style: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+                      style: TextStyle(
+                        color: cs.onSurface.withValues(alpha: 0.6),
+                      ),
                     ),
                   ),
                 )
@@ -120,11 +122,10 @@ class DesktopMcpPane extends StatelessWidget {
                               await context.read<McpProvider>().reconnect(s.id);
                             },
                             onDelete: () async {
+                              final mcpProvider = context.read<McpProvider>();
                               final ok = await _confirmDelete(context);
                               if (ok == true) {
-                                await context.read<McpProvider>().removeServer(
-                                  s.id,
-                                );
+                                await mcpProvider.removeServer(s.id);
                                 if (context.mounted) {
                                   showAppSnackBar(
                                     context,
@@ -200,10 +201,12 @@ class _ServerCardState extends State<_ServerCard> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
 
-    final baseBg = isDark ? Colors.white10 : Colors.white.withOpacity(0.96);
+    final baseBg = isDark
+        ? Colors.white10
+        : Colors.white.withValues(alpha: 0.96);
     final borderColor = _hover
-        ? cs.primary.withOpacity(isDark ? 0.35 : 0.45)
-        : cs.outlineVariant.withOpacity(isDark ? 0.12 : 0.08);
+        ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
 
     Color statusColor;
     String statusText;
@@ -218,7 +221,6 @@ class _ServerCardState extends State<_ServerCard> {
         break;
       case McpStatus.error:
       case McpStatus.idle:
-      default:
         statusColor = Colors.redAccent;
         statusText = l10n.mcpPageStatusDisconnected;
         break;
@@ -229,9 +231,9 @@ class _ServerCardState extends State<_ServerCard> {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: c.withOpacity(0.12),
+          color: c.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: c.withOpacity(0.35)),
+          border: Border.all(color: c.withValues(alpha: 0.35)),
         ),
         child: Text(
           text,
@@ -351,7 +353,7 @@ class _ServerCardState extends State<_ServerCard> {
                         if (!widget.enabled)
                           tag(
                             l10n.mcpPageStatusDisabled,
-                            color: cs.onSurface.withOpacity(0.7),
+                            color: cs.onSurface.withValues(alpha: 0.7),
                           ),
                       ],
                     ),
@@ -378,7 +380,7 @@ class _ServerCardState extends State<_ServerCard> {
                             onPressed: widget.onDetails,
                             style: ButtonStyle(
                               splashFactory: NoSplash.splashFactory,
-                              overlayColor: const MaterialStatePropertyAll(
+                              overlayColor: const WidgetStatePropertyAll(
                                 Colors.transparent,
                               ),
                             ),
@@ -423,8 +425,8 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = _hover
         ? (isDark
-              ? Colors.white.withOpacity(0.06)
-              : Colors.black.withOpacity(0.05))
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
         : Colors.transparent;
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
@@ -487,7 +489,7 @@ Future<void> _showErrorDetails(
                           Text(
                             name,
                             style: TextStyle(
-                              color: cs.onSurface.withOpacity(0.7),
+                              color: cs.onSurface.withValues(alpha: 0.7),
                             ),
                           ),
                         ],
@@ -509,7 +511,7 @@ Future<void> _showErrorDetails(
                         : const Color(0xFFF7F7F9),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: cs.outlineVariant.withOpacity(0.2),
+                      color: cs.outlineVariant.withValues(alpha: 0.2),
                     ),
                   ),
                   child: SingleChildScrollView(
@@ -575,7 +577,7 @@ Future<bool?> _confirmDelete(BuildContext context) async {
                 const SizedBox(height: 10),
                 Text(
                   l10n.mcpPageConfirmDeleteContent,
-                  style: TextStyle(color: cs.onSurface.withOpacity(0.8)),
+                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -589,24 +591,24 @@ Future<bool?> _confirmDelete(BuildContext context) async {
                           onPressed: () => Navigator.of(ctx).pop(false),
                           style: ButtonStyle(
                             splashFactory: NoSplash.splashFactory,
-                            overlayColor: const MaterialStatePropertyAll(
+                            overlayColor: const WidgetStatePropertyAll(
                               Colors.transparent,
                             ),
-                            minimumSize: const MaterialStatePropertyAll(
+                            minimumSize: const WidgetStatePropertyAll(
                               Size(88, 36),
                             ),
-                            shape: MaterialStatePropertyAll(
+                            shape: WidgetStatePropertyAll(
                               RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                            backgroundColor: MaterialStateProperty.resolveWith((
+                            backgroundColor: WidgetStateProperty.resolveWith((
                               states,
                             ) {
-                              if (states.contains(MaterialState.hovered)) {
+                              if (states.contains(WidgetState.hovered)) {
                                 return isDark
-                                    ? Colors.white.withOpacity(0.06)
-                                    : Colors.black.withOpacity(0.05);
+                                    ? Colors.white.withValues(alpha: 0.06)
+                                    : Colors.black.withValues(alpha: 0.05);
                               }
                               return Colors.transparent;
                             }),
@@ -623,21 +625,21 @@ Future<bool?> _confirmDelete(BuildContext context) async {
                             foregroundColor: cs.onError,
                           ).copyWith(
                             splashFactory: NoSplash.splashFactory,
-                            overlayColor: const MaterialStatePropertyAll(
+                            overlayColor: const WidgetStatePropertyAll(
                               Colors.transparent,
                             ),
-                            minimumSize: const MaterialStatePropertyAll(
+                            minimumSize: const WidgetStatePropertyAll(
                               Size(88, 36),
                             ),
-                            shape: MaterialStatePropertyAll(
+                            shape: WidgetStatePropertyAll(
                               RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                            backgroundColor: MaterialStateProperty.resolveWith((
+                            backgroundColor: WidgetStateProperty.resolveWith((
                               states,
                             ) {
-                              if (states.contains(MaterialState.hovered)) {
+                              if (states.contains(WidgetState.hovered)) {
                                 return Color.lerp(cs.error, Colors.white, 0.08);
                               }
                               return cs.error;

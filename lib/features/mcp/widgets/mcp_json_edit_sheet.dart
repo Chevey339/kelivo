@@ -12,7 +12,6 @@ import '../../../core/providers/settings_provider.dart';
 
 Future<void> showMcpJsonEditSheet(BuildContext context) async {
   final cs = Theme.of(context).colorScheme;
-  final l10n = AppLocalizations.of(context)!;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -113,7 +112,7 @@ class _McpJsonEditSheetState extends State<_McpJsonEditSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: cs.onSurface.withOpacity(0.2),
+                  color: cs.onSurface.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -163,7 +162,7 @@ class _McpJsonEditSheetState extends State<_McpJsonEditSheet> {
                     color: isDark ? Colors.white10 : Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: cs.outlineVariant.withOpacity(0.3),
+                      color: cs.outlineVariant.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Padding(

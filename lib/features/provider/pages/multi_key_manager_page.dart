@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/models/api_keys.dart';
 import '../../../l10n/app_localizations.dart';
@@ -173,7 +170,6 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
       case LoadBalanceStrategy.random:
         return l10n.multiKeyPageStrategyRandom;
       case LoadBalanceStrategy.roundRobin:
-      default:
         return l10n.multiKeyPageStrategyRoundRobin;
     }
   }
@@ -252,7 +248,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
         case ApiKeyStatus.active:
           return Colors.green;
         case ApiKeyStatus.disabled:
-          return cs.onSurface.withOpacity(0.6);
+          return cs.onSurface.withValues(alpha: 0.6);
         case ApiKeyStatus.error:
           return cs.error;
         case ApiKeyStatus.rateLimited:
@@ -313,7 +309,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: statusColor(k.status).withOpacity(0.12),
+                    color: statusColor(k.status).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
@@ -400,7 +396,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
         color: bg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: cs.outlineVariant.withOpacity(isDark ? 0.08 : 0.06),
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
           width: 0.6,
         ),
         // boxShadow: [
@@ -432,21 +428,16 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
           Expanded(child: Text(label, style: const TextStyle(fontSize: 15))),
           if (trailing != null)
             DefaultTextStyle.merge(
-              style: TextStyle(color: cs.onSurface.withOpacity(0.8)),
+              style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
               child: trailing,
             ),
         ],
       ),
     );
     if (onTap != null) {
-      return _TactileScale(child: row, onTap: onTap);
+      return _TactileScale(onTap: onTap, child: row);
     }
     return row;
-  }
-
-  Widget _divider(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(height: 0.6, color: cs.outlineVariant.withOpacity(0.25));
   }
 
   Future<void> _updateKey(ApiKeyConfig updated) async {
@@ -515,10 +506,13 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
   }
 
   Future<void> _editKey(ApiKeyConfig k) async {
-    final updated = await _showEditKeySheet(k);
-    if (updated == null) return;
-    // Optional: prevent duplicate keys if key changed
     final settings = context.read<SettingsProvider>();
+    final l10n = AppLocalizations.of(context)!;
+    final updated = await _showEditKeySheet(k);
+    if (updated == null) {
+      return;
+    }
+    // Optional: prevent duplicate keys if key changed
     final cfg = settings.getProviderConfig(
       widget.providerKey,
       defaultName: widget.providerDisplayName,
@@ -528,9 +522,12 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
       (e) => e.id != k.id && e.key.trim() == updated.key.trim(),
     );
     if (duplicate) {
+      if (!mounted) {
+        return;
+      }
       showAppSnackBar(
         context,
-        message: AppLocalizations.of(context)!.multiKeyPageDuplicateKeyWarning,
+        message: l10n.multiKeyPageDuplicateKeyWarning,
         type: NotificationType.warning,
       );
       return;
@@ -540,9 +537,11 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
 
   Future<void> _onAddKeys() async {
     final l10n = AppLocalizations.of(context)!;
-    final added = await _showAddKeysSheet();
-    if (added == null) return;
     final settings = context.read<SettingsProvider>();
+    final added = await _showAddKeysSheet();
+    if (added == null) {
+      return;
+    }
     final cfg = settings.getProviderConfig(
       widget.providerKey,
       defaultName: widget.providerDisplayName,
@@ -555,6 +554,9 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
       if (!existingSet.contains(k)) unique.add(k);
     }
     if (unique.isEmpty) {
+      if (!mounted) {
+        return;
+      }
       showAppSnackBar(context, message: l10n.multiKeyPageImportedSnackbar(0));
       return;
     }
@@ -707,14 +709,6 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
     );
   }
 
-  Future<void> _chooseDetectModel() async {
-    final sel = await showModelSelector(
-      context,
-      limitProviderKey: widget.providerKey,
-    );
-    if (sel != null) setState(() => _detectModelId = sel.modelId);
-  }
-
   Future<void> _showStrategySheet() async {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
@@ -734,7 +728,6 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
         case LoadBalanceStrategy.random:
           return l10n.multiKeyPageStrategyRandom;
         case LoadBalanceStrategy.roundRobin:
-        default:
           return l10n.multiKeyPageStrategyRoundRobin;
       }
     }
@@ -757,7 +750,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: cs.onSurface.withOpacity(0.2),
+                    color: cs.onSurface.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -858,7 +851,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: cs.onSurface.withOpacity(0.2),
+                      color: cs.onSurface.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -901,19 +894,19 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.primary.withOpacity(0.5),
+                        color: cs.primary.withValues(alpha: 0.5),
                       ),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
@@ -975,7 +968,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: cs.onSurface.withOpacity(0.2),
+                      color: cs.onSurface.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -1016,19 +1009,19 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.primary.withOpacity(0.5),
+                        color: cs.primary.withValues(alpha: 0.5),
                       ),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
@@ -1047,19 +1040,19 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.primary.withOpacity(0.5),
+                        color: cs.primary.withValues(alpha: 0.5),
                       ),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
@@ -1079,19 +1072,19 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.primary.withOpacity(0.5),
+                        color: cs.primary.withValues(alpha: 0.5),
                       ),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
@@ -1109,7 +1102,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                     backgroundColor: cs.primary,
                     onTap: () {
                       final p = int.tryParse(priCtrl.text.trim()) ?? k.priority;
-                      final clamped = p.clamp(1, 10) as int;
+                      final clamped = p.clamp(1, 10);
                       Navigator.of(ctx).pop(
                         k.copyWith(
                           name: aliasCtrl.text.trim().isEmpty
@@ -1178,7 +1171,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
       final k = toTest[i];
       final ok = await _testSingleKey(base, modelId, k);
       final idx = out.indexWhere((e) => e.id == k.id);
-      if (idx >= 0)
+      if (idx >= 0) {
         out[idx] = k.copyWith(
           status: ok ? ApiKeyStatus.active : ApiKeyStatus.error,
           usage: k.usage.copyWith(
@@ -1191,6 +1184,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
           lastError: ok ? null : 'Test failed',
           updatedAt: DateTime.now().millisecondsSinceEpoch,
         );
+      }
       // Small delay between tests for UX
       await Future.delayed(const Duration(milliseconds: 120));
     }
@@ -1246,8 +1240,9 @@ class _TactileScaleState extends State<_TactileScale> {
       onTap: widget.onTap == null
           ? null
           : () {
-              if (context.read<SettingsProvider>().hapticsOnListItemTap)
+              if (context.read<SettingsProvider>().hapticsOnListItemTap) {
                 Haptics.soft();
+              }
               widget.onTap!.call();
             },
       child: AnimatedScale(
@@ -1268,7 +1263,6 @@ class _TactileIconButton extends StatefulWidget {
     required this.onTap,
     this.onLongPress,
     this.semanticLabel,
-    this.size = 22,
   });
 
   final IconData icon;
@@ -1276,7 +1270,6 @@ class _TactileIconButton extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final String? semanticLabel;
-  final double size;
 
   @override
   State<_TactileIconButton> createState() => _TactileIconButtonState();
@@ -1288,10 +1281,10 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   @override
   Widget build(BuildContext context) {
     final base = widget.color;
-    final pressColor = base.withOpacity(0.7);
+    final pressColor = base.withValues(alpha: 0.7);
     final icon = Icon(
       widget.icon,
-      size: widget.size,
+      size: 22,
       color: _pressed ? pressColor : base,
       semanticLabel: widget.semanticLabel,
     );

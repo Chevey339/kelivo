@@ -143,14 +143,16 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
     });
     // Resolve display model id from per-model overrides when present (apiModelId),
     // falling back to the logical key for backwards compatibility.
-    Map<String, dynamic>? _initialOv;
+    Map<String, dynamic>? initialOv;
     if (!widget.isNew) {
       final raw = cfg.modelOverrides[widget.modelId];
-      if (raw is Map) _initialOv = raw.map((k, v) => MapEntry(k.toString(), v));
+      if (raw is Map) {
+        initialOv = raw.map((k, v) => MapEntry(k.toString(), v));
+      }
     }
     String displayModelId = widget.modelId;
-    if (_initialOv != null) {
-      final raw = (_initialOv['apiModelId'] ?? _initialOv['api_model_id'])
+    if (initialOv != null) {
+      final raw = (initialOv['apiModelId'] ?? initialOv['api_model_id'])
           ?.toString()
           .trim();
       if (raw != null && raw.isNotEmpty) {
@@ -165,7 +167,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
         displayName: displayModelId.isEmpty ? '' : displayModelId,
       ),
     );
-    final ov = _initialOv;
+    final ov = initialOv;
     final effective = ov == null
         ? base
         : ModelOverrideResolver.applyModelOverride(
@@ -296,7 +298,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: cs.onSurface.withOpacity(0.2),
+                color: cs.onSurface.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -398,7 +400,9 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
               readOnly: !widget.isNew, // existing model ID is read-only
               enableInteractiveSelection: widget.isNew,
               style: TextStyle(
-                color: widget.isNew ? null : cs.onSurface.withOpacity(0.6),
+                color: widget.isNew
+                    ? null
+                    : cs.onSurface.withValues(alpha: 0.6),
               ),
               onChanged: widget.isNew
                   ? (v) {
@@ -417,7 +421,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                   borderSide: BorderSide(
                     color: Theme.of(
                       context,
-                    ).colorScheme.outlineVariant.withOpacity(0.4),
+                    ).colorScheme.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
@@ -425,7 +429,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                   borderSide: BorderSide(
                     color: Theme.of(
                       context,
-                    ).colorScheme.outlineVariant.withOpacity(0.4),
+                    ).colorScheme.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
@@ -433,7 +437,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                   borderSide: BorderSide(
                     color: Theme.of(
                       context,
-                    ).colorScheme.primary.withOpacity(0.5),
+                    ).colorScheme.primary.withValues(alpha: 0.5),
                   ),
                 ),
                 suffixIconConstraints: const BoxConstraints(
@@ -457,9 +461,9 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                           },
                           tooltip: l10n.shareProviderSheetCopyButton,
                           icon: Lucide.Copy,
-                          color: cs.onSurface.withOpacity(0.9),
-                          hoverColor: cs.onSurface.withOpacity(0.08),
-                          pressedColor: cs.onSurface.withOpacity(0.12),
+                          color: cs.onSurface.withValues(alpha: 0.9),
+                          hoverColor: cs.onSurface.withValues(alpha: 0.08),
+                          pressedColor: cs.onSurface.withValues(alpha: 0.12),
                         ),
                       ),
               ),
@@ -480,7 +484,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                   borderSide: BorderSide(
                     color: Theme.of(
                       context,
-                    ).colorScheme.outlineVariant.withOpacity(0.4),
+                    ).colorScheme.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
@@ -488,7 +492,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                   borderSide: BorderSide(
                     color: Theme.of(
                       context,
-                    ).colorScheme.outlineVariant.withOpacity(0.4),
+                    ).colorScheme.outlineVariant.withValues(alpha: 0.4),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
@@ -496,7 +500,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                   borderSide: BorderSide(
                     color: Theme.of(
                       context,
-                    ).colorScheme.primary.withOpacity(0.5),
+                    ).colorScheme.primary.withValues(alpha: 0.5),
                   ),
                 ),
               ),
@@ -608,7 +612,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
             Text(
               l10n.modelDetailSheetProviderOverrideDescription,
               style: TextStyle(
-                color: cs.onSurface.withOpacity(0.8),
+                color: cs.onSurface.withValues(alpha: 0.8),
                 fontSize: 13,
               ),
               textAlign: TextAlign.center,
@@ -692,7 +696,10 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: Text(
           l10n.modelDetailSheetBuiltinToolsDescription,
-          style: TextStyle(color: cs.onSurface.withOpacity(0.8), fontSize: 13),
+          style: TextStyle(
+            color: cs.onSurface.withValues(alpha: 0.8),
+            fontSize: 13,
+          ),
         ),
       ),
       if (_providerKind == ProviderKind.google) ...[
@@ -736,7 +743,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
             child: Text(
               l10n.modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint,
               style: TextStyle(
-                color: cs.onSurface.withOpacity(0.65),
+                color: cs.onSurface.withValues(alpha: 0.65),
                 fontSize: 12,
               ),
             ),
@@ -773,7 +780,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
           child: Text(
             l10n.modelDetailSheetBuiltinToolsUnsupportedHint,
             style: TextStyle(
-              color: cs.onSurface.withOpacity(0.65),
+              color: cs.onSurface.withValues(alpha: 0.65),
               fontSize: 12,
             ),
           ),
@@ -808,7 +815,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
     text,
     style: TextStyle(
       fontSize: 13,
-      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
     ),
   );
 
@@ -863,16 +870,21 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       builtInSet.remove(BuiltInToolNames.codeExecution);
       builtInSet.remove(BuiltInToolNames.youtube);
       if (_googleUrlContextTool) builtInSet.add(BuiltInToolNames.urlContext);
-      if (_googleCodeExecutionTool)
+      if (_googleCodeExecutionTool) {
         builtInSet.add(BuiltInToolNames.codeExecution);
-      if (_googleYoutubeTool) builtInSet.add(BuiltInToolNames.youtube);
+      }
+      if (_googleYoutubeTool) {
+        builtInSet.add(BuiltInToolNames.youtube);
+      }
     } else if (_providerKind == ProviderKind.openai) {
       builtInSet.remove(BuiltInToolNames.codeInterpreter);
       builtInSet.remove(BuiltInToolNames.imageGeneration);
-      if (_openaiCodeInterpreterTool)
+      if (_openaiCodeInterpreterTool) {
         builtInSet.add(BuiltInToolNames.codeInterpreter);
-      if (_openaiImageGenerationTool)
+      }
+      if (_openaiImageGenerationTool) {
         builtInSet.add(BuiltInToolNames.imageGeneration);
+      }
     }
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
     // Decide which logical key to use for this instance
@@ -935,52 +947,6 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
   }
 }
 
-class _TabChip extends StatelessWidget {
-  const _TabChip({required this.label, required this.selected, this.onTap});
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = selected
-        ? (isDark ? cs.primary.withOpacity(0.25) : cs.primary.withOpacity(0.15))
-        : Colors.transparent;
-    final fg = selected
-        ? (isDark ? cs.primary : cs.primary)
-        : cs.onSurface.withOpacity(0.8);
-    return Padding(
-      padding: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: selected
-                  ? cs.primary.withOpacity(0.25)
-                  : cs.outlineVariant.withOpacity(0.4),
-              width: 1,
-            ),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              color: fg,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _SegmentedSingle extends StatelessWidget {
   const _SegmentedSingle({
     required this.options,
@@ -995,14 +961,16 @@ class _SegmentedSingle extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final Color sel = isDark
-        ? cs.primary.withOpacity(0.20)
-        : cs.primary.withOpacity(0.14);
+        ? cs.primary.withValues(alpha: 0.20)
+        : cs.primary.withValues(alpha: 0.14);
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.35),
+          color: Theme.of(
+            context,
+          ).colorScheme.outlineVariant.withValues(alpha: 0.35),
         ),
       ),
       child: Row(
@@ -1075,8 +1043,8 @@ class _SegmentedMulti extends StatelessWidget {
 
     final base = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
     final sel = isDark
-        ? cs.primary.withOpacity(0.20)
-        : cs.primary.withOpacity(0.14);
+        ? cs.primary.withValues(alpha: 0.20)
+        : cs.primary.withValues(alpha: 0.14);
     final r = BorderRadius.circular(12);
 
     return DecoratedBox(
@@ -1084,7 +1052,9 @@ class _SegmentedMulti extends StatelessWidget {
         borderRadius: r,
         color: base, // 外层始终用同一个“底色”
         border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.35),
+          color: Theme.of(
+            context,
+          ).colorScheme.outlineVariant.withValues(alpha: 0.35),
         ),
       ),
       child: ClipRRect(
@@ -1202,19 +1172,19 @@ class _HeaderRow extends StatelessWidget {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.outlineVariant.withOpacity(0.4),
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
-                        color: cs.primary.withOpacity(0.5),
+                        color: cs.primary.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -1223,7 +1193,7 @@ class _HeaderRow extends StatelessWidget {
               IosIconButton(
                 icon: Lucide.Trash2,
                 size: 20,
-                color: cs.onSurface.withOpacity(0.8),
+                color: cs.onSurface.withValues(alpha: 0.8),
                 onTap: onDelete,
                 semanticLabel: 'Delete header',
                 minSize: 40,
@@ -1240,19 +1210,21 @@ class _HeaderRow extends StatelessWidget {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide(
-                  color: cs.outlineVariant.withOpacity(0.4),
+                  color: cs.outlineVariant.withValues(alpha: 0.4),
                 ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide(
-                  color: cs.outlineVariant.withOpacity(0.4),
+                  color: cs.outlineVariant.withValues(alpha: 0.4),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.5),
                 ),
               ),
             ),
@@ -1290,7 +1262,7 @@ class _BodyRow extends StatelessWidget {
                       borderSide: BorderSide(
                         color: Theme.of(
                           context,
-                        ).colorScheme.outlineVariant.withOpacity(0.4),
+                        ).colorScheme.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
@@ -1298,7 +1270,7 @@ class _BodyRow extends StatelessWidget {
                       borderSide: BorderSide(
                         color: Theme.of(
                           context,
-                        ).colorScheme.outlineVariant.withOpacity(0.4),
+                        ).colorScheme.outlineVariant.withValues(alpha: 0.4),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
@@ -1306,7 +1278,7 @@ class _BodyRow extends StatelessWidget {
                       borderSide: BorderSide(
                         color: Theme.of(
                           context,
-                        ).colorScheme.primary.withOpacity(0.5),
+                        ).colorScheme.primary.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -1315,7 +1287,7 @@ class _BodyRow extends StatelessWidget {
               IosIconButton(
                 icon: Lucide.Trash2,
                 size: 20,
-                color: cs.onSurface.withOpacity(0.8),
+                color: cs.onSurface.withValues(alpha: 0.8),
                 onTap: onDelete,
                 semanticLabel: 'Delete entry',
                 minSize: 40,
@@ -1336,7 +1308,7 @@ class _BodyRow extends StatelessWidget {
                 borderSide: BorderSide(
                   color: Theme.of(
                     context,
-                  ).colorScheme.outlineVariant.withOpacity(0.4),
+                  ).colorScheme.outlineVariant.withValues(alpha: 0.4),
                 ),
               ),
               enabledBorder: OutlineInputBorder(
@@ -1344,13 +1316,15 @@ class _BodyRow extends StatelessWidget {
                 borderSide: BorderSide(
                   color: Theme.of(
                     context,
-                  ).colorScheme.outlineVariant.withOpacity(0.4),
+                  ).colorScheme.outlineVariant.withValues(alpha: 0.4),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.5),
                 ),
               ),
             ),
@@ -1402,7 +1376,7 @@ class _ToolTile extends StatelessWidget {
                       desc,
                       style: TextStyle(
                         fontSize: 12,
-                        color: cs.onSurface.withOpacity(0.7),
+                        color: cs.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
@@ -1424,7 +1398,7 @@ class _OutlinedAddButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final border = BorderSide(color: cs.primary.withOpacity(0.5));
+    final border = BorderSide(color: cs.primary.withValues(alpha: 0.5));
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -1540,7 +1514,7 @@ class _SegTabBar extends StatelessWidget {
             segWidth * tabs.length + gap * (tabs.length - 1);
 
         final Color shellBg = isDark
-            ? Colors.white.withOpacity(0.08)
+            ? Colors.white.withValues(alpha: 0.08)
             : Colors.white;
 
         List<Widget> children = [];
@@ -1558,7 +1532,7 @@ class _SegTabBar extends StatelessWidget {
                   curve: Curves.easeOutCubic,
                   decoration: BoxDecoration(
                     color: selected
-                        ? cs.primary.withOpacity(0.14)
+                        ? cs.primary.withValues(alpha: 0.14)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(innerRadius),
                   ),
@@ -1570,7 +1544,7 @@ class _SegTabBar extends StatelessWidget {
                     style: TextStyle(
                       color: selected
                           ? cs.primary
-                          : cs.onSurface.withOpacity(0.82),
+                          : cs.onSurface.withValues(alpha: 0.82),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1578,8 +1552,9 @@ class _SegTabBar extends StatelessWidget {
               ),
             ),
           );
-          if (index != tabs.length - 1)
+          if (index != tabs.length - 1) {
             children.add(const SizedBox(width: gap));
+          }
         }
 
         return Container(

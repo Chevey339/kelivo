@@ -357,7 +357,12 @@ class _NotificationWidgetState extends State<NotificationWidget>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         transform: Matrix4.translationValues(0, _dragOffset, 0)
-          ..scale(interactiveScale),
+          ..scaleByDouble(
+            interactiveScale,
+            interactiveScale,
+            interactiveScale,
+            1.0,
+          ),
         child: Container(
           margin: const EdgeInsets.only(bottom: 8),
           constraints: const BoxConstraints(maxWidth: 400),

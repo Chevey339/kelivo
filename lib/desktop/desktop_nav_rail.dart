@@ -1,7 +1,6 @@
 import 'dart:io' show File, Platform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:characters/characters.dart';
 import '../shared/widgets/emoji_text.dart';
 import '../l10n/app_localizations.dart';
 import '../core/providers/user_provider.dart';
@@ -124,7 +123,7 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: cs.primary.withOpacity(0.15),
+          color: cs.primary.withValues(alpha: 0.15),
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
@@ -173,7 +172,7 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
           // Also open dialog on right-click for consistency
           showUserProfileDialog(context);
         },
-        child: _HoverCircle(child: avatar, size: 42),
+        child: _HoverCircle(size: 42, child: avatar),
       ),
     );
   }
@@ -184,7 +183,7 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.15),
+        color: cs.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
@@ -232,7 +231,7 @@ class _CircleAction extends StatelessWidget {
           child: Icon(
             icon,
             size: iconSize,
-            color: (iconColor ?? cs.onSurface.withOpacity(0.8)),
+            color: (iconColor ?? cs.onSurface.withValues(alpha: 0.8)),
           ),
         ),
       ),
@@ -263,7 +262,9 @@ class _HoverCircleState extends State<_HoverCircle> {
         width: widget.size,
         height: widget.size,
         decoration: BoxDecoration(
-          color: _hovered ? cs.primary.withOpacity(0.10) : Colors.transparent,
+          color: _hovered
+              ? cs.primary.withValues(alpha: 0.10)
+              : Colors.transparent,
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
@@ -279,8 +280,6 @@ class _ThemeCycleButton extends StatefulWidget {
 }
 
 class _ThemeCycleButtonState extends State<_ThemeCycleButton> {
-  bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
     final sp = context.watch<SettingsProvider>();
@@ -294,7 +293,11 @@ class _ThemeCycleButtonState extends State<_ThemeCycleButton> {
         onTap: () => _cycleTheme(context),
         child: _HoverCircle(
           size: 40,
-          child: Icon(icon, size: 20, color: cs.onSurface.withOpacity(0.8)),
+          child: Icon(
+            icon,
+            size: 20,
+            color: cs.onSurface.withValues(alpha: 0.8),
+          ),
         ),
       ),
     );
@@ -307,7 +310,6 @@ class _ThemeCycleButtonState extends State<_ThemeCycleButton> {
       case ThemeMode.dark:
         return lucide.Lucide.Moon;
       case ThemeMode.system:
-      default:
         return lucide.Lucide.Monitor;
     }
   }

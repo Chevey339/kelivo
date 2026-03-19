@@ -9,6 +9,7 @@ import '../core/providers/assistant_provider.dart';
 import '../core/providers/settings_provider.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
+import '../shared/dialogs/reasoning_budget_custom_dialog.dart';
 
 Future<void> showDesktopReasoningBudgetPopover(
   BuildContext context, {
@@ -16,7 +17,7 @@ Future<void> showDesktopReasoningBudgetPopover(
   String? modelProvider,
   String? modelId,
 }) async {
-  final overlay = Overlay.of(context);
+  final overlay = Overlay.maybeOf(context);
   if (overlay == null) return;
   final keyContext = anchorKey.currentContext;
   if (keyContext == null) return;
@@ -78,6 +79,7 @@ class _ReasoningPopoverOverlayState extends State<_ReasoningPopoverOverlay>
   late final AnimationController _controller;
   late final Animation<double> _fadeIn;
   bool _closing = false;
+  bool _suspended = false;
   Offset _offset = const Offset(0, 0.12);
 
   @override
@@ -125,51 +127,61 @@ class _ReasoningPopoverOverlayState extends State<_ReasoningPopoverOverlay>
         );
     final clipHeight = widget.anchorRect.top.clamp(0.0, screen.height);
 
-    return Stack(
-      children: [
-        // tap outside to close
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: _close,
-          ),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          height: clipHeight,
-          child: ClipRect(
-            child: Stack(
-              children: [
-                Positioned(
-                  left: left,
-                  width: width,
-                  bottom: 0,
-                  child: FadeTransition(
-                    opacity: _fadeIn,
-                    child: AnimatedSlide(
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      offset: _offset,
-                      child: _GlassPanel(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(14),
-                        ),
-                        child: _ReasoningContent(
-                          onDone: _close,
-                          modelProvider: widget.modelProvider,
-                          modelId: widget.modelId,
+    return IgnorePointer(
+      ignoring: _suspended,
+      child: Opacity(
+        opacity: _suspended ? 0.0 : 1.0,
+        child: Stack(
+          children: [
+            // tap outside to close
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _close,
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              height: clipHeight,
+              child: ClipRect(
+                child: Stack(
+                  children: [
+                    Positioned(
+                      left: left,
+                      width: width,
+                      bottom: 0,
+                      child: FadeTransition(
+                        opacity: _fadeIn,
+                        child: AnimatedSlide(
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOutCubic,
+                          offset: _offset,
+                          child: _GlassPanel(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(14),
+                            ),
+                            child: _ReasoningContent(
+                              onDone: _close,
+                              onSuspendedChanged: (v) {
+                                if (_suspended == v) return;
+                                setState(() => _suspended = v);
+                              },
+                              modelProvider: widget.modelProvider,
+                              modelId: widget.modelId,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -189,20 +201,20 @@ class _GlassPanel extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             // Match the preferred grey smudge style
-            color: (isDark ? Colors.black : Colors.white).withOpacity(
-              isDark ? 0.28 : 0.56,
+            color: (isDark ? Colors.black : Colors.white).withValues(
+              alpha: isDark ? 0.28 : 0.56,
             ),
             border: Border(
               top: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.06 : 0.18),
+                color: Colors.white.withValues(alpha: isDark ? 0.06 : 0.18),
                 width: 0.7,
               ),
               left: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
               right: BorderSide(
-                color: Colors.white.withOpacity(isDark ? 0.04 : 0.12),
+                color: Colors.white.withValues(alpha: isDark ? 0.04 : 0.12),
                 width: 0.6,
               ),
             ),
@@ -217,22 +229,19 @@ class _GlassPanel extends StatelessWidget {
 class _ReasoningContent extends StatelessWidget {
   const _ReasoningContent({
     required this.onDone,
+    required this.onSuspendedChanged,
     this.modelProvider,
     this.modelId,
   });
-  final VoidCallback onDone;
+  final Future<void> Function() onDone;
+  final ValueChanged<bool> onSuspendedChanged;
   final String? modelProvider;
   final String? modelId;
 
-  int _bucket(int? n, {bool allowXhigh = true}) {
-    if (n == null) return -1;
-    if (n == -1) return -1;
-    if (n < 1024) return 0;
-    if (n < 16000) return 1024;
-    if (n < 32000) return 16000;
-    if (!allowXhigh) return 32000;
-    if (n < 64000) return 32000;
-    return 64000;
+  bool _isCustomSelected(int? budget, {required bool showXhigh}) {
+    final v = budget ?? -1;
+    final presets = <int>{-1, 0, 1024, 16000, 32000, if (showXhigh) 64000};
+    return !presets.contains(v);
   }
 
   bool _showXhighOption(BuildContext context, SettingsProvider settings) {
@@ -255,15 +264,22 @@ class _ReasoningContent extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
     final showXhigh = _showXhighOption(context, sp);
-    final selected = _bucket(sp.thinkingBudget, allowXhigh: showXhigh);
+    final selected = sp.thinkingBudget ?? -1;
+    final customActive = _isCustomSelected(
+      sp.thinkingBudget,
+      showXhigh: showXhigh,
+    );
 
     Widget tile({
       required Widget Function(Color color) leadingBuilder,
       required String label,
       required int value,
+      bool? activeOverride,
+      Widget? trailing,
+      VoidCallback? onTap,
     }) {
       final cs = Theme.of(context).colorScheme;
-      final active = selected == value;
+      final active = activeOverride ?? (selected == value);
       final onColor = active ? cs.primary : cs.onSurface;
       final iconColor = active ? cs.primary : cs.onSurface;
       return Padding(
@@ -272,10 +288,13 @@ class _ReasoningContent extends StatelessWidget {
           leading: leadingBuilder(iconColor),
           label: label,
           selected: active,
-          onTap: () async {
-            await context.read<SettingsProvider>().setThinkingBudget(value);
-            onDone();
-          },
+          trailing: trailing,
+          onTap:
+              onTap ??
+              () async {
+                await context.read<SettingsProvider>().setThinkingBudget(value);
+                await onDone();
+              },
           labelStyle: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w400,
@@ -343,6 +362,50 @@ class _ReasoningContent extends StatelessWidget {
                 label: l10n.reasoningBudgetSheetXhigh,
                 value: 64000,
               ),
+            tile(
+              leadingBuilder: (c) => Icon(Lucide.Hash, size: 16, color: c),
+              label: l10n.reasoningBudgetSheetCustomLabel,
+              value: -999999,
+              activeOverride: customActive,
+              trailing: customActive
+                  ? Text(
+                      selected.toString(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.primary,
+                        decoration: TextDecoration.none,
+                      ),
+                    )
+                  : Icon(
+                      Lucide.ChevronRight,
+                      size: 16,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.45),
+                    ),
+              onTap: () async {
+                final initialValue = selected >= 1024 ? selected : 2048;
+                onSuspendedChanged(true);
+                var restore = true;
+                try {
+                  final chosen = await ReasoningBudgetCustomDialog.show(
+                    context,
+                    initialValue: initialValue,
+                  );
+                  if (!context.mounted) return;
+                  if (chosen == null) return;
+                  restore = false;
+                  await context.read<SettingsProvider>().setThinkingBudget(
+                    chosen,
+                  );
+                  if (!context.mounted) return;
+                  await onDone();
+                } finally {
+                  if (restore && context.mounted) onSuspendedChanged(false);
+                }
+              },
+            ),
           ],
         ),
       ),
@@ -356,12 +419,14 @@ class _HoverRow extends StatefulWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.trailing,
     this.labelStyle,
   });
   final Widget leading;
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final Widget? trailing;
   final TextStyle? labelStyle;
 
   @override
@@ -377,8 +442,8 @@ class _HoverRowState extends State<_HoverRow> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final baseBg = Colors.transparent;
-    final hoverBg = (isDark ? Colors.white : Colors.black).withOpacity(
-      isDark ? 0.12 : 0.10,
+    final hoverBg = (isDark ? Colors.white : Colors.black).withValues(
+      alpha: isDark ? 0.12 : 0.10,
     );
 
     return MouseRegion(
@@ -418,6 +483,10 @@ class _HoverRowState extends State<_HoverRow> {
                       ),
                 ),
               ),
+              if (widget.trailing != null) ...[
+                const SizedBox(width: 8),
+                widget.trailing!,
+              ],
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 160),
                 child: widget.selected

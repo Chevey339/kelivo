@@ -172,9 +172,14 @@ class DesktopTrayController with TrayListener, WindowListener {
     }
     _contextMenuOpen = true;
     try {
-      // Windows 需要在调用 TrackPopupMenu 前把窗口置为前台，
-      // 否则点击其他地方时菜单可能不会自动关闭。
-      await trayManager.popUpContextMenu(bringAppToFront: true);
+      // Windows 环境下建议在弹出菜单前尝试聚焦窗口，
+      // 以避免部分环境中菜单不会在点击其他地方时自动关闭。
+      if (defaultTargetPlatform == TargetPlatform.windows) {
+        try {
+          await windowManager.focus();
+        } catch (_) {}
+      }
+      await trayManager.popUpContextMenu();
     } catch (_) {}
     // 无论是点击菜单项还是点击其他地方关闭菜单，
     // popUpContextMenu 都会在菜单关闭后返回，这里统一重置标记。
