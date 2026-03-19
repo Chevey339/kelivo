@@ -17,11 +17,16 @@ String buildFunctionCallToolName(String serverName, String toolName) {
         '${head.isNotEmpty ? head : ''}-${sanitizedTool.isNotEmpty ? sanitizedTool : ''}';
   }
   name = name.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-  if (!RegExp(r'^[a-zA-Z]').hasMatch(name)) name = 'tool-$name';
+  if (!RegExp(r'^[a-zA-Z]').hasMatch(name)) {
+    name = 'tool-$name';
+  }
   name = name.replaceAll(RegExp(r'[_-]{2,}'), '_');
-  if (name.length > 63) name = name.substring(0, 63);
-  if (name.endsWith('_') || name.endsWith('-'))
+  if (name.length > 63) {
+    name = name.substring(0, 63);
+  }
+  if (name.endsWith('_') || name.endsWith('-')) {
     name = name.substring(0, name.length - 1);
+  }
   return name;
 }
 

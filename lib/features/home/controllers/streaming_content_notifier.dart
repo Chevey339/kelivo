@@ -13,7 +13,7 @@ import 'package:flutter/foundation.dart';
 /// 3. Only the streaming message widget rebuilds, not the entire page
 class StreamingContentNotifier {
   /// Map of message ID to its content notifier.
-  /// Each streaming message has its own ValueNotifier<String>.
+  /// Each streaming message has its own `ValueNotifier<String>`.
   final Map<String, ValueNotifier<StreamingContentData>> _notifiers =
       <String, ValueNotifier<StreamingContentData>>{};
 

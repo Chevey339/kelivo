@@ -55,7 +55,7 @@ class Conversation extends HiveObject {
     List<String>? messageIds,
     this.isPinned = false,
     List<String>? mcpServerIds,
-    String? assistantId,
+    this.assistantId,
     int? truncateIndex,
     Map<String, int>? versionSelections,
     this.summary,
@@ -65,7 +65,6 @@ class Conversation extends HiveObject {
        updatedAt = updatedAt ?? DateTime.now(),
        messageIds = messageIds ?? [],
        mcpServerIds = mcpServerIds ?? [],
-       assistantId = assistantId,
        truncateIndex = truncateIndex ?? -1,
        versionSelections = versionSelections ?? <String, int>{},
        lastSummarizedMessageCount = lastSummarizedMessageCount ?? 0;
