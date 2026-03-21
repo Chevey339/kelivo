@@ -801,7 +801,7 @@
   "modelDetailSheetCustomBodyTitle": "自定义 Body",
   "modelDetailSheetAddBody": "添加 Body",
   "modelDetailSheetBuiltinToolsDescription": "内置工具仅支持官方 API。",
-"modelDetailSheetBuiltinToolsUnsupportedHint": "当前供应商不支持这些内置工具。",
+  "modelDetailSheetBuiltinToolsUnsupportedHint": "当前供应商不支持这些内置工具。",
   "modelDetailSheetSearchTool": "搜索",
   "modelDetailSheetSearchToolDescription": "启用 Google 搜索集成",
   "modelDetailSheetUrlContextTool": "URL 上下文",

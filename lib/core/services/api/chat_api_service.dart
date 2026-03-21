@@ -784,7 +784,10 @@ class ChatApiService {
           'generationConfig': {'temperature': 0.3},
         };
 
-        // Inject Gemini built-in tools (now supported for both official API and Vertex)
+        // Inject Gemini built-in tools (now supported for both official API and Vertex).
+        // generateText is a single-shot utility (title generation, etc.) — no
+        // multi-round tool calling or MCP interaction, so version-aware mutual
+        // exclusion (Gemini 3 vs 2.x) is not required here.
         final builtIns = _builtInTools(config, modelId);
         if (builtIns.isNotEmpty) {
           final toolsArr = <Map<String, dynamic>>[];

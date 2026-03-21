@@ -763,7 +763,7 @@
   "modelDetailSheetCustomBodyTitle": "自訂 Body",
   "modelDetailSheetAddBody": "新增 Body",
   "modelDetailSheetBuiltinToolsDescription": "內建工具僅支援官方 API。",
-"modelDetailSheetBuiltinToolsUnsupportedHint": "目前供應商不支援這些內建工具。",
+  "modelDetailSheetBuiltinToolsUnsupportedHint": "目前供應商不支援這些內建工具。",
   "modelDetailSheetSearchTool": "搜尋",
   "modelDetailSheetSearchToolDescription": "啟用 Google 搜尋整合",
   "modelDetailSheetUrlContextTool": "URL 上下文",

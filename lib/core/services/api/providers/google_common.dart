@@ -387,7 +387,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         ];
         continue;
       }
-      // Emit server-side code execution parts as tool cards
+      // Emit server-side code execution parts as tool cards.
+      // Assumes executableCode and codeExecutionResult alternate in 1:1 pairs
+      // (matching current Gemini API behavior).
       int codeExecIdx = 0;
       for (final p in parts) {
         if (p is! Map) continue;
@@ -1055,7 +1057,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     } catch (_) {}
                   }
                 }
-                // Emit server-side code execution parts as tool cards
+                // Emit server-side code execution parts as tool cards.
+                // Assumes executableCode and codeExecutionResult alternate in
+                // 1:1 pairs (matching current Gemini API behavior).
                 final codeExec =
                     p['executableCode'] ?? p['executable_code'];
                 if (codeExec is Map) {
@@ -1109,6 +1113,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                 // Uses deny-list: preserves any part not already handled by client
                 // (text, functionCall, inlineData, fileData, thought, code execution).
                 // Per the API contract, all parts must be returned to maintain context.
+                // TODO: update this deny-list when Gemini API introduces new
+                // client-handled part types to avoid incorrectly capturing them.
                 if (isGemini3 &&
                     !p.containsKey('text') &&
                     !p.containsKey('functionCall') &&

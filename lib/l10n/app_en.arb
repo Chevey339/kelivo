@@ -1088,7 +1088,7 @@
   "modelDetailSheetSaveFailedMessage": "Save failed. Please try again.",
   "modelDetailSheetAddBody": "Add Body",
   "modelDetailSheetBuiltinToolsDescription": "Built-in tools only support official APIs.",
-"modelDetailSheetBuiltinToolsUnsupportedHint": "Current provider does not support these built-in tools.",
+  "modelDetailSheetBuiltinToolsUnsupportedHint": "Current provider does not support these built-in tools.",
   "modelDetailSheetSearchTool": "Search",
   "modelDetailSheetSearchToolDescription": "Enable Google Search integration",
   "modelDetailSheetUrlContextTool": "URL Context",
