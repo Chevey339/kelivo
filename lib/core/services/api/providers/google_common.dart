@@ -1,38 +1,16 @@
 part of '../chat_api_service.dart';
 
-/// Renders an `executableCode` part as a markdown code block.
-String _renderExecutableCode(Map part) {
-  final ec = part['executableCode'] ?? part['executable_code'];
-  if (ec is! Map) return '';
-  final lang = (ec['language'] ?? '').toString().toLowerCase();
-  final code = (ec['code'] ?? '').toString();
-  if (code.isEmpty) return '';
-  return '\n```$lang\n$code\n```\n';
-}
-
-/// Renders a `codeExecutionResult` part as a markdown output block.
-String _renderCodeExecutionResult(Map part) {
-  final cr = part['codeExecutionResult'] ?? part['code_execution_result'];
-  if (cr is! Map) return '';
-  final outcome = (cr['outcome'] ?? '').toString();
-  final output = (cr['output'] ?? '').toString();
-  final failed = outcome.contains('FAILED') || outcome.contains('ERROR');
-  final label = failed ? 'Error' : 'Output';
-  if (output.isEmpty && !failed) return '';
-  return '\n**$label:**\n```\n$output\n```\n';
-}
-
 /// Builds the Gemini tools array, handling Gemini 3 coexistence vs 2.x mutual exclusion.
 ///
 /// Gemini 3: built-in tools can coexist with function_declarations (MCP).
 /// Gemini 2.x and below: code_execution is exclusive; search/url_context exclude MCP.
 List<Map<String, dynamic>> _buildGeminiToolsArray({
   required Set<String> builtIns,
-  required bool isGemini3,
+  required bool allowCoexistence,
   List<Map<String, dynamic>>? geminiTools,
 }) {
   final toolsArr = <Map<String, dynamic>>[];
-  if (isGemini3) {
+  if (allowCoexistence) {
     if (builtIns.contains(BuiltInToolNames.codeExecution)) {
       toolsArr.add({'code_execution': {}});
     }
@@ -282,12 +260,12 @@ Stream<ChatStreamChunk> _sendGoogleStream(
 
     final toolsArr = _buildGeminiToolsArray(
       builtIns: builtIns,
-      isGemini3: isGemini3,
+      allowCoexistence: isGemini3 || isVertex,
       geminiTools: geminiTools,
     );
     final geminiToolConfig = buildGeminiToolConfig(
       tools: toolsArr,
-      isGemini3: isGemini3,
+      isGemini3: isGemini3 && !isVertex,
     );
 
     Map<String, dynamic> baseBody = {
@@ -409,19 +387,58 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         ];
         continue;
       }
+      // Emit server-side code execution parts as tool cards
+      int codeExecIdx = 0;
+      for (final p in parts) {
+        if (p is! Map) continue;
+        final ec = p['executableCode'] ?? p['executable_code'];
+        if (ec is Map) {
+          final lang = (ec['language'] ?? '').toString().toLowerCase();
+          final code = (ec['code'] ?? '').toString();
+          if (code.isNotEmpty) {
+            final ceId = 'code_exec_$codeExecIdx';
+            codeExecIdx++;
+            yield ChatStreamChunk(
+              content: '',
+              isDone: false,
+              totalTokens: totalUsage?.totalTokens ?? 0,
+              usage: totalUsage,
+              toolCalls: [
+                ToolCallInfo(
+                  id: ceId,
+                  name: 'code_execution',
+                  arguments: {'language': lang, 'code': code},
+                ),
+              ],
+            );
+          }
+        }
+        final cr = p['codeExecutionResult'] ?? p['code_execution_result'];
+        if (cr is Map) {
+          final outcome = (cr['outcome'] ?? '').toString();
+          final output = (cr['output'] ?? '').toString();
+          final resultId =
+              codeExecIdx > 0 ? 'code_exec_${codeExecIdx - 1}' : 'code_exec_0';
+          yield ChatStreamChunk(
+            content: '',
+            isDone: false,
+            totalTokens: totalUsage?.totalTokens ?? 0,
+            usage: totalUsage,
+            toolResults: [
+              ToolResultInfo(
+                id: resultId,
+                name: 'code_execution',
+                arguments: const <String, dynamic>{},
+                content: output.isEmpty ? outcome : output,
+              ),
+            ],
+          );
+        }
+      }
       final buf = StringBuffer();
       for (final p in parts) {
         if (p is! Map) continue;
         if (p['text'] is String) buf.write(p['text']);
-        // Render server-side code execution parts as markdown
-        if (p.containsKey('executableCode') ||
-            p.containsKey('executable_code')) {
-          buf.write(_renderExecutableCode(p));
-        }
-        if (p.containsKey('codeExecutionResult') ||
-            p.containsKey('code_execution_result')) {
-          buf.write(_renderCodeExecutionResult(p));
-        }
       }
       var contentStr = buf.toString();
       if (persistGeminiThoughtSigs) {
@@ -627,12 +644,12 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   }
   final toolsArr = _buildGeminiToolsArray(
     builtIns: builtIns,
-    isGemini3: isGemini3,
+    allowCoexistence: isGemini3 || isVertex,
     geminiTools: geminiTools,
   );
   final geminiToolConfig = buildGeminiToolConfig(
     tools: toolsArr,
-    isGemini3: isGemini3,
+    isGemini3: isGemini3 && !isVertex,
   );
 
   // Maintain a rolling conversation for multi-round tool calls
@@ -811,6 +828,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     final List<Map<String, dynamic>> roundServerParts = <Map<String, dynamic>>[];
     // Accumulate text for model turn in convo (needed for Gemini 3 full-parts rebuild)
     final StringBuffer roundAccumulatedText = StringBuffer();
+    // Counter for server-side code execution tool cards
+    int codeExecCounter = 0;
 
     // Track thought signature across chunks (Gemini 3 requirement)
     String? persistentThoughtSigKey;
@@ -1036,19 +1055,55 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     } catch (_) {}
                   }
                 }
-                // Render server-side code execution parts as markdown for UI.
-                // Only added to textDelta (display), NOT to roundAccumulatedText,
-                // because the original parts are preserved in roundServerParts
-                // for convo history — adding rendered text would duplicate them.
-                if (p.containsKey('executableCode') ||
-                    p.containsKey('executable_code')) {
-                  final rendered = _renderExecutableCode(p);
-                  if (rendered.isNotEmpty) textDelta += rendered;
+                // Emit server-side code execution parts as tool cards
+                final codeExec =
+                    p['executableCode'] ?? p['executable_code'];
+                if (codeExec is Map) {
+                  final lang =
+                      (codeExec['language'] ?? '').toString().toLowerCase();
+                  final code = (codeExec['code'] ?? '').toString();
+                  if (code.isNotEmpty) {
+                    final ceId = 'code_exec_$codeExecCounter';
+                    codeExecCounter++;
+                    yield ChatStreamChunk(
+                      content: '',
+                      isDone: false,
+                      totalTokens: totalTokens,
+                      usage: usage,
+                      toolCalls: [
+                        ToolCallInfo(
+                          id: ceId,
+                          name: 'code_execution',
+                          arguments: {'language': lang, 'code': code},
+                        ),
+                      ],
+                    );
+                  }
                 }
-                if (p.containsKey('codeExecutionResult') ||
-                    p.containsKey('code_execution_result')) {
-                  final rendered = _renderCodeExecutionResult(p);
-                  if (rendered.isNotEmpty) textDelta += rendered;
+                final codeResult =
+                    p['codeExecutionResult'] ?? p['code_execution_result'];
+                if (codeResult is Map) {
+                  final outcome =
+                      (codeResult['outcome'] ?? '').toString();
+                  final output =
+                      (codeResult['output'] ?? '').toString();
+                  final resultId = codeExecCounter > 0
+                      ? 'code_exec_${codeExecCounter - 1}'
+                      : 'code_exec_0';
+                  yield ChatStreamChunk(
+                    content: '',
+                    isDone: false,
+                    totalTokens: totalTokens,
+                    usage: usage,
+                    toolResults: [
+                      ToolResultInfo(
+                        id: resultId,
+                        name: 'code_execution',
+                        arguments: const <String, dynamic>{},
+                        content: output.isEmpty ? outcome : output,
+                      ),
+                    ],
+                  );
                 }
                 // Capture server-side tool parts for convo rebuild (Gemini 3).
                 // Uses deny-list: preserves any part not already handled by client
