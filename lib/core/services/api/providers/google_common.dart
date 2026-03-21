@@ -260,7 +260,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
 
     final toolsArr = _buildGeminiToolsArray(
       builtIns: builtIns,
-      allowCoexistence: isGemini3 || isVertex,
+      allowCoexistence: isGemini3,
       geminiTools: geminiTools,
     );
     final geminiToolConfig = buildGeminiToolConfig(
@@ -644,7 +644,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   }
   final toolsArr = _buildGeminiToolsArray(
     builtIns: builtIns,
-    allowCoexistence: isGemini3 || isVertex,
+    allowCoexistence: isGemini3,
     geminiTools: geminiTools,
   );
   final geminiToolConfig = buildGeminiToolConfig(
