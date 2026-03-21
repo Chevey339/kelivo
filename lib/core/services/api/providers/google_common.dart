@@ -33,22 +33,29 @@ List<Map<String, dynamic>> _buildGeminiToolsArray({
 }) {
   final toolsArr = <Map<String, dynamic>>[];
   if (isGemini3) {
-    if (builtIns.contains(BuiltInToolNames.codeExecution))
+    if (builtIns.contains(BuiltInToolNames.codeExecution)) {
       toolsArr.add({'code_execution': {}});
-    if (builtIns.contains(BuiltInToolNames.search))
+    }
+    if (builtIns.contains(BuiltInToolNames.search)) {
       toolsArr.add({'google_search': {}});
-    if (builtIns.contains(BuiltInToolNames.urlContext))
+    }
+    if (builtIns.contains(BuiltInToolNames.urlContext)) {
       toolsArr.add({'url_context': {}});
-    if (geminiTools != null) toolsArr.addAll(geminiTools);
+    }
+    if (geminiTools != null) {
+      toolsArr.addAll(geminiTools);
+    }
   } else {
     if (builtIns.contains(BuiltInToolNames.codeExecution)) {
       toolsArr.add({'code_execution': {}});
     } else if (builtIns.contains(BuiltInToolNames.search) ||
         builtIns.contains(BuiltInToolNames.urlContext)) {
-      if (builtIns.contains(BuiltInToolNames.search))
+      if (builtIns.contains(BuiltInToolNames.search)) {
         toolsArr.add({'google_search': {}});
-      if (builtIns.contains(BuiltInToolNames.urlContext))
+      }
+      if (builtIns.contains(BuiltInToolNames.urlContext)) {
         toolsArr.add({'url_context': {}});
+      }
     } else if (geminiTools != null) {
       toolsArr.addAll(geminiTools);
     }
@@ -1055,8 +1062,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     !p.containsKey('fileData') &&
                     !p.containsKey('file_data') &&
                     p['thought'] != true) {
-                  roundServerParts
-                      .add(Map<String, dynamic>.from(p as Map));
+                  roundServerParts.add(Map<String, dynamic>.from(p));
                 }
                 final fc = p['functionCall'];
                 if (fc is Map) {
@@ -1300,7 +1306,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         final textPart = <String, dynamic>{'text': accText};
         if (responseTextThoughtSigKey != null &&
             responseTextThoughtSigVal != null) {
-          textPart[responseTextThoughtSigKey!] = responseTextThoughtSigVal;
+          textPart[responseTextThoughtSigKey] = responseTextThoughtSigVal;
         }
         modelParts.add(textPart);
       }
