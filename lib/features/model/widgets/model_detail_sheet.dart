@@ -704,16 +704,6 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       ),
       if (_providerKind == ProviderKind.google) ...[
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-          child: Text(
-            l10n.modelDetailSheetGeminiCodeExecutionMutuallyExclusiveHint,
-            style: TextStyle(
-              color: cs.onSurface.withValues(alpha: 0.65),
-              fontSize: 12,
-            ),
-          ),
-        ),
-        Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
           child: _ToolTile(
             title: l10n.modelDetailSheetUrlContextTool,
@@ -721,10 +711,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
             value: _googleUrlContextTool,
             onChanged: disableTools
                 ? null
-                : (v) => setState(() {
-                    _googleUrlContextTool = v;
-                    if (v) _googleCodeExecutionTool = false;
-                  }),
+                : (v) => setState(() => _googleUrlContextTool = v),
           ),
         ),
         Padding(
@@ -735,10 +722,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
             value: _googleCodeExecutionTool,
             onChanged: disableTools
                 ? null
-                : (v) => setState(() {
-                    _googleCodeExecutionTool = v;
-                    if (v) _googleUrlContextTool = false;
-                  }),
+                : (v) => setState(() => _googleCodeExecutionTool = v),
           ),
         ),
         Padding(

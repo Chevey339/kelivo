@@ -2352,10 +2352,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetBuiltinToolsDescription => '内置工具仅支持官方 API。';
 
   @override
-  String get modelDetailSheetGeminiCodeExecutionMutuallyExclusiveHint =>
-      '代码执行无法与搜索/URL 上下文/MCP 工具共存。';
-
-  @override
   String get modelDetailSheetBuiltinToolsUnsupportedHint => '当前供应商不支持这些内置工具。';
 
   @override
@@ -6523,10 +6519,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetBuiltinToolsDescription => '内置工具仅支持官方 API。';
-
-  @override
-  String get modelDetailSheetGeminiCodeExecutionMutuallyExclusiveHint =>
-      '代码执行无法与搜索/URL 上下文/MCP 工具共存。';
 
   @override
   String get modelDetailSheetBuiltinToolsUnsupportedHint => '当前供应商不支持这些内置工具。';
@@ -10705,10 +10697,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetBuiltinToolsDescription => '內建工具僅支援官方 API。';
-
-  @override
-  String get modelDetailSheetGeminiCodeExecutionMutuallyExclusiveHint =>
-      '程式碼執行無法與搜尋/URL 上下文/MCP 工具共存。';
 
   @override
   String get modelDetailSheetBuiltinToolsUnsupportedHint => '目前供應商不支援這些內建工具。';

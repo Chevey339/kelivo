@@ -717,16 +717,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                 fontSize: 13,
               ),
             ),
-            if (_providerKind == ProviderKind.google) ...[
-              const SizedBox(height: 6),
-              Text(
-                l10n.modelDetailSheetGeminiCodeExecutionMutuallyExclusiveHint,
-                style: TextStyle(
-                  color: cs.onSurface.withValues(alpha: 0.65),
-                  fontSize: 12,
-                ),
-              ),
-            ] else if (_providerKind == ProviderKind.openai &&
+            if (_providerKind == ProviderKind.openai &&
                 cfg.useResponseApi != true) ...[
               const SizedBox(height: 6),
               Text(
@@ -757,10 +748,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
           value: _googleUrlContextTool,
           onChanged: disableTools
               ? null
-              : (v) => setState(() {
-                  _googleUrlContextTool = v;
-                  if (v) _googleCodeExecutionTool = false;
-                }),
+              : (v) => setState(() => _googleUrlContextTool = v),
         ),
         const SizedBox(height: 8),
         _ToolTile(
@@ -769,10 +757,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
           value: _googleCodeExecutionTool,
           onChanged: disableTools
               ? null
-              : (v) => setState(() {
-                  _googleCodeExecutionTool = v;
-                  if (v) _googleUrlContextTool = false;
-                }),
+              : (v) => setState(() => _googleCodeExecutionTool = v),
         ),
         const SizedBox(height: 8),
         _ToolTile(

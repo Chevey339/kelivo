@@ -4568,12 +4568,6 @@ abstract class AppLocalizations {
   /// **'Built-in tools only support official APIs.'**
   String get modelDetailSheetBuiltinToolsDescription;
 
-  /// No description provided for @modelDetailSheetGeminiCodeExecutionMutuallyExclusiveHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Code execution cannot coexist with Search/URL Context/MCP tools.'**
-  String get modelDetailSheetGeminiCodeExecutionMutuallyExclusiveHint;
-
   /// No description provided for @modelDetailSheetBuiltinToolsUnsupportedHint.
   ///
   /// In en, this message translates to:

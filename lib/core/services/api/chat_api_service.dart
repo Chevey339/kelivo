@@ -784,21 +784,17 @@ class ChatApiService {
           'generationConfig': {'temperature': 0.3},
         };
 
-        // Inject Gemini built-in tools (now supported for both official API and Vertex)
-        // code_execution is exclusive - cannot be used with other built-in tools
+        // Inject Gemini built-in tools with version-aware mutual exclusion.
+        // Gemini 2.x: code_execution is exclusive (cannot coexist with others).
+        // Gemini 3: all built-in tools can coexist.
         final builtIns = _builtInTools(config, modelId);
         if (builtIns.isNotEmpty) {
-          final toolsArr = <Map<String, dynamic>>[];
-          if (builtIns.contains(BuiltInToolNames.codeExecution)) {
-            toolsArr.add({'code_execution': {}});
-          } else {
-            if (builtIns.contains(BuiltInToolNames.search)) {
-              toolsArr.add({'google_search': {}});
-            }
-            if (builtIns.contains(BuiltInToolNames.urlContext)) {
-              toolsArr.add({'url_context': {}});
-            }
-          }
+          final bool isGemini3 =
+              upstreamModelId.toLowerCase().contains('gemini-3');
+          final toolsArr = _buildGeminiToolsArray(
+            builtIns: builtIns,
+            allowCoexistence: isGemini3,
+          );
           if (toolsArr.isNotEmpty) {
             body['tools'] = toolsArr;
           }

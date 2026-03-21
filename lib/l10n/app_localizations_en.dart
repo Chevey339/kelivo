@@ -2434,10 +2434,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Built-in tools only support official APIs.';
 
   @override
-  String get modelDetailSheetGeminiCodeExecutionMutuallyExclusiveHint =>
-      'Code execution cannot coexist with Search/URL Context/MCP tools.';
-
-  @override
   String get modelDetailSheetBuiltinToolsUnsupportedHint =>
       'Current provider does not support these built-in tools.';
 
