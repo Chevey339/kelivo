@@ -1048,6 +1048,7 @@
   "displaySettingsPageShowUpdatesSubtitle": "显示应用更新通知",
   "displaySettingsPageMessageNavButtonsTitle": "消息导航按钮",
   "displaySettingsPageMessageNavButtonsSubtitle": "滚动时显示快速跳转按钮",
+  "displaySettingsPageUseNewAssistantAvatarUxTitle": "聊天标题栏显示助手头像",
   "displaySettingsPageHapticsOnSidebarTitle": "侧边栏触觉反馈",
   "displaySettingsPageHapticsOnSidebarSubtitle": "打开/关闭侧边栏时启用触觉反馈",
   "displaySettingsPageHapticsGlobalTitle": "全局触觉反馈",

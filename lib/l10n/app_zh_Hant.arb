@@ -1032,6 +1032,7 @@
   "displaySettingsPageShowUpdatesSubtitle": "顯示應用程式更新通知",
   "displaySettingsPageMessageNavButtonsTitle": "訊息導航按鈕",
   "displaySettingsPageMessageNavButtonsSubtitle": "滾動時顯示快速跳轉按鈕",
+  "displaySettingsPageUseNewAssistantAvatarUxTitle": "聊天標題欄顯示助手頭像",
   "displaySettingsPageHapticsOnSidebarTitle": "側邊欄觸覺回饋",
   "displaySettingsPageHapticsOnSidebarSubtitle": "開啟/關閉側邊欄時啟用觸覺回饋",
   "displaySettingsPageHapticsGlobalTitle": "全域觸覺回饋",

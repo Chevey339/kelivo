@@ -74,6 +74,7 @@ class _HomePageState extends State<HomePage>
   final TextEditingController _inputController = TextEditingController();
   final ChatInputBarController _mediaController = ChatInputBarController();
   final ScrollController _scrollController = ScrollController();
+  final BackdropKey _messageListBackdropKey = BackdropKey();
   final GlobalKey _inputBarKey = GlobalKey();
   final GlobalKey _selectionMiniMapKey = GlobalKey();
   final GlobalKey _selectionExportBarKey = GlobalKey();
@@ -725,49 +726,52 @@ class _HomePageState extends State<HomePage>
     BuildContext context, {
     required EdgeInsetsGeometry dividerPadding,
   }) {
-    return MessageListView(
-      isProcessingFiles: _controller.isProcessingFiles,
-      scrollController: _scrollController,
-      messages: _controller.messages,
-      versionSelections: _controller.versionSelections,
-      currentConversation: _controller.currentConversation,
-      messageKeys: _controller.messageKeys,
-      reasoning: _controller.reasoning,
-      reasoningSegments: _controller.reasoningSegments,
-      toolParts: _controller.toolParts,
-      translations: _buildTranslationUiStates(),
-      selecting: _controller.selecting,
-      selectedItems: _controller.selectedItems,
-      dividerPadding: dividerPadding,
-      streamingContentNotifier: _controller.streamingContentNotifier,
-      spotlightMessageId: _controller.spotlightMessageId,
-      spotlightToken: _controller.spotlightToken,
-      onVersionChange: (groupId, version) async {
-        await _controller.setSelectedVersion(groupId, version);
-      },
-      onRegenerateMessage: (message) =>
-          _controller.regenerateAtMessage(message),
-      onResendMessage: (message) => _controller.regenerateAtMessage(message),
-      onTranslateMessage: (message) => _controller.translateMessage(message),
-      onEditMessage: (message) => _controller.editMessage(message),
-      onDeleteMessage: (message, byGroup) =>
-          _handleDeleteMessage(context, message, byGroup),
-      onForkConversation: (message) => _controller.forkConversation(message),
-      onShareMessage: (index, messages) =>
-          _controller.shareMessage(index, messages),
-      onSpeakMessage: (message) => _controller.speakMessage(message),
-      onToggleSelection: (messageId, selected) {
-        _controller.toggleSelection(messageId, selected);
-      },
-      onToggleReasoning: (messageId) {
-        _controller.toggleReasoning(messageId);
-      },
-      onToggleTranslation: (messageId) {
-        _controller.toggleTranslation(messageId);
-      },
-      onToggleReasoningSegment: (messageId, segmentIndex) {
-        _controller.toggleReasoningSegment(messageId, segmentIndex);
-      },
+    return BackdropGroup(
+      backdropKey: _messageListBackdropKey,
+      child: MessageListView(
+        isProcessingFiles: _controller.isProcessingFiles,
+        scrollController: _scrollController,
+        messages: _controller.messages,
+        versionSelections: _controller.versionSelections,
+        currentConversation: _controller.currentConversation,
+        messageKeys: _controller.messageKeys,
+        reasoning: _controller.reasoning,
+        reasoningSegments: _controller.reasoningSegments,
+        toolParts: _controller.toolParts,
+        translations: _buildTranslationUiStates(),
+        selecting: _controller.selecting,
+        selectedItems: _controller.selectedItems,
+        dividerPadding: dividerPadding,
+        streamingContentNotifier: _controller.streamingContentNotifier,
+        spotlightMessageId: _controller.spotlightMessageId,
+        spotlightToken: _controller.spotlightToken,
+        onVersionChange: (groupId, version) async {
+          await _controller.setSelectedVersion(groupId, version);
+        },
+        onRegenerateMessage: (message) =>
+            _controller.regenerateAtMessage(message),
+        onResendMessage: (message) => _controller.regenerateAtMessage(message),
+        onTranslateMessage: (message) => _controller.translateMessage(message),
+        onEditMessage: (message) => _controller.editMessage(message),
+        onDeleteMessage: (message, byGroup) =>
+            _handleDeleteMessage(context, message, byGroup),
+        onForkConversation: (message) => _controller.forkConversation(message),
+        onShareMessage: (index, messages) =>
+            _controller.shareMessage(index, messages),
+        onSpeakMessage: (message) => _controller.speakMessage(message),
+        onToggleSelection: (messageId, selected) {
+          _controller.toggleSelection(messageId, selected);
+        },
+        onToggleReasoning: (messageId) {
+          _controller.toggleReasoning(messageId);
+        },
+        onToggleTranslation: (messageId) {
+          _controller.toggleTranslation(messageId);
+        },
+        onToggleReasoningSegment: (messageId, segmentIndex) {
+          _controller.toggleReasoningSegment(messageId, segmentIndex);
+        },
+      ),
     );
   }
 

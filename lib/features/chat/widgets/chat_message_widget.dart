@@ -1189,7 +1189,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       case ChatMessageBackgroundStyle.frosted:
         return ClipRRect(
           borderRadius: radius,
-          child: BackdropFilter(
+          child: BackdropFilter.grouped(
             filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
             child: DecoratedBox(
               decoration: BoxDecoration(

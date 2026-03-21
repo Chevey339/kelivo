@@ -1447,6 +1447,16 @@ class ChatItemDisplaySettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.Bot,
+                label: l10n.displaySettingsPageUseNewAssistantAvatarUxTitle,
+                value: sp.useNewAssistantAvatarUx,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setUseNewAssistantAvatarUx(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.MessageSquare,
                 label: l10n.displaySettingsPageShowModelNameTimestampTitle,
                 value: sp.showModelNameTimestamp,

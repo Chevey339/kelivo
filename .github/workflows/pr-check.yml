@@ -1,0 +1,87 @@
+name: PR Checks
+
+env:
+  FLUTTER_VERSION: '3.38.5'
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  checks:
+    name: Analyze / Test / L10n / Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Dart format (changed files only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- | grep -E '^(lib|test)/.*\\.dart$' || true)"
+          if [ -z "$files" ]; then
+            echo "No changed Dart files to format-check."
+            exit 0
+          fi
+
+          echo "Format-checking files:"
+          echo "$files"
+          dart format --output=none --set-exit-if-changed $files
+
+      - name: Generate l10n and ensure committed outputs
+        run: |
+          flutter gen-l10n
+          git diff --exit-code -- lib/l10n
+
+      - name: No new untranslated messages (PR)
+        if: ${{ github.event_name == 'pull_request' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA='${{ github.event.pull_request.base.sha }}'
+          BASE_DIR="$(mktemp -d)"
+          cleanup() {
+            git worktree remove --force "$BASE_DIR" >/dev/null 2>&1 || true
+            rm -rf "$BASE_DIR" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          git worktree add --detach "$BASE_DIR" "$BASE_SHA"
+          pushd "$BASE_DIR" >/dev/null
+          flutter pub get
+          flutter gen-l10n
+          popd >/dev/null
+
+          python3 .github/scripts/check_no_new_untranslated.py \
+            "$BASE_DIR/desiredFileName.txt" \
+            "desiredFileName.txt"
+
+      - name: dart analyze (root package only)
+        run: dart analyze --fatal-infos lib test
+
+      - name: flutter test
+        run: flutter test

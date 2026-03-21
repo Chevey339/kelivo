@@ -66,6 +66,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowShowModelIcon(),
                   _RowDivider(),
+                  _ToggleRowUseNewAssistantAvatarUx(),
+                  _RowDivider(),
                   _ToggleRowShowModelNameTs(),
                   _RowDivider(),
                   _ToggleRowShowTokenStats(),
@@ -2287,6 +2289,21 @@ class _ToggleRowMsgNavButtons extends StatelessWidget {
       value: sp.showMessageNavButtons,
       onChanged: (v) =>
           context.read<SettingsProvider>().setShowMessageNavButtons(v),
+    );
+  }
+}
+
+class _ToggleRowUseNewAssistantAvatarUx extends StatelessWidget {
+  const _ToggleRowUseNewAssistantAvatarUx();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageUseNewAssistantAvatarUxTitle,
+      value: sp.useNewAssistantAvatarUx,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setUseNewAssistantAvatarUx(v),
     );
   }
 }

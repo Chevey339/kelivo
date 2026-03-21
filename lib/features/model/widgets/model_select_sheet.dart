@@ -959,7 +959,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                             ),
                             children: [
                               TextSpan(
-                                text: ' | $m.providerName',
+                                text: ' | ${m.providerName}',
                                 style: TextStyle(
                                   color: cs.onSurface.withValues(alpha: 0.6),
                                   fontSize: 12,
@@ -1792,7 +1792,7 @@ class _DesktopModelSelectDialogBodyState
                   children: [
                     if (showProviderLabel)
                       TextSpan(
-                        text: ' | $m.providerName',
+                        text: ' | ${m.providerName}',
                         style: TextStyle(
                           fontSize: 11.5,
                           color: cs.onSurface.withValues(alpha: 0.6),
