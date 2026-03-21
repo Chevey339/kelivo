@@ -1,5 +1,61 @@
 part of '../chat_api_service.dart';
 
+/// Renders an `executableCode` part as a markdown code block.
+String _renderExecutableCode(Map part) {
+  final ec = part['executableCode'] ?? part['executable_code'];
+  if (ec is! Map) return '';
+  final lang = (ec['language'] ?? '').toString().toLowerCase();
+  final code = (ec['code'] ?? '').toString();
+  if (code.isEmpty) return '';
+  return '\n```$lang\n$code\n```\n';
+}
+
+/// Renders a `codeExecutionResult` part as a markdown output block.
+String _renderCodeExecutionResult(Map part) {
+  final cr = part['codeExecutionResult'] ?? part['code_execution_result'];
+  if (cr is! Map) return '';
+  final outcome = (cr['outcome'] ?? '').toString();
+  final output = (cr['output'] ?? '').toString();
+  final failed = outcome.contains('FAILED') || outcome.contains('ERROR');
+  final label = failed ? 'Error' : 'Output';
+  if (output.isEmpty && !failed) return '';
+  return '\n**$label:**\n```\n$output\n```\n';
+}
+
+/// Builds the Gemini tools array, handling Gemini 3 coexistence vs 2.x mutual exclusion.
+///
+/// Gemini 3: built-in tools can coexist with function_declarations (MCP).
+/// Gemini 2.x and below: code_execution is exclusive; search/url_context exclude MCP.
+List<Map<String, dynamic>> _buildGeminiToolsArray({
+  required Set<String> builtIns,
+  required bool isGemini3,
+  List<Map<String, dynamic>>? geminiTools,
+}) {
+  final toolsArr = <Map<String, dynamic>>[];
+  if (isGemini3) {
+    if (builtIns.contains(BuiltInToolNames.codeExecution))
+      toolsArr.add({'code_execution': {}});
+    if (builtIns.contains(BuiltInToolNames.search))
+      toolsArr.add({'google_search': {}});
+    if (builtIns.contains(BuiltInToolNames.urlContext))
+      toolsArr.add({'url_context': {}});
+    if (geminiTools != null) toolsArr.addAll(geminiTools);
+  } else {
+    if (builtIns.contains(BuiltInToolNames.codeExecution)) {
+      toolsArr.add({'code_execution': {}});
+    } else if (builtIns.contains(BuiltInToolNames.search) ||
+        builtIns.contains(BuiltInToolNames.urlContext)) {
+      if (builtIns.contains(BuiltInToolNames.search))
+        toolsArr.add({'google_search': {}});
+      if (builtIns.contains(BuiltInToolNames.urlContext))
+        toolsArr.add({'url_context': {}});
+    } else if (geminiTools != null) {
+      toolsArr.addAll(geminiTools);
+    }
+  }
+  return toolsArr;
+}
+
 Stream<ChatStreamChunk> _sendGoogleStream(
   http.Client client,
   ProviderConfig config,
@@ -40,9 +96,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   }
 
   final upstreamModelId = _apiModelId(config, modelId);
-  final bool persistGeminiThoughtSigs = upstreamModelId.toLowerCase().contains(
-    'gemini-3',
-  );
+  final bool isGemini3 = upstreamModelId.toLowerCase().contains('gemini-3');
+  final bool persistGeminiThoughtSigs = isGemini3;
   final builtIns = _builtInTools(config, modelId);
   final enableYoutube = builtIns.contains(BuiltInToolNames.youtube);
   // Non-streaming path: use generateContent
@@ -218,19 +273,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
     }
 
-    // Built-in tools can coexist with function_declarations (MCP) in Gemini API
-    final toolsArr = <Map<String, dynamic>>[];
-    if (builtIns.contains(BuiltInToolNames.codeExecution))
-      toolsArr.add({'code_execution': {}});
-    if (builtIns.contains(BuiltInToolNames.search))
-      toolsArr.add({'google_search': {}});
-    if (builtIns.contains(BuiltInToolNames.urlContext))
-      toolsArr.add({'url_context': {}});
-    if (geminiTools != null) {
-      toolsArr.addAll(geminiTools);
-    }
-    final shouldAttachToolConfig = shouldAttachGeminiFunctionCallingConfig(
-      toolsArr,
+    final toolsArr = _buildGeminiToolsArray(
+      builtIns: builtIns,
+      isGemini3: isGemini3,
+      geminiTools: geminiTools,
+    );
+    final geminiToolConfig = buildGeminiToolConfig(
+      tools: toolsArr,
+      isGemini3: isGemini3,
     );
 
     Map<String, dynamic> baseBody = {
@@ -245,10 +295,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       if (topP != null) 'topP': topP,
       if (maxTokens != null) 'generationConfig': {'maxOutputTokens': maxTokens},
       if (toolsArr.isNotEmpty) 'tools': toolsArr,
-      if (shouldAttachToolConfig)
-        'toolConfig': {
-          'function_calling_config': {'mode': 'AUTO'},
-        },
+      if (geminiToolConfig != null) 'toolConfig': geminiToolConfig,
     };
     final extraG = _customBody(config, modelId);
     if (extraG.isNotEmpty) baseBody.addAll(extraG);
@@ -300,58 +347,74 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
       final cand = (candidates.first as Map).cast<String, dynamic>();
       final parts = (cand['content']?['parts'] as List?) ?? const <dynamic>[];
-      final fc = parts.firstWhere(
-        (e) => (e is Map) && e.containsKey('functionCall'),
-        orElse: () => null,
-      );
-      if (fc is Map && fc['functionCall'] is Map && onToolCall != null) {
-        final call = (fc['functionCall'] as Map).cast<String, dynamic>();
-        final name = (call['name'] ?? '').toString();
-        final args =
-            (call['args'] as Map?)?.cast<String, dynamic>() ??
-            const <String, dynamic>{};
-        yield ChatStreamChunk(
-          content: '',
-          isDone: false,
-          totalTokens: totalUsage?.totalTokens ?? 0,
-          usage: totalUsage,
-          toolCalls: [ToolCallInfo(id: 'fn_0', name: name, arguments: args)],
-        );
-        final res = await onToolCall(name, args);
-        yield ChatStreamChunk(
-          content: '',
-          isDone: false,
-          totalTokens: totalUsage?.totalTokens ?? 0,
-          usage: totalUsage,
-          toolResults: [
-            ToolResultInfo(
-              id: 'fn_0',
-              name: name,
-              arguments: args,
-              content: res,
-            ),
-          ],
-        );
+      final functionCallParts =
+          parts.where((e) => e is Map && e.containsKey('functionCall')).toList();
+      if (functionCallParts.isNotEmpty && onToolCall != null) {
+        final responseParts = <Map<String, dynamic>>[];
+        for (int idx = 0; idx < functionCallParts.length; idx++) {
+          final fc = functionCallParts[idx] as Map;
+          final call = (fc['functionCall'] as Map).cast<String, dynamic>();
+          final name = (call['name'] ?? '').toString();
+          final args =
+              (call['args'] as Map?)?.cast<String, dynamic>() ??
+              const <String, dynamic>{};
+          // Prefer API-provided id (part-level), fall back to synthetic
+          final partId = fc['id']?.toString() ?? 'fn_$idx';
+          yield ChatStreamChunk(
+            content: '',
+            isDone: false,
+            totalTokens: totalUsage?.totalTokens ?? 0,
+            usage: totalUsage,
+            toolCalls: [
+              ToolCallInfo(id: partId, name: name, arguments: args),
+            ],
+          );
+          final res = await onToolCall(name, args);
+          yield ChatStreamChunk(
+            content: '',
+            isDone: false,
+            totalTokens: totalUsage?.totalTokens ?? 0,
+            usage: totalUsage,
+            toolResults: [
+              ToolResultInfo(
+                id: partId,
+                name: name,
+                arguments: args,
+                content: res,
+              ),
+            ],
+          );
+          final frPart = <String, dynamic>{
+            'functionResponse': {
+              'name': name,
+              'response': {'result': res},
+            },
+            if (fc.containsKey('id')) 'id': fc['id'],
+          };
+          responseParts.add(frPart);
+        }
         currentContents = [
           ...currentContents,
+          // Pass ALL parts from model response (preserves server-side tool parts,
+          // thought signatures, and other fields)
           {'role': 'model', 'parts': parts},
-          {
-            'role': 'user',
-            'parts': [
-              {
-                'functionResponse': {
-                  'name': name,
-                  'response': {'result': res},
-                },
-              },
-            ],
-          },
+          {'role': 'user', 'parts': responseParts},
         ];
         continue;
       }
       final buf = StringBuffer();
       for (final p in parts) {
-        if (p is Map && p['text'] is String) buf.write(p['text']);
+        if (p is! Map) continue;
+        if (p['text'] is String) buf.write(p['text']);
+        // Render server-side code execution parts as markdown
+        if (p.containsKey('executableCode') ||
+            p.containsKey('executable_code')) {
+          buf.write(_renderExecutableCode(p));
+        }
+        if (p.containsKey('codeExecutionResult') ||
+            p.containsKey('code_execution_result')) {
+          buf.write(_renderCodeExecutionResult(p));
+        }
       }
       var contentStr = buf.toString();
       if (persistGeminiThoughtSigs) {
@@ -555,19 +618,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       ];
     }
   }
-  // Built-in tools can coexist with function_declarations (MCP) in Gemini API
-  final toolsArr = <Map<String, dynamic>>[];
-  if (builtIns.contains(BuiltInToolNames.codeExecution))
-    toolsArr.add({'code_execution': {}});
-  if (builtIns.contains(BuiltInToolNames.search))
-    toolsArr.add({'google_search': {}});
-  if (builtIns.contains(BuiltInToolNames.urlContext))
-    toolsArr.add({'url_context': {}});
-  if (geminiTools != null) {
-    toolsArr.addAll(geminiTools);
-  }
-  final shouldAttachToolConfig = shouldAttachGeminiFunctionCallingConfig(
-    toolsArr,
+  final toolsArr = _buildGeminiToolsArray(
+    builtIns: builtIns,
+    isGemini3: isGemini3,
+    geminiTools: geminiTools,
+  );
+  final geminiToolConfig = buildGeminiToolConfig(
+    tools: toolsArr,
+    isGemini3: isGemini3,
   );
 
   // Maintain a rolling conversation for multi-round tool calls
@@ -694,10 +752,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         },
       if (gen.isNotEmpty) 'generationConfig': gen,
       if (toolsArr.isNotEmpty) 'tools': toolsArr,
-      if (shouldAttachToolConfig)
-        'toolConfig': {
-          'function_calling_config': {'mode': 'AUTO'},
-        },
+      if (geminiToolConfig != null) 'toolConfig': geminiToolConfig,
     };
 
     final request = http.Request('POST', uri);
@@ -745,6 +800,10 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     // Collect any function calls in this round
     final List<Map<String, dynamic>> calls =
         <Map<String, dynamic>>[]; // {id,name,args,res}
+    // Capture server-side tool parts (Gemini 3 tool combination)
+    final List<Map<String, dynamic>> roundServerParts = <Map<String, dynamic>>[];
+    // Accumulate text for model turn in convo (needed for Gemini 3 full-parts rebuild)
+    final StringBuffer roundAccumulatedText = StringBuffer();
 
     // Track thought signature across chunks (Gemini 3 requirement)
     String? persistentThoughtSigKey;
@@ -899,6 +958,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     pendingImageTrailingText += t;
                   } else {
                     textDelta += t;
+                    // Accumulate full text for convo rebuild (Gemini 3)
+                    if (isGemini3) roundAccumulatedText.write(t);
                   }
                 }
                 // Parse inline image data from Gemini (inlineData)
@@ -968,6 +1029,35 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     } catch (_) {}
                   }
                 }
+                // Render server-side code execution parts as markdown for UI.
+                // Only added to textDelta (display), NOT to roundAccumulatedText,
+                // because the original parts are preserved in roundServerParts
+                // for convo history — adding rendered text would duplicate them.
+                if (p.containsKey('executableCode') ||
+                    p.containsKey('executable_code')) {
+                  final rendered = _renderExecutableCode(p);
+                  if (rendered.isNotEmpty) textDelta += rendered;
+                }
+                if (p.containsKey('codeExecutionResult') ||
+                    p.containsKey('code_execution_result')) {
+                  final rendered = _renderCodeExecutionResult(p);
+                  if (rendered.isNotEmpty) textDelta += rendered;
+                }
+                // Capture server-side tool parts for convo rebuild (Gemini 3).
+                // Uses deny-list: preserves any part not already handled by client
+                // (text, functionCall, inlineData, fileData, thought, code execution).
+                // Per the API contract, all parts must be returned to maintain context.
+                if (isGemini3 &&
+                    !p.containsKey('text') &&
+                    !p.containsKey('functionCall') &&
+                    !p.containsKey('inlineData') &&
+                    !p.containsKey('inline_data') &&
+                    !p.containsKey('fileData') &&
+                    !p.containsKey('file_data') &&
+                    p['thought'] != true) {
+                  roundServerParts
+                      .add(Map<String, dynamic>.from(p as Map));
+                }
                 final fc = p['functionCall'];
                 if (fc is Map) {
                   final name = (fc['name'] ?? '').toString();
@@ -981,7 +1071,10 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                           .cast<String, dynamic>();
                     } catch (_) {}
                   }
-                  final id = 'call_${DateTime.now().microsecondsSinceEpoch}';
+                  // Prefer API-provided id (part-level), fall back to synthetic
+                  final apiId = p['id']?.toString();
+                  final id =
+                      apiId ?? 'call_${DateTime.now().microsecondsSinceEpoch}';
 
                   // Capture thought signature (Gemini 3 Pro requirement)
                   // Preserve exact key/value as received
@@ -1032,6 +1125,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                   }
                   calls.add({
                     'id': id,
+                    'apiId': apiId,
                     'name': name,
                     'args': args,
                     'result': resText,
@@ -1195,43 +1289,99 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     }
 
     // Append model functionCall(s) and user functionResponse(s) to conversation, then loop
-    for (final c in calls) {
-      final name = (c['name'] ?? '').toString();
-      final args =
-          (c['args'] as Map<String, dynamic>? ?? const <String, dynamic>{});
-      final resText = (c['result'] ?? '').toString();
-      final thoughtSigKey = c['thoughtSigKey'] as String?;
-      final thoughtSigVal = c['thoughtSigVal'];
+    if (isGemini3) {
+      // Gemini 3: build a single model turn with all parts (text, server-side
+      // tool parts, and functionCall parts) to preserve full context.
+      final modelParts = <Map<String, dynamic>>[];
 
-      // Add the model's functionCall turn
-      final part = <String, dynamic>{
-        'functionCall': {'name': name, 'args': args},
-      };
-      if (thoughtSigKey != null && thoughtSigVal != null) {
-        part[thoughtSigKey] = thoughtSigVal;
+      // 1. Accumulated text part (with thought signature if available)
+      final accText = roundAccumulatedText.toString();
+      if (accText.isNotEmpty) {
+        final textPart = <String, dynamic>{'text': accText};
+        if (responseTextThoughtSigKey != null &&
+            responseTextThoughtSigVal != null) {
+          textPart[responseTextThoughtSigKey!] = responseTextThoughtSigVal;
+        }
+        modelParts.add(textPart);
       }
 
-      convo.add({
-        'role': 'model',
-        'parts': [part],
-      });
-      // Prepare JSON response object
-      Map<String, dynamic> responseObj;
-      try {
-        responseObj = (jsonDecode(resText) as Map).cast<String, dynamic>();
-      } catch (_) {
-        // Wrap plain text result
-        responseObj = {'result': resText};
+      // 2. Server-side tool parts (toolCall/toolResponse, preserved raw)
+      modelParts.addAll(roundServerParts);
+
+      // 3. functionCall parts (with thought signatures)
+      for (final c in calls) {
+        final name = (c['name'] ?? '').toString();
+        final args =
+            (c['args'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+        final thoughtSigKey = c['thoughtSigKey'] as String?;
+        final thoughtSigVal = c['thoughtSigVal'];
+        final apiId = c['apiId'] as String?;
+        final part = <String, dynamic>{
+          'functionCall': {'name': name, 'args': args},
+          if (apiId != null) 'id': apiId,
+        };
+        if (thoughtSigKey != null && thoughtSigVal != null) {
+          part[thoughtSigKey] = thoughtSigVal;
+        }
+        modelParts.add(part);
       }
-      // Add user's functionResponse turn
-      convo.add({
-        'role': 'user',
-        'parts': [
-          {
-            'functionResponse': {'name': name, 'response': responseObj},
-          },
-        ],
-      });
+
+      convo.add({'role': 'model', 'parts': modelParts});
+
+      // 4. All functionResponses in one user turn
+      final responseParts = <Map<String, dynamic>>[];
+      for (final c in calls) {
+        final name = (c['name'] ?? '').toString();
+        final resText = (c['result'] ?? '').toString();
+        final apiId = c['apiId'] as String?;
+        Map<String, dynamic> responseObj;
+        try {
+          responseObj = (jsonDecode(resText) as Map).cast<String, dynamic>();
+        } catch (_) {
+          responseObj = {'result': resText};
+        }
+        responseParts.add({
+          'functionResponse': {'name': name, 'response': responseObj},
+          if (apiId != null) 'id': apiId,
+        });
+      }
+      convo.add({'role': 'user', 'parts': responseParts});
+    } else {
+      // Gemini 2.x: existing per-call reconstruction
+      for (final c in calls) {
+        final name = (c['name'] ?? '').toString();
+        final args =
+            (c['args'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+        final resText = (c['result'] ?? '').toString();
+        final thoughtSigKey = c['thoughtSigKey'] as String?;
+        final thoughtSigVal = c['thoughtSigVal'];
+
+        final part = <String, dynamic>{
+          'functionCall': {'name': name, 'args': args},
+        };
+        if (thoughtSigKey != null && thoughtSigVal != null) {
+          part[thoughtSigKey] = thoughtSigVal;
+        }
+
+        convo.add({
+          'role': 'model',
+          'parts': [part],
+        });
+        Map<String, dynamic> responseObj;
+        try {
+          responseObj = (jsonDecode(resText) as Map).cast<String, dynamic>();
+        } catch (_) {
+          responseObj = {'result': resText};
+        }
+        convo.add({
+          'role': 'user',
+          'parts': [
+            {
+              'functionResponse': {'name': name, 'response': responseObj},
+            },
+          ],
+        });
+      }
     }
     // Continue while(true) for next round
   }
