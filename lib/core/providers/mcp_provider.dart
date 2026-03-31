@@ -1069,7 +1069,9 @@ class McpProvider extends ChangeNotifier {
           if (v == null) {
             if (propSchema.containsKey('default')) {
               v = propSchema['default'];
-            } else {
+            } else if (req.contains(key)) {
+              // Only synthesize enum / waitFor defaults for required fields; optional
+              // omitted keys should stay absent (do not pick enum.first).
               final enumVals = _schemaEnum(propSchema);
               if (enumVals.isNotEmpty) {
                 v = enumVals.first;
