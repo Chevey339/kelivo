@@ -63,6 +63,32 @@ class ChatController extends ChangeNotifier {
   /// Get the ChatService instance.
   ChatService get chatService => _chatService;
 
+  /// Lazily migrate parentId for messages that don't have one yet.
+  /// Should be called before operations that depend on tree structure
+  /// (e.g., regenerate, send). Uses flat collapseVersions as the
+  /// reference order for building the parentId chain.
+  Future<void> ensureParentIdsMigrated() async {
+    if (_messages.isEmpty) return;
+    if (!_messages.any((m) => m.parentId == null)) return;
+
+    final migrated = await _chatService.migrateParentIds(
+      messages: _messages,
+      versionSelections: _versionSelections,
+      collapseVersions: (items, selections) {
+        // Use flat collapse for migration (before tree structure exists)
+        return _collapseVersionsFlat(items);
+      },
+    );
+    if (migrated) {
+      // Reload messages from storage to get updated parentIds
+      final cid = _currentConversation?.id;
+      if (cid != null) {
+        _messages = List.of(_chatService.getMessages(cid));
+        invalidateCache();
+      }
+    }
+  }
+
   // ============================================================================
   // Conversation Management
   // ============================================================================
@@ -321,9 +347,20 @@ class ChatController extends ChangeNotifier {
 
   /// Collapse message versions to show only the selected version per group.
   ///
-  /// This groups messages by their groupId and returns only the message
-  /// at the selected version index for each group.
+  /// When messages have parentId set (tree structure), uses tree traversal
+  /// to follow the active branch. Falls back to flat order for legacy
+  /// messages where all parentIds are null.
   List<ChatMessage> collapseVersions(List<ChatMessage> items) {
+    if (items.isEmpty) return <ChatMessage>[];
+
+    final hasTree = items.any((m) => m.parentId != null);
+    if (!hasTree) {
+      return _collapseVersionsFlat(items);
+    }
+    return _collapseVersionsTree(items);
+  }
+
+  List<ChatMessage> _collapseVersionsFlat(List<ChatMessage> items) {
     final Map<String, List<ChatMessage>> byGroup =
         <String, List<ChatMessage>>{};
     final List<String> order = <String>[];
@@ -337,12 +374,10 @@ class ChatController extends ChangeNotifier {
       list.add(m);
     }
 
-    // Sort each group by version
     for (final e in byGroup.entries) {
       e.value.sort((a, b) => a.version.compareTo(b.version));
     }
 
-    // Select the appropriate version from each group
     final out = <ChatMessage>[];
     for (final gid in order) {
       final vers = byGroup[gid]!;
@@ -351,6 +386,88 @@ class ChatController extends ChangeNotifier {
           ? sel
           : (vers.length - 1);
       out.add(vers[idx]);
+    }
+
+    return out;
+  }
+
+  List<ChatMessage> _collapseVersionsTree(List<ChatMessage> items) {
+    final Map<String, List<ChatMessage>> byGroup =
+        <String, List<ChatMessage>>{};
+    for (final m in items) {
+      final gid = (m.groupId ?? m.id);
+      byGroup.putIfAbsent(gid, () => <ChatMessage>[]).add(m);
+    }
+    for (final e in byGroup.entries) {
+      e.value.sort((a, b) => a.version.compareTo(b.version));
+    }
+
+    ChatMessage selectFromGroup(List<ChatMessage> vers) {
+      final gid = vers.first.groupId ?? vers.first.id;
+      final sel = _versionSelections[gid];
+      final idx = (sel != null && sel >= 0 && sel < vers.length)
+          ? sel
+          : (vers.length - 1);
+      return vers[idx];
+    }
+
+    final Map<String, Set<String>> childGroupsByParent =
+        <String, Set<String>>{};
+    for (final entry in byGroup.entries) {
+      final parentId = entry.value.first.parentId;
+      if (parentId != null && parentId.isNotEmpty) {
+        childGroupsByParent
+            .putIfAbsent(parentId, () => <String>{})
+            .add(entry.key);
+      }
+    }
+
+    final rootGroups = <String>[];
+    for (final entry in byGroup.entries) {
+      final parentId = entry.value.first.parentId;
+      if (parentId == null || parentId.isEmpty) {
+        rootGroups.add(entry.key);
+      }
+    }
+
+    final Map<String, int> groupFirstIndex = <String, int>{};
+    for (int i = 0; i < items.length; i++) {
+      final gid = items[i].groupId ?? items[i].id;
+      groupFirstIndex.putIfAbsent(gid, () => i);
+    }
+    rootGroups.sort(
+      (a, b) => (groupFirstIndex[a] ?? 0).compareTo(groupFirstIndex[b] ?? 0),
+    );
+
+    final out = <ChatMessage>[];
+    final visited = <String>{};
+
+    void traverse(String groupId) {
+      if (visited.contains(groupId)) return;
+      visited.add(groupId);
+
+      final vers = byGroup[groupId];
+      if (vers == null || vers.isEmpty) return;
+
+      final selected = selectFromGroup(vers);
+      out.add(selected);
+
+      final childGids = childGroupsByParent[selected.id];
+      if (childGids == null || childGids.isEmpty) return;
+
+      final sortedChildren = childGids.toList()
+        ..sort(
+          (a, b) =>
+              (groupFirstIndex[a] ?? 0).compareTo(groupFirstIndex[b] ?? 0),
+        );
+
+      for (final childGid in sortedChildren) {
+        traverse(childGid);
+      }
+    }
+
+    for (final rootGid in rootGroups) {
+      traverse(rootGid);
     }
 
     return out;

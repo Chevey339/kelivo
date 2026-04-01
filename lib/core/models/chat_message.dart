@@ -70,6 +70,12 @@ class ChatMessage extends HiveObject {
   @HiveField(19)
   final int? durationMs;
 
+  // Tree structure: parentId links to the previous message in the conversation
+  // flow. Messages sharing the same groupId also share the same parentId.
+  // Null for legacy messages (lazily migrated on first access).
+  @HiveField(20)
+  final String? parentId;
+
   ChatMessage({
     String? id,
     required this.role,
@@ -91,6 +97,7 @@ class ChatMessage extends HiveObject {
     this.completionTokens,
     this.cachedTokens,
     this.durationMs,
+    this.parentId,
   }) : id = id ?? const Uuid().v4(),
        timestamp = timestamp ?? DateTime.now(),
        groupId = groupId ?? id,
@@ -117,6 +124,7 @@ class ChatMessage extends HiveObject {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    String? parentId,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -140,6 +148,7 @@ class ChatMessage extends HiveObject {
       completionTokens: completionTokens ?? this.completionTokens,
       cachedTokens: cachedTokens ?? this.cachedTokens,
       durationMs: durationMs ?? this.durationMs,
+      parentId: parentId ?? this.parentId,
     );
   }
 
@@ -165,6 +174,7 @@ class ChatMessage extends HiveObject {
       'completionTokens': completionTokens,
       'cachedTokens': cachedTokens,
       'durationMs': durationMs,
+      'parentId': parentId,
     };
   }
 
@@ -194,6 +204,7 @@ class ChatMessage extends HiveObject {
       completionTokens: json['completionTokens'] as int?,
       cachedTokens: json['cachedTokens'] as int?,
       durationMs: json['durationMs'] as int?,
+      parentId: json['parentId'] as String?,
     );
   }
 }

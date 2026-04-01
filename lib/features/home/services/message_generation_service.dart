@@ -200,6 +200,7 @@ class MessageGenerationService {
     required String conversationId,
     required ChatInputData input,
     required Assistant? assistant,
+    String? parentId,
   }) async {
     final content = input.text.trim();
     final imageMarkers = input.imagePaths.map((p) => '\n[image:$p]').join();
@@ -218,6 +219,7 @@ class MessageGenerationService {
       conversationId: conversationId,
       role: 'user',
       content: processedUserText + imageMarkers + docMarkers,
+      parentId: parentId,
     );
   }
 
@@ -228,6 +230,7 @@ class MessageGenerationService {
     required String providerKey,
     String? groupId,
     int version = 0,
+    String? parentId,
   }) async {
     return chatService.addMessage(
       conversationId: conversationId,
@@ -238,6 +241,7 @@ class MessageGenerationService {
       isStreaming: true,
       groupId: groupId,
       version: version,
+      parentId: parentId,
     );
   }
 

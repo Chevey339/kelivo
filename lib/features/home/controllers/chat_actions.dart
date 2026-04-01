@@ -279,11 +279,23 @@ class ChatActions {
       return ChatActionResult.error('audio_attachment_unsupported');
     }
 
+    // Ensure parentIds are migrated before tree-aware operations
+    await chatController.ensureParentIdsMigrated();
+
+    // Determine parentId for user message: last visible message in collapsed list
+    String? userParentId;
+    final collapsed = messageGenerationService.messageBuilderService
+        .collapseVersions(_messages, _versionSelections);
+    if (collapsed.isNotEmpty) {
+      userParentId = collapsed.last.id;
+    }
+
     // Create user message
     final userMessage = await messageGenerationService.createUserMessage(
       conversationId: conversation.id,
       input: input,
       assistant: assistant,
+      parentId: userParentId,
     );
     _messages.add(userMessage);
     onMessagesChanged?.call();
@@ -296,6 +308,7 @@ class ChatActions {
           conversationId: conversation.id,
           modelId: modelId,
           providerKey: providerKey,
+          parentId: userMessage.id,
         );
 
     // Pre-create streaming notifier BEFORE adding message to list
@@ -398,6 +411,9 @@ class ChatActions {
 
     await cancelStreaming(conversation);
 
+    // Ensure parentIds are migrated before tree-aware operations
+    await chatController.ensureParentIdsMigrated();
+
     final idx = _messages.indexWhere((m) => m.id == message.id);
     if (idx < 0) {
       return ChatActionResult.error('message_not_found');
@@ -441,15 +457,27 @@ class ChatActions {
       return ChatActionResult.error('audio_attachment_unsupported');
     }
 
-    // Remove trailing messages - returns list of removed IDs for UI cleanup
-    final removeIds = await messageGenerationService.removeTrailingMessages(
-      messages: _messages,
-      lastKeep: versioning.lastKeep,
-      targetGroupId: versioning.targetGroupId,
-    );
-    if (removeIds.isNotEmpty) {
-      _messages.removeWhere((m) => removeIds.contains(m.id));
-      onMessagesChanged?.call();
+    // Tree structure: NO longer remove trailing messages.
+    // Instead, the new assistant version gets the same parentId as existing
+    // versions in its group (they all share a parent). For new replies
+    // (targetGroupId == null), parentId is the trigger message's id.
+
+    // Determine parentId for the new assistant message
+    String? regenParentId;
+    if (versioning.targetGroupId != null) {
+      // Same group: inherit parentId from existing group members
+      for (final m in _messages) {
+        final gid = m.groupId ?? m.id;
+        if (gid == versioning.targetGroupId && m.parentId != null) {
+          regenParentId = m.parentId;
+          break;
+        }
+      }
+      // Fallback: if no existing member has parentId, use message's id as parent
+      regenParentId ??= message.id;
+    } else {
+      // New reply: parent is the trigger message
+      regenParentId = message.id;
     }
 
     // Create assistant message placeholder (new version)
@@ -460,6 +488,7 @@ class ChatActions {
           providerKey: providerKey,
           groupId: versioning.targetGroupId,
           version: versioning.nextVersion,
+          parentId: regenParentId,
         );
 
     // Pre-create streaming notifier BEFORE adding message to list

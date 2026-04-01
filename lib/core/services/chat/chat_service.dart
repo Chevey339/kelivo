@@ -529,6 +529,7 @@ class ChatService extends ChangeNotifier {
     DateTime? reasoningFinishedAt,
     String? groupId,
     int? version,
+    String? parentId,
   }) async {
     if (!_initialized) await init();
 
@@ -562,6 +563,7 @@ class ChatService extends ChangeNotifier {
       reasoningFinishedAt: reasoningFinishedAt,
       groupId: groupId,
       version: version,
+      parentId: parentId,
     );
 
     await _messagesBox.put(message.id, message);
@@ -802,6 +804,7 @@ class ChatService extends ChangeNotifier {
         reasoningSegmentsJson: src.reasoningSegmentsJson,
         groupId: src.groupId,
         version: src.version,
+        parentId: src.parentId,
       );
       await _messagesBox.put(clone.id, clone);
       ids.add(clone.id);
@@ -859,6 +862,7 @@ class ChatService extends ChangeNotifier {
       isStreaming: false,
       groupId: gid,
       version: nextVersion,
+      parentId: original.parentId, // inherit parentId from same group
     );
     await _messagesBox.put(newMsg.id, newMsg);
     // Append to conversation order at the end (we'll group when rendering)
@@ -1069,6 +1073,84 @@ class ChatService extends ChangeNotifier {
   // Move an existing conversation to a different assistant.
   // If the conversation is still a draft, update it in memory;
   // otherwise persist the assistantId change and updatedAt.
+
+  /// Lazily migrate parentId for messages that don't have one.
+  /// Uses the flat order of collapsed messages to assign parentId chains.
+  /// Returns true if any migration was performed.
+  Future<bool> migrateParentIds({
+    required List<ChatMessage> messages,
+    required Map<String, int> versionSelections,
+    required List<ChatMessage> Function(List<ChatMessage>, Map<String, int>)
+    collapseVersions,
+  }) async {
+    if (messages.isEmpty) return false;
+
+    // Check if migration is needed: any message with null parentId
+    final needsMigration = messages.any((m) => m.parentId == null);
+    if (!needsMigration) return false;
+
+    // Get the collapsed (visible) order
+    final collapsed = collapseVersions(messages, versionSelections);
+
+    // Build parentId chain: collapsed[i+1].parentId = collapsed[i].id
+    final Map<String, String> groupToParent = <String, String>{};
+    for (int i = 0; i < collapsed.length; i++) {
+      final gid = collapsed[i].groupId ?? collapsed[i].id;
+      if (i == 0) {
+        // First message has no parent
+        groupToParent[gid] = '';
+      } else {
+        groupToParent[gid] = collapsed[i - 1].id;
+      }
+    }
+
+    // Apply parentId to all messages based on their group
+    bool changed = false;
+    for (final m in messages) {
+      if (m.parentId != null) continue;
+      final gid = m.groupId ?? m.id;
+      final parent = groupToParent[gid];
+      if (parent == null) continue; // group not in collapsed list
+
+      final pid = parent.isEmpty ? null : parent;
+      // Only update if parentId actually needs setting
+      if (pid != null) {
+        final updated = m.copyWith(parentId: pid);
+        await _messagesBox.put(m.id, updated);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      // Invalidate cache so next getMessages() picks up updated messages
+      for (final m in messages) {
+        _messagesCache.remove(m.conversationId);
+      }
+    }
+    return changed;
+  }
+
+  /// Update only the parentId of a message (used during migration and tree ops).
+  Future<void> updateMessageParentId(String messageId, String? parentId) async {
+    if (!_initialized) return;
+    final message = _messagesBox.get(messageId);
+    if (message == null) return;
+    if (message.parentId == parentId) return;
+
+    final updated = message.copyWith(parentId: parentId);
+    await _messagesBox.put(messageId, updated);
+
+    // Update cache
+    final conversationId = message.conversationId;
+    if (_messagesCache.containsKey(conversationId)) {
+      final messages = _messagesCache[conversationId]!;
+      final index = messages.indexWhere((m) => m.id == messageId);
+      if (index != -1) {
+        messages[index] = updated;
+      }
+    }
+  }
+
   Future<void> moveConversationToAssistant({
     required String conversationId,
     required String assistantId,

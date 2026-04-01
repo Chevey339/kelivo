@@ -25,7 +25,7 @@ class ChatMessageAdapter extends TypeAdapter<ChatMessage> {
       providerId: fields[5] as String?,
       totalTokens: fields[6] as int?,
       conversationId: fields[7] as String,
-      isStreaming: fields[8] as bool,
+      isStreaming: fields[8] as bool? ?? false,
       reasoningText: fields[9] as String?,
       reasoningStartAt: fields[10] as DateTime?,
       reasoningFinishedAt: fields[11] as DateTime?,
@@ -37,13 +37,14 @@ class ChatMessageAdapter extends TypeAdapter<ChatMessage> {
       completionTokens: fields[17] is int ? fields[17] as int : null,
       cachedTokens: fields[18] is int ? fields[18] as int : null,
       durationMs: fields[19] is int ? fields[19] as int : null,
+      parentId: fields[20] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ChatMessage obj) {
     writer
-      ..writeByte(20)
+      ..writeByte(21)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -83,7 +84,9 @@ class ChatMessageAdapter extends TypeAdapter<ChatMessage> {
       ..writeByte(18)
       ..write(obj.cachedTokens)
       ..writeByte(19)
-      ..write(obj.durationMs);
+      ..write(obj.durationMs)
+      ..writeByte(20)
+      ..write(obj.parentId);
   }
 
   @override
