@@ -1373,6 +1373,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageEditPageSave => '保存';
 
   @override
+  String get messageEditPageOverwrite => '覆盖保存';
+
+  @override
   String get messageEditPageSaveAndSend => '保存并发送';
 
   @override
@@ -1571,11 +1574,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatMessageWidgetRegenerateTooltip => '重新生成';
 
   @override
-  String get chatMessageWidgetRegenerateConfirmTitle => '确认重新生成';
+  String get chatMessageWidgetRegenerateConfirmTitle => '重新生成';
 
   @override
   String get chatMessageWidgetRegenerateConfirmContent =>
-      '重新生成将会覆盖此消息之后的所有消息，且无法撤销。确定要继续吗？';
+      '将创建新的回复分支，你可以通过左右箭头切换不同版本。';
 
   @override
   String get chatMessageWidgetRegenerateConfirmCancel => '取消';
@@ -5638,6 +5641,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageEditPageSave => '保存';
 
   @override
+  String get messageEditPageOverwrite => '覆盖保存';
+
+  @override
   String get messageEditPageSaveAndSend => '保存并发送';
 
   @override
@@ -5836,11 +5842,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatMessageWidgetRegenerateTooltip => '重新生成';
 
   @override
-  String get chatMessageWidgetRegenerateConfirmTitle => '确认重新生成';
+  String get chatMessageWidgetRegenerateConfirmTitle => '重新生成';
 
   @override
   String get chatMessageWidgetRegenerateConfirmContent =>
-      '重新生成将会覆盖此消息之后的所有消息，且无法撤销。确定要继续吗？';
+      '将创建新的回复分支，你可以通过左右箭头切换不同版本。';
 
   @override
   String get chatMessageWidgetRegenerateConfirmCancel => '取消';
@@ -9850,6 +9856,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageEditPageSave => '儲存';
 
   @override
+  String get messageEditPageOverwrite => '覆蓋儲存';
+
+  @override
   String get messageEditPageSaveAndSend => '儲存並發送';
 
   @override
@@ -10048,11 +10057,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatMessageWidgetRegenerateTooltip => '重新生成';
 
   @override
-  String get chatMessageWidgetRegenerateConfirmTitle => '確認重新生成';
+  String get chatMessageWidgetRegenerateConfirmTitle => '重新生成';
 
   @override
   String get chatMessageWidgetRegenerateConfirmContent =>
-      '重新生成將會覆蓋此訊息之後的所有訊息，且無法撤銷。確定要繼續嗎？';
+      '將創建新的回覆分支，你可以透過左右箭頭切換不同版本。';
 
   @override
   String get chatMessageWidgetRegenerateConfirmCancel => '取消';

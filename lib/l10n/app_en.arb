@@ -581,6 +581,7 @@
   "chatHistoryPagePinned": "Pinned",
   "messageEditPageTitle": "Edit Message",
   "messageEditPageSave": "Save",
+  "messageEditPageOverwrite": "Overwrite",
   "messageEditPageSaveAndSend": "Save & Send",
   "messageEditPageHint": "Enter message…",
   "selectCopyPageTitle": "Select & Copy",
@@ -685,8 +686,8 @@
     }
   },
   "chatMessageWidgetRegenerateTooltip": "Regenerate",
-  "chatMessageWidgetRegenerateConfirmTitle": "Confirm Regenerate",
-  "chatMessageWidgetRegenerateConfirmContent": "Regenerating will overwrite all messages after this one and cannot be undone. Are you sure?",
+  "chatMessageWidgetRegenerateConfirmTitle": "Regenerate",
+  "chatMessageWidgetRegenerateConfirmContent": "A new reply branch will be created. You can switch between versions using the left/right arrows.",
   "chatMessageWidgetRegenerateConfirmCancel": "Cancel",
   "chatMessageWidgetRegenerateConfirmOk": "Regenerate",
   "chatMessageWidgetStopTooltip": "Stop",

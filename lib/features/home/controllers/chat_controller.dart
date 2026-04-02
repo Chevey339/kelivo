@@ -455,24 +455,7 @@ class ChatController extends ChangeNotifier {
       out.add(selected);
 
       // Find child groups that point to this selected message
-      var childGids = childGroupsByParent[selected.id];
-
-      // For user messages with multiple versions: if the selected version has
-      // no children yet (e.g., "save only" edit before retry), fall back to
-      // another version's children so the conversation remains visible.
-      if ((childGids == null || childGids.isEmpty) &&
-          selected.role == 'user' &&
-          vers.length > 1) {
-        for (final v in vers) {
-          if (v.id == selected.id) continue;
-          final cg = childGroupsByParent[v.id];
-          if (cg != null && cg.isNotEmpty) {
-            childGids = cg;
-            break;
-          }
-        }
-      }
-
+      final childGids = childGroupsByParent[selected.id];
       if (childGids == null || childGids.isEmpty) return;
 
       final sortedChildren = childGids.toList()

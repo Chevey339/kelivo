@@ -44,6 +44,8 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
+    final isUser = widget.message.role == 'user';
+
     return Dialog(
       elevation: 12,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
@@ -95,11 +97,41 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                         ),
                       ),
                       const SizedBox(width: 4),
+                      if (!isUser) ...[
+                        // Assistant: Overwrite button
+                        TextButton.icon(
+                          onPressed: () {
+                            final text = _controller.text.trim();
+                            Navigator.of(context).pop<MessageEditResult>(
+                              MessageEditResult(
+                                content: text,
+                                overwrite: true,
+                              ),
+                            );
+                          },
+                          icon: Icon(
+                            Lucide.Edit,
+                            size: 18,
+                            color: cs.primary,
+                          ),
+                          label: Text(
+                            l10n.messageEditPageOverwrite,
+                            style: TextStyle(
+                              color: cs.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
                       TextButton.icon(
                         onPressed: () {
                           final text = _controller.text.trim();
                           Navigator.of(context).pop<MessageEditResult>(
-                            MessageEditResult(content: text, shouldSend: false),
+                            MessageEditResult(
+                              content: text,
+                              overwrite: isUser,
+                            ),
                           );
                         },
                         icon: Icon(Lucide.Check, size: 18, color: cs.primary),

@@ -2741,6 +2741,12 @@ abstract class AppLocalizations {
   /// **'Save'**
   String get messageEditPageSave;
 
+  /// No description provided for @messageEditPageOverwrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Overwrite'**
+  String get messageEditPageOverwrite;
+
   /// No description provided for @messageEditPageSaveAndSend.
   ///
   /// In en, this message translates to:
@@ -3116,13 +3122,13 @@ abstract class AppLocalizations {
   /// No description provided for @chatMessageWidgetRegenerateConfirmTitle.
   ///
   /// In en, this message translates to:
-  /// **'Confirm Regenerate'**
+  /// **'Regenerate'**
   String get chatMessageWidgetRegenerateConfirmTitle;
 
   /// No description provided for @chatMessageWidgetRegenerateConfirmContent.
   ///
   /// In en, this message translates to:
-  /// **'Regenerating will overwrite all messages after this one and cannot be undone. Are you sure?'**
+  /// **'A new reply branch will be created. You can switch between versions using the left/right arrows.'**
   String get chatMessageWidgetRegenerateConfirmContent;
 
   /// No description provided for @chatMessageWidgetRegenerateConfirmCancel.

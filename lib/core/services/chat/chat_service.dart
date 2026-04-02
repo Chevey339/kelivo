@@ -954,69 +954,65 @@ class ChatService extends ChangeNotifier {
     final message = _messagesBox.get(messageId);
     if (message == null) return;
 
-    final conversation = _conversationsBox.get(message.conversationId);
-    if (conversation != null) {
-      final gid = message.groupId ?? message.id;
-      final ids = conversation.messageIds;
+    final conversationId = message.conversationId;
 
-      // Find the earliest position of this message group before removal so we
-      // can keep the group anchored when deleting one of its versions.
-      int anchorIndex = -1;
-      for (int i = 0; i < ids.length; i++) {
-        final mid = ids[i];
+    // Collect all descendant message IDs via parentId tree traversal.
+    // This prevents orphan messages when a parent is deleted.
+    final toDelete = <String>{messageId};
+    final queue = <String>[messageId];
+    while (queue.isNotEmpty) {
+      final parentId = queue.removeAt(0);
+      for (final mid in _messagesBox.keys.cast<String>()) {
+        if (toDelete.contains(mid)) continue;
         final m = _messagesBox.get(mid);
-        if (m == null) continue;
-        final mgid = m.groupId ?? m.id;
-        if (mgid == gid) {
-          anchorIndex = i;
-          break;
+        if (m == null || m.conversationId != conversationId) continue;
+        if (m.parentId == parentId) {
+          toDelete.add(mid);
+          queue.add(mid);
         }
       }
+    }
 
-      ids.remove(messageId);
-
-      // If we removed the earliest version but other versions remain, move the
-      // earliest remaining one back to the original anchor index to preserve
-      // the group's relative order in the conversation.
-      if (anchorIndex >= 0) {
-        int? earliestRemaining;
-        for (int i = 0; i < ids.length; i++) {
-          final mid = ids[i];
-          final m = _messagesBox.get(mid);
-          if (m == null) continue;
-          final mgid = m.groupId ?? m.id;
-          if (mgid == gid) {
-            earliestRemaining = i;
-            break;
-          }
-        }
-
-        if (earliestRemaining != null && earliestRemaining > anchorIndex) {
-          final replacementId = ids.removeAt(earliestRemaining);
-          final insertAt = anchorIndex <= ids.length ? anchorIndex : ids.length;
-          ids.insert(insertAt, replacementId);
-        }
+    // Also collect all group-sibling versions of descendant messages
+    // (other versions in the same group that may have different parentIds).
+    final groupsToDelete = <String>{};
+    for (final mid in toDelete) {
+      final m = _messagesBox.get(mid);
+      if (m != null) groupsToDelete.add(m.groupId ?? m.id);
+    }
+    for (final mid in _messagesBox.keys.cast<String>()) {
+      if (toDelete.contains(mid)) continue;
+      final m = _messagesBox.get(mid);
+      if (m == null || m.conversationId != conversationId) continue;
+      final gid = m.groupId ?? m.id;
+      if (groupsToDelete.contains(gid)) {
+        toDelete.add(mid);
       }
+    }
 
+    final conversation = _conversationsBox.get(conversationId);
+    if (conversation != null) {
+      conversation.messageIds.removeWhere((id) => toDelete.contains(id));
+      // Clean up versionSelections for removed groups
+      for (final gid in groupsToDelete) {
+        conversation.versionSelections.remove(gid);
+      }
       await conversation.save();
     }
 
-    await _messagesBox.delete(messageId);
-    // Remove any tool events linked to this assistant message
-    if (message.role == 'assistant') {
-      try {
-        await _toolEventsBox.delete(message.id);
-      } catch (_) {}
-      try {
-        await _toolEventsBox.delete(_sigKey(message.id));
-      } catch (_) {}
+    for (final mid in toDelete) {
+      final m = _messagesBox.get(mid);
+      await _messagesBox.delete(mid);
+      if (m != null && m.role == 'assistant') {
+        try { await _toolEventsBox.delete(mid); } catch (_) {}
+        try { await _toolEventsBox.delete(_sigKey(mid)); } catch (_) {}
+      }
     }
 
-    // Update cache: clear this conversation so that next getMessages()
-    // reloads messages in the updated order from conversation.messageIds.
-    _messagesCache.remove(message.conversationId);
+    // Update cache
+    _messagesCache.remove(conversationId);
 
-    // Clean up orphaned upload files that are no longer referenced by any message
+    // Clean up orphaned upload files
     await _cleanupOrphanUploads();
 
     notifyListeners();

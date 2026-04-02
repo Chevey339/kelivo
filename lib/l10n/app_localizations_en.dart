@@ -1410,6 +1410,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageEditPageSave => 'Save';
 
   @override
+  String get messageEditPageOverwrite => 'Overwrite';
+
+  @override
   String get messageEditPageSaveAndSend => 'Save & Send';
 
   @override
@@ -1615,11 +1618,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatMessageWidgetRegenerateTooltip => 'Regenerate';
 
   @override
-  String get chatMessageWidgetRegenerateConfirmTitle => 'Confirm Regenerate';
+  String get chatMessageWidgetRegenerateConfirmTitle => 'Regenerate';
 
   @override
   String get chatMessageWidgetRegenerateConfirmContent =>
-      'Regenerating will overwrite all messages after this one and cannot be undone. Are you sure?';
+      'A new reply branch will be created. You can switch between versions using the left/right arrows.';
 
   @override
   String get chatMessageWidgetRegenerateConfirmCancel => 'Cancel';

@@ -741,6 +741,19 @@ class HomePageController extends ChangeNotifier {
     final MessageEditResult? result = await future;
     if (result == null) return;
 
+    // ── Overwrite path: update content in-place, no new version ──
+    if (result.overwrite) {
+      await _chatService.updateMessage(message.id, content: result.content);
+      final idx = messages.indexWhere((m) => m.id == message.id);
+      if (idx != -1) {
+        messages[idx] = messages[idx].copyWith(content: result.content);
+      }
+      _chatController.invalidateCache();
+      notifyListeners();
+      return;
+    }
+
+    // ── New-version path ──
     // Ensure parentIds are migrated before tree-aware operations
     await _chatController.ensureParentIdsMigrated();
 

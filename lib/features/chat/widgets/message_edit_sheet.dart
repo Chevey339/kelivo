@@ -44,12 +44,32 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
     super.dispose();
   }
 
+  Widget _buildTextButton(
+    String label,
+    ColorScheme cs,
+    VoidCallback onTap,
+  ) {
+    return IosCardPress(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      baseColor: Colors.transparent,
+      pressedBlendStrength:
+          Theme.of(context).brightness == Brightness.dark ? 0.10 : 0.06,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: Text(
+        label,
+        style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final isUser = widget.message.role == 'user';
+
     return Padding(
-      // Ensure keyboard-safe bottom inset for the sheet
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: DraggableScrollableSheet(
         expand: false,
@@ -73,76 +93,67 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
               const SizedBox(height: 10),
               SizedBox(
                 height: 32,
-                child: Stack(
-                  alignment: Alignment.center,
+                child: Row(
                   children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IosCardPress(
-                        onTap: () {
+                    // Left: Save & Send
+                    _buildTextButton(
+                      l10n.messageEditPageSaveAndSend,
+                      cs,
+                      () {
+                        Haptics.light();
+                        final text = _controller.text.trim();
+                        Navigator.of(context).pop<MessageEditResult>(
+                          MessageEditResult(
+                            content: text,
+                            shouldSend: true,
+                          ),
+                        );
+                      },
+                    ),
+                    const Spacer(),
+                    // Center: Title
+                    Text(
+                      l10n.messageEditPageTitle,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    // Right buttons
+                    if (!isUser) ...[
+                      // Assistant: Overwrite button
+                      _buildTextButton(
+                        l10n.messageEditPageOverwrite,
+                        cs,
+                        () {
                           Haptics.light();
                           final text = _controller.text.trim();
                           Navigator.of(context).pop<MessageEditResult>(
-                            MessageEditResult(content: text, shouldSend: true),
+                            MessageEditResult(
+                              content: text,
+                              overwrite: true,
+                            ),
                           );
                         },
-                        borderRadius: BorderRadius.circular(20),
-                        baseColor: Colors.transparent,
-                        pressedBlendStrength:
-                            Theme.of(context).brightness == Brightness.dark
-                            ? 0.10
-                            : 0.06,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        child: Text(
-                          l10n.messageEditPageSaveAndSend,
-                          style: TextStyle(
-                            color: cs.primary,
-                            fontWeight: FontWeight.w700,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    // Save button
+                    // User: overwrite original; Assistant: create new version
+                    _buildTextButton(
+                      l10n.messageEditPageSave,
+                      cs,
+                      () {
+                        Haptics.light();
+                        final text = _controller.text.trim();
+                        Navigator.of(context).pop<MessageEditResult>(
+                          MessageEditResult(
+                            content: text,
+                            overwrite: isUser,
                           ),
-                        ),
-                      ),
-                    ),
-                    Center(
-                      child: Text(
-                        l10n.messageEditPageTitle,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: IosCardPress(
-                        onTap: () {
-                          Haptics.light();
-                          final text = _controller.text.trim();
-                          Navigator.of(context).pop<MessageEditResult>(
-                            MessageEditResult(content: text, shouldSend: false),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(20),
-                        baseColor: Colors.transparent,
-                        pressedBlendStrength:
-                            Theme.of(context).brightness == Brightness.dark
-                            ? 0.10
-                            : 0.06,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        child: Text(
-                          l10n.messageEditPageSave,
-                          style: TextStyle(
-                            color: cs.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -160,16 +171,19 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                     decoration: InputDecoration(
                       hintText: l10n.messageEditPageHint,
                       filled: true,
-                      fillColor: Theme.of(context).brightness == Brightness.dark
+                      fillColor:
+                          Theme.of(context).brightness == Brightness.dark
                           ? Colors.white10
                           : const Color(0xFFF2F3F5),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Colors.transparent),
+                        borderSide:
+                            const BorderSide(color: Colors.transparent),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Colors.transparent),
+                        borderSide:
+                            const BorderSide(color: Colors.transparent),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
