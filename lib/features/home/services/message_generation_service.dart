@@ -339,16 +339,6 @@ class MessageGenerationService {
       }
     } else {
       // User message
-      final userGroupId = message.groupId ?? message.id;
-      int userFirst = -1;
-      for (int i = 0; i < messages.length; i++) {
-        final gid0 = (messages[i].groupId ?? messages[i].id);
-        if (gid0 == userGroupId) {
-          userFirst = i;
-          break;
-        }
-      }
-      if (userFirst < 0) userFirst = idx;
 
       if (assistantAsNewReply) {
         // Edit + send: the new assistant should be a brand-new message
@@ -358,19 +348,32 @@ class MessageGenerationService {
         targetGroupId = null;
         nextVersion = 0;
       } else {
-        // Regular retry on user message: create a new version of the
-        // existing assistant group.
-        int aid = -1;
-        for (int i = userFirst + 1; i < messages.length; i++) {
-          if (messages[i].role == 'assistant') {
-            aid = i;
+        // Regular retry on user message: find the assistant group that
+        // is a direct child of THIS specific user version via parentId.
+        // Only match message.id (the selected version), not all versions
+        // in the group, to avoid cross-branch contamination.
+        String? childAssistantGroupId;
+
+        for (final m in messages) {
+          if (m.role == 'assistant' &&
+              m.parentId == message.id) {
+            childAssistantGroupId = m.groupId ?? m.id;
             break;
           }
         }
 
-        if (aid >= 0) {
-          lastKeep = aid;
-          targetGroupId = messages[aid].groupId ?? messages[aid].id;
+        if (childAssistantGroupId != null) {
+          // Find the index of any member for lastKeep
+          int aid = -1;
+          for (int i = 0; i < messages.length; i++) {
+            if ((messages[i].groupId ?? messages[i].id) ==
+                childAssistantGroupId) {
+              aid = i;
+              break;
+            }
+          }
+          lastKeep = aid >= 0 ? aid : idx;
+          targetGroupId = childAssistantGroupId;
           int maxVer = -1;
           for (final m in messages) {
             final gid = (m.groupId ?? m.id);
@@ -380,7 +383,8 @@ class MessageGenerationService {
           }
           nextVersion = maxVer + 1;
         } else {
-          lastKeep = userFirst;
+          // No assistant child found – create a brand-new assistant
+          lastKeep = idx;
           targetGroupId = null;
           nextVersion = 0;
         }

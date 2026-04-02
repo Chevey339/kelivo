@@ -955,58 +955,31 @@ class ChatService extends ChangeNotifier {
     if (message == null) return;
 
     final conversationId = message.conversationId;
+    final gid = message.groupId ?? message.id;
 
-    // Collect all descendant message IDs via parentId tree traversal.
-    // This prevents orphan messages when a parent is deleted.
-    final toDelete = <String>{messageId};
-    final queue = <String>[messageId];
-    while (queue.isNotEmpty) {
-      final parentId = queue.removeAt(0);
-      for (final mid in _messagesBox.keys.cast<String>()) {
-        if (toDelete.contains(mid)) continue;
-        final m = _messagesBox.get(mid);
-        if (m == null || m.conversationId != conversationId) continue;
-        if (m.parentId == parentId) {
-          toDelete.add(mid);
-          queue.add(mid);
-        }
-      }
-    }
-
-    // Also collect all group-sibling versions of descendant messages
-    // (other versions in the same group that may have different parentIds).
-    final groupsToDelete = <String>{};
-    for (final mid in toDelete) {
-      final m = _messagesBox.get(mid);
-      if (m != null) groupsToDelete.add(m.groupId ?? m.id);
-    }
-    for (final mid in _messagesBox.keys.cast<String>()) {
-      if (toDelete.contains(mid)) continue;
-      final m = _messagesBox.get(mid);
-      if (m == null || m.conversationId != conversationId) continue;
-      final gid = m.groupId ?? m.id;
-      if (groupsToDelete.contains(gid)) {
-        toDelete.add(mid);
-      }
-    }
-
+    // Only delete this single message/version — no cascade.
+    // Children whose parentId pointed to this message will become
+    // unreachable in the tree traversal (they simply won't appear
+    // in any branch), which is the safe default.
     final conversation = _conversationsBox.get(conversationId);
     if (conversation != null) {
-      conversation.messageIds.removeWhere((id) => toDelete.contains(id));
-      // Clean up versionSelections for removed groups
-      for (final gid in groupsToDelete) {
+      conversation.messageIds.remove(messageId);
+
+      // If the group has no more members, clean up versionSelections
+      final groupStillExists = conversation.messageIds.any((id) {
+        final m = _messagesBox.get(id);
+        return m != null && (m.groupId ?? m.id) == gid;
+      });
+      if (!groupStillExists) {
         conversation.versionSelections.remove(gid);
       }
       await conversation.save();
     }
 
-    for (final mid in toDelete) {
-      final m = _messagesBox.get(mid);
-      await _messagesBox.delete(mid);
-      if (m != null && m.role == 'assistant') {
-        try { await _toolEventsBox.delete(mid); } catch (_) {}
-        try { await _toolEventsBox.delete(_sigKey(mid)); } catch (_) {}
-      }
+    await _messagesBox.delete(messageId);
+    if (message.role == 'assistant') {
+      try { await _toolEventsBox.delete(messageId); } catch (_) {}
+      try { await _toolEventsBox.delete(_sigKey(messageId)); } catch (_) {}
     }
 
     // Update cache
