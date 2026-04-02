@@ -414,11 +414,13 @@ class ChatController extends ChangeNotifier {
     final Map<String, Set<String>> childGroupsByParent =
         <String, Set<String>>{};
     for (final entry in byGroup.entries) {
-      final parentId = entry.value.first.parentId;
-      if (parentId != null && parentId.isNotEmpty) {
-        childGroupsByParent
-            .putIfAbsent(parentId, () => <String>{})
-            .add(entry.key);
+      for (final m in entry.value) {
+        final parentId = m.parentId;
+        if (parentId != null && parentId.isNotEmpty) {
+          childGroupsByParent
+              .putIfAbsent(parentId, () => <String>{})
+              .add(entry.key);
+        }
       }
     }
 
@@ -452,7 +454,25 @@ class ChatController extends ChangeNotifier {
       final selected = selectFromGroup(vers);
       out.add(selected);
 
-      final childGids = childGroupsByParent[selected.id];
+      // Find child groups that point to this selected message
+      var childGids = childGroupsByParent[selected.id];
+
+      // For user messages with multiple versions: if the selected version has
+      // no children yet (e.g., "save only" edit before retry), fall back to
+      // another version's children so the conversation remains visible.
+      if ((childGids == null || childGids.isEmpty) &&
+          selected.role == 'user' &&
+          vers.length > 1) {
+        for (final v in vers) {
+          if (v.id == selected.id) continue;
+          final cg = childGroupsByParent[v.id];
+          if (cg != null && cg.isNotEmpty) {
+            childGids = cg;
+            break;
+          }
+        }
+      }
+
       if (childGids == null || childGids.isEmpty) return;
 
       final sortedChildren = childGids.toList()

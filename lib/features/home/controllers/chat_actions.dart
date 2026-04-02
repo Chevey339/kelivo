@@ -464,8 +464,14 @@ class ChatActions {
 
     // Determine parentId for the new assistant message
     String? regenParentId;
-    if (versioning.targetGroupId != null) {
-      // Same group: inherit parentId from existing group members
+    if (message.role == 'user') {
+      // Regenerating from a user message (edit+send or manual retry):
+      // link the new assistant directly to THIS user version so the tree
+      // traversal can find it when this version is selected.
+      regenParentId = message.id;
+    } else if (versioning.targetGroupId != null) {
+      // Retrying an assistant message (same group): inherit parentId from
+      // existing group members so all versions share the same parent.
       for (final m in _messages) {
         final gid = m.groupId ?? m.id;
         if (gid == versioning.targetGroupId && m.parentId != null) {
@@ -473,10 +479,9 @@ class ChatActions {
           break;
         }
       }
-      // Fallback: if no existing member has parentId, use message's id as parent
       regenParentId ??= message.id;
     } else {
-      // New reply: parent is the trigger message
+      // New reply (new group): parent is the trigger message
       regenParentId = message.id;
     }
 

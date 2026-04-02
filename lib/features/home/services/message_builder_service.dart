@@ -150,16 +150,20 @@ class MessageBuilderService {
     }
 
     // Build children index: parentMsgId → list of child groups (by groupId)
-    // A child group's parentId points to a specific message id
+    // Register ALL unique parentIds from every version in the group so that
+    // the tree traversal can find children regardless of which version is
+    // selected (e.g., after editing a user message, the new assistant version
+    // has parentId pointing to the new user version id).
     final Map<String, Set<String>> childGroupsByParent =
         <String, Set<String>>{};
     for (final entry in byGroup.entries) {
-      // All messages in the same group share parentId, use the first one
-      final parentId = entry.value.first.parentId;
-      if (parentId != null && parentId.isNotEmpty) {
-        childGroupsByParent
-            .putIfAbsent(parentId, () => <String>{})
-            .add(entry.key);
+      for (final m in entry.value) {
+        final parentId = m.parentId;
+        if (parentId != null && parentId.isNotEmpty) {
+          childGroupsByParent
+              .putIfAbsent(parentId, () => <String>{})
+              .add(entry.key);
+        }
       }
     }
 
@@ -197,7 +201,24 @@ class MessageBuilderService {
       out.add(selected);
 
       // Find child groups that point to this selected message
-      final childGids = childGroupsByParent[selected.id];
+      var childGids = childGroupsByParent[selected.id];
+
+      // For user messages with multiple versions: if the selected version has
+      // no children yet (e.g., "save only" edit before retry), fall back to
+      // another version's children so the conversation remains visible.
+      if ((childGids == null || childGids.isEmpty) &&
+          selected.role == 'user' &&
+          vers.length > 1) {
+        for (final v in vers) {
+          if (v.id == selected.id) continue;
+          final cg = childGroupsByParent[v.id];
+          if (cg != null && cg.isNotEmpty) {
+            childGids = cg;
+            break;
+          }
+        }
+      }
+
       if (childGids == null || childGids.isEmpty) return;
 
       // Sort children by their first appearance in items list

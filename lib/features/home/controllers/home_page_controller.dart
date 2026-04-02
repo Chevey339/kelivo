@@ -741,6 +741,9 @@ class HomePageController extends ChangeNotifier {
     final MessageEditResult? result = await future;
     if (result == null) return;
 
+    // Ensure parentIds are migrated before tree-aware operations
+    await _chatController.ensureParentIdsMigrated();
+
     final newMsg = await _chatService.appendMessageVersion(
       messageId: message.id,
       content: result.content,
@@ -766,7 +769,10 @@ class HomePageController extends ChangeNotifier {
     if (message.role == 'assistant') {
       await regenerateAtMessage(newMsg, assistantAsNewReply: true);
     } else {
-      await regenerateAtMessage(newMsg);
+      // Editing a user message + sending creates a user branch;
+      // the assistant reply should be a brand-new message (new group),
+      // not a new version of the existing assistant.
+      await regenerateAtMessage(newMsg, assistantAsNewReply: true);
     }
   }
 

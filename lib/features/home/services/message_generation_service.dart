@@ -350,29 +350,40 @@ class MessageGenerationService {
       }
       if (userFirst < 0) userFirst = idx;
 
-      int aid = -1;
-      for (int i = userFirst + 1; i < messages.length; i++) {
-        if (messages[i].role == 'assistant') {
-          aid = i;
-          break;
-        }
-      }
-
-      if (aid >= 0) {
-        lastKeep = aid;
-        targetGroupId = messages[aid].groupId ?? messages[aid].id;
-        int maxVer = -1;
-        for (final m in messages) {
-          final gid = (m.groupId ?? m.id);
-          if (gid == targetGroupId) {
-            if (m.version > maxVer) maxVer = m.version;
-          }
-        }
-        nextVersion = maxVer + 1;
-      } else {
-        lastKeep = userFirst;
+      if (assistantAsNewReply) {
+        // Edit + send: the new assistant should be a brand-new message
+        // (new group) linked to this user version, not a version of the
+        // old assistant.
+        lastKeep = idx;
         targetGroupId = null;
         nextVersion = 0;
+      } else {
+        // Regular retry on user message: create a new version of the
+        // existing assistant group.
+        int aid = -1;
+        for (int i = userFirst + 1; i < messages.length; i++) {
+          if (messages[i].role == 'assistant') {
+            aid = i;
+            break;
+          }
+        }
+
+        if (aid >= 0) {
+          lastKeep = aid;
+          targetGroupId = messages[aid].groupId ?? messages[aid].id;
+          int maxVer = -1;
+          for (final m in messages) {
+            final gid = (m.groupId ?? m.id);
+            if (gid == targetGroupId) {
+              if (m.version > maxVer) maxVer = m.version;
+            }
+          }
+          nextVersion = maxVer + 1;
+        } else {
+          lastKeep = userFirst;
+          targetGroupId = null;
+          nextVersion = 0;
+        }
       }
     }
 
