@@ -69,7 +69,10 @@ class ChatController extends ChangeNotifier {
   /// reference order for building the parentId chain.
   Future<void> ensureParentIdsMigrated() async {
     if (_messages.isEmpty) return;
-    if (!_messages.any((m) => m.parentId == null)) return;
+    // Only migrate truly legacy data: ALL messages have null parentId.
+    // If any message already has parentId set, the conversation is already
+    // using tree structure (root messages legitimately have null parentId).
+    if (_messages.any((m) => m.parentId != null)) return;
 
     final migrated = await _chatService.migrateParentIds(
       messages: _messages,

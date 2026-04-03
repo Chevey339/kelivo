@@ -955,46 +955,59 @@ class ChatService extends ChangeNotifier {
     if (message == null) return;
 
     final conversationId = message.conversationId;
-    final gid = message.groupId ?? message.id;
-    final inheritedParentId = message.parentId;
 
-    // Re-parent children: any message whose parentId == messageId is
-    // adopted by the deleted message's own parent, keeping the tree
-    // connected and preventing orphan data.
-    for (final mid in _messagesBox.keys.cast<String>()) {
-      if (mid == messageId) continue;
-      final child = _messagesBox.get(mid);
-      if (child == null || child.conversationId != conversationId) continue;
-      if (child.parentId == messageId) {
-        final updated = _copyMessageWithParentId(child, inheritedParentId);
-        await _messagesBox.put(mid, updated);
+    // Cascade delete: collect this message and ALL descendants reachable
+    // via parentId.  This deletes the entire branch rooted at this message.
+    // NOTE: we do NOT expand to group-siblings of descendants — each
+    // version is its own branch entry and other versions are preserved.
+    final toDelete = <String>{messageId};
+    final queue = <String>[messageId];
+    while (queue.isNotEmpty) {
+      final pid = queue.removeAt(0);
+      for (final mid in _messagesBox.keys.cast<String>()) {
+        if (toDelete.contains(mid)) continue;
+        final m = _messagesBox.get(mid);
+        if (m == null || m.conversationId != conversationId) continue;
+        if (m.parentId == pid) {
+          toDelete.add(mid);
+          queue.add(mid);
+        }
       }
+    }
+
+    // Collect affected groups to clean up versionSelections
+    final affectedGroups = <String>{};
+    for (final mid in toDelete) {
+      final m = _messagesBox.get(mid);
+      if (m != null) affectedGroups.add(m.groupId ?? m.id);
     }
 
     // Remove from conversation
     final conversation = _conversationsBox.get(conversationId);
     if (conversation != null) {
-      conversation.messageIds.remove(messageId);
+      conversation.messageIds.removeWhere((id) => toDelete.contains(id));
 
-      // If the group has no more members, clean up versionSelections
-      final groupStillExists = conversation.messageIds.any((id) {
-        final m = _messagesBox.get(id);
-        return m != null && (m.groupId ?? m.id) == gid;
-      });
-      if (!groupStillExists) {
-        conversation.versionSelections.remove(gid);
+      // Clean up versionSelections for groups that no longer have members
+      for (final gid in affectedGroups) {
+        final groupStillExists = conversation.messageIds.any((id) {
+          final m = _messagesBox.get(id);
+          return m != null && (m.groupId ?? m.id) == gid;
+        });
+        if (!groupStillExists) {
+          conversation.versionSelections.remove(gid);
+        }
       }
       await conversation.save();
     }
 
-    await _messagesBox.delete(messageId);
-    if (message.role == 'assistant') {
-      try {
-        await _toolEventsBox.delete(messageId);
-      } catch (_) {}
-      try {
-        await _toolEventsBox.delete(_sigKey(messageId));
-      } catch (_) {}
+    // Delete messages and clean up metadata
+    for (final mid in toDelete) {
+      final m = _messagesBox.get(mid);
+      await _messagesBox.delete(mid);
+      if (m != null && m.role == 'assistant') {
+        try { await _toolEventsBox.delete(mid); } catch (_) {}
+        try { await _toolEventsBox.delete(_sigKey(mid)); } catch (_) {}
+      }
     }
 
     // Update cache
@@ -1069,8 +1082,11 @@ class ChatService extends ChangeNotifier {
   }) async {
     if (messages.isEmpty) return false;
 
-    // Check if migration is needed: any message with null parentId
-    final needsMigration = messages.any((m) => m.parentId == null);
+    // Only migrate truly legacy conversations where ALL messages have
+    // null parentId.  If any message already has parentId set, the
+    // conversation is already tree-structured; root messages legitimately
+    // have null parentId and must not be re-migrated.
+    final needsMigration = !messages.any((m) => m.parentId != null);
     if (!needsMigration) return false;
 
     // Get the collapsed (visible) order
