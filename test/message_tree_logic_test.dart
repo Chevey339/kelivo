@@ -371,6 +371,113 @@ void main() {
         );
       },
     );
+
+    test(
+      'ensureParentIdsMigrated migrates truly legacy conversation once',
+      () async {
+        const userGroupId = 'user-group';
+
+        final conversation = await harness.chatService.createConversation(
+          title: 'Legacy migrate',
+        );
+
+        final userV0 = await harness.chatService.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'user-v0',
+          groupId: userGroupId,
+          version: 0,
+        );
+        final userV1 = await harness.chatService.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'user-v1',
+          groupId: userGroupId,
+          version: 1,
+        );
+        final assistant = await harness.chatService.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'assistant-v0',
+        );
+
+        harness.chatController.setCurrentConversation(conversation);
+        await harness.chatController.ensureParentIdsMigrated();
+
+        final migrated = harness.chatService.getMessages(conversation.id);
+        final migratedUserV0 = migrated.firstWhere((m) => m.id == userV0.id);
+        final migratedUserV1 = migrated.firstWhere((m) => m.id == userV1.id);
+        final migratedAssistant = migrated.firstWhere(
+          (m) => m.id == assistant.id,
+        );
+
+        expect(migratedUserV0.parentId, isNull);
+        expect(migratedUserV1.parentId, isNull);
+        expect(migratedAssistant.parentId, userV1.id);
+      },
+    );
+
+    test(
+      'ensureParentIdsMigrated does not remigrate tree conversation after deletion',
+      () async {
+        final conversation = await harness.chatService.createConversation(
+          title: 'Skip remigrate',
+        );
+
+        final user1 = await harness.chatService.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'u1',
+        );
+        final assistant1 = await harness.chatService.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'a1',
+          parentId: user1.id,
+        );
+        // Create a second branch so something survives the cascade delete
+        final user1v2 = await harness.chatService.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'u1-v2',
+          groupId: user1.groupId ?? user1.id,
+          version: 1,
+        );
+        final assistant2 = await harness.chatService.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'a2',
+          parentId: user1v2.id,
+        );
+
+        // Delete the first branch (user1 version 0) — cascade removes assistant1
+        await harness.chatService.deleteMessage(user1.id);
+
+        harness.chatController.setCurrentConversation(conversation);
+        final before = harness.chatService.getMessages(conversation.id);
+        final beforeParents = <String, String?>{
+          for (final m in before) m.id: m.parentId,
+        };
+
+        // user1v2 is root (null parentId), assistant2 points to user1v2
+        expect(beforeParents[user1v2.id], isNull);
+        expect(beforeParents[assistant2.id], user1v2.id);
+
+        await harness.chatController.ensureParentIdsMigrated();
+
+        final after = harness.chatService.getMessages(conversation.id);
+        final afterParents = <String, String?>{
+          for (final m in after) m.id: m.parentId,
+        };
+
+        // Migration should NOT have changed anything
+        expect(afterParents, beforeParents);
+        expect(
+          harness.chatController.collapsedMessages.map((m) => m.id).toList(),
+          <String>[user1v2.id, assistant2.id],
+        );
+      },
+    );
   });
 
   group('ChatService.deleteMessage', () {
@@ -385,7 +492,7 @@ void main() {
     });
 
     test(
-      'deleting middle message reparents direct children and preserves branch visibility',
+      'deleting middle message cascade-deletes its descendants',
       () async {
         final conversation = await harness.chatService.createConversation(
           title: 'Delete middle',
@@ -402,42 +509,36 @@ void main() {
           content: 'a1',
           parentId: user1.id,
         );
-        final user2 = await harness.chatService.addMessage(
+        await harness.chatService.addMessage(
           conversationId: conversation.id,
           role: 'user',
           content: 'u2',
           parentId: assistant1.id,
         );
-        final assistant2 = await harness.chatService.addMessage(
+        await harness.chatService.addMessage(
           conversationId: conversation.id,
           role: 'assistant',
           content: 'a2',
-          parentId: user2.id,
+          parentId: assistant1.id, // also child of assistant1
         );
 
+        // Deleting assistant1 should cascade-delete user2 and assistant2
         await harness.chatService.deleteMessage(assistant1.id);
 
         final messages = harness.chatService.getMessages(conversation.id);
-        final reparentedUser2 = messages.firstWhere((m) => m.id == user2.id);
-
-        expect(messages.map((m) => m.id).toList(), <String>[
-          user1.id,
-          user2.id,
-          assistant2.id,
-        ]);
-        expect(reparentedUser2.parentId, user1.id);
+        expect(messages.map((m) => m.id).toList(), <String>[user1.id]);
         expect(
           harness.builderService
               .collapseVersions(messages, const <String, int>{})
               .map((m) => m.id)
               .toList(),
-          <String>[user1.id, user2.id, assistant2.id],
+          <String>[user1.id],
         );
       },
     );
 
     test(
-      'deleting root message reparents child to root and keeps branch reachable',
+      'deleting root message cascade-deletes entire branch',
       () async {
         final conversation = await harness.chatService.createConversation(
           title: 'Delete root',
@@ -448,34 +549,25 @@ void main() {
           role: 'user',
           content: 'u1',
         );
-        final assistant1 = await harness.chatService.addMessage(
+        await harness.chatService.addMessage(
           conversationId: conversation.id,
           role: 'assistant',
           content: 'a1',
           parentId: user1.id,
         );
-        final user2 = await harness.chatService.addMessage(
+        await harness.chatService.addMessage(
           conversationId: conversation.id,
           role: 'user',
           content: 'u2',
-          parentId: assistant1.id,
+          parentId: user1.id, // sibling branch — not a descendant of assistant1
         );
 
         await harness.chatService.deleteMessage(user1.id);
 
+        // Entire branch rooted at user1 is deleted (user1 + assistant1 + user2
+        // since they all descend from user1 via parentId).
         final messages = harness.chatService.getMessages(conversation.id);
-        final reparentedAssistant = messages.firstWhere(
-          (m) => m.id == assistant1.id,
-        );
-
-        expect(reparentedAssistant.parentId, isNull);
-        expect(
-          harness.builderService
-              .collapseVersions(messages, const <String, int>{})
-              .map((m) => m.id)
-              .toList(),
-          <String>[assistant1.id, user2.id],
-        );
+        expect(messages, isEmpty);
       },
     );
 
@@ -535,6 +627,58 @@ void main() {
           harness.chatService.getGeminiThoughtSignature(assistant.id),
           isNull,
         );
+      },
+    );
+
+    test(
+      'deleting one user version should not surface deleted branch assistant before surviving branch',
+      () async {
+        const userGroupId = 'user-group';
+
+        final conversation = await harness.chatService.createConversation(
+          title: 'Delete user version branch',
+        );
+
+        final userV0 = await harness.chatService.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'user-v0',
+          groupId: userGroupId,
+          version: 0,
+        );
+        final assistantV0 = await harness.chatService.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'assistant-v0',
+          parentId: userV0.id,
+        );
+        final userV1 = await harness.chatService.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'user-v1',
+          groupId: userGroupId,
+          version: 1,
+        );
+        final assistantV1 = await harness.chatService.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'assistant-v1',
+          parentId: userV1.id,
+        );
+
+        await harness.chatService.deleteMessage(userV0.id);
+
+        final messages = harness.chatService.getMessages(conversation.id);
+        final collapsed = harness.builderService.collapseVersions(
+          messages,
+          const <String, int>{},
+        );
+
+        expect(collapsed.map((m) => m.id).toList(), <String>[
+          userV1.id,
+          assistantV1.id,
+        ]);
+        expect(collapsed.any((m) => m.id == assistantV0.id), isFalse);
       },
     );
   });
