@@ -824,16 +824,12 @@ class ChatService extends ChangeNotifier {
       final remappedGroupId =
           src.groupId != null ? oldToNew[src.groupId] : null;
 
-      if (remappedParentId != null ||
-          remappedGroupId != null ||
-          src.version != null) {
-        final updated = clone.copyWith(
-          parentId: remappedParentId,
-          groupId: remappedGroupId,
-          version: src.version,
-        );
-        await _messagesBox.put(newId, updated);
-      }
+      final updated = clone.copyWith(
+        parentId: remappedParentId,
+        groupId: remappedGroupId,
+        version: src.version,
+      );
+      await _messagesBox.put(newId, updated);
     }
 
     // Also remap versionSelections keys (old groupId → new groupId)
@@ -993,16 +989,28 @@ class ChatService extends ChangeNotifier {
     // via parentId.  This deletes the entire branch rooted at this message.
     // NOTE: we do NOT expand to group-siblings of descendants — each
     // version is its own branch entry and other versions are preserved.
+
+    // Pre-filter: collect only messages in this conversation and build a
+    // parentId → children index so the BFS runs in O(M) where M is the
+    // conversation size, instead of O(N * D) over the entire messages box.
+    final Map<String, List<String>> childrenByParent = <String, List<String>>{};
+    for (final mid in _messagesBox.keys.cast<String>()) {
+      final m = _messagesBox.get(mid);
+      if (m == null || m.conversationId != conversationId) continue;
+      final pid = m.parentId;
+      if (pid != null && pid.isNotEmpty) {
+        childrenByParent.putIfAbsent(pid, () => <String>[]).add(mid);
+      }
+    }
+
     final toDelete = <String>{messageId};
     final queue = <String>[messageId];
     while (queue.isNotEmpty) {
       final pid = queue.removeAt(0);
-      for (final mid in _messagesBox.keys.cast<String>()) {
-        if (toDelete.contains(mid)) continue;
-        final m = _messagesBox.get(mid);
-        if (m == null || m.conversationId != conversationId) continue;
-        if (m.parentId == pid) {
-          toDelete.add(mid);
+      final children = childrenByParent[pid];
+      if (children == null) continue;
+      for (final mid in children) {
+        if (toDelete.add(mid)) {
           queue.add(mid);
         }
       }
@@ -1170,7 +1178,7 @@ class ChatService extends ChangeNotifier {
     if (message == null) return;
     if (message.parentId == parentId) return;
 
-    final updated = _copyMessageWithParentId(message, parentId);
+    final updated = message.copyWith(parentId: parentId);
     await _messagesBox.put(messageId, updated);
 
     // Update cache
@@ -1182,32 +1190,6 @@ class ChatService extends ChangeNotifier {
         messages[index] = updated;
       }
     }
-  }
-
-  ChatMessage _copyMessageWithParentId(ChatMessage message, String? parentId) {
-    return ChatMessage(
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      timestamp: message.timestamp,
-      modelId: message.modelId,
-      providerId: message.providerId,
-      totalTokens: message.totalTokens,
-      conversationId: message.conversationId,
-      isStreaming: message.isStreaming,
-      reasoningText: message.reasoningText,
-      reasoningStartAt: message.reasoningStartAt,
-      reasoningFinishedAt: message.reasoningFinishedAt,
-      translation: message.translation,
-      reasoningSegmentsJson: message.reasoningSegmentsJson,
-      groupId: message.groupId,
-      version: message.version,
-      promptTokens: message.promptTokens,
-      completionTokens: message.completionTokens,
-      cachedTokens: message.cachedTokens,
-      durationMs: message.durationMs,
-      parentId: parentId,
-    );
   }
 
   Future<void> moveConversationToAssistant({

@@ -399,6 +399,10 @@ class MessageGenerationService {
   }
 
   /// Remove trailing messages after regeneration cut point.
+  ///
+  /// **Deprecated**: Tree-structure branching no longer removes trailing
+  /// messages during regeneration. Kept for potential future use.
+  @Deprecated('Tree branching no longer removes trailing messages')
   Future<List<String>> removeTrailingMessages({
     required List<ChatMessage> messages,
     required int lastKeep,
