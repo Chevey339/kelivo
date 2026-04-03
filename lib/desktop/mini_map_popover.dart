@@ -4,6 +4,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../core/models/chat_message.dart';
+import '../icons/lucide_adapter.dart';
+import '../l10n/app_localizations.dart';
 
 Future<String?> showDesktopMiniMapPopover(
   BuildContext context, {
@@ -98,7 +100,12 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
   late final AnimationController _controller;
   late final Animation<double> _fadeIn;
   late final Animation<double> _slideY; // px translateY
+  late final TextEditingController _searchController;
+  late final FocusNode _searchFocusNode;
+  late final ScrollController _listController;
   bool _closing = false;
+  bool _isSearching = false;
+  String _query = '';
 
   @override
   void initState() {
@@ -113,6 +120,9 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
     );
     _fadeIn = curve;
     _slideY = Tween<double>(begin: 16.0, end: 0.0).animate(curve);
+    _searchController = TextEditingController();
+    _searchFocusNode = FocusNode();
+    _listController = ScrollController();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         await _controller.forward();
@@ -123,7 +133,44 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
   @override
   void dispose() {
     _controller.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    _listController.dispose();
     super.dispose();
+  }
+
+  void _startSearch() {
+    setState(() {
+      _isSearching = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _searchFocusNode.requestFocus();
+    });
+  }
+
+  void _clearOrCloseSearch({bool close = false}) {
+    setState(() {
+      _query = '';
+      _searchController.clear();
+      if (close) {
+        _isSearching = false;
+      }
+    });
+    if (close) {
+      _searchFocusNode.unfocus();
+      return;
+    }
+    _searchFocusNode.requestFocus();
+  }
+
+  void _scrollToBottom() {
+    if (!_listController.hasClients) return;
+    _listController.animateTo(
+      _listController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   Future<void> _close() async {
@@ -145,6 +192,7 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
           screen.width - width - 8.0,
         );
     final clipHeight = widget.anchorRect.top.clamp(0.0, screen.height);
+    final panelHeight = (clipHeight - 12).clamp(360.0, 620.0).toDouble();
 
     return Stack(
       children: [
@@ -178,19 +226,47 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(14),
                         ),
-                        child: _MiniMapList(
-                          messages: widget.messages,
-                          selecting: widget.selecting,
-                          selectedMessageIds: widget.selectedMessageIds,
-                          selectionListenable: widget.selectionListenable,
-                          onTapMessage: (id) {
-                            if (_closing) return;
-                            if (widget.selecting) {
-                              widget.onToggleSelection?.call(id);
-                            } else {
-                              widget.onSelect?.call(id);
-                            }
-                          },
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxHeight: panelHeight),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _MiniMapHeader(
+                                isSearching: _isSearching,
+                                searchController: _searchController,
+                                searchFocusNode: _searchFocusNode,
+                                onSearchChanged: (value) {
+                                  setState(() {
+                                    _query = value;
+                                  });
+                                },
+                                onStartSearch: _startSearch,
+                                onCloseSearch: () =>
+                                    _clearOrCloseSearch(close: true),
+                                onScrollToBottom: _scrollToBottom,
+                              ),
+                              Flexible(
+                                child: _MiniMapList(
+                                  messages: widget.messages,
+                                  query: _query,
+                                  scrollController: _listController,
+                                  selecting: widget.selecting,
+                                  selectedMessageIds: widget.selectedMessageIds,
+                                  selectionListenable:
+                                      widget.selectionListenable,
+                                  onTapMessage: (id) {
+                                    if (_closing) return;
+                                    if (widget.selecting) {
+                                      widget.onToggleSelection?.call(id);
+                                    } else {
+                                      widget.onSelect?.call(id);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -201,6 +277,244 @@ class _MiniMapPopoverState extends State<_MiniMapPopover>
           ),
         ),
       ],
+    );
+  }
+}
+
+class _MiniMapHeader extends StatelessWidget {
+  const _MiniMapHeader({
+    required this.isSearching,
+    required this.searchController,
+    required this.searchFocusNode,
+    required this.onSearchChanged,
+    required this.onStartSearch,
+    required this.onCloseSearch,
+    required this.onScrollToBottom,
+  });
+
+  final bool isSearching;
+  final TextEditingController searchController;
+  final FocusNode searchFocusNode;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onStartSearch;
+  final VoidCallback onCloseSearch;
+  final VoidCallback onScrollToBottom;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor = cs.outlineVariant.withValues(alpha: isDark ? 0.5 : 0.8);
+    final l10n = AppLocalizations.of(context)!;
+    const searchFieldWidth = 248.0;
+    const compactSearchWidth = 36.0;
+    const expandedSearchWidth = searchFieldWidth + 44;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: IgnorePointer(
+              ignoring: isSearching,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                opacity: isSearching ? 0.0 : 1.0,
+                child: Row(
+                  children: [
+                    Icon(Lucide.Map, size: 18, color: cs.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.miniMapTitle,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            width: isSearching
+                ? expandedSearchWidth + 44
+                : compactSearchWidth + 44,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedSlide(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  offset: isSearching ? const Offset(-0.18, 0) : Offset.zero,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    opacity: isSearching ? 1.0 : 0.82,
+                    child: SizedBox(
+                      height: 36,
+                      width: 36,
+                      child: IconButton(
+                        onPressed: onScrollToBottom,
+                        tooltip: l10n.miniMapScrollToBottomTooltip,
+                        icon: Icon(
+                          Lucide.ChevronsDown,
+                          size: 18,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  width: isSearching ? expandedSearchWidth : compactSearchWidth,
+                  height: 36,
+                  child: ClipRect(
+                    child: Stack(
+                      alignment: Alignment.centerRight,
+                      children: [
+                        IgnorePointer(
+                          ignoring: isSearching,
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 140),
+                            curve: Curves.easeOut,
+                            opacity: isSearching ? 0.0 : 1.0,
+                            child: SizedBox(
+                              key: const ValueKey('desktopMiniMapSearchButton'),
+                              height: 36,
+                              width: 36,
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                icon: Icon(
+                                  Lucide.Search,
+                                  size: 20,
+                                  color: cs.onSurface,
+                                ),
+                                onPressed: onStartSearch,
+                                tooltip: MaterialLocalizations.of(
+                                  context,
+                                ).searchFieldLabel,
+                              ),
+                            ),
+                          ),
+                        ),
+                        IgnorePointer(
+                          ignoring: !isSearching,
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOutCubic,
+                            opacity: isSearching ? 1.0 : 0.0,
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: SizedBox(
+                                key: const ValueKey(
+                                  'desktopMiniMapSearchField',
+                                ),
+                                width: expandedSearchWidth,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 36,
+                                        child: TextField(
+                                          controller: searchController,
+                                          focusNode: searchFocusNode,
+                                          onChanged: onSearchChanged,
+                                          textInputAction:
+                                              TextInputAction.search,
+                                          textAlignVertical:
+                                              TextAlignVertical.center,
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            hintText: MaterialLocalizations.of(
+                                              context,
+                                            ).searchFieldLabel,
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 8,
+                                                ),
+                                            filled: true,
+                                            fillColor: cs
+                                                .surfaceContainerHighest
+                                                .withValues(
+                                                  alpha: isDark ? 0.35 : 0.6,
+                                                ),
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              borderSide: BorderSide(
+                                                color: borderColor,
+                                              ),
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              borderSide: BorderSide(
+                                                color: borderColor,
+                                              ),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              borderSide: BorderSide(
+                                                color: cs.primary,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    SizedBox(
+                                      height: 36,
+                                      width: 36,
+                                      child: IconButton(
+                                        key: const ValueKey(
+                                          'desktopMiniMapCloseSearchButton',
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                        icon: Icon(
+                                          Lucide.X,
+                                          size: 18,
+                                          color: cs.onSurface.withValues(
+                                            alpha: 0.7,
+                                          ),
+                                        ),
+                                        onPressed: onCloseSearch,
+                                        tooltip: MaterialLocalizations.of(
+                                          context,
+                                        ).closeButtonLabel,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -247,12 +561,16 @@ class _GlassPanel extends StatelessWidget {
 class _MiniMapList extends StatelessWidget {
   const _MiniMapList({
     required this.messages,
+    required this.query,
+    required this.scrollController,
     required this.onTapMessage,
     required this.selecting,
     this.selectedMessageIds,
     this.selectionListenable,
   });
   final List<ChatMessage> messages;
+  final String query;
+  final ScrollController scrollController;
   final ValueChanged<String> onTapMessage;
   final bool selecting;
   final Set<String>? selectedMessageIds;
@@ -296,44 +614,51 @@ class _MiniMapList extends StatelessWidget {
     return pairs;
   }
 
+  List<_QaPair> _filteredPairs(List<_QaPair> base) {
+    final needle = query.trim().toLowerCase();
+    if (needle.isEmpty) return base;
+    return base.where((pair) {
+      final user = pair.user?.content.toLowerCase() ?? '';
+      final assistant = pair.assistant?.content.toLowerCase() ?? '';
+      return user.contains(needle) || assistant.contains(needle);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget buildList(List<_QaPair> pairs) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 2),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 420),
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
-            primary: false,
-            shrinkWrap: true,
-            itemCount: pairs.length,
-            itemBuilder: (context, index) {
-              final p = pairs[index];
-              final userSelected =
-                  selecting &&
-                  selectedMessageIds != null &&
-                  p.user != null &&
-                  selectedMessageIds!.contains(p.user!.id);
-              final assistantSelected =
-                  selecting &&
-                  selectedMessageIds != null &&
-                  p.assistant != null &&
-                  selectedMessageIds!.contains(p.assistant!.id);
+        child: ListView.builder(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          primary: false,
+          itemCount: pairs.length,
+          itemBuilder: (context, index) {
+            final p = pairs[index];
+            final userSelected =
+                selecting &&
+                selectedMessageIds != null &&
+                p.user != null &&
+                selectedMessageIds!.contains(p.user!.id);
+            final assistantSelected =
+                selecting &&
+                selectedMessageIds != null &&
+                p.assistant != null &&
+                selectedMessageIds!.contains(p.assistant!.id);
 
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: _MiniMapRow(
-                  user: p.user,
-                  assistant: p.assistant,
-                  userSelected: userSelected,
-                  assistantSelected: assistantSelected,
-                  toOneLine: _oneLine,
-                  onTapMessage: onTapMessage,
-                ),
-              );
-            },
-          ),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: _MiniMapRow(
+                user: p.user,
+                assistant: p.assistant,
+                userSelected: userSelected,
+                assistantSelected: assistantSelected,
+                toOneLine: _oneLine,
+                onTapMessage: onTapMessage,
+              ),
+            );
+          },
         ),
       );
     }
@@ -341,37 +666,12 @@ class _MiniMapList extends StatelessWidget {
     if (selecting && selectionListenable != null) {
       return AnimatedBuilder(
         animation: selectionListenable!,
-        builder: (context, child) => buildList(_buildPairs(messages)),
+        builder: (context, child) =>
+            buildList(_filteredPairs(_buildPairs(messages))),
       );
     }
 
-    final pairs = _buildPairs(messages);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 420),
-        child: ListView.builder(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
-          primary: false,
-          shrinkWrap: true,
-          itemCount: pairs.length,
-          itemBuilder: (context, index) {
-            final p = pairs[index];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: _MiniMapRow(
-                user: p.user,
-                assistant: p.assistant,
-                userSelected: false,
-                assistantSelected: false,
-                toOneLine: _oneLine,
-                onTapMessage: onTapMessage,
-              ),
-            );
-          },
-        ),
-      ),
-    );
+    return buildList(_filteredPairs(_buildPairs(messages)));
   }
 }
 
