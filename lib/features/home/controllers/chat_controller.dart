@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../services/message_tree_utils.dart';
 
 /// Controller for managing conversation state in the home page.
 ///
@@ -354,129 +355,11 @@ class ChatController extends ChangeNotifier {
   /// to follow the active branch. Falls back to flat order for legacy
   /// messages where all parentIds are null.
   List<ChatMessage> collapseVersions(List<ChatMessage> items) {
-    if (items.isEmpty) return <ChatMessage>[];
-
-    final hasTree = items.any((m) => m.parentId != null);
-    if (!hasTree) {
-      return _collapseVersionsFlat(items);
-    }
-    return _collapseVersionsTree(items);
+    return MessageTreeUtils.collapseVersions(items, _versionSelections);
   }
 
   List<ChatMessage> _collapseVersionsFlat(List<ChatMessage> items) {
-    final Map<String, List<ChatMessage>> byGroup =
-        <String, List<ChatMessage>>{};
-    final List<String> order = <String>[];
-
-    for (final m in items) {
-      final gid = (m.groupId ?? m.id);
-      final list = byGroup.putIfAbsent(gid, () {
-        order.add(gid);
-        return <ChatMessage>[];
-      });
-      list.add(m);
-    }
-
-    for (final e in byGroup.entries) {
-      e.value.sort((a, b) => a.version.compareTo(b.version));
-    }
-
-    final out = <ChatMessage>[];
-    for (final gid in order) {
-      final vers = byGroup[gid]!;
-      final sel = _versionSelections[gid];
-      final idx = (sel != null && sel >= 0 && sel < vers.length)
-          ? sel
-          : (vers.length - 1);
-      out.add(vers[idx]);
-    }
-
-    return out;
-  }
-
-  List<ChatMessage> _collapseVersionsTree(List<ChatMessage> items) {
-    final Map<String, List<ChatMessage>> byGroup =
-        <String, List<ChatMessage>>{};
-    for (final m in items) {
-      final gid = (m.groupId ?? m.id);
-      byGroup.putIfAbsent(gid, () => <ChatMessage>[]).add(m);
-    }
-    for (final e in byGroup.entries) {
-      e.value.sort((a, b) => a.version.compareTo(b.version));
-    }
-
-    ChatMessage selectFromGroup(List<ChatMessage> vers) {
-      final gid = vers.first.groupId ?? vers.first.id;
-      final sel = _versionSelections[gid];
-      final idx = (sel != null && sel >= 0 && sel < vers.length)
-          ? sel
-          : (vers.length - 1);
-      return vers[idx];
-    }
-
-    final Map<String, Set<String>> childGroupsByParent =
-        <String, Set<String>>{};
-    for (final entry in byGroup.entries) {
-      for (final m in entry.value) {
-        final parentId = m.parentId;
-        if (parentId != null && parentId.isNotEmpty) {
-          childGroupsByParent
-              .putIfAbsent(parentId, () => <String>{})
-              .add(entry.key);
-        }
-      }
-    }
-
-    final rootGroups = <String>[];
-    for (final entry in byGroup.entries) {
-      final parentId = entry.value.first.parentId;
-      if (parentId == null || parentId.isEmpty) {
-        rootGroups.add(entry.key);
-      }
-    }
-
-    final Map<String, int> groupFirstIndex = <String, int>{};
-    for (int i = 0; i < items.length; i++) {
-      final gid = items[i].groupId ?? items[i].id;
-      groupFirstIndex.putIfAbsent(gid, () => i);
-    }
-    rootGroups.sort(
-      (a, b) => (groupFirstIndex[a] ?? 0).compareTo(groupFirstIndex[b] ?? 0),
-    );
-
-    final out = <ChatMessage>[];
-    final visited = <String>{};
-
-    void traverse(String groupId) {
-      if (visited.contains(groupId)) return;
-      visited.add(groupId);
-
-      final vers = byGroup[groupId];
-      if (vers == null || vers.isEmpty) return;
-
-      final selected = selectFromGroup(vers);
-      out.add(selected);
-
-      // Find child groups that point to this selected message
-      final childGids = childGroupsByParent[selected.id];
-      if (childGids == null || childGids.isEmpty) return;
-
-      final sortedChildren = childGids.toList()
-        ..sort(
-          (a, b) =>
-              (groupFirstIndex[a] ?? 0).compareTo(groupFirstIndex[b] ?? 0),
-        );
-
-      for (final childGid in sortedChildren) {
-        traverse(childGid);
-      }
-    }
-
-    for (final rootGid in rootGroups) {
-      traverse(rootGid);
-    }
-
-    return out;
+    return MessageTreeUtils.collapseVersionsFlat(items, _versionSelections);
   }
 
   /// Get messages collapsed by version (cached).

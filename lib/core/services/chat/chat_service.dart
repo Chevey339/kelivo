@@ -990,13 +990,16 @@ class ChatService extends ChangeNotifier {
     // NOTE: we do NOT expand to group-siblings of descendants — each
     // version is its own branch entry and other versions are preserved.
 
-    // Pre-filter: collect only messages in this conversation and build a
-    // parentId → children index so the BFS runs in O(M) where M is the
-    // conversation size, instead of O(N * D) over the entire messages box.
+    // Build parentId → children index scoped to this conversation only.
+    // Uses conversation.messageIds instead of scanning the entire messages box,
+    // keeping the cost at O(M) where M is the conversation size.
+    final conversation = _conversationsBox.get(conversationId)
+        ?? _draftConversations[conversationId];
+    final conversationMids = conversation?.messageIds ?? <String>[];
     final Map<String, List<String>> childrenByParent = <String, List<String>>{};
-    for (final mid in _messagesBox.keys.cast<String>()) {
+    for (final mid in conversationMids) {
       final m = _messagesBox.get(mid);
-      if (m == null || m.conversationId != conversationId) continue;
+      if (m == null) continue;
       final pid = m.parentId;
       if (pid != null && pid.isNotEmpty) {
         childrenByParent.putIfAbsent(pid, () => <String>[]).add(mid);
@@ -1024,7 +1027,6 @@ class ChatService extends ChangeNotifier {
     }
 
     // Remove from conversation
-    final conversation = _conversationsBox.get(conversationId);
     if (conversation != null) {
       conversation.messageIds.removeWhere((id) => toDelete.contains(id));
 
