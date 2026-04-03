@@ -429,7 +429,7 @@ void main() {
           role: 'user',
           content: 'u1',
         );
-        final assistant1 = await harness.chatService.addMessage(
+        await harness.chatService.addMessage(
           conversationId: conversation.id,
           role: 'assistant',
           content: 'a1',

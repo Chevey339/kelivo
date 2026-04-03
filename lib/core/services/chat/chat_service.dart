@@ -786,6 +786,9 @@ class ChatService extends ChangeNotifier {
       title: title,
       assistantId: assistantId,
     );
+
+    // Pass 1: clone messages, record old-id → new-id mapping
+    final oldToNew = <String, String>{};
     final ids = <String>[];
     for (final src in sourceMessages) {
       final clone = ChatMessage(
@@ -802,12 +805,44 @@ class ChatService extends ChangeNotifier {
         reasoningFinishedAt: src.reasoningFinishedAt,
         translation: src.translation,
         reasoningSegmentsJson: src.reasoningSegmentsJson,
-        groupId: src.groupId,
-        version: src.version,
-        parentId: src.parentId,
+        // groupId and parentId will be remapped in pass 2
       );
+      oldToNew[src.id] = clone.id;
       await _messagesBox.put(clone.id, clone);
       ids.add(clone.id);
+    }
+
+    // Pass 2: remap parentId and groupId using the old→new mapping
+    for (final src in sourceMessages) {
+      final newId = oldToNew[src.id];
+      if (newId == null) continue;
+      final clone = _messagesBox.get(newId);
+      if (clone == null) continue;
+
+      final remappedParentId =
+          src.parentId != null ? oldToNew[src.parentId] : null;
+      final remappedGroupId =
+          src.groupId != null ? oldToNew[src.groupId] : null;
+
+      if (remappedParentId != null ||
+          remappedGroupId != null ||
+          src.version != null) {
+        final updated = clone.copyWith(
+          parentId: remappedParentId,
+          groupId: remappedGroupId,
+          version: src.version,
+        );
+        await _messagesBox.put(newId, updated);
+      }
+    }
+
+    // Also remap versionSelections keys (old groupId → new groupId)
+    final remappedSelections = <String, int>{};
+    if (versionSelections != null) {
+      for (final entry in versionSelections.entries) {
+        final newKey = oldToNew[entry.key] ?? entry.key;
+        remappedSelections[newKey] = entry.value;
+      }
     }
     // Attach to conversation in storage
     final c = _conversationsBox.get(convo.id);
@@ -815,9 +850,7 @@ class ChatService extends ChangeNotifier {
       c.messageIds
         ..clear()
         ..addAll(ids);
-      c.versionSelections = Map<String, int>.from(
-        versionSelections ?? const <String, int>{},
-      );
+      c.versionSelections = remappedSelections;
       c.updatedAt = DateTime.now();
       await c.save();
     }

@@ -413,36 +413,38 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Fork conversation at a specific message.
   Future<void> forkConversation(ChatMessage message) async {
-    // Determine included groups up to the message's group (inclusive)
-    final Map<String, int> groupFirstIndex = <String, int>{};
-    final List<String> groupOrder = <String>[];
-    for (int i = 0; i < messages.length; i++) {
-      final gid0 = (messages[i].groupId ?? messages[i].id);
-      if (!groupFirstIndex.containsKey(gid0)) {
-        groupFirstIndex[gid0] = i;
-        groupOrder.add(gid0);
-      }
+    // Fork only the single visible branch — no other versions / branches.
+    final collapsed = _chatController.collapsedMessages;
+    final targetIdx = collapsed.indexWhere((m) => m.id == message.id);
+    if (targetIdx < 0) {
+      // Fallback: match by group
+      final targetGroup = (message.groupId ?? message.id);
+      final gi = collapsed.indexWhere(
+        (m) => (m.groupId ?? m.id) == targetGroup,
+      );
+      if (gi < 0) return;
+      final selected = collapsed.sublist(0, gi + 1);
+      final newConvo = await _chatService.forkConversation(
+        title: getTitleForLocale(_contextProvider),
+        assistantId: currentConversation?.assistantId,
+        sourceMessages: selected,
+      );
+      _chatService.setCurrentConversation(newConvo.id);
+      _chatController.setCurrentConversation(newConvo);
+      _restoreMessageUiState();
+      notifyListeners();
+      onConversationSwitched?.call();
+      onScrollToBottom?.call();
+      return;
     }
-    final targetGroup = (message.groupId ?? message.id);
-    final targetOrderIndex = groupOrder.indexOf(targetGroup);
-    if (targetOrderIndex < 0) return;
 
-    final includeGroups = groupOrder.take(targetOrderIndex + 1).toSet();
-    final selected = [
-      for (final m in messages)
-        if (includeGroups.contains(m.groupId ?? m.id)) m,
-    ];
-    // Filter version selections to included groups
-    final sel = <String, int>{};
-    for (final gid in includeGroups) {
-      final v = versionSelections[gid];
-      if (v != null) sel[gid] = v;
-    }
+    // Take only collapsed messages up to the target — one message per group,
+    // no version history, no hidden branches.
+    final selected = collapsed.sublist(0, targetIdx + 1);
     final newConvo = await _chatService.forkConversation(
       title: getTitleForLocale(_contextProvider),
       assistantId: currentConversation?.assistantId,
       sourceMessages: selected,
-      versionSelections: sel,
     );
 
     // Switch to the new conversation
