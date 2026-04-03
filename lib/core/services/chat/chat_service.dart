@@ -956,11 +956,22 @@ class ChatService extends ChangeNotifier {
 
     final conversationId = message.conversationId;
     final gid = message.groupId ?? message.id;
+    final inheritedParentId = message.parentId;
 
-    // Only delete this single message/version — no cascade.
-    // Children whose parentId pointed to this message will become
-    // unreachable in the tree traversal (they simply won't appear
-    // in any branch), which is the safe default.
+    // Re-parent children: any message whose parentId == messageId is
+    // adopted by the deleted message's own parent, keeping the tree
+    // connected and preventing orphan data.
+    for (final mid in _messagesBox.keys.cast<String>()) {
+      if (mid == messageId) continue;
+      final child = _messagesBox.get(mid);
+      if (child == null || child.conversationId != conversationId) continue;
+      if (child.parentId == messageId) {
+        final updated = _copyMessageWithParentId(child, inheritedParentId);
+        await _messagesBox.put(mid, updated);
+      }
+    }
+
+    // Remove from conversation
     final conversation = _conversationsBox.get(conversationId);
     if (conversation != null) {
       conversation.messageIds.remove(messageId);
@@ -978,8 +989,12 @@ class ChatService extends ChangeNotifier {
 
     await _messagesBox.delete(messageId);
     if (message.role == 'assistant') {
-      try { await _toolEventsBox.delete(messageId); } catch (_) {}
-      try { await _toolEventsBox.delete(_sigKey(messageId)); } catch (_) {}
+      try {
+        await _toolEventsBox.delete(messageId);
+      } catch (_) {}
+      try {
+        await _toolEventsBox.delete(_sigKey(messageId));
+      } catch (_) {}
     }
 
     // Update cache
@@ -1106,7 +1121,7 @@ class ChatService extends ChangeNotifier {
     if (message == null) return;
     if (message.parentId == parentId) return;
 
-    final updated = message.copyWith(parentId: parentId);
+    final updated = _copyMessageWithParentId(message, parentId);
     await _messagesBox.put(messageId, updated);
 
     // Update cache
@@ -1118,6 +1133,32 @@ class ChatService extends ChangeNotifier {
         messages[index] = updated;
       }
     }
+  }
+
+  ChatMessage _copyMessageWithParentId(ChatMessage message, String? parentId) {
+    return ChatMessage(
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      timestamp: message.timestamp,
+      modelId: message.modelId,
+      providerId: message.providerId,
+      totalTokens: message.totalTokens,
+      conversationId: message.conversationId,
+      isStreaming: message.isStreaming,
+      reasoningText: message.reasoningText,
+      reasoningStartAt: message.reasoningStartAt,
+      reasoningFinishedAt: message.reasoningFinishedAt,
+      translation: message.translation,
+      reasoningSegmentsJson: message.reasoningSegmentsJson,
+      groupId: message.groupId,
+      version: message.version,
+      promptTokens: message.promptTokens,
+      completionTokens: message.completionTokens,
+      cachedTokens: message.cachedTokens,
+      durationMs: message.durationMs,
+      parentId: parentId,
+    );
   }
 
   Future<void> moveConversationToAssistant({
