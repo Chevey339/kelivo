@@ -68,7 +68,8 @@ class DesktopWindowController with WindowListener {
       final shouldRestorePos = validatedPos != null && !isMac;
       if (shouldRestorePos) {
         try {
-          await windowManager.setPosition(validatedPos);
+          final logicPos = await _physicalToLogical(validatedPos);
+          await windowManager.setPosition(logicPos);
         } catch (_) {}
       }
       // Only auto-restore maximize on Windows; macOS restore may cause jump.
@@ -81,7 +82,36 @@ class DesktopWindowController with WindowListener {
 
     _attachListeners();
   }
-
+    /// 将物理像素坐标转换为逻辑坐标
+    /// Windows上 window_manager 返回物理像素，需除以所在屏幕的 devicePixelRatio
+    Future<Offset> _physicalToLogical(Offset physicalPos) async {
+      try {
+        final displays = await ScreenRetriever.instance.getAllDisplays();
+        for (final display in displays) {
+          if (display.visiblePosition == null || display.visibleSize == null) continue;
+          final scale = display.scaleFactor ?? 1.0; // scaleFactor 即 devicePixelRatio
+        
+          // display 的 visiblePosition/visibleSize 是逻辑像素
+          // 把 physicalPos 先转成该屏幕下的逻辑坐标再判断归属
+          final logicalPos = Offset(physicalPos.dx / scale, physicalPos.dy / scale);
+        
+          // 但这样不对，因为多屏时物理坐标的原点是混合的
+          // 更可靠：直接比较物理坐标范围
+          final physLeft = display.visiblePosition!.dx * scale;
+          final physTop = display.visiblePosition!.dy * scale;
+          final physRight = physLeft + display.visibleSize!.width * scale;
+          final physBottom = physTop + display.visibleSize!.height * scale;
+        
+          if (physicalPos.dx >= physLeft && physicalPos.dx < physRight &&
+              physicalPos.dy >= physTop && physicalPos.dy < physBottom) {
+            // 属于这个屏幕，转为逻辑坐标
+            return Offset(physicalPos.dx / scale, physicalPos.dy / scale);
+          }
+        }
+      } catch (_) {}
+      return physicalPos; // fallback
+    }
+    
   /// Returns [position] if at least a portion of the window (defined by
   /// [windowSize]) would be visible on any connected display; otherwise
   /// returns `null` so the OS can place the window at a default location.
