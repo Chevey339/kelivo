@@ -100,7 +100,7 @@ class _SponsorPageState extends State<SponsorPage> {
                 icon: Lucide.Heart,
                 label: l10n.sponsorPageAfdianTitle,
                 onTap: () async {
-                  final uri = Uri.parse('https://afdian.com/a/kelivo');
+                  final uri = Uri.parse('https://ifdian.net/a/kelivo');
                   if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }
