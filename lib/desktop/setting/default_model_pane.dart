@@ -5,6 +5,7 @@ import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../features/model/widgets/model_select_sheet.dart';
 import '../../utils/brand_assets.dart';
+import '../../shared/widgets/input_height_constraints.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 class DesktopDefaultModelPane extends StatelessWidget {
@@ -1009,18 +1010,18 @@ Widget _promptEditor(
   required TextEditingController controller,
   required String hintText,
 }) {
-  final editorHeight = (MediaQuery.of(context).size.height * 0.45).clamp(
-    180.0,
-    420.0,
+  final maxPromptHeight = computeInputMaxHeight(
+    context: context,
+    reservedHeight: 220,
+    softCapFraction: 0.6,
+    minHeight: 160,
   );
-  return SizedBox(
-    height: editorHeight.toDouble(),
+  return ConstrainedBox(
+    constraints: BoxConstraints(minHeight: 160, maxHeight: maxPromptHeight),
     child: TextField(
       controller: controller,
       maxLines: null,
-      minLines: null,
-      expands: true,
-      textAlignVertical: TextAlignVertical.top,
+      minLines: 8,
       style: const TextStyle(fontSize: 14),
       decoration: _deskInputDecoration(context).copyWith(hintText: hintText),
     ),
