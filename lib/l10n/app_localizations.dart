@@ -1469,6 +1469,30 @@ abstract class AppLocalizations {
   /// **'Camera unavailable: permission not granted.'**
   String get cameraPermissionDeniedMessage;
 
+  /// No description provided for @voiceInputPermissionDeniedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone unavailable: permission not granted.'**
+  String get voiceInputPermissionDeniedMessage;
+
+  /// No description provided for @voiceRecordingStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t start recording.'**
+  String get voiceRecordingStartFailed;
+
+  /// No description provided for @voiceRecordingStopFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t process the recording.'**
+  String get voiceRecordingStopFailed;
+
+  /// No description provided for @voiceRecordingDisplayLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'User voice ({duration})'**
+  String voiceRecordingDisplayLabel(Object duration);
+
   /// No description provided for @openSystemSettings.
   ///
   /// In en, this message translates to:
@@ -3838,6 +3862,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'MCP Servers'**
   String get chatInputBarMcpServersTooltip;
+
+  /// No description provided for @chatInputBarVoiceInputTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Voice'**
+  String get chatInputBarVoiceInputTooltip;
+
+  /// No description provided for @chatInputBarVoiceRecordingTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Recording'**
+  String get chatInputBarVoiceRecordingTooltip;
 
   /// No description provided for @chatInputBarMoreTooltip.
   ///

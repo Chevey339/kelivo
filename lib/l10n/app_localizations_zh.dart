@@ -727,6 +727,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cameraPermissionDeniedMessage => '未授予相机权限';
 
   @override
+  String get voiceInputPermissionDeniedMessage => '未授予麦克风权限';
+
+  @override
+  String get voiceRecordingStartFailed => '无法开始录音';
+
+  @override
+  String get voiceRecordingStopFailed => '无法处理录音文件';
+
+  @override
+  String voiceRecordingDisplayLabel(Object duration) {
+    return '用户语音（$duration）';
+  }
+
+  @override
   String get openSystemSettings => '去设置';
 
   @override
@@ -1962,6 +1976,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatInputBarMcpServersTooltip => 'MCP服务器';
+
+  @override
+  String get chatInputBarVoiceInputTooltip => '语音输入';
+
+  @override
+  String get chatInputBarVoiceRecordingTooltip => '停止录音';
 
   @override
   String get chatInputBarMoreTooltip => '更多';
@@ -4992,6 +5012,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get cameraPermissionDeniedMessage => '未授予相机权限';
 
   @override
+  String get voiceInputPermissionDeniedMessage => '未授予麦克风权限';
+
+  @override
+  String get voiceRecordingStartFailed => '无法开始录音';
+
+  @override
+  String get voiceRecordingStopFailed => '无法处理录音文件';
+
+  @override
+  String voiceRecordingDisplayLabel(Object duration) {
+    return '用户语音（$duration）';
+  }
+
+  @override
   String get openSystemSettings => '去设置';
 
   @override
@@ -6227,6 +6261,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatInputBarMcpServersTooltip => 'MCP服务器';
+
+  @override
+  String get chatInputBarVoiceInputTooltip => '语音输入';
+
+  @override
+  String get chatInputBarVoiceRecordingTooltip => '停止录音';
 
   @override
   String get chatInputBarMoreTooltip => '更多';
@@ -9205,6 +9245,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get cameraPermissionDeniedMessage => '未授予相機權限';
 
   @override
+  String get voiceInputPermissionDeniedMessage => '未授予麥克風權限';
+
+  @override
+  String get voiceRecordingStartFailed => '無法開始錄音';
+
+  @override
+  String get voiceRecordingStopFailed => '無法處理錄音檔案';
+
+  @override
+  String voiceRecordingDisplayLabel(Object duration) {
+    return '使用者語音（$duration）';
+  }
+
+  @override
   String get openSystemSettings => '前往設定';
 
   @override
@@ -10439,6 +10493,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatInputBarMcpServersTooltip => 'MCP伺服器';
+
+  @override
+  String get chatInputBarVoiceInputTooltip => '語音輸入';
+
+  @override
+  String get chatInputBarVoiceRecordingTooltip => '停止錄音';
 
   @override
   String get chatInputBarMoreTooltip => '更多';

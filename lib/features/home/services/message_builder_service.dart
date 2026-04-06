@@ -462,6 +462,16 @@ class MessageBuilderService {
     }
   }
 
+  void injectGeminiAudioInputPrompt(List<Map<String, dynamic>> apiMessages) {
+    _appendToSystemMessage(apiMessages, '''
+The latest user turn may include one or more audio files.
+- Treat any text in the same user turn as instructions or context for the audio.
+- Listen to and reason over the audio content directly instead of ignoring it.
+- If the user asks for a transcript, provide an accurate transcript first.
+- If the audio is not speech, describe the relevant sounds and events.
+''');
+  }
+
   /// Inject memory prompts and recent chats reference into apiMessages.
   Future<void> injectMemoryAndRecentChats(
     List<Map<String, dynamic>> apiMessages,

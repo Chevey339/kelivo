@@ -345,6 +345,15 @@
   "desktopNavSettingsTooltip": "Settings",
   "desktopAvatarMenuUseEmoji": "Use emoji",
   "cameraPermissionDeniedMessage": "Camera unavailable: permission not granted.",
+  "voiceInputPermissionDeniedMessage": "Microphone unavailable: permission not granted.",
+  "voiceRecordingStartFailed": "Couldn't start recording.",
+  "voiceRecordingStopFailed": "Couldn't process the recording.",
+  "voiceRecordingDisplayLabel": "User voice ({duration})",
+  "@voiceRecordingDisplayLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
   "openSystemSettings": "Open Settings",
   "desktopAvatarMenuChangeFromImage": "Change from image…",
   "desktopAvatarMenuReset": "Reset avatar",
@@ -893,6 +902,8 @@
   "chatInputBarOnlineSearchTooltip": "Online Search",
   "chatInputBarReasoningStrengthTooltip": "Reasoning Strength",
   "chatInputBarMcpServersTooltip": "MCP Servers",
+  "chatInputBarVoiceInputTooltip": "Record Voice",
+  "chatInputBarVoiceRecordingTooltip": "Stop Recording",
   "chatInputBarMoreTooltip": "Add",
   "chatInputBarInsertNewline": "Newline",
   "chatInputBarExpand": "Expand",

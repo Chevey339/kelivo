@@ -17,14 +17,17 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../utils/clipboard_images.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/services/haptics.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/voice_attachment_utils.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
+import '../services/voice_input_service.dart';
 
 class ChatInputBarController {
   _ChatInputBarState? _state;
@@ -68,6 +71,11 @@ class ChatInputBar extends StatefulWidget {
     this.onPickCamera,
     this.onPickPhotos,
     this.onUploadFiles,
+    this.showVoiceInputButton = false,
+    this.voiceRecording = false,
+    this.onStartVoiceRecording,
+    this.onStopVoiceRecording,
+    this.onCancelVoiceRecording,
     this.onToggleLearningMode,
     this.onOpenWorldBook,
     this.onClearContext,
@@ -110,6 +118,11 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onPickCamera;
   final VoidCallback? onPickPhotos;
   final VoidCallback? onUploadFiles;
+  final bool showVoiceInputButton;
+  final bool voiceRecording;
+  final Future<bool> Function()? onStartVoiceRecording;
+  final Future<DocumentAttachment?> Function()? onStopVoiceRecording;
+  final Future<void> Function()? onCancelVoiceRecording;
   final VoidCallback? onToggleLearningMode;
   final VoidCallback? onOpenWorldBook;
   final VoidCallback? onClearContext;
@@ -136,6 +149,15 @@ class _ChatInputBarState extends State<ChatInputBar>
   final List<String> _images = <String>[]; // local file paths
   final List<DocumentAttachment> _docs =
       <DocumentAttachment>[]; // files to upload
+  bool _voiceActionInFlight = false;
+  Timer? _voiceAutoStopTimer;
+  final GlobalKey _voiceButtonKey = GlobalKey(
+    debugLabel: 'voice-button-anchor',
+  );
+  OverlayEntry? _voiceOverlayEntry;
+  bool _voicePointerHeld = false;
+  bool _voicePressActive = false;
+  bool _voiceWillCancel = false;
   final Map<LogicalKeyboardKey, Timer?> _repeatTimers = {};
   static const Duration _repeatInitialDelay = Duration(milliseconds: 300);
   static const Duration _repeatPeriod = Duration(milliseconds: 35);
@@ -215,6 +237,8 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _voiceAutoStopTimer?.cancel();
+    _removeVoiceOverlay();
     for (final timer in _repeatTimers.values) {
       try {
         timer?.cancel();
@@ -231,6 +255,13 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   void didUpdateWidget(covariant ChatInputBar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.voiceRecording && !widget.voiceRecording) {
+      _voiceAutoStopTimer?.cancel();
+      _removeVoiceOverlay();
+      _voicePointerHeld = false;
+      _voicePressActive = false;
+      _voiceWillCancel = false;
+    }
   }
 
   String _hint(BuildContext context) {
@@ -249,13 +280,18 @@ class _ChatInputBarState extends State<ChatInputBar>
   bool get _showExpandButton => _lineCount >= 3;
 
   void _handleSend() {
+    _sendCurrentInput();
+  }
+
+  void _sendCurrentInput({List<DocumentAttachment> extraDocuments = const []}) {
     final text = _controller.text.trim();
-    if (text.isEmpty && _images.isEmpty && _docs.isEmpty) return;
+    final documents = <DocumentAttachment>[..._docs, ...extraDocuments];
+    if (text.isEmpty && _images.isEmpty && documents.isEmpty) return;
     widget.onSend?.call(
       ChatInputData(
         text: text,
         imagePaths: List.of(_images),
-        documents: List.of(_docs),
+        documents: documents,
       ),
     );
     _controller.clear();
@@ -268,6 +304,237 @@ class _ChatInputBarState extends State<ChatInputBar>
         widget.focusNode?.requestFocus();
       }
     } catch (_) {}
+  }
+
+  Future<void> _startVoicePress(Offset globalPosition) async {
+    if (_voiceActionInFlight ||
+        _voicePressActive ||
+        widget.voiceRecording ||
+        widget.loading) {
+      return;
+    }
+    final startRecording = widget.onStartVoiceRecording;
+    if (startRecording == null) return;
+
+    setState(() => _voiceActionInFlight = true);
+    try {
+      final started = await startRecording();
+      if (!mounted || !started) return;
+      if (!_voicePointerHeld) {
+        final cancelRecording = widget.onCancelVoiceRecording;
+        if (cancelRecording != null) {
+          await cancelRecording();
+        } else {
+          await widget.onStopVoiceRecording?.call();
+        }
+        return;
+      }
+      Haptics.soft();
+      _voicePressActive = true;
+      _voiceWillCancel = false;
+      _showVoiceOverlay();
+      _updateVoiceDrag(globalPosition);
+      _voiceAutoStopTimer?.cancel();
+      _voiceAutoStopTimer = Timer(VoiceInputService.maxRecordingDuration, () {
+        if (!mounted || !_voicePressActive) return;
+        unawaited(_finishVoicePress());
+      });
+      if (mounted) setState(() {});
+    } finally {
+      if (mounted) {
+        setState(() => _voiceActionInFlight = false);
+      }
+    }
+  }
+
+  void _updateVoiceDrag(Offset globalPosition) {
+    if (!_voicePressActive) return;
+    final geometry = _resolveVoiceOverlayGeometry();
+    final bool willCancel =
+        geometry == null || !_isPointInVoiceKeepZone(globalPosition, geometry);
+    if (willCancel == _voiceWillCancel) return;
+    setState(() => _voiceWillCancel = willCancel);
+    _markVoiceOverlayNeedsBuild();
+  }
+
+  Future<void> _finishVoicePress({bool forceCancel = false}) async {
+    _voicePointerHeld = false;
+    if (_voiceActionInFlight || !_voicePressActive) return;
+    final stopRecording = widget.onStopVoiceRecording;
+    final cancelRecording = widget.onCancelVoiceRecording;
+    if (stopRecording == null) return;
+
+    final shouldCancel = forceCancel || _voiceWillCancel;
+    _voiceAutoStopTimer?.cancel();
+    _removeVoiceOverlay();
+    setState(() {
+      _voiceActionInFlight = true;
+      _voicePressActive = false;
+      _voiceWillCancel = false;
+    });
+
+    try {
+      if (shouldCancel) {
+        if (cancelRecording != null) {
+          await cancelRecording();
+        } else {
+          await stopRecording();
+        }
+        return;
+      }
+      final attachment = await stopRecording();
+      if (!mounted) return;
+      if (attachment != null) {
+        _sendCurrentInput(extraDocuments: [attachment]);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _voiceActionInFlight = false);
+      }
+    }
+  }
+
+  void _showVoiceOverlay() {
+    _removeVoiceOverlay();
+    final overlay = Overlay.of(context, rootOverlay: true);
+    _voiceOverlayEntry = OverlayEntry(
+      builder: (context) {
+        final geometry = _resolveVoiceOverlayGeometry();
+        if (!_voicePressActive || geometry == null) {
+          return const SizedBox.shrink();
+        }
+        return IgnorePointer(
+          child: Positioned.fill(
+            child: CustomPaint(
+              painter: _VoiceKeepZonePainter(
+                geometry: geometry,
+                cancelling: _voiceWillCancel,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    overlay.insert(_voiceOverlayEntry!);
+  }
+
+  void _removeVoiceOverlay() {
+    _voiceOverlayEntry?.remove();
+    _voiceOverlayEntry = null;
+  }
+
+  void _markVoiceOverlayNeedsBuild() {
+    _voiceOverlayEntry?.markNeedsBuild();
+  }
+
+  _VoiceOverlayGeometry? _resolveVoiceOverlayGeometry() {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final overlayBox = overlay.context.findRenderObject() as RenderBox?;
+    final voiceBox =
+        _voiceButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (overlayBox == null ||
+        voiceBox == null ||
+        !overlayBox.attached ||
+        !voiceBox.attached) {
+      return null;
+    }
+    final voiceTopLeft = voiceBox.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    final center = voiceTopLeft + voiceBox.size.center(Offset.zero);
+    final mediaQuery = MediaQuery.of(overlay.context);
+    final bottomInset = math.max(
+      mediaQuery.viewInsets.bottom,
+      mediaQuery.padding.bottom,
+    );
+    final drawableRect = Rect.fromLTRB(
+      mediaQuery.padding.left,
+      mediaQuery.padding.top,
+      overlayBox.size.width - mediaQuery.padding.right,
+      overlayBox.size.height - bottomInset,
+    );
+    final radius = math.min(
+      drawableRect.width * 0.3,
+      _maxDistanceToRectCorner(center, drawableRect) + 24,
+    );
+    return _VoiceOverlayGeometry(
+      center: center,
+      drawableRect: drawableRect,
+      radius: radius,
+    );
+  }
+
+  bool _isPointInVoiceKeepZone(
+    Offset globalPosition,
+    _VoiceOverlayGeometry geometry,
+  ) {
+    if (!geometry.drawableRect.contains(globalPosition)) return false;
+    final dx = globalPosition.dx - geometry.center.dx;
+    final dy = globalPosition.dy - geometry.center.dy;
+    final distance = math.sqrt(dx * dx + dy * dy);
+    if (distance > geometry.radius) return false;
+    return true;
+  }
+
+  double _maxDistanceToRectCorner(Offset center, Rect rect) {
+    final corners = <Offset>[
+      rect.topLeft,
+      rect.topRight,
+      rect.bottomLeft,
+      rect.bottomRight,
+    ];
+    double maxDistance = 0;
+    for (final corner in corners) {
+      final dx = corner.dx - center.dx;
+      final dy = corner.dy - center.dy;
+      maxDistance = math.max(maxDistance, math.sqrt(dx * dx + dy * dy));
+    }
+    return maxDistance;
+  }
+
+  Widget _buildVoicePressButton(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final semanticLabel = _voicePressActive
+        ? l10n.chatInputBarVoiceRecordingTooltip
+        : l10n.chatInputBarVoiceInputTooltip;
+
+    return Semantics(
+      button: true,
+      enabled: !_voiceActionInFlight && !widget.loading,
+      label: semanticLabel,
+      child: Listener(
+        key: _voiceButtonKey,
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: _voiceActionInFlight || widget.loading
+            ? null
+            : (event) {
+                _voicePointerHeld = true;
+                unawaited(_startVoicePress(event.position));
+              },
+        onPointerMove: (event) {
+          _updateVoiceDrag(event.position);
+        },
+        onPointerUp: (event) {
+          _updateVoiceDrag(event.position);
+          unawaited(_finishVoicePress());
+        },
+        onPointerCancel: (_) {
+          unawaited(_finishVoicePress(forceCancel: true));
+        },
+        child: AnimatedScale(
+          scale: _voicePressActive ? 2.0 : 1.0,
+          duration: const Duration(milliseconds: 390),
+          curve: Curves.elasticOut,
+          child: _CompactRoundActionButton(
+            enabled: !_voiceActionInFlight && !widget.loading,
+            active: _voicePressActive,
+            color: Theme.of(context).colorScheme.primary,
+            icon: Lucide.Mic,
+          ),
+        ),
+      ),
+    );
   }
 
   void _insertNewlineAtCursor() {
@@ -1368,6 +1635,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final isDark = theme.brightness == Brightness.dark;
     final hasText = _controller.text.trim().isNotEmpty;
     final hasImages = _images.isNotEmpty;
@@ -1423,6 +1691,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (context, idx) {
                     final d = _docs[idx];
+                    final isVoice = isVoiceRecordingAttachment(d);
                     return Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -1438,12 +1707,20 @@ class _ChatInputBarState extends State<ChatInputBar>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.insert_drive_file, size: 18),
+                          Icon(
+                            isVoice
+                                ? Lucide.AudioLines
+                                : Icons.insert_drive_file,
+                            size: 18,
+                            color: isVoice ? theme.colorScheme.primary : null,
+                          ),
                           const SizedBox(width: 6),
                           ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 180),
                             child: Text(
-                              d.fileName,
+                              isVoice
+                                  ? voiceRecordingDisplayLabel(l10n, d.fileName)
+                                  : d.fileName,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -1763,6 +2040,10 @@ class _ChatInputBarState extends State<ChatInputBar>
                                   ),
                                   const SizedBox(width: 8),
                                 ],
+                                if (widget.showVoiceInputButton) ...[
+                                  _buildVoicePressButton(context),
+                                  const SizedBox(width: 8),
+                                ],
                                 _CompactSendButton(
                                   enabled:
                                       (hasText || hasImages || hasDocs) &&
@@ -1880,6 +2161,50 @@ class _CompactIconButton extends StatelessWidget {
   }
 }
 
+class _CompactRoundActionButton extends StatelessWidget {
+  const _CompactRoundActionButton({
+    required this.enabled,
+    required this.active,
+    required this.color,
+    required this.icon,
+    this.child,
+    this.onTap,
+  });
+
+  final bool enabled;
+  final bool active;
+  final Color color;
+  final IconData icon;
+  final Widget? child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = active
+        ? color
+        : (isDark
+              ? Colors.white12
+              : Colors.grey.shade300.withValues(alpha: 0.84));
+    final fg = active
+        ? (isDark ? Colors.black : Colors.white)
+        : (isDark ? Colors.white70 : Colors.grey.shade600);
+
+    return Material(
+      color: bg,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: enabled ? onTap : null,
+        child: Padding(
+          padding: const EdgeInsets.all(7),
+          child: child ?? Icon(icon, size: 18, color: fg),
+        ),
+      ),
+    );
+  }
+}
+
 // New compact send button for the integrated input bar
 class _CompactSendButton extends StatelessWidget {
   const _CompactSendButton({
@@ -1901,41 +2226,83 @@ class _CompactSendButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = (enabled || loading)
-        ? color
-        : (isDark
-              ? Colors.white12
-              : Colors.grey.shade300.withValues(alpha: 0.84));
     final fg = (enabled || loading)
         ? (isDark ? Colors.black : Colors.white)
         : (isDark ? Colors.white70 : Colors.grey.shade600);
 
-    return Material(
-      color: bg,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: loading ? onStop : (enabled ? onSend : null),
-        child: Padding(
-          padding: const EdgeInsets.all(7),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            transitionBuilder: (child, anim) => ScaleTransition(
-              scale: anim,
-              child: FadeTransition(opacity: anim, child: child),
-            ),
-            child: loading
-                ? SvgPicture.asset(
-                    key: const ValueKey('stop'),
-                    'assets/icons/stop.svg',
-                    width: 18,
-                    height: 18,
-                    colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
-                  )
-                : Icon(icon, key: const ValueKey('send'), size: 18, color: fg),
-          ),
+    return _CompactRoundActionButton(
+      enabled: loading ? onStop != null : enabled,
+      active: enabled || loading,
+      color: color,
+      icon: icon,
+      onTap: loading ? onStop : onSend,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        transitionBuilder: (child, anim) => ScaleTransition(
+          scale: anim,
+          child: FadeTransition(opacity: anim, child: child),
         ),
+        child: loading
+            ? SvgPicture.asset(
+                key: const ValueKey('stop'),
+                'assets/icons/stop.svg',
+                width: 18,
+                height: 18,
+                colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+              )
+            : Icon(icon, key: const ValueKey('send'), size: 18, color: fg),
       ),
     );
+  }
+}
+
+class _VoiceOverlayGeometry {
+  const _VoiceOverlayGeometry({
+    required this.center,
+    required this.drawableRect,
+    required this.radius,
+  });
+
+  final Offset center;
+  final Rect drawableRect;
+  final double radius;
+}
+
+class _VoiceKeepZonePainter extends CustomPainter {
+  const _VoiceKeepZonePainter({
+    required this.geometry,
+    required this.cancelling,
+  });
+
+  final _VoiceOverlayGeometry geometry;
+  final bool cancelling;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.clipRect(geometry.drawableRect);
+
+    final circleRect = Rect.fromCircle(
+      center: geometry.center,
+      radius: geometry.radius,
+    );
+    final path = Path()..addOval(circleRect);
+    final baseColor = cancelling
+        ? const Color(0xFFFF5D73)
+        : const Color(0xFF8BC8FF);
+    final solidFill = Paint()
+      ..color = baseColor.withValues(alpha: 0.3)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawPath(path, solidFill);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _VoiceKeepZonePainter oldDelegate) {
+    return geometry.center != oldDelegate.geometry.center ||
+        geometry.drawableRect != oldDelegate.geometry.drawableRect ||
+        geometry.radius != oldDelegate.geometry.radius ||
+        cancelling != oldDelegate.cancelling;
   }
 }

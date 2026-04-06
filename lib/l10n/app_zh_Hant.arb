@@ -78,6 +78,15 @@
   "settingsPageSponsor": "贊助",
   "settingsPageShare": "分享",
   "cameraPermissionDeniedMessage": "未授予相機權限",
+  "voiceInputPermissionDeniedMessage": "未授予麥克風權限",
+  "voiceRecordingStartFailed": "無法開始錄音",
+  "voiceRecordingStopFailed": "無法處理錄音檔案",
+  "voiceRecordingDisplayLabel": "使用者語音（{duration}）",
+  "@voiceRecordingDisplayLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
   "openSystemSettings": "前往設定",
   "sponsorPageMethodsSectionTitle": "贊助方式",
   "sponsorPageSponsorsSectionTitle": "贊助用戶",
@@ -637,6 +646,8 @@
   "chatInputBarOnlineSearchTooltip": "聯網搜尋",
   "chatInputBarReasoningStrengthTooltip": "思維鏈強度",
   "chatInputBarMcpServersTooltip": "MCP伺服器",
+  "chatInputBarVoiceInputTooltip": "語音輸入",
+  "chatInputBarVoiceRecordingTooltip": "停止錄音",
   "chatInputBarMoreTooltip": "更多",
   "chatInputBarInsertNewline": "換行",
   "chatInputBarExpand": "展開",

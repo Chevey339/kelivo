@@ -24,6 +24,7 @@ import 'package:intl/intl.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/assistant_regex.dart';
+import '../../../utils/voice_attachment_utils.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
@@ -890,6 +891,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         spacing: 8,
                         runSpacing: 8,
                         children: parsed.docs.map((d) {
+                          final isVoice = isVoiceRecordingFileName(d.fileName);
                           return Material(
                             color: Colors.transparent,
                             child: InkWell(
@@ -950,8 +952,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               },
                               child: Ink(
                                 decoration: BoxDecoration(
-                                  color: isDark ? Colors.white12 : cs.surface,
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: isVoice
+                                      ? cs.primary.withValues(
+                                          alpha: isDark ? 0.28 : 0.18,
+                                        )
+                                      : (isDark ? Colors.white12 : cs.surface),
+                                  borderRadius: BorderRadius.circular(
+                                    isVoice ? 18 : 10,
+                                  ),
                                 ),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
@@ -961,9 +969,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Icon(
-                                        Icons.insert_drive_file,
+                                      Icon(
+                                        isVoice
+                                            ? Lucide.AudioLines
+                                            : Icons.insert_drive_file,
                                         size: 16,
+                                        color: isVoice ? cs.primary : null,
                                       ),
                                       const SizedBox(width: 6),
                                       ConstrainedBox(
@@ -971,8 +982,21 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                           maxWidth: 180,
                                         ),
                                         child: Text(
-                                          d.fileName,
+                                          isVoice
+                                              ? voiceRecordingDisplayLabel(
+                                                  l10n,
+                                                  d.fileName,
+                                                )
+                                              : d.fileName,
                                           overflow: TextOverflow.ellipsis,
+                                          style: isVoice
+                                              ? TextStyle(
+                                                  color: isDark
+                                                      ? Colors.white
+                                                      : cs.primary,
+                                                  fontWeight: FontWeight.w600,
+                                                )
+                                              : null,
                                         ),
                                       ),
                                     ],

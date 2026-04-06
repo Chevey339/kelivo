@@ -746,6 +746,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Camera unavailable: permission not granted.';
 
   @override
+  String get voiceInputPermissionDeniedMessage =>
+      'Microphone unavailable: permission not granted.';
+
+  @override
+  String get voiceRecordingStartFailed => 'Couldn\'t start recording.';
+
+  @override
+  String get voiceRecordingStopFailed => 'Couldn\'t process the recording.';
+
+  @override
+  String voiceRecordingDisplayLabel(Object duration) {
+    return 'User voice ($duration)';
+  }
+
+  @override
   String get openSystemSettings => 'Open Settings';
 
   @override
@@ -2027,6 +2042,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatInputBarMcpServersTooltip => 'MCP Servers';
+
+  @override
+  String get chatInputBarVoiceInputTooltip => 'Record Voice';
+
+  @override
+  String get chatInputBarVoiceRecordingTooltip => 'Stop Recording';
 
   @override
   String get chatInputBarMoreTooltip => 'Add';

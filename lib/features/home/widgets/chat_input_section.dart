@@ -21,6 +21,9 @@ typedef IsToolModelCallback = bool Function(String providerKey, String modelId);
 typedef IsReasoningModelCallback =
     bool Function(String providerKey, String modelId);
 
+typedef SupportsAudioInputCallback =
+    bool Function(String providerKey, String modelId);
+
 /// Callback for checking if reasoning is enabled.
 typedef IsReasoningEnabledCallback = bool Function(int? budget);
 
@@ -39,7 +42,9 @@ class ChatInputSection extends StatelessWidget {
     required this.isLoading,
     required this.isToolModel,
     required this.isReasoningModel,
+    required this.supportsAudioInput,
     required this.isReasoningEnabled,
+    this.voiceRecording = false,
     this.onMore,
     this.onSelectModel,
     this.onLongPressSelectModel,
@@ -56,6 +61,9 @@ class ChatInputSection extends StatelessWidget {
     this.onPickCamera,
     this.onPickPhotos,
     this.onUploadFiles,
+    this.onStartVoiceRecording,
+    this.onStopVoiceRecording,
+    this.onCancelVoiceRecording,
     this.onToggleLearningMode,
     this.onOpenWorldBook, // 新增世界书支持桌面端
     this.onLongPressLearning,
@@ -69,10 +77,12 @@ class ChatInputSection extends StatelessWidget {
   final ChatInputBarController mediaController;
   final bool isTablet;
   final bool isLoading;
+  final bool voiceRecording;
 
   // Model capability checkers
   final IsToolModelCallback isToolModel;
   final IsReasoningModelCallback isReasoningModel;
+  final SupportsAudioInputCallback supportsAudioInput;
   final IsReasoningEnabledCallback isReasoningEnabled;
 
   // Callbacks
@@ -92,6 +102,9 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onPickCamera;
   final VoidCallback? onPickPhotos;
   final VoidCallback? onUploadFiles;
+  final Future<bool> Function()? onStartVoiceRecording;
+  final Future<DocumentAttachment?> Function()? onStopVoiceRecording;
+  final Future<void> Function()? onCancelVoiceRecording;
   final VoidCallback? onToggleLearningMode;
   final VoidCallback? onOpenWorldBook;
   final VoidCallback? onLongPressLearning;
@@ -174,6 +187,15 @@ class ChatInputSection extends StatelessWidget {
       onPickCamera: isTablet ? (isDesktop ? null : onPickCamera) : null,
       onPickPhotos: isTablet ? (isDesktop ? null : onPickPhotos) : null,
       onUploadFiles: isTablet ? onUploadFiles : null,
+      showVoiceInputButton: !isDesktop && pk != null && mid != null
+          ? supportsAudioInput(pk, mid)
+          : false,
+      voiceRecording: !isDesktop && onStopVoiceRecording != null
+          ? voiceRecording
+          : false,
+      onStartVoiceRecording: !isDesktop ? onStartVoiceRecording : null,
+      onStopVoiceRecording: !isDesktop ? onStopVoiceRecording : null,
+      onCancelVoiceRecording: !isDesktop ? onCancelVoiceRecording : null,
       onToggleLearningMode: isTablet ? onToggleLearningMode : null,
       onOpenWorldBook: hasWorldBooks ? onOpenWorldBook : null,
       onLongPressLearning: isTablet ? onLongPressLearning : null,

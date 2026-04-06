@@ -78,6 +78,15 @@
   "settingsPageSponsor": "赞助",
   "settingsPageShare": "分享",
   "cameraPermissionDeniedMessage": "未授予相机权限",
+  "voiceInputPermissionDeniedMessage": "未授予麦克风权限",
+  "voiceRecordingStartFailed": "无法开始录音",
+  "voiceRecordingStopFailed": "无法处理录音文件",
+  "voiceRecordingDisplayLabel": "用户语音（{duration}）",
+  "@voiceRecordingDisplayLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
   "openSystemSettings": "去设置",
   "sponsorPageMethodsSectionTitle": "赞助方式",
   "sponsorPageSponsorsSectionTitle": "赞助用户",
@@ -649,6 +658,8 @@
   "chatInputBarOnlineSearchTooltip": "联网搜索",
   "chatInputBarReasoningStrengthTooltip": "思维链强度",
   "chatInputBarMcpServersTooltip": "MCP服务器",
+  "chatInputBarVoiceInputTooltip": "语音输入",
+  "chatInputBarVoiceRecordingTooltip": "停止录音",
   "chatInputBarMoreTooltip": "更多",
   "chatInputBarInsertNewline": "换行",
   "chatInputBarExpand": "展开",
