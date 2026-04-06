@@ -130,8 +130,14 @@ class ChatInputSection extends StatelessWidget {
     final builtinSearchActive = _isBuiltinSearchActive(settings, a, pk, mid);
 
     final isDesktop = _isDesktopPlatform(context);
+    final isMacDesktop = Theme.of(context).platform == TargetPlatform.macOS;
     final hasWorldBooks =
         isTablet && context.watch<WorldBookProvider>().books.isNotEmpty;
+    final canUseVoiceInput =
+        pk != null &&
+        mid != null &&
+        supportsAudioInput(pk, mid) &&
+        (!isDesktop || isMacDesktop);
 
     return ChatInputBar(
       key: inputBarKey,
@@ -187,15 +193,13 @@ class ChatInputSection extends StatelessWidget {
       onPickCamera: isTablet ? (isDesktop ? null : onPickCamera) : null,
       onPickPhotos: isTablet ? (isDesktop ? null : onPickPhotos) : null,
       onUploadFiles: isTablet ? onUploadFiles : null,
-      showVoiceInputButton: !isDesktop && pk != null && mid != null
-          ? supportsAudioInput(pk, mid)
-          : false,
+      showVoiceInputButton: canUseVoiceInput,
       voiceRecording: !isDesktop && onStopVoiceRecording != null
           ? voiceRecording
           : false,
-      onStartVoiceRecording: !isDesktop ? onStartVoiceRecording : null,
-      onStopVoiceRecording: !isDesktop ? onStopVoiceRecording : null,
-      onCancelVoiceRecording: !isDesktop ? onCancelVoiceRecording : null,
+      onStartVoiceRecording: canUseVoiceInput ? onStartVoiceRecording : null,
+      onStopVoiceRecording: canUseVoiceInput ? onStopVoiceRecording : null,
+      onCancelVoiceRecording: canUseVoiceInput ? onCancelVoiceRecording : null,
       onToggleLearningMode: isTablet ? onToggleLearningMode : null,
       onOpenWorldBook: hasWorldBooks ? onOpenWorldBook : null,
       onLongPressLearning: isTablet ? onLongPressLearning : null,

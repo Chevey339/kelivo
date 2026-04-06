@@ -1984,6 +1984,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarVoiceRecordingTooltip => '停止录音';
 
   @override
+  String chatInputBarDesktopVoiceCountdownLabel(int seconds) {
+    return '$seconds 秒后开始录音';
+  }
+
+  @override
+  String get chatInputBarDesktopVoiceCountdownHelp => 'Kelivo 会在倒计时结束后自动开始录音。';
+
+  @override
+  String chatInputBarDesktopVoiceRecordingLabel(Object duration) {
+    return '录音中… $duration';
+  }
+
+  @override
+  String chatInputBarDesktopVoiceRecordingHelp(Object shortcut) {
+    return '点击“停止录音”，或松开 $shortcut 结束录音。';
+  }
+
+  @override
+  String get chatInputBarDesktopVoiceConfirmLabel => '发送这段语音吗？';
+
+  @override
+  String get chatInputBarDesktopVoiceConfirmHelp => '按回车发送，按 Esc 取消。';
+
+  @override
+  String get chatInputBarDesktopVoiceStopButton => '停止录音';
+
+  @override
+  String get chatInputBarDesktopVoiceSendButton => '发送语音';
+
+  @override
+  String get chatInputBarDesktopVoiceCancelButton => '取消';
+
+  @override
   String get chatInputBarMoreTooltip => '更多';
 
   @override
@@ -6269,6 +6302,39 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarVoiceRecordingTooltip => '停止录音';
 
   @override
+  String chatInputBarDesktopVoiceCountdownLabel(int seconds) {
+    return '$seconds 秒后开始录音';
+  }
+
+  @override
+  String get chatInputBarDesktopVoiceCountdownHelp => 'Kelivo 会在倒计时结束后自动开始录音。';
+
+  @override
+  String chatInputBarDesktopVoiceRecordingLabel(Object duration) {
+    return '录音中… $duration';
+  }
+
+  @override
+  String chatInputBarDesktopVoiceRecordingHelp(Object shortcut) {
+    return '点击“停止录音”，或松开 $shortcut 结束录音。';
+  }
+
+  @override
+  String get chatInputBarDesktopVoiceConfirmLabel => '发送这段语音吗？';
+
+  @override
+  String get chatInputBarDesktopVoiceConfirmHelp => '按回车发送，按 Esc 取消。';
+
+  @override
+  String get chatInputBarDesktopVoiceStopButton => '停止录音';
+
+  @override
+  String get chatInputBarDesktopVoiceSendButton => '发送语音';
+
+  @override
+  String get chatInputBarDesktopVoiceCancelButton => '取消';
+
+  @override
   String get chatInputBarMoreTooltip => '更多';
 
   @override
@@ -10499,6 +10565,39 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatInputBarVoiceRecordingTooltip => '停止錄音';
+
+  @override
+  String chatInputBarDesktopVoiceCountdownLabel(int seconds) {
+    return '$seconds 秒後開始錄音';
+  }
+
+  @override
+  String get chatInputBarDesktopVoiceCountdownHelp => 'Kelivo 會在倒數結束後自動開始錄音。';
+
+  @override
+  String chatInputBarDesktopVoiceRecordingLabel(Object duration) {
+    return '錄音中… $duration';
+  }
+
+  @override
+  String chatInputBarDesktopVoiceRecordingHelp(Object shortcut) {
+    return '點擊「停止錄音」，或鬆開 $shortcut 結束錄音。';
+  }
+
+  @override
+  String get chatInputBarDesktopVoiceConfirmLabel => '要傳送這段語音嗎？';
+
+  @override
+  String get chatInputBarDesktopVoiceConfirmHelp => '按 Enter 傳送，按 Esc 取消。';
+
+  @override
+  String get chatInputBarDesktopVoiceStopButton => '停止錄音';
+
+  @override
+  String get chatInputBarDesktopVoiceSendButton => '傳送語音';
+
+  @override
+  String get chatInputBarDesktopVoiceCancelButton => '取消';
 
   @override
   String get chatInputBarMoreTooltip => '更多';

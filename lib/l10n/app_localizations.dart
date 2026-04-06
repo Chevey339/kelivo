@@ -3875,6 +3875,60 @@ abstract class AppLocalizations {
   /// **'Stop Recording'**
   String get chatInputBarVoiceRecordingTooltip;
 
+  /// No description provided for @chatInputBarDesktopVoiceCountdownLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording starts in {seconds}s'**
+  String chatInputBarDesktopVoiceCountdownLabel(int seconds);
+
+  /// No description provided for @chatInputBarDesktopVoiceCountdownHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo will start recording automatically after the countdown.'**
+  String get chatInputBarDesktopVoiceCountdownHelp;
+
+  /// No description provided for @chatInputBarDesktopVoiceRecordingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording... {duration}'**
+  String chatInputBarDesktopVoiceRecordingLabel(Object duration);
+
+  /// No description provided for @chatInputBarDesktopVoiceRecordingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Click Stop, or release {shortcut} to finish recording.'**
+  String chatInputBarDesktopVoiceRecordingHelp(Object shortcut);
+
+  /// No description provided for @chatInputBarDesktopVoiceConfirmLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Send this voice recording?'**
+  String get chatInputBarDesktopVoiceConfirmLabel;
+
+  /// No description provided for @chatInputBarDesktopVoiceConfirmHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Press Enter to send, or press Esc to cancel.'**
+  String get chatInputBarDesktopVoiceConfirmHelp;
+
+  /// No description provided for @chatInputBarDesktopVoiceStopButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Recording'**
+  String get chatInputBarDesktopVoiceStopButton;
+
+  /// No description provided for @chatInputBarDesktopVoiceSendButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Recording'**
+  String get chatInputBarDesktopVoiceSendButton;
+
+  /// No description provided for @chatInputBarDesktopVoiceCancelButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get chatInputBarDesktopVoiceCancelButton;
+
   /// No description provided for @chatInputBarMoreTooltip.
   ///
   /// In en, this message translates to:

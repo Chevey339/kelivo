@@ -491,6 +491,9 @@ class HomePageController extends ChangeNotifier {
         case ChatAction.exitGlobalSearch:
           exitGlobalSearchMode(clearQuery: true);
           break;
+        case ChatAction.cancelTransientUi:
+          _mediaController.cancelDesktopVoiceSession();
+          break;
       }
     });
   }
@@ -1479,6 +1482,9 @@ class HomePageController extends ChangeNotifier {
 
   void onAppLifecycleStateChanged(AppLifecycleState state) {
     _appInForeground = (state == AppLifecycleState.resumed);
+    if (state != AppLifecycleState.resumed && isDesktopPlatform) {
+      _mediaController.cancelDesktopVoiceSession();
+    }
   }
 
   void onDidPopNext() {

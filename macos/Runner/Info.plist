@@ -26,6 +26,8 @@
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Kelivo needs microphone access to record voice input.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

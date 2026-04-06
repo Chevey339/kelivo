@@ -54,6 +54,9 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
       switch (action) {
         case HotkeyAction.openSettings:
           if (mounted) {
+            if (_tabIndex == 0) {
+              ChatActionBus.instance.fire(ChatAction.cancelTransientUi);
+            }
             setState(() {
               _tabIndex = 3;
               _globalSearchActive = false;
@@ -174,19 +177,30 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
                 ChatActionBus.instance.fire(ChatAction.enterGlobalSearch);
               },
               onTapTranslate: () {
+                if (_tabIndex == 0) {
+                  ChatActionBus.instance.fire(ChatAction.cancelTransientUi);
+                }
                 setState(() {
                   _tabIndex = 1;
                   _globalSearchActive = false;
                 });
                 ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
               },
-              onTapStorage: () => setState(() {
-                _tabIndex = 2;
-                _globalSearchActive = false;
-                _storageVisited = true;
+              onTapStorage: () {
+                if (_tabIndex == 0) {
+                  ChatActionBus.instance.fire(ChatAction.cancelTransientUi);
+                }
+                setState(() {
+                  _tabIndex = 2;
+                  _globalSearchActive = false;
+                  _storageVisited = true;
+                });
                 ChatActionBus.instance.fire(ChatAction.exitGlobalSearch);
-              }),
+              },
               onTapSettings: () {
+                if (_tabIndex == 0) {
+                  ChatActionBus.instance.fire(ChatAction.cancelTransientUi);
+                }
                 setState(() {
                   _tabIndex = 3;
                   _globalSearchActive = false;

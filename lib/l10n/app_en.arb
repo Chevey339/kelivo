@@ -904,6 +904,32 @@
   "chatInputBarMcpServersTooltip": "MCP Servers",
   "chatInputBarVoiceInputTooltip": "Record Voice",
   "chatInputBarVoiceRecordingTooltip": "Stop Recording",
+  "chatInputBarDesktopVoiceCountdownLabel": "Recording starts in {seconds}s",
+  "@chatInputBarDesktopVoiceCountdownLabel": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "chatInputBarDesktopVoiceCountdownHelp": "Kelivo will start recording automatically after the countdown.",
+  "chatInputBarDesktopVoiceRecordingLabel": "Recording... {duration}",
+  "@chatInputBarDesktopVoiceRecordingLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
+  "chatInputBarDesktopVoiceRecordingHelp": "Click Stop, or release {shortcut} to finish recording.",
+  "@chatInputBarDesktopVoiceRecordingHelp": {
+    "placeholders": {
+      "shortcut": {}
+    }
+  },
+  "chatInputBarDesktopVoiceConfirmLabel": "Send this voice recording?",
+  "chatInputBarDesktopVoiceConfirmHelp": "Press Enter to send, or press Esc to cancel.",
+  "chatInputBarDesktopVoiceStopButton": "Stop Recording",
+  "chatInputBarDesktopVoiceSendButton": "Send Recording",
+  "chatInputBarDesktopVoiceCancelButton": "Cancel",
   "chatInputBarMoreTooltip": "Add",
   "chatInputBarInsertNewline": "Newline",
   "chatInputBarExpand": "Expand",

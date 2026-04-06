@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show File;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:provider/provider.dart';
@@ -81,6 +82,7 @@ class _HomePageState extends State<HomePage>
   final GlobalKey _selectionMiniMapKey = GlobalKey();
   final GlobalKey _selectionExportBarKey = GlobalKey();
   StreamSubscription<String>? _processTextSub;
+  bool _desktopVoiceShortcutPressed = false;
 
   // ============================================================================
   // Page Controller (manages all business logic and state)
@@ -134,6 +136,9 @@ class _HomePageState extends State<HomePage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      _desktopVoiceShortcutPressed = false;
+    }
     _controller.onAppLifecycleStateChanged(state);
   }
 
@@ -153,6 +158,7 @@ class _HomePageState extends State<HomePage>
       WidgetsBinding.instance.removeObserver(this);
     } catch (_) {}
     _processTextSub?.cancel();
+    _mediaController.cancelDesktopVoiceSession();
     _controller.removeListener(_onControllerChanged);
     _drawerController.removeListener(_onDrawerValueChanged);
     _inputFocus.dispose();
@@ -176,6 +182,59 @@ class _HomePageState extends State<HomePage>
         _assistantPickerCloseTick.value++;
       }
     }
+  }
+
+  KeyEventResult _handleDesktopVoiceHotkey(FocusNode node, KeyEvent event) {
+    if (!PlatformUtils.isMacOS) return KeyEventResult.ignored;
+
+    final key = event.logicalKey;
+    final isDown = event is KeyDownEvent || event is KeyRepeatEvent;
+    final trackedKeys = <LogicalKeyboardKey>{
+      LogicalKeyboardKey.keyR,
+      LogicalKeyboardKey.metaLeft,
+      LogicalKeyboardKey.metaRight,
+      LogicalKeyboardKey.shiftLeft,
+      LogicalKeyboardKey.shiftRight,
+    };
+    final keys = HardwareKeyboard.instance.logicalKeysPressed;
+    final meta =
+        keys.contains(LogicalKeyboardKey.metaLeft) ||
+        keys.contains(LogicalKeyboardKey.metaRight);
+    final shift =
+        keys.contains(LogicalKeyboardKey.shiftLeft) ||
+        keys.contains(LogicalKeyboardKey.shiftRight);
+    final isShortcutDown =
+        key == LogicalKeyboardKey.keyR && meta && shift && isDown;
+
+    if (isShortcutDown && !_desktopVoiceShortcutPressed) {
+      _desktopVoiceShortcutPressed = true;
+      _mediaController.startDesktopVoiceHotkeyRecording();
+      return KeyEventResult.handled;
+    }
+
+    if (_desktopVoiceShortcutPressed && isDown && trackedKeys.contains(key)) {
+      return KeyEventResult.handled;
+    }
+
+    if (_desktopVoiceShortcutPressed &&
+        event is KeyUpEvent &&
+        trackedKeys.contains(key)) {
+      _desktopVoiceShortcutPressed = false;
+      _mediaController.finishDesktopVoiceHotkeyRecording();
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  Widget _wrapWithDesktopVoiceHotkeyFocus(Widget child) {
+    if (!PlatformUtils.isMacOS) return child;
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: _handleDesktopVoiceHotkey,
+      child: child,
+    );
   }
 
   void _initProcessText() {
@@ -484,7 +543,9 @@ class _HomePageState extends State<HomePage>
               onInvertSelection: _controller.invertSelection,
             )
           : null,
-      body: _wrapWithDropTarget(_buildTabletBody(context, cs)),
+      body: _wrapWithDesktopVoiceHotkeyFocus(
+        _wrapWithDropTarget(_buildTabletBody(context, cs)),
+      ),
     );
   }
 

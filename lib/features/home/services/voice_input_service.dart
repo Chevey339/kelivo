@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -26,15 +27,12 @@ class VoiceInputService {
   DateTime? _recordingStartedAt;
 
   Future<bool> startRecording() async {
-    if (!PlatformUtils.isMobileTarget) return false;
+    if (!(PlatformUtils.isMobileTarget || PlatformUtils.isMacOS)) return false;
     if (_contextIfMounted() == null) return false;
 
     try {
-      var status = await Permission.microphone.status;
-      if (status.isDenied || status.isRestricted) {
-        status = await Permission.microphone.request();
-      }
-      if (!status.isGranted) {
+      final hasPermission = await _requestMicrophonePermission();
+      if (!hasPermission) {
         _showPermissionDenied();
         return false;
       }
@@ -64,6 +62,20 @@ class VoiceInputService {
       _showStartFailed();
       return false;
     }
+  }
+
+  Future<bool> _requestMicrophonePermission() async {
+    if (PlatformUtils.isMacOS) {
+      // macOS uses the record plugin for permission checks; permission_handler
+      // is not registered on macOS in this app.
+      return _recorder.hasPermission(request: true);
+    }
+
+    var status = await Permission.microphone.status;
+    if (status.isDenied || status.isRestricted) {
+      status = await Permission.microphone.request();
+    }
+    return status.isGranted;
   }
 
   Future<DocumentAttachment?> stopRecording() async {
@@ -150,11 +162,21 @@ class VoiceInputService {
       duration: const Duration(seconds: 4),
       actionLabel: l10n.openSystemSettings,
       onAction: () {
-        try {
-          openAppSettings();
-        } catch (_) {}
+        unawaited(_openSystemSettings());
       },
     );
+  }
+
+  Future<void> _openSystemSettings() async {
+    try {
+      if (PlatformUtils.isMacOS) {
+        await Process.run('open', const [
+          'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+        ]);
+        return;
+      }
+      await openAppSettings();
+    } catch (_) {}
   }
 
   void _showStartFailed() {
