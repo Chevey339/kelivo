@@ -144,6 +144,7 @@ class ChatInputBar extends StatefulWidget {
 
 class _ChatInputBarState extends State<ChatInputBar>
     with WidgetsBindingObserver {
+  static const double _maxVoiceKeepZoneRadius = 130;
   late TextEditingController _controller;
   bool _isExpanded = false; // Track expand/collapse state for input field
   final List<String> _images = <String>[]; // local file paths
@@ -455,7 +456,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       overlayBox.size.height - bottomInset,
     );
     final radius = math.min(
-      drawableRect.width * 0.3,
+      math.min(drawableRect.width * 0.3, _maxVoiceKeepZoneRadius),
       _maxDistanceToRectCorner(center, drawableRect) + 24,
     );
     return _VoiceOverlayGeometry(
