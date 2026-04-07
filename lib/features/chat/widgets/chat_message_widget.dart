@@ -35,6 +35,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../core/providers/voice_message_playback_provider.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
@@ -395,6 +396,95 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       return '$displayName | $providerName';
     }
     return displayName;
+  }
+
+  String _voicePlaybackIdForPath(String path) {
+    return '${widget.message.id}:$path';
+  }
+
+  Future<void> _handleDocumentAttachmentTap(_DocRef docRef) async {
+    if (isVoiceRecordingFileName(docRef.fileName)) {
+      await _toggleVoiceAttachmentPlayback(docRef);
+      return;
+    }
+    await _openDocumentAttachment(docRef);
+  }
+
+  Future<void> _toggleVoiceAttachmentPlayback(_DocRef docRef) async {
+    final l10n = AppLocalizations.of(context)!;
+    final fixedPath = SandboxPathResolver.fix(docRef.path);
+    final playbackId = _voicePlaybackIdForPath(fixedPath);
+    final playback = context.read<VoiceMessagePlaybackProvider>();
+    final ttsProvider = context.read<TtsProvider>();
+    final fallbackDuration = tryParseVoiceRecordingDuration(docRef.fileName);
+
+    if (playback.isPlayingItem(playbackId)) {
+      await playback.stop();
+      return;
+    }
+
+    final file = File(fixedPath);
+    if (!await file.exists()) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.chatMessageWidgetFileNotFound(docRef.fileName),
+        type: NotificationType.error,
+      );
+      return;
+    }
+
+    try {
+      await playback.toggle(
+        playbackId: playbackId,
+        path: fixedPath,
+        fallbackDuration: fallbackDuration,
+        beforePlay: ttsProvider.stop,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.chatMessageWidgetVoicePlaybackFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    }
+  }
+
+  Future<void> _openDocumentAttachment(_DocRef docRef) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final fixed = SandboxPathResolver.fix(docRef.path);
+      final file = File(fixed);
+      if (!(await file.exists())) {
+        if (!mounted) return;
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetFileNotFound(docRef.fileName),
+          type: NotificationType.error,
+        );
+        return;
+      }
+      final res = await OpenFilex.open(fixed, type: docRef.mime);
+      if (res.type != ResultType.done) {
+        if (!mounted) return;
+        final openMessage = res.message;
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetCannotOpenFile(
+            openMessage.isNotEmpty ? openMessage : res.type.toString(),
+          ),
+          type: NotificationType.error,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.chatMessageWidgetOpenFileError(e.toString()),
+        type: NotificationType.error,
+      );
+    }
   }
 
   @override
@@ -892,6 +982,59 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         runSpacing: 8,
                         children: parsed.docs.map((d) {
                           final isVoice = isVoiceRecordingFileName(d.fileName);
+                          final fixedPath = SandboxPathResolver.fix(d.path);
+                          final voicePlaybackId = _voicePlaybackIdForPath(
+                            fixedPath,
+                          );
+                          final voiceDuration =
+                              tryParseVoiceRecordingDuration(d.fileName) ??
+                              Duration.zero;
+                          final voicePlaybackState = isVoice
+                              ? context.select<
+                                  VoiceMessagePlaybackProvider,
+                                  ({
+                                    bool isPlaying,
+                                    double progress,
+                                    Duration? remaining,
+                                  })
+                                >(
+                                  (provider) => (
+                                    isPlaying: provider.isPlayingItem(
+                                      voicePlaybackId,
+                                    ),
+                                    progress: provider.progressFor(
+                                      voicePlaybackId,
+                                    ),
+                                    remaining: provider.remainingFor(
+                                      voicePlaybackId,
+                                    ),
+                                  ),
+                                )
+                              : (
+                                  isPlaying: false,
+                                  progress: 0.0,
+                                  remaining: null,
+                                );
+                          final isPlayingVoice = voicePlaybackState.isPlaying;
+                          final voiceProgress = voicePlaybackState.progress;
+                          final displayedVoiceDuration = isPlayingVoice
+                              ? (voicePlaybackState.remaining ?? voiceDuration)
+                              : voiceDuration;
+                          final borderRadius = BorderRadius.circular(
+                            isVoice ? 18 : 10,
+                          );
+                          final bubbleColor = isVoice
+                              ? cs.primary.withValues(
+                                  alpha: isPlayingVoice
+                                      ? (isDark ? 0.36 : 0.24)
+                                      : (isDark ? 0.28 : 0.18),
+                                )
+                              : (isDark ? Colors.white12 : cs.surface);
+                          final progressColor = isVoice
+                              ? cs.primary.withValues(
+                                  alpha: isDark ? 0.46 : 0.28,
+                                )
+                              : Colors.transparent;
                           return Material(
                             color: Colors.transparent,
                             child: InkWell(
@@ -905,98 +1048,77 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               ),
                               splashColor: cs.primary.withValues(alpha: 0.18),
                               onTap: () async {
-                                try {
-                                  final fixed = SandboxPathResolver.fix(d.path);
-                                  final f = File(fixed);
-                                  if (!(await f.exists())) {
-                                    if (!mounted) return;
-                                    showAppSnackBar(
-                                      context,
-                                      message: l10n
-                                          .chatMessageWidgetFileNotFound(
-                                            d.fileName,
-                                          ),
-                                      type: NotificationType.error,
-                                    );
-                                    return;
-                                  }
-                                  final res = await OpenFilex.open(
-                                    fixed,
-                                    type: d.mime,
-                                  );
-                                  if (res.type != ResultType.done) {
-                                    if (!mounted) return;
-                                    final openMessage = res.message;
-                                    showAppSnackBar(
-                                      context,
-                                      message: l10n
-                                          .chatMessageWidgetCannotOpenFile(
-                                            openMessage.isNotEmpty
-                                                ? openMessage
-                                                : res.type.toString(),
-                                          ),
-                                      type: NotificationType.error,
-                                    );
-                                  }
-                                } catch (e) {
-                                  if (!mounted) return;
-                                  showAppSnackBar(
-                                    context,
-                                    message: l10n
-                                        .chatMessageWidgetOpenFileError(
-                                          e.toString(),
-                                        ),
-                                    type: NotificationType.error,
-                                  );
-                                }
+                                await _handleDocumentAttachmentTap(d);
                               },
                               child: Ink(
                                 decoration: BoxDecoration(
-                                  color: isVoice
-                                      ? cs.primary.withValues(
-                                          alpha: isDark ? 0.28 : 0.18,
-                                        )
-                                      : (isDark ? Colors.white12 : cs.surface),
-                                  borderRadius: BorderRadius.circular(
-                                    isVoice ? 18 : 10,
-                                  ),
+                                  color: bubbleColor,
+                                  borderRadius: borderRadius,
                                 ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 8,
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
+                                child: ClipRRect(
+                                  borderRadius: borderRadius,
+                                  child: Stack(
                                     children: [
-                                      Icon(
-                                        isVoice
-                                            ? Lucide.AudioLines
-                                            : Icons.insert_drive_file,
-                                        size: 16,
-                                        color: isVoice ? cs.primary : null,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      ConstrainedBox(
-                                        constraints: const BoxConstraints(
-                                          maxWidth: 180,
+                                      if (isVoice && voiceProgress > 0)
+                                        Positioned.fill(
+                                          child: Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: FractionallySizedBox(
+                                              widthFactor: voiceProgress,
+                                              heightFactor: 1,
+                                              alignment: Alignment.centerLeft,
+                                              child: DecoratedBox(
+                                                decoration: BoxDecoration(
+                                                  color: progressColor,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                        child: Text(
-                                          isVoice
-                                              ? voiceRecordingDisplayLabel(
-                                                  l10n,
-                                                  d.fileName,
-                                                )
-                                              : d.fileName,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: isVoice
-                                              ? TextStyle(
-                                                  color: isDark
-                                                      ? Colors.white
-                                                      : cs.primary,
-                                                  fontWeight: FontWeight.w600,
-                                                )
-                                              : null,
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 8,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              isVoice
+                                                  ? (isPlayingVoice
+                                                        ? Lucide.CircleStop
+                                                        : Lucide.AudioLines)
+                                                  : Icons.insert_drive_file,
+                                              size: 16,
+                                              color: isVoice
+                                                  ? cs.primary
+                                                  : null,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                maxWidth: 180,
+                                              ),
+                                              child: Text(
+                                                isVoice
+                                                    ? voiceRecordingDisplayLabelForDuration(
+                                                        l10n,
+                                                        displayedVoiceDuration,
+                                                      )
+                                                    : d.fileName,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: isVoice
+                                                    ? TextStyle(
+                                                        color: isDark
+                                                            ? Colors.white
+                                                            : cs.primary,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      )
+                                                    : null,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],

@@ -33,9 +33,16 @@ String formatVoiceRecordingDuration(Duration duration) {
   return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }
 
-String voiceRecordingDisplayLabel(AppLocalizations l10n, String fileName) {
-  final duration = tryParseVoiceRecordingDuration(fileName) ?? Duration.zero;
+String voiceRecordingDisplayLabelForDuration(
+  AppLocalizations l10n,
+  Duration duration,
+) {
   return l10n.voiceRecordingDisplayLabel(
     formatVoiceRecordingDuration(duration),
   );
+}
+
+String voiceRecordingDisplayLabel(AppLocalizations l10n, String fileName) {
+  final duration = tryParseVoiceRecordingDuration(fileName) ?? Duration.zero;
+  return voiceRecordingDisplayLabelForDuration(l10n, duration);
 }

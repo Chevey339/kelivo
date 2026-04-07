@@ -1553,6 +1553,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String chatMessageWidgetVoicePlaybackFailed(String error) {
+    return '播放语音消息失败: $error';
+  }
+
+  @override
   String get chatMessageWidgetCopiedToClipboard => '已复制到剪贴板';
 
   @override
@@ -5876,6 +5881,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String chatMessageWidgetVoicePlaybackFailed(String error) {
+    return '播放语音消息失败: $error';
+  }
+
+  @override
   String get chatMessageWidgetCopiedToClipboard => '已复制到剪贴板';
 
   @override
@@ -10143,6 +10153,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String chatMessageWidgetOpenFileError(String error) {
     return '開啟檔案失敗: $error';
+  }
+
+  @override
+  String chatMessageWidgetVoicePlaybackFailed(String error) {
+    return '播放語音訊息失敗: $error';
   }
 
   @override

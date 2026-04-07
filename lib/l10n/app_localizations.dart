@@ -3077,6 +3077,12 @@ abstract class AppLocalizations {
   /// **'Failed to open file: {error}'**
   String chatMessageWidgetOpenFileError(String error);
 
+  /// No description provided for @chatMessageWidgetVoicePlaybackFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to play voice message: {error}'**
+  String chatMessageWidgetVoicePlaybackFailed(String error);
+
   /// No description provided for @chatMessageWidgetCopiedToClipboard.
   ///
   /// In en, this message translates to:

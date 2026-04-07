@@ -675,6 +675,14 @@
       }
     }
   },
+  "chatMessageWidgetVoicePlaybackFailed": "Failed to play voice message: {error}",
+  "@chatMessageWidgetVoicePlaybackFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "chatMessageWidgetCopiedToClipboard": "Copied to clipboard",
   "chatMessageWidgetResendTooltip": "Resend",
   "chatMessageWidgetMoreTooltip": "More",

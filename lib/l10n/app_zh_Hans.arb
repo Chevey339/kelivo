@@ -573,6 +573,7 @@
   "chatMessageWidgetFileNotFound": "文件不存在: {fileName}",
   "chatMessageWidgetCannotOpenFile": "无法打开文件: {message}",
   "chatMessageWidgetOpenFileError": "打开文件失败: {error}",
+  "chatMessageWidgetVoicePlaybackFailed": "播放语音消息失败: {error}",
   "chatMessageWidgetCopiedToClipboard": "已复制到剪贴板",
   "chatMessageWidgetResendTooltip": "重新发送",
   "chatMessageWidgetMoreTooltip": "更多",

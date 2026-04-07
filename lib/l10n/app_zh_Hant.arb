@@ -527,6 +527,7 @@
   "chatMessageWidgetFileNotFound": "檔案不存在: {fileName}",
   "chatMessageWidgetCannotOpenFile": "無法開啟檔案: {message}",
   "chatMessageWidgetOpenFileError": "開啟檔案失敗: {error}",
+  "chatMessageWidgetVoicePlaybackFailed": "播放語音訊息失敗: {error}",
   "chatMessageWidgetCopiedToClipboard": "已複製到剪貼簿",
   "chatMessageWidgetResendTooltip": "重新傳送",
   "chatMessageWidgetMoreTooltip": "更多",

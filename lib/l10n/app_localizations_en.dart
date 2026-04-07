@@ -1598,6 +1598,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String chatMessageWidgetVoicePlaybackFailed(String error) {
+    return 'Failed to play voice message: $error';
+  }
+
+  @override
   String get chatMessageWidgetCopiedToClipboard => 'Copied to clipboard';
 
   @override
