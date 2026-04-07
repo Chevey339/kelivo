@@ -1128,6 +1128,7 @@
   "modelDetailSheetAbilitiesLabel": "Abilities",
   "modelDetailSheetTextMode": "Text",
   "modelDetailSheetImageMode": "Image",
+  "modelDetailSheetAudioMode": "Audio",
   "modelDetailSheetToolsAbility": "Tools",
   "modelDetailSheetReasoningAbility": "Reasoning",
   "modelDetailSheetProviderOverrideDescription": "Provider overrides: customize provider for a specific model.",

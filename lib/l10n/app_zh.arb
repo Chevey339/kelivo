@@ -793,6 +793,7 @@
   "modelDetailSheetAbilitiesLabel": "能力",
   "modelDetailSheetTextMode": "文本",
   "modelDetailSheetImageMode": "图片",
+  "modelDetailSheetAudioMode": "音频",
   "modelDetailSheetToolsAbility": "工具",
   "modelDetailSheetReasoningAbility": "推理",
   "modelDetailSheetProviderOverrideDescription": "供应商重写：允许为特定模型自定义供应商设置。（暂未实现）",

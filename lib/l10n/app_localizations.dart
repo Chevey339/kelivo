@@ -4604,6 +4604,12 @@ abstract class AppLocalizations {
   /// **'Image'**
   String get modelDetailSheetImageMode;
 
+  /// No description provided for @modelDetailSheetAudioMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get modelDetailSheetAudioMode;
+
   /// No description provided for @modelDetailSheetToolsAbility.
   ///
   /// In en, this message translates to:

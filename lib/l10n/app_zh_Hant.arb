@@ -781,6 +781,7 @@
   "modelDetailSheetAbilitiesLabel": "能力",
   "modelDetailSheetTextMode": "文字",
   "modelDetailSheetImageMode": "圖片",
+  "modelDetailSheetAudioMode": "音訊",
   "modelDetailSheetToolsAbility": "工具",
   "modelDetailSheetReasoningAbility": "推理",
   "modelDetailSheetProviderOverrideDescription": "供應商覆寫：允許為特定模型自訂供應商設定。（暫未實現）",

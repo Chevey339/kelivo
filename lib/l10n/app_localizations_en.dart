@@ -2465,6 +2465,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modelDetailSheetImageMode => 'Image';
 
   @override
+  String get modelDetailSheetAudioMode => 'Audio';
+
+  @override
   String get modelDetailSheetToolsAbility => 'Tools';
 
   @override

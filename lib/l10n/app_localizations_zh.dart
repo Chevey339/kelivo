@@ -2381,6 +2381,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetImageMode => '图片';
 
   @override
+  String get modelDetailSheetAudioMode => '音频';
+
+  @override
   String get modelDetailSheetToolsAbility => '工具';
 
   @override
@@ -6676,6 +6679,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetImageMode => '图片';
+
+  @override
+  String get modelDetailSheetAudioMode => '音频';
 
   @override
   String get modelDetailSheetToolsAbility => '工具';
@@ -10982,6 +10988,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetImageMode => '圖片';
+
+  @override
+  String get modelDetailSheetAudioMode => '音訊';
 
   @override
   String get modelDetailSheetToolsAbility => '工具';
