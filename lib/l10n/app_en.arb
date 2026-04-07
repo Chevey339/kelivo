@@ -347,6 +347,12 @@
   "cameraPermissionDeniedMessage": "Camera unavailable: permission not granted.",
   "voiceInputPermissionDeniedMessage": "Microphone unavailable: permission not granted.",
   "voiceRecordingStartFailed": "Couldn't start recording.",
+  "voiceRecordingLinuxDependencyMissing": "Linux voice input requires {dependencies}. Install them and try again.",
+  "@voiceRecordingLinuxDependencyMissing": {
+    "placeholders": {
+      "dependencies": {}
+    }
+  },
   "voiceRecordingStopFailed": "Couldn't process the recording.",
   "voiceRecordingDisplayLabel": "User voice ({duration})",
   "@voiceRecordingDisplayLabel": {

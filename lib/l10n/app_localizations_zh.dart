@@ -733,6 +733,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceRecordingStartFailed => '无法开始录音';
 
   @override
+  String voiceRecordingLinuxDependencyMissing(Object dependencies) {
+    return 'Linux 语音输入依赖 $dependencies，请先安装后重试。';
+  }
+
+  @override
   String get voiceRecordingStopFailed => '无法处理录音文件';
 
   @override
@@ -5051,6 +5056,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get voiceRecordingStartFailed => '无法开始录音';
 
   @override
+  String voiceRecordingLinuxDependencyMissing(Object dependencies) {
+    return 'Linux 语音输入依赖 $dependencies，请先安装后重试。';
+  }
+
+  @override
   String get voiceRecordingStopFailed => '无法处理录音文件';
 
   @override
@@ -9315,6 +9325,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get voiceRecordingStartFailed => '無法開始錄音';
+
+  @override
+  String voiceRecordingLinuxDependencyMissing(Object dependencies) {
+    return 'Linux 語音輸入需要 $dependencies，請先安裝後再試。';
+  }
 
   @override
   String get voiceRecordingStopFailed => '無法處理錄音檔案';

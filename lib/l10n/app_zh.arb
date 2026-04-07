@@ -80,6 +80,12 @@
   "cameraPermissionDeniedMessage": "未授予相机权限",
   "voiceInputPermissionDeniedMessage": "未授予麦克风权限",
   "voiceRecordingStartFailed": "无法开始录音",
+  "voiceRecordingLinuxDependencyMissing": "Linux 语音输入依赖 {dependencies}，请先安装后重试。",
+  "@voiceRecordingLinuxDependencyMissing": {
+    "placeholders": {
+      "dependencies": {}
+    }
+  },
   "voiceRecordingStopFailed": "无法处理录音文件",
   "voiceRecordingDisplayLabel": "用户语音（{duration}）",
   "@voiceRecordingDisplayLabel": {

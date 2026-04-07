@@ -80,6 +80,12 @@
   "cameraPermissionDeniedMessage": "未授予相機權限",
   "voiceInputPermissionDeniedMessage": "未授予麥克風權限",
   "voiceRecordingStartFailed": "無法開始錄音",
+  "voiceRecordingLinuxDependencyMissing": "Linux 語音輸入需要 {dependencies}，請先安裝後再試。",
+  "@voiceRecordingLinuxDependencyMissing": {
+    "placeholders": {
+      "dependencies": {}
+    }
+  },
   "voiceRecordingStopFailed": "無法處理錄音檔案",
   "voiceRecordingDisplayLabel": "使用者語音（{duration}）",
   "@voiceRecordingDisplayLabel": {

@@ -753,6 +753,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceRecordingStartFailed => 'Couldn\'t start recording.';
 
   @override
+  String voiceRecordingLinuxDependencyMissing(Object dependencies) {
+    return 'Linux voice input requires $dependencies. Install them and try again.';
+  }
+
+  @override
   String get voiceRecordingStopFailed => 'Couldn\'t process the recording.';
 
   @override

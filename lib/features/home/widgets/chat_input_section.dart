@@ -11,6 +11,7 @@ import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../utils/model_display_helper.dart';
+import '../utils/desktop_voice_input_utils.dart';
 import 'chat_input_bar.dart';
 import 'model_icon.dart';
 
@@ -130,14 +131,14 @@ class ChatInputSection extends StatelessWidget {
     final builtinSearchActive = _isBuiltinSearchActive(settings, a, pk, mid);
 
     final isDesktop = _isDesktopPlatform(context);
-    final isMacDesktop = Theme.of(context).platform == TargetPlatform.macOS;
     final hasWorldBooks =
         isTablet && context.watch<WorldBookProvider>().books.isNotEmpty;
     final canUseVoiceInput =
         pk != null &&
         mid != null &&
         supportsAudioInput(pk, mid) &&
-        (!isDesktop || isMacDesktop);
+        (!isDesktop ||
+            supportsDesktopVoiceInputPlatform(Theme.of(context).platform));
 
     return ChatInputBar(
       key: inputBarKey,

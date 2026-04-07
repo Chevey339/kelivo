@@ -1481,6 +1481,12 @@ abstract class AppLocalizations {
   /// **'Couldn\'t start recording.'**
   String get voiceRecordingStartFailed;
 
+  /// No description provided for @voiceRecordingLinuxDependencyMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Linux voice input requires {dependencies}. Install them and try again.'**
+  String voiceRecordingLinuxDependencyMissing(Object dependencies);
+
   /// No description provided for @voiceRecordingStopFailed.
   ///
   /// In en, this message translates to:

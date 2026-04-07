@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 import '../../../theme/design_tokens.dart';
@@ -28,6 +29,7 @@ import '../../../utils/voice_attachment_utils.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../services/voice_input_service.dart';
+import '../utils/desktop_voice_input_utils.dart';
 
 class ChatInputBarController {
   _ChatInputBarState? _state;
@@ -305,7 +307,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   bool get _showExpandButton => _lineCount >= 3;
 
   bool get _isDesktopVoiceSupported {
-    return Platform.isMacOS &&
+    return supportsDesktopVoiceInputPlatform(defaultTargetPlatform) &&
         widget.showVoiceInputButton &&
         widget.onStartVoiceRecording != null &&
         widget.onStopVoiceRecording != null &&
@@ -316,7 +318,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     return _desktopVoiceState != _DesktopVoiceState.idle;
   }
 
-  String _desktopVoiceShortcutLabel() => '⌘ + Shift + R';
+  String _desktopVoiceShortcutLabel() =>
+      desktopVoiceShortcutLabelForPlatform(defaultTargetPlatform);
 
   void _startDesktopVoiceHotkeyRecording() {
     if (!_isDesktopVoiceSupported) return;

@@ -13,27 +13,57 @@ import '../../../utils/app_directories.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../utils/voice_attachment_utils.dart';
 
+const List<String> linuxVoiceInputDependencyCommands = <String>[
+  'parecord',
+  'ffmpeg',
+];
+
+List<String> missingLinuxVoiceInputDependencies(
+  Map<String, bool> commandAvailability,
+) {
+  return <String>[
+    for (final command in linuxVoiceInputDependencyCommands)
+      if (!(commandAvailability[command] ?? false)) command,
+  ];
+}
+
 class VoiceInputService {
-  VoiceInputService({required BuildContext Function() getContext})
-    : _getContext = getContext;
+  VoiceInputService({
+    required BuildContext Function() getContext,
+    Future<bool> Function(String command)? isCommandAvailable,
+  }) : _getContext = getContext,
+       _isCommandAvailable =
+           isCommandAvailable ?? VoiceInputService._defaultIsCommandAvailable;
 
   static const Duration maxRecordingDuration = Duration(minutes: 1);
   static const int recordingSampleRate = 16000;
 
   final BuildContext Function() _getContext;
+  final Future<bool> Function(String command) _isCommandAvailable;
   final AudioRecorder _recorder = AudioRecorder();
 
   String? _currentRecordingPath;
   DateTime? _recordingStartedAt;
 
   Future<bool> startRecording() async {
-    if (!(PlatformUtils.isMobileTarget || PlatformUtils.isMacOS)) return false;
+    if (!(PlatformUtils.isMobileTarget ||
+        PlatformUtils.isMacOS ||
+        PlatformUtils.isLinux)) {
+      return false;
+    }
     if (_contextIfMounted() == null) return false;
 
     try {
       final hasPermission = await _requestMicrophonePermission();
       if (!hasPermission) {
         _showPermissionDenied();
+        return false;
+      }
+
+      final missingLinuxDependencies =
+          await _missingLinuxVoiceInputDependencies();
+      if (missingLinuxDependencies.isNotEmpty) {
+        _showLinuxDependencyMissing(missingLinuxDependencies);
         return false;
       }
 
@@ -59,6 +89,13 @@ class VoiceInputService {
       return true;
     } catch (_) {
       _currentRecordingPath = null;
+      _recordingStartedAt = null;
+      final missingLinuxDependencies =
+          await _missingLinuxVoiceInputDependencies();
+      if (missingLinuxDependencies.isNotEmpty) {
+        _showLinuxDependencyMissing(missingLinuxDependencies);
+        return false;
+      }
       _showStartFailed();
       return false;
     }
@@ -71,11 +108,25 @@ class VoiceInputService {
       return _recorder.hasPermission(request: true);
     }
 
+    if (PlatformUtils.isLinux) {
+      return true;
+    }
+
     var status = await Permission.microphone.status;
     if (status.isDenied || status.isRestricted) {
       status = await Permission.microphone.request();
     }
     return status.isGranted;
+  }
+
+  Future<List<String>> _missingLinuxVoiceInputDependencies() async {
+    if (!PlatformUtils.isLinux) return const <String>[];
+
+    final availability = <String, bool>{};
+    for (final command in linuxVoiceInputDependencyCommands) {
+      availability[command] = await _isCommandAvailable(command);
+    }
+    return missingLinuxVoiceInputDependencies(availability);
   }
 
   Future<DocumentAttachment?> stopRecording() async {
@@ -188,6 +239,17 @@ class VoiceInputService {
     );
   }
 
+  void _showLinuxDependencyMissing(List<String> missingDependencies) {
+    final context = _contextIfMounted();
+    if (context == null) return;
+    _showError(
+      context,
+      AppLocalizations.of(
+        context,
+      )!.voiceRecordingLinuxDependencyMissing(missingDependencies.join(', ')),
+    );
+  }
+
   void _showStopFailed() {
     final context = _contextIfMounted();
     if (context == null) return;
@@ -207,5 +269,14 @@ class VoiceInputService {
     final context = _getContext();
     if (!context.mounted) return null;
     return context;
+  }
+
+  static Future<bool> _defaultIsCommandAvailable(String command) async {
+    try {
+      final result = await Process.run('which', <String>[command]);
+      return result.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
   }
 }

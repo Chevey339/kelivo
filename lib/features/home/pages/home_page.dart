@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' show File;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -48,6 +49,7 @@ import '../widgets/message_list_view.dart';
 import '../widgets/chat_input_section.dart';
 import '../widgets/chat_selection_app_bar.dart';
 import '../widgets/chat_selection_export_bar.dart';
+import '../utils/desktop_voice_input_utils.dart';
 import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
 import '../controllers/home_page_controller.dart';
@@ -185,26 +187,21 @@ class _HomePageState extends State<HomePage>
   }
 
   KeyEventResult _handleDesktopVoiceHotkey(FocusNode node, KeyEvent event) {
-    if (!PlatformUtils.isMacOS) return KeyEventResult.ignored;
+    final platform = defaultTargetPlatform;
+    if (!supportsDesktopVoiceInputPlatform(platform)) {
+      return KeyEventResult.ignored;
+    }
 
     final key = event.logicalKey;
     final isDown = event is KeyDownEvent || event is KeyRepeatEvent;
-    final trackedKeys = <LogicalKeyboardKey>{
-      LogicalKeyboardKey.keyR,
-      LogicalKeyboardKey.metaLeft,
-      LogicalKeyboardKey.metaRight,
-      LogicalKeyboardKey.shiftLeft,
-      LogicalKeyboardKey.shiftRight,
-    };
+    final trackedKeys = desktopVoiceHotkeyTrackedKeys(platform);
     final keys = HardwareKeyboard.instance.logicalKeysPressed;
-    final meta =
-        keys.contains(LogicalKeyboardKey.metaLeft) ||
-        keys.contains(LogicalKeyboardKey.metaRight);
-    final shift =
-        keys.contains(LogicalKeyboardKey.shiftLeft) ||
-        keys.contains(LogicalKeyboardKey.shiftRight);
-    final isShortcutDown =
-        key == LogicalKeyboardKey.keyR && meta && shift && isDown;
+    final isShortcutDown = isDesktopVoiceHotkeyDown(
+      platform: platform,
+      eventKey: key,
+      pressedKeys: keys,
+      isDown: isDown,
+    );
 
     if (isShortcutDown && !_desktopVoiceShortcutPressed) {
       _desktopVoiceShortcutPressed = true;
@@ -228,7 +225,9 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _wrapWithDesktopVoiceHotkeyFocus(Widget child) {
-    if (!PlatformUtils.isMacOS) return child;
+    if (!supportsDesktopVoiceInputPlatform(defaultTargetPlatform)) {
+      return child;
+    }
     return Focus(
       canRequestFocus: false,
       skipTraversal: true,
