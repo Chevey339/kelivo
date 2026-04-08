@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:re_editor/re_editor.dart';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
@@ -16,6 +17,8 @@ import 'model_fetch_dialog.dart' show showModelFetchDialog;
 import 'widgets/desktop_select_dropdown.dart';
 import '../shared/widgets/ios_switch.dart';
 import '../shared/widgets/ios_checkbox.dart';
+import '../shared/widgets/input_height_constraints.dart';
+import '../shared/widgets/plain_text_code_editor.dart';
 // Desktop assistants panel dependencies
 import '../features/assistant/pages/assistant_settings_edit_page.dart'
     show showAssistantDesktopDialog; // dialog opener only
@@ -25,6 +28,7 @@ import '../utils/avatar_cache.dart';
 import '../utils/sandbox_path_resolver.dart';
 import 'dart:io' show Directory, File, Platform;
 import '../utils/app_directories.dart';
+import '../utils/re_editor_utils.dart';
 import 'add_provider_dialog.dart' show showDesktopAddProviderDialog;
 import 'model_edit_dialog.dart'
     show showDesktopCreateModelDialog, showDesktopModelEditDialog;
