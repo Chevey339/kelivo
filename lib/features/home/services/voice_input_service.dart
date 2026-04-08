@@ -48,6 +48,7 @@ class VoiceInputService {
   Future<bool> startRecording() async {
     if (!(PlatformUtils.isMobileTarget ||
         PlatformUtils.isMacOS ||
+        PlatformUtils.isWindows ||
         PlatformUtils.isLinux)) {
       return false;
     }

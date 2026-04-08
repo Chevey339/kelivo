@@ -5,22 +5,28 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('desktop voice input platform support', () {
-    test('supports macOS and Linux desktop voice input', () {
+    test('supports macOS, Windows, and Linux desktop voice input', () {
       expect(supportsDesktopVoiceInputPlatform(TargetPlatform.macOS), isTrue);
+      expect(supportsDesktopVoiceInputPlatform(TargetPlatform.windows), isTrue);
       expect(supportsDesktopVoiceInputPlatform(TargetPlatform.linux), isTrue);
     });
 
-    test('keeps Windows desktop voice input disabled', () {
+    test('keeps mobile platforms out of desktop voice input support', () {
       expect(
-        supportsDesktopVoiceInputPlatform(TargetPlatform.windows),
+        supportsDesktopVoiceInputPlatform(TargetPlatform.android),
         isFalse,
       );
+      expect(supportsDesktopVoiceInputPlatform(TargetPlatform.iOS), isFalse);
     });
 
     test('returns platform-specific desktop voice shortcut labels', () {
       expect(
         desktopVoiceShortcutLabelForPlatform(TargetPlatform.macOS),
         '⌘ + Shift + R',
+      );
+      expect(
+        desktopVoiceShortcutLabelForPlatform(TargetPlatform.windows),
+        'Ctrl + Shift + R',
       );
       expect(
         desktopVoiceShortcutLabelForPlatform(TargetPlatform.linux),
@@ -45,6 +51,20 @@ void main() {
 
       expect(
         isDesktopVoiceHotkeyDown(
+          platform: TargetPlatform.windows,
+          eventKey: LogicalKeyboardKey.keyR,
+          pressedKeys: <LogicalKeyboardKey>{
+            LogicalKeyboardKey.keyR,
+            LogicalKeyboardKey.controlLeft,
+            LogicalKeyboardKey.shiftLeft,
+          },
+          isDown: true,
+        ),
+        isTrue,
+      );
+
+      expect(
+        isDesktopVoiceHotkeyDown(
           platform: TargetPlatform.linux,
           eventKey: LogicalKeyboardKey.keyR,
           pressedKeys: <LogicalKeyboardKey>{
@@ -55,6 +75,20 @@ void main() {
           isDown: true,
         ),
         isTrue,
+      );
+
+      expect(
+        isDesktopVoiceHotkeyDown(
+          platform: TargetPlatform.windows,
+          eventKey: LogicalKeyboardKey.keyR,
+          pressedKeys: <LogicalKeyboardKey>{
+            LogicalKeyboardKey.keyR,
+            LogicalKeyboardKey.metaLeft,
+            LogicalKeyboardKey.shiftLeft,
+          },
+          isDown: true,
+        ),
+        isFalse,
       );
 
       expect(
