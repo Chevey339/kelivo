@@ -18,12 +18,19 @@ import '../../../shared/pages/webview_page.dart';
 import '../../../desktop/html_preview_dialog.dart';
 import 'dart:convert';
 
-enum MessageMoreAction { edit, fork, delete, share }
+enum MessageMoreAction {
+  edit,
+  fork,
+  deleteCurrentVersion,
+  deleteAllVersions,
+  share,
+}
 
 Future<MessageMoreAction?> showMessageMoreSheet(
   BuildContext context,
-  ChatMessage message,
-) async {
+  ChatMessage message, {
+  required bool canDeleteAllVersions,
+}) async {
   final isDesktop =
       defaultTargetPlatform == TargetPlatform.macOS ||
       defaultTargetPlatform == TargetPlatform.windows ||
@@ -37,8 +44,11 @@ Future<MessageMoreAction?> showMessageMoreSheet(
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) =>
-          _MessageMoreSheet(message: message, parentContext: context),
+      builder: (ctx) => _MessageMoreSheet(
+        message: message,
+        parentContext: context,
+        canDeleteAllVersions: canDeleteAllVersions,
+      ),
     );
   }
 
@@ -116,9 +126,18 @@ Future<MessageMoreAction?> showMessageMoreSheet(
         label: l10n.messageMoreSheetDelete,
         danger: true,
         onTap: () {
-          selected = MessageMoreAction.delete;
+          selected = MessageMoreAction.deleteCurrentVersion;
         },
       ),
+      if (canDeleteAllVersions)
+        DesktopContextMenuItem(
+          icon: Lucide.Trash,
+          label: l10n.messageMoreSheetDeleteAllVersions,
+          danger: true,
+          onTap: () {
+            selected = MessageMoreAction.deleteAllVersions;
+          },
+        ),
     ],
   );
   if (afterClose != null) {
@@ -128,9 +147,14 @@ Future<MessageMoreAction?> showMessageMoreSheet(
 }
 
 class _MessageMoreSheet extends StatefulWidget {
-  const _MessageMoreSheet({required this.message, required this.parentContext});
+  const _MessageMoreSheet({
+    required this.message,
+    required this.parentContext,
+    required this.canDeleteAllVersions,
+  });
   final ChatMessage message;
   final BuildContext parentContext;
+  final bool canDeleteAllVersions;
 
   @override
   State<_MessageMoreSheet> createState() => _MessageMoreSheetState();
@@ -302,9 +326,22 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                       label: l10n.messageMoreSheetDelete,
                       danger: true,
                       onTap: () {
-                        Navigator.of(context).pop(MessageMoreAction.delete);
+                        Navigator.of(
+                          context,
+                        ).pop(MessageMoreAction.deleteCurrentVersion);
                       },
                     ),
+                    if (widget.canDeleteAllVersions)
+                      _actionItem(
+                        icon: Lucide.Trash,
+                        label: l10n.messageMoreSheetDeleteAllVersions,
+                        danger: true,
+                        onTap: () {
+                          Navigator.of(
+                            context,
+                          ).pop(MessageMoreAction.deleteAllVersions);
+                        },
+                      ),
 
                     const SizedBox(height: 8),
                   ],

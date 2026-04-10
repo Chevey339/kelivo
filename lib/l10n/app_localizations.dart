@@ -1016,14 +1016,26 @@ abstract class AppLocalizations {
   /// No description provided for @homePageDeleteMessage.
   ///
   /// In en, this message translates to:
-  /// **'Delete Message'**
+  /// **'Delete This Version'**
   String get homePageDeleteMessage;
 
   /// No description provided for @homePageDeleteMessageConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Are you sure you want to delete this message? This cannot be undone.'**
+  /// **'Are you sure you want to delete this version? This cannot be undone.'**
   String get homePageDeleteMessageConfirm;
+
+  /// No description provided for @homePageDeleteAllVersions.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete All Versions'**
+  String get homePageDeleteAllVersions;
+
+  /// No description provided for @homePageDeleteAllVersionsConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete all versions of this message? This cannot be undone.'**
+  String get homePageDeleteAllVersionsConfirm;
 
   /// No description provided for @homePageCancel.
   ///
@@ -2930,8 +2942,14 @@ abstract class AppLocalizations {
   /// No description provided for @messageMoreSheetDelete.
   ///
   /// In en, this message translates to:
-  /// **'Delete'**
+  /// **'Delete This Version'**
   String get messageMoreSheetDelete;
+
+  /// No description provided for @messageMoreSheetDeleteAllVersions.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete All Versions'**
+  String get messageMoreSheetDeleteAllVersions;
 
   /// No description provided for @reasoningBudgetSheetOff.
   ///

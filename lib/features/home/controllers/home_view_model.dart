@@ -375,52 +375,116 @@ class HomeViewModel extends ChangeNotifier {
     required ChatMessage message,
     required Map<String, List<ChatMessage>> byGroup,
   }) async {
-    final id = message.id;
     final gid = (message.groupId ?? message.id);
+    final versBefore = List<ChatMessage>.of(
+      byGroup[gid] ?? const <ChatMessage>[],
+    )..sort((a, b) => a.version.compareTo(b.version));
+    await _deleteMessageVersions(
+      gid: gid,
+      versionsBefore: versBefore,
+      deletedMessageIds: <String>{message.id},
+    );
+  }
 
-    // Compute selection adjustment before removal
-    final versBefore = (byGroup[gid] ?? const <ChatMessage>[])
+  Future<void> deleteAllMessageVersions({
+    required ChatMessage message,
+    required Map<String, List<ChatMessage>> byGroup,
+  }) async {
+    final gid = (message.groupId ?? message.id);
+    final versBefore = List<ChatMessage>.of(
+      byGroup[gid] ?? const <ChatMessage>[],
+    )..sort((a, b) => a.version.compareTo(b.version));
+    await _deleteMessageVersions(
+      gid: gid,
+      versionsBefore: versBefore,
+      deletedMessageIds: versBefore.map((m) => m.id).toSet(),
+    );
+  }
+
+  @visibleForTesting
+  static int? computeNextVersionSelection({
+    required List<ChatMessage> versionsBefore,
+    required Set<String> deletedMessageIds,
+    required int? oldSelection,
+  }) {
+    final sorted = List<ChatMessage>.of(versionsBefore)
       ..sort((a, b) => a.version.compareTo(b.version));
+    if (sorted.isEmpty) return null;
+
+    final remainingCount = sorted
+        .where((message) => !deletedMessageIds.contains(message.id))
+        .length;
+    if (remainingCount <= 0) return null;
+
+    int newSelection = oldSelection ?? (sorted.length - 1);
+    final deletedIndices = <int>[];
+    for (int i = 0; i < sorted.length; i++) {
+      if (deletedMessageIds.contains(sorted[i].id)) {
+        deletedIndices.add(i);
+      }
+    }
+
+    for (final deletedIndex in deletedIndices) {
+      if (deletedIndex < newSelection) {
+        newSelection -= 1;
+      } else if (deletedIndex == newSelection) {
+        newSelection = newSelection > 0 ? newSelection - 1 : 0;
+      }
+    }
+
+    if (newSelection < 0) return 0;
+    if (newSelection > remainingCount - 1) return remainingCount - 1;
+    return newSelection;
+  }
+
+  Future<void> _deleteMessageVersions({
+    required String gid,
+    required List<ChatMessage> versionsBefore,
+    required Set<String> deletedMessageIds,
+  }) async {
+    if (deletedMessageIds.isEmpty) return;
+
     final oldSel =
         versionSelections[gid] ??
-        (versBefore.isNotEmpty ? versBefore.length - 1 : 0);
-    final delIndex = versBefore.indexWhere((m) => m.id == id);
+        (versionsBefore.isNotEmpty ? versionsBefore.length - 1 : 0);
+    final newSel = computeNextVersionSelection(
+      versionsBefore: versionsBefore,
+      deletedMessageIds: deletedMessageIds,
+      oldSelection: oldSel,
+    );
 
     // Clean up message UI state
-    _streamController.clearMessageState(id);
+    for (final id in deletedMessageIds) {
+      _streamController.clearMessageState(id);
+    }
 
     // Adjust selected version index for this group
-    final newTotal = versBefore.length - 1;
-    if (newTotal <= 0) {
+    if (newSel == null) {
       _chatController.versionSelections.remove(gid);
     } else {
-      int newSel = oldSel;
-      if (delIndex >= 0) {
-        if (delIndex < oldSel) {
-          newSel = oldSel - 1;
-        } else if (delIndex == oldSel) {
-          newSel = (oldSel > 0) ? oldSel - 1 : 0;
-        }
-      }
-      if (newSel < 0) newSel = 0;
-      if (newSel > newTotal - 1) newSel = newTotal - 1;
       _chatController.versionSelections[gid] = newSel;
     }
 
-    // Persist updated selection if group still exists
-    final sel = versionSelections[gid];
-    if (sel != null && currentConversation != null) {
+    if (currentConversation != null) {
       try {
-        await _chatService.setSelectedVersion(
-          currentConversation!.id,
-          gid,
-          sel,
-        );
+        if (newSel == null) {
+          await _chatService.clearSelectedVersion(currentConversation!.id, gid);
+        } else {
+          await _chatService.setSelectedVersion(
+            currentConversation!.id,
+            gid,
+            newSel,
+          );
+        }
       } catch (_) {}
     }
 
-    // Delete message from storage
-    await _chatService.deleteMessage(id);
+    final messagesToDelete = versionsBefore
+        .where((message) => deletedMessageIds.contains(message.id))
+        .toList();
+    for (final message in messagesToDelete) {
+      await _chatService.deleteMessage(message.id);
+    }
 
     // Reload messages
     _chatController.reloadMessages();

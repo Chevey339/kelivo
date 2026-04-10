@@ -498,10 +498,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get userProviderDefaultUserName => '用户';
 
   @override
-  String get homePageDeleteMessage => '删除消息';
+  String get homePageDeleteMessage => '删除本版本';
 
   @override
-  String get homePageDeleteMessageConfirm => '确定要删除这条消息吗？此操作不可撤销。';
+  String get homePageDeleteMessageConfirm => '确定要删除当前版本吗？此操作不可撤销。';
+
+  @override
+  String get homePageDeleteAllVersions => '删除全部版本';
+
+  @override
+  String get homePageDeleteAllVersionsConfirm => '确定要删除这条消息的全部版本吗？此操作不可撤销。';
 
   @override
   String get homePageCancel => '取消';
@@ -1466,7 +1472,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMoreSheetCreateBranch => '创建分支';
 
   @override
-  String get messageMoreSheetDelete => '删除';
+  String get messageMoreSheetDelete => '删除本版本';
+
+  @override
+  String get messageMoreSheetDeleteAllVersions => '删除全部版本';
 
   @override
   String get reasoningBudgetSheetOff => '关闭';
@@ -4769,10 +4778,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get userProviderDefaultUserName => '用户';
 
   @override
-  String get homePageDeleteMessage => '删除消息';
+  String get homePageDeleteMessage => '删除本版本';
 
   @override
-  String get homePageDeleteMessageConfirm => '确定要删除这条消息吗？此操作不可撤销。';
+  String get homePageDeleteMessageConfirm => '确定要删除当前版本吗？此操作不可撤销。';
+
+  @override
+  String get homePageDeleteAllVersions => '删除全部版本';
+
+  @override
+  String get homePageDeleteAllVersionsConfirm => '确定要删除这条消息的全部版本吗？此操作不可撤销。';
 
   @override
   String get homePageCancel => '取消';
@@ -5737,7 +5752,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageMoreSheetCreateBranch => '创建分支';
 
   @override
-  String get messageMoreSheetDelete => '删除';
+  String get messageMoreSheetDelete => '删除本版本';
+
+  @override
+  String get messageMoreSheetDeleteAllVersions => '删除全部版本';
 
   @override
   String get reasoningBudgetSheetOff => '关闭';
@@ -8988,10 +9006,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get userProviderDefaultUserName => '使用者';
 
   @override
-  String get homePageDeleteMessage => '刪除訊息';
+  String get homePageDeleteMessage => '刪除本版本';
 
   @override
-  String get homePageDeleteMessageConfirm => '確定要刪除這條訊息嗎？此操作不可撤銷。';
+  String get homePageDeleteMessageConfirm => '確定要刪除目前版本嗎？此操作不可撤銷。';
+
+  @override
+  String get homePageDeleteAllVersions => '刪除全部版本';
+
+  @override
+  String get homePageDeleteAllVersionsConfirm => '確定要刪除這則訊息的全部版本嗎？此操作不可撤銷。';
 
   @override
   String get homePageCancel => '取消';
@@ -9955,7 +9979,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageMoreSheetCreateBranch => '建立分支';
 
   @override
-  String get messageMoreSheetDelete => '刪除';
+  String get messageMoreSheetDelete => '刪除本版本';
+
+  @override
+  String get messageMoreSheetDeleteAllVersions => '刪除全部版本';
 
   @override
   String get reasoningBudgetSheetOff => '關閉';
