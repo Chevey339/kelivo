@@ -345,6 +345,21 @@
   "desktopNavSettingsTooltip": "Settings",
   "desktopAvatarMenuUseEmoji": "Use emoji",
   "cameraPermissionDeniedMessage": "Camera unavailable: permission not granted.",
+  "voiceInputPermissionDeniedMessage": "Microphone unavailable: permission not granted.",
+  "voiceRecordingStartFailed": "Couldn't start recording.",
+  "voiceRecordingLinuxDependencyMissing": "Linux voice input requires {dependencies}. Install them and try again.",
+  "@voiceRecordingLinuxDependencyMissing": {
+    "placeholders": {
+      "dependencies": {}
+    }
+  },
+  "voiceRecordingStopFailed": "Couldn't process the recording.",
+  "voiceRecordingDisplayLabel": "User voice ({duration})",
+  "@voiceRecordingDisplayLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
   "openSystemSettings": "Open Settings",
   "desktopAvatarMenuChangeFromImage": "Change from image…",
   "desktopAvatarMenuReset": "Reset avatar",
@@ -660,6 +675,14 @@
       }
     }
   },
+  "chatMessageWidgetVoicePlaybackFailed": "Failed to play voice message: {error}",
+  "@chatMessageWidgetVoicePlaybackFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "chatMessageWidgetCopiedToClipboard": "Copied to clipboard",
   "chatMessageWidgetResendTooltip": "Resend",
   "chatMessageWidgetMoreTooltip": "More",
@@ -893,6 +916,34 @@
   "chatInputBarOnlineSearchTooltip": "Online Search",
   "chatInputBarReasoningStrengthTooltip": "Reasoning Strength",
   "chatInputBarMcpServersTooltip": "MCP Servers",
+  "chatInputBarVoiceInputTooltip": "Record Voice",
+  "chatInputBarVoiceRecordingTooltip": "Stop Recording",
+  "chatInputBarDesktopVoiceCountdownLabel": "Recording starts in {seconds}s",
+  "@chatInputBarDesktopVoiceCountdownLabel": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "chatInputBarDesktopVoiceCountdownHelp": "Kelivo will start recording automatically after the countdown.",
+  "chatInputBarDesktopVoiceRecordingLabel": "Recording... {duration}",
+  "@chatInputBarDesktopVoiceRecordingLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
+  "chatInputBarDesktopVoiceRecordingHelp": "Click Stop, or release {shortcut} to finish recording.",
+  "@chatInputBarDesktopVoiceRecordingHelp": {
+    "placeholders": {
+      "shortcut": {}
+    }
+  },
+  "chatInputBarDesktopVoiceConfirmLabel": "Send this voice recording?",
+  "chatInputBarDesktopVoiceConfirmHelp": "Press Enter to send, or press Esc to cancel.",
+  "chatInputBarDesktopVoiceStopButton": "Stop Recording",
+  "chatInputBarDesktopVoiceSendButton": "Send Recording",
+  "chatInputBarDesktopVoiceCancelButton": "Cancel",
   "chatInputBarMoreTooltip": "Add",
   "chatInputBarInsertNewline": "Newline",
   "chatInputBarExpand": "Expand",
@@ -1077,6 +1128,7 @@
   "modelDetailSheetAbilitiesLabel": "Abilities",
   "modelDetailSheetTextMode": "Text",
   "modelDetailSheetImageMode": "Image",
+  "modelDetailSheetAudioMode": "Audio",
   "modelDetailSheetToolsAbility": "Tools",
   "modelDetailSheetReasoningAbility": "Reasoning",
   "modelDetailSheetProviderOverrideDescription": "Provider overrides: customize provider for a specific model.",

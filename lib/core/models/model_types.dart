@@ -2,7 +2,15 @@ import 'package:flutter/foundation.dart';
 
 enum ModelType { chat, embedding }
 
-enum Modality { text, image }
+enum Modality { text, image, audio }
+
+extension ModalityStorage on Modality {
+  String get storageValue => switch (this) {
+    Modality.text => 'text',
+    Modality.image => 'image',
+    Modality.audio => 'audio',
+  };
+}
 
 enum ModelAbility { tool, reasoning }
 

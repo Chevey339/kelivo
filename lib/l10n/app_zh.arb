@@ -78,6 +78,21 @@
   "settingsPageSponsor": "赞助",
   "settingsPageShare": "分享",
   "cameraPermissionDeniedMessage": "未授予相机权限",
+  "voiceInputPermissionDeniedMessage": "未授予麦克风权限",
+  "voiceRecordingStartFailed": "无法开始录音",
+  "voiceRecordingLinuxDependencyMissing": "Linux 语音输入依赖 {dependencies}，请先安装后重试。",
+  "@voiceRecordingLinuxDependencyMissing": {
+    "placeholders": {
+      "dependencies": {}
+    }
+  },
+  "voiceRecordingStopFailed": "无法处理录音文件",
+  "voiceRecordingDisplayLabel": "用户语音（{duration}）",
+  "@voiceRecordingDisplayLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
   "openSystemSettings": "去设置",
   "sponsorPageMethodsSectionTitle": "赞助方式",
   "sponsorPageSponsorsSectionTitle": "赞助用户",
@@ -514,6 +529,7 @@
   "chatMessageWidgetFileNotFound": "文件不存在: {fileName}",
   "chatMessageWidgetCannotOpenFile": "无法打开文件: {message}",
   "chatMessageWidgetOpenFileError": "打开文件失败: {error}",
+  "chatMessageWidgetVoicePlaybackFailed": "播放语音消息失败: {error}",
   "chatMessageWidgetCopiedToClipboard": "已复制到剪贴板",
   "chatMessageWidgetResendTooltip": "重新发送",
   "chatMessageWidgetMoreTooltip": "更多",
@@ -649,6 +665,17 @@
   "chatInputBarOnlineSearchTooltip": "联网搜索",
   "chatInputBarReasoningStrengthTooltip": "思维链强度",
   "chatInputBarMcpServersTooltip": "MCP服务器",
+  "chatInputBarVoiceInputTooltip": "语音输入",
+  "chatInputBarVoiceRecordingTooltip": "停止录音",
+  "chatInputBarDesktopVoiceCountdownLabel": "{seconds} 秒后开始录音",
+  "chatInputBarDesktopVoiceCountdownHelp": "Kelivo 会在倒计时结束后自动开始录音。",
+  "chatInputBarDesktopVoiceRecordingLabel": "录音中… {duration}",
+  "chatInputBarDesktopVoiceRecordingHelp": "点击“停止录音”，或松开 {shortcut} 结束录音。",
+  "chatInputBarDesktopVoiceConfirmLabel": "发送这段语音吗？",
+  "chatInputBarDesktopVoiceConfirmHelp": "按回车发送，按 Esc 取消。",
+  "chatInputBarDesktopVoiceStopButton": "停止录音",
+  "chatInputBarDesktopVoiceSendButton": "发送语音",
+  "chatInputBarDesktopVoiceCancelButton": "取消",
   "chatInputBarMoreTooltip": "更多",
   "chatInputBarInsertNewline": "换行",
   "chatInputBarExpand": "展开",
@@ -766,6 +793,7 @@
   "modelDetailSheetAbilitiesLabel": "能力",
   "modelDetailSheetTextMode": "文本",
   "modelDetailSheetImageMode": "图片",
+  "modelDetailSheetAudioMode": "音频",
   "modelDetailSheetToolsAbility": "工具",
   "modelDetailSheetReasoningAbility": "推理",
   "modelDetailSheetProviderOverrideDescription": "供应商重写：允许为特定模型自定义供应商设置。（暂未实现）",

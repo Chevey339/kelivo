@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 import '../../../theme/design_tokens.dart';
@@ -17,14 +18,18 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../utils/clipboard_images.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/services/haptics.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/voice_attachment_utils.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
+import '../services/voice_input_service.dart';
+import '../utils/desktop_voice_input_utils.dart';
 
 class ChatInputBarController {
   _ChatInputBarState? _state;
@@ -37,7 +42,15 @@ class ChatInputBarController {
   void clearImages() => _state?._clearImages();
   void addFiles(List<DocumentAttachment> docs) => _state?._addFiles(docs);
   void clearFiles() => _state?._clearFiles();
+  void startDesktopVoiceHotkeyRecording() =>
+      _state?._startDesktopVoiceHotkeyRecording();
+  void finishDesktopVoiceHotkeyRecording() =>
+      _state?._finishDesktopVoiceHotkeyRecording();
+  void cancelDesktopVoiceSession() => _state?._cancelDesktopVoiceSession();
+  bool hasDesktopVoiceSession() => _state?._hasDesktopVoiceSession() ?? false;
 }
+
+enum _DesktopVoiceState { idle, countdown, recording, confirm }
 
 class ChatInputBar extends StatefulWidget {
   const ChatInputBar({
@@ -68,6 +81,11 @@ class ChatInputBar extends StatefulWidget {
     this.onPickCamera,
     this.onPickPhotos,
     this.onUploadFiles,
+    this.showVoiceInputButton = false,
+    this.voiceRecording = false,
+    this.onStartVoiceRecording,
+    this.onStopVoiceRecording,
+    this.onCancelVoiceRecording,
     this.onToggleLearningMode,
     this.onOpenWorldBook,
     this.onClearContext,
@@ -110,6 +128,11 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onPickCamera;
   final VoidCallback? onPickPhotos;
   final VoidCallback? onUploadFiles;
+  final bool showVoiceInputButton;
+  final bool voiceRecording;
+  final Future<bool> Function()? onStartVoiceRecording;
+  final Future<DocumentAttachment?> Function()? onStopVoiceRecording;
+  final Future<void> Function()? onCancelVoiceRecording;
   final VoidCallback? onToggleLearningMode;
   final VoidCallback? onOpenWorldBook;
   final VoidCallback? onClearContext;
@@ -131,11 +154,33 @@ class ChatInputBar extends StatefulWidget {
 
 class _ChatInputBarState extends State<ChatInputBar>
     with WidgetsBindingObserver {
+  static const double _maxVoiceKeepZoneRadius = 130;
+  static const int _desktopVoiceCountdownSeconds = 2;
   late TextEditingController _controller;
   bool _isExpanded = false; // Track expand/collapse state for input field
   final List<String> _images = <String>[]; // local file paths
   final List<DocumentAttachment> _docs =
       <DocumentAttachment>[]; // files to upload
+  bool _voiceActionInFlight = false;
+  Timer? _voiceAutoStopTimer;
+  Timer? _desktopVoiceCountdownTimer;
+  Timer? _desktopVoiceTicker;
+  final GlobalKey _voiceButtonKey = GlobalKey(
+    debugLabel: 'voice-button-anchor',
+  );
+  OverlayEntry? _voiceOverlayEntry;
+  OverlayEntry? _desktopVoiceOverlayEntry;
+  bool _voicePointerHeld = false;
+  bool _voicePressActive = false;
+  bool _voiceWillCancel = false;
+  bool _desktopVoiceHotkeyHeld = false;
+  bool _desktopVoiceHotkeyMode = false;
+  bool _desktopVoiceCancelAfterStart = false;
+  _DesktopVoiceState _desktopVoiceState = _DesktopVoiceState.idle;
+  int _desktopVoiceCountdown = _desktopVoiceCountdownSeconds;
+  DateTime? _desktopVoiceRecordingStartedAt;
+  Duration _desktopVoiceElapsed = Duration.zero;
+  DocumentAttachment? _desktopVoicePendingAttachment;
   final Map<LogicalKeyboardKey, Timer?> _repeatTimers = {};
   static const Duration _repeatInitialDelay = Duration(milliseconds: 300);
   static const Duration _repeatPeriod = Duration(milliseconds: 35);
@@ -209,12 +254,18 @@ class _ChatInputBarState extends State<ChatInputBar>
       // When going to background, hide any open toolbar
       _suppressContextMenu = true;
       widget.focusNode?.unfocus();
+      _cancelDesktopVoiceSession();
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _voiceAutoStopTimer?.cancel();
+    _desktopVoiceCountdownTimer?.cancel();
+    _desktopVoiceTicker?.cancel();
+    _removeVoiceOverlay();
+    _removeDesktopVoiceOverlay();
     for (final timer in _repeatTimers.values) {
       try {
         timer?.cancel();
@@ -231,6 +282,13 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   void didUpdateWidget(covariant ChatInputBar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.voiceRecording && !widget.voiceRecording) {
+      _voiceAutoStopTimer?.cancel();
+      _removeVoiceOverlay();
+      _voicePointerHeld = false;
+      _voicePressActive = false;
+      _voiceWillCancel = false;
+    }
   }
 
   String _hint(BuildContext context) {
@@ -248,14 +306,311 @@ class _ChatInputBarState extends State<ChatInputBar>
   /// Whether to show the expand/collapse button (when text has 3+ lines).
   bool get _showExpandButton => _lineCount >= 3;
 
+  bool get _isDesktopVoiceSupported {
+    return supportsDesktopVoiceInputPlatform(defaultTargetPlatform) &&
+        widget.showVoiceInputButton &&
+        widget.onStartVoiceRecording != null &&
+        widget.onStopVoiceRecording != null &&
+        widget.onCancelVoiceRecording != null;
+  }
+
+  bool _hasDesktopVoiceSession() {
+    return _desktopVoiceState != _DesktopVoiceState.idle;
+  }
+
+  String _desktopVoiceShortcutLabel() =>
+      desktopVoiceShortcutLabelForPlatform(defaultTargetPlatform);
+
+  void _startDesktopVoiceHotkeyRecording() {
+    if (!_isDesktopVoiceSupported) return;
+    if (_voiceActionInFlight ||
+        widget.loading ||
+        _desktopVoiceState != _DesktopVoiceState.idle) {
+      return;
+    }
+    _desktopVoiceHotkeyHeld = true;
+    _desktopVoiceHotkeyMode = true;
+    _desktopVoiceCancelAfterStart = false;
+    unawaited(_startDesktopVoiceSession(skipCountdown: true));
+  }
+
+  void _finishDesktopVoiceHotkeyRecording() {
+    final hadHold = _desktopVoiceHotkeyHeld;
+    _desktopVoiceHotkeyHeld = false;
+    if (!hadHold && !_desktopVoiceHotkeyMode) return;
+    if (_desktopVoiceState == _DesktopVoiceState.recording &&
+        !_voiceActionInFlight) {
+      unawaited(_stopDesktopVoiceRecordingForConfirmation());
+    }
+  }
+
+  Future<void> _onDesktopVoiceButtonTap() async {
+    if (!_isDesktopVoiceSupported || _voiceActionInFlight || widget.loading) {
+      return;
+    }
+    switch (_desktopVoiceState) {
+      case _DesktopVoiceState.idle:
+        await _startDesktopVoiceSession(skipCountdown: false);
+        return;
+      case _DesktopVoiceState.countdown:
+        await _cancelDesktopVoiceSessionInternal();
+        return;
+      case _DesktopVoiceState.recording:
+        await _stopDesktopVoiceRecordingForConfirmation();
+        return;
+      case _DesktopVoiceState.confirm:
+        return;
+    }
+  }
+
+  Future<bool> _startDesktopVoiceSession({required bool skipCountdown}) async {
+    if (!_isDesktopVoiceSupported ||
+        _voiceActionInFlight ||
+        widget.loading ||
+        _desktopVoiceState != _DesktopVoiceState.idle) {
+      return false;
+    }
+
+    _desktopVoiceCancelAfterStart = false;
+    _desktopVoicePendingAttachment = null;
+    _desktopVoiceElapsed = Duration.zero;
+    _desktopVoiceRecordingStartedAt = null;
+    _desktopVoiceCountdownTimer?.cancel();
+    _desktopVoiceTicker?.cancel();
+    _voiceAutoStopTimer?.cancel();
+
+    if (skipCountdown) {
+      setState(() {
+        _desktopVoiceState = _DesktopVoiceState.recording;
+      });
+      _showDesktopVoiceOverlay();
+      _markDesktopVoiceOverlayNeedsBuild();
+      return _beginDesktopVoiceRecording();
+    }
+
+    setState(() {
+      _desktopVoiceHotkeyMode = false;
+      _desktopVoiceCountdown = _desktopVoiceCountdownSeconds;
+      _desktopVoiceState = _DesktopVoiceState.countdown;
+    });
+    _showDesktopVoiceOverlay();
+    _markDesktopVoiceOverlayNeedsBuild();
+    _desktopVoiceCountdownTimer = Timer.periodic(const Duration(seconds: 1), (
+      timer,
+    ) async {
+      if (!mounted || _desktopVoiceState != _DesktopVoiceState.countdown) {
+        timer.cancel();
+        _desktopVoiceCountdownTimer = null;
+        return;
+      }
+      if (_desktopVoiceCountdown > 1) {
+        setState(() {
+          _desktopVoiceCountdown -= 1;
+        });
+        _markDesktopVoiceOverlayNeedsBuild();
+        return;
+      }
+      timer.cancel();
+      _desktopVoiceCountdownTimer = null;
+      await _beginDesktopVoiceRecording();
+    });
+    return true;
+  }
+
+  Future<bool> _beginDesktopVoiceRecording() async {
+    final startRecording = widget.onStartVoiceRecording;
+    if (startRecording == null) {
+      await _cancelDesktopVoiceSessionInternal();
+      return false;
+    }
+
+    setState(() {
+      _voiceActionInFlight = true;
+      _desktopVoiceState = _DesktopVoiceState.recording;
+      _desktopVoiceElapsed = Duration.zero;
+    });
+    _markDesktopVoiceOverlayNeedsBuild();
+
+    try {
+      final started = await startRecording();
+      if (!mounted || !started) {
+        await _cancelDesktopVoiceSessionInternal();
+        return false;
+      }
+      if (_desktopVoiceCancelAfterStart) {
+        _desktopVoiceCancelAfterStart = false;
+        await widget.onCancelVoiceRecording?.call();
+        await _cancelDesktopVoiceSessionInternal(deletePendingFile: false);
+        return false;
+      }
+
+      _desktopVoiceRecordingStartedAt = DateTime.now();
+      _desktopVoiceElapsed = Duration.zero;
+      _desktopVoiceTicker?.cancel();
+      _desktopVoiceTicker = Timer.periodic(const Duration(milliseconds: 200), (
+        _,
+      ) {
+        final startedAt = _desktopVoiceRecordingStartedAt;
+        if (!mounted ||
+            _desktopVoiceState != _DesktopVoiceState.recording ||
+            startedAt == null) {
+          return;
+        }
+        final elapsed = DateTime.now().difference(startedAt);
+        setState(() {
+          _desktopVoiceElapsed =
+              elapsed > VoiceInputService.maxRecordingDuration
+              ? VoiceInputService.maxRecordingDuration
+              : elapsed;
+        });
+        _markDesktopVoiceOverlayNeedsBuild();
+      });
+      _voiceAutoStopTimer?.cancel();
+      _voiceAutoStopTimer = Timer(VoiceInputService.maxRecordingDuration, () {
+        if (!mounted || _desktopVoiceState != _DesktopVoiceState.recording) {
+          return;
+        }
+        unawaited(_stopDesktopVoiceRecordingForConfirmation());
+      });
+      if (_desktopVoiceHotkeyMode && !_desktopVoiceHotkeyHeld) {
+        unawaited(_stopDesktopVoiceRecordingForConfirmation());
+      }
+      return true;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _voiceActionInFlight = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _stopDesktopVoiceRecordingForConfirmation() async {
+    if (_desktopVoiceState != _DesktopVoiceState.recording ||
+        _voiceActionInFlight) {
+      return;
+    }
+    final stopRecording = widget.onStopVoiceRecording;
+    if (stopRecording == null) return;
+
+    _desktopVoiceHotkeyHeld = false;
+    _desktopVoiceHotkeyMode = false;
+    _desktopVoiceCountdownTimer?.cancel();
+    _desktopVoiceCountdownTimer = null;
+    _desktopVoiceTicker?.cancel();
+    _desktopVoiceTicker = null;
+    _voiceAutoStopTimer?.cancel();
+    _voiceAutoStopTimer = null;
+
+    setState(() {
+      _voiceActionInFlight = true;
+    });
+    _markDesktopVoiceOverlayNeedsBuild();
+
+    try {
+      final attachment = await stopRecording();
+      if (!mounted) {
+        if (attachment != null) {
+          await _deleteVoiceAttachmentFile(attachment);
+        }
+        return;
+      }
+      if (attachment == null) {
+        await _cancelDesktopVoiceSessionInternal(deletePendingFile: false);
+        return;
+      }
+      setState(() {
+        _desktopVoicePendingAttachment = attachment;
+        _desktopVoiceState = _DesktopVoiceState.confirm;
+      });
+      _markDesktopVoiceOverlayNeedsBuild();
+      widget.focusNode?.requestFocus();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _voiceActionInFlight = false;
+        });
+      }
+    }
+  }
+
+  void _confirmDesktopVoiceSend() {
+    final attachment = _desktopVoicePendingAttachment;
+    if (attachment == null || _voiceActionInFlight) return;
+    _desktopVoicePendingAttachment = null;
+    _clearDesktopVoiceUi(clearPendingAttachment: false);
+    _sendCurrentInput(extraDocuments: [attachment]);
+  }
+
+  void _cancelDesktopVoiceSession() {
+    unawaited(_cancelDesktopVoiceSessionInternal());
+  }
+
+  Future<void> _cancelDesktopVoiceSessionInternal({
+    bool deletePendingFile = true,
+  }) async {
+    final currentState = _desktopVoiceState;
+    final pendingAttachment = _desktopVoicePendingAttachment;
+    _desktopVoiceHotkeyHeld = false;
+    _desktopVoiceHotkeyMode = false;
+    if (_voiceActionInFlight && currentState == _DesktopVoiceState.recording) {
+      _desktopVoiceCancelAfterStart = true;
+    }
+    final cancelAfterStart = _desktopVoiceCancelAfterStart;
+    _clearDesktopVoiceUi();
+
+    if (currentState == _DesktopVoiceState.recording && !cancelAfterStart) {
+      await widget.onCancelVoiceRecording?.call();
+      return;
+    }
+    if (deletePendingFile && pendingAttachment != null) {
+      await _deleteVoiceAttachmentFile(pendingAttachment);
+    }
+  }
+
+  void _clearDesktopVoiceUi({bool clearPendingAttachment = true}) {
+    _desktopVoiceCountdownTimer?.cancel();
+    _desktopVoiceCountdownTimer = null;
+    _desktopVoiceTicker?.cancel();
+    _desktopVoiceTicker = null;
+    _voiceAutoStopTimer?.cancel();
+    _voiceAutoStopTimer = null;
+    _desktopVoiceCountdown = _desktopVoiceCountdownSeconds;
+    _desktopVoiceRecordingStartedAt = null;
+    _desktopVoiceElapsed = Duration.zero;
+    _desktopVoiceState = _DesktopVoiceState.idle;
+    _desktopVoiceCancelAfterStart = false;
+    if (clearPendingAttachment) {
+      _desktopVoicePendingAttachment = null;
+    }
+    if (mounted) {
+      setState(() {});
+    }
+    _removeDesktopVoiceOverlay();
+  }
+
+  Future<void> _deleteVoiceAttachmentFile(DocumentAttachment attachment) async {
+    try {
+      final file = File(attachment.path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
+  }
+
   void _handleSend() {
+    _sendCurrentInput();
+  }
+
+  void _sendCurrentInput({List<DocumentAttachment> extraDocuments = const []}) {
     final text = _controller.text.trim();
-    if (text.isEmpty && _images.isEmpty && _docs.isEmpty) return;
+    final documents = <DocumentAttachment>[..._docs, ...extraDocuments];
+    if (text.isEmpty && _images.isEmpty && documents.isEmpty) return;
     widget.onSend?.call(
       ChatInputData(
         text: text,
         imagePaths: List.of(_images),
-        documents: List.of(_docs),
+        documents: documents,
       ),
     );
     _controller.clear();
@@ -268,6 +623,453 @@ class _ChatInputBarState extends State<ChatInputBar>
         widget.focusNode?.requestFocus();
       }
     } catch (_) {}
+  }
+
+  Future<void> _startVoicePress(Offset globalPosition) async {
+    if (_voiceActionInFlight ||
+        _voicePressActive ||
+        widget.voiceRecording ||
+        widget.loading) {
+      return;
+    }
+    final startRecording = widget.onStartVoiceRecording;
+    if (startRecording == null) return;
+
+    setState(() => _voiceActionInFlight = true);
+    try {
+      final started = await startRecording();
+      if (!mounted || !started) return;
+      if (!_voicePointerHeld) {
+        final cancelRecording = widget.onCancelVoiceRecording;
+        if (cancelRecording != null) {
+          await cancelRecording();
+        } else {
+          await widget.onStopVoiceRecording?.call();
+        }
+        return;
+      }
+      Haptics.soft();
+      _voicePressActive = true;
+      _voiceWillCancel = false;
+      _showVoiceOverlay();
+      _updateVoiceDrag(globalPosition);
+      _voiceAutoStopTimer?.cancel();
+      _voiceAutoStopTimer = Timer(VoiceInputService.maxRecordingDuration, () {
+        if (!mounted || !_voicePressActive) return;
+        unawaited(_finishVoicePress());
+      });
+      if (mounted) setState(() {});
+    } finally {
+      if (mounted) {
+        setState(() => _voiceActionInFlight = false);
+      }
+    }
+  }
+
+  void _updateVoiceDrag(Offset globalPosition) {
+    if (!_voicePressActive) return;
+    final geometry = _resolveVoiceOverlayGeometry();
+    final bool willCancel =
+        geometry == null || !_isPointInVoiceKeepZone(globalPosition, geometry);
+    if (willCancel == _voiceWillCancel) return;
+    setState(() => _voiceWillCancel = willCancel);
+    _markVoiceOverlayNeedsBuild();
+  }
+
+  Future<void> _finishVoicePress({bool forceCancel = false}) async {
+    _voicePointerHeld = false;
+    if (_voiceActionInFlight || !_voicePressActive) return;
+    final stopRecording = widget.onStopVoiceRecording;
+    final cancelRecording = widget.onCancelVoiceRecording;
+    if (stopRecording == null) return;
+
+    final shouldCancel = forceCancel || _voiceWillCancel;
+    _voiceAutoStopTimer?.cancel();
+    _removeVoiceOverlay();
+    setState(() {
+      _voiceActionInFlight = true;
+      _voicePressActive = false;
+      _voiceWillCancel = false;
+    });
+
+    try {
+      if (shouldCancel) {
+        if (cancelRecording != null) {
+          await cancelRecording();
+        } else {
+          await stopRecording();
+        }
+        return;
+      }
+      final attachment = await stopRecording();
+      if (!mounted) return;
+      if (attachment != null) {
+        _sendCurrentInput(extraDocuments: [attachment]);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _voiceActionInFlight = false);
+      }
+    }
+  }
+
+  void _showVoiceOverlay() {
+    _removeVoiceOverlay();
+    final overlay = Overlay.of(context, rootOverlay: true);
+    _voiceOverlayEntry = OverlayEntry(
+      builder: (context) {
+        final geometry = _resolveVoiceOverlayGeometry();
+        if (!_voicePressActive || geometry == null) {
+          return const SizedBox.shrink();
+        }
+        return IgnorePointer(
+          child: Positioned.fill(
+            child: CustomPaint(
+              painter: _VoiceKeepZonePainter(
+                geometry: geometry,
+                cancelling: _voiceWillCancel,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    overlay.insert(_voiceOverlayEntry!);
+  }
+
+  void _removeVoiceOverlay() {
+    _voiceOverlayEntry?.remove();
+    _voiceOverlayEntry = null;
+  }
+
+  void _markVoiceOverlayNeedsBuild() {
+    _voiceOverlayEntry?.markNeedsBuild();
+  }
+
+  void _showDesktopVoiceOverlay() {
+    _removeDesktopVoiceOverlay();
+    final overlay = Overlay.of(context, rootOverlay: true);
+    _desktopVoiceOverlayEntry = OverlayEntry(
+      builder: (overlayContext) {
+        final anchorRect = _resolveDesktopVoiceAnchorRect();
+        if (_desktopVoiceState == _DesktopVoiceState.idle ||
+            anchorRect == null) {
+          return const SizedBox.shrink();
+        }
+        final mediaQuery = MediaQuery.of(overlayContext);
+        final overlayBox = overlay.context.findRenderObject() as RenderBox?;
+        if (overlayBox == null) return const SizedBox.shrink();
+
+        const width = 320.0;
+        final panelHeight = switch (_desktopVoiceState) {
+          _DesktopVoiceState.countdown => 168.0,
+          _DesktopVoiceState.recording => 188.0,
+          _DesktopVoiceState.confirm => 182.0,
+          _DesktopVoiceState.idle => 0.0,
+        };
+        final left = (anchorRect.center.dx - width / 2).clamp(
+          12.0,
+          overlayBox.size.width - width - 12.0,
+        );
+        var top = anchorRect.top - panelHeight - 14.0;
+        final minTop = mediaQuery.padding.top + 12.0;
+        final maxTop = overlayBox.size.height - panelHeight - 12.0;
+        if (top < minTop) {
+          top = anchorRect.bottom + 14.0;
+        }
+        top = top.clamp(minTop, maxTop);
+
+        final dismissOnTapOutside =
+            _desktopVoiceState != _DesktopVoiceState.recording;
+
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: dismissOnTapOutside ? _cancelDesktopVoiceSession : null,
+                child: const SizedBox.expand(),
+              ),
+            ),
+            Positioned(
+              left: left,
+              top: top,
+              width: width,
+              child: _DesktopVoicePopover(
+                title: _desktopVoicePopoverTitle(overlayContext),
+                subtitle: _desktopVoicePopoverSubtitle(overlayContext),
+                primaryButtonLabel: _desktopVoicePrimaryButtonLabel(
+                  overlayContext,
+                ),
+                secondaryButtonLabel: _desktopVoiceSecondaryButtonLabel(
+                  overlayContext,
+                ),
+                primaryButtonKey:
+                    _desktopVoiceState == _DesktopVoiceState.recording
+                    ? const ValueKey('desktop_voice_stop_button')
+                    : _desktopVoiceState == _DesktopVoiceState.confirm
+                    ? const ValueKey('desktop_voice_send_button')
+                    : null,
+                secondaryButtonKey:
+                    _desktopVoiceState == _DesktopVoiceState.confirm ||
+                        _desktopVoiceState == _DesktopVoiceState.countdown
+                    ? const ValueKey('desktop_voice_cancel_button')
+                    : null,
+                onPrimaryTap: _desktopVoicePrimaryAction(),
+                onSecondaryTap: _desktopVoiceSecondaryAction(),
+                accentColor: Theme.of(overlayContext).colorScheme.primary,
+                state: _desktopVoiceState,
+                busy: _voiceActionInFlight,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    overlay.insert(_desktopVoiceOverlayEntry!);
+  }
+
+  void _removeDesktopVoiceOverlay() {
+    _desktopVoiceOverlayEntry?.remove();
+    _desktopVoiceOverlayEntry = null;
+  }
+
+  void _markDesktopVoiceOverlayNeedsBuild() {
+    _desktopVoiceOverlayEntry?.markNeedsBuild();
+  }
+
+  Rect? _resolveDesktopVoiceAnchorRect() {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final overlayBox = overlay.context.findRenderObject() as RenderBox?;
+    final voiceBox =
+        _voiceButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (overlayBox == null || voiceBox == null) return null;
+    if (!overlayBox.attached || !voiceBox.attached) return null;
+    final topLeft = voiceBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    return Rect.fromLTWH(
+      topLeft.dx,
+      topLeft.dy,
+      voiceBox.size.width,
+      voiceBox.size.height,
+    );
+  }
+
+  String _desktopVoicePopoverTitle(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return switch (_desktopVoiceState) {
+      _DesktopVoiceState.countdown =>
+        l10n.chatInputBarDesktopVoiceCountdownLabel(_desktopVoiceCountdown),
+      _DesktopVoiceState.recording =>
+        l10n.chatInputBarDesktopVoiceRecordingLabel(
+          formatVoiceRecordingDuration(_desktopVoiceElapsed),
+        ),
+      _DesktopVoiceState.confirm =>
+        _desktopVoicePendingAttachment == null
+            ? l10n.chatInputBarDesktopVoiceConfirmLabel
+            : voiceRecordingDisplayLabel(
+                l10n,
+                _desktopVoicePendingAttachment!.fileName,
+              ),
+      _DesktopVoiceState.idle => '',
+    };
+  }
+
+  String _desktopVoicePopoverSubtitle(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return switch (_desktopVoiceState) {
+      _DesktopVoiceState.countdown =>
+        l10n.chatInputBarDesktopVoiceCountdownHelp,
+      _DesktopVoiceState.recording =>
+        l10n.chatInputBarDesktopVoiceRecordingHelp(
+          _desktopVoiceShortcutLabel(),
+        ),
+      _DesktopVoiceState.confirm => l10n.chatInputBarDesktopVoiceConfirmHelp,
+      _DesktopVoiceState.idle => '',
+    };
+  }
+
+  String? _desktopVoicePrimaryButtonLabel(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return switch (_desktopVoiceState) {
+      _DesktopVoiceState.countdown => null,
+      _DesktopVoiceState.recording => l10n.chatInputBarDesktopVoiceStopButton,
+      _DesktopVoiceState.confirm => l10n.chatInputBarDesktopVoiceSendButton,
+      _DesktopVoiceState.idle => null,
+    };
+  }
+
+  String? _desktopVoiceSecondaryButtonLabel(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return switch (_desktopVoiceState) {
+      _DesktopVoiceState.countdown => l10n.chatInputBarDesktopVoiceCancelButton,
+      _DesktopVoiceState.recording => null,
+      _DesktopVoiceState.confirm => l10n.chatInputBarDesktopVoiceCancelButton,
+      _DesktopVoiceState.idle => null,
+    };
+  }
+
+  VoidCallback? _desktopVoicePrimaryAction() {
+    return switch (_desktopVoiceState) {
+      _DesktopVoiceState.countdown => null,
+      _DesktopVoiceState.recording => () {
+        unawaited(_stopDesktopVoiceRecordingForConfirmation());
+      },
+      _DesktopVoiceState.confirm => _confirmDesktopVoiceSend,
+      _DesktopVoiceState.idle => null,
+    };
+  }
+
+  VoidCallback? _desktopVoiceSecondaryAction() {
+    return switch (_desktopVoiceState) {
+      _DesktopVoiceState.countdown => _cancelDesktopVoiceSession,
+      _DesktopVoiceState.recording => null,
+      _DesktopVoiceState.confirm => _cancelDesktopVoiceSession,
+      _DesktopVoiceState.idle => null,
+    };
+  }
+
+  _VoiceOverlayGeometry? _resolveVoiceOverlayGeometry() {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final overlayBox = overlay.context.findRenderObject() as RenderBox?;
+    final voiceBox =
+        _voiceButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (overlayBox == null ||
+        voiceBox == null ||
+        !overlayBox.attached ||
+        !voiceBox.attached) {
+      return null;
+    }
+    final voiceTopLeft = voiceBox.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    final center = voiceTopLeft + voiceBox.size.center(Offset.zero);
+    final mediaQuery = MediaQuery.of(overlay.context);
+    final bottomInset = math.max(
+      mediaQuery.viewInsets.bottom,
+      mediaQuery.padding.bottom,
+    );
+    final drawableRect = Rect.fromLTRB(
+      mediaQuery.padding.left,
+      mediaQuery.padding.top,
+      overlayBox.size.width - mediaQuery.padding.right,
+      overlayBox.size.height - bottomInset,
+    );
+    final radius = math.min(
+      math.min(drawableRect.width * 0.3, _maxVoiceKeepZoneRadius),
+      _maxDistanceToRectCorner(center, drawableRect) + 24,
+    );
+    return _VoiceOverlayGeometry(
+      center: center,
+      drawableRect: drawableRect,
+      radius: radius,
+    );
+  }
+
+  bool _isPointInVoiceKeepZone(
+    Offset globalPosition,
+    _VoiceOverlayGeometry geometry,
+  ) {
+    if (!geometry.drawableRect.contains(globalPosition)) return false;
+    final dx = globalPosition.dx - geometry.center.dx;
+    final dy = globalPosition.dy - geometry.center.dy;
+    final distance = math.sqrt(dx * dx + dy * dy);
+    if (distance > geometry.radius) return false;
+    return true;
+  }
+
+  double _maxDistanceToRectCorner(Offset center, Rect rect) {
+    final corners = <Offset>[
+      rect.topLeft,
+      rect.topRight,
+      rect.bottomLeft,
+      rect.bottomRight,
+    ];
+    double maxDistance = 0;
+    for (final corner in corners) {
+      final dx = corner.dx - center.dx;
+      final dy = corner.dy - center.dy;
+      maxDistance = math.max(maxDistance, math.sqrt(dx * dx + dy * dy));
+    }
+    return maxDistance;
+  }
+
+  Widget _buildVoicePressButton(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    if (_isDesktopVoiceSupported) {
+      final semanticLabel = _desktopVoiceState == _DesktopVoiceState.recording
+          ? l10n.chatInputBarDesktopVoiceStopButton
+          : l10n.chatInputBarVoiceInputTooltip;
+
+      return Semantics(
+        button: true,
+        enabled: !_voiceActionInFlight && !widget.loading,
+        label: semanticLabel,
+        child: KeyedSubtree(
+          key: const ValueKey('desktop_voice_trigger'),
+          child: SizedBox(
+            key: _voiceButtonKey,
+            child: _CompactRoundActionButton(
+              enabled:
+                  !_voiceActionInFlight &&
+                  !widget.loading &&
+                  _desktopVoiceState != _DesktopVoiceState.confirm,
+              active:
+                  _desktopVoiceState == _DesktopVoiceState.countdown ||
+                  _desktopVoiceState == _DesktopVoiceState.recording,
+              color: Theme.of(context).colorScheme.primary,
+              icon: _desktopVoiceState == _DesktopVoiceState.recording
+                  ? Lucide.AudioLines
+                  : Lucide.Mic,
+              onTap: () {
+                unawaited(_onDesktopVoiceButtonTap());
+              },
+            ),
+          ),
+        ),
+      );
+    }
+
+    final semanticLabel = _voicePressActive
+        ? l10n.chatInputBarVoiceRecordingTooltip
+        : l10n.chatInputBarVoiceInputTooltip;
+
+    return Semantics(
+      button: true,
+      enabled: !_voiceActionInFlight && !widget.loading,
+      label: semanticLabel,
+      child: Listener(
+        key: _voiceButtonKey,
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: _voiceActionInFlight || widget.loading
+            ? null
+            : (event) {
+                _voicePointerHeld = true;
+                unawaited(_startVoicePress(event.position));
+              },
+        onPointerMove: (event) {
+          _updateVoiceDrag(event.position);
+        },
+        onPointerUp: (event) {
+          _updateVoiceDrag(event.position);
+          unawaited(_finishVoicePress());
+        },
+        onPointerCancel: (_) {
+          unawaited(_finishVoicePress(forceCancel: true));
+        },
+        child: AnimatedScale(
+          scale: _voicePressActive ? 2.0 : 1.0,
+          duration: const Duration(milliseconds: 390),
+          curve: Curves.elasticOut,
+          child: _CompactRoundActionButton(
+            enabled: !_voiceActionInFlight && !widget.loading,
+            active: _voicePressActive,
+            color: Theme.of(context).colorScheme.primary,
+            icon: Lucide.Mic,
+          ),
+        ),
+      ),
+    );
   }
 
   void _insertNewlineAtCursor() {
@@ -436,10 +1238,24 @@ class _ChatInputBarState extends State<ChatInputBar>
     final isEnter =
         key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter;
+    final isEscape = key == LogicalKeyboardKey.escape;
     final isArrow =
         key == LogicalKeyboardKey.arrowLeft ||
         key == LogicalKeyboardKey.arrowRight;
     final isPasteV = key == LogicalKeyboardKey.keyV;
+
+    if (_isDesktopVoiceSupported && isDown) {
+      if (_desktopVoiceState == _DesktopVoiceState.confirm && isEnter) {
+        _confirmDesktopVoiceSend();
+        return KeyEventResult.handled;
+      }
+      if ((_desktopVoiceState == _DesktopVoiceState.confirm ||
+              _desktopVoiceState == _DesktopVoiceState.countdown) &&
+          isEscape) {
+        _cancelDesktopVoiceSession();
+        return KeyEventResult.handled;
+      }
+    }
 
     // Enter handling on tablet/desktop: configurable shortcut
     if (isEnter && isTabletOrDesktop) {
@@ -1368,6 +2184,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final isDark = theme.brightness == Brightness.dark;
     final hasText = _controller.text.trim().isNotEmpty;
     final hasImages = _images.isNotEmpty;
@@ -1423,6 +2240,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (context, idx) {
                     final d = _docs[idx];
+                    final isVoice = isVoiceRecordingAttachment(d);
                     return Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -1438,12 +2256,20 @@ class _ChatInputBarState extends State<ChatInputBar>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.insert_drive_file, size: 18),
+                          Icon(
+                            isVoice
+                                ? Lucide.AudioLines
+                                : Icons.insert_drive_file,
+                            size: 18,
+                            color: isVoice ? theme.colorScheme.primary : null,
+                          ),
                           const SizedBox(width: 6),
                           ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 180),
                             child: Text(
-                              d.fileName,
+                              isVoice
+                                  ? voiceRecordingDisplayLabel(l10n, d.fileName)
+                                  : d.fileName,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -1763,6 +2589,10 @@ class _ChatInputBarState extends State<ChatInputBar>
                                   ),
                                   const SizedBox(width: 8),
                                 ],
+                                if (widget.showVoiceInputButton) ...[
+                                  _buildVoicePressButton(context),
+                                  const SizedBox(width: 8),
+                                ],
                                 _CompactSendButton(
                                   enabled:
                                       (hasText || hasImages || hasDocs) &&
@@ -1880,6 +2710,50 @@ class _CompactIconButton extends StatelessWidget {
   }
 }
 
+class _CompactRoundActionButton extends StatelessWidget {
+  const _CompactRoundActionButton({
+    required this.enabled,
+    required this.active,
+    required this.color,
+    required this.icon,
+    this.child,
+    this.onTap,
+  });
+
+  final bool enabled;
+  final bool active;
+  final Color color;
+  final IconData icon;
+  final Widget? child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = active
+        ? color
+        : (isDark
+              ? Colors.white12
+              : Colors.grey.shade300.withValues(alpha: 0.84));
+    final fg = active
+        ? (isDark ? Colors.black : Colors.white)
+        : (isDark ? Colors.white70 : Colors.grey.shade600);
+
+    return Material(
+      color: bg,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: enabled ? onTap : null,
+        child: Padding(
+          padding: const EdgeInsets.all(7),
+          child: child ?? Icon(icon, size: 18, color: fg),
+        ),
+      ),
+    );
+  }
+}
+
 // New compact send button for the integrated input bar
 class _CompactSendButton extends StatelessWidget {
   const _CompactSendButton({
@@ -1901,41 +2775,294 @@ class _CompactSendButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = (enabled || loading)
-        ? color
-        : (isDark
-              ? Colors.white12
-              : Colors.grey.shade300.withValues(alpha: 0.84));
     final fg = (enabled || loading)
         ? (isDark ? Colors.black : Colors.white)
         : (isDark ? Colors.white70 : Colors.grey.shade600);
 
-    return Material(
-      color: bg,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: loading ? onStop : (enabled ? onSend : null),
-        child: Padding(
-          padding: const EdgeInsets.all(7),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            transitionBuilder: (child, anim) => ScaleTransition(
-              scale: anim,
-              child: FadeTransition(opacity: anim, child: child),
+    return _CompactRoundActionButton(
+      enabled: loading ? onStop != null : enabled,
+      active: enabled || loading,
+      color: color,
+      icon: icon,
+      onTap: loading ? onStop : onSend,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        transitionBuilder: (child, anim) => ScaleTransition(
+          scale: anim,
+          child: FadeTransition(opacity: anim, child: child),
+        ),
+        child: loading
+            ? SvgPicture.asset(
+                key: const ValueKey('stop'),
+                'assets/icons/stop.svg',
+                width: 18,
+                height: 18,
+                colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+              )
+            : Icon(icon, key: const ValueKey('send'), size: 18, color: fg),
+      ),
+    );
+  }
+}
+
+class _DesktopVoicePopover extends StatelessWidget {
+  const _DesktopVoicePopover({
+    required this.title,
+    required this.subtitle,
+    required this.primaryButtonLabel,
+    required this.secondaryButtonLabel,
+    required this.onPrimaryTap,
+    required this.onSecondaryTap,
+    required this.accentColor,
+    required this.state,
+    required this.busy,
+    this.primaryButtonKey,
+    this.secondaryButtonKey,
+  });
+
+  final String title;
+  final String subtitle;
+  final String? primaryButtonLabel;
+  final String? secondaryButtonLabel;
+  final VoidCallback? onPrimaryTap;
+  final VoidCallback? onSecondaryTap;
+  final Color accentColor;
+  final _DesktopVoiceState state;
+  final bool busy;
+  final Key? primaryButtonKey;
+  final Key? secondaryButtonKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cs = theme.colorScheme;
+    final icon = switch (state) {
+      _DesktopVoiceState.countdown => Lucide.Mic,
+      _DesktopVoiceState.recording => Lucide.AudioLines,
+      _DesktopVoiceState.confirm => Lucide.ArrowUp,
+      _DesktopVoiceState.idle => Lucide.Mic,
+    };
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: (isDark ? Colors.black : Colors.white).withValues(
+              alpha: isDark ? 0.76 : 0.88,
             ),
-            child: loading
-                ? SvgPicture.asset(
-                    key: const ValueKey('stop'),
-                    'assets/icons/stop.svg',
-                    width: 18,
-                    height: 18,
-                    colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
-                  )
-                : Icon(icon, key: const ValueKey('send'), size: 18, color: fg),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: cs.outlineVariant.withValues(alpha: isDark ? 0.18 : 0.14),
+              width: 0.8,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.32 : 0.08),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(
+                            alpha: isDark ? 0.22 : 0.14,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(icon, size: 18, color: accentColor),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              subtitle,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                height: 1.35,
+                                color: cs.onSurface.withValues(alpha: 0.72),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (primaryButtonLabel != null ||
+                      secondaryButtonLabel != null) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        if (secondaryButtonLabel != null)
+                          Expanded(
+                            child: _DesktopVoicePopoverButton(
+                              key: secondaryButtonKey,
+                              label: secondaryButtonLabel!,
+                              onTap: busy ? null : onSecondaryTap,
+                              filled: false,
+                              accentColor: accentColor,
+                            ),
+                          ),
+                        if (secondaryButtonLabel != null &&
+                            primaryButtonLabel != null)
+                          const SizedBox(width: 10),
+                        if (primaryButtonLabel != null)
+                          Expanded(
+                            child: _DesktopVoicePopoverButton(
+                              key: primaryButtonKey,
+                              label: primaryButtonLabel!,
+                              onTap: busy ? null : onPrimaryTap,
+                              filled: true,
+                              accentColor: accentColor,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
+  }
+}
+
+class _DesktopVoicePopoverButton extends StatelessWidget {
+  const _DesktopVoicePopoverButton({
+    super.key,
+    required this.label,
+    required this.onTap,
+    required this.filled,
+    required this.accentColor,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
+  final bool filled;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fg = filled
+        ? (isDark ? Colors.black : Colors.white)
+        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.86);
+    final bg = filled
+        ? accentColor
+        : (isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.04));
+    final borderColor = filled
+        ? accentColor
+        : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.24);
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 140),
+      opacity: onTap == null ? 0.5 : 1,
+      child: Material(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Container(
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: borderColor, width: filled ? 0 : 0.8),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: fg,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VoiceOverlayGeometry {
+  const _VoiceOverlayGeometry({
+    required this.center,
+    required this.drawableRect,
+    required this.radius,
+  });
+
+  final Offset center;
+  final Rect drawableRect;
+  final double radius;
+}
+
+class _VoiceKeepZonePainter extends CustomPainter {
+  const _VoiceKeepZonePainter({
+    required this.geometry,
+    required this.cancelling,
+  });
+
+  final _VoiceOverlayGeometry geometry;
+  final bool cancelling;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.clipRect(geometry.drawableRect);
+
+    final circleRect = Rect.fromCircle(
+      center: geometry.center,
+      radius: geometry.radius,
+    );
+    final path = Path()..addOval(circleRect);
+    final baseColor = cancelling
+        ? const Color(0xFFFF5D73)
+        : const Color(0xFF8BC8FF);
+    final solidFill = Paint()
+      ..color = baseColor.withValues(alpha: 0.3)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawPath(path, solidFill);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _VoiceKeepZonePainter oldDelegate) {
+    return geometry.center != oldDelegate.geometry.center ||
+        geometry.drawableRect != oldDelegate.geometry.drawableRect ||
+        geometry.radius != oldDelegate.geometry.radius ||
+        cancelling != oldDelegate.cancelling;
   }
 }

@@ -8,6 +8,22 @@ import '../../core/models/model_types.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 
+String _modalityLabel(AppLocalizations? l10n, Modality modality) {
+  return switch (modality) {
+    Modality.text => l10n?.modelDetailSheetTextMode ?? 'Text',
+    Modality.image => l10n?.modelDetailSheetImageMode ?? 'Image',
+    Modality.audio => l10n?.modelDetailSheetAudioMode ?? 'Audio',
+  };
+}
+
+IconData _modalityIcon(Modality modality, {required bool isOutput}) {
+  return switch (modality) {
+    Modality.text => Lucide.Type,
+    Modality.image => isOutput ? Lucide.Image : Lucide.Eye,
+    Modality.audio => isOutput ? Lucide.Volume2 : Lucide.AudioLines,
+  };
+}
+
 /// Shared model tag/capsule renderer used across model lists.
 class ModelTagWrap extends StatelessWidget {
   const ModelTagWrap({super.key, required this.model});
@@ -56,8 +72,6 @@ class ModelTagWrap extends StatelessWidget {
     final bool isEmbedding = model.type == ModelType.embedding;
     final chatLabel = l10n?.modelSelectSheetChatType ?? 'Chat';
     final embeddingLabel = l10n?.modelSelectSheetEmbeddingType ?? 'Embedding';
-    final textLabel = l10n?.modelDetailSheetTextMode ?? 'Text';
-    final imageLabel = l10n?.modelDetailSheetImageMode ?? 'Image';
     final toolsLabel = l10n?.modelDetailSheetToolsAbility ?? 'Tools';
     final reasoningLabel =
         l10n?.modelDetailSheetReasoningAbility ?? 'Reasoning';
@@ -107,9 +121,8 @@ class ModelTagWrap extends StatelessWidget {
     final outputModsUnique = LinkedHashSet<Modality>.from(
       outputMods,
     ).toList(growable: false);
-    String modLabel(Modality m) => m == Modality.text ? textLabel : imageLabel;
     final ioLabel =
-        '${inputModsUnique.map(modLabel).join(', ')} -> ${outputModsUnique.map(modLabel).join(', ')}';
+        '${inputModsUnique.map((m) => _modalityLabel(l10n, m)).join(', ')} -> ${outputModsUnique.map((m) => _modalityLabel(l10n, m)).join(', ')}';
 
     chips.add(
       Tooltip(
@@ -136,7 +149,7 @@ class ModelTagWrap extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(right: 2),
                       child: Icon(
-                        mod == Modality.text ? Lucide.Type : Lucide.Image,
+                        _modalityIcon(mod, isOutput: false),
                         size: 12,
                         color: isDark
                             ? cs.tertiary
@@ -154,7 +167,7 @@ class ModelTagWrap extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(left: 2),
                       child: Icon(
-                        mod == Modality.text ? Lucide.Type : Lucide.Image,
+                        _modalityIcon(mod, isOutput: true),
                         size: 12,
                         color: isDark
                             ? cs.tertiary
@@ -274,7 +287,6 @@ class ModelCapsulesRow extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final inputLabel = l10n?.modelDetailSheetInputModesLabel ?? 'Input';
     final outputLabel = l10n?.modelDetailSheetOutputModesLabel ?? 'Output';
-    final imageLabel = l10n?.modelDetailSheetImageMode ?? 'Image';
     final toolsLabel = l10n?.modelDetailSheetToolsAbility ?? 'Tools';
     final reasoningLabel =
         l10n?.modelDetailSheetReasoningAbility ?? 'Reasoning';
@@ -311,24 +323,34 @@ class ModelCapsulesRow extends StatelessWidget {
 
     final caps = <Widget>[];
 
-    if (model.input.contains(Modality.image)) {
+    for (final mod in model.input.where((m) => m != Modality.text)) {
       caps.add(
         labeledCapsule(
-          label: '$inputLabel: $imageLabel',
-          icon: Icon(Lucide.Eye, size: iconSize, color: cs.secondary),
+          label: '$inputLabel: ${_modalityLabel(l10n, mod)}',
+          icon: Icon(
+            _modalityIcon(mod, isOutput: false),
+            size: iconSize,
+            color: cs.secondary,
+          ),
           color: cs.secondary,
         ),
       );
     }
 
-    if (model.type == ModelType.chat && model.output.contains(Modality.image)) {
-      caps.add(
-        labeledCapsule(
-          label: '$outputLabel: $imageLabel',
-          icon: Icon(Lucide.Image, size: iconSize, color: cs.tertiary),
-          color: cs.tertiary,
-        ),
-      );
+    if (model.type == ModelType.chat) {
+      for (final mod in model.output.where((m) => m != Modality.text)) {
+        caps.add(
+          labeledCapsule(
+            label: '$outputLabel: ${_modalityLabel(l10n, mod)}',
+            icon: Icon(
+              _modalityIcon(mod, isOutput: true),
+              size: iconSize,
+              color: cs.tertiary,
+            ),
+            color: cs.tertiary,
+          ),
+        );
+      }
     }
 
     if (model.type == ModelType.chat) {

@@ -88,6 +88,16 @@ enum _TabKind { basic, advanced, tools }
 
 class _ModelDetailSheetState extends State<_ModelDetailSheet>
     with SingleTickerProviderStateMixin {
+  static const List<Modality> _inputModeOrder = <Modality>[
+    Modality.text,
+    Modality.image,
+    Modality.audio,
+  ];
+  static const List<Modality> _outputModeOrder = <Modality>[
+    Modality.text,
+    Modality.image,
+  ];
+
   _TabKind _tab = _TabKind.basic;
   late final TabController _tabCtrl;
   late final ProviderKind _providerKind;
@@ -115,6 +125,17 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
   bool _googleYoutubeTool = false;
   bool _openaiCodeInterpreterTool = false;
   bool _openaiImageGenerationTool = false;
+
+  void _toggleModality(Set<Modality> modalities, Modality mod) {
+    if (modalities.contains(mod)) {
+      modalities.remove(mod);
+      if (modalities.isEmpty) {
+        modalities.add(Modality.text);
+      }
+      return;
+    }
+    modalities.add(mod);
+  }
 
   @override
   void initState() {
@@ -532,19 +553,15 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
               options: [
                 l10n.modelDetailSheetTextMode,
                 l10n.modelDetailSheetImageMode,
+                l10n.modelDetailSheetAudioMode,
               ],
               isSelected: [
                 _input.contains(Modality.text),
                 _input.contains(Modality.image),
+                _input.contains(Modality.audio),
               ],
               onChanged: (idx) => setState(() {
-                final mod = idx == 0 ? Modality.text : Modality.image;
-                if (_input.contains(mod)) {
-                  _input.remove(mod);
-                  if (_input.isEmpty) _input.add(Modality.text);
-                } else {
-                  _input.add(mod);
-                }
+                _toggleModality(_input, _inputModeOrder[idx]);
               }),
             ),
             if (_type == ModelType.chat) ...[
@@ -561,13 +578,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                   _output.contains(Modality.image),
                 ],
                 onChanged: (idx) => setState(() {
-                  final mod = idx == 0 ? Modality.text : Modality.image;
-                  if (_output.contains(mod)) {
-                    _output.remove(mod);
-                    if (_output.isEmpty) _output.add(Modality.text);
-                  } else {
-                    _output.add(mod);
-                  }
+                  _toggleModality(_output, _outputModeOrder[idx]);
                 }),
               ),
               const SizedBox(height: 12),
@@ -896,13 +907,8 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       'apiModelId': apiModelId,
       'name': _nameCtrl.text.trim(),
       'type': _type == ModelType.chat ? 'chat' : 'embedding',
-      'input': _input
-          .map((e) => e == Modality.image ? 'image' : 'text')
-          .toList(),
-      if (!isEmbedding)
-        'output': _output
-            .map((e) => e == Modality.image ? 'image' : 'text')
-            .toList(),
+      'input': _input.map((e) => e.storageValue).toList(),
+      if (!isEmbedding) 'output': _output.map((e) => e.storageValue).toList(),
       if (!isEmbedding)
         'abilities': _abilities
             .map((e) => e == ModelAbility.reasoning ? 'reasoning' : 'tool')

@@ -1469,6 +1469,36 @@ abstract class AppLocalizations {
   /// **'Camera unavailable: permission not granted.'**
   String get cameraPermissionDeniedMessage;
 
+  /// No description provided for @voiceInputPermissionDeniedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone unavailable: permission not granted.'**
+  String get voiceInputPermissionDeniedMessage;
+
+  /// No description provided for @voiceRecordingStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t start recording.'**
+  String get voiceRecordingStartFailed;
+
+  /// No description provided for @voiceRecordingLinuxDependencyMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Linux voice input requires {dependencies}. Install them and try again.'**
+  String voiceRecordingLinuxDependencyMissing(Object dependencies);
+
+  /// No description provided for @voiceRecordingStopFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t process the recording.'**
+  String get voiceRecordingStopFailed;
+
+  /// No description provided for @voiceRecordingDisplayLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'User voice ({duration})'**
+  String voiceRecordingDisplayLabel(Object duration);
+
   /// No description provided for @openSystemSettings.
   ///
   /// In en, this message translates to:
@@ -3047,6 +3077,12 @@ abstract class AppLocalizations {
   /// **'Failed to open file: {error}'**
   String chatMessageWidgetOpenFileError(String error);
 
+  /// No description provided for @chatMessageWidgetVoicePlaybackFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to play voice message: {error}'**
+  String chatMessageWidgetVoicePlaybackFailed(String error);
+
   /// No description provided for @chatMessageWidgetCopiedToClipboard.
   ///
   /// In en, this message translates to:
@@ -3839,6 +3875,72 @@ abstract class AppLocalizations {
   /// **'MCP Servers'**
   String get chatInputBarMcpServersTooltip;
 
+  /// No description provided for @chatInputBarVoiceInputTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Voice'**
+  String get chatInputBarVoiceInputTooltip;
+
+  /// No description provided for @chatInputBarVoiceRecordingTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Recording'**
+  String get chatInputBarVoiceRecordingTooltip;
+
+  /// No description provided for @chatInputBarDesktopVoiceCountdownLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording starts in {seconds}s'**
+  String chatInputBarDesktopVoiceCountdownLabel(int seconds);
+
+  /// No description provided for @chatInputBarDesktopVoiceCountdownHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo will start recording automatically after the countdown.'**
+  String get chatInputBarDesktopVoiceCountdownHelp;
+
+  /// No description provided for @chatInputBarDesktopVoiceRecordingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording... {duration}'**
+  String chatInputBarDesktopVoiceRecordingLabel(Object duration);
+
+  /// No description provided for @chatInputBarDesktopVoiceRecordingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Click Stop, or release {shortcut} to finish recording.'**
+  String chatInputBarDesktopVoiceRecordingHelp(Object shortcut);
+
+  /// No description provided for @chatInputBarDesktopVoiceConfirmLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Send this voice recording?'**
+  String get chatInputBarDesktopVoiceConfirmLabel;
+
+  /// No description provided for @chatInputBarDesktopVoiceConfirmHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Press Enter to send, or press Esc to cancel.'**
+  String get chatInputBarDesktopVoiceConfirmHelp;
+
+  /// No description provided for @chatInputBarDesktopVoiceStopButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Recording'**
+  String get chatInputBarDesktopVoiceStopButton;
+
+  /// No description provided for @chatInputBarDesktopVoiceSendButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Recording'**
+  String get chatInputBarDesktopVoiceSendButton;
+
+  /// No description provided for @chatInputBarDesktopVoiceCancelButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get chatInputBarDesktopVoiceCancelButton;
+
   /// No description provided for @chatInputBarMoreTooltip.
   ///
   /// In en, this message translates to:
@@ -4501,6 +4603,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Image'**
   String get modelDetailSheetImageMode;
+
+  /// No description provided for @modelDetailSheetAudioMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get modelDetailSheetAudioMode;
 
   /// No description provided for @modelDetailSheetToolsAbility.
   ///

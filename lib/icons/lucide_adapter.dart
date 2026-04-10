@@ -33,6 +33,7 @@ class Lucide {
   static const IconData Heart = lucide.LucideIcons.heart;
   static const IconData Boxes = lucide.LucideIcons.boxes;
   static const IconData Volume2 = lucide.LucideIcons.volume2;
+  static const IconData Mic = lucide.LucideIcons.mic;
   static const IconData Terminal = lucide.LucideIcons.terminal;
   static const IconData Database = lucide.LucideIcons.database;
   static const IconData HardDrive = lucide.LucideIcons.hardDrive;
@@ -146,6 +147,7 @@ class Lucide {
   static const IconData Shapes = lucide.LucideIcons.shapes;
   static const IconData CheckCircle = lucide.LucideIcons.circleCheck;
   static const IconData XCircle = lucide.LucideIcons.circleX;
+  static const IconData AudioLines = lucide.LucideIcons.audioLines;
   static const IconData AudioWaveform = lucide.LucideIcons.audioWaveform;
   static const IconData SquareEqual = lucide.LucideIcons.squareEqual;
   static const IconData UnfoldVertical = lucide.LucideIcons.unfoldVertical;

@@ -41,6 +41,8 @@ class ModelOverrideResolver {
         out.add(Modality.text);
       } else if (s == 'image') {
         out.add(Modality.image);
+      } else if (s == 'audio') {
+        out.add(Modality.audio);
       } else if (s.isNotEmpty) {
         _logUnknown('modality', s);
       }

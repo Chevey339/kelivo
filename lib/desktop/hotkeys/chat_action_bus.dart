@@ -8,6 +8,7 @@ enum ChatAction {
   switchModel,
   enterGlobalSearch,
   exitGlobalSearch,
+  cancelTransientUi,
 }
 
 class ChatActionBus {

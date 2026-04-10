@@ -14,6 +14,22 @@ bool isLongCatOmniModelId(String upstreamModelId) {
       normalized.contains('/longcat-flash-omni');
 }
 
+bool supportsGeminiNativeAudioInputModelId(String upstreamModelId) {
+  final normalized = upstreamModelId.trim().toLowerCase();
+  if (normalized.isEmpty) return false;
+
+  if (!normalized.contains('gemini')) return false;
+  if (normalized.contains('-live-') ||
+      normalized.contains('-tts') ||
+      normalized.contains('-image-')) {
+    return false;
+  }
+
+  return normalized.contains(RegExp(r'gemini-2\.0-flash(-lite)?')) ||
+      normalized.contains(RegExp(r'gemini-2\.5-(flash|flash-lite|pro)')) ||
+      normalized.contains(RegExp(r'gemini-3(\.1)?-(flash|flash-lite|pro)'));
+}
+
 String inferMediaMimeFromSource(String source, {String fallbackMime = ''}) {
   final lower = source.toLowerCase();
   if (lower.startsWith('data:')) {
