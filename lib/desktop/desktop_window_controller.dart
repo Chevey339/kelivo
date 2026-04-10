@@ -68,7 +68,8 @@ class DesktopWindowController with WindowListener {
       final shouldRestorePos = validatedPos != null && !isMac;
       if (shouldRestorePos) {
         try {
-          await windowManager.setPosition(validatedPos);
+          final logicPos = await _physicalToLogical(validatedPos);
+          await windowManager.setPosition(logicPos);
         } catch (_) {}
       }
       // Only auto-restore maximize on Windows; macOS restore may cause jump.
@@ -81,7 +82,20 @@ class DesktopWindowController with WindowListener {
 
     _attachListeners();
   }
-
+    /// 将物理像素坐标转换为逻辑坐标
+    /// Windows上 window_manager 返回物理像素，需除以所在屏幕的 devicePixelRatio
+    Future<Offset> _physicalToLogical(Offset physicalPos) async {
+      try {
+        final display = await ScreenRetriever.instance.getPrimaryDisplay();
+        if (display.visiblePosition == null || display.visibleSize == null){
+             return physicalPos; // fallback
+        }
+        final scale = display.scaleFactor ?? 1.0;
+        return Offset(physicalPos.dx / scale, physicalPos.dy / scale);
+      } catch (_) {}
+      return physicalPos; // fallback
+    }
+    
   /// Returns [position] if at least a portion of the window (defined by
   /// [windowSize]) would be visible on any connected display; otherwise
   /// returns `null` so the OS can place the window at a default location.
