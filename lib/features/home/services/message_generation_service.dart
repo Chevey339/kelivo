@@ -25,6 +25,26 @@ typedef OnShowError = void Function(String message);
 typedef OnShowWarning = void Function(String message);
 typedef OnHapticFeedback = void Function();
 
+const String conversationIdHeaderName = 'X-Conversation-Id';
+const String _conversationIdHeaderNameLower = 'x-conversation-id';
+
+Map<String, String>? buildConversationRequestHeaders({
+  required String conversationId,
+  Map<String, String>? customHeaders,
+}) {
+  final headers = <String, String>{
+    if (customHeaders != null)
+      for (final entry in customHeaders.entries)
+        if (entry.key.toLowerCase() != _conversationIdHeaderNameLower)
+          entry.key: entry.value,
+  };
+  final normalizedConversationId = conversationId.trim();
+  if (normalizedConversationId.isNotEmpty) {
+    headers[conversationIdHeaderName] = normalizedConversationId;
+  }
+  return headers.isEmpty ? null : headers;
+}
+
 /// Result of preparing a message generation
 class PreparedGeneration {
   final List<Map<String, dynamic>> apiMessages;
@@ -280,7 +300,10 @@ class MessageGenerationService {
       config: settings.getProviderConfig(providerKey),
       toolDefs: prepared.toolDefs,
       onToolCall: prepared.onToolCall,
-      extraHeaders: generationController.buildCustomHeaders(assistant),
+      extraHeaders: buildConversationRequestHeaders(
+        conversationId: assistantMessage.conversationId,
+        customHeaders: generationController.buildCustomHeaders(assistant),
+      ),
       extraBody: generationController.buildCustomBody(assistant),
       supportsReasoning: supportsReasoning,
       enableReasoning: enableReasoning,

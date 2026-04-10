@@ -251,11 +251,19 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         config.serviceAccountJson ?? '',
       );
       headers['Authorization'] = 'Bearer $token';
+      final proj = (config.projectId ?? '').trim();
+      if (proj.isNotEmpty) {
+        headers['X-Goog-User-Project'] = proj;
+      }
     } else {
       final apiKey = _effectiveApiKey(config);
       if (apiKey.isNotEmpty) {
         headers['x-goog-api-key'] = apiKey;
       }
+    }
+    headers.addAll(_customHeaders(config, modelId));
+    if (extraHeaders != null && extraHeaders.isNotEmpty) {
+      headers.addAll(extraHeaders);
     }
 
     final toolsArr = _buildGeminiToolsArray(
