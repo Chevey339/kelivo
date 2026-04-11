@@ -722,8 +722,8 @@ class _ChatInputBarState extends State<ChatInputBar>
         if (!_voicePressActive || geometry == null) {
           return const SizedBox.shrink();
         }
-        return IgnorePointer(
-          child: Positioned.fill(
+        return Positioned.fill(
+          child: IgnorePointer(
             child: CustomPaint(
               painter: _VoiceKeepZonePainter(
                 geometry: geometry,

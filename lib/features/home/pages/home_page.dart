@@ -811,6 +811,8 @@ class _HomePageState extends State<HomePage>
         isProcessingFiles: _controller.isProcessingFiles,
         scrollController: _scrollController,
         observerController: _controller.scrollCtrl.observerController,
+        allowUserScroll:
+            !PlatformUtils.isMobile || !_controller.isVoiceRecording,
         messages: _controller.chatController.collapsedMessages,
         byGroup: _controller.chatController.groupedMessages,
         versionSelections: _controller.versionSelections,
