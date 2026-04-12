@@ -260,6 +260,7 @@ class ChatActions {
     final modelConfig = messageGenerationService.getModelConfig(
       settings,
       assistant,
+      conversation,
     );
 
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
@@ -418,6 +419,7 @@ class ChatActions {
     final modelConfig = messageGenerationService.getModelConfig(
       settings,
       assistant,
+      conversation,
     );
 
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {

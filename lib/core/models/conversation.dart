@@ -47,6 +47,13 @@ class Conversation extends HiveObject {
   @HiveField(11)
   int lastSummarizedMessageCount;
 
+  // Per-conversation model override (null means use assistant/global default)
+  @HiveField(12)
+  String? modelProvider;
+
+  @HiveField(13)
+  String? modelId;
+
   Conversation({
     String? id,
     required this.title,
@@ -60,6 +67,8 @@ class Conversation extends HiveObject {
     Map<String, int>? versionSelections,
     this.summary,
     int? lastSummarizedMessageCount,
+    this.modelProvider,
+    this.modelId,
   }) : id = id ?? const Uuid().v4(),
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now(),
@@ -82,7 +91,10 @@ class Conversation extends HiveObject {
     Map<String, int>? versionSelections,
     String? summary,
     int? lastSummarizedMessageCount,
+    String? modelProvider,
+    String? modelId,
     bool clearSummary = false,
+    bool clearModel = false,
   }) {
     return Conversation(
       id: id ?? this.id,
@@ -98,6 +110,8 @@ class Conversation extends HiveObject {
       summary: clearSummary ? null : (summary ?? this.summary),
       lastSummarizedMessageCount:
           lastSummarizedMessageCount ?? this.lastSummarizedMessageCount,
+      modelProvider: clearModel ? null : (modelProvider ?? this.modelProvider),
+      modelId: clearModel ? null : (modelId ?? this.modelId),
     );
   }
 
@@ -115,6 +129,8 @@ class Conversation extends HiveObject {
       'versionSelections': versionSelections,
       'summary': summary,
       'lastSummarizedMessageCount': lastSummarizedMessageCount,
+      'modelProvider': modelProvider,
+      'modelId': modelId,
     };
   }
 
@@ -138,6 +154,8 @@ class Conversation extends HiveObject {
       summary: json['summary'] as String?,
       lastSummarizedMessageCount:
           json['lastSummarizedMessageCount'] as int? ?? 0,
+      modelProvider: json['modelProvider'] as String?,
+      modelId: json['modelId'] as String?,
     );
   }
 }
