@@ -318,41 +318,59 @@ class ToolHandlerService {
     final assistantProvider = contextProvider.read<AssistantProvider>();
 
     return (name, args) async {
-      // Search tool
-      if (name == SearchToolService.toolName && settings.searchEnabled) {
-        final q = (args['query'] ?? '').toString();
-        return await SearchToolService.executeSearch(q, settings);
-      }
+      try {
+        // Search tool
+        if (name == SearchToolService.toolName && settings.searchEnabled) {
+          final q = (args['query'] ?? '').toString();
+          return await SearchToolService.executeSearch(q, settings);
+        }
 
-      // Memory tools
-      final memoryResult = await _handleMemoryToolCall(name, args, assistant);
-      if (memoryResult != null) {
-        return memoryResult;
-      }
+        // Memory tools
+        final memoryResult = await _handleMemoryToolCall(name, args, assistant);
+        if (memoryResult != null) {
+          return memoryResult;
+        }
 
-      // Approval gate for MCP tools
-      if (approvalService != null && mcp.toolNeedsApproval(name)) {
-        // Generate a unique id for this tool call approval request
-        final toolCallId = '${name}_${DateTime.now().microsecondsSinceEpoch}';
-        final result = await approvalService.requestApproval(
-          toolCallId: toolCallId,
+        // Approval gate for MCP tools
+        if (approvalService != null && mcp.toolNeedsApproval(name)) {
+          // Generate a unique id for this tool call approval request
+          final toolCallId = '${name}_${DateTime.now().microsecondsSinceEpoch}';
+          final result = await approvalService.requestApproval(
+            toolCallId: toolCallId,
+            toolName: name,
+            arguments: args,
+          );
+          if (!result.approved) {
+            return jsonEncode({
+              'type': 'tool_error',
+              'error': 'approval_denied',
+              'message': result.denyReason ?? 'User denied the tool call',
+              'tool': name,
+            });
+          }
+        }
+
+        // MCP tools
+        final text = await toolSvc.callToolTextForAssistant(
+          mcp,
+          assistantProvider,
+          assistantId: assistant?.id,
           toolName: name,
           arguments: args,
         );
-        if (!result.approved) {
-          return 'Tool call "$name" denied. Reason: ${result.denyReason ?? "User denied"}';
-        }
+        return text;
+      } catch (e) {
+        // Catch unexpected exceptions and return error JSON to LLM
+        // This prevents tool failures from terminating the chat flow
+        return jsonEncode({
+          'type': 'tool_error',
+          'error': 'execution_error',
+          'message': e.toString(),
+          'tool': name,
+          'instruction':
+              'The tool execution failed unexpectedly. You may try again with different parameters or inform the user about the issue.',
+        });
       }
-
-      // MCP tools
-      final text = await toolSvc.callToolTextForAssistant(
-        mcp,
-        assistantProvider,
-        assistantId: assistant?.id,
-        toolName: name,
-        arguments: args,
-      );
-      return text;
     };
   }
 
