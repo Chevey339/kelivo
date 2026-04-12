@@ -289,15 +289,22 @@ class MessageGenerationService {
     );
   }
 
-  /// Get current model and provider from assistant or global settings.
+  /// Get current model and provider from conversation override, assistant, or global settings.
+  /// Priority: conversation → assistant → global default.
   ({String? providerKey, String? modelId}) getModelConfig(
     SettingsProvider settings,
     Assistant? assistant,
+    Conversation? conversation,
   ) {
     return (
       providerKey:
-          assistant?.chatModelProvider ?? settings.currentModelProvider,
-      modelId: assistant?.chatModelId ?? settings.currentModelId,
+          conversation?.modelProvider ??
+          assistant?.chatModelProvider ??
+          settings.currentModelProvider,
+      modelId:
+          conversation?.modelId ??
+          assistant?.chatModelId ??
+          settings.currentModelId,
     );
   }
 

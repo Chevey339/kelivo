@@ -434,6 +434,7 @@ class HomeViewModel extends ChangeNotifier {
   /// Switch to an existing conversation.
   Future<void> switchConversation(String id) async {
     final assistantProvider = _contextProvider.read<AssistantProvider>();
+    final settings = _contextProvider.read<SettingsProvider>();
 
     // Flush current conversation progress before switching
     await _chatActions.flushConversationProgress(currentConversation);
@@ -451,6 +452,10 @@ class HomeViewModel extends ChangeNotifier {
           assistantProvider.currentAssistantId != convoAssistantId &&
           assistantProvider.getById(convoAssistantId) != null) {
         await assistantProvider.setCurrentAssistant(convoAssistantId);
+      }
+      // Restore conversation's model override if set (for UI display consistency)
+      if (convo.modelProvider != null && convo.modelId != null) {
+        await settings.setCurrentModel(convo.modelProvider!, convo.modelId!);
       }
       _chatController.setCurrentConversation(convo);
       _streamController.clearGeminiThoughtSigs();
@@ -470,12 +475,19 @@ class HomeViewModel extends ChangeNotifier {
     isProcessingFiles.value = false;
 
     final ap = _contextProvider.read<AssistantProvider>();
+    final settings = _contextProvider.read<SettingsProvider>();
     final assistantId = ap.currentAssistantId;
     final a = ap.currentAssistant;
+
+    // Capture current model for new conversation
+    final currentModelProvider = settings.currentModelProvider;
+    final currentModelId = settings.currentModelId;
 
     final conversation = await _chatService.createDraftConversation(
       title: getTitleForLocale(_contextProvider),
       assistantId: assistantId,
+      modelProvider: currentModelProvider,
+      modelId: currentModelId,
     );
 
     _chatController.setCurrentConversation(conversation);
@@ -536,6 +548,8 @@ class HomeViewModel extends ChangeNotifier {
       assistantId: currentConversation?.assistantId,
       sourceMessages: selected,
       versionSelections: sel,
+      modelProvider: currentConversation?.modelProvider,
+      modelId: currentConversation?.modelId,
     );
 
     // Switch to the new conversation
