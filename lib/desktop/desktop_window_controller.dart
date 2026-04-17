@@ -60,7 +60,7 @@ class DesktopWindowController with WindowListener {
       doWhenWindowReady(() async {
         appWindow.minSize = options.minimumSize;
         appWindow.maxSize = options.maximumSize;
-        appWindow.size = options.size;
+        appWindow.size = initialSize;
 
         if (savedPos != null) {
           appWindow.position = savedPos;
