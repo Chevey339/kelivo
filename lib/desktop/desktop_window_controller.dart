@@ -6,6 +6,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'window_size_manager.dart';
 import 'dart:async';
+import 'package:bitsdojo_window/bitsdojo_window.dart';
 
 /// Handles desktop window initialization and persistence (size/position/maximized).
 class DesktopWindowController with WindowListener {
@@ -28,7 +29,7 @@ class DesktopWindowController with WindowListener {
     }
 
     await windowManager.ensureInitialized();
-
+    _attachListeners();
     // Windows custom title bar is handled in main (TitleBarStyle.hidden)
 
     final initialSize = await _sizeMgr.getInitialSize();
@@ -54,95 +55,40 @@ class DesktopWindowController with WindowListener {
     final savedPos = await _sizeMgr.getPosition();
     final wasMax = await _sizeMgr.getWindowMaximized();
 
-    // Validate saved position against current screen bounds to prevent
-    // the window from restoring off-screen (e.g. after an RDP session
-    // changes the display layout). See issue #432.
-    final validatedPos =
-        savedPos != null ? await _validatePosition(savedPos, initialSize) : null;
+    if (defaultTargetPlatform == TargetPlatform.windows){
+      await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
+      doWhenWindowReady(() async {
+        appWindow.minSize = options.minimumSize;
+        appWindow.maxSize = options.maximumSize;
+        appWindow.size = options.size;
 
-    await windowManager.waitUntilReadyToShow(options, () async {
-      // Show first, then restore position to avoid macOS jump/flicker.
-      await windowManager.show();
-      await windowManager.focus();
-      // On macOS rely on native autosave. Do not set position from Dart.
-      final shouldRestorePos = validatedPos != null && !isMac;
-      if (shouldRestorePos) {
-        try {
-          await windowManager.setPosition(validatedPos);
-        } catch (_) {}
-      }
-      // Only auto-restore maximize on Windows; macOS restore may cause jump.
-      try {
-        if (defaultTargetPlatform == TargetPlatform.windows && wasMax) {
-          await windowManager.maximize();
+        if (position != null) {
+          appWindow.position = savedPos;
         }
-      } catch (_) {}
-    });
 
-    _attachListeners();
-  }
-
-  /// Returns [position] if at least a portion of the window (defined by
-  /// [windowSize]) would be visible on any connected display; otherwise
-  /// returns `null` so the OS can place the window at a default location.
-  ///
-  /// This guards against the window restoring off-screen when the display
-  /// layout has changed (e.g. after an RDP session or monitor disconnect).
-  Future<Offset?> _validatePosition(Offset position, Size windowSize) async {
-    try {
-      final displays = await ScreenRetriever.instance.getAllDisplays();
-      if (displays.isEmpty) return position; // fallback: trust the value
-
-      // Require at least this many pixels of the window to be visible
-      // on some display so the user can grab and move it.
-      const minVisible = 100.0;
-
-      final winLeft = position.dx;
-      final winTop = position.dy;
-      final winRight = winLeft + windowSize.width;
-      final winBottom = winTop + windowSize.height;
-
-      for (final display in displays) {
-        final visibleRect = display.visiblePosition != null &&
-                display.visibleSize != null
-            ? Rect.fromLTWH(
-                display.visiblePosition!.dx,
-                display.visiblePosition!.dy,
-                display.visibleSize!.width,
-                display.visibleSize!.height,
-              )
-            : Rect.fromLTWH(
-                display.size.width * 0, // origin fallback
-                display.size.height * 0,
-                display.size.width,
-                display.size.height,
-              );
-
-        // Compute overlap between window rect and display rect.
-        final overlapLeft =
-            winLeft > visibleRect.left ? winLeft : visibleRect.left;
-        final overlapTop =
-            winTop > visibleRect.top ? winTop : visibleRect.top;
-        final overlapRight =
-            winRight < visibleRect.right ? winRight : visibleRect.right;
-        final overlapBottom =
-            winBottom < visibleRect.bottom ? winBottom : visibleRect.bottom;
-
-        final overlapW = overlapRight - overlapLeft;
-        final overlapH = overlapBottom - overlapTop;
-
-        if (overlapW >= minVisible && overlapH >= minVisible) {
-          return position; // enough of the window is visible
+        /// on Windows we maximize the window if it was previously closed
+        /// from a maximized state.
+        if (wasMax) {
+          appWindow.maximize();
         }
-      }
-
-      // Window would be off-screen on all displays → discard position.
-      return null;
-    } catch (_) {
-      // If screen query fails, fall back to the saved position rather
-      // than risk discarding a valid one.
-      return position;
+      });
+    } else {
+      await windowManager.waitUntilReadyToShow(options, () async {
+        // Show first, then restore position to avoid macOS jump/flicker.
+        await windowManager.show();
+        await windowManager.focus();
+        // On macOS rely on native autosave. Do not set position from Dart.
+        final shouldRestorePos = savedPos != null && !isMac;
+        if (shouldRestorePos) {
+          try {
+            await windowManager.setPosition(savedPos);
+          } catch (_) {}
+        }
+      });      
     }
+
+
+    
   }
 
   void _attachListeners() {
