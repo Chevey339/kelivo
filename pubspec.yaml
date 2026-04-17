@@ -31,7 +31,8 @@ dependencies:
   flutter:
     sdk: flutter
   logging: ^1.2.0
-  
+  # BitsDojo Window for Windows
+  bitsdojo_window: ^0.1.6
   window_manager: ^0.5.1
   screen_retriever: ^0.2.0
   tray_manager:

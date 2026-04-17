@@ -62,7 +62,7 @@ class DesktopWindowController with WindowListener {
         appWindow.maxSize = options.maximumSize;
         appWindow.size = options.size;
 
-        if (position != null) {
+        if (savedPos != null) {
           appWindow.position = savedPos;
         }
 
