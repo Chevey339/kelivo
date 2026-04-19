@@ -37,7 +37,7 @@ dependencies:
   screen_retriever: ^0.2.0
   tray_manager:
     path: ./dependencies/tray_manager/packages/tray_manager
-  desktop_drop: ^0.7.0
+  desktop_drop: ^0.7.1
   hotkey_manager: ^0.2.3
 
   # Localizations for Chinese/English UI strings
