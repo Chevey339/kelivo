@@ -49,6 +49,7 @@ class McpToolConfig {
   final List<McpParamSpec> params;
   // Raw JSON schema for parameters, if provided by the server
   final Map<String, dynamic>? schema;
+
   /// Whether this tool requires user approval before execution.
   final bool needsApproval;
 
@@ -712,8 +713,10 @@ class McpProvider extends ChangeNotifier {
     if (idx < 0) return;
     final server = _servers[idx];
     final tools = server.tools
-        .map((t) =>
-            t.name == toolName ? t.copyWith(needsApproval: needsApproval) : t)
+        .map(
+          (t) =>
+              t.name == toolName ? t.copyWith(needsApproval: needsApproval) : t,
+        )
         .toList();
     _servers[idx] = server.copyWith(tools: tools);
     await _persist();
@@ -1394,14 +1397,43 @@ class McpProvider extends ChangeNotifier {
 
   Future<String?> _getSystemPath() async {
     if (_cachedSystemPath != null) return _cachedSystemPath;
-    if (!Platform.isMacOS) return null;
-    try {
-      final result = await Process.run('launchctl', ['getenv', 'PATH']);
-      if (result.exitCode == 0) {
-        _cachedSystemPath = (result.stdout as String).trim();
-        return _cachedSystemPath;
-      }
-    } catch (_) {}
+    // macOS: use launchctl to get system PATH
+    if (Platform.isMacOS) {
+      try {
+        final result = await Process.run('launchctl', ['getenv', 'PATH']);
+        if (result.exitCode == 0) {
+          _cachedSystemPath = (result.stdout as String).trim();
+          return _cachedSystemPath;
+        }
+      } catch (_) {}
+    }
+    // Windows: get user PATH from registry if not in current environment
+    if (Platform.isWindows) {
+      try {
+        // Try to get PATH from the user environment via PowerShell
+        final result = await Process.run('powershell', [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          r'[Environment]::GetEnvironmentVariable("PATH", "User")',
+        ]);
+        if (result.exitCode == 0) {
+          final userPath = (result.stdout as String).trim();
+          if (userPath.isNotEmpty) {
+            // Merge with current PATH
+            final currentPath = Platform.environment['PATH'] ?? '';
+            if (currentPath.isNotEmpty && userPath.isNotEmpty) {
+              _cachedSystemPath = '$currentPath;$userPath';
+            } else {
+              _cachedSystemPath = currentPath.isNotEmpty
+                  ? currentPath
+                  : userPath;
+            }
+            return _cachedSystemPath;
+          }
+        }
+      } catch (_) {}
+    }
     return null;
   }
 
@@ -1423,14 +1455,54 @@ class McpProvider extends ChangeNotifier {
     Map<String, String> environment,
   ) async {
     try {
-      final whichCmd = Platform.isWindows ? 'where' : 'which';
-      final result = await Process.run(
-        whichCmd,
-        [command],
-        environment: environment,
-        runInShell: true,
-      );
-      return result.exitCode == 0;
+      // On Windows, we need special handling:
+      // 1. npm packages install as .cmd files (e.g., npx.cmd)
+      // 2. The 'where' command finds them, but execution needs cmd.exe
+      // 3. Try direct execution first, then fallback to 'where'
+      if (Platform.isWindows) {
+        // First, try to find the command with 'where'
+        final whereResult = await Process.run(
+          'where',
+          [command],
+          environment: environment,
+          runInShell: true,
+        );
+        if (whereResult.exitCode != 0) {
+          return false;
+        }
+        // If found, verify it can actually run
+        // For .cmd/.bat files, use cmd.exe explicitly
+        final testCommand = command.toLowerCase();
+        if (testCommand.endsWith('.cmd') || testCommand.endsWith('.bat')) {
+          final testResult = await Process.run(
+            'cmd.exe',
+            ['/c', command, '--version'],
+            environment: environment,
+            runInShell: true,
+          );
+          //command might not have --version, but if it runs without error, it's valid
+          return testResult.exitCode == 0 || testResult.exitCode == 1;
+        } else {
+          // Try running with --help or --version to verify
+          final testResult = await Process.run(
+            'cmd.exe',
+            ['/c', command],
+            environment: environment,
+            runInShell: true,
+          );
+          return testResult.exitCode == 0 || testResult.exitCode == 1;
+        }
+      } else {
+        // Unix-like: use which
+        final whichCmd = 'which';
+        final result = await Process.run(
+          whichCmd,
+          [command],
+          environment: environment,
+          runInShell: true,
+        );
+        return result.exitCode == 0;
+      }
     } catch (_) {
       return false;
     }
