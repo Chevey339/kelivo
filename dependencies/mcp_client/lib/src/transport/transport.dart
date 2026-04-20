@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
-import 'dart:io' show Process, HttpClient, ContentType;
+import 'dart:io' show Platform, Process, HttpClient, ContentType;
 
 import '../../logger.dart';
 import '../models/models.dart';
@@ -48,11 +48,39 @@ class StdioClientTransport implements ClientTransport {
   }) async {
     _logger.debug('Starting process: $command ${arguments.join(' ')}');
 
+    // On Windows, handle .cmd/.bat files specially
+    List<String> effectiveArgs;
+    String executableCommand;
+    Map<String, String>? effectiveEnv = environment;
+
+    if (Platform.isWindows) {
+      final cmdLower = command.toLowerCase();
+      // Check if this is a .cmd or .bat file, or a known npm command
+      if (cmdLower.endsWith('.cmd') ||
+          cmdLower.endsWith('.bat') ||
+          command == 'npx' ||
+          command == 'npm') {
+        // Use cmd.exe to execute .cmd/.bat files, or for npx/npm
+        executableCommand = 'cmd.exe';
+        effectiveArgs = ['/c', command, ...arguments];
+      } else {
+        executableCommand = command;
+        effectiveArgs = arguments;
+      }
+    } else {
+      executableCommand = command;
+      effectiveArgs = arguments;
+    }
+
+    _logger.debug(
+      'Effective command: $executableCommand, args: $effectiveArgs',
+    );
+
     final process = await Process.start(
-      command,
-      arguments,
+      executableCommand,
+      effectiveArgs,
       workingDirectory: workingDirectory,
-      environment: environment,
+      environment: effectiveEnv,
     );
 
     return StdioClientTransport._internal(process);
