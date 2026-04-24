@@ -1,7 +1,7 @@
+import 'dart:convert' show jsonDecode, jsonEncode;
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../core/models/unified_thread.dart';
 import '../../../core/models/unified_message.dart';
@@ -114,7 +114,6 @@ class ThreadBackupProvider extends ChangeNotifier {
   // === Import Flow ===
 
   /// Import threads from a JSON string (auto-detects source).
-  /// Returns the import result with dedup applied.
   Future<ImportResult> importFromJson(String jsonString) async {
     _importState = ImportState.parsing;
     _lastError = null;
@@ -130,17 +129,16 @@ class ThreadBackupProvider extends ChangeNotifier {
         return result;
       }
 
-      // Apply dedup against existing threads
-      final (newThreads, skipped) = _dedupNewThreads(result.imported);
-      _pendingImports = newThreads;
-      _duplicatesSkipped = skipped;
+      final dedupResult = _dedupNewThreads(result.imported);
+      _pendingImports = dedupResult.$1;
+      _duplicatesSkipped = dedupResult.$2;
 
       _importState =
-          newThreads.isEmpty ? ImportState.complete : ImportState.reviewing;
+          _pendingImports.isEmpty ? ImportState.complete : ImportState.reviewing;
       notifyListeners();
 
       return ImportResult(
-        imported: newThreads,
+        imported: _pendingImports,
         errors: result.errors,
       );
     } catch (e) {
@@ -173,16 +171,16 @@ class ThreadBackupProvider extends ChangeNotifier {
         return result;
       }
 
-      final (newThreads, skipped) = _dedupNewThreads(result.imported);
-      _pendingImports = newThreads;
-      _duplicatesSkipped = skipped;
+      final dedupResult = _dedupNewThreads(result.imported);
+      _pendingImports = dedupResult.$1;
+      _duplicatesSkipped = dedupResult.$2;
 
       _importState =
-          newThreads.isEmpty ? ImportState.complete : ImportState.reviewing;
+          _pendingImports.isEmpty ? ImportState.complete : ImportState.reviewing;
       notifyListeners();
 
       return ImportResult(
-        imported: newThreads,
+        imported: _pendingImports,
         errors: result.errors,
       );
     } catch (e) {
@@ -241,7 +239,7 @@ class ThreadBackupProvider extends ChangeNotifier {
   /// Export all threads to a JSON string.
   String exportToJson() {
     final list = _threads.map((t) => t.toJson()).toList();
-    return _encodeJson(list);
+    return jsonEncode(list);
   }
 
   /// Export all threads to a file at the given path.
@@ -260,7 +258,7 @@ class ThreadBackupProvider extends ChangeNotifier {
   /// Detect source format from a JSON string (without importing).
   DetectedSource detectSource(String jsonString) {
     try {
-      final dynamic parsed = _parseJson(jsonString);
+      final dynamic parsed = jsonDecode(jsonString);
       return _importManager.detectSource(parsed);
     } catch (_) {
       return DetectedSource.unknown;
@@ -289,15 +287,5 @@ class ThreadBackupProvider extends ChangeNotifier {
     }
 
     return (newThreads, skipped);
-  }
-
-  dynamic _parseJson(String jsonString) {
-    import 'dart:convert' show jsonDecode;
-    return jsonDecode(jsonString);
-  }
-
-  String _encodeJson(dynamic value) {
-    import 'dart:convert' show jsonEncode;
-    return jsonEncode(value);
   }
 }
