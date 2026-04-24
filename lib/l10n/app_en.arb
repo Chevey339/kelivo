@@ -23,6 +23,9 @@
   "settingsPageInstructionInjection": "Instruction Injection",
   "settingsPageDataSection": "Data",
   "settingsPageBackup": "Backup",
+  "settingsPageBackupSubtitle": "WebDAV, S3 and local backup",
+  "settingsPageThreadBackup": "Thread Backup",
+  "settingsPageThreadBackupSubtitle": "Import chats from ChatGPT, Gemini, Perplexity, Claude",
   "settingsPageChatStorage": "Chat Storage",
   "settingsPageCalculating": "Calculating…",
   "settingsPageFilesCount": "{count} files · {size}",
@@ -549,7 +552,14 @@
   "backupPageRestoreTooltip": "Restore",
   "backupPageDeleteTooltip": "Delete",
   "backupPageDeleteConfirmTitle": "Confirm Deletion",
-  "backupPageDeleteConfirmContent": "Are you sure you want to delete remote backup \"{name}\"? This action cannot be undone.",
+  "backupPageDeleteConfirmContent": "Are you sure you want to delete remote backup "{name}"? This action cannot be undone.",
+  "@backupPageDeleteConfirmContent": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "backupPageBackupManagement": "Backup Management",
   "backupPageWebDavBackup": "WebDAV Backup",
   "backupPageWebDavServerSettings": "WebDAV Server Settings",
@@ -811,7 +821,7 @@
   "sideDrawerMenuRegenerateTitle": "Regenerate Title",
   "sideDrawerMenuMoveTo": "Move to",
   "sideDrawerMenuDelete": "Delete",
-  "sideDrawerDeleteSnackbar": "Deleted \"{title}\"",
+  "sideDrawerDeleteSnackbar": "Deleted "{title}"",
   "@sideDrawerDeleteSnackbar": {
     "placeholders": {
       "title": {
@@ -1089,9 +1099,8 @@
   "modelDetailSheetCustomHeadersTitle": "Custom Headers",
   "modelDetailSheetAddHeader": "Add Header",
   "modelDetailSheetCustomBodyTitle": "Custom Body",
-  "modelFetchInvertTooltip": "Invert",
-  "modelDetailSheetSaveFailedMessage": "Save failed. Please try again.",
   "modelDetailSheetAddBody": "Add Body",
+  "modelDetailSheetSaveFailedMessage": "Save failed. Please try again.",
   "modelDetailSheetBuiltinToolsDescription": "Built-in tools only support official APIs.",
   "modelDetailSheetBuiltinToolsUnsupportedHint": "Current provider does not support these built-in tools.",
   "modelDetailSheetSearchTool": "Search",
@@ -1196,7 +1205,7 @@
   "providerGroupsCreateDialogOk": "Create",
   "providerGroupsCreateFailedToast": "Failed to create group",
   "providerGroupsDeleteConfirmTitle": "Delete group?",
-  "providerGroupsDeleteConfirmContent": "Providers in this group will be moved to “Other”.",
+  "providerGroupsDeleteConfirmContent": "Providers in this group will be moved to "Other".",
   "providerGroupsDeleteConfirmCancel": "Cancel",
   "providerGroupsDeleteConfirmOk": "Delete",
   "providerGroupsDeletedToast": "Group deleted",
@@ -1632,8 +1641,7 @@
   "displaySettingsPageBehaviorStartupTitle": "Behavior & startup",
   "displaySettingsPageHapticsSettingsTitle": "Haptics",
   "assistantSettingsNoPromptPlaceholder": "No prompt yet",
-  "providersPageMultiSelectTooltip": "Multi-select"
-  ,
+  "providersPageMultiSelectTooltip": "Multi-select",
   "providersPageDeleteSelectedConfirmContent": "Delete selected providers? This cannot be undone.",
   "providersPageDeleteSelectedSnackbar": "Deleted selected providers",
   "providersPageExportSelectedTitle": "Export {count} providers",
@@ -1783,7 +1791,7 @@
   "worldBookExport": "Share / Export",
   "worldBookConfig": "Configure",
   "worldBookDeleteTitle": "Delete World Book",
-  "worldBookDeleteMessage": "Delete “{name}”? This cannot be undone.",
+  "worldBookDeleteMessage": "Delete "{name}"? This cannot be undone.",
   "@worldBookDeleteMessage": {
     "placeholders": {
       "name": {
@@ -1846,7 +1854,7 @@
   "toolApprovalDeny": "Deny",
   "toolApprovalDenyTitle": "Deny tool call",
   "toolApprovalDenyHint": "Reason (optional)",
-  "toolApprovalDeniedMessage": "Tool call \"{toolName}\" was denied by user. Reason: {reason}",
+  "toolApprovalDeniedMessage": "Tool call "{toolName}" was denied by user. Reason: {reason}",
   "tokenDetailPromptTokens": "{count} tokens",
   "@tokenDetailPromptTokens": {
     "placeholders": {
@@ -1883,5 +1891,144 @@
     "placeholders": {
       "count": {"type": "int"}
     }
-  }
+  },
+  "threadBackupTitle": "Thread Backup",
+  "threadBackupImport": "Import",
+  "threadBackupExportAll": "Export All",
+  "threadBackupDeleteAll": "Delete All",
+  "threadBackupCancel": "Cancel",
+  "threadBackupConfirm": "Confirm",
+  "threadBackupDismiss": "Dismiss",
+  "threadBackupImportFromFile": "Import from file",
+  "threadBackupImportFromFileSubtitle": "Pick a JSON export file",
+  "threadBackupPasteJson": "Paste JSON",
+  "threadBackupPasteJsonSubtitle": "Paste export JSON directly",
+  "threadBackupChooseSource": "Choose source...",
+  "threadBackupChooseSourceSubtitle": "Manually select the platform",
+  "threadBackupSummary": "{count} threads from {sources} sources",
+  "@threadBackupSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "sources": {
+        "type": "int"
+      }
+    }
+  },
+  "threadBackupNoThreads": "No threads backed up yet.",
+  "threadBackupNoThreadsHint": "Tap + to import from ChatGPT, Gemini, or others.",
+  "threadBackupConfirmImport": "{count} new threads ready to import",
+  "@threadBackupConfirmImport": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "threadBackupDuplicatesSkipped": " ({count} duplicates skipped)",
+  "@threadBackupDuplicatesSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "threadBackupImportSuccess": "{count} threads imported successfully.",
+  "@threadBackupImportSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "threadBackupImportFailed": "Import failed: {error}",
+  "@threadBackupImportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "threadBackupExportSuccess": "Exported {count} threads to file.",
+  "@threadBackupExportSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "threadBackupExportFailed": "Export failed: {error}",
+  "@threadBackupExportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "threadBackupDeleteConfirmTitle": "Delete Thread",
+  "threadBackupDeleteConfirmContent": "Remove this thread from the backup? This does not affect the original chat app.",
+  "threadBackupDeleteAllConfirmTitle": "Delete All Threads",
+  "threadBackupDeleteAllConfirmContent": "Remove all backed-up threads? This action cannot be undone.",
+  "threadBackupDelete": "Delete",
+  "threadBackupDeleteAll": "Delete All",
+  "threadBackupSelectSourceTitle": "Select source platform",
+  "threadBackupPasteJsonTitle": "Paste Export JSON",
+  "threadBackupPasteJsonHint": "Paste your export JSON here...",
+  "threadBackupMessagesCount": "{count} msgs",
+  "@threadBackupMessagesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "threadBackupSourceChatGPT": "ChatGPT",
+  "threadBackupSourceGemini": "Gemini",
+  "threadBackupSourcePerplexity": "Perplexity",
+  "threadBackupSourceClaude": "Claude",
+  "threadBackupSourceKelivo": "Kelivo",
+  "threadBackupSourceOther": "Other",
+  "threadBackupDetailSource": "Source: {source}",
+  "@threadBackupDetailSource": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "threadBackupDetailMessages": "Messages: {count}",
+  "@threadBackupDetailMessages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "threadBackupDetailCreated": "Created: {date}",
+  "@threadBackupDetailCreated": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "threadBackupDetailUpdated": "Updated: {date}",
+  "@threadBackupDetailUpdated": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "threadBackupDetailRecentMessages": "Recent Messages:",
+  "threadBackupDetailMoreMessages": "... and {count} more messages",
+  "@threadBackupDetailMoreMessages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "threadBackupDetailClose": "Close"
 }

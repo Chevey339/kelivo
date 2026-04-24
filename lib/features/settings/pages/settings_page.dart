@@ -300,25 +300,27 @@ class SettingsPage extends StatelessWidget {
             children: [
               _iosNavRow(
                 context,
-                icon: Lucide.databaseBackup,
+                icon: Lucide.Database,
+                label: l10n.settingsPageBackup,
+                subtitle: l10n.settingsPageBackupSubtitle,
+                onTap: () {
+                  Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => const BackupPage()));
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.CloudUpload,
                 label: l10n.settingsPageThreadBackup,
+                subtitle: l10n.settingsPageThreadBackupSubtitle,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const ThreadBackupPage(),
                     ),
                   );
-                },
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.Database,
-                label: l10n.settingsPageBackup,
-                onTap: () {
-                  Navigator.of(
-                    context,
-                  ).push(MaterialPageRoute(builder: (_) => const BackupPage()));
                 },
               ),
               _iosDivider(context),
@@ -362,8 +364,7 @@ class SettingsPage extends StatelessWidget {
                   }
                 },
               ),
-              if (settings.requestLogEnabled || settings.flutterLogEnabled) ...[
-                _iosDivider(context),
+              if (settings.requestLogEnabled || settings.flutterLogEnabled) ...[        _iosDivider(context),
                 _iosNavRow(
                   context,
                   icon: Lucide.FileText,
@@ -396,7 +397,7 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-// All private helper widgets below are unchanged from the original.
+// --- iOS-style widgets for Settings page ---
 
 Widget _iosSectionCard({required List<Widget> children}) {
   return Builder(
@@ -515,6 +516,7 @@ Widget _iosNavRow(
   BuildContext context, {
   required IconData icon,
   required String label,
+  String? subtitle,
   VoidCallback? onTap,
   String? detailText,
   Widget Function(BuildContext ctx)? detailBuilder,
@@ -538,15 +540,32 @@ Widget _iosNavRow(
                 SizedBox(width: 36, child: Icon(icon, size: 20, color: c)),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: c,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: c,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurface.withValues(alpha: 0.5),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 if (detailBuilder != null)
