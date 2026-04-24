@@ -1,3 +1,5 @@
+import 'dart:convert' show jsonDecode;
+
 import '../../../core/models/unified_thread.dart';
 import 'chatgpt_importer.dart';
 import 'gemini_importer.dart';
@@ -79,7 +81,6 @@ class ImportManager {
         if (map.containsKey('mapping') && map.containsKey('current_node')) {
           return DetectedSource.chatgpt;
         }
-        // ChatGPT without current_node still has mapping
         if (map.containsKey('mapping')) {
           return DetectedSource.chatgpt;
         }
@@ -87,17 +88,16 @@ class ImportManager {
         if (map.containsKey('uuid') && map.containsKey('chat_messages')) {
           return DetectedSource.claude;
         }
-        // Claude: has 'name' and 'chat_messages'
         if (map.containsKey('name') && map.containsKey('chat_messages')) {
           return DetectedSource.claude;
         }
-        // Gemini: has 'title' and 'messages' (but not 'role' per-message at top level)
+        // Gemini: has 'title' + 'messages' + 'createTime'
         if (map.containsKey('title') &&
             map.containsKey('messages') &&
             map.containsKey('createTime')) {
           return DetectedSource.gemini;
         }
-        // Perplexity: has 'title' and 'messages' and 'url'
+        // Perplexity: has 'title' + 'messages' + ('url' or 'thread_id')
         if (map.containsKey('title') &&
             map.containsKey('messages') &&
             (map.containsKey('url') || map.containsKey('thread_id'))) {
@@ -109,22 +109,17 @@ class ImportManager {
           final firstMsg = messages.first;
           if (firstMsg is Map) {
             final msgMap = firstMsg as Map<String, dynamic>;
-            // Perplexity messages have 'role' and 'content'
             if (msgMap.containsKey('role') && msgMap.containsKey('content')) {
-              // Has citations? => Perplexity
               if (msgMap.containsKey('citations')) {
                 return DetectedSource.perplexity;
               }
-              // Gemini has 'author' not 'role'
               if (!msgMap.containsKey('author')) {
-                // Could be perplexity or simple
                 return DetectedSource.perplexity;
               }
             }
           }
         }
       } else if (parsedJson is Map) {
-        // Could be wrapped
         if (parsedJson.containsKey('items')) {
           final items = parsedJson['items'];
           if (items is List && items.isNotEmpty) {
@@ -154,7 +149,7 @@ class ImportManager {
   ImportResult importFromJson(String jsonString) {
     final dynamic parsed;
     try {
-      parsed = _parseJson(jsonString);
+      parsed = jsonDecode(jsonString);
     } catch (e) {
       return ImportResult(
         imported: [],
@@ -169,7 +164,8 @@ class ImportManager {
         errors: [
           ImportError(
             index: 0,
-            message: 'Could not detect source format. Please select the source manually.',
+            message:
+                'Could not detect source format. Please select the source manually.',
           ),
         ],
       );
@@ -195,7 +191,6 @@ class ImportManager {
           final threads = _claude.importFromJson(jsonString);
           return ImportResult(imported: threads, errors: []);
         case DetectedSource.kelivo:
-          // Kelivo import uses its own JSON format (same as UnifiedThread JSON)
           final threads = _importKelivo(jsonString);
           return ImportResult(imported: threads, errors: []);
         case DetectedSource.unknown:
@@ -217,7 +212,7 @@ class ImportManager {
   List<UnifiedThread> _importKelivo(String jsonString) {
     final dynamic parsed;
     try {
-      parsed = _parseJson(jsonString);
+      parsed = jsonDecode(jsonString);
     } catch (e) {
       throw FormatException('Invalid JSON: $e');
     }
@@ -241,10 +236,5 @@ class ImportManager {
     }
 
     return [];
-  }
-
-  dynamic _parseJson(String jsonString) {
-    import 'dart:convert' show jsonDecode;
-    return jsonDecode(jsonString);
   }
 }
