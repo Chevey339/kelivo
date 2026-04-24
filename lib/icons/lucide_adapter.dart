@@ -70,7 +70,7 @@ class Lucide {
   static const IconData MessageCircle = lucide.LucideIcons.messageCircle;
   static const IconData NotebookTabs = lucide.LucideIcons.notebookTabs;
   static const IconData Vibrate = lucide.LucideIcons.vibrate;
-  static const IconData TextSelect = lucide.LucideIcons.lassoSelect;
+  static const IconData TextSelect = lucide.LucideIcons.textSelect;
   static const IconData BookOpenText = lucide.LucideIcons.bookOpenText;
   static const IconData Pencil = lucide.LucideIcons.pencil;
   static const IconData GitFork = lucide.LucideIcons.gitFork;
