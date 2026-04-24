@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../core/models/unified_thread.dart';
 import '../../../core/models/unified_message.dart';
@@ -6,9 +7,6 @@ import '../../../core/models/message_attachment.dart';
 import 'thread_repository.dart';
 
 /// ThreadRepository implementation backed by Hive local storage.
-///
-/// Threads are stored in a single Hive box with typeId 50.
-/// Messages and attachments are stored as nested Hive lists within each thread.
 class HiveThreadRepository implements ThreadRepository {
   static const String _boxName = 'unified_threads';
 
@@ -16,6 +14,21 @@ class HiveThreadRepository implements ThreadRepository {
 
   Future<Box<UnifiedThread>> get _ensureBox async {
     if (_box != null && _box!.isOpen) return _box!;
+
+    // Register adapters if not already registered
+    if (!Hive.isAdapterRegistered(50)) {
+      Hive.registerAdapter(UnifiedThreadAdapter());
+    }
+    if (!Hive.isAdapterRegistered(51)) {
+      Hive.registerAdapter(UnifiedMessageAdapter());
+    }
+    if (!Hive.isAdapterRegistered(52)) {
+      Hive.registerAdapter(MessageAttachmentAdapter());
+    }
+    if (!Hive.isAdapterRegistered(53)) {
+      Hive.registerAdapter(MessageRoleAdapter());
+    }
+
     _box = await Hive.openBox<UnifiedThread>(_boxName);
     return _box!;
   }
