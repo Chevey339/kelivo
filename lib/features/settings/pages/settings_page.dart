@@ -14,6 +14,7 @@ import 'sponsor_page.dart';
 import 'log_viewer_page.dart';
 import '../../search/pages/search_services_page.dart';
 import '../../backup/pages/backup_page.dart';
+import '../../backup/pages/thread_backup_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
@@ -89,7 +90,6 @@ class SettingsPage extends StatelessWidget {
       }
     }
 
-    // iOS-style section header (neutral color, not theme color)
     Widget header(String text, {bool first = false}) => Padding(
       padding: EdgeInsets.fromLTRB(12, first ? 2 : 12, 12, 6),
       child: Text(
@@ -146,7 +146,6 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
 
-          // 通用设置：使用iOS风格分组卡片，黑色（中性）图标与标题，无描述
           header(l10n.settingsPageGeneralSection, first: true),
           _iosSectionCard(
             children: [
@@ -301,6 +300,19 @@ class SettingsPage extends StatelessWidget {
             children: [
               _iosNavRow(
                 context,
+                icon: Lucide.CloudUpload,
+                label: l10n.settingsPageThreadBackup,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ThreadBackupPage(),
+                    ),
+                  );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
                 icon: Lucide.Database,
                 label: l10n.settingsPageBackup,
                 onTap: () {
@@ -350,8 +362,7 @@ class SettingsPage extends StatelessWidget {
                   }
                 },
               ),
-              if (settings.requestLogEnabled || settings.flutterLogEnabled) ...[
-                _iosDivider(context),
+              if (settings.requestLogEnabled || settings.flutterLogEnabled) ...[n                _iosDivider(context),
                 _iosNavRow(
                   context,
                   icon: Lucide.FileText,
@@ -374,32 +385,6 @@ class SettingsPage extends StatelessWidget {
                   );
                 },
               ),
-              // _iosDivider(context),
-              // _iosNavRow(
-              //   context,
-              //   icon: Lucide.Share2,
-              //   label: l10n.settingsPageShare,
-              //   onTap: () async {
-              //     // Provide anchor rect from overlay for iPad share sheet
-              //     Rect anchor;
-              //     try {
-              //       final overlay = Overlay.of(context);
-              //       final ro = overlay?.context.findRenderObject();
-              //       if (ro is RenderBox && ro.hasSize) {
-              //         final center = ro.size.center(Offset.zero);
-              //         final global = ro.localToGlobal(center);
-              //         anchor = Rect.fromCenter(center: global, width: 1, height: 1);
-              //       } else {
-              //         final size = MediaQuery.of(context).size;
-              //         anchor = Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: 1, height: 1);
-              //       }
-              //     } catch (_) {
-              //       final size = MediaQuery.of(context).size;
-              //       anchor = Rect.fromCenter(center: Offset(size.width / 2, size.height / 2), width: 1, height: 1);
-              //     }
-              //     await Share.share(l10n.settingsShare, sharePositionOrigin: anchor);
-              //   },
-              // ),
             ],
           ),
 
@@ -410,7 +395,7 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-// --- iOS-style widgets for Settings page ---
+// --- iOS-style widgets for Settings page (unchanged) ---
 
 Widget _iosSectionCard({required List<Widget> children}) {
   return Builder(
@@ -418,7 +403,6 @@ Widget _iosSectionCard({required List<Widget> children}) {
       final theme = Theme.of(context);
       final cs = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
-      // Light: white with slight transparency; Dark: subtle translucent dark
       final Color bg = isDark
           ? Colors.white10
           : Colors.white.withValues(alpha: 0.96);
@@ -443,7 +427,6 @@ Widget _iosSectionCard({required List<Widget> children}) {
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
-  // Restore previous visual: align with icon slot (36) + gap (12) + padding (12)
   return Divider(
     height: 6,
     thickness: 0.6,
@@ -453,7 +436,6 @@ Widget _iosDivider(BuildContext context) {
   );
 }
 
-// Shared color tween wrapper to mimic iOS gentle press color transition
 class _AnimatedPressColor extends StatelessWidget {
   const _AnimatedPressColor({
     required this.pressed,
@@ -640,7 +622,6 @@ class _TactileRowState extends State<_TactileRow> {
   }
 }
 
-// Icon-only tactile button for AppBar: no ripple, slight press scale
 class _TactileIconButton extends StatefulWidget {
   const _TactileIconButton({
     required this.icon,
@@ -691,7 +672,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   }
 }
 
-// Bottom sheet iOS-style option with tactile feedback (no ripple)
 Widget _sheetOption(
   BuildContext context, {
   required IconData icon,
