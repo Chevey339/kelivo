@@ -1,20 +1,16 @@
+import 'dart:convert' show jsonDecode;
+
 import '../../../core/models/unified_thread.dart';
 import '../../../core/models/unified_message.dart';
 import '../../../core/models/message_attachment.dart';
 
 /// Imports threads from Google Gemini (Google Takeout) export JSON.
-///
-/// Gemini export format (My Activity / Gemini) is a JSON array of session
-/// objects. Each session has:
-/// - title: String
-/// - createTime: String (ISO 8601)
-/// - messages: [{ author: 'user' | 'model', content: String | [{text: String}] }]
 class GeminiImporter {
   /// Parse a Gemini export JSON string into a list of [UnifiedThread].
   List<UnifiedThread> importFromJson(String jsonString) {
     final dynamic decoded;
     try {
-      decoded = _parseJson(jsonString);
+      decoded = jsonDecode(jsonString);
     } catch (e) {
       throw FormatException('Gemini JSON parse error: $e');
     }
@@ -23,7 +19,6 @@ class GeminiImporter {
     if (decoded is List) {
       sessions = decoded;
     } else if (decoded is Map) {
-      // Some exports wrap in { "sessions": [...] } or { "items": [...] }
       sessions = (decoded['sessions'] ?? decoded['items'] ?? []) as List<dynamic>;
     } else {
       sessions = [];
@@ -59,10 +54,9 @@ class GeminiImporter {
 
     if (messages.isEmpty) return null;
 
-    // Use first message timestamp as approximate created time if not available
     final effectiveUpdateTime = messages.last.timestamp;
-
-    final threadId = 'gemini_${createTime.millisecondsSinceEpoch}_${messages.length}';
+    final threadId =
+        'gemini_${createTime.millisecondsSinceEpoch}_${messages.length}';
 
     return UnifiedThread(
       id: threadId,
@@ -96,7 +90,6 @@ class GeminiImporter {
           if (partMap['text'] != null) {
             textContent += '${partMap['text']}\n';
           }
-          // Handle inline data (images)
           final inlineData = partMap['inlineData'] as Map<String, dynamic>?;
           if (inlineData != null) {
             final mimeType = inlineData['mimeType'] as String? ?? 'image/png';
@@ -137,10 +130,5 @@ class GeminiImporter {
       return DateTime.fromMillisecondsSinceEpoch((value * 1000).toInt());
     }
     return DateTime.now();
-  }
-
-  dynamic _parseJson(String jsonString) {
-    import 'dart:convert' show jsonDecode;
-    return jsonDecode(jsonString);
   }
 }

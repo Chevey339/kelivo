@@ -1,3 +1,5 @@
+import 'dart:convert' show jsonDecode;
+
 import '../../../core/models/unified_thread.dart';
 import '../../../core/models/unified_message.dart';
 import '../../../core/models/message_attachment.dart';
@@ -19,7 +21,7 @@ class ChatGPTImporter {
   List<UnifiedThread> importFromJson(String jsonString) {
     final dynamic decoded;
     try {
-      decoded = _parseJson(jsonString);
+      decoded = jsonDecode(jsonString);
     } catch (e) {
       throw FormatException('ChatGPT JSON parse error: $e');
     }
@@ -28,7 +30,6 @@ class ChatGPTImporter {
     if (decoded is List) {
       conversations = decoded;
     } else if (decoded is Map && decoded.containsKey('items')) {
-      // Some exports wrap in { "items": [...] }
       conversations = (decoded['items'] as List<dynamic>?) ?? [];
     } else {
       conversations = [decoded];
@@ -41,7 +42,6 @@ class ChatGPTImporter {
         final thread = _parseConversation(raw as Map<String, dynamic>);
         if (thread != null) threads.add(thread);
       } catch (_) {
-        // Skip malformed conversations
         continue;
       }
     }
@@ -58,11 +58,9 @@ class ChatGPTImporter {
 
     if (id == null) return null;
 
-    // Walk from current_node up to root to get the active linear thread
     final messages = _flattenActiveTree(mapping, currentNodeId);
     if (messages.isEmpty) return null;
 
-    // Extract model info from the first assistant message's metadata
     String? modelName;
     for (final msg in messages) {
       if (msg.role == 'assistant') {
@@ -97,15 +95,13 @@ class ChatGPTImporter {
   ) {
     if (currentNodeId == null) return [];
 
-    // Build node map
     final nodes = <String, Map<String, dynamic>>{};
     mapping.forEach((key, value) {
       if (value is Map) {
-        nodes[key] = value.cast<String, dynamic>();
+        nodes[key] = (value as Map).cast<String, dynamic>();
       }
     });
 
-    // Walk from current_node up to root
     final nodeIds = <String>[];
     String? cursor = currentNodeId;
     while (cursor != null && nodes.containsKey(cursor)) {
@@ -114,7 +110,6 @@ class ChatGPTImporter {
       cursor = node['parent'] as String?;
     }
 
-    // Convert nodes to messages in order
     final messages = <UnifiedMessage>[];
     for (final nodeId in nodeIds) {
       final node = nodes[nodeId]!;
@@ -137,7 +132,6 @@ class ChatGPTImporter {
     final content = message['content'] as Map<String, dynamic>? ?? {};
     final contentType = content['content_type'] as String? ?? 'text';
 
-    // Extract text content
     String textContent = '';
     final attachments = <MessageAttachment>[];
 
@@ -148,7 +142,6 @@ class ChatGPTImporter {
           if (part is String) {
             textContent += part;
           } else if (part is Map) {
-            // Could be a multimodal part with image_url, etc.
             final partMap = part as Map<String, dynamic>;
             if (partMap['asset_pointer'] != null) {
               attachments.add(MessageAttachment(
@@ -184,10 +177,7 @@ class ChatGPTImporter {
       textContent = content['text'] as String? ?? '';
     }
 
-    // Get timestamp
     final timestamp = _parseTimestamp(message['create_time']);
-
-    // Get metadata
     final metadataMap = message['metadata'] as Map<String, dynamic>?;
 
     final metadata = <String, dynamic>{
@@ -224,14 +214,10 @@ class ChatGPTImporter {
   DateTime _parseTimestamp(dynamic value) {
     if (value == null) return DateTime.now();
     if (value is num) {
-      // Unix timestamp (seconds or milliseconds)
       if (value > 1e11) {
-        // Milliseconds
         return DateTime.fromMillisecondsSinceEpoch(value.toInt());
       }
-      return DateTime.fromMillisecondsSinceEpoch(
-        (value * 1000).toInt(),
-      );
+      return DateTime.fromMillisecondsSinceEpoch((value * 1000).toInt());
     }
     if (value is String) {
       return DateTime.tryParse(value) ?? DateTime.now();
@@ -242,11 +228,5 @@ class ChatGPTImporter {
   String _sanitizeTitle(String title) {
     if (title.trim().isEmpty) return 'Untitled Conversation';
     return title.trim();
-  }
-
-  dynamic _parseJson(String jsonString) {
-    // Use dart:convert
-    import 'dart:convert' show jsonDecode;
-    return jsonDecode(jsonString);
   }
 }

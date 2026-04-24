@@ -1,23 +1,16 @@
+import 'dart:convert' show jsonDecode;
+
 import '../../../core/models/unified_thread.dart';
 import '../../../core/models/unified_message.dart';
 import '../../../core/models/message_attachment.dart';
 
 /// Imports threads from Claude (Anthropic) export JSON.
-///
-/// Claude export format is a JSON array of conversation objects.
-/// Each conversation has:
-/// - uuid: String
-/// - name: String
-/// - created_at: String (ISO 8601)
-/// - updated_at: String (ISO 8601)
-/// - chat_messages: [{ uuid, sender: 'human' | 'assistant', text: String, created_at: String }]
-/// - Files/artifacts may be included as separate fields
 class ClaudeImporter {
   /// Parse a Claude export JSON string into a list of [UnifiedThread].
   List<UnifiedThread> importFromJson(String jsonString) {
     final dynamic decoded;
     try {
-      decoded = _parseJson(jsonString);
+      decoded = jsonDecode(jsonString);
     } catch (e) {
       throw FormatException('Claude JSON parse error: $e');
     }
@@ -29,14 +22,14 @@ class ClaudeImporter {
       conversations = (decoded['conversations'] ??
               decoded['accounts'] ??
               []) as List<dynamic>;
-      // Some exports nest conversations inside an accounts array
       if (conversations.isEmpty && decoded.containsKey('accounts')) {
         final accounts = decoded['accounts'] as List<dynamic>? ?? [];
         conversations = [];
         for (final account in accounts) {
           if (account is Map) {
-            final convos = (account as Map<String, dynamic>)['conversations']
-                as List<dynamic>?;
+            final convos =
+                (account as Map<String, dynamic>)['conversations']
+                    as List<dynamic>?;
             if (convos != null) conversations.addAll(convos);
           }
         }
@@ -107,7 +100,6 @@ class ClaudeImporter {
 
     if (text.trim().isEmpty) return null;
 
-    // Check for artifacts / files attached to this message
     final attachments = <MessageAttachment>[];
     final files = json['files'] as List<dynamic>?;
     if (files != null) {
@@ -127,7 +119,6 @@ class ClaudeImporter {
       }
     }
 
-    // Check for artifacts (Claude code / markdown artifacts)
     final artifacts = json['artifacts'] as List<dynamic>?;
     if (artifacts != null) {
       for (final a in artifacts) {
@@ -164,10 +155,5 @@ class ClaudeImporter {
       return DateTime.fromMillisecondsSinceEpoch((value * 1000).toInt());
     }
     return DateTime.now();
-  }
-
-  dynamic _parseJson(String jsonString) {
-    import 'dart:convert' show jsonDecode;
-    return jsonDecode(jsonString);
   }
 }

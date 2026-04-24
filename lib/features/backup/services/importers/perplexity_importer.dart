@@ -1,21 +1,16 @@
+import 'dart:convert' show jsonDecode;
+
 import '../../../core/models/unified_thread.dart';
 import '../../../core/models/unified_message.dart';
 import '../../../core/models/message_attachment.dart';
 
 /// Imports threads from a Perplexity AI export JSON.
-///
-/// Perplexity export format is a JSON array of thread objects.
-/// Each thread has:
-/// - title: String
-/// - url: String (unique permalink)
-/// - messages: [{ role: 'user' | 'assistant', content: String, timestamp: Number (unix ms) }]
-/// - Assistant messages may have: citations: [{ url: String, title: String }]
 class PerplexityImporter {
   /// Parse a Perplexity export JSON string into a list of [UnifiedThread].
   List<UnifiedThread> importFromJson(String jsonString) {
     final dynamic decoded;
     try {
-      decoded = _parseJson(jsonString);
+      decoded = jsonDecode(jsonString);
     } catch (e) {
       throw FormatException('Perplexity JSON parse error: $e');
     }
@@ -45,7 +40,6 @@ class PerplexityImporter {
   UnifiedThread? _parseThread(Map<String, dynamic> json) {
     final title = json['title'] as String? ?? 'Perplexity Thread';
     final url = json['url'] as String?;
-    // Use URL as the originalId if available
     final originalId = url ?? json['id'] as String?;
 
     final rawMessages = json['messages'] as List<dynamic>? ?? [];
@@ -71,7 +65,8 @@ class PerplexityImporter {
 
     if (messages.isEmpty) return null;
 
-    final threadId = 'perplexity_${originalId ?? earliestTs!.millisecondsSinceEpoch}';
+    final threadId =
+        'perplexity_${originalId ?? earliestTs!.millisecondsSinceEpoch}';
 
     return UnifiedThread(
       id: threadId,
@@ -98,7 +93,6 @@ class PerplexityImporter {
 
     if (content.trim().isEmpty) return null;
 
-    // Handle citations in assistant messages
     final attachments = <MessageAttachment>[];
     final rawCitations = json['citations'] as List<dynamic>?;
     if (rawCitations != null && rawCitations.isNotEmpty) {
@@ -140,10 +134,5 @@ class PerplexityImporter {
       return DateTime.tryParse(value) ?? DateTime.now();
     }
     return DateTime.now();
-  }
-
-  dynamic _parseJson(String jsonString) {
-    import 'dart:convert' show jsonDecode;
-    return jsonDecode(jsonString);
   }
 }
