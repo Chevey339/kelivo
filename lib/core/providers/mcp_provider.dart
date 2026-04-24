@@ -256,6 +256,7 @@ class McpProvider extends ChangeNotifier {
   final Map<String, Timer> _heartbeats = <String, Timer>{};
   Duration _requestTimeout = const Duration(seconds: 30);
   String? _cachedSystemPath;
+  Future<String?>? _systemPathFuture;
 
   McpProvider() {
     _load();
@@ -1395,46 +1396,54 @@ class McpProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<String?> _getSystemPath() async {
-    if (_cachedSystemPath != null) return _cachedSystemPath;
-    // macOS: use launchctl to get system PATH
-    if (Platform.isMacOS) {
-      try {
-        final result = await Process.run('launchctl', ['getenv', 'PATH']);
-        if (result.exitCode == 0) {
-          _cachedSystemPath = (result.stdout as String).trim();
-          return _cachedSystemPath;
-        }
-      } catch (_) {}
-    }
-    // Windows: get user PATH from registry if not in current environment
-    if (Platform.isWindows) {
-      try {
-        // Try to get PATH from the user environment via PowerShell
-        final result = await Process.run('powershell', [
-          '-NoProfile',
-          '-NonInteractive',
-          '-Command',
-          r'[Environment]::GetEnvironmentVariable("PATH", "User")',
-        ]);
-        if (result.exitCode == 0) {
-          final userPath = (result.stdout as String).trim();
-          if (userPath.isNotEmpty) {
-            // Merge with current PATH
-            final currentPath = Platform.environment['PATH'] ?? '';
-            if (currentPath.isNotEmpty && userPath.isNotEmpty) {
-              _cachedSystemPath = '$currentPath;$userPath';
-            } else {
-              _cachedSystemPath = currentPath.isNotEmpty
-                  ? currentPath
-                  : userPath;
-            }
+  Future<String?> _getSystemPath() {
+    final cachedFuture = _systemPathFuture;
+    if (cachedFuture != null) return cachedFuture;
+
+    final systemPathFuture = () async {
+      if (_cachedSystemPath != null) return _cachedSystemPath;
+      // macOS: use launchctl to get system PATH
+      if (Platform.isMacOS) {
+        try {
+          final result = await Process.run('launchctl', ['getenv', 'PATH']);
+          if (result.exitCode == 0) {
+            _cachedSystemPath = (result.stdout as String).trim();
             return _cachedSystemPath;
           }
-        }
-      } catch (_) {}
-    }
-    return null;
+        } catch (_) {}
+      }
+      // Windows: get user PATH from registry if not in current environment
+      if (Platform.isWindows) {
+        try {
+          // Try to get PATH from the user environment via PowerShell
+          final result = await Process.run('powershell', [
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            r'[Environment]::GetEnvironmentVariable("PATH", "User")',
+          ]);
+          if (result.exitCode == 0) {
+            final userPath = (result.stdout as String).trim();
+            if (userPath.isNotEmpty) {
+              // Merge with current PATH
+              final currentPath = Platform.environment['PATH'] ?? '';
+              if (currentPath.isNotEmpty && userPath.isNotEmpty) {
+                _cachedSystemPath = '$currentPath;$userPath';
+              } else {
+                _cachedSystemPath = currentPath.isNotEmpty
+                    ? currentPath
+                    : userPath;
+              }
+              return _cachedSystemPath;
+            }
+          }
+        } catch (_) {}
+      }
+      return null;
+    }();
+
+    _systemPathFuture = systemPathFuture;
+    return systemPathFuture;
   }
 
   Future<Map<String, String>> _resolveEnvironmentWithPath(
@@ -1455,45 +1464,15 @@ class McpProvider extends ChangeNotifier {
     Map<String, String> environment,
   ) async {
     try {
-      // On Windows, we need special handling:
-      // 1. npm packages install as .cmd files (e.g., npx.cmd)
-      // 2. The 'where' command finds them, but execution needs cmd.exe
-      // 3. Try direct execution first, then fallback to 'where'
       if (Platform.isWindows) {
-        // First, try to find the command with 'where'
         final whereResult = await Process.run(
           'where',
           [command],
           environment: environment,
           runInShell: true,
         );
-        if (whereResult.exitCode != 0) {
-          return false;
-        }
-        // If found, verify it can actually run
-        // For .cmd/.bat files, use cmd.exe explicitly
-        final testCommand = command.toLowerCase();
-        if (testCommand.endsWith('.cmd') || testCommand.endsWith('.bat')) {
-          final testResult = await Process.run(
-            'cmd.exe',
-            ['/c', command, '--version'],
-            environment: environment,
-            runInShell: true,
-          );
-          //command might not have --version, but if it runs without error, it's valid
-          return testResult.exitCode == 0 || testResult.exitCode == 1;
-        } else {
-          // Try running with --help or --version to verify
-          final testResult = await Process.run(
-            'cmd.exe',
-            ['/c', command],
-            environment: environment,
-            runInShell: true,
-          );
-          return testResult.exitCode == 0 || testResult.exitCode == 1;
-        }
+        return whereResult.exitCode == 0;
       } else {
-        // Unix-like: use which
         final whichCmd = 'which';
         final result = await Process.run(
           whichCmd,
