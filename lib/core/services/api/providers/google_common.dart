@@ -834,33 +834,47 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     // Collect any function calls in this round
     final List<Map<String, dynamic>> calls =
         <Map<String, dynamic>>[]; // {id,name,args,res}
+    final List<Map<String, dynamic>> pendingThoughtSignatureTargets =
+        <Map<String, dynamic>>[];
     // Preserve the model turn parts in the exact order they were received.
     final List<Map<String, dynamic>> roundModelParts = <Map<String, dynamic>>[];
     // Counter for server-side code execution tool cards
     int codeExecCounter = 0;
 
-    void assignThoughtSignatureToFirstUnassignedCall(
-      String key,
-      dynamic value,
-    ) {
-      for (final call in calls) {
-        if (call['thoughtSigKey'] == null && call['thoughtSigVal'] == null) {
-          call['thoughtSigKey'] = key;
-          call['thoughtSigVal'] = value;
-          final part = call['part'];
-          if (part is Map<String, dynamic>) {
-            part[key] = value;
-          }
-          return;
-        }
-      }
+    bool partHasNonFunctionPayload(Map<dynamic, dynamic> part) {
+      return part.containsKey('toolCall') ||
+          part.containsKey('toolResponse') ||
+          part.containsKey('inlineData') ||
+          part.containsKey('inline_data') ||
+          part.containsKey('fileData') ||
+          part.containsKey('file_data') ||
+          part.containsKey('executableCode') ||
+          part.containsKey('executable_code') ||
+          part.containsKey('codeExecutionResult') ||
+          part.containsKey('code_execution_result');
     }
 
-    bool hasAnyCallThoughtSignature() {
-      return calls.any(
-        (call) =>
-            call['thoughtSigKey'] != null && call['thoughtSigVal'] != null,
-      );
+    bool assignThoughtSignatureToFirstPendingTarget(String key, dynamic value) {
+      while (pendingThoughtSignatureTargets.isNotEmpty) {
+        final target = pendingThoughtSignatureTargets.removeAt(0);
+        final part = target['part'];
+        if (part is! Map<String, dynamic>) {
+          continue;
+        }
+        if (part.containsKey('thoughtSignature') ||
+            part.containsKey('thought_signature')) {
+          continue;
+        }
+        part[key] = value;
+        final call = target['call'];
+        if (call is Map<String, dynamic>) {
+          call['thoughtSigKey'] = key;
+          call['thoughtSigVal'] = value;
+          return true;
+        }
+        return false;
+      }
+      return false;
     }
 
     // Capture thought signatures for history (Gemini 3 image/editing)
@@ -990,36 +1004,37 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                 final thought = p['thought'] as bool? ?? false;
                 final fc = p['functionCall'];
                 final rawPart = Map<String, dynamic>.from(p);
-                bool backfilledThoughtSignatureToCall = false;
-                if (partThoughtSigKey != null &&
+                final hasNonFunctionPayload = partHasNonFunctionPayload(p);
+                final isDetachedThoughtSignatureCarrier =
+                    partThoughtSigKey != null &&
                     partThoughtSigVal != null &&
+                    !thought &&
+                    t.isEmpty &&
                     fc is! Map &&
-                    calls.isNotEmpty &&
-                    !hasAnyCallThoughtSignature()) {
-                  assignThoughtSignatureToFirstUnassignedCall(
-                    partThoughtSigKey,
-                    partThoughtSigVal,
-                  );
-                  backfilledThoughtSignatureToCall = true;
+                    !hasNonFunctionPayload;
+                bool backfilledThoughtSignatureToCall = false;
+                if (isDetachedThoughtSignatureCarrier &&
+                    pendingThoughtSignatureTargets.isNotEmpty) {
+                  backfilledThoughtSignatureToCall =
+                      assignThoughtSignatureToFirstPendingTarget(
+                        partThoughtSigKey,
+                        partThoughtSigVal,
+                      );
                 }
 
                 final hasRelevantPayload =
                     t.isNotEmpty ||
                     partThoughtSigKey != null ||
                     fc is Map ||
-                    p.containsKey('toolCall') ||
-                    p.containsKey('toolResponse') ||
-                    p.containsKey('inlineData') ||
-                    p.containsKey('inline_data') ||
-                    p.containsKey('fileData') ||
-                    p.containsKey('file_data') ||
-                    p.containsKey('executableCode') ||
-                    p.containsKey('executable_code') ||
-                    p.containsKey('codeExecutionResult') ||
-                    p.containsKey('code_execution_result');
+                    hasNonFunctionPayload;
 
                 if (isGemini3 && !thought && hasRelevantPayload) {
                   roundModelParts.add(rawPart);
+                }
+
+                if (hasNonFunctionPayload &&
+                    (partThoughtSigKey == null || partThoughtSigVal == null)) {
+                  pendingThoughtSignatureTargets.add({'part': rawPart});
                 }
 
                 // Capture thought signature for text part (Gemini 3 image/editing)
@@ -1217,7 +1232,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                       ],
                     );
                   }
-                  calls.add({
+                  final call = <String, dynamic>{
                     'id': id,
                     'apiId': apiId,
                     'name': name,
@@ -1226,7 +1241,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     'thoughtSigKey': thoughtSigKey,
                     'thoughtSigVal': thoughtSigVal,
                     'part': rawPart,
-                  });
+                  };
+                  calls.add(call);
+                  if (thoughtSigKey == null || thoughtSigVal == null) {
+                    pendingThoughtSignatureTargets.add({
+                      'part': rawPart,
+                      'call': call,
+                    });
+                  }
                 }
               }
               // Capture explicit finish reason if present
