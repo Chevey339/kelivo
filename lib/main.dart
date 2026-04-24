@@ -35,6 +35,7 @@ import 'core/services/chat/chat_service.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/logging/flutter_logger.dart';
 import 'features/home/services/tool_approval_service.dart';
+import 'features/backup/providers/thread_backup_provider.dart';
 import 'utils/sandbox_path_resolver.dart';
 import 'shared/widgets/snackbar.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -68,13 +69,6 @@ Future<void> main() async {
       } catch (_) {}
       // Desktop (Windows) window setup: hide native title bar for custom Flutter bar
       await _initDesktopWindow();
-      // Avoid preloading all system fonts at launch (huge memory on desktop)
-      // Debug logging and global error handlers were enabled previously for diagnosis.
-      // They are commented out now per request to reduce log noise.
-      // FlutterError.onError = (FlutterErrorDetails details) { ... };
-      // WidgetsBinding.instance.platformDispatcher.onError = (Object error, StackTrace stack) { ... };
-      // logging.Logger.root.level = logging.Level.ALL;
-      // logging.Logger.root.onRecord.listen((rec) { ... });
       // Cache current Documents directory to fix sandboxed absolute paths on iOS
       await SandboxPathResolver.init();
       // Enable edge-to-edge to allow content under system bars (Android)
@@ -104,8 +98,6 @@ Future<void> _initDesktopWindow() async {
     // Ignore on unsupported platforms.
   }
 }
-
-// Removed eager system font preloading to reduce memory footprint at launch.
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -146,6 +138,8 @@ class MyApp extends StatelessWidget {
             initialConfig: ctx.read<SettingsProvider>().s3Config,
           ),
         ),
+        // Thread/Supabase backup provider for unified chat imports
+        ChangeNotifierProvider(create: (_) => ThreadBackupProvider()),
       ],
       child: Builder(
         builder: (context) {
@@ -201,19 +195,8 @@ class MyApp extends StatelessWidget {
           }
           return DynamicColorBuilder(
             builder: (lightDynamic, darkDynamic) {
-              // if (lightDynamic != null) {
-              //   debugPrint('[DynamicColor] Light dynamic detected. primary=${lightDynamic.primary.value.toRadixString(16)} surface=${lightDynamic.surface.value.toRadixString(16)}');
-              // } else {
-              //   debugPrint('[DynamicColor] Light dynamic not available');
-              // }
-              // if (darkDynamic != null) {
-              //   debugPrint('[DynamicColor] Dark dynamic detected. primary=${darkDynamic.primary.value.toRadixString(16)} surface=${darkDynamic.surface.value.toRadixString(16)}');
-              // } else {
-              //   debugPrint('[DynamicColor] Dark dynamic not available');
-              // }
               final isAndroid =
                   Theme.of(context).platform == TargetPlatform.android;
-              // Update dynamic color capability for settings UI (avoid notify during build)
               final dynSupported =
                   isAndroid && (lightDynamic != null || darkDynamic != null);
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -244,7 +227,6 @@ class MyApp extends StatelessWidget {
                     if (mode != AndroidBackgroundChatMode.off) {
                       final l10n = AppLocalizations.of(context);
                       if (l10n == null) return;
-                      // Enable only if currently disabled to avoid duplicate ROM prompts
                       try {
                         final already =
                             await AndroidBackgroundManager.isEnabled();
@@ -280,7 +262,7 @@ class MyApp extends StatelessWidget {
                 dynamicScheme: useDyn ? darkDynamic : null,
                 pureBackground: settings.usePureBackground,
               );
-              // Resolve effective app font family (system/Google/local alias)
+
               String? effectiveAppFontFamily() {
                 final fam = settings.appFontFamily;
                 if (fam == null || fam.isEmpty) return null;
@@ -297,7 +279,6 @@ class MyApp extends StatelessWidget {
 
               final effectiveAppFont = effectiveAppFontFamily();
 
-              // Apply user-selected app font to theme text styles and app bar
               ThemeData applyAppFont(ThemeData base) {
                 if (effectiveAppFont == null || effectiveAppFont.isEmpty) {
                   return base;
@@ -328,7 +309,6 @@ class MyApp extends StatelessWidget {
                   toolbarTextStyle: (bar.toolbarTextStyle ?? const TextStyle())
                       .copyWith(fontFamily: effectiveAppFont),
                 );
-                // Apply as default family to all text in ThemeData
                 return base.copyWith(
                   textTheme: apply(base.textTheme),
                   primaryTextTheme: apply(base.primaryTextTheme),
@@ -338,13 +318,10 @@ class MyApp extends StatelessWidget {
 
               final themedLight = applyAppFont(light);
               final themedDark = applyAppFont(dark);
-              // Log top-level colors likely used by widgets (card/bg/shadow approximations)
-              // debugPrint('[Theme/App] Light scaffoldBg=${light.colorScheme.surface.value.toRadixString(16)} card≈${light.colorScheme.surface.value.toRadixString(16)} shadow=${light.colorScheme.shadow.value.toRadixString(16)}');
-              // debugPrint('[Theme/App] Dark scaffoldBg=${dark.colorScheme.surface.value.toRadixString(16)} card≈${dark.colorScheme.surface.value.toRadixString(16)} shadow=${dark.colorScheme.shadow.value.toRadixString(16)}');
+
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
                 title: 'Kelivo',
-                // App UI language; null = follow system (respects iOS per-app language)
                 locale: settings.appLocaleForMaterialApp,
                 supportedLocales: AppLocalizations.supportedLocales,
                 localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -451,5 +428,3 @@ Widget _selectHome() {
       defaultTargetPlatform == TargetPlatform.linux;
   return isDesktop ? const DesktopHomePage() : const HomePage();
 }
-
-// Overrides logic is implemented within SettingsProvider now.
