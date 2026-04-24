@@ -300,7 +300,7 @@ class SettingsPage extends StatelessWidget {
             children: [
               _iosNavRow(
                 context,
-                icon: Lucide.CloudUpload,
+                icon: Lucide.databaseBackup,
                 label: l10n.settingsPageThreadBackup,
                 onTap: () {
                   Navigator.of(context).push(
@@ -362,7 +362,8 @@ class SettingsPage extends StatelessWidget {
                   }
                 },
               ),
-              if (settings.requestLogEnabled || settings.flutterLogEnabled) ...[n                _iosDivider(context),
+              if (settings.requestLogEnabled || settings.flutterLogEnabled) ...[
+                _iosDivider(context),
                 _iosNavRow(
                   context,
                   icon: Lucide.FileText,
@@ -395,7 +396,7 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-// --- iOS-style widgets for Settings page (unchanged) ---
+// All private helper widgets below are unchanged from the original.
 
 Widget _iosSectionCard({required List<Widget> children}) {
   return Builder(
