@@ -834,48 +834,10 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     // Collect any function calls in this round
     final List<Map<String, dynamic>> calls =
         <Map<String, dynamic>>[]; // {id,name,args,res}
-    final List<Map<String, dynamic>> pendingThoughtSignatureTargets =
-        <Map<String, dynamic>>[];
     // Preserve the model turn parts in the exact order they were received.
     final List<Map<String, dynamic>> roundModelParts = <Map<String, dynamic>>[];
     // Counter for server-side code execution tool cards
     int codeExecCounter = 0;
-
-    bool partHasNonFunctionPayload(Map<dynamic, dynamic> part) {
-      return part.containsKey('toolCall') ||
-          part.containsKey('toolResponse') ||
-          part.containsKey('inlineData') ||
-          part.containsKey('inline_data') ||
-          part.containsKey('fileData') ||
-          part.containsKey('file_data') ||
-          part.containsKey('executableCode') ||
-          part.containsKey('executable_code') ||
-          part.containsKey('codeExecutionResult') ||
-          part.containsKey('code_execution_result');
-    }
-
-    bool assignThoughtSignatureToFirstPendingTarget(String key, dynamic value) {
-      while (pendingThoughtSignatureTargets.isNotEmpty) {
-        final target = pendingThoughtSignatureTargets.removeAt(0);
-        final part = target['part'];
-        if (part is! Map<String, dynamic>) {
-          continue;
-        }
-        if (part.containsKey('thoughtSignature') ||
-            part.containsKey('thought_signature')) {
-          continue;
-        }
-        part[key] = value;
-        final call = target['call'];
-        if (call is Map<String, dynamic>) {
-          call['thoughtSigKey'] = key;
-          call['thoughtSigVal'] = value;
-          return true;
-        }
-        return false;
-      }
-      return false;
-    }
 
     // Capture thought signatures for history (Gemini 3 image/editing)
     String? responseTextThoughtSigKey;
@@ -1004,45 +966,16 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                 final thought = p['thought'] as bool? ?? false;
                 final fc = p['functionCall'];
                 final rawPart = Map<String, dynamic>.from(p);
-                final hasNonFunctionPayload = partHasNonFunctionPayload(p);
-                final isDetachedThoughtSignatureCarrier =
-                    partThoughtSigKey != null &&
-                    partThoughtSigVal != null &&
-                    !thought &&
-                    t.isEmpty &&
-                    fc is! Map &&
-                    !hasNonFunctionPayload;
-                bool backfilledThoughtSignatureToCall = false;
-                if (isDetachedThoughtSignatureCarrier &&
-                    pendingThoughtSignatureTargets.isNotEmpty) {
-                  backfilledThoughtSignatureToCall =
-                      assignThoughtSignatureToFirstPendingTarget(
-                        partThoughtSigKey,
-                        partThoughtSigVal,
-                      );
-                }
 
-                final hasRelevantPayload =
-                    t.isNotEmpty ||
-                    partThoughtSigKey != null ||
-                    fc is Map ||
-                    hasNonFunctionPayload;
-
-                if (isGemini3 && !thought && hasRelevantPayload) {
+                if (isGemini3 && !thought && rawPart.isNotEmpty) {
                   roundModelParts.add(rawPart);
-                }
-
-                if (hasNonFunctionPayload &&
-                    (partThoughtSigKey == null || partThoughtSigVal == null)) {
-                  pendingThoughtSignatureTargets.add({'part': rawPart});
                 }
 
                 // Capture thought signature for text part (Gemini 3 image/editing)
                 if (persistGeminiThoughtSigs &&
                     !thought &&
                     partThoughtSigKey != null &&
-                    partThoughtSigVal != null &&
-                    !backfilledThoughtSignatureToCall) {
+                    partThoughtSigVal != null) {
                   if (t.isNotEmpty && responseTextThoughtSigKey == null) {
                     responseTextThoughtSigKey = partThoughtSigKey;
                     responseTextThoughtSigVal = partThoughtSigVal;
@@ -1243,12 +1176,6 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     'part': rawPart,
                   };
                   calls.add(call);
-                  if (thoughtSigKey == null || thoughtSigVal == null) {
-                    pendingThoughtSignatureTargets.add({
-                      'part': rawPart,
-                      'call': call,
-                    });
-                  }
                 }
               }
               // Capture explicit finish reason if present
