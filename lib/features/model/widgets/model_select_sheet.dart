@@ -5,6 +5,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'model_detail_sheet.dart';
@@ -230,10 +231,27 @@ Future<void> showModelSelectSheet(
 }) async {
   final assistantProvider = context.read<AssistantProvider>();
   final settings = context.read<SettingsProvider>();
+  final chatService = context.read<ChatService>();
+
   final sel = await showModelSelector(context);
   if (sel != null) {
-    if (updateAssistant) {
-      // Update assistant's model instead of global default
+    // Get current conversation
+    final currentConversationId = chatService.currentConversationId;
+    final conversation = currentConversationId != null
+        ? chatService.getConversation(currentConversationId)
+        : null;
+
+    if (conversation != null) {
+      // Update current conversation's model (preferred behavior)
+      await chatService.updateConversationModel(
+        conversation.id,
+        sel.providerKey,
+        sel.modelId,
+      );
+      // Also update settings for UI display consistency
+      await settings.setCurrentModel(sel.providerKey, sel.modelId);
+    } else if (updateAssistant) {
+      // No active conversation: update assistant's model instead
       final assistant = assistantProvider.currentAssistant;
       if (assistant != null) {
         await assistantProvider.updateAssistant(
@@ -244,7 +262,7 @@ Future<void> showModelSelectSheet(
         );
       }
     } else {
-      // Only update global default when explicitly requested (e.g., from settings)
+      // Only update global default when explicitly requested
       await settings.setCurrentModel(sel.providerKey, sel.modelId);
     }
   }
