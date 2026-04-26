@@ -63,6 +63,7 @@ class BrandAssets {
         MapEntry(RegExp(r'cohere|command-.+'), 'cohere-color.svg'),
         MapEntry(RegExp(r'kelivo'), 'kelivo.png'),
         MapEntry(RegExp(r'tensdaq'), 'tensdaq-color.svg'),
+        MapEntry(RegExp(r'fireworks'), 'fireworks-ai-color.svg'),
         MapEntry(RegExp(r'longcat'), 'longcat.png'),
         MapEntry(RegExp(r'iflow|心流'), 'iflow-color.svg'),
         MapEntry(RegExp(r'sora'), 'sora-color.svg'),
