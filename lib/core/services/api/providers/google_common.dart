@@ -834,17 +834,11 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     // Collect any function calls in this round
     final List<Map<String, dynamic>> calls =
         <Map<String, dynamic>>[]; // {id,name,args,res}
-    // Capture server-side tool parts (Gemini 3 tool combination)
-    final List<Map<String, dynamic>> roundServerParts =
-        <Map<String, dynamic>>[];
-    // Accumulate text for model turn in convo (needed for Gemini 3 full-parts rebuild)
-    final StringBuffer roundAccumulatedText = StringBuffer();
+    // Preserve the model turn parts in the exact order they were received.
+    final List<Map<String, dynamic>> roundModelParts = <Map<String, dynamic>>[];
     // Counter for server-side code execution tool cards
     int codeExecCounter = 0;
 
-    // Track thought signature across chunks (Gemini 3 requirement)
-    String? persistentThoughtSigKey;
-    dynamic persistentThoughtSigVal;
     // Capture thought signatures for history (Gemini 3 image/editing)
     String? responseTextThoughtSigKey;
     dynamic responseTextThoughtSigVal;
@@ -970,11 +964,11 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                 }
                 final t = (p['text'] ?? '') as String? ?? '';
                 final thought = p['thought'] as bool? ?? false;
+                final fc = p['functionCall'];
+                final rawPart = Map<String, dynamic>.from(p);
 
-                // Check for thought signature in this part and update persistence
-                if (partThoughtSigKey != null) {
-                  persistentThoughtSigKey = partThoughtSigKey;
-                  persistentThoughtSigVal = partThoughtSigVal;
+                if (isGemini3 && !thought && rawPart.isNotEmpty) {
+                  roundModelParts.add(rawPart);
                 }
 
                 // Capture thought signature for text part (Gemini 3 image/editing)
@@ -995,8 +989,6 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     pendingImageTrailingText += t;
                   } else {
                     textDelta += t;
-                    // Accumulate full text for convo rebuild (Gemini 3)
-                    if (isGemini3) roundAccumulatedText.write(t);
                   }
                 }
                 // Parse inline image data from Gemini (inlineData)
@@ -1116,23 +1108,6 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     ],
                   );
                 }
-                // Capture server-side tool parts for convo rebuild (Gemini 3).
-                // Uses deny-list: preserves any part not already handled by client
-                // (text, functionCall, inlineData, fileData, thought, code execution).
-                // Per the API contract, all parts must be returned to maintain context.
-                // TODO: update this deny-list when Gemini API introduces new
-                // client-handled part types to avoid incorrectly capturing them.
-                if (isGemini3 &&
-                    !p.containsKey('text') &&
-                    !p.containsKey('functionCall') &&
-                    !p.containsKey('inlineData') &&
-                    !p.containsKey('inline_data') &&
-                    !p.containsKey('fileData') &&
-                    !p.containsKey('file_data') &&
-                    p['thought'] != true) {
-                  roundServerParts.add(Map<String, dynamic>.from(p));
-                }
-                final fc = p['functionCall'];
                 if (fc is Map) {
                   final name = (fc['name'] ?? '').toString();
                   Map<String, dynamic> args = const <String, dynamic>{};
@@ -1160,13 +1135,6 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                   } else if (p.containsKey('thought_signature')) {
                     thoughtSigKey = 'thought_signature';
                     thoughtSigVal = p['thought_signature'];
-                  }
-
-                  // Fallback to persistent signature if not found in this part
-                  if (thoughtSigKey == null &&
-                      persistentThoughtSigKey != null) {
-                    thoughtSigKey = persistentThoughtSigKey;
-                    thoughtSigVal = persistentThoughtSigVal;
                   }
 
                   // Emit placeholder immediately
@@ -1197,7 +1165,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                       ],
                     );
                   }
-                  calls.add({
+                  final call = <String, dynamic>{
                     'id': id,
                     'apiId': apiId,
                     'name': name,
@@ -1205,7 +1173,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                     'result': resText,
                     'thoughtSigKey': thoughtSigKey,
                     'thoughtSigVal': thoughtSigVal,
-                  });
+                    'part': rawPart,
+                  };
+                  calls.add(call);
                 }
               }
               // Capture explicit finish reason if present
@@ -1364,43 +1334,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
 
     // Append model functionCall(s) and user functionResponse(s) to conversation, then loop
     if (isGemini3) {
-      // Gemini 3: build a single model turn with all parts (text, server-side
-      // tool parts, and functionCall parts) to preserve full context.
-      final modelParts = <Map<String, dynamic>>[];
-
-      // 1. Accumulated text part (with thought signature if available)
-      final accText = roundAccumulatedText.toString();
-      if (accText.isNotEmpty) {
-        final textPart = <String, dynamic>{'text': accText};
-        if (responseTextThoughtSigKey != null &&
-            responseTextThoughtSigVal != null) {
-          textPart[responseTextThoughtSigKey] = responseTextThoughtSigVal;
-        }
-        modelParts.add(textPart);
-      }
-
-      // 2. Server-side tool parts (toolCall/toolResponse, preserved raw)
-      modelParts.addAll(roundServerParts);
-
-      // 3. functionCall parts (with thought signatures)
-      for (final c in calls) {
-        final name = (c['name'] ?? '').toString();
-        final args =
-            (c['args'] as Map<String, dynamic>? ?? const <String, dynamic>{});
-        final thoughtSigKey = c['thoughtSigKey'] as String?;
-        final thoughtSigVal = c['thoughtSigVal'];
-        final apiId = c['apiId'] as String?;
-        final part = <String, dynamic>{
-          'functionCall': {'name': name, 'args': args},
-          if (apiId != null) 'id': apiId,
-        };
-        if (thoughtSigKey != null && thoughtSigVal != null) {
-          part[thoughtSigKey] = thoughtSigVal;
-        }
-        modelParts.add(part);
-      }
-
-      convo.add({'role': 'model', 'parts': modelParts});
+      // Gemini 3: preserve the original model parts order exactly.
+      convo.add({'role': 'model', 'parts': roundModelParts});
 
       // 4. All functionResponses in one user turn
       final responseParts = <Map<String, dynamic>>[];
