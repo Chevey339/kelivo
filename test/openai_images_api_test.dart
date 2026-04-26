@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 
-ProviderConfig _openAiConfig(String baseUrl) {
+ProviderConfig _openAiConfig(String baseUrl, {bool useResponseApi = false}) {
   return ProviderConfig(
     id: 'OpenAITest',
     enabled: true,
@@ -14,7 +14,7 @@ ProviderConfig _openAiConfig(String baseUrl) {
     apiKey: 'test-key',
     baseUrl: baseUrl,
     providerType: ProviderKind.openai,
-    useResponseApi: false,
+    useResponseApi: useResponseApi,
   );
 }
 
@@ -79,6 +79,48 @@ void main() {
       );
       expect(chunks.single.usage?.totalTokens, 8);
     });
+
+    test(
+      'routes image models to Images API even when Responses is enabled',
+      () async {
+        late Uri requestUri;
+        late Map<String, dynamic> requestBody;
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requestUri = request.uri;
+          requestBody =
+              jsonDecode(await utf8.decoder.bind(request).join())
+                  as Map<String, dynamic>;
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'data': [
+                {'url': 'https://example.com/generated.png'},
+              ],
+            }),
+          );
+          await request.response.close();
+        });
+
+        await ChatApiService.sendMessageStream(
+          config: _openAiConfig(_baseUrl(server), useResponseApi: true),
+          modelId: 'gpt-image-2',
+          messages: const [
+            {'role': 'user', 'content': 'generate an empty image'},
+          ],
+        ).toList();
+
+        expect(requestUri.path, '/v1/images/generations');
+        expect(requestBody['model'], 'gpt-image-2');
+        expect(requestBody.containsKey('input'), isFalse);
+        expect(requestBody.containsKey('stream'), isFalse);
+      },
+    );
 
     test('routes image model with input image to edits multipart', () async {
       late Uri requestUri;

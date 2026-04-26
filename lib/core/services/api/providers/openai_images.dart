@@ -1,7 +1,6 @@
 part of '../chat_api_service.dart';
 
 bool _shouldUseOpenAIImagesApi(ProviderConfig config, String modelId) {
-  if (config.useResponseApi == true) return false;
   final upstreamModelId = _apiModelId(config, modelId).toLowerCase();
   return upstreamModelId.startsWith('gpt-image-') ||
       upstreamModelId.startsWith('dall-e-') ||
