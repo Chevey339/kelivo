@@ -560,7 +560,7 @@ Future<void> _showSponsorDesktopDialog(BuildContext context) async {
   final cs = Theme.of(context).colorScheme;
   final l10n = AppLocalizations.of(context)!;
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  const afdianUrl = 'https://afdian.com/a/kelivo';
+  const afdianUrl = 'https://ifdian.net/a/kelivo';
   final wechatQrUrl = isDark
       ? 'https://c.img.dasctf.com/LightPicture/2025/10/ee10ae78acbd01f3.png'
       : 'https://c.img.dasctf.com/LightPicture/2025/10/6ba60ac0f2f8e2b4.png';
