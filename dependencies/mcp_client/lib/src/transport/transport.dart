@@ -6,6 +6,7 @@ import 'dart:io' show Process, HttpClient, ContentType;
 import '../../logger.dart';
 import '../models/models.dart';
 import 'event_source.dart';
+import 'stdio_launch.dart';
 
 final Logger _logger = Logger('mcp_client.transport');
 
@@ -48,9 +49,17 @@ class StdioClientTransport implements ClientTransport {
   }) async {
     _logger.debug('Starting process: $command ${arguments.join(' ')}');
 
+    final launchPlan = resolveStdioLaunch(command, arguments);
+    final effectiveArgs = launchPlan.effectiveArgs;
+    final executableCommand = launchPlan.executableCommand;
+
+    _logger.debug(
+      'Effective command: $executableCommand, args: $effectiveArgs',
+    );
+
     final process = await Process.start(
-      command,
-      arguments,
+      executableCommand,
+      effectiveArgs,
       workingDirectory: workingDirectory,
       environment: environment,
     );
