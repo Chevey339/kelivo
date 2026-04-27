@@ -179,6 +179,60 @@ void main() {
     });
 
     test(
+      'uses the latest assistant image as edit input for follow-up turns',
+      () async {
+        late Uri requestUri;
+        late String contentType;
+        late String requestBody;
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requestUri = request.uri;
+          contentType = request.headers.contentType?.mimeType ?? '';
+          requestBody = latin1.decode(await _readBytes(request));
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'data': [
+                {'url': 'https://example.com/follow-up-edit.png'},
+              ],
+            }),
+          );
+          await request.response.close();
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _openAiConfig(_baseUrl(server)),
+          modelId: 'gpt-image-2',
+          messages: const [
+            {'role': 'user', 'content': 'draw a tabby cat'},
+            {
+              'role': 'assistant',
+              'content': '![image](data:image/png;base64,AQIDBA==)',
+            },
+            {'role': 'user', 'content': 'make it realistic'},
+          ],
+        ).toList();
+
+        expect(requestUri.path, '/v1/images/edits');
+        expect(contentType, 'multipart/form-data');
+        expect(requestBody, contains('name="image[]"'));
+        expect(requestBody, contains('make it realistic'));
+        expect(requestBody, isNot(contains('draw a tabby cat')));
+        expect(requestBody, isNot(contains('Original image request:')));
+        expect(requestBody, isNot(contains('Edit request:')));
+        expect(
+          chunks.single.content,
+          '![image](https://example.com/follow-up-edit.png)',
+        );
+      },
+    );
+
+    test(
       'throws useful exception on non-success Images API response',
       () async {
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

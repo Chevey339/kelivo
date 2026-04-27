@@ -23,14 +23,13 @@ Stream<ChatStreamChunk> _sendOpenAIImagesStream(
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
 }) async* {
-  final prompt = await _lastOpenAIImagePrompt(messages);
-  final imageRefs = await _openAIImageEditRefs(messages, userImagePaths);
-  final response = imageRefs.isEmpty
+  final input = await _openAIImagesInput(messages, userImagePaths);
+  final response = input.imageRefs.isEmpty
       ? await _sendOpenAIImageGeneration(
           client,
           config,
           modelId,
-          prompt,
+          input.prompt,
           extraHeaders: extraHeaders,
           extraBody: extraBody,
         )
@@ -38,8 +37,8 @@ Stream<ChatStreamChunk> _sendOpenAIImagesStream(
           client,
           config,
           modelId,
-          prompt,
-          imageRefs,
+          input.prompt,
+          input.imageRefs,
           extraHeaders: extraHeaders,
           extraBody: extraBody,
         );
@@ -173,16 +172,20 @@ Future<String> _lastOpenAIImagePrompt(
   return '';
 }
 
-Future<List<_ImageRef>> _openAIImageEditRefs(
+Future<_OpenAIImagesInput> _openAIImagesInput(
   List<Map<String, dynamic>> messages,
   List<String>? userImagePaths,
 ) async {
+  final prompt = await _lastOpenAIImagePrompt(messages);
   final explicitPaths = (userImagePaths ?? const <String>[])
       .map((path) => path.trim())
       .where((path) => path.isNotEmpty)
       .toList(growable: false);
   if (explicitPaths.isNotEmpty) {
-    return [for (final path in explicitPaths) _imageRefFromSource(path)];
+    return _OpenAIImagesInput(
+      prompt: prompt,
+      imageRefs: [for (final path in explicitPaths) _imageRefFromSource(path)],
+    );
   }
 
   for (int i = messages.length - 1; i >= 0; i--) {
@@ -193,9 +196,69 @@ Future<List<_ImageRef>> _openAIImageEditRefs(
       allowLocalImages: true,
       keepRemoteMarkdownText: false,
     );
-    return parsed.images;
+    if (parsed.images.isNotEmpty) {
+      return _OpenAIImagesInput(prompt: prompt, imageRefs: parsed.images);
+    }
+
+    final previousAssistantImage = _lastAssistantImageBefore(messages, i);
+    if (previousAssistantImage == null) {
+      return _OpenAIImagesInput(prompt: prompt);
+    }
+
+    return _OpenAIImagesInput(
+      prompt: prompt,
+      imageRefs: [previousAssistantImage],
+    );
   }
-  return const <_ImageRef>[];
+  return _OpenAIImagesInput(prompt: prompt);
+}
+
+_ImageRef? _lastAssistantImageBefore(
+  List<Map<String, dynamic>> messages,
+  int beforeIndex,
+) {
+  for (int i = beforeIndex - 1; i >= 0; i--) {
+    if ((messages[i]['role'] ?? '').toString() != 'assistant') continue;
+    final images = _extractOpenAIImageRefs(messages[i]['content']);
+    if (images.isNotEmpty) return images.last;
+  }
+  return null;
+}
+
+List<_ImageRef> _extractOpenAIImageRefs(dynamic content) {
+  if (content is List) {
+    final refs = <_ImageRef>[];
+    for (final part in content) {
+      if (part is! Map) continue;
+      final type = (part['type'] ?? '').toString();
+      if (type == 'image_url') {
+        final imageUrl = part['image_url'];
+        final source = imageUrl is Map
+            ? (imageUrl['url'] ?? '').toString().trim()
+            : imageUrl.toString().trim();
+        if (source.isNotEmpty) refs.add(_imageRefFromSource(source));
+      } else if (type == 'input_image') {
+        final source = (part['image_url'] ?? '').toString().trim();
+        if (source.isNotEmpty) refs.add(_imageRefFromSource(source));
+      }
+    }
+    return refs;
+  }
+
+  final raw = (content ?? '').toString();
+  if (raw.isEmpty) return const <_ImageRef>[];
+  final refs = <_ImageRef>[];
+  final markdownImage = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
+  final customImage = RegExp(r'\[image:(.+?)\]');
+  for (final match in markdownImage.allMatches(raw)) {
+    final source = (match.group(1) ?? '').trim();
+    if (source.isNotEmpty) refs.add(_imageRefFromSource(source));
+  }
+  for (final match in customImage.allMatches(raw)) {
+    final source = (match.group(1) ?? '').trim();
+    if (source.isNotEmpty) refs.add(_imageRefFromSource(source));
+  }
+  return refs;
 }
 
 _ImageRef _imageRefFromSource(String source) {
@@ -311,4 +374,11 @@ TokenUsage? _openAIImagesUsage(Map<String, dynamic> response) {
     completionTokens: output,
     totalTokens: input + output,
   );
+}
+
+class _OpenAIImagesInput {
+  const _OpenAIImagesInput({required this.prompt, this.imageRefs = const []});
+
+  final String prompt;
+  final List<_ImageRef> imageRefs;
 }
