@@ -271,6 +271,7 @@ _ImageRef _imageRefFromSource(String source) {
 
 Future<http.MultipartFile> _openAIImageMultipartFile(_ImageRef ref) async {
   if (ref.kind == 'data') {
+    final mime = _mimeFromDataUrl(ref.src);
     final commaIndex = ref.src.indexOf(',');
     final payload = commaIndex >= 0
         ? ref.src.substring(commaIndex + 1)
@@ -278,12 +279,29 @@ Future<http.MultipartFile> _openAIImageMultipartFile(_ImageRef ref) async {
     return http.MultipartFile.fromBytes(
       'image[]',
       base64Decode(payload.replaceAll(RegExp(r'\s'), '')),
-      filename:
-          'image.${AppDirectories.extFromMime(_mimeFromDataUrl(ref.src))}',
+      filename: 'image.${AppDirectories.extFromMime(mime)}',
+      contentType: _openAIImageMediaType(mime),
     );
   }
   final fixed = SandboxPathResolver.fix(ref.src);
-  return http.MultipartFile.fromPath('image[]', fixed);
+  final mime = _mimeFromPath(fixed);
+  return http.MultipartFile.fromPath(
+    'image[]',
+    fixed,
+    contentType: _openAIImageMediaType(mime),
+  );
+}
+
+MediaType _openAIImageMediaType(String mime) {
+  final normalized = mime.trim().toLowerCase();
+  if (normalized == 'image/jpeg' ||
+      normalized == 'image/png' ||
+      normalized == 'image/webp') {
+    return MediaType.parse(normalized);
+  }
+  throw FormatException(
+    'OpenAI image edits only support image/jpeg, image/png, and image/webp; got $mime.',
+  );
 }
 
 Map<String, String> _openAIImagesJsonHeaders(

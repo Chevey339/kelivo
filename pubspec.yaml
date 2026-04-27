@@ -84,6 +84,7 @@ dependencies:
   audioplayers: ^6.5.1
   html: ^0.15.6
   html2md: ^1.2.10
+  http_parser: ^4.1.2
   animations: ^2.0.11
   flutter_animate: ^4.5.2
   webview_flutter: ^4.7.0

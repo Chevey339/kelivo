@@ -174,8 +174,54 @@ void main() {
       expect(requestBody, contains('name="prompt"'));
       expect(requestBody, contains('make the background blue'));
       expect(requestBody, contains('name="image[]"'));
+      expect(requestBody, contains('content-type: image/png'));
       expect(requestBody, contains('filename="source.png"'));
       expect(chunks.single.content, '![image](https://example.com/edited.png)');
+    });
+
+    test('sets jpeg content type for jpg image edit uploads', () async {
+      late String requestBody;
+      final tempDir = await Directory.systemTemp.createTemp(
+        'kelivo_openai_jpeg_edit_',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+      final inputImage = File('${tempDir.path}/source.jpg');
+      await inputImage.writeAsBytes(const [1, 2, 3, 4]);
+
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBody = latin1.decode(await _readBytes(request));
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/edited.jpg'},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server)),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'make it cinematic'},
+        ],
+        userImagePaths: [inputImage.path],
+      ).toList();
+
+      expect(requestBody, contains('filename="source.jpg"'));
+      expect(requestBody, contains('content-type: image/jpeg'));
     });
 
     test(
