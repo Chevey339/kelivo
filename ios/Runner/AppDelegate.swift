@@ -43,6 +43,8 @@ import UIKit
         }
         self?.fileSaveHandler.handle(call: call, result: result)
       }
+
+      KelivoTerminalPlugin.register(binaryMessenger: controller.binaryMessenger)
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

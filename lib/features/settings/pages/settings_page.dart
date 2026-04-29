@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import '../../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -18,6 +20,7 @@ import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
 import 'network_proxy_page.dart';
+import '../../terminal/pages/terminal_management_page.dart';
 import 'storage_space_page.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -31,6 +34,8 @@ class SettingsPage extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
+    final showIosTerminalEntry =
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
     String modeLabel(ThemeMode m) {
       switch (m) {
@@ -292,6 +297,21 @@ class SettingsPage extends StatelessWidget {
                   );
                 },
               ),
+              if (showIosTerminalEntry) ...[
+                _iosDivider(context),
+                _iosNavRow(
+                  context,
+                  icon: Lucide.Terminal,
+                  label: l10n.settingsPageTerminal,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TerminalManagementPage(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ],
           ),
 

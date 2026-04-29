@@ -3945,6 +3945,214 @@ class AppLocalizationsZh extends AppLocalizations {
   String get networkProxyPriorityNote => '当同时开启全局代理与供应商代理时，将优先使用供应商代理。';
 
   @override
+  String get settingsPageTerminal => '终端';
+
+  @override
+  String get terminalManagementPageTitle => '终端';
+
+  @override
+  String get terminalManagementRefreshTooltip => '刷新终端状态';
+
+  @override
+  String terminalManagementNativeActionFailed(String code) {
+    return '终端操作失败：$code';
+  }
+
+  @override
+  String get terminalManagementActionUnavailable => '此终端操作暂不可用。';
+
+  @override
+  String terminalManagementStatusLoadFailed(String code) {
+    return '无法加载终端状态：$code';
+  }
+
+  @override
+  String get terminalManagementIntro =>
+      'Kelivo 终端会在 iOS 应用沙盒内运行由 Kelivo 管理的 Linux 运行时。';
+
+  @override
+  String get terminalManagementRuntimeStatus => '运行时状态';
+
+  @override
+  String get terminalManagementNativeRuntime => '原生运行时';
+
+  @override
+  String get terminalManagementRuntimeId => '运行时 ID';
+
+  @override
+  String get terminalManagementIntegrationReference => '集成来源';
+
+  @override
+  String get terminalManagementRuntimeVersion => '运行时版本';
+
+  @override
+  String get terminalManagementPackageSource => '资源包来源';
+
+  @override
+  String get terminalManagementDefaultPackageSource => 'Kelivo 稳定版 iOS 运行时清单';
+
+  @override
+  String get terminalManagementRootfsSize => 'Rootfs 大小';
+
+  @override
+  String get terminalManagementHomeSize => 'Home 大小';
+
+  @override
+  String get terminalManagementCacheSize => '缓存大小';
+
+  @override
+  String get terminalManagementBackupSize => '备份大小';
+
+  @override
+  String get terminalManagementTotalSize => '总大小';
+
+  @override
+  String get terminalManagementLastInstallTime => '上次安装或更新';
+
+  @override
+  String get terminalManagementLastError => '最近错误';
+
+  @override
+  String get terminalManagementNotAvailable => '不可用';
+
+  @override
+  String get terminalManagementNotInstalled => '未安装';
+
+  @override
+  String get terminalManagementNoError => '无错误';
+
+  @override
+  String get terminalManagementNever => '从未';
+
+  @override
+  String get terminalManagementPrimaryActions => '操作';
+
+  @override
+  String get terminalManagementInstallRuntime => '安装运行时';
+
+  @override
+  String get terminalManagementInstalling => '安装中…';
+
+  @override
+  String get terminalManagementOpenTerminal => '打开终端';
+
+  @override
+  String get terminalManagementBrowseFiles => '浏览文件';
+
+  @override
+  String get terminalManagementBackupData => '备份终端数据';
+
+  @override
+  String get terminalManagementDiagnostics => '诊断';
+
+  @override
+  String get terminalManagementExportDiagnosticLog => '导出诊断日志';
+
+  @override
+  String get terminalManagementDiagnosticLogTitle => '终端诊断日志';
+
+  @override
+  String get terminalManagementDiagnosticLogEmpty => '还没有记录终端诊断日志。';
+
+  @override
+  String get terminalManagementDiagnosticLogCopy => '复制';
+
+  @override
+  String get terminalManagementDiagnosticLogClose => '关闭';
+
+  @override
+  String get terminalManagementClearInstallerCache => '清理安装缓存';
+
+  @override
+  String get terminalManagementRetry => '重试';
+
+  @override
+  String get terminalStatusNotInstalled => '未安装';
+
+  @override
+  String get terminalStatusInstalling => '安装中';
+
+  @override
+  String get terminalStatusInstalled => '已安装';
+
+  @override
+  String get terminalStatusUpdateAvailable => '有可用更新';
+
+  @override
+  String get terminalStatusRepairRequired => '需要修复';
+
+  @override
+  String get terminalStatusFailed => '失败';
+
+  @override
+  String get terminalIntegrationMissingSource => '缺少 OpenMinis 源码';
+
+  @override
+  String get terminalIntegrationMissingBuildTools => '缺少构建工具';
+
+  @override
+  String get terminalIntegrationNotLinked => '未链接';
+
+  @override
+  String get terminalIntegrationLinked => '已链接';
+
+  @override
+  String get terminalPageTitle => '终端';
+
+  @override
+  String get terminalPageRestartTooltip => '重启终端会话';
+
+  @override
+  String get terminalPageConnecting => '连接中';
+
+  @override
+  String get terminalPageConnected => '已连接';
+
+  @override
+  String terminalPageConnectionFailed(String code) {
+    return '连接失败：$code';
+  }
+
+  @override
+  String get terminalPageWaitingForOutput => '正在等待终端输出…';
+
+  @override
+  String get terminalPageRuntimeUnavailable => '本地终端运行时暂不可用。';
+
+  @override
+  String get terminalShortcutEsc => 'Esc';
+
+  @override
+  String get terminalShortcutTab => 'Tab';
+
+  @override
+  String get terminalShortcutCtrl => 'Ctrl';
+
+  @override
+  String get terminalShortcutSlash => '/';
+
+  @override
+  String get terminalShortcutDash => '-';
+
+  @override
+  String get terminalShortcutPipe => '|';
+
+  @override
+  String get terminalShortcutTilde => '~';
+
+  @override
+  String get terminalShortcutLeft => '左';
+
+  @override
+  String get terminalShortcutUp => '上';
+
+  @override
+  String get terminalShortcutDown => '下';
+
+  @override
+  String get terminalShortcutRight => '右';
+
+  @override
   String get desktopShowProviderInModelCapsule => '模型胶囊显示供应商';
 
   @override
@@ -8272,6 +8480,214 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get networkProxyPriorityNote => '当同时开启全局代理与供应商代理时，将优先使用供应商代理。';
 
   @override
+  String get settingsPageTerminal => '终端';
+
+  @override
+  String get terminalManagementPageTitle => '终端';
+
+  @override
+  String get terminalManagementRefreshTooltip => '刷新终端状态';
+
+  @override
+  String terminalManagementNativeActionFailed(String code) {
+    return '终端操作失败：$code';
+  }
+
+  @override
+  String get terminalManagementActionUnavailable => '此终端操作暂不可用。';
+
+  @override
+  String terminalManagementStatusLoadFailed(String code) {
+    return '无法加载终端状态：$code';
+  }
+
+  @override
+  String get terminalManagementIntro =>
+      'Kelivo 终端会在 iOS 应用沙盒内运行由 Kelivo 管理的 Linux 运行时。';
+
+  @override
+  String get terminalManagementRuntimeStatus => '运行时状态';
+
+  @override
+  String get terminalManagementNativeRuntime => '原生运行时';
+
+  @override
+  String get terminalManagementRuntimeId => '运行时 ID';
+
+  @override
+  String get terminalManagementIntegrationReference => '集成来源';
+
+  @override
+  String get terminalManagementRuntimeVersion => '运行时版本';
+
+  @override
+  String get terminalManagementPackageSource => '资源包来源';
+
+  @override
+  String get terminalManagementDefaultPackageSource => 'Kelivo 稳定版 iOS 运行时清单';
+
+  @override
+  String get terminalManagementRootfsSize => 'Rootfs 大小';
+
+  @override
+  String get terminalManagementHomeSize => 'Home 大小';
+
+  @override
+  String get terminalManagementCacheSize => '缓存大小';
+
+  @override
+  String get terminalManagementBackupSize => '备份大小';
+
+  @override
+  String get terminalManagementTotalSize => '总大小';
+
+  @override
+  String get terminalManagementLastInstallTime => '上次安装或更新';
+
+  @override
+  String get terminalManagementLastError => '最近错误';
+
+  @override
+  String get terminalManagementNotAvailable => '不可用';
+
+  @override
+  String get terminalManagementNotInstalled => '未安装';
+
+  @override
+  String get terminalManagementNoError => '无错误';
+
+  @override
+  String get terminalManagementNever => '从未';
+
+  @override
+  String get terminalManagementPrimaryActions => '操作';
+
+  @override
+  String get terminalManagementInstallRuntime => '安装运行时';
+
+  @override
+  String get terminalManagementInstalling => '安装中…';
+
+  @override
+  String get terminalManagementOpenTerminal => '打开终端';
+
+  @override
+  String get terminalManagementBrowseFiles => '浏览文件';
+
+  @override
+  String get terminalManagementBackupData => '备份终端数据';
+
+  @override
+  String get terminalManagementDiagnostics => '诊断';
+
+  @override
+  String get terminalManagementExportDiagnosticLog => '导出诊断日志';
+
+  @override
+  String get terminalManagementDiagnosticLogTitle => '终端诊断日志';
+
+  @override
+  String get terminalManagementDiagnosticLogEmpty => '还没有记录终端诊断日志。';
+
+  @override
+  String get terminalManagementDiagnosticLogCopy => '复制';
+
+  @override
+  String get terminalManagementDiagnosticLogClose => '关闭';
+
+  @override
+  String get terminalManagementClearInstallerCache => '清理安装缓存';
+
+  @override
+  String get terminalManagementRetry => '重试';
+
+  @override
+  String get terminalStatusNotInstalled => '未安装';
+
+  @override
+  String get terminalStatusInstalling => '安装中';
+
+  @override
+  String get terminalStatusInstalled => '已安装';
+
+  @override
+  String get terminalStatusUpdateAvailable => '有可用更新';
+
+  @override
+  String get terminalStatusRepairRequired => '需要修复';
+
+  @override
+  String get terminalStatusFailed => '失败';
+
+  @override
+  String get terminalIntegrationMissingSource => '缺少 OpenMinis 源码';
+
+  @override
+  String get terminalIntegrationMissingBuildTools => '缺少构建工具';
+
+  @override
+  String get terminalIntegrationNotLinked => '未链接';
+
+  @override
+  String get terminalIntegrationLinked => '已链接';
+
+  @override
+  String get terminalPageTitle => '终端';
+
+  @override
+  String get terminalPageRestartTooltip => '重启终端会话';
+
+  @override
+  String get terminalPageConnecting => '连接中';
+
+  @override
+  String get terminalPageConnected => '已连接';
+
+  @override
+  String terminalPageConnectionFailed(String code) {
+    return '连接失败：$code';
+  }
+
+  @override
+  String get terminalPageWaitingForOutput => '正在等待终端输出…';
+
+  @override
+  String get terminalPageRuntimeUnavailable => '本地终端运行时暂不可用。';
+
+  @override
+  String get terminalShortcutEsc => 'Esc';
+
+  @override
+  String get terminalShortcutTab => 'Tab';
+
+  @override
+  String get terminalShortcutCtrl => 'Ctrl';
+
+  @override
+  String get terminalShortcutSlash => '/';
+
+  @override
+  String get terminalShortcutDash => '-';
+
+  @override
+  String get terminalShortcutPipe => '|';
+
+  @override
+  String get terminalShortcutTilde => '~';
+
+  @override
+  String get terminalShortcutLeft => '左';
+
+  @override
+  String get terminalShortcutUp => '上';
+
+  @override
+  String get terminalShortcutDown => '下';
+
+  @override
+  String get terminalShortcutRight => '右';
+
+  @override
   String get desktopShowProviderInModelCapsule => '模型胶囊显示供应商';
 
   @override
@@ -12597,6 +13013,214 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get networkProxyPriorityNote => '同時啟用全域代理與供應商代理時，將優先使用供應商代理。';
+
+  @override
+  String get settingsPageTerminal => '終端';
+
+  @override
+  String get terminalManagementPageTitle => '終端';
+
+  @override
+  String get terminalManagementRefreshTooltip => '重新整理終端狀態';
+
+  @override
+  String terminalManagementNativeActionFailed(String code) {
+    return '終端操作失敗：$code';
+  }
+
+  @override
+  String get terminalManagementActionUnavailable => '此終端操作暫不可用。';
+
+  @override
+  String terminalManagementStatusLoadFailed(String code) {
+    return '無法載入終端狀態：$code';
+  }
+
+  @override
+  String get terminalManagementIntro =>
+      'Kelivo 終端會在 iOS 應用程式沙盒內執行由 Kelivo 管理的 Linux 執行階段。';
+
+  @override
+  String get terminalManagementRuntimeStatus => '執行階段狀態';
+
+  @override
+  String get terminalManagementNativeRuntime => '原生執行階段';
+
+  @override
+  String get terminalManagementRuntimeId => '執行階段 ID';
+
+  @override
+  String get terminalManagementIntegrationReference => '整合來源';
+
+  @override
+  String get terminalManagementRuntimeVersion => '執行階段版本';
+
+  @override
+  String get terminalManagementPackageSource => '資源包來源';
+
+  @override
+  String get terminalManagementDefaultPackageSource => 'Kelivo 穩定版 iOS 執行階段清單';
+
+  @override
+  String get terminalManagementRootfsSize => 'Rootfs 大小';
+
+  @override
+  String get terminalManagementHomeSize => 'Home 大小';
+
+  @override
+  String get terminalManagementCacheSize => '快取大小';
+
+  @override
+  String get terminalManagementBackupSize => '備份大小';
+
+  @override
+  String get terminalManagementTotalSize => '總大小';
+
+  @override
+  String get terminalManagementLastInstallTime => '上次安裝或更新';
+
+  @override
+  String get terminalManagementLastError => '最近錯誤';
+
+  @override
+  String get terminalManagementNotAvailable => '不可用';
+
+  @override
+  String get terminalManagementNotInstalled => '未安裝';
+
+  @override
+  String get terminalManagementNoError => '無錯誤';
+
+  @override
+  String get terminalManagementNever => '從未';
+
+  @override
+  String get terminalManagementPrimaryActions => '操作';
+
+  @override
+  String get terminalManagementInstallRuntime => '安裝執行階段';
+
+  @override
+  String get terminalManagementInstalling => '安裝中…';
+
+  @override
+  String get terminalManagementOpenTerminal => '開啟終端';
+
+  @override
+  String get terminalManagementBrowseFiles => '瀏覽檔案';
+
+  @override
+  String get terminalManagementBackupData => '備份終端資料';
+
+  @override
+  String get terminalManagementDiagnostics => '診斷';
+
+  @override
+  String get terminalManagementExportDiagnosticLog => '匯出診斷日誌';
+
+  @override
+  String get terminalManagementDiagnosticLogTitle => '終端診斷日誌';
+
+  @override
+  String get terminalManagementDiagnosticLogEmpty => '尚未記錄終端診斷日誌。';
+
+  @override
+  String get terminalManagementDiagnosticLogCopy => '複製';
+
+  @override
+  String get terminalManagementDiagnosticLogClose => '關閉';
+
+  @override
+  String get terminalManagementClearInstallerCache => '清理安裝快取';
+
+  @override
+  String get terminalManagementRetry => '重試';
+
+  @override
+  String get terminalStatusNotInstalled => '未安裝';
+
+  @override
+  String get terminalStatusInstalling => '安裝中';
+
+  @override
+  String get terminalStatusInstalled => '已安裝';
+
+  @override
+  String get terminalStatusUpdateAvailable => '有可用更新';
+
+  @override
+  String get terminalStatusRepairRequired => '需要修復';
+
+  @override
+  String get terminalStatusFailed => '失敗';
+
+  @override
+  String get terminalIntegrationMissingSource => '缺少 OpenMinis 原始碼';
+
+  @override
+  String get terminalIntegrationMissingBuildTools => '缺少建置工具';
+
+  @override
+  String get terminalIntegrationNotLinked => '未連結';
+
+  @override
+  String get terminalIntegrationLinked => '已連結';
+
+  @override
+  String get terminalPageTitle => '終端';
+
+  @override
+  String get terminalPageRestartTooltip => '重新啟動終端工作階段';
+
+  @override
+  String get terminalPageConnecting => '連線中';
+
+  @override
+  String get terminalPageConnected => '已連線';
+
+  @override
+  String terminalPageConnectionFailed(String code) {
+    return '連線失敗：$code';
+  }
+
+  @override
+  String get terminalPageWaitingForOutput => '正在等待終端輸出…';
+
+  @override
+  String get terminalPageRuntimeUnavailable => '本地終端執行階段暫不可用。';
+
+  @override
+  String get terminalShortcutEsc => 'Esc';
+
+  @override
+  String get terminalShortcutTab => 'Tab';
+
+  @override
+  String get terminalShortcutCtrl => 'Ctrl';
+
+  @override
+  String get terminalShortcutSlash => '/';
+
+  @override
+  String get terminalShortcutDash => '-';
+
+  @override
+  String get terminalShortcutPipe => '|';
+
+  @override
+  String get terminalShortcutTilde => '~';
+
+  @override
+  String get terminalShortcutLeft => '左';
+
+  @override
+  String get terminalShortcutUp => '上';
+
+  @override
+  String get terminalShortcutDown => '下';
+
+  @override
+  String get terminalShortcutRight => '右';
 
   @override
   String get desktopShowProviderInModelCapsule => '模型膠囊顯示供應商';

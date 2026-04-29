@@ -4101,6 +4101,218 @@ class AppLocalizationsEn extends AppLocalizations {
       'When both global and provider proxies are enabled, provider-level proxy takes priority.';
 
   @override
+  String get settingsPageTerminal => 'Terminal';
+
+  @override
+  String get terminalManagementPageTitle => 'Terminal';
+
+  @override
+  String get terminalManagementRefreshTooltip => 'Refresh terminal status';
+
+  @override
+  String terminalManagementNativeActionFailed(String code) {
+    return 'Terminal action failed: $code';
+  }
+
+  @override
+  String get terminalManagementActionUnavailable =>
+      'This terminal action is not available yet.';
+
+  @override
+  String terminalManagementStatusLoadFailed(String code) {
+    return 'Unable to load terminal status: $code';
+  }
+
+  @override
+  String get terminalManagementIntro =>
+      'Kelivo Terminal runs a managed Linux runtime inside the app sandbox on iOS.';
+
+  @override
+  String get terminalManagementRuntimeStatus => 'Runtime Status';
+
+  @override
+  String get terminalManagementNativeRuntime => 'Native Runtime';
+
+  @override
+  String get terminalManagementRuntimeId => 'Runtime ID';
+
+  @override
+  String get terminalManagementIntegrationReference => 'Integration';
+
+  @override
+  String get terminalManagementRuntimeVersion => 'Runtime Version';
+
+  @override
+  String get terminalManagementPackageSource => 'Package Source';
+
+  @override
+  String get terminalManagementDefaultPackageSource =>
+      'Kelivo stable iOS runtime manifest';
+
+  @override
+  String get terminalManagementRootfsSize => 'Rootfs Size';
+
+  @override
+  String get terminalManagementHomeSize => 'Home Size';
+
+  @override
+  String get terminalManagementCacheSize => 'Cache Size';
+
+  @override
+  String get terminalManagementBackupSize => 'Backup Size';
+
+  @override
+  String get terminalManagementTotalSize => 'Total Size';
+
+  @override
+  String get terminalManagementLastInstallTime => 'Last Install or Update';
+
+  @override
+  String get terminalManagementLastError => 'Last Error';
+
+  @override
+  String get terminalManagementNotAvailable => 'Not available';
+
+  @override
+  String get terminalManagementNotInstalled => 'Not installed';
+
+  @override
+  String get terminalManagementNoError => 'No error';
+
+  @override
+  String get terminalManagementNever => 'Never';
+
+  @override
+  String get terminalManagementPrimaryActions => 'Actions';
+
+  @override
+  String get terminalManagementInstallRuntime => 'Install Runtime';
+
+  @override
+  String get terminalManagementInstalling => 'Installing…';
+
+  @override
+  String get terminalManagementOpenTerminal => 'Open Terminal';
+
+  @override
+  String get terminalManagementBrowseFiles => 'Browse Files';
+
+  @override
+  String get terminalManagementBackupData => 'Back Up Terminal Data';
+
+  @override
+  String get terminalManagementDiagnostics => 'Diagnostics';
+
+  @override
+  String get terminalManagementExportDiagnosticLog => 'Export Diagnostic Log';
+
+  @override
+  String get terminalManagementDiagnosticLogTitle => 'Terminal Diagnostic Log';
+
+  @override
+  String get terminalManagementDiagnosticLogEmpty =>
+      'No terminal diagnostic log has been recorded yet.';
+
+  @override
+  String get terminalManagementDiagnosticLogCopy => 'Copy';
+
+  @override
+  String get terminalManagementDiagnosticLogClose => 'Close';
+
+  @override
+  String get terminalManagementClearInstallerCache => 'Clear Installer Cache';
+
+  @override
+  String get terminalManagementRetry => 'Retry';
+
+  @override
+  String get terminalStatusNotInstalled => 'Not installed';
+
+  @override
+  String get terminalStatusInstalling => 'Installing';
+
+  @override
+  String get terminalStatusInstalled => 'Installed';
+
+  @override
+  String get terminalStatusUpdateAvailable => 'Update available';
+
+  @override
+  String get terminalStatusRepairRequired => 'Repair required';
+
+  @override
+  String get terminalStatusFailed => 'Failed';
+
+  @override
+  String get terminalIntegrationMissingSource => 'OpenMinis source missing';
+
+  @override
+  String get terminalIntegrationMissingBuildTools => 'Build tools missing';
+
+  @override
+  String get terminalIntegrationNotLinked => 'Not linked';
+
+  @override
+  String get terminalIntegrationLinked => 'Linked';
+
+  @override
+  String get terminalPageTitle => 'Terminal';
+
+  @override
+  String get terminalPageRestartTooltip => 'Restart terminal session';
+
+  @override
+  String get terminalPageConnecting => 'Connecting';
+
+  @override
+  String get terminalPageConnected => 'Connected';
+
+  @override
+  String terminalPageConnectionFailed(String code) {
+    return 'Connection failed: $code';
+  }
+
+  @override
+  String get terminalPageWaitingForOutput => 'Waiting for terminal output…';
+
+  @override
+  String get terminalPageRuntimeUnavailable =>
+      'The local terminal runtime is not available yet.';
+
+  @override
+  String get terminalShortcutEsc => 'Esc';
+
+  @override
+  String get terminalShortcutTab => 'Tab';
+
+  @override
+  String get terminalShortcutCtrl => 'Ctrl';
+
+  @override
+  String get terminalShortcutSlash => '/';
+
+  @override
+  String get terminalShortcutDash => '-';
+
+  @override
+  String get terminalShortcutPipe => '|';
+
+  @override
+  String get terminalShortcutTilde => '~';
+
+  @override
+  String get terminalShortcutLeft => 'Left';
+
+  @override
+  String get terminalShortcutUp => 'Up';
+
+  @override
+  String get terminalShortcutDown => 'Down';
+
+  @override
+  String get terminalShortcutRight => 'Right';
+
+  @override
   String get desktopShowProviderInModelCapsule =>
       'Show provider in model capsule';
 

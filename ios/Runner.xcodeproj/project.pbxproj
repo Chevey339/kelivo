@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		09EF4B3FACFDD4C7C29B23D1 /* KelivoOpenMinisRuntimeBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = B7BA1C3CCFAA03E1021FCBF9 /* KelivoOpenMinisRuntimeBridge.m */; };
+		107903F5B2B7C2821F725878 /* KelivoTerminalPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 970AD0B3E600B27A0523B648 /* KelivoTerminalPlugin.swift */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
@@ -61,7 +63,9 @@
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
+		7FBE56112D1327F515C7727F /* KelivoOpenMinisRuntimeBridge.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = KelivoOpenMinisRuntimeBridge.h; sourceTree = "<group>"; };
 		916AC80231ED78D192677E69 /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		970AD0B3E600B27A0523B648 /* KelivoTerminalPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KelivoTerminalPlugin.swift; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
 		97C146EE1CF9000F007C117D /* Runner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runner.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -70,6 +74,7 @@
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A0FC04191A5EC777C16F7895 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
+		B7BA1C3CCFAA03E1021FCBF9 /* KelivoOpenMinisRuntimeBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = KelivoOpenMinisRuntimeBridge.m; sourceTree = "<group>"; };
 		C7611D570BED92819FE5AADD /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -153,6 +158,7 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
+				D1F05092D252DCC41EA8D475 /* Terminal */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -168,6 +174,17 @@
 				1F8FF45839D55317C55B7458 /* Pods-RunnerTests.profile.xcconfig */,
 			);
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		D1F05092D252DCC41EA8D475 /* Terminal */ = {
+			isa = PBXGroup;
+			children = (
+				970AD0B3E600B27A0523B648 /* KelivoTerminalPlugin.swift */,
+				7FBE56112D1327F515C7727F /* KelivoOpenMinisRuntimeBridge.h */,
+				B7BA1C3CCFAA03E1021FCBF9 /* KelivoOpenMinisRuntimeBridge.m */,
+			);
+			name = Terminal;
+			path = Terminal;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -404,6 +421,8 @@
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
+				107903F5B2B7C2821F725878 /* KelivoTerminalPlugin.swift in Sources */,
+				09EF4B3FACFDD4C7C29B23D1 /* KelivoOpenMinisRuntimeBridge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -507,10 +526,26 @@
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = CQD34Y5L42;
 				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"$(KELIVO_TERMINAL_GCC_DEFINITIONS)",
+				);
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(KELIVO_TERMINAL_HEADER_SEARCH_PATHS)",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(KELIVO_TERMINAL_LIBRARY_SEARCH_PATHS)",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"$(KELIVO_TERMINAL_OTHER_LDFLAGS)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.psyche.kelivo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -701,10 +736,26 @@
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = CQD34Y5L42;
 				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"$(KELIVO_TERMINAL_GCC_DEFINITIONS)",
+				);
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(KELIVO_TERMINAL_HEADER_SEARCH_PATHS)",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(KELIVO_TERMINAL_LIBRARY_SEARCH_PATHS)",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"$(KELIVO_TERMINAL_OTHER_LDFLAGS)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.psyche.kelivo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -727,10 +778,26 @@
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = CQD34Y5L42;
 				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"$(KELIVO_TERMINAL_GCC_DEFINITIONS)",
+				);
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(KELIVO_TERMINAL_HEADER_SEARCH_PATHS)",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(KELIVO_TERMINAL_LIBRARY_SEARCH_PATHS)",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"$(KELIVO_TERMINAL_OTHER_LDFLAGS)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.psyche.kelivo;
 				PRODUCT_NAME = "$(TARGET_NAME)";

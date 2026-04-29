@@ -1,0 +1,3 @@
+[submodule "dependencies/ish-arm64"]
+	path = dependencies/ish-arm64
+	url = https://github.com/OpenMinis/ish-arm64.git

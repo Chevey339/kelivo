@@ -7640,6 +7640,408 @@ abstract class AppLocalizations {
   /// **'When both global and provider proxies are enabled, provider-level proxy takes priority.'**
   String get networkProxyPriorityNote;
 
+  /// No description provided for @settingsPageTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal'**
+  String get settingsPageTerminal;
+
+  /// No description provided for @terminalManagementPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal'**
+  String get terminalManagementPageTitle;
+
+  /// No description provided for @terminalManagementRefreshTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh terminal status'**
+  String get terminalManagementRefreshTooltip;
+
+  /// No description provided for @terminalManagementNativeActionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal action failed: {code}'**
+  String terminalManagementNativeActionFailed(String code);
+
+  /// No description provided for @terminalManagementActionUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This terminal action is not available yet.'**
+  String get terminalManagementActionUnavailable;
+
+  /// No description provided for @terminalManagementStatusLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to load terminal status: {code}'**
+  String terminalManagementStatusLoadFailed(String code);
+
+  /// No description provided for @terminalManagementIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo Terminal runs a managed Linux runtime inside the app sandbox on iOS.'**
+  String get terminalManagementIntro;
+
+  /// No description provided for @terminalManagementRuntimeStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Runtime Status'**
+  String get terminalManagementRuntimeStatus;
+
+  /// No description provided for @terminalManagementNativeRuntime.
+  ///
+  /// In en, this message translates to:
+  /// **'Native Runtime'**
+  String get terminalManagementNativeRuntime;
+
+  /// No description provided for @terminalManagementRuntimeId.
+  ///
+  /// In en, this message translates to:
+  /// **'Runtime ID'**
+  String get terminalManagementRuntimeId;
+
+  /// No description provided for @terminalManagementIntegrationReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Integration'**
+  String get terminalManagementIntegrationReference;
+
+  /// No description provided for @terminalManagementRuntimeVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Runtime Version'**
+  String get terminalManagementRuntimeVersion;
+
+  /// No description provided for @terminalManagementPackageSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Package Source'**
+  String get terminalManagementPackageSource;
+
+  /// No description provided for @terminalManagementDefaultPackageSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo stable iOS runtime manifest'**
+  String get terminalManagementDefaultPackageSource;
+
+  /// No description provided for @terminalManagementRootfsSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Rootfs Size'**
+  String get terminalManagementRootfsSize;
+
+  /// No description provided for @terminalManagementHomeSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Home Size'**
+  String get terminalManagementHomeSize;
+
+  /// No description provided for @terminalManagementCacheSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache Size'**
+  String get terminalManagementCacheSize;
+
+  /// No description provided for @terminalManagementBackupSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup Size'**
+  String get terminalManagementBackupSize;
+
+  /// No description provided for @terminalManagementTotalSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Size'**
+  String get terminalManagementTotalSize;
+
+  /// No description provided for @terminalManagementLastInstallTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Install or Update'**
+  String get terminalManagementLastInstallTime;
+
+  /// No description provided for @terminalManagementLastError.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Error'**
+  String get terminalManagementLastError;
+
+  /// No description provided for @terminalManagementNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available'**
+  String get terminalManagementNotAvailable;
+
+  /// No description provided for @terminalManagementNotInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Not installed'**
+  String get terminalManagementNotInstalled;
+
+  /// No description provided for @terminalManagementNoError.
+  ///
+  /// In en, this message translates to:
+  /// **'No error'**
+  String get terminalManagementNoError;
+
+  /// No description provided for @terminalManagementNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get terminalManagementNever;
+
+  /// No description provided for @terminalManagementPrimaryActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get terminalManagementPrimaryActions;
+
+  /// No description provided for @terminalManagementInstallRuntime.
+  ///
+  /// In en, this message translates to:
+  /// **'Install Runtime'**
+  String get terminalManagementInstallRuntime;
+
+  /// No description provided for @terminalManagementInstalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing…'**
+  String get terminalManagementInstalling;
+
+  /// No description provided for @terminalManagementOpenTerminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Terminal'**
+  String get terminalManagementOpenTerminal;
+
+  /// No description provided for @terminalManagementBrowseFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse Files'**
+  String get terminalManagementBrowseFiles;
+
+  /// No description provided for @terminalManagementBackupData.
+  ///
+  /// In en, this message translates to:
+  /// **'Back Up Terminal Data'**
+  String get terminalManagementBackupData;
+
+  /// No description provided for @terminalManagementDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get terminalManagementDiagnostics;
+
+  /// No description provided for @terminalManagementExportDiagnosticLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Diagnostic Log'**
+  String get terminalManagementExportDiagnosticLog;
+
+  /// No description provided for @terminalManagementDiagnosticLogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal Diagnostic Log'**
+  String get terminalManagementDiagnosticLogTitle;
+
+  /// No description provided for @terminalManagementDiagnosticLogEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No terminal diagnostic log has been recorded yet.'**
+  String get terminalManagementDiagnosticLogEmpty;
+
+  /// No description provided for @terminalManagementDiagnosticLogCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get terminalManagementDiagnosticLogCopy;
+
+  /// No description provided for @terminalManagementDiagnosticLogClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get terminalManagementDiagnosticLogClose;
+
+  /// No description provided for @terminalManagementClearInstallerCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Installer Cache'**
+  String get terminalManagementClearInstallerCache;
+
+  /// No description provided for @terminalManagementRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get terminalManagementRetry;
+
+  /// No description provided for @terminalStatusNotInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Not installed'**
+  String get terminalStatusNotInstalled;
+
+  /// No description provided for @terminalStatusInstalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing'**
+  String get terminalStatusInstalling;
+
+  /// No description provided for @terminalStatusInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed'**
+  String get terminalStatusInstalled;
+
+  /// No description provided for @terminalStatusUpdateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available'**
+  String get terminalStatusUpdateAvailable;
+
+  /// No description provided for @terminalStatusRepairRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair required'**
+  String get terminalStatusRepairRequired;
+
+  /// No description provided for @terminalStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get terminalStatusFailed;
+
+  /// No description provided for @terminalIntegrationMissingSource.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenMinis source missing'**
+  String get terminalIntegrationMissingSource;
+
+  /// No description provided for @terminalIntegrationMissingBuildTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Build tools missing'**
+  String get terminalIntegrationMissingBuildTools;
+
+  /// No description provided for @terminalIntegrationNotLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Not linked'**
+  String get terminalIntegrationNotLinked;
+
+  /// No description provided for @terminalIntegrationLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked'**
+  String get terminalIntegrationLinked;
+
+  /// No description provided for @terminalPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal'**
+  String get terminalPageTitle;
+
+  /// No description provided for @terminalPageRestartTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart terminal session'**
+  String get terminalPageRestartTooltip;
+
+  /// No description provided for @terminalPageConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting'**
+  String get terminalPageConnecting;
+
+  /// No description provided for @terminalPageConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get terminalPageConnected;
+
+  /// No description provided for @terminalPageConnectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed: {code}'**
+  String terminalPageConnectionFailed(String code);
+
+  /// No description provided for @terminalPageWaitingForOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for terminal output…'**
+  String get terminalPageWaitingForOutput;
+
+  /// No description provided for @terminalPageRuntimeUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The local terminal runtime is not available yet.'**
+  String get terminalPageRuntimeUnavailable;
+
+  /// No description provided for @terminalShortcutEsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Esc'**
+  String get terminalShortcutEsc;
+
+  /// No description provided for @terminalShortcutTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab'**
+  String get terminalShortcutTab;
+
+  /// No description provided for @terminalShortcutCtrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Ctrl'**
+  String get terminalShortcutCtrl;
+
+  /// No description provided for @terminalShortcutSlash.
+  ///
+  /// In en, this message translates to:
+  /// **'/'**
+  String get terminalShortcutSlash;
+
+  /// No description provided for @terminalShortcutDash.
+  ///
+  /// In en, this message translates to:
+  /// **'-'**
+  String get terminalShortcutDash;
+
+  /// No description provided for @terminalShortcutPipe.
+  ///
+  /// In en, this message translates to:
+  /// **'|'**
+  String get terminalShortcutPipe;
+
+  /// No description provided for @terminalShortcutTilde.
+  ///
+  /// In en, this message translates to:
+  /// **'~'**
+  String get terminalShortcutTilde;
+
+  /// No description provided for @terminalShortcutLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get terminalShortcutLeft;
+
+  /// No description provided for @terminalShortcutUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Up'**
+  String get terminalShortcutUp;
+
+  /// No description provided for @terminalShortcutDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Down'**
+  String get terminalShortcutDown;
+
+  /// No description provided for @terminalShortcutRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get terminalShortcutRight;
+
   /// No description provided for @desktopShowProviderInModelCapsule.
   ///
   /// In en, this message translates to:
