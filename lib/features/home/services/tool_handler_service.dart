@@ -8,6 +8,8 @@ import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/search/search_tool_service.dart';
+import '../../terminal/providers/terminal_ai_tool_provider.dart';
+import '../../terminal/services/terminal_ai_tool_service.dart';
 import 'tool_approval_service.dart';
 
 /// 工具调用处理服务
@@ -165,6 +167,13 @@ class ToolHandlerService {
       toolDefs.addAll(_buildMemoryToolDefinitions());
     }
 
+    final terminalTools = _buildTerminalToolDefinitions(
+      settings: settings,
+      providerKey: providerKey,
+      supportsTools: supportsTools,
+    );
+    toolDefs.addAll(terminalTools);
+
     // MCP tools
     final mcpTools = _buildMcpToolDefinitions(
       settings: settings,
@@ -175,6 +184,40 @@ class ToolHandlerService {
     toolDefs.addAll(mcpTools);
 
     return toolDefs;
+  }
+
+  List<Map<String, dynamic>> _buildTerminalToolDefinitions({
+    required SettingsProvider settings,
+    required String providerKey,
+    required bool supportsTools,
+  }) {
+    if (!supportsTools ||
+        !TerminalAiToolProvider.isAvailableOnCurrentPlatform()) {
+      return const [];
+    }
+    final provider = _terminalAiToolProviderOrNull();
+    if (provider?.enabled != true) return const [];
+
+    final providerCfg = settings.getProviderConfig(providerKey);
+    final providerKind = ProviderConfig.classify(
+      providerCfg.id,
+      explicitType: providerCfg.providerType,
+    );
+    return TerminalAiToolService.toolDefinitions
+        .map((tool) {
+          final function = Map<String, dynamic>.from(
+            tool['function'] as Map<String, dynamic>,
+          );
+          final parameters = Map<String, dynamic>.from(
+            function['parameters'] as Map<String, dynamic>,
+          );
+          function['parameters'] = sanitizeToolParametersForProvider(
+            parameters,
+            providerKind,
+          );
+          return {'type': tool['type'], 'function': function};
+        })
+        .toList(growable: false);
   }
 
   /// Build memory tool definitions (create/edit/delete).
@@ -331,6 +374,10 @@ class ToolHandlerService {
           return memoryResult;
         }
 
+        if (_terminalToolsEnabled() && TerminalAiToolService.canHandle(name)) {
+          return TerminalAiToolService().handleToolCall(name, args);
+        }
+
         // Approval gate for MCP tools
         if (approvalService != null && mcp.toolNeedsApproval(name)) {
           // Generate a unique id for this tool call approval request
@@ -372,6 +419,19 @@ class ToolHandlerService {
         });
       }
     };
+  }
+
+  bool _terminalToolsEnabled() {
+    if (!TerminalAiToolProvider.isAvailableOnCurrentPlatform()) return false;
+    return _terminalAiToolProviderOrNull()?.enabled == true;
+  }
+
+  TerminalAiToolProvider? _terminalAiToolProviderOrNull() {
+    try {
+      return contextProvider.read<TerminalAiToolProvider>();
+    } on ProviderNotFoundException {
+      return null;
+    }
   }
 
   /// Handle memory tool calls (create/edit/delete).

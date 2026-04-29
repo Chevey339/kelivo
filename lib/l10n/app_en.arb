@@ -1762,6 +1762,7 @@
   },
   "terminalPageWaitingForOutput": "Waiting for terminal output…",
   "terminalPageRuntimeUnavailable": "The local terminal runtime is not available yet.",
+  "terminalPageAiTools": "AI tools",
   "terminalShortcutEsc": "Esc",
   "terminalShortcutTab": "Tab",
   "terminalShortcutCtrl": "Ctrl",

@@ -26,6 +26,29 @@ class TerminalNativeBridgeException implements Exception {
   String toString() => 'TerminalNativeBridgeException($code, $message)';
 }
 
+class TerminalCommandResult {
+  const TerminalCommandResult({
+    required this.output,
+    required this.exitCode,
+    required this.timedOut,
+    required this.truncated,
+  });
+
+  final String output;
+  final int exitCode;
+  final bool timedOut;
+  final bool truncated;
+
+  factory TerminalCommandResult.fromMap(Map<Object?, Object?> payload) {
+    return TerminalCommandResult(
+      output: payload['output']?.toString() ?? '',
+      exitCode: (payload['exitCode'] as num?)?.toInt() ?? -1,
+      timedOut: payload['timedOut'] == true,
+      truncated: payload['truncated'] == true,
+    );
+  }
+}
+
 class TerminalNativeBridge {
   TerminalNativeBridge({
     MethodChannel methodChannel = const MethodChannel('kelivo.terminal/ios'),
@@ -152,6 +175,30 @@ class TerminalNativeBridge {
       await _methodChannel.invokeMethod<Object?>('stopSession', {
         'sessionId': sessionId,
       });
+    } on PlatformException catch (error) {
+      throw TerminalNativeBridgeException.fromPlatformException(error);
+    }
+  }
+
+  Future<TerminalCommandResult> runCommand({
+    required String command,
+    Duration timeout = const Duration(seconds: 20),
+    int maxOutputBytes = 65536,
+  }) async {
+    try {
+      final payload = await _methodChannel
+          .invokeMapMethod<Object?, Object?>('runCommand', {
+            'command': command,
+            'timeoutSeconds': timeout.inSeconds,
+            'maxOutputBytes': maxOutputBytes,
+          });
+      if (payload == null) {
+        throw const TerminalNativeBridgeException(
+          code: 'empty_command_result',
+          message: 'Native terminal command response was empty.',
+        );
+      }
+      return TerminalCommandResult.fromMap(payload);
     } on PlatformException catch (error) {
       throw TerminalNativeBridgeException.fromPlatformException(error);
     }

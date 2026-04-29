@@ -4120,6 +4120,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get terminalPageRuntimeUnavailable => '本地终端运行时暂不可用。';
 
   @override
+  String get terminalPageAiTools => 'AI 工具';
+
+  @override
   String get terminalShortcutEsc => 'Esc';
 
   @override
@@ -8655,6 +8658,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get terminalPageRuntimeUnavailable => '本地终端运行时暂不可用。';
 
   @override
+  String get terminalPageAiTools => 'AI 工具';
+
+  @override
   String get terminalShortcutEsc => 'Esc';
 
   @override
@@ -13188,6 +13194,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get terminalPageRuntimeUnavailable => '本地終端執行階段暫不可用。';
+
+  @override
+  String get terminalPageAiTools => 'AI 工具';
 
   @override
   String get terminalShortcutEsc => 'Esc';

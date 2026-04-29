@@ -44,6 +44,13 @@ final class KelivoTerminalPlugin: NSObject {
       result(runtime.resizeSession(withArguments: arguments))
     case "stopSession":
       result(runtime.stopSession(withArguments: arguments))
+    case "runCommand":
+      DispatchQueue.global(qos: .userInitiated).async {
+        let payload = self.runtime.runCommand(withArguments: arguments)
+        DispatchQueue.main.async {
+          result(payload)
+        }
+      }
     case "cancelInstall", "listFiles", "resetRuntime":
       result(KelivoTerminalPlugin.unavailable(method: call.method))
     default:

@@ -1437,6 +1437,7 @@
   },
   "terminalPageWaitingForOutput": "正在等待终端输出…",
   "terminalPageRuntimeUnavailable": "本地终端运行时暂不可用。",
+  "terminalPageAiTools": "AI 工具",
   "terminalShortcutEsc": "Esc",
   "terminalShortcutTab": "Tab",
   "terminalShortcutCtrl": "Ctrl",

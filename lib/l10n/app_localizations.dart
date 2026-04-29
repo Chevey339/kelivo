@@ -7976,6 +7976,12 @@ abstract class AppLocalizations {
   /// **'The local terminal runtime is not available yet.'**
   String get terminalPageRuntimeUnavailable;
 
+  /// No description provided for @terminalPageAiTools.
+  ///
+  /// In en, this message translates to:
+  /// **'AI tools'**
+  String get terminalPageAiTools;
+
   /// No description provided for @terminalShortcutEsc.
   ///
   /// In en, this message translates to:

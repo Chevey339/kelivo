@@ -170,6 +170,30 @@ static BOOL KelivoGzReadFully(gzFile file, void *buffer, unsigned int length) {
   return YES;
 }
 
+static BOOL KelivoAppendCString(char *buffer, size_t capacity, size_t *offset, const char *value) {
+  if (value == NULL) {
+    return NO;
+  }
+  size_t length = strlen(value);
+  if (*offset + length + 1 > capacity) {
+    return NO;
+  }
+  memcpy(buffer + *offset, value, length);
+  *offset += length;
+  buffer[*offset] = '\0';
+  *offset += 1;
+  return YES;
+}
+
+static NSString *KelivoStringFromOutputData(NSData *data) {
+  NSString *text = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+  if (text != nil) {
+    return text;
+  }
+  text = [[NSString alloc] initWithData:data encoding:NSISOLatin1StringEncoding];
+  return text ?: @"";
+}
+
 static BOOL KelivoTarBlockIsEmpty(const unsigned char *block) {
   for (int i = 0; i < 512; i++) {
     if (block[i] != 0) {
@@ -364,8 +388,13 @@ static FlutterError *_Nullable KelivoUnpackTarGz(NSString *archivePath, NSString
 @property(nonatomic, nullable) NSString *sessionId;
 @property(nonatomic) struct tty *tty;
 @property(nonatomic) NSMutableData *pendingOutput;
+@property(nonatomic) NSMutableData *capturedOutput;
+@property(nonatomic) NSCondition *captureCondition;
 @property(nonatomic) NSUInteger outputEvents;
 @property(nonatomic) NSUInteger outputBytes;
+@property(nonatomic) NSUInteger captureOutputLimit;
+@property(nonatomic) BOOL captureOutput;
+@property(nonatomic) BOOL captureTruncated;
 @property(nonatomic) BOOL didLogFirstOutput;
 @end
 
@@ -380,6 +409,8 @@ void KelivoOpenMinisDiagnostic(const char *message) {
   self = [super init];
   if (self) {
     _pendingOutput = [NSMutableData data];
+    _capturedOutput = [NSMutableData data];
+    _captureCondition = [NSCondition new];
   }
   return self;
 }
@@ -439,6 +470,24 @@ static int KelivoPtyWrite(struct tty *tty, const void *buf, size_t len, bool blo
     KelivoTerminalAppendDiagnostic([NSString stringWithFormat:@"KelivoPtyWrite first len=%zu blocking=%@", len, blocking ? @"yes" : @"no"]);
   }
   NSData *output = [NSData dataWithBytes:buf length:len];
+  if (terminal.captureOutput) {
+    [terminal.captureCondition lock];
+    NSUInteger available = terminal.captureOutputLimit > terminal.capturedOutput.length
+                               ? terminal.captureOutputLimit - terminal.capturedOutput.length
+                               : 0;
+    if (available > 0) {
+      NSUInteger bytesToAppend = MIN(available, output.length);
+      [terminal.capturedOutput appendData:[output subdataWithRange:NSMakeRange(0, bytesToAppend)]];
+      if (bytesToAppend < output.length) {
+        terminal.captureTruncated = YES;
+      }
+    } else {
+      terminal.captureTruncated = YES;
+    }
+    [terminal.captureCondition signal];
+    [terminal.captureCondition unlock];
+    return (int)len;
+  }
   if (terminal.sessionId.length == 0) {
     [terminal.pendingOutput appendData:output];
     return (int)len;
@@ -946,6 +995,151 @@ static void KelivoIshDieHandler(const char *message) {
   }
   [self emit:@{@"type" : @"sessionExit", @"sessionId" : session.sessionId, @"code" : @"stopped"}];
   return nil;
+#endif
+}
+
+- (id)runCommandWithArguments:(NSDictionary<NSString *, id> *)arguments {
+#if !KELIVO_OPENMINIS_ISH
+  return KelivoTerminalError(@"openminis_runtime_not_linked", @"OpenMinis iSH ARM64 is not linked.", @{@"method" : @"runCommand"});
+#else
+  NSString *command = [self requiredString:arguments key:@"command"];
+  if (command.length == 0) {
+    return KelivoTerminalError(@"invalid_args", @"Missing command.", nil);
+  }
+
+  NSTimeInterval timeout = [arguments[@"timeoutSeconds"] respondsToSelector:@selector(doubleValue)]
+                                ? [arguments[@"timeoutSeconds"] doubleValue]
+                                : 20.0;
+  if (timeout < 1.0) timeout = 1.0;
+  if (timeout > 120.0) timeout = 120.0;
+  NSUInteger maxOutputBytes = [arguments[@"maxOutputBytes"] respondsToSelector:@selector(unsignedIntegerValue)]
+                                  ? [arguments[@"maxOutputBytes"] unsignedIntegerValue]
+                                  : 65536;
+  if (maxOutputBytes < 1024) maxOutputBytes = 1024;
+  if (maxOutputBytes > 1024 * 1024) maxOutputBytes = 1024 * 1024;
+
+  FlutterError *bootError = [self bootIfNeeded];
+  if (bootError != nil) {
+    return bootError;
+  }
+
+  NSString *marker = [NSString stringWithFormat:@"__KELIVO_EXIT_%@__:", NSUUID.UUID.UUIDString];
+  NSString *wrappedCommand = [NSString stringWithFormat:@"stty -echo -onlcr 2>/dev/null\n%@\nkelivo_rc=$?\nprintf '%@%%s\\n' \"$kelivo_rc\"\n",
+                                                        command,
+                                                        marker];
+  const char *shellPath = "/bin/sh";
+  const char *wrappedCString = wrappedCommand.UTF8String;
+  if (wrappedCString == NULL) {
+    return KelivoTerminalError(@"invalid_args", @"Command could not be encoded as UTF-8.", nil);
+  }
+
+  KelivoTerminalAppendDiagnostic(@"runCommand entering ish do_execve");
+  int retval = become_new_init_child();
+  if (retval < 0) {
+    return KelivoTerminalError(@"openminis_command_start_failed",
+                               @"OpenMinis iSH failed to create the command process.",
+                               @{@"retval" : @(retval)});
+  }
+
+  struct tty *tty = pty_open_fake(&KelivoPtyDriver);
+  if (IS_ERR(tty)) {
+    retval = (int)PTR_ERR(tty);
+    return KelivoTerminalError(@"openminis_command_start_failed",
+                               @"OpenMinis iSH failed to create a command pseudo terminal.",
+                               @{@"retval" : @(retval)});
+  }
+
+  KelivoOpenMinisTerminalHandle *terminal = (__bridge KelivoOpenMinisTerminalHandle *)tty->data;
+  terminal.captureOutput = YES;
+  terminal.captureOutputLimit = maxOutputBytes + marker.length + 32;
+
+  NSString *stdioFile = [NSString stringWithFormat:@"/dev/pts/%d", tty->num];
+  retval = create_stdio(stdioFile.fileSystemRepresentation, TTY_PSEUDO_SLAVE_MAJOR, tty->num);
+  tty_release(tty);
+  if (retval < 0) {
+    return KelivoTerminalError(@"openminis_command_start_failed",
+                               @"OpenMinis iSH failed to attach command stdio.",
+                               @{@"retval" : @(retval)});
+  }
+
+  char argvBuffer[65536];
+  memset(argvBuffer, 0, sizeof(argvBuffer));
+  size_t argvOffset = 0;
+  if (!KelivoAppendCString(argvBuffer, sizeof(argvBuffer), &argvOffset, shellPath) ||
+      !KelivoAppendCString(argvBuffer, sizeof(argvBuffer), &argvOffset, "-lc") ||
+      !KelivoAppendCString(argvBuffer, sizeof(argvBuffer), &argvOffset, wrappedCString)) {
+    return KelivoTerminalError(@"invalid_args", @"Command is too long.", nil);
+  }
+
+  const char envpBuffer[] =
+      "TERM=xterm-256color\0"
+      "HOME=/root\0"
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
+      "PYTHONMALLOC=malloc\0"
+      "\0";
+  retval = do_execve(shellPath, 3, argvBuffer, envpBuffer);
+  if (retval < 0) {
+    return KelivoTerminalError(@"openminis_command_start_failed",
+                               @"OpenMinis iSH failed to execute the command shell.",
+                               @{@"retval" : @(retval)});
+  }
+
+  task_start(current);
+
+  NSData *markerData = [marker dataUsingEncoding:NSUTF8StringEncoding] ?: NSData.data;
+  NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
+  NSData *captured = nil;
+  NSRange markerRange = NSMakeRange(NSNotFound, 0);
+  while (NSDate.date.timeIntervalSince1970 < deadline.timeIntervalSince1970) {
+    [terminal.captureCondition lock];
+    captured = [terminal.capturedOutput copy];
+    markerRange = [captured rangeOfData:markerData options:0 range:NSMakeRange(0, captured.length)];
+    if (markerRange.location != NSNotFound) {
+      [terminal.captureCondition unlock];
+      break;
+    }
+    [terminal.captureCondition waitUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+    [terminal.captureCondition unlock];
+  }
+  [terminal.captureCondition lock];
+  captured = [terminal.capturedOutput copy];
+  markerRange = [captured rangeOfData:markerData options:0 range:NSMakeRange(0, captured.length)];
+  BOOL truncated = terminal.captureTruncated;
+  [terminal.captureCondition unlock];
+
+  if (tty != NULL) {
+    lock(&tty->lock);
+    tty_hangup(tty);
+    unlock(&tty->lock);
+  }
+
+  if (markerRange.location == NSNotFound) {
+    return KelivoTerminalError(@"terminal_command_timeout",
+                               @"Terminal command timed out before completion.",
+                               @{@"timeoutSeconds" : @(timeout), @"truncated" : @(truncated)});
+  }
+
+  NSData *outputData = [captured subdataWithRange:NSMakeRange(0, markerRange.location)];
+  NSUInteger exitStart = markerRange.location + markerRange.length;
+  NSUInteger exitEnd = exitStart;
+  const unsigned char *bytes = captured.bytes;
+  while (exitEnd < captured.length && bytes[exitEnd] != '\n' && bytes[exitEnd] != '\r') {
+    exitEnd++;
+  }
+  NSData *exitData = [captured subdataWithRange:NSMakeRange(exitStart, exitEnd - exitStart)];
+  NSString *exitText = [[NSString alloc] initWithData:exitData encoding:NSUTF8StringEncoding] ?: @"-1";
+  NSInteger exitCode = exitText.integerValue;
+  NSString *output = KelivoStringFromOutputData(outputData);
+  KelivoTerminalAppendDiagnostic([NSString stringWithFormat:@"runCommand completed exit=%ld bytes=%lu truncated=%@",
+                                                            (long)exitCode,
+                                                            (unsigned long)outputData.length,
+                                                            truncated ? @"yes" : @"no"]);
+  return @{
+    @"output" : output,
+    @"exitCode" : @(exitCode),
+    @"timedOut" : @NO,
+    @"truncated" : @(truncated),
+  };
 #endif
 }
 

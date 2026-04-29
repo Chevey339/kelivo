@@ -4280,6 +4280,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'The local terminal runtime is not available yet.';
 
   @override
+  String get terminalPageAiTools => 'AI tools';
+
+  @override
   String get terminalShortcutEsc => 'Esc';
 
   @override

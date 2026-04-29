@@ -2,12 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:xterm/xterm.dart';
 
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../providers/terminal_ai_tool_provider.dart';
 import '../services/terminal_native_bridge.dart';
 
 class TerminalPage extends StatefulWidget {
@@ -377,17 +380,55 @@ class _TerminalPageState extends State<TerminalPage> {
                 ),
               ),
             ),
-            child: Text(
-              _connecting
-                  ? l10n.terminalPageConnecting
-                  : _errorCode == null
-                  ? l10n.terminalPageConnected
-                  : l10n.terminalPageConnectionFailed(_errorCode!),
-              style: TextStyle(
-                fontSize: 13,
-                color: _errorCode == null ? cs.primary : cs.error,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _connecting
+                        ? l10n.terminalPageConnecting
+                        : _errorCode == null
+                        ? l10n.terminalPageConnected
+                        : l10n.terminalPageConnectionFailed(_errorCode!),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _errorCode == null ? cs.primary : cs.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Selector<TerminalAiToolProvider, bool>(
+                  selector: (_, provider) => provider.enabled,
+                  builder: (context, enabled, _) {
+                    final provider = context.read<TerminalAiToolProvider>();
+                    final available =
+                        TerminalAiToolProvider.isAvailableOnCurrentPlatform();
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          l10n.terminalPageAiTools,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: available
+                                ? cs.onSurfaceVariant
+                                : cs.onSurfaceVariant.withValues(alpha: 0.55),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IosSwitch(
+                          value: available && enabled,
+                          onChanged: available
+                              ? (value) => provider.setEnabled(value).ignore()
+                              : null,
+                          semanticLabel: l10n.terminalPageAiTools,
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
             ),
           ),
           Expanded(

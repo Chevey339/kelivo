@@ -88,5 +88,38 @@ void main() {
       ]);
       expect(calls.single.method, 'drainEvents');
     });
+
+    test('runs one-shot terminal command through native channel', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            if (call.method == 'runCommand') {
+              return {
+                'output': '/root\n',
+                'exitCode': 0,
+                'timedOut': false,
+                'truncated': false,
+              };
+            }
+            return null;
+          });
+
+      final result = await bridge.runCommand(
+        command: 'pwd',
+        timeout: const Duration(seconds: 2),
+        maxOutputBytes: 12345,
+      );
+
+      expect(result.output, '/root\n');
+      expect(result.exitCode, 0);
+      expect(result.timedOut, isFalse);
+      expect(result.truncated, isFalse);
+      expect(calls.single.method, 'runCommand');
+      expect(calls.single.arguments, {
+        'command': 'pwd',
+        'timeoutSeconds': 2,
+        'maxOutputBytes': 12345,
+      });
+    });
   });
 }

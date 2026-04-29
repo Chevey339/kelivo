@@ -1430,6 +1430,7 @@
   },
   "terminalPageWaitingForOutput": "正在等待終端輸出…",
   "terminalPageRuntimeUnavailable": "本地終端執行階段暫不可用。",
+  "terminalPageAiTools": "AI 工具",
   "terminalShortcutEsc": "Esc",
   "terminalShortcutTab": "Tab",
   "terminalShortcutCtrl": "Ctrl",

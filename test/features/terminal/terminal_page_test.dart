@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/terminal/pages/terminal_page.dart';
+import 'package:Kelivo/features/terminal/providers/terminal_ai_tool_provider.dart';
 import 'package:Kelivo/features/terminal/services/terminal_native_bridge.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
 
 class _FakeTerminalBridge extends TerminalNativeBridge {
   _FakeTerminalBridge({this.bootingFailuresBeforeSuccess = 0});
@@ -65,10 +69,18 @@ class _FakeTerminalBridge extends TerminalNativeBridge {
 Future<void> _pumpTerminalPage(
   WidgetTester tester, {
   required TerminalNativeBridge bridge,
+  TerminalAiToolProvider? terminalAiToolProvider,
 }) async {
   await tester.pumpWidget(
-    ChangeNotifierProvider(
-      create: (_) => SettingsProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(
+          create: (_) =>
+              terminalAiToolProvider ??
+              TerminalAiToolProvider(initialEnabled: false),
+        ),
+      ],
       child: MaterialApp(
         localizationsDelegates: const [
           AppLocalizations.delegate,
@@ -85,6 +97,10 @@ Future<void> _pumpTerminalPage(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
 
   testWidgets('TerminalPage retries while native kernel is booting', (
     tester,
@@ -141,5 +157,28 @@ void main() {
       bridge.diagnostics,
       contains(startsWith('TerminalPage first terminal write chars=7')),
     );
+  });
+
+  testWidgets('TerminalPage toggles AI terminal tools', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    final bridge = _FakeTerminalBridge();
+    final terminalAiTools = TerminalAiToolProvider(initialEnabled: false);
+
+    await _pumpTerminalPage(
+      tester,
+      bridge: bridge,
+      terminalAiToolProvider: terminalAiTools,
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('AI tools'), findsOneWidget);
+    expect(terminalAiTools.enabled, isFalse);
+
+    await tester.tap(find.byType(IosSwitch));
+    await tester.pump();
+
+    expect(terminalAiTools.enabled, isTrue);
+    debugDefaultTargetPlatformOverride = null;
   });
 }
