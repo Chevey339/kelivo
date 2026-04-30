@@ -99,6 +99,28 @@ Map<String, dynamic> _googleFunctionResponsePartFromToolMessage(
   return part;
 }
 
+List<Map<String, dynamic>> _googleApiContents(
+  List<Map<String, dynamic>> contents,
+) {
+  return [
+    for (final content in contents)
+      {
+        ...content,
+        if (content['parts'] is List)
+          'parts': [
+            for (final part in content['parts'] as List)
+              part is Map ? _googleApiPart(part) : part,
+          ],
+      },
+  ];
+}
+
+Map<String, dynamic> _googleApiPart(Map part) {
+  final out = Map<String, dynamic>.from(part);
+  out.remove('id');
+  return out;
+}
+
 Stream<ChatStreamChunk> _sendGoogleStream(
   http.Client client,
   ProviderConfig config,
@@ -384,7 +406,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       final req = http.Request('POST', Uri.parse(url));
       req.headers.addAll(headers);
       final body = Map<String, dynamic>.from(baseBody);
-      body['contents'] = currentContents;
+      body['contents'] = _googleApiContents(currentContents);
       req.body = jsonEncode(body);
       final resp = await client.send(req);
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
@@ -921,6 +943,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         body[k] = (v is String) ? _parseOverrideValue(v) : v;
       });
     }
+    body['contents'] = _googleApiContents(convo);
     request.body = jsonEncode(body);
 
     final resp = await client.send(request);
