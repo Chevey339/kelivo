@@ -136,6 +136,65 @@ void main() {
       expect(sanitized, isNot(contains('text-key-secret')));
     });
 
+    test('handles malformed percent encoding while redacting query secrets', () {
+      const cases = <({String body, List<String> contains, List<String> absent})>[
+        (
+          body: 'multipart fragment ?bad%=value&api_key=bad-percent-api-secret',
+          contains: ['bad%=value', 'api_key=%3Credacted%3E'],
+          absent: ['bad-percent-api-secret'],
+        ),
+        (
+          body:
+              'stream error https://example.com/path?bad%2=value&key=incomplete-percent-key-secret',
+          contains: ['bad%2=value', 'key=%3Credacted%3E'],
+          absent: ['incomplete-percent-key-secret'],
+        ),
+        (
+          body:
+              'plain text https://example.com/path?bad%zz=value&access_token=invalid-hex-token-secret',
+          contains: ['bad%zz=value', 'access_token=%3Credacted%3E'],
+          absent: ['invalid-hex-token-secret'],
+        ),
+        (
+          body:
+              'binary-ish text ?model=100%broken&api_key=invalid-percent-value-secret',
+          contains: ['model=100%broken', 'api_key=%3Credacted%3E'],
+          absent: ['invalid-percent-value-secret'],
+        ),
+        (
+          body:
+              'malformed sensitive key ?api%_key=malformed-sensitive-key-secret&model=visible-model',
+          contains: ['api%_key=%3Credacted%3E', 'model=visible-model'],
+          absent: ['malformed-sensitive-key-secret'],
+        ),
+        (
+          body:
+              'encoded sensitive key ?api%5Fkey=encoded-sensitive-key-secret&model=visible-model',
+          contains: ['api%5Fkey=%3Credacted%3E', 'model=visible-model'],
+          absent: ['encoded-sensitive-key-secret'],
+        ),
+        (
+          body:
+              'userinfo https://user%:password@example.com/path?api_key=userinfo-secret',
+          contains: [
+            'https://%3Credacted%3E@example.com/path',
+            'api_key=%3Credacted%3E',
+          ],
+          absent: ['user%:password', 'userinfo-secret'],
+        ),
+      ];
+
+      for (final c in cases) {
+        final sanitized = RequestLogger.sanitizeBodyForLogging(c.body);
+        for (final expected in c.contains) {
+          expect(sanitized, contains(expected), reason: c.body);
+        }
+        for (final forbidden in c.absent) {
+          expect(sanitized, isNot(contains(forbidden)), reason: c.body);
+        }
+      }
+    });
+
     test('redacts quoted sensitive keys in non-JSON fragments', () {
       final sanitized = RequestLogger.sanitizeBodyForLogging(
         'data: {"access_token":"fragment-access-secret","api_key":"fragment-api-secret"}',

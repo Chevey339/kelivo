@@ -261,10 +261,18 @@ class RequestLogger {
     return text.replaceAllMapped(_urlQueryParamRe, (m) {
       final prefix = m.group(1) ?? '';
       final rawKey = m.group(2) ?? '';
-      final normalizedKey = _normalizeKey(Uri.decodeQueryComponent(rawKey));
+      final normalizedKey = _normalizeQueryKey(rawKey);
       if (!_isSensitiveQueryKey(normalizedKey)) return m.group(0) ?? '';
       return '$prefix$rawKey=${Uri.encodeQueryComponent(_redactedValue)}';
     });
+  }
+
+  static String _normalizeQueryKey(String rawKey) {
+    try {
+      return _normalizeKey(Uri.decodeQueryComponent(rawKey));
+    } catch (_) {
+      return _normalizeKey(rawKey);
+    }
   }
 
   static bool _isSensitiveQueryKey(String normalizedKey) {
