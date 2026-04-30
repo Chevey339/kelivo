@@ -2,9 +2,22 @@ part of '../chat_api_service.dart';
 
 bool _shouldUseOpenAIImagesApi(ProviderConfig config, String modelId) {
   final upstreamModelId = _apiModelId(config, modelId).toLowerCase();
-  return upstreamModelId.startsWith('gpt-image-') ||
-      upstreamModelId.startsWith('dall-e-') ||
-      upstreamModelId.startsWith('chatgpt-image-');
+  return _supportsOpenAIImageGenerations(upstreamModelId);
+}
+
+bool _supportsOpenAIImageGenerations(String modelId) {
+  final normalized = modelId.toLowerCase();
+  return normalized.startsWith('gpt-image-') ||
+      normalized.startsWith('chatgpt-image-') ||
+      normalized == 'dall-e-2' ||
+      normalized == 'dall-e-3';
+}
+
+bool _supportsOpenAIImageEdits(String modelId) {
+  final normalized = modelId.toLowerCase();
+  return normalized.startsWith('gpt-image-') ||
+      normalized.startsWith('chatgpt-image-') ||
+      normalized == 'dall-e-2';
 }
 
 Uri _openAIImagesUrl(ProviderConfig config, String path) {
@@ -24,6 +37,14 @@ Stream<ChatStreamChunk> _sendOpenAIImagesStream(
   Map<String, dynamic>? extraBody,
 }) async* {
   final input = await _openAIImagesInput(messages, userImagePaths);
+  final outputMime = _openAIImagesOutputMime(config, modelId, extraBody);
+  final upstreamModelId = _apiModelId(config, modelId);
+  if (input.imageRefs.isNotEmpty &&
+      !_supportsOpenAIImageEdits(upstreamModelId)) {
+    throw UnsupportedError(
+      'OpenAI Images API model $upstreamModelId does not support image edits with input images.',
+    );
+  }
   final response = input.imageRefs.isEmpty
       ? await _sendOpenAIImageGeneration(
           client,
@@ -42,7 +63,10 @@ Stream<ChatStreamChunk> _sendOpenAIImagesStream(
           extraHeaders: extraHeaders,
           extraBody: extraBody,
         );
-  final markdown = await _openAIImagesResponseToMarkdown(response);
+  final markdown = await _openAIImagesResponseToMarkdown(
+    response,
+    outputMime: outputMime,
+  );
   final usage = _openAIImagesUsage(response);
   yield ChatStreamChunk(
     content: markdown,
@@ -190,8 +214,16 @@ Future<_OpenAIImagesInput> _openAIImagesInput(
 
   for (int i = messages.length - 1; i >= 0; i--) {
     if ((messages[i]['role'] ?? '').toString() != 'user') continue;
+    final content = messages[i]['content'];
+    if (content is List) {
+      final structuredImages = _extractOpenAIImageRefs(content);
+      if (structuredImages.isNotEmpty) {
+        return _OpenAIImagesInput(prompt: prompt, imageRefs: structuredImages);
+      }
+    }
+
     final parsed = await _parseTextAndImages(
-      (messages[i]['content'] ?? '').toString(),
+      (content ?? '').toString(),
       allowRemoteImages: true,
       allowLocalImages: true,
       keepRemoteMarkdownText: false,
@@ -232,14 +264,10 @@ List<_ImageRef> _extractOpenAIImageRefs(dynamic content) {
       if (part is! Map) continue;
       final type = (part['type'] ?? '').toString();
       if (type == 'image_url') {
-        final imageUrl = part['image_url'];
-        final source = imageUrl is Map
-            ? (imageUrl['url'] ?? '').toString().trim()
-            : imageUrl.toString().trim();
-        if (source.isNotEmpty) refs.add(_imageRefFromSource(source));
-      } else if (type == 'input_image') {
-        final source = (part['image_url'] ?? '').toString().trim();
-        if (source.isNotEmpty) refs.add(_imageRefFromSource(source));
+        _addOpenAIStructuredImageRefs(refs, part['image_url']);
+      } else if (type == 'input_image' || type == 'image') {
+        _addOpenAIStructuredImageRefs(refs, part['image_url']);
+        _addOpenAIStructuredImageRefs(refs, part['input_image']);
       }
     }
     return refs;
@@ -259,6 +287,55 @@ List<_ImageRef> _extractOpenAIImageRefs(dynamic content) {
     if (source.isNotEmpty) refs.add(_imageRefFromSource(source));
   }
   return refs;
+}
+
+void _addOpenAIStructuredImageRefs(List<_ImageRef> refs, dynamic value) {
+  if (value == null) return;
+  if (value is List) {
+    for (final item in value) {
+      _addOpenAIStructuredImageRefs(refs, item);
+    }
+    return;
+  }
+  if (value is Map) {
+    _addOpenAIStructuredImageRefs(refs, value['url'] ?? value['image_url']);
+    final data = value['data'];
+    if (data != null) {
+      final type = (value['type'] ?? '').toString().trim().toLowerCase();
+      final mime = (value['mime_type'] ?? value['media_type'] ?? 'image/png')
+          .toString()
+          .trim();
+      _addOpenAIStructuredImageData(
+        refs,
+        data,
+        isBase64: type == 'base64',
+        mime: mime.isEmpty ? 'image/png' : mime,
+      );
+    }
+    return;
+  }
+  final source = value.toString().trim();
+  if (source.isNotEmpty) refs.add(_imageRefFromSource(source));
+}
+
+void _addOpenAIStructuredImageData(
+  List<_ImageRef> refs,
+  dynamic data, {
+  required bool isBase64,
+  required String mime,
+}) {
+  if (data is List) {
+    for (final item in data) {
+      _addOpenAIStructuredImageData(refs, item, isBase64: isBase64, mime: mime);
+    }
+    return;
+  }
+  var source = data.toString().trim();
+  if (source.isEmpty) return;
+  if (isBase64 && !source.startsWith('data:')) {
+    source = 'data:$mime;base64,$source';
+  }
+  refs.add(_imageRefFromSource(source));
 }
 
 _ImageRef _imageRefFromSource(String source) {
@@ -346,6 +423,30 @@ void _applyOpenAIImagesExtraBody(
   }
 }
 
+String _openAIImagesOutputMime(
+  ProviderConfig config,
+  String modelId,
+  Map<String, dynamic>? extraBody,
+) {
+  final body = <String, dynamic>{};
+  _applyOpenAIImagesExtraBody(body, config, modelId, extraBody);
+  final format = (body['output_format'] ?? '').toString().trim().toLowerCase();
+  switch (format) {
+    case '':
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'webp':
+      return 'image/webp';
+    default:
+      throw FormatException(
+        'OpenAI Images API output_format must be png, jpeg, or webp; got $format.',
+      );
+  }
+}
+
 Map<String, dynamic> _decodeOpenAIImagesResponse(http.Response response) {
   if (response.statusCode < 200 || response.statusCode >= 300) {
     throw HttpException('HTTP ${response.statusCode}: ${response.body}');
@@ -360,8 +461,9 @@ Map<String, dynamic> _decodeOpenAIImagesResponse(http.Response response) {
 }
 
 Future<String> _openAIImagesResponseToMarkdown(
-  Map<String, dynamic> response,
-) async {
+  Map<String, dynamic> response, {
+  required String outputMime,
+}) async {
   final data = response['data'];
   if (data is! List || data.isEmpty) return '';
   final lines = <String>[];
@@ -374,7 +476,12 @@ Future<String> _openAIImagesResponseToMarkdown(
     }
     final b64 = (item['b64_json'] ?? '').toString().trim();
     if (b64.isEmpty) continue;
-    final path = await AppDirectories.saveBase64Image('image/png', b64);
+    final path = await AppDirectories.saveBase64Image(outputMime, b64);
+    if (path == null || path.isEmpty) {
+      throw const FileSystemException(
+        'Failed to save OpenAI Images API base64 image.',
+      );
+    }
     lines.add('![image]($path)');
   }
   return lines.join('\n\n');
