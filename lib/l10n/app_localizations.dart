@@ -3101,6 +3101,72 @@ abstract class AppLocalizations {
   /// **'No messages to compress'**
   String get compressContextNoMessages;
 
+  /// No description provided for @compressContextNoConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'No conversation to compress'**
+  String get compressContextNoConversation;
+
+  /// No description provided for @compressContextNoModel.
+  ///
+  /// In en, this message translates to:
+  /// **'No compression model configured'**
+  String get compressContextNoModel;
+
+  /// No description provided for @compressContextEmptySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Compression returned an empty summary'**
+  String get compressContextEmptySummary;
+
+  /// No description provided for @compressContextOptionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Compress Context'**
+  String get compressContextOptionsTitle;
+
+  /// No description provided for @compressContextOptionsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which part of the current chat is sent to the compression model.'**
+  String get compressContextOptionsDesc;
+
+  /// No description provided for @compressContextKeepStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get compressContextKeepStart;
+
+  /// No description provided for @compressContextKeepRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get compressContextKeepRecent;
+
+  /// No description provided for @compressContextUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited'**
+  String get compressContextUnlimited;
+
+  /// No description provided for @compressContextMaxCharsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Characters'**
+  String get compressContextMaxCharsLabel;
+
+  /// No description provided for @compressContextInvalidLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a positive character count'**
+  String get compressContextInvalidLimit;
+
+  /// No description provided for @compressContextStartButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Compress'**
+  String get compressContextStartButton;
+
   /// No description provided for @bottomToolsSheetLearningMode.
   ///
   /// In en, this message translates to:

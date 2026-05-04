@@ -1591,6 +1591,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get compressContextNoMessages => 'No messages to compress';
 
   @override
+  String get compressContextNoConversation => 'No conversation to compress';
+
+  @override
+  String get compressContextNoModel => 'No compression model configured';
+
+  @override
+  String get compressContextEmptySummary =>
+      'Compression returned an empty summary';
+
+  @override
+  String get compressContextOptionsTitle => 'Compress Context';
+
+  @override
+  String get compressContextOptionsDesc =>
+      'Choose which part of the current chat is sent to the compression model.';
+
+  @override
+  String get compressContextKeepStart => 'Start';
+
+  @override
+  String get compressContextKeepRecent => 'Recent';
+
+  @override
+  String get compressContextUnlimited => 'Unlimited';
+
+  @override
+  String get compressContextMaxCharsLabel => 'Characters';
+
+  @override
+  String get compressContextInvalidLimit => 'Enter a positive character count';
+
+  @override
+  String get compressContextStartButton => 'Compress';
+
+  @override
   String get bottomToolsSheetLearningMode => 'Learning Mode';
 
   @override

@@ -1553,6 +1553,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String get compressContextNoMessages => '没有可压缩的消息';
 
   @override
+  String get compressContextNoConversation => '没有可压缩的会话';
+
+  @override
+  String get compressContextNoModel => '未配置压缩模型';
+
+  @override
+  String get compressContextEmptySummary => '压缩返回了空摘要';
+
+  @override
+  String get compressContextOptionsTitle => '压缩上下文';
+
+  @override
+  String get compressContextOptionsDesc => '选择发送给压缩模型的当前聊天范围。';
+
+  @override
+  String get compressContextKeepStart => '最开始';
+
+  @override
+  String get compressContextKeepRecent => '最近';
+
+  @override
+  String get compressContextUnlimited => '无限制';
+
+  @override
+  String get compressContextMaxCharsLabel => '字符数';
+
+  @override
+  String get compressContextInvalidLimit => '请输入大于 0 的字符数';
+
+  @override
+  String get compressContextStartButton => '开始压缩';
+
+  @override
   String get bottomToolsSheetLearningMode => '学习模式';
 
   @override
@@ -6068,6 +6101,39 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get compressContextNoMessages => '没有可压缩的消息';
 
   @override
+  String get compressContextNoConversation => '没有可压缩的会话';
+
+  @override
+  String get compressContextNoModel => '未配置压缩模型';
+
+  @override
+  String get compressContextEmptySummary => '压缩返回了空摘要';
+
+  @override
+  String get compressContextOptionsTitle => '压缩上下文';
+
+  @override
+  String get compressContextOptionsDesc => '选择发送给压缩模型的当前聊天范围。';
+
+  @override
+  String get compressContextKeepStart => '最开始';
+
+  @override
+  String get compressContextKeepRecent => '最近';
+
+  @override
+  String get compressContextUnlimited => '无限制';
+
+  @override
+  String get compressContextMaxCharsLabel => '字符数';
+
+  @override
+  String get compressContextInvalidLimit => '请输入大于 0 的字符数';
+
+  @override
+  String get compressContextStartButton => '开始压缩';
+
+  @override
   String get bottomToolsSheetLearningMode => '学习模式';
 
   @override
@@ -10580,6 +10646,39 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get compressContextNoMessages => '沒有可壓縮的訊息';
+
+  @override
+  String get compressContextNoConversation => '沒有可壓縮的對話';
+
+  @override
+  String get compressContextNoModel => '未設定壓縮模型';
+
+  @override
+  String get compressContextEmptySummary => '壓縮返回了空摘要';
+
+  @override
+  String get compressContextOptionsTitle => '壓縮上下文';
+
+  @override
+  String get compressContextOptionsDesc => '選擇要傳送給壓縮模型的目前聊天範圍。';
+
+  @override
+  String get compressContextKeepStart => '最開始';
+
+  @override
+  String get compressContextKeepRecent => '最近';
+
+  @override
+  String get compressContextUnlimited => '無限制';
+
+  @override
+  String get compressContextMaxCharsLabel => '字元數';
+
+  @override
+  String get compressContextInvalidLimit => '請輸入大於 0 的字元數';
+
+  @override
+  String get compressContextStartButton => '開始壓縮';
 
   @override
   String get bottomToolsSheetLearningMode => '學習模式';

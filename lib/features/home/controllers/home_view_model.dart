@@ -18,6 +18,33 @@ import 'chat_controller.dart';
 import 'generation_controller.dart';
 import 'stream_controller.dart' as stream_ctrl;
 
+enum CompressContextLimitMode { start, recent, unlimited }
+
+class CompressContextOptions {
+  const CompressContextOptions({required this.mode, this.maxChars});
+
+  static const int defaultMaxChars = 6000;
+
+  final CompressContextLimitMode mode;
+  final int? maxChars;
+}
+
+String buildCompressContextContent(
+  String joined,
+  CompressContextOptions options,
+) {
+  if (options.mode == CompressContextLimitMode.unlimited) return joined;
+  final maxChars = options.maxChars ?? CompressContextOptions.defaultMaxChars;
+  if (maxChars <= 0 || joined.length <= maxChars) return joined;
+  return switch (options.mode) {
+    CompressContextLimitMode.start => joined.substring(0, maxChars),
+    CompressContextLimitMode.recent => joined.substring(
+      joined.length - maxChars,
+    ),
+    CompressContextLimitMode.unlimited => joined,
+  };
+}
+
 /// ViewModel for the home page, combining actions + services.
 ///
 /// This ViewModel:
@@ -633,7 +660,9 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Compress context: summarize messages via LLM, create new conversation with summary.
   /// Returns null on success, or an error key string on failure.
-  Future<String?> compressContext() async {
+  Future<String?> compressContext({
+    required CompressContextOptions options,
+  }) async {
     final convo = currentConversation;
     if (convo == null) return 'no_conversation';
 
@@ -652,8 +681,7 @@ class HomeViewModel extends ChangeNotifier {
         .join('\n\n');
     if (joined.trim().isEmpty) return 'no_messages';
 
-    // Truncate to reasonable length
-    final content = joined.length > 6000 ? joined.substring(0, 6000) : joined;
+    final content = buildCompressContextContent(joined, options);
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
 
     // Resolve model: compress model → summary model → title model → assistant model → global default
