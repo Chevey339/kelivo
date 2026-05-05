@@ -324,6 +324,19 @@
   "assistantEditPageQuickPhraseTab": "Quick Phrase",
   "assistantEditPageCustomTab": "Custom",
   "assistantEditPageRegexTab": "Regex Replace",
+  "assistantEditTabLayoutTooltip": "Customize tabs",
+  "assistantEditTabLayoutTitle": "Customize tabs",
+  "assistantEditTabLayoutSubtitle": "Drag tabs to reorder. Turn off tabs you do not need.",
+  "assistantEditTabLayoutResetTooltip": "Reset tab layout",
+  "assistantEditTabLayoutAtLeastOneVisible": "Keep at least one tab visible",
+  "assistantEditTabLayoutDragHandle": "Drag to reorder {tab}",
+  "@assistantEditTabLayoutDragHandle": {
+    "placeholders": {
+      "tab": {
+        "type": "String"
+      }
+    }
+  },
   "assistantEditRegexDescription": "Create regex rules to rewrite or visually adjust user/assistant messages.",
   "assistantEditAddRegexButton": "Add Regex Rule",
   "assistantRegexAddTitle": "Add Regex Rule",

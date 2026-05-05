@@ -663,6 +663,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditPageRegexTab => '正则替换';
 
   @override
+  String get assistantEditTabLayoutTooltip => '自定义标签页';
+
+  @override
+  String get assistantEditTabLayoutTitle => '自定义标签页';
+
+  @override
+  String get assistantEditTabLayoutSubtitle => '拖动标签页调整顺序，关闭暂时用不到的标签页。';
+
+  @override
+  String get assistantEditTabLayoutResetTooltip => '重置标签页布局';
+
+  @override
+  String get assistantEditTabLayoutAtLeastOneVisible => '至少保留一个可见标签页';
+
+  @override
+  String assistantEditTabLayoutDragHandle(String tab) {
+    return '拖动以调整 $tab 的顺序';
+  }
+
+  @override
   String get assistantEditRegexDescription => '为用户/助手消息配置正则规则，可修改或仅调整显示效果。';
 
   @override
@@ -5211,6 +5231,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditPageRegexTab => '正则替换';
 
   @override
+  String get assistantEditTabLayoutTooltip => '自定义标签页';
+
+  @override
+  String get assistantEditTabLayoutTitle => '自定义标签页';
+
+  @override
+  String get assistantEditTabLayoutSubtitle => '拖动标签页调整顺序，关闭暂时用不到的标签页。';
+
+  @override
+  String get assistantEditTabLayoutResetTooltip => '重置标签页布局';
+
+  @override
+  String get assistantEditTabLayoutAtLeastOneVisible => '至少保留一个可见标签页';
+
+  @override
+  String assistantEditTabLayoutDragHandle(String tab) {
+    return '拖动以调整 $tab 的顺序';
+  }
+
+  @override
   String get assistantEditRegexDescription => '为用户/助手消息配置正则规则，可修改或仅调整显示效果。';
 
   @override
@@ -9757,6 +9797,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditPageRegexTab => '正則替換';
+
+  @override
+  String get assistantEditTabLayoutTooltip => '自訂標籤頁';
+
+  @override
+  String get assistantEditTabLayoutTitle => '自訂標籤頁';
+
+  @override
+  String get assistantEditTabLayoutSubtitle => '拖動標籤頁調整順序，關閉暫時用不到的標籤頁。';
+
+  @override
+  String get assistantEditTabLayoutResetTooltip => '重設標籤頁佈局';
+
+  @override
+  String get assistantEditTabLayoutAtLeastOneVisible => '至少保留一個可見標籤頁';
+
+  @override
+  String assistantEditTabLayoutDragHandle(String tab) {
+    return '拖動以調整 $tab 的順序';
+  }
 
   @override
   String get assistantEditRegexDescription => '為使用者/助理訊息配置正則規則，可修改或僅調整顯示效果。';

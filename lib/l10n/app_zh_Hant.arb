@@ -148,6 +148,19 @@
   "assistantEditPageMcpTab": "MCP",
   "assistantEditPageCustomTab": "自訂請求",
   "assistantEditPageRegexTab": "正則替換",
+  "assistantEditTabLayoutTooltip": "自訂標籤頁",
+  "assistantEditTabLayoutTitle": "自訂標籤頁",
+  "assistantEditTabLayoutSubtitle": "拖動標籤頁調整順序，關閉暫時用不到的標籤頁。",
+  "assistantEditTabLayoutResetTooltip": "重設標籤頁佈局",
+  "assistantEditTabLayoutAtLeastOneVisible": "至少保留一個可見標籤頁",
+  "assistantEditTabLayoutDragHandle": "拖動以調整 {tab} 的順序",
+  "@assistantEditTabLayoutDragHandle": {
+    "placeholders": {
+      "tab": {
+        "type": "String"
+      }
+    }
+  },
   "assistantEditRegexDescription": "為使用者/助理訊息配置正則規則，可修改或僅調整顯示效果。",
   "assistantEditAddRegexButton": "新增正則規則",
   "assistantRegexAddTitle": "新增正則規則",

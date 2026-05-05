@@ -144,6 +144,19 @@
   "assistantEditPageQuickPhraseTab": "快捷短语",
   "assistantEditPageCustomTab": "自定义请求",
   "assistantEditPageRegexTab": "正则替换",
+  "assistantEditTabLayoutTooltip": "自定义标签页",
+  "assistantEditTabLayoutTitle": "自定义标签页",
+  "assistantEditTabLayoutSubtitle": "拖动标签页调整顺序，关闭暂时用不到的标签页。",
+  "assistantEditTabLayoutResetTooltip": "重置标签页布局",
+  "assistantEditTabLayoutAtLeastOneVisible": "至少保留一个可见标签页",
+  "assistantEditTabLayoutDragHandle": "拖动以调整 {tab} 的顺序",
+  "@assistantEditTabLayoutDragHandle": {
+    "placeholders": {
+      "tab": {
+        "type": "String"
+      }
+    }
+  },
   "assistantEditRegexDescription": "为用户/助手消息配置正则规则，可修改或仅调整显示效果。",
   "assistantEditAddRegexButton": "添加正则规则",
   "assistantRegexAddTitle": "添加正则规则",

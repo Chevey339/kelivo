@@ -673,6 +673,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditPageRegexTab => 'Regex Replace';
 
   @override
+  String get assistantEditTabLayoutTooltip => 'Customize tabs';
+
+  @override
+  String get assistantEditTabLayoutTitle => 'Customize tabs';
+
+  @override
+  String get assistantEditTabLayoutSubtitle =>
+      'Drag tabs to reorder. Turn off tabs you do not need.';
+
+  @override
+  String get assistantEditTabLayoutResetTooltip => 'Reset tab layout';
+
+  @override
+  String get assistantEditTabLayoutAtLeastOneVisible =>
+      'Keep at least one tab visible';
+
+  @override
+  String assistantEditTabLayoutDragHandle(String tab) {
+    return 'Drag to reorder $tab';
+  }
+
+  @override
   String get assistantEditRegexDescription =>
       'Create regex rules to rewrite or visually adjust user/assistant messages.';
 

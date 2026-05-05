@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:collection';
 import 'dart:io';
 import 'package:socks5_proxy/socks_client.dart' as socks;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -180,6 +181,10 @@ class SettingsProvider extends ChangeNotifier {
       'display_use_pure_background_v1';
   static const String _displayChatMessageBackgroundStyleKey =
       'display_chat_message_background_style_v1';
+  static const String _mobileAssistantEditTabOrderKey =
+      'mobile_assistant_edit_tab_order_v1';
+  static const String _mobileAssistantEditTabHiddenKey =
+      'mobile_assistant_edit_tab_hidden_v1';
   // Network request logging (debug)
   static const String _requestLogEnabledKey = 'request_log_enabled_v1';
   // Flutter runtime logging (debug)
@@ -925,6 +930,12 @@ class SettingsProvider extends ChangeNotifier {
       default:
         _chatMessageBackgroundStyle = ChatMessageBackgroundStyle.defaultStyle;
     }
+    _mobileAssistantEditTabOrder = List.unmodifiable(
+      prefs.getStringList(_mobileAssistantEditTabOrderKey) ?? const <String>[],
+    );
+    _hiddenMobileAssistantEditTabs = Set.unmodifiable(
+      prefs.getStringList(_mobileAssistantEditTabHiddenKey) ?? const <String>[],
+    );
     // desktop UI
     _desktopSidebarWidth = prefs.getDouble(_desktopSidebarWidthKey) ?? 300;
     _desktopSidebarOpen = prefs.getBool(_desktopSidebarOpenKey) ?? true;
@@ -1948,6 +1959,30 @@ class SettingsProvider extends ChangeNotifier {
       ChatMessageBackgroundStyle.defaultStyle => 'default',
     };
     await prefs.setString(_displayChatMessageBackgroundStyleKey, v);
+  }
+
+  List<String> _mobileAssistantEditTabOrder = const <String>[];
+  List<String> get mobileAssistantEditTabOrder => _mobileAssistantEditTabOrder;
+  Future<void> setMobileAssistantEditTabOrder(List<String> order) async {
+    final next = List<String>.unmodifiable(LinkedHashSet<String>.from(order));
+    if (listEquals(_mobileAssistantEditTabOrder, next)) return;
+    _mobileAssistantEditTabOrder = next;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_mobileAssistantEditTabOrderKey, next);
+  }
+
+  Set<String> _hiddenMobileAssistantEditTabs = const <String>{};
+  Set<String> get hiddenMobileAssistantEditTabs =>
+      _hiddenMobileAssistantEditTabs;
+  Future<void> setHiddenMobileAssistantEditTabs(Set<String> hidden) async {
+    final sorted = hidden.toList()..sort();
+    final next = Set<String>.unmodifiable(sorted);
+    if (setEquals(_hiddenMobileAssistantEditTabs, next)) return;
+    _hiddenMobileAssistantEditTabs = next;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_mobileAssistantEditTabHiddenKey, sorted);
   }
 
   // ===== Android background chat generation =====

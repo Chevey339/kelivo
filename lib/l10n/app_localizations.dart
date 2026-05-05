@@ -1343,6 +1343,42 @@ abstract class AppLocalizations {
   /// **'Regex Replace'**
   String get assistantEditPageRegexTab;
 
+  /// No description provided for @assistantEditTabLayoutTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize tabs'**
+  String get assistantEditTabLayoutTooltip;
+
+  /// No description provided for @assistantEditTabLayoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize tabs'**
+  String get assistantEditTabLayoutTitle;
+
+  /// No description provided for @assistantEditTabLayoutSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag tabs to reorder. Turn off tabs you do not need.'**
+  String get assistantEditTabLayoutSubtitle;
+
+  /// No description provided for @assistantEditTabLayoutResetTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset tab layout'**
+  String get assistantEditTabLayoutResetTooltip;
+
+  /// No description provided for @assistantEditTabLayoutAtLeastOneVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep at least one tab visible'**
+  String get assistantEditTabLayoutAtLeastOneVisible;
+
+  /// No description provided for @assistantEditTabLayoutDragHandle.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder {tab}'**
+  String assistantEditTabLayoutDragHandle(String tab);
+
   /// No description provided for @assistantEditRegexDescription.
   ///
   /// In en, this message translates to:
