@@ -469,71 +469,98 @@ Future<int?> showBackupReminderCustomDaysDialog(
   BuildContext context, {
   required int initialDays,
 }) {
-  final l10n = AppLocalizations.of(context)!;
-  final formKey = GlobalKey<FormState>();
-  final controller = TextEditingController(text: initialDays.toString());
-
   return showDialog<int>(
     context: context,
-    builder: (ctx) {
-      final cs = Theme.of(ctx).colorScheme;
-      return AlertDialog(
-        title: Text(l10n.backupReminderCustomDialogTitle),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l10n.backupReminderCustomDialogDescription),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: controller,
-                autofocus: true,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(
-                  labelText: l10n.backupReminderCustomDaysLabel,
-                  filled: true,
-                  fillColor: Theme.of(ctx).brightness == Brightness.dark
-                      ? Colors.white10
-                      : const Color(0xFFF2F3F5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: cs.outlineVariant.withValues(alpha: 0.2),
-                    ),
+    builder: (_) => _BackupReminderCustomDaysDialog(initialDays: initialDays),
+  );
+}
+
+class _BackupReminderCustomDaysDialog extends StatefulWidget {
+  const _BackupReminderCustomDaysDialog({required this.initialDays});
+
+  final int initialDays;
+
+  @override
+  State<_BackupReminderCustomDaysDialog> createState() =>
+      _BackupReminderCustomDaysDialogState();
+}
+
+class _BackupReminderCustomDaysDialogState
+    extends State<_BackupReminderCustomDaysDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialDays.toString());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() != true) return;
+    Navigator.of(context).pop(int.parse(_controller.text));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+
+    return AlertDialog(
+      title: Text(l10n.backupReminderCustomDialogTitle),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.backupReminderCustomDialogDescription),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _controller,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                labelText: l10n.backupReminderCustomDaysLabel,
+                filled: true,
+                fillColor: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white10
+                    : const Color(0xFFF2F3F5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: cs.outlineVariant.withValues(alpha: 0.2),
                   ),
                 ),
-                validator: (value) {
-                  final days = int.tryParse(value ?? '');
-                  if (days == null || days < 1 || days > 365) {
-                    return l10n.backupReminderCustomDaysInvalid;
-                  }
-                  return null;
-                },
-                onFieldSubmitted: (_) {
-                  if (formKey.currentState?.validate() != true) return;
-                  Navigator.of(ctx).pop(int.parse(controller.text));
-                },
               ),
-            ],
-          ),
+              validator: (value) {
+                final days = int.tryParse(value ?? '');
+                if (days == null || days < 1 || days > 365) {
+                  return l10n.backupReminderCustomDaysInvalid;
+                }
+                return null;
+              },
+              onFieldSubmitted: (_) {
+                _submit();
+              },
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(l10n.backupPageCancel),
-          ),
-          TextButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() != true) return;
-              Navigator.of(ctx).pop(int.parse(controller.text));
-            },
-            child: Text(l10n.backupPageOK),
-          ),
-        ],
-      );
-    },
-  ).whenComplete(controller.dispose);
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.backupPageCancel),
+        ),
+        TextButton(onPressed: _submit, child: Text(l10n.backupPageOK)),
+      ],
+    );
+  }
 }

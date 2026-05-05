@@ -102,6 +102,51 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     }
   });
+
+  testWidgets('custom days dialog can be cancelled without controller errors', (
+    tester,
+  ) async {
+    int? selectedDays;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) {
+            return Scaffold(
+              body: Center(
+                child: TextButton(
+                  onPressed: () async {
+                    selectedDays = await showBackupReminderCustomDaysDialog(
+                      context,
+                      initialDays: 7,
+                    );
+                  },
+                  child: const Text('open custom'),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('open custom'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Custom Frequency'), findsOneWidget);
+    expect(find.byType(TextFormField), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpAndSettle();
+    expect(selectedDays, isNull);
+  });
 }
 
 void _expectAllPickersLooping(WidgetTester tester) {
