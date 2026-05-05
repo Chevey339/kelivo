@@ -27,6 +27,7 @@ import '../../../core/models/conversation.dart';
 import '../../../core/models/preset_message.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -49,6 +50,7 @@ import 'assistant_regex_tab.dart';
 part 'assistant_settings_edit_basic_tab.dart';
 part 'assistant_settings_edit_prompt_tab.dart';
 part 'assistant_settings_edit_memory_tab.dart';
+part 'assistant_settings_edit_mcp_tab.dart';
 part 'assistant_settings_edit_quick_phrase_tab.dart';
 part 'assistant_settings_edit_custom_request_tab.dart';
 
@@ -153,7 +155,7 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this); //mcp
+    _tabController = TabController(length: 7, vsync: this);
     _tabController.addListener(() {
       // Close IME when switching tabs and refresh state
       FocusManager.instance.primaryFocus?.unfocus();
@@ -223,7 +225,7 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
                       l10n.assistantEditPageBasicTab,
                       l10n.assistantEditPagePromptsTab,
                       l10n.assistantEditPageMemoryTab,
-                      // l10n.assistantEditPageMcpTab,
+                      l10n.assistantEditPageMcpTab,
                       l10n.assistantEditPageQuickPhraseTab,
                       l10n.assistantEditPageCustomTab,
                       l10n.assistantEditPageRegexTab,
@@ -244,7 +246,7 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
             _BasicSettingsTab(assistantId: assistant.id),
             _PromptTab(assistantId: assistant.id),
             _MemoryTab(assistantId: assistant.id),
-            // _McpTab(assistantId: assistant.id),
+            _McpTab(assistantId: assistant.id),
             _QuickPhraseTab(assistantId: assistant.id),
             _CustomRequestTab(assistantId: assistant.id),
             AssistantRegexTab(assistantId: assistant.id),
@@ -878,7 +880,7 @@ class _IosButtonState extends State<_IosButton> {
 
 // ===== Desktop Assistant Dialog (reuses mobile tabs) =====
 
-enum _AssistantDesktopMenu { basic, prompts, memory, quick, custom, regex }
+enum _AssistantDesktopMenu { basic, prompts, memory, mcp, quick, custom, regex }
 
 Future<void> showAssistantDesktopDialog(
   BuildContext context, {
@@ -983,6 +985,8 @@ class _DesktopAssistantDialogShellState
                         return _PromptTab(assistantId: widget.assistantId);
                       case _AssistantDesktopMenu.memory:
                         return _MemoryTab(assistantId: widget.assistantId);
+                      case _AssistantDesktopMenu.mcp:
+                        return _McpTab(assistantId: widget.assistantId);
                       case _AssistantDesktopMenu.quick:
                         return _QuickPhraseTab(assistantId: widget.assistantId);
                       case _AssistantDesktopMenu.custom:
@@ -1024,6 +1028,7 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
       (_AssistantDesktopMenu.basic, l10n.assistantEditPageBasicTab),
       (_AssistantDesktopMenu.prompts, l10n.assistantEditPagePromptsTab),
       (_AssistantDesktopMenu.memory, l10n.assistantEditPageMemoryTab),
+      (_AssistantDesktopMenu.mcp, l10n.assistantEditPageMcpTab),
       (_AssistantDesktopMenu.quick, l10n.assistantEditPageQuickPhraseTab),
       (_AssistantDesktopMenu.custom, l10n.assistantEditPageCustomTab),
       (_AssistantDesktopMenu.regex, l10n.assistantEditPageRegexTab),
