@@ -83,7 +83,7 @@ class S3BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> backup() async {
+  Future<bool> backup() async {
     _busy = true;
     _message = null;
     notifyListeners();
@@ -94,8 +94,10 @@ class S3BackupProvider extends ChangeNotifier {
       // Use file-stream upload to avoid loading entire ZIP into memory.
       await _client.uploadFile(_cfg, key: key, file: file);
       _message = 'Backup uploaded';
+      return true;
     } catch (e) {
       _message = e.toString();
+      return false;
     } finally {
       _busy = false;
       notifyListeners();

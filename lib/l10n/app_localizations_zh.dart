@@ -1482,6 +1482,86 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageImportFromChatbox => '从 Chatbox 导入';
 
   @override
+  String get backupReminderSectionTitle => '备份提醒';
+
+  @override
+  String get backupReminderEnableTitle => '定期提醒我备份';
+
+  @override
+  String get backupReminderFrequencyTitle => '提醒频率';
+
+  @override
+  String get backupReminderTimeTitle => '提醒时间';
+
+  @override
+  String get backupReminderTimeInputHint => 'HH:mm';
+
+  @override
+  String get backupReminderTimeInvalid => '请输入 00:00 到 23:59 之间的时间。';
+
+  @override
+  String get backupReminderLastBackupTitle => '上次备份';
+
+  @override
+  String get backupReminderNextReminderTitle => '下次提醒';
+
+  @override
+  String get backupReminderNever => '从未';
+
+  @override
+  String get backupReminderDisabled => '关闭';
+
+  @override
+  String get backupReminderDueNow => '现在已到期';
+
+  @override
+  String get backupReminderEveryDay => '每天';
+
+  @override
+  String get backupReminderEveryThreeDays => '每 3 天';
+
+  @override
+  String get backupReminderEveryWeek => '每周';
+
+  @override
+  String get backupReminderEveryFourteenDays => '每 14 天';
+
+  @override
+  String get backupReminderEveryMonth => '每月';
+
+  @override
+  String backupReminderCustomDays(int days) {
+    return '每 $days 天';
+  }
+
+  @override
+  String get backupReminderCustomOption => '自定义...';
+
+  @override
+  String get backupReminderCustomDialogTitle => '自定义频率';
+
+  @override
+  String get backupReminderCustomDialogDescription => '输入两次备份提醒之间间隔多少天。';
+
+  @override
+  String get backupReminderCustomDaysLabel => '天数';
+
+  @override
+  String get backupReminderCustomDaysInvalid => '请输入 1 到 365 之间的数字。';
+
+  @override
+  String get backupReminderSidebarTitle => '备份提醒';
+
+  @override
+  String get backupReminderSidebarSubtitle => '已经到你设定的备份周期了。';
+
+  @override
+  String get backupReminderSidebarAction => '去备份';
+
+  @override
+  String get backupReminderSnoozeTooltip => '稍后提醒';
+
+  @override
   String get chatHistoryPageTitle => '聊天历史';
 
   @override
@@ -6053,6 +6133,86 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageImportFromChatbox => '从 Chatbox 导入';
 
   @override
+  String get backupReminderSectionTitle => '备份提醒';
+
+  @override
+  String get backupReminderEnableTitle => '定期提醒我备份';
+
+  @override
+  String get backupReminderFrequencyTitle => '提醒频率';
+
+  @override
+  String get backupReminderTimeTitle => '提醒时间';
+
+  @override
+  String get backupReminderTimeInputHint => 'HH:mm';
+
+  @override
+  String get backupReminderTimeInvalid => '请输入 00:00 到 23:59 之间的时间。';
+
+  @override
+  String get backupReminderLastBackupTitle => '上次备份';
+
+  @override
+  String get backupReminderNextReminderTitle => '下次提醒';
+
+  @override
+  String get backupReminderNever => '从未';
+
+  @override
+  String get backupReminderDisabled => '关闭';
+
+  @override
+  String get backupReminderDueNow => '现在已到期';
+
+  @override
+  String get backupReminderEveryDay => '每天';
+
+  @override
+  String get backupReminderEveryThreeDays => '每 3 天';
+
+  @override
+  String get backupReminderEveryWeek => '每周';
+
+  @override
+  String get backupReminderEveryFourteenDays => '每 14 天';
+
+  @override
+  String get backupReminderEveryMonth => '每月';
+
+  @override
+  String backupReminderCustomDays(int days) {
+    return '每 $days 天';
+  }
+
+  @override
+  String get backupReminderCustomOption => '自定义...';
+
+  @override
+  String get backupReminderCustomDialogTitle => '自定义频率';
+
+  @override
+  String get backupReminderCustomDialogDescription => '输入两次备份提醒之间间隔多少天。';
+
+  @override
+  String get backupReminderCustomDaysLabel => '天数';
+
+  @override
+  String get backupReminderCustomDaysInvalid => '请输入 1 到 365 之间的数字。';
+
+  @override
+  String get backupReminderSidebarTitle => '备份提醒';
+
+  @override
+  String get backupReminderSidebarSubtitle => '已经到你设定的备份周期了。';
+
+  @override
+  String get backupReminderSidebarAction => '去备份';
+
+  @override
+  String get backupReminderSnoozeTooltip => '稍后提醒';
+
+  @override
   String get chatHistoryPageTitle => '聊天历史';
 
   @override
@@ -10622,6 +10782,86 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromChatbox => '從 Chatbox 匯入';
+
+  @override
+  String get backupReminderSectionTitle => '備份提醒';
+
+  @override
+  String get backupReminderEnableTitle => '定期提醒我備份';
+
+  @override
+  String get backupReminderFrequencyTitle => '提醒頻率';
+
+  @override
+  String get backupReminderTimeTitle => '提醒時間';
+
+  @override
+  String get backupReminderTimeInputHint => 'HH:mm';
+
+  @override
+  String get backupReminderTimeInvalid => '請輸入 00:00 到 23:59 之間的時間。';
+
+  @override
+  String get backupReminderLastBackupTitle => '上次備份';
+
+  @override
+  String get backupReminderNextReminderTitle => '下次提醒';
+
+  @override
+  String get backupReminderNever => '從未';
+
+  @override
+  String get backupReminderDisabled => '關閉';
+
+  @override
+  String get backupReminderDueNow => '現在已到期';
+
+  @override
+  String get backupReminderEveryDay => '每天';
+
+  @override
+  String get backupReminderEveryThreeDays => '每 3 天';
+
+  @override
+  String get backupReminderEveryWeek => '每週';
+
+  @override
+  String get backupReminderEveryFourteenDays => '每 14 天';
+
+  @override
+  String get backupReminderEveryMonth => '每月';
+
+  @override
+  String backupReminderCustomDays(int days) {
+    return '每 $days 天';
+  }
+
+  @override
+  String get backupReminderCustomOption => '自訂...';
+
+  @override
+  String get backupReminderCustomDialogTitle => '自訂頻率';
+
+  @override
+  String get backupReminderCustomDialogDescription => '輸入兩次備份提醒之間間隔多少天。';
+
+  @override
+  String get backupReminderCustomDaysLabel => '天數';
+
+  @override
+  String get backupReminderCustomDaysInvalid => '請輸入 1 到 365 之間的數字。';
+
+  @override
+  String get backupReminderSidebarTitle => '備份提醒';
+
+  @override
+  String get backupReminderSidebarSubtitle => '已經到你設定的備份週期了。';
+
+  @override
+  String get backupReminderSidebarAction => '去備份';
+
+  @override
+  String get backupReminderSnoozeTooltip => '稍後提醒';
 
   @override
   String get chatHistoryPageTitle => '聊天歷史';

@@ -40,6 +40,7 @@ import '../core/models/api_keys.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import 'desktop_context_menu.dart';
+import 'desktop_settings_navigation_bus.dart';
 import '../shared/widgets/snackbar.dart';
 import 'setting/default_model_pane.dart';
 import 'setting/search_services_pane.dart';
@@ -101,6 +102,7 @@ enum _SettingsMenuItem {
 
 class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   _SettingsMenuItem _selected = _SettingsMenuItem.display;
+  StreamSubscription<DesktopSettingsNavigationTarget>? _settingsNavSub;
 
   @override
   void initState() {
@@ -109,6 +111,22 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
       // Deep link into Providers tab when a provider is specified
       _selected = _SettingsMenuItem.providers;
     }
+    _settingsNavSub = DesktopSettingsNavigationBus.instance.stream.listen((
+      target,
+    ) {
+      if (!mounted) return;
+      switch (target) {
+        case DesktopSettingsNavigationTarget.backup:
+          setState(() => _selected = _SettingsMenuItem.backup);
+          break;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _settingsNavSub?.cancel();
+    super.dispose();
   }
 
   @override

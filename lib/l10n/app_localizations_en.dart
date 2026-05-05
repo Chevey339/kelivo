@@ -1521,6 +1521,88 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageImportFromChatbox => 'Import from Chatbox';
 
   @override
+  String get backupReminderSectionTitle => 'Backup Reminder';
+
+  @override
+  String get backupReminderEnableTitle => 'Remind me to back up';
+
+  @override
+  String get backupReminderFrequencyTitle => 'Frequency';
+
+  @override
+  String get backupReminderTimeTitle => 'Reminder Time';
+
+  @override
+  String get backupReminderTimeInputHint => 'HH:mm';
+
+  @override
+  String get backupReminderTimeInvalid => 'Enter a time from 00:00 to 23:59.';
+
+  @override
+  String get backupReminderLastBackupTitle => 'Last Backup';
+
+  @override
+  String get backupReminderNextReminderTitle => 'Next Reminder';
+
+  @override
+  String get backupReminderNever => 'Never';
+
+  @override
+  String get backupReminderDisabled => 'Off';
+
+  @override
+  String get backupReminderDueNow => 'Due now';
+
+  @override
+  String get backupReminderEveryDay => 'Every day';
+
+  @override
+  String get backupReminderEveryThreeDays => 'Every 3 days';
+
+  @override
+  String get backupReminderEveryWeek => 'Every week';
+
+  @override
+  String get backupReminderEveryFourteenDays => 'Every 14 days';
+
+  @override
+  String get backupReminderEveryMonth => 'Every month';
+
+  @override
+  String backupReminderCustomDays(int days) {
+    return 'Every $days days';
+  }
+
+  @override
+  String get backupReminderCustomOption => 'Custom...';
+
+  @override
+  String get backupReminderCustomDialogTitle => 'Custom Frequency';
+
+  @override
+  String get backupReminderCustomDialogDescription =>
+      'Enter how many days to wait between backup reminders.';
+
+  @override
+  String get backupReminderCustomDaysLabel => 'Days';
+
+  @override
+  String get backupReminderCustomDaysInvalid => 'Enter a number from 1 to 365.';
+
+  @override
+  String get backupReminderSidebarTitle => 'Backup reminder';
+
+  @override
+  String get backupReminderSidebarSubtitle =>
+      'Your backup interval has arrived.';
+
+  @override
+  String get backupReminderSidebarAction => 'Go to backup';
+
+  @override
+  String get backupReminderSnoozeTooltip => 'Remind me later';
+
+  @override
   String get chatHistoryPageTitle => 'Chat History';
 
   @override

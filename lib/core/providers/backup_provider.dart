@@ -43,15 +43,17 @@ class BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> backup() async {
+  Future<bool> backup() async {
     _busy = true;
     _message = null;
     notifyListeners();
     try {
       await _dataSync.backupToWebDav(_cfg);
       _message = 'Backup uploaded';
+      return true;
     } catch (e) {
       _message = e.toString();
+      return false;
     } finally {
       _busy = false;
       notifyListeners();

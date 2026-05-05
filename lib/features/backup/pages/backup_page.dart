@@ -12,6 +12,7 @@ import '../../../shared/animations/widgets.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/models/backup.dart';
 import '../../../core/providers/backup_provider.dart';
+import '../../../core/providers/backup_reminder_provider.dart';
 import '../../../core/providers/s3_backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -20,6 +21,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
 import '../../../utils/platform_utils.dart';
+import '../widgets/backup_reminder_helpers.dart';
 
 // File size formatter (B, KB, MB, GB)
 String _fmtBytes(int bytes) {
@@ -308,6 +310,9 @@ class _BackupPageState extends State<BackupPage> {
                     ),
                   ],
                 ),
+
+                header(l10n.backupReminderSectionTitle),
+                const _BackupReminderMobileSection(),
 
                 // Section 2: WebDAV备份
                 header(l10n.backupPageWebDavBackup),
@@ -733,12 +738,18 @@ class _BackupPageState extends State<BackupPage> {
                       onTap: vm.busy
                           ? null
                           : () async {
-                              await _runWithExportingOverlay(
+                              final reminderProvider = context
+                                  .read<BackupReminderProvider>();
+                              final success = await _runWithExportingOverlay(
                                 context,
                                 () => vm.backup(),
                               );
                               if (!context.mounted) return;
                               final rawMessage = vm.message;
+                              if (success) {
+                                await reminderProvider.recordBackupCompleted();
+                                if (!context.mounted) return;
+                              }
                               final message =
                                   rawMessage ?? l10n.backupPageBackupUploaded;
                               showAppSnackBar(
@@ -1157,12 +1168,18 @@ class _BackupPageState extends State<BackupPage> {
                       onTap: s3Vm.busy
                           ? null
                           : () async {
-                              await _runWithExportingOverlay(
+                              final reminderProvider = context
+                                  .read<BackupReminderProvider>();
+                              final success = await _runWithExportingOverlay(
                                 context,
                                 () => s3Vm.backup(),
                               );
                               if (!context.mounted) return;
                               final rawMessage = s3Vm.message;
+                              if (success) {
+                                await reminderProvider.recordBackupCompleted();
+                                if (!context.mounted) return;
+                              }
                               final message =
                                   rawMessage ?? l10n.backupPageBackupUploaded;
                               showAppSnackBar(
@@ -1353,10 +1370,13 @@ class _BackupPageState extends State<BackupPage> {
     final isMobile = Platform.isAndroid || Platform.isIOS;
     if (isMobile) {
       try {
-        await NativeFileSave.saveFileFromPath(
+        final saved = await NativeFileSave.saveFileFromPath(
           sourcePath: file.path,
           fileName: file.uri.pathSegments.last,
         );
+        if (saved && context.mounted) {
+          await context.read<BackupReminderProvider>().recordBackupCompleted();
+        }
       } catch (e) {
         if (!context.mounted) return;
         showAppSnackBar(
@@ -1376,6 +1396,11 @@ class _BackupPageState extends State<BackupPage> {
         try {
           await File(savePath).parent.create(recursive: true);
           await file.copy(savePath);
+          if (context.mounted) {
+            await context
+                .read<BackupReminderProvider>()
+                .recordBackupCompleted();
+          }
         } catch (_) {}
       }
     }
@@ -1450,6 +1475,218 @@ class _BackupPageState extends State<BackupPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) => _S3SettingsSheet(settings: settings, vm: vm, cfg: cfg),
+    );
+  }
+}
+
+class _BackupReminderMobileSection extends StatelessWidget {
+  const _BackupReminderMobileSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final reminder = context.watch<BackupReminderProvider>();
+
+    return _iosSectionCard(
+      children: [
+        _iosSwitchRow(
+          context,
+          icon: Lucide.Timer,
+          label: l10n.backupReminderEnableTitle,
+          value: reminder.enabled,
+          onChanged: (value) async {
+            final provider = context.read<BackupReminderProvider>();
+            if (!value) {
+              await provider.setEnabled(false);
+              return;
+            }
+            final minutes = await showBackupReminderTimePicker(
+              context,
+              initialMinutes: provider.reminderMinutesOfDay,
+            );
+            if (minutes == null) return;
+            await provider.saveSchedule(
+              enabled: true,
+              intervalDays: provider.intervalDays,
+              reminderMinutesOfDay: minutes,
+            );
+          },
+        ),
+        if (reminder.enabled) ...[
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.Repeat,
+            label: l10n.backupReminderFrequencyTitle,
+            detailText: backupReminderFrequencyLabel(
+              l10n,
+              reminder.intervalDays,
+            ),
+            onTap: () => _showBackupReminderFrequencySheet(context),
+          ),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.clock,
+            label: l10n.backupReminderTimeTitle,
+            detailText: backupReminderTimeLabel(
+              context,
+              reminder.reminderMinutesOfDay,
+            ),
+            onTap: () async {
+              final provider = context.read<BackupReminderProvider>();
+              final minutes = await showBackupReminderTimePicker(
+                context,
+                initialMinutes: provider.reminderMinutesOfDay,
+              );
+              if (minutes == null) return;
+              await provider.saveSchedule(
+                enabled: true,
+                intervalDays: provider.intervalDays,
+                reminderMinutesOfDay: minutes,
+              );
+            },
+          ),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.CheckCircle,
+            label: l10n.backupReminderLastBackupTitle,
+            detailText: backupReminderDateTimeLabel(
+              context,
+              reminder.lastBackupAt,
+            ),
+          ),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.Calendar,
+            label: l10n.backupReminderNextReminderTitle,
+            detailText: backupReminderNextLabel(
+              context,
+              reminder.nextReminderAt,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+Future<void> _showBackupReminderFrequencySheet(BuildContext context) async {
+  final l10n = AppLocalizations.of(context)!;
+  final provider = context.read<BackupReminderProvider>();
+  final selected = await showModalBottomSheet<int>(
+    context: context,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) {
+      final options = <int>[
+        ...BackupReminderProvider.presetIntervals,
+        if (!BackupReminderProvider.presetIntervals.contains(
+          provider.intervalDays,
+        ))
+          provider.intervalDays,
+        0,
+      ];
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final days in options)
+                _ReminderFrequencyTile(
+                  label: days == 0
+                      ? l10n.backupReminderCustomOption
+                      : backupReminderFrequencyLabel(l10n, days),
+                  selected: days != 0 && days == provider.intervalDays,
+                  onTap: () => Navigator.of(ctx).pop(days),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+  if (!context.mounted || selected == null) return;
+
+  final days = selected == 0
+      ? await showBackupReminderCustomDaysDialog(
+          context,
+          initialDays: provider.intervalDays,
+        )
+      : selected;
+  if (!context.mounted || days == null) return;
+  final providerAfterDialog = context.read<BackupReminderProvider>();
+  var minutes = providerAfterDialog.reminderMinutesOfDay;
+  minutes ??= await showBackupReminderTimePicker(context);
+  if (!context.mounted || minutes == null) return;
+  await context.read<BackupReminderProvider>().saveSchedule(
+    enabled: true,
+    intervalDays: days,
+    reminderMinutesOfDay: minutes,
+  );
+}
+
+class _ReminderFrequencyTile extends StatefulWidget {
+  const _ReminderFrequencyTile({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_ReminderFrequencyTile> createState() => _ReminderFrequencyTileState();
+}
+
+class _ReminderFrequencyTileState extends State<_ReminderFrequencyTile> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: () {
+        Haptics.soft();
+        widget.onTap();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOutCubic,
+        margin: const EdgeInsets.symmetric(vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: widget.selected
+              ? cs.primary.withValues(alpha: 0.12)
+              : _pressed
+              ? cs.onSurface.withValues(alpha: 0.05)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                widget.label,
+                style: TextStyle(fontSize: 15, color: cs.onSurface),
+              ),
+            ),
+            if (widget.selected)
+              Icon(Lucide.Check, size: 18, color: cs.primary),
+          ],
+        ),
+      ),
     );
   }
 }

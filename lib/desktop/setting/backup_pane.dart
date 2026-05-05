@@ -8,6 +8,7 @@ import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../core/models/backup.dart';
 import '../../core/providers/backup_provider.dart';
+import '../../core/providers/backup_reminder_provider.dart';
 import '../../core/providers/s3_backup_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/chat/chat_service.dart';
@@ -16,6 +17,8 @@ import '../../core/services/backup/chatbox_importer.dart';
 import '../../utils/platform_utils.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/snackbar.dart';
+import '../../features/backup/widgets/backup_reminder_helpers.dart';
+import '../widgets/desktop_select_dropdown.dart';
 
 class DesktopBackupPane extends StatefulWidget {
   const DesktopBackupPane({super.key});
@@ -336,6 +339,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
+              SliverToBoxAdapter(child: _BackupReminderDesktopSection()),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
               // WebDAV settings card with left label right input, realtime save
               SliverToBoxAdapter(
                 child: _sectionCard(
@@ -494,10 +501,18 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                 : () async {
                                     final backupProvider = context
                                         .read<BackupProvider>();
+                                    final reminderProvider = context
+                                        .read<BackupReminderProvider>();
                                     await _saveConfig();
-                                    await backupProvider.backup();
+                                    final success = await backupProvider
+                                        .backup();
                                     if (!context.mounted) return;
                                     final rawMessage = backupProvider.message;
+                                    if (success) {
+                                      await reminderProvider
+                                          .recordBackupCompleted();
+                                      if (!context.mounted) return;
+                                    }
                                     final message =
                                         rawMessage ??
                                         l10n.backupPageBackupUploaded;
@@ -736,10 +751,18 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                 : () async {
                                     final s3BackupProvider = context
                                         .read<S3BackupProvider>();
+                                    final reminderProvider = context
+                                        .read<BackupReminderProvider>();
                                     await _saveS3Config();
-                                    await s3BackupProvider.backup();
+                                    final success = await s3BackupProvider
+                                        .backup();
                                     if (!context.mounted) return;
                                     final rawMessage = s3BackupProvider.message;
+                                    if (success) {
+                                      await reminderProvider
+                                          .recordBackupCompleted();
+                                      if (!context.mounted) return;
+                                    }
                                     final message =
                                         rawMessage ??
                                         l10n.backupPageBackupUploaded;
@@ -803,6 +826,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                   savePath,
                                 ).parent.create(recursive: true);
                                 await file.copy(savePath);
+                                if (context.mounted) {
+                                  await context
+                                      .read<BackupReminderProvider>()
+                                      .recordBackupCompleted();
+                                }
                               } catch (_) {}
                             }
                           },
@@ -995,6 +1023,172 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BackupReminderDesktopSection extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final reminder = context.watch<BackupReminderProvider>();
+
+    return _sectionCard(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            l10n.backupReminderSectionTitle,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ),
+        _ItemRow(
+          label: l10n.backupReminderEnableTitle,
+          vpad: 2,
+          trailing: IosSwitch(
+            value: reminder.enabled,
+            onChanged: (value) async {
+              final provider = context.read<BackupReminderProvider>();
+              if (!value) {
+                await provider.setEnabled(false);
+                return;
+              }
+              final minutes = await showBackupReminderTimePicker(
+                context,
+                initialMinutes: provider.reminderMinutesOfDay,
+              );
+              if (minutes == null) return;
+              await provider.saveSchedule(
+                enabled: true,
+                intervalDays: provider.intervalDays,
+                reminderMinutesOfDay: minutes,
+              );
+            },
+          ),
+        ),
+        if (reminder.enabled) ...[
+          _rowDivider(context),
+          _ItemRow(
+            label: l10n.backupReminderFrequencyTitle,
+            trailing: _FrequencyDropdown(reminder: reminder),
+          ),
+          _rowDivider(context),
+          _ItemRow(
+            label: l10n.backupReminderTimeTitle,
+            trailing: _DeskIosButton(
+              label: backupReminderTimeLabel(
+                context,
+                reminder.reminderMinutesOfDay,
+              ),
+              filled: false,
+              dense: true,
+              onTap: () async {
+                final provider = context.read<BackupReminderProvider>();
+                final minutes = await showBackupReminderTimePicker(
+                  context,
+                  initialMinutes: provider.reminderMinutesOfDay,
+                );
+                if (minutes == null) return;
+                await provider.saveSchedule(
+                  enabled: true,
+                  intervalDays: provider.intervalDays,
+                  reminderMinutesOfDay: minutes,
+                );
+              },
+            ),
+          ),
+          _rowDivider(context),
+          _ItemRow(
+            label: l10n.backupReminderLastBackupTitle,
+            trailing: _ReminderDetailText(
+              backupReminderDateTimeLabel(context, reminder.lastBackupAt),
+            ),
+          ),
+          _rowDivider(context),
+          _ItemRow(
+            label: l10n.backupReminderNextReminderTitle,
+            trailing: _ReminderDetailText(
+              backupReminderNextLabel(context, reminder.nextReminderAt),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _FrequencyDropdown extends StatelessWidget {
+  const _FrequencyDropdown({required this.reminder});
+
+  final BackupReminderProvider reminder;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final current = reminder.intervalDays;
+    final preset = BackupReminderProvider.presetIntervals;
+    final options = <DesktopSelectOption<int>>[
+      for (final days in preset)
+        DesktopSelectOption(
+          value: days,
+          label: backupReminderFrequencyLabel(l10n, days),
+        ),
+      if (!preset.contains(current))
+        DesktopSelectOption(
+          value: current,
+          label: backupReminderFrequencyLabel(l10n, current),
+        ),
+      DesktopSelectOption(value: 0, label: l10n.backupReminderCustomOption),
+    ];
+
+    return DesktopSelectDropdown<int>(
+      value: current,
+      options: options,
+      minWidth: 150,
+      onSelected: (value) async {
+        final provider = context.read<BackupReminderProvider>();
+        final days = value == 0
+            ? await showBackupReminderCustomDaysDialog(
+                context,
+                initialDays: provider.intervalDays,
+              )
+            : value;
+        if (!context.mounted) return;
+        if (days == null) return;
+        var minutes = provider.reminderMinutesOfDay;
+        minutes ??= await showBackupReminderTimePicker(context);
+        if (!context.mounted) return;
+        if (minutes == null) return;
+        await provider.saveSchedule(
+          enabled: true,
+          intervalDays: days,
+          reminderMinutesOfDay: minutes,
+        );
+      },
+    );
+  }
+}
+
+class _ReminderDetailText extends StatelessWidget {
+  const _ReminderDetailText(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 360),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.end,
+        style: TextStyle(
+          fontSize: 13,
+          color: cs.onSurface.withValues(alpha: 0.68),
         ),
       ),
     );

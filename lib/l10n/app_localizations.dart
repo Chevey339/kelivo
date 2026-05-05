@@ -2957,6 +2957,162 @@ abstract class AppLocalizations {
   /// **'Import from Chatbox'**
   String get backupPageImportFromChatbox;
 
+  /// No description provided for @backupReminderSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup Reminder'**
+  String get backupReminderSectionTitle;
+
+  /// No description provided for @backupReminderEnableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remind me to back up'**
+  String get backupReminderEnableTitle;
+
+  /// No description provided for @backupReminderFrequencyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Frequency'**
+  String get backupReminderFrequencyTitle;
+
+  /// No description provided for @backupReminderTimeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder Time'**
+  String get backupReminderTimeTitle;
+
+  /// No description provided for @backupReminderTimeInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'HH:mm'**
+  String get backupReminderTimeInputHint;
+
+  /// No description provided for @backupReminderTimeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a time from 00:00 to 23:59.'**
+  String get backupReminderTimeInvalid;
+
+  /// No description provided for @backupReminderLastBackupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Backup'**
+  String get backupReminderLastBackupTitle;
+
+  /// No description provided for @backupReminderNextReminderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Next Reminder'**
+  String get backupReminderNextReminderTitle;
+
+  /// No description provided for @backupReminderNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get backupReminderNever;
+
+  /// No description provided for @backupReminderDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get backupReminderDisabled;
+
+  /// No description provided for @backupReminderDueNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Due now'**
+  String get backupReminderDueNow;
+
+  /// No description provided for @backupReminderEveryDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Every day'**
+  String get backupReminderEveryDay;
+
+  /// No description provided for @backupReminderEveryThreeDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Every 3 days'**
+  String get backupReminderEveryThreeDays;
+
+  /// No description provided for @backupReminderEveryWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Every week'**
+  String get backupReminderEveryWeek;
+
+  /// No description provided for @backupReminderEveryFourteenDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Every 14 days'**
+  String get backupReminderEveryFourteenDays;
+
+  /// No description provided for @backupReminderEveryMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Every month'**
+  String get backupReminderEveryMonth;
+
+  /// No description provided for @backupReminderCustomDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Every {days} days'**
+  String backupReminderCustomDays(int days);
+
+  /// No description provided for @backupReminderCustomOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom...'**
+  String get backupReminderCustomOption;
+
+  /// No description provided for @backupReminderCustomDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Frequency'**
+  String get backupReminderCustomDialogTitle;
+
+  /// No description provided for @backupReminderCustomDialogDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter how many days to wait between backup reminders.'**
+  String get backupReminderCustomDialogDescription;
+
+  /// No description provided for @backupReminderCustomDaysLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Days'**
+  String get backupReminderCustomDaysLabel;
+
+  /// No description provided for @backupReminderCustomDaysInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a number from 1 to 365.'**
+  String get backupReminderCustomDaysInvalid;
+
+  /// No description provided for @backupReminderSidebarTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup reminder'**
+  String get backupReminderSidebarTitle;
+
+  /// No description provided for @backupReminderSidebarSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your backup interval has arrived.'**
+  String get backupReminderSidebarSubtitle;
+
+  /// No description provided for @backupReminderSidebarAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to backup'**
+  String get backupReminderSidebarAction;
+
+  /// No description provided for @backupReminderSnoozeTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Remind me later'**
+  String get backupReminderSnoozeTooltip;
+
   /// No description provided for @chatHistoryPageTitle.
   ///
   /// In en, this message translates to:
