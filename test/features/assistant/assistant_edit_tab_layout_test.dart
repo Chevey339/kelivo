@@ -4,6 +4,18 @@ import 'package:Kelivo/features/assistant/utils/assistant_edit_tab_layout.dart';
 
 void main() {
   group('assistant edit tab layout', () {
+    test('default order keeps MCP after regex replace', () {
+      expect(defaultAssistantEditTabIds, const [
+        'basic',
+        'prompts',
+        'memory',
+        'quickPhrase',
+        'custom',
+        'regex',
+        'mcp',
+      ]);
+    });
+
     test('orders saved ids first and appends missing defaults', () {
       final ordered = orderAssistantEditTabIds(
         savedOrder: const ['mcp', 'basic'],

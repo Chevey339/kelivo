@@ -672,6 +672,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditTabLayoutSubtitle => '拖动标签页调整顺序，关闭暂时用不到的标签页。';
 
   @override
+  String get assistantEditOutlineModeTitle => '二级列表样式';
+
+  @override
+  String get assistantEditOutlineModeSubtitle => '先显示助手概览，再从列表进入各个设置项。';
+
+  @override
   String get assistantEditTabLayoutResetTooltip => '重置标签页布局';
 
   @override
@@ -5240,6 +5246,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditTabLayoutSubtitle => '拖动标签页调整顺序，关闭暂时用不到的标签页。';
 
   @override
+  String get assistantEditOutlineModeTitle => '二级列表样式';
+
+  @override
+  String get assistantEditOutlineModeSubtitle => '先显示助手概览，再从列表进入各个设置项。';
+
+  @override
   String get assistantEditTabLayoutResetTooltip => '重置标签页布局';
 
   @override
@@ -9806,6 +9818,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditTabLayoutSubtitle => '拖動標籤頁調整順序，關閉暫時用不到的標籤頁。';
+
+  @override
+  String get assistantEditOutlineModeTitle => '二級列表樣式';
+
+  @override
+  String get assistantEditOutlineModeSubtitle => '先顯示助理概覽，再從列表進入各個設定項。';
 
   @override
   String get assistantEditTabLayoutResetTooltip => '重設標籤頁佈局';

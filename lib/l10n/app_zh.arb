@@ -1373,6 +1373,8 @@
   "assistantEditPageMemoryTab": "记忆",
   "assistantEditMemorySwitchTitle": "记忆",
   "assistantEditMemorySwitchDescription": "允许助手主动存储并在对话间引用用户相关信息",
+  "assistantEditOutlineModeTitle": "二级列表样式",
+  "assistantEditOutlineModeSubtitle": "先显示助手概览，再从列表进入各个设置项。",
   "assistantEditRecentChatsSwitchTitle": "参考历史聊天记录",
   "assistantEditRecentChatsSwitchDescription": "在新对话中引用最近的对话标题以增强上下文",
   "assistantEditManageMemoryTitle": "管理记忆",

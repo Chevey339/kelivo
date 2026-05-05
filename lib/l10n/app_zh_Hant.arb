@@ -1362,6 +1362,8 @@
   "assistantEditPageMemoryTab": "記憶",
   "assistantEditMemorySwitchTitle": "記憶",
   "assistantEditMemorySwitchDescription": "允許助理主動儲存並在對話間引用使用者相關資訊",
+  "assistantEditOutlineModeTitle": "二級列表樣式",
+  "assistantEditOutlineModeSubtitle": "先顯示助理概覽，再從列表進入各個設定項。",
   "assistantEditRecentChatsSwitchTitle": "參考歷史聊天記錄",
   "assistantEditRecentChatsSwitchDescription": "在新對話中引用最近的對話標題以增強上下文",
   "assistantEditManageMemoryTitle": "管理記憶",

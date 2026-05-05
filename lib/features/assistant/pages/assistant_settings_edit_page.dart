@@ -19,6 +19,7 @@ import 'package:syncfusion_flutter_sliders/sliders.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../chat/widgets/chat_message_widget.dart';
+import '../../home/widgets/assistant_avatar.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../../core/models/assistant.dart';
@@ -305,7 +306,10 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
 
     final allTabs = _assistantEditTabSpecs(context, assistant.id);
     final visibleTabs = _visibleAssistantEditTabs(allTabs, settings);
-    _syncTabController(visibleTabs.length);
+    final useOutline = settings.mobileAssistantDetailOutlineEnabled;
+    if (!useOutline) {
+      _syncTabController(visibleTabs.length);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -343,30 +347,227 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
           ),
           const SizedBox(width: 8),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _SegTabBar(
-                    controller: _tabController,
-                    tabs: visibleTabs.map((tab) => tab.label).toList(),
+        bottom: useOutline
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(52),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _SegTabBar(
+                          controller: _tabController,
+                          tabs: visibleTabs.map((tab) => tab.label).toList(),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
+              ),
       ),
       body: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: TabBarView(
-          controller: _tabController,
-          children: visibleTabs.map((tab) => tab.child).toList(),
+        child: useOutline
+            ? _AssistantDetailOutlinePage(
+                assistant: assistant,
+                tabs: visibleTabs,
+              )
+            : TabBarView(
+                controller: _tabController,
+                children: visibleTabs.map((tab) => tab.child).toList(),
+              ),
+      ),
+    );
+  }
+}
+
+class _AssistantDetailOutlinePage extends StatelessWidget {
+  const _AssistantDetailOutlinePage({
+    required this.assistant,
+    required this.tabs,
+  });
+
+  final Assistant assistant;
+  final List<_AssistantEditTabSpec> tabs;
+
+  @override
+  Widget build(BuildContext context) {
+    final prompt = assistant.systemPrompt.trim();
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+      children: [
+        _AssistantOutlineHeader(assistant: assistant, prompt: prompt),
+        const SizedBox(height: 18),
+        _iosSectionCard(
+          children: [
+            for (var i = 0; i < tabs.length; i++) ...[
+              _AssistantOutlineItem(tab: tabs[i], assistantId: assistant.id),
+              if (i != tabs.length - 1) _iosDivider(context),
+            ],
+          ],
         ),
+      ],
+    );
+  }
+}
+
+class _AssistantOutlineHeader extends StatelessWidget {
+  const _AssistantOutlineHeader({
+    required this.assistant,
+    required this.prompt,
+  });
+
+  final Assistant assistant;
+  final String prompt;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final name = assistant.name.trim().isNotEmpty
+        ? assistant.name.trim()
+        : l10n.assistantEditPageTitle;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.1 : 0.08),
+          width: 0.7,
+        ),
+      ),
+      child: Column(
+        children: [
+          AssistantAvatar(assistant: assistant, fallbackName: name, size: 82),
+          const SizedBox(height: 14),
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 21,
+              height: 1.18,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface.withValues(alpha: 0.94),
+            ),
+          ),
+          if (prompt.isNotEmpty) ...[
+            const SizedBox(height: 9),
+            Text(
+              prompt,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13.5,
+                height: 1.35,
+                color: cs.onSurface.withValues(alpha: 0.58),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AssistantOutlineItem extends StatelessWidget {
+  const _AssistantOutlineItem({required this.tab, required this.assistantId});
+
+  final _AssistantEditTabSpec tab;
+  final String assistantId;
+
+  @override
+  Widget build(BuildContext context) {
+    return _iosNavRow(
+      context,
+      icon: tab.icon,
+      label: tab.label,
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => _AssistantDetailSectionPage(
+              assistantId: assistantId,
+              tabId: tab.id,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AssistantDetailSectionPage extends StatelessWidget {
+  const _AssistantDetailSectionPage({
+    required this.assistantId,
+    required this.tabId,
+  });
+
+  final String assistantId;
+  final String tabId;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final provider = context.watch<AssistantProvider>();
+    final assistant = provider.getById(assistantId);
+
+    if (assistant == null) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: Tooltip(
+            message: l10n.settingsPageBackButton,
+            child: IosIconButton(
+              icon: Lucide.ArrowLeft,
+              color: cs.onSurface,
+              size: 22,
+              minSize: 44,
+              semanticLabel: l10n.settingsPageBackButton,
+              onTap: () => Navigator.of(context).maybePop(),
+            ),
+          ),
+          title: Text(l10n.assistantEditPageTitle),
+          actions: const [SizedBox(width: 12)],
+        ),
+        body: Center(child: Text(l10n.assistantEditPageNotFound)),
+      );
+    }
+
+    final tabs = _assistantEditTabSpecs(context, assistant.id);
+    final tab = tabs.firstWhere(
+      (candidate) => candidate.id == tabId,
+      orElse: () => tabs.first,
+    );
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: Tooltip(
+          message: l10n.settingsPageBackButton,
+          child: IosIconButton(
+            icon: Lucide.ArrowLeft,
+            color: cs.onSurface,
+            size: 22,
+            minSize: 44,
+            semanticLabel: l10n.settingsPageBackButton,
+            onTap: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        title: Text(tab.label),
+        actions: const [SizedBox(width: 12)],
+      ),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: tab.child,
       ),
     );
   }
@@ -424,14 +625,21 @@ class _AssistantTabLayoutPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-            child: Text(
-              l10n.assistantEditTabLayoutSubtitle,
-              style: TextStyle(
-                color: cs.onSurface.withValues(alpha: 0.68),
-                fontSize: 13,
-                height: 1.35,
-              ),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _AssistantOutlineModeSwitch(settings: settings),
+                const SizedBox(height: 12),
+                Text(
+                  l10n.assistantEditTabLayoutSubtitle,
+                  style: TextStyle(
+                    color: cs.onSurface.withValues(alpha: 0.68),
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -499,6 +707,44 @@ class _AssistantTabLayoutPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AssistantOutlineModeSwitch extends StatelessWidget {
+  const _AssistantOutlineModeSwitch({required this.settings});
+
+  final SettingsProvider settings;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return _iosSectionCard(
+      children: [
+        _iosSwitchRow(
+          context,
+          icon: Lucide.ListTree,
+          label: l10n.assistantEditOutlineModeTitle,
+          value: settings.mobileAssistantDetailOutlineEnabled,
+          onChanged: (enabled) => context
+              .read<SettingsProvider>()
+              .setMobileAssistantDetailOutlineEnabled(enabled),
+        ),
+        _iosDivider(context),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(60, 4, 14, 8),
+          child: Text(
+            l10n.assistantEditOutlineModeSubtitle,
+            style: TextStyle(
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.56),
+              fontSize: 12.5,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

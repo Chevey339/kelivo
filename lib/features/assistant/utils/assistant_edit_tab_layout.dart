@@ -10,10 +10,10 @@ const List<String> defaultAssistantEditTabIds = [
   assistantEditTabBasic,
   assistantEditTabPrompts,
   assistantEditTabMemory,
-  assistantEditTabMcp,
   assistantEditTabQuickPhrase,
   assistantEditTabCustom,
   assistantEditTabRegex,
+  assistantEditTabMcp,
 ];
 
 List<String> orderAssistantEditTabIds({

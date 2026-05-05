@@ -683,6 +683,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Drag tabs to reorder. Turn off tabs you do not need.';
 
   @override
+  String get assistantEditOutlineModeTitle => 'Section list style';
+
+  @override
+  String get assistantEditOutlineModeSubtitle =>
+      'Show an assistant overview first, then open each setting section from a list.';
+
+  @override
   String get assistantEditTabLayoutResetTooltip => 'Reset tab layout';
 
   @override

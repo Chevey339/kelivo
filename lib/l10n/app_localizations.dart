@@ -1361,6 +1361,18 @@ abstract class AppLocalizations {
   /// **'Drag tabs to reorder. Turn off tabs you do not need.'**
   String get assistantEditTabLayoutSubtitle;
 
+  /// No description provided for @assistantEditOutlineModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Section list style'**
+  String get assistantEditOutlineModeTitle;
+
+  /// No description provided for @assistantEditOutlineModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show an assistant overview first, then open each setting section from a list.'**
+  String get assistantEditOutlineModeSubtitle;
+
   /// No description provided for @assistantEditTabLayoutResetTooltip.
   ///
   /// In en, this message translates to:

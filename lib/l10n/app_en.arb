@@ -327,6 +327,8 @@
   "assistantEditTabLayoutTooltip": "Customize tabs",
   "assistantEditTabLayoutTitle": "Customize tabs",
   "assistantEditTabLayoutSubtitle": "Drag tabs to reorder. Turn off tabs you do not need.",
+  "assistantEditOutlineModeTitle": "Section list style",
+  "assistantEditOutlineModeSubtitle": "Show an assistant overview first, then open each setting section from a list.",
   "assistantEditTabLayoutResetTooltip": "Reset tab layout",
   "assistantEditTabLayoutAtLeastOneVisible": "Keep at least one tab visible",
   "assistantEditTabLayoutDragHandle": "Drag to reorder {tab}",

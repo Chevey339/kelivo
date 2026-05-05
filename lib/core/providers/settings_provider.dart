@@ -185,6 +185,8 @@ class SettingsProvider extends ChangeNotifier {
       'mobile_assistant_edit_tab_order_v1';
   static const String _mobileAssistantEditTabHiddenKey =
       'mobile_assistant_edit_tab_hidden_v1';
+  static const String _mobileAssistantDetailOutlineEnabledKey =
+      'mobile_assistant_detail_outline_enabled_v1';
   // Network request logging (debug)
   static const String _requestLogEnabledKey = 'request_log_enabled_v1';
   // Flutter runtime logging (debug)
@@ -936,6 +938,8 @@ class SettingsProvider extends ChangeNotifier {
     _hiddenMobileAssistantEditTabs = Set.unmodifiable(
       prefs.getStringList(_mobileAssistantEditTabHiddenKey) ?? const <String>[],
     );
+    _mobileAssistantDetailOutlineEnabled =
+        prefs.getBool(_mobileAssistantDetailOutlineEnabledKey) ?? false;
     // desktop UI
     _desktopSidebarWidth = prefs.getDouble(_desktopSidebarWidthKey) ?? 300;
     _desktopSidebarOpen = prefs.getBool(_desktopSidebarOpenKey) ?? true;
@@ -1983,6 +1987,17 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_mobileAssistantEditTabHiddenKey, sorted);
+  }
+
+  bool _mobileAssistantDetailOutlineEnabled = false;
+  bool get mobileAssistantDetailOutlineEnabled =>
+      _mobileAssistantDetailOutlineEnabled;
+  Future<void> setMobileAssistantDetailOutlineEnabled(bool enabled) async {
+    if (_mobileAssistantDetailOutlineEnabled == enabled) return;
+    _mobileAssistantDetailOutlineEnabled = enabled;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_mobileAssistantDetailOutlineEnabledKey, enabled);
   }
 
   // ===== Android background chat generation =====
@@ -3525,6 +3540,10 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._desktopMinimizeToTrayOnClose = _desktopMinimizeToTrayOnClose;
     copy._usePureBackground = _usePureBackground;
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
+    copy._mobileAssistantEditTabOrder = _mobileAssistantEditTabOrder;
+    copy._hiddenMobileAssistantEditTabs = _hiddenMobileAssistantEditTabs;
+    copy._mobileAssistantDetailOutlineEnabled =
+        _mobileAssistantDetailOutlineEnabled;
     return copy;
   }
 }
