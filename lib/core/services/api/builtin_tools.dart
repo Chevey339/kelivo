@@ -200,6 +200,13 @@ abstract class BuiltInToolsHelper {
         m.startsWith('gpt-5');
   }
 
+  static bool isOpenRouterProvider(ProviderConfig? cfg) {
+    if (cfg == null) return false;
+    final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
+    final providerId = cfg.id.toLowerCase();
+    return host.contains('openrouter.ai') || providerId.contains('openrouter');
+  }
+
   static bool isDashScopeChatBuiltInSearchSupportedModel(String? modelId) {
     final m = _normalizedModelId(modelId);
     return _matchesExactOrSnapshot(
@@ -292,6 +299,9 @@ abstract class BuiltInToolsHelper {
       case ProviderKind.claude:
         return isClaudeBuiltInSearchSupportedModel(upstreamModelId);
       case ProviderKind.openai:
+        if (isOpenRouterProvider(cfg)) {
+          return cfg.useResponseApi != true;
+        }
         if (isGrokModel(upstreamModelId)) return true;
         if (cfg.useResponseApi == true) {
           if (isOpenAIResponsesBuiltInSearchSupportedModel(upstreamModelId)) {

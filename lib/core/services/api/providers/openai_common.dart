@@ -29,6 +29,27 @@ void _applyCompatibleBuiltInSearch(
   final builtIns = _builtInTools(config, modelId);
   if (!builtIns.contains(BuiltInToolNames.search)) return;
 
+  if (BuiltInToolsHelper.isOpenRouterProvider(config)) {
+    if (config.useResponseApi == true) return;
+    final plugins = <Map<String, dynamic>>[];
+    final existingPlugins = body['plugins'];
+    if (existingPlugins is List) {
+      for (final plugin in existingPlugins) {
+        if (plugin is Map) {
+          plugins.add(plugin.cast<String, dynamic>());
+        }
+      }
+    }
+    final hasWebPlugin = plugins.any(
+      (plugin) => (plugin['id'] ?? '').toString() == 'web',
+    );
+    if (!hasWebPlugin) {
+      plugins.add({'id': 'web'});
+    }
+    body['plugins'] = plugins;
+    return;
+  }
+
   if (BuiltInToolsHelper.isGrokModel(upstreamModelId)) {
     body['search_parameters'] = {'mode': 'auto', 'return_citations': true};
     return;
