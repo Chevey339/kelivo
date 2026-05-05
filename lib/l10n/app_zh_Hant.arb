@@ -335,7 +335,6 @@
   "assistantEditMcpToolsCountTag": "工具: {enabled}/{total}",
   "assistantEditModelUseGlobalDefault": "使用全域預設",
   "assistantSettingsPageTitle": "助理設定",
-  "assistantSettingsDefaultTag": "預設",
   "assistantSettingsCopyButton": "複製",
   "assistantSettingsCopySuccess": "已複製助理",
   "assistantSettingsCopySuffix": "副本",

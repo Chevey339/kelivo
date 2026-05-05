@@ -1237,9 +1237,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantSettingsPageTitle => 'Assistant Settings';
 
   @override
-  String get assistantSettingsDefaultTag => 'Default';
-
-  @override
   String get assistantSettingsCopyButton => 'Copy';
 
   @override

@@ -1204,9 +1204,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantSettingsPageTitle => '助手设置';
 
   @override
-  String get assistantSettingsDefaultTag => '默认';
-
-  @override
   String get assistantSettingsCopyButton => '复制';
 
   @override
@@ -5778,9 +5775,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantSettingsPageTitle => '助手设置';
 
   @override
-  String get assistantSettingsDefaultTag => '默认';
-
-  @override
   String get assistantSettingsCopyButton => '复制';
 
   @override
@@ -10350,9 +10344,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantSettingsPageTitle => '助理設定';
-
-  @override
-  String get assistantSettingsDefaultTag => '預設';
 
   @override
   String get assistantSettingsCopyButton => '複製';

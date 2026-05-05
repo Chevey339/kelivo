@@ -169,11 +169,6 @@ class _AssistantCard extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              if (!item.deletable)
-                                _TagPill(
-                                  text: l10n.assistantSettingsDefaultTag,
-                                  color: cs.primary,
-                                ),
                             ],
                           ),
                           const SizedBox(height: 4),
@@ -747,33 +742,6 @@ class _IosFilledButtonState extends State<_IosFilledButton> {
             widget.label,
             style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.w600),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TagPill extends StatelessWidget {
-  const _TagPill({required this.text, required this.color});
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(left: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 11,
-          color: color,
-          fontWeight: FontWeight.w700,
         ),
       ),
     );

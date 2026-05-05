@@ -35,7 +35,6 @@ class Assistant {
   final String messageTemplate; // e.g. "{{ message }}"
   final List<String> mcpServerIds; // bound MCP server IDs
   final String? background; // chat background (color/image ref)
-  final bool deletable; // can be deleted by user
   // Custom request overrides (per assistant)
   final List<Map<String, String>>
   customHeaders; // [{name:'X-Header', value:'v'}]
@@ -69,7 +68,6 @@ class Assistant {
     this.messageTemplate = '{{ message }}',
     this.mcpServerIds = const <String>[],
     this.background,
-    this.deletable = true,
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
     this.enableMemory = false,
@@ -98,7 +96,6 @@ class Assistant {
     String? messageTemplate,
     List<String>? mcpServerIds,
     String? background,
-    bool? deletable,
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
     bool? enableMemory,
@@ -137,7 +134,6 @@ class Assistant {
       messageTemplate: messageTemplate ?? this.messageTemplate,
       mcpServerIds: mcpServerIds ?? this.mcpServerIds,
       background: clearBackground ? null : (background ?? this.background),
-      deletable: deletable ?? this.deletable,
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
       enableMemory: enableMemory ?? this.enableMemory,
@@ -169,7 +165,6 @@ class Assistant {
     'messageTemplate': messageTemplate,
     'mcpServerIds': mcpServerIds,
     'background': background,
-    'deletable': deletable,
     'customHeaders': customHeaders,
     'customBody': customBody,
     'enableMemory': enableMemory,
@@ -199,7 +194,6 @@ class Assistant {
     mcpServerIds:
         (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],
     background: json['background'] as String?,
-    deletable: json['deletable'] as bool? ?? true,
     customHeaders: (() {
       final raw = json['customHeaders'];
       if (raw is List) {

@@ -352,7 +352,6 @@
   "assistantEditMcpToolsCountTag": "工具: {enabled}/{total}",
   "assistantEditModelUseGlobalDefault": "使用全局默认",
   "assistantSettingsPageTitle": "助手设置",
-  "assistantSettingsDefaultTag": "默认",
   "assistantSettingsCopyButton": "复制",
   "assistantSettingsCopySuccess": "已复制助手",
   "assistantSettingsCopySuffix": "副本",

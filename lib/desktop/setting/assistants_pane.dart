@@ -592,31 +592,6 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                               ),
                             ),
                           ),
-                          if (!widget.item.deletable)
-                            Container(
-                              margin: const EdgeInsets.only(left: 8),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: cs.primary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(999),
-                                border: Border.all(
-                                  color: cs.primary.withValues(alpha: 0.35),
-                                ),
-                              ),
-                              child: Text(
-                                AppLocalizations.of(
-                                  context,
-                                )!.assistantSettingsDefaultTag,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: cs.primary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
                           _CopyAssistantIcon(
                             onCopy: () async {
                               final assistantProvider = context

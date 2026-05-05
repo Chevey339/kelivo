@@ -2405,12 +2405,6 @@ abstract class AppLocalizations {
   /// **'Assistant Settings'**
   String get assistantSettingsPageTitle;
 
-  /// No description provided for @assistantSettingsDefaultTag.
-  ///
-  /// In en, this message translates to:
-  /// **'Default'**
-  String get assistantSettingsDefaultTag;
-
   /// No description provided for @assistantSettingsCopyButton.
   ///
   /// In en, this message translates to:

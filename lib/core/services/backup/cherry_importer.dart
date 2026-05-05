@@ -558,7 +558,6 @@ class CherryImporter {
         'messageTemplate': '{{ message }}',
         'mcpServerIds': const <String>[],
         'background': null,
-        'deletable': true,
         'customHeaders': const <Map<String, String>>[],
         'customBody': const <Map<String, String>>[],
         'enableMemory': false,

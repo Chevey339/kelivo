@@ -89,7 +89,6 @@ class AssistantProvider extends ChangeNotifier {
     id: const Uuid().v4(),
     name: l10n.assistantProviderDefaultAssistantName,
     systemPrompt: '',
-    deletable: false,
     thinkingBudget: null,
     temperature: 0.6,
     topP: null,
@@ -114,7 +113,6 @@ class AssistantProvider extends ChangeNotifier {
           '{device_info}',
           '{system_version}',
         ),
-        deletable: false,
         temperature: 0.6,
         topP: null,
       ),
@@ -259,7 +257,6 @@ class AssistantProvider extends ChangeNotifier {
       name: _buildCopyName(source, l10n),
       avatar: avatarCopy,
       background: backgroundCopy,
-      deletable: true,
       mcpServerIds: List<String>.of(source.mcpServerIds),
       customHeaders: source.customHeaders
           .map((e) => Map<String, String>.from(e))
