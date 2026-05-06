@@ -14,6 +14,7 @@ import 'providers/bocha_search_service.dart';
 import 'providers/perplexity_search_service.dart';
 import 'providers/duckduckgo_search_service.dart';
 import 'providers/serper_search_service.dart';
+import 'providers/grok_search_service.dart';
 
 // Base interface for all search services
 abstract class SearchService<T extends SearchServiceOptions> {
@@ -58,6 +59,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return DuckDuckGoSearchService() as SearchService;
       case SerperOptions _:
         return SerperSearchService() as SearchService;
+      case GrokOptions _:
+        return GrokSearchService() as SearchService;
       default:
         return BingSearchService() as SearchService;
     }
@@ -175,6 +178,8 @@ abstract class SearchServiceOptions {
         return PerplexityOptions.fromJson(json);
       case 'serper':
         return SerperOptions.fromJson(json);
+      case 'grok':
+        return GrokOptions.fromJson(json);
       default:
         return BingLocalOptions(id: json['id']);
     }
@@ -514,5 +519,58 @@ class SerperOptions extends SearchServiceOptions {
     hl: json['hl'] ?? '',
     tbs: json['tbs'] ?? '',
     page: json['page'] ?? 1,
+  );
+}
+
+class GrokOptions extends SearchServiceOptions {
+  static const String defaultUrl = 'https://api.x.ai/v1/responses';
+  static const String defaultModel = 'grok-4-1-fast-non-reasoning';
+  static const String defaultSystemPrompt =
+      "You are a helpful search assistant. Search the web to find accurate and up-to-date information for the user's query. Provide a comprehensive answer with citations.";
+
+  final String apiKey;
+  final String model;
+  final String customUrl;
+  final String systemPrompt;
+
+  GrokOptions({
+    required super.id,
+    required this.apiKey,
+    this.model = defaultModel,
+    this.customUrl = defaultUrl,
+    this.systemPrompt = defaultSystemPrompt,
+  });
+
+  String get resolvedUrl {
+    final trimmed = customUrl.trim();
+    return trimmed.isEmpty ? defaultUrl : trimmed;
+  }
+
+  String get resolvedModel {
+    final trimmed = model.trim();
+    return trimmed.isEmpty ? defaultModel : trimmed;
+  }
+
+  String get resolvedSystemPrompt {
+    final trimmed = systemPrompt.trim();
+    return trimmed.isEmpty ? defaultSystemPrompt : trimmed;
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'grok',
+    'id': id,
+    'apiKey': apiKey,
+    'model': model.trim(),
+    'customUrl': customUrl.trim(),
+    'systemPrompt': systemPrompt,
+  };
+
+  factory GrokOptions.fromJson(Map<String, dynamic> json) => GrokOptions(
+    id: json['id'],
+    apiKey: json['apiKey'] ?? '',
+    model: json['model'] ?? defaultModel,
+    customUrl: json['customUrl'] ?? defaultUrl,
+    systemPrompt: json['systemPrompt'] ?? defaultSystemPrompt,
   );
 }

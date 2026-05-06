@@ -602,6 +602,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is PerplexityOptions) return 'perplexity';
     if (s is BochaOptions) return 'bocha';
     if (s is SerperOptions) return 'serper';
+    if (s is GrokOptions) return 'grok';
     return 'search';
   }
 
@@ -779,6 +780,11 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     'hl': TextEditingController(),
     'tbs': TextEditingController(),
     'page': TextEditingController(),
+    'model': TextEditingController(text: GrokOptions.defaultModel),
+    'customUrl': TextEditingController(text: GrokOptions.defaultUrl),
+    'systemPrompt': TextEditingController(
+      text: GrokOptions.defaultSystemPrompt,
+    ),
   };
 
   @override
@@ -871,7 +877,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
         return [
           TextField(
             controller: _controllers['apiKey'],
-            decoration: deco('API Key'),
+            decoration: deco(l10n.searchServicesDialogApiKey),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -937,6 +943,36 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             controller: _controllers['page'],
             decoration: deco(l10n.searchServicesDialogPageOptional),
             keyboardType: TextInputType.number,
+          ),
+        ];
+      case 'grok':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco('API Key'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['model'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesDialogModel,
+              hintText: GrokOptions.defaultModel,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['customUrl'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesFieldCustomUrlOptional,
+              hintText: GrokOptions.defaultUrl,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['systemPrompt'],
+            decoration: deco(l10n.searchServicesDialogSystemPrompt),
+            minLines: 3,
+            maxLines: 5,
           ),
         ];
       case 'searxng':
@@ -1029,6 +1065,14 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           tbs: _controllers['tbs']!.text.trim(),
           page: page == null || page < 1 ? 1 : page,
         );
+      case 'grok':
+        return GrokOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          model: _controllers['model']!.text.trim(),
+          customUrl: _controllers['customUrl']!.text.trim(),
+          systemPrompt: _controllers['systemPrompt']!.text,
+        );
       case 'bing_local':
       default:
         return BingLocalOptions(id: id);
@@ -1090,6 +1134,13 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       _controllers['tbs'] = TextEditingController(text: s.tbs);
       _controllers['page'] = TextEditingController(
         text: s.page == 1 ? '' : s.page.toString(),
+      );
+    } else if (s is GrokOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+      _controllers['model'] = TextEditingController(text: s.model);
+      _controllers['customUrl'] = TextEditingController(text: s.customUrl);
+      _controllers['systemPrompt'] = TextEditingController(
+        text: s.systemPrompt,
       );
     }
   }
@@ -1171,7 +1222,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       return [
         TextField(
           controller: _controllers['apiKey'],
-          decoration: deco('API Key'),
+          decoration: deco(l10n.searchServicesDialogApiKey),
         ),
         const SizedBox(height: 12),
         TextField(
@@ -1209,6 +1260,36 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         TextField(
           controller: _controllers['apiKey'],
           decoration: deco('API Key'),
+        ),
+      ];
+    } else if (s is GrokOptions) {
+      return [
+        TextField(
+          controller: _controllers['apiKey'],
+          decoration: deco('API Key'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['model'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServicesDialogModel,
+            hintText: GrokOptions.defaultModel,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['customUrl'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServicesFieldCustomUrlOptional,
+            hintText: GrokOptions.defaultUrl,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['systemPrompt'],
+          decoration: deco(l10n.searchServicesDialogSystemPrompt),
+          minLines: 3,
+          maxLines: 5,
         ),
       ];
     } else if (s is SerperOptions) {
@@ -1346,6 +1427,15 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         page: page == null || page < 1 ? 1 : page,
       );
     }
+    if (s is GrokOptions) {
+      return GrokOptions(
+        id: s.id,
+        apiKey: _controllers['apiKey']!.text,
+        model: _controllers['model']!.text.trim(),
+        customUrl: _controllers['customUrl']!.text.trim(),
+        systemPrompt: _controllers['systemPrompt']!.text,
+      );
+    }
     return s;
   }
 }
@@ -1377,6 +1467,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'perplexity', name: 'Perplexity', brand: 'perplexity'),
     (type: 'bocha', name: 'Bocha', brand: 'bocha'),
     (type: 'serper', name: 'Serper', brand: 'serper'),
+    (type: 'grok', name: 'Grok', brand: 'grok'),
   ];
   @override
   Widget build(BuildContext context) {

@@ -6296,6 +6296,24 @@ abstract class AppLocalizations {
   /// **'Custom URL (optional)'**
   String get searchServicesFieldCustomUrlOptional;
 
+  /// No description provided for @searchServicesDialogApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key'**
+  String get searchServicesDialogApiKey;
+
+  /// No description provided for @searchServicesDialogModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get searchServicesDialogModel;
+
+  /// No description provided for @searchServicesDialogSystemPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'System Prompt'**
+  String get searchServicesDialogSystemPrompt;
+
   /// No description provided for @searchServicesAddDialogInstanceUrl.
   ///
   /// In en, this message translates to:
@@ -7597,6 +7615,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Serper Google Search API. Fast web results with optional country, language, time, and page filters.'**
   String get searchProviderSerperDescription;
+
+  /// No description provided for @searchServiceNameGrok.
+  ///
+  /// In en, this message translates to:
+  /// **'Grok'**
+  String get searchServiceNameGrok;
+
+  /// No description provided for @searchProviderGrokDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Grok search via xAI Responses API. Uses web and X search tools and returns cited sources.'**
+  String get searchProviderGrokDescription;
 
   /// No description provided for @searchServicesDialogCountryOptional.
   ///

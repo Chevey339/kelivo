@@ -3235,6 +3235,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesFieldCustomUrlOptional => '自定义 URL（可选）';
 
   @override
+  String get searchServicesDialogApiKey => 'API Key';
+
+  @override
+  String get searchServicesDialogModel => '模型';
+
+  @override
+  String get searchServicesDialogSystemPrompt => '系统提示词';
+
+  @override
   String get searchServicesAddDialogInstanceUrl => '实例 URL';
 
   @override
@@ -3920,6 +3929,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get searchProviderSerperDescription =>
       'Serper Google 搜索 API。响应快速，支持国家/地区、语言、时间和页码过滤。';
+
+  @override
+  String get searchServiceNameGrok => 'Grok';
+
+  @override
+  String get searchProviderGrokDescription =>
+      '通过 xAI Responses API 使用 Grok 搜索。调用网页和 X 搜索工具，并返回带引用的来源。';
 
   @override
   String get searchServicesDialogCountryOptional => '国家/地区（可选）';
@@ -7886,6 +7902,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServicesFieldCustomUrlOptional => '自定义 URL（可选）';
 
   @override
+  String get searchServicesDialogApiKey => 'API Key';
+
+  @override
+  String get searchServicesDialogModel => '模型';
+
+  @override
+  String get searchServicesDialogSystemPrompt => '系统提示词';
+
+  @override
   String get searchServicesAddDialogInstanceUrl => '实例 URL';
 
   @override
@@ -8571,6 +8596,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get searchProviderSerperDescription =>
       'Serper Google 搜索 API。响应快速，支持国家/地区、语言、时间和页码过滤。';
+
+  @override
+  String get searchServiceNameGrok => 'Grok';
+
+  @override
+  String get searchProviderGrokDescription =>
+      '通过 xAI Responses API 使用 Grok 搜索。调用网页和 X 搜索工具，并返回带引用的来源。';
 
   @override
   String get searchServicesDialogCountryOptional => '国家/地区（可选）';
@@ -12535,6 +12567,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServicesFieldCustomUrlOptional => '自訂 URL（可選）';
 
   @override
+  String get searchServicesDialogApiKey => 'API Key';
+
+  @override
+  String get searchServicesDialogModel => '模型';
+
+  @override
+  String get searchServicesDialogSystemPrompt => '系統提示詞';
+
+  @override
   String get searchServicesAddDialogInstanceUrl => '實例 URL';
 
   @override
@@ -13221,6 +13262,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get searchProviderSerperDescription =>
       'Serper Google 搜尋 API。回應快速，支援國家/地區、語言、時間和頁碼過濾。';
+
+  @override
+  String get searchServiceNameGrok => 'Grok';
+
+  @override
+  String get searchProviderGrokDescription =>
+      '透過 xAI Responses API 使用 Grok 搜尋。呼叫網頁和 X 搜尋工具，並返回帶引用的來源。';
 
   @override
   String get searchServicesDialogCountryOptional => '國家/地區（可選）';

@@ -3341,6 +3341,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchServicesFieldCustomUrlOptional => 'Custom URL (optional)';
 
   @override
+  String get searchServicesDialogApiKey => 'API Key';
+
+  @override
+  String get searchServicesDialogModel => 'Model';
+
+  @override
+  String get searchServicesDialogSystemPrompt => 'System Prompt';
+
+  @override
   String get searchServicesAddDialogInstanceUrl => 'Instance URL';
 
   @override
@@ -4076,6 +4085,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get searchProviderSerperDescription =>
       'Serper Google Search API. Fast web results with optional country, language, time, and page filters.';
+
+  @override
+  String get searchServiceNameGrok => 'Grok';
+
+  @override
+  String get searchProviderGrokDescription =>
+      'Grok search via xAI Responses API. Uses web and X search tools and returns cited sources.';
 
   @override
   String get searchServicesDialogCountryOptional => 'Country/region (optional)';
