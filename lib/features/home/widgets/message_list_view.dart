@@ -34,6 +34,7 @@ typedef OnForkConversation = Future<void> Function(ChatMessage message);
 typedef OnShareMessage =
     void Function(int messageIndex, List<ChatMessage> messages);
 typedef OnSpeakMessage = Future<void> Function(ChatMessage message);
+typedef OnSuggestionTap = void Function(String suggestion);
 
 /// Data class for reasoning UI state
 class ReasoningUiState {
@@ -101,6 +102,8 @@ class MessageListView extends StatelessWidget {
     this.onForkConversation,
     this.onShareMessage,
     this.onSpeakMessage,
+    this.suggestions = const <String>[],
+    this.onSuggestionTap,
     this.onToggleSelection,
     this.onToggleReasoning,
     this.onToggleTranslation,
@@ -159,6 +162,8 @@ class MessageListView extends StatelessWidget {
   final OnForkConversation? onForkConversation;
   final OnShareMessage? onShareMessage;
   final OnSpeakMessage? onSpeakMessage;
+  final List<String> suggestions;
+  final OnSuggestionTap? onSuggestionTap;
   final void Function(String messageId, bool selected)? onToggleSelection;
   final void Function(String messageId)? onToggleReasoning;
   final void Function(String messageId)? onToggleTranslation;
@@ -275,6 +280,15 @@ class MessageListView extends StatelessWidget {
     final total = vers.length;
     if (selectedIdx < 0) selectedIdx = 0;
     if (total > 0 && selectedIdx > total - 1) selectedIdx = total - 1;
+    final latestAssistantIndex = _latestAssistantMessageIndex();
+    final messageSuggestions =
+        !selecting &&
+            index == latestAssistantIndex &&
+            message.role == 'assistant' &&
+            !message.isStreaming &&
+            onSuggestionTap != null
+        ? suggestions
+        : const <String>[];
 
     // Check if this is a streaming message that should use ValueListenableBuilder
     final isStreaming =
@@ -331,6 +345,7 @@ class MessageListView extends StatelessWidget {
                               selectedIdx: selectedIdx,
                               total: total,
                               isProcessingFiles: isProcessingFiles,
+                              suggestions: messageSuggestions,
                             )
                           : _buildChatMessageWidget(
                               context,
@@ -345,6 +360,7 @@ class MessageListView extends StatelessWidget {
                               selectedIdx: selectedIdx,
                               total: total,
                               isProcessingFiles: isProcessingFiles,
+                              suggestions: messageSuggestions,
                             ),
                     );
                   },
@@ -408,6 +424,14 @@ class MessageListView extends StatelessWidget {
     );
   }
 
+  int _latestAssistantMessageIndex() {
+    for (var i = messages.length - 1; i >= 0; i--) {
+      final message = messages[i];
+      if (message.role == 'assistant' && !message.isStreaming) return i;
+    }
+    return -1;
+  }
+
   /// Build a streaming message widget that uses ValueListenableBuilder
   /// to avoid full page rebuilds during streaming.
   Widget _buildStreamingMessageWidget(
@@ -423,6 +447,7 @@ class MessageListView extends StatelessWidget {
     required int selectedIdx,
     required int total,
     required bool isProcessingFiles,
+    required List<String> suggestions,
   }) {
     return ValueListenableBuilder<StreamingContentData>(
       valueListenable: streamingContentNotifier!.getNotifier(message.id),
@@ -480,6 +505,7 @@ class MessageListView extends StatelessWidget {
             selectedIdx: selectedIdx,
             total: total,
             isProcessingFiles: isProcessingFiles,
+            suggestions: suggestions,
           ),
         );
       },
@@ -500,6 +526,7 @@ class MessageListView extends StatelessWidget {
     required int selectedIdx,
     required int total,
     required bool isProcessingFiles,
+    required List<String> suggestions,
   }) {
     return ChatMessageWidget(
       message: message,
@@ -629,6 +656,8 @@ class MessageListView extends StatelessWidget {
             })()
           : null,
       isProcessingFiles: isProcessingFiles,
+      suggestions: suggestions,
+      onSuggestionTap: onSuggestionTap,
     );
   }
 }

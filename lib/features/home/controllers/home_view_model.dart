@@ -13,6 +13,7 @@ import '../../../core/services/logging/flutter_logger.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
+import '../services/chat_suggestion_service.dart';
 import 'chat_actions.dart';
 import 'chat_controller.dart';
 import 'generation_controller.dart';
@@ -92,6 +93,7 @@ class HomeViewModel extends ChangeNotifier {
     _chatActions.onStreamError = _onStreamError;
     _chatActions.onMaybeGenerateTitle = _onMaybeGenerateTitle;
     _chatActions.onMaybeGenerateSummary = _onMaybeGenerateSummary;
+    _chatActions.onMaybeGenerateSuggestions = _onMaybeGenerateSuggestions;
     _chatActions.onStreamFinished = _onStreamFinished;
     _chatActions.onFileProcessingStarted = _onFileProcessingStarted;
     _chatActions.onFileProcessingFinished = _onFileProcessingFinished;
@@ -110,6 +112,8 @@ class HomeViewModel extends ChangeNotifier {
   final stream_ctrl.StreamController _streamController;
   final ChatController _chatController;
   final BuildContext _contextProvider;
+  final ChatSuggestionService _suggestionService =
+      const ChatSuggestionService();
   late final ChatActions _chatActions;
   QueuedChatInput? _queuedInput;
   bool _isDrainingQueuedInput = false;
@@ -224,6 +228,10 @@ class HomeViewModel extends ChangeNotifier {
     _maybeGenerateSummaryFor(conversationId);
   }
 
+  void _onMaybeGenerateSuggestions(String conversationId) {
+    _maybeGenerateSuggestionsFor(conversationId);
+  }
+
   void _onStreamFinished() {
     onStreamFinished?.call();
   }
@@ -300,6 +308,8 @@ class HomeViewModel extends ChangeNotifier {
 
     _chatActions.onScheduleImageSanitize = onScheduleImageSanitize;
 
+    await _clearSuggestionsFor(conversation.id);
+
     if (input.documents.isNotEmpty) {
       isProcessingFiles.value = true;
     }
@@ -374,6 +384,7 @@ class HomeViewModel extends ChangeNotifier {
     _chatActions.onScheduleImageSanitize = onScheduleImageSanitize;
 
     onHapticFeedback?.call();
+    await _clearSuggestionsFor(conversation.id);
 
     final result = await _chatActions.regenerateAtMessage(
       message: message,
@@ -475,6 +486,11 @@ class HomeViewModel extends ChangeNotifier {
     required Set<String> deletedMessageIds,
   }) async {
     if (deletedMessageIds.isEmpty) return;
+
+    final cid = currentConversation?.id;
+    if (cid != null) {
+      await _clearSuggestionsFor(cid);
+    }
 
     final oldSel =
         versionSelections[gid] ??
@@ -648,9 +664,11 @@ class HomeViewModel extends ChangeNotifier {
     final convo = currentConversation;
     if (convo == null) return;
 
+    final defaultTitle = getTitleForLocale(_contextProvider);
+    await _clearSuggestionsFor(convo.id);
     final updated = await _chatService.toggleTruncateAtTail(
       convo.id,
-      defaultTitle: getTitleForLocale(_contextProvider),
+      defaultTitle: defaultTitle,
     );
     if (updated != null) {
       _chatController.updateCurrentConversation(updated);
@@ -763,6 +781,10 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Set selected version for a message group.
   Future<void> setSelectedVersion(String groupId, int version) async {
+    final cid = currentConversation?.id;
+    if (cid != null) {
+      await _clearSuggestionsFor(cid);
+    }
     await _chatController.setSelectedVersion(groupId, version);
     notifyListeners();
   }
@@ -1065,6 +1087,87 @@ class HomeViewModel extends ChangeNotifier {
       }
     } catch (_) {
       // Keep old summary on failure, ignore silently
+    }
+  }
+
+  // ============================================================================
+  // Chat Suggestions
+  // ============================================================================
+
+  Future<void> _clearSuggestionsFor(String conversationId) async {
+    final convo = _chatService.getConversation(conversationId);
+    if (convo == null || convo.chatSuggestions.isEmpty) return;
+    await _chatService.clearConversationSuggestions(conversationId);
+    if (currentConversation?.id == conversationId) {
+      _chatController.updateCurrentConversation(
+        _chatService.getConversation(conversationId),
+      );
+      notifyListeners();
+    }
+  }
+
+  Future<void> _maybeGenerateSuggestionsFor(String conversationId) async {
+    final convo = _chatService.getConversation(conversationId);
+    if (convo == null) return;
+
+    final settings = _contextProvider.read<SettingsProvider>();
+    final provKey = settings.suggestionModelProvider;
+    final mdlId = settings.suggestionModelId;
+    if (provKey == null || mdlId == null) return;
+
+    final msgs = collapseVersions(_chatService.getMessages(convo.id));
+    final lastAssistant = msgs.cast<ChatMessage?>().lastWhere(
+      (m) =>
+          m != null &&
+          m.role == 'assistant' &&
+          !m.isStreaming &&
+          m.content.trim().isNotEmpty,
+      orElse: () => null,
+    );
+    if (lastAssistant == null) return;
+
+    final assistantProvider = _contextProvider.read<AssistantProvider>();
+    final assistant = convo.assistantId != null
+        ? assistantProvider.getById(convo.assistantId!)
+        : assistantProvider.currentAssistant;
+    final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
+    final budget = assistant?.thinkingBudget ?? settings.thinkingBudget;
+
+    try {
+      await _chatService.clearConversationSuggestions(conversationId);
+      final suggestions = await _suggestionService.generate(
+        settings: settings,
+        providerKey: provKey,
+        modelId: mdlId,
+        messages: msgs,
+        truncateIndex: convo.truncateIndex,
+        locale: locale,
+        thinkingBudget: budget,
+      );
+      if (suggestions.isEmpty) return;
+
+      final latest = _chatService.getConversation(conversationId);
+      if (latest == null ||
+          latest.messageIds.length != convo.messageIds.length) {
+        return;
+      }
+
+      await _chatService.updateConversationSuggestions(
+        conversationId,
+        suggestions,
+      );
+      if (currentConversation?.id == conversationId) {
+        _chatController.updateCurrentConversation(
+          _chatService.getConversation(conversationId),
+        );
+        notifyListeners();
+        onScrollToBottom?.call();
+      }
+    } catch (e) {
+      FlutterLogger.log(
+        '[SuggestionGen] Generation failed: $e',
+        tag: 'HomeViewModel',
+      );
     }
   }
 

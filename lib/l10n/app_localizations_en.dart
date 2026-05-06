@@ -2512,6 +2512,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Used for generating conversation summaries; prefer fast and cheap models';
 
   @override
+  String get defaultModelPageSuggestionModelTitle => 'Chat Suggestions Model';
+
+  @override
+  String get defaultModelPageSuggestionModelSubtitle =>
+      'Used for follow-up suggestion bubbles after assistant replies. Disabled until a model is selected.';
+
+  @override
   String get assistantEditRecentChatsSummaryFrequencyTitle =>
       'Summary Refresh Frequency';
 
@@ -2573,6 +2580,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter prompt template for summary generation';
 
   @override
+  String get defaultModelPageSuggestionPromptHint =>
+      'Enter prompt template for chat suggestions';
+
+  @override
   String get defaultModelPageTranslatePromptHint =>
       'Enter prompt template for translation';
 
@@ -2600,6 +2611,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String defaultModelPageSuggestionVars(String contentVar, String localeVar) {
+    return 'Variables: conversation: $contentVar, language: $localeVar';
+  }
+
+  @override
   String get defaultModelPageCompressModelTitle => 'Compress Model';
 
   @override
@@ -2622,6 +2638,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultModelPageUseCurrentModel => 'Use current chat model';
+
+  @override
+  String get defaultModelPageNotEnabled => 'Not enabled';
 
   @override
   String get translatePagePasteButton => 'Paste';

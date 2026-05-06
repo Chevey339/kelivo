@@ -38,6 +38,7 @@ import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
 import '../../home/services/tool_approval_service.dart';
+import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
 
 final RegExp _urlSchemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
@@ -577,6 +578,8 @@ class ChatMessageWidget extends StatefulWidget {
   final bool hideStreamingIndicator;
   // Whether files are currently being processed
   final bool isProcessingFiles;
+  final List<String> suggestions;
+  final ValueChanged<String>? onSuggestionTap;
 
   const ChatMessageWidget({
     super.key,
@@ -616,6 +619,8 @@ class ChatMessageWidget extends StatefulWidget {
     this.toolCountAtSplit,
     this.hideStreamingIndicator = false,
     this.isProcessingFiles = false,
+    this.suggestions = const <String>[],
+    this.onSuggestionTap,
   });
 
   @override
@@ -2523,6 +2528,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     ),
                   ),
           ),
+          if (!widget.message.isStreaming &&
+              widget.suggestions.isNotEmpty &&
+              widget.onSuggestionTap != null) ...[
+            const SizedBox(height: 8),
+            ChatSuggestionBubbles(
+              suggestions: widget.suggestions,
+              onTap: widget.onSuggestionTap!,
+            ),
+          ],
         ],
       ),
     );

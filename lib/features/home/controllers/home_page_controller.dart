@@ -595,6 +595,12 @@ class HomePageController extends ChangeNotifier {
     return result;
   }
 
+  Future<void> sendSuggestion(String suggestion) async {
+    final text = suggestion.trim();
+    if (text.isEmpty) return;
+    await sendMessage(ChatInputData(text: text));
+  }
+
   void cancelQueuedMessage() {
     final restored = _viewModel.cancelCurrentQueuedInput();
     if (restored == null) return;
@@ -793,6 +799,13 @@ class HomePageController extends ChangeNotifier {
         : showMessageEditSheet(ctx, message: message);
     final MessageEditResult? result = await future;
     if (result == null) return;
+
+    if (currentConversation != null) {
+      await _chatService.clearConversationSuggestions(currentConversation!.id);
+      _viewModel.updateCurrentConversation(
+        _chatService.getConversation(currentConversation!.id),
+      );
+    }
 
     final newMsg = await _chatService.appendMessageVersion(
       messageId: message.id,

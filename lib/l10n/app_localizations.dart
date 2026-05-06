@@ -4763,6 +4763,18 @@ abstract class AppLocalizations {
   /// **'Used for generating conversation summaries; prefer fast and cheap models'**
   String get defaultModelPageSummaryModelSubtitle;
 
+  /// No description provided for @defaultModelPageSuggestionModelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat Suggestions Model'**
+  String get defaultModelPageSuggestionModelTitle;
+
+  /// No description provided for @defaultModelPageSuggestionModelSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Used for follow-up suggestion bubbles after assistant replies. Disabled until a model is selected.'**
+  String get defaultModelPageSuggestionModelSubtitle;
+
   /// No description provided for @assistantEditRecentChatsSummaryFrequencyTitle.
   ///
   /// In en, this message translates to:
@@ -4859,6 +4871,12 @@ abstract class AppLocalizations {
   /// **'Enter prompt template for summary generation'**
   String get defaultModelPageSummaryPromptHint;
 
+  /// No description provided for @defaultModelPageSuggestionPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter prompt template for chat suggestions'**
+  String get defaultModelPageSuggestionPromptHint;
+
   /// No description provided for @defaultModelPageTranslatePromptHint.
   ///
   /// In en, this message translates to:
@@ -4898,6 +4916,12 @@ abstract class AppLocalizations {
     String userMessagesVar,
   );
 
+  /// No description provided for @defaultModelPageSuggestionVars.
+  ///
+  /// In en, this message translates to:
+  /// **'Variables: conversation: {contentVar}, language: {localeVar}'**
+  String defaultModelPageSuggestionVars(String contentVar, String localeVar);
+
   /// No description provided for @defaultModelPageCompressModelTitle.
   ///
   /// In en, this message translates to:
@@ -4933,6 +4957,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use current chat model'**
   String get defaultModelPageUseCurrentModel;
+
+  /// No description provided for @defaultModelPageNotEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enabled'**
+  String get defaultModelPageNotEnabled;
 
   /// No description provided for @translatePagePasteButton.
   ///

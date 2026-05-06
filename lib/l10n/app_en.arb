@@ -1081,6 +1081,8 @@
   "defaultModelPageTitleModelSubtitle": "Used for summarizing conversation titles; prefer fast & cheap models",
   "defaultModelPageSummaryModelTitle": "Summary Model",
   "defaultModelPageSummaryModelSubtitle": "Used for generating conversation summaries; prefer fast and cheap models",
+  "defaultModelPageSuggestionModelTitle": "Chat Suggestions Model",
+  "defaultModelPageSuggestionModelSubtitle": "Used for follow-up suggestion bubbles after assistant replies. Disabled until a model is selected.",
   "assistantEditRecentChatsSummaryFrequencyTitle": "Summary Refresh Frequency",
   "assistantEditRecentChatsSummaryFrequencyDescription": "Refresh recent-chat summaries after the selected number of new messages.",
   "assistantEditRecentChatsSummaryFrequencyOption": "Every {count}",
@@ -1104,6 +1106,7 @@
   "defaultModelPagePromptLabel": "Prompt",
   "defaultModelPageTitlePromptHint": "Enter prompt template for title summarization",
   "defaultModelPageSummaryPromptHint": "Enter prompt template for summary generation",
+  "defaultModelPageSuggestionPromptHint": "Enter prompt template for chat suggestions",
   "defaultModelPageTranslatePromptHint": "Enter prompt template for translation",
   "defaultModelPageOcrPromptHint": "Enter prompt template for OCR image understanding",
   "defaultModelPageResetDefault": "Reset to default",
@@ -1126,6 +1129,17 @@
         "type": "String"
       },
       "userMessagesVar": {
+        "type": "String"
+      }
+    }
+  },
+  "defaultModelPageSuggestionVars": "Variables: conversation: {contentVar}, language: {localeVar}",
+  "@defaultModelPageSuggestionVars": {
+    "placeholders": {
+      "contentVar": {
+        "type": "String"
+      },
+      "localeVar": {
         "type": "String"
       }
     }
@@ -1156,6 +1170,7 @@
     }
   },
   "defaultModelPageUseCurrentModel": "Use current chat model",
+  "defaultModelPageNotEnabled": "Not enabled",
   "translatePagePasteButton": "Paste",
   "translatePageCopyResult": "Copy result",
   "translatePageClearAll": "Clear All",

@@ -2435,6 +2435,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get defaultModelPageSummaryModelSubtitle => '用于生成对话摘要的模型，推荐使用快速且便宜的模型';
 
   @override
+  String get defaultModelPageSuggestionModelTitle => '聊天建议模型';
+
+  @override
+  String get defaultModelPageSuggestionModelSubtitle =>
+      '用于在助手回复后生成继续对话的建议气泡。选择模型后才会启用。';
+
+  @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新频率';
 
   @override
@@ -2490,6 +2497,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get defaultModelPageSummaryPromptHint => '输入用于生成摘要的提示词模板';
 
   @override
+  String get defaultModelPageSuggestionPromptHint => '输入用于生成聊天建议的提示词模板';
+
+  @override
   String get defaultModelPageTranslatePromptHint => '输入用于翻译的提示词模板';
 
   @override
@@ -2515,6 +2525,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String defaultModelPageSuggestionVars(String contentVar, String localeVar) {
+    return '变量：对话内容：$contentVar，语言：$localeVar';
+  }
+
+  @override
   String get defaultModelPageCompressModelTitle => '压缩模型';
 
   @override
@@ -2535,6 +2550,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageUseCurrentModel => '使用当前对话模型';
+
+  @override
+  String get defaultModelPageNotEnabled => '未启用';
 
   @override
   String get translatePagePasteButton => '粘贴';
@@ -7102,6 +7120,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get defaultModelPageSummaryModelSubtitle => '用于生成对话摘要的模型，推荐使用快速且便宜的模型';
 
   @override
+  String get defaultModelPageSuggestionModelTitle => '聊天建议模型';
+
+  @override
+  String get defaultModelPageSuggestionModelSubtitle =>
+      '用于在助手回复后生成继续对话的建议气泡。选择模型后才会启用。';
+
+  @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新频率';
 
   @override
@@ -7157,6 +7182,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get defaultModelPageSummaryPromptHint => '输入用于生成摘要的提示词模板';
 
   @override
+  String get defaultModelPageSuggestionPromptHint => '输入用于生成聊天建议的提示词模板';
+
+  @override
   String get defaultModelPageTranslatePromptHint => '输入用于翻译的提示词模板';
 
   @override
@@ -7182,6 +7210,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String defaultModelPageSuggestionVars(String contentVar, String localeVar) {
+    return '变量：对话内容：$contentVar，语言：$localeVar';
+  }
+
+  @override
   String get defaultModelPageCompressModelTitle => '压缩模型';
 
   @override
@@ -7202,6 +7235,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageUseCurrentModel => '使用当前对话模型';
+
+  @override
+  String get defaultModelPageNotEnabled => '未启用';
 
   @override
   String get translatePagePasteButton => '粘贴';
@@ -11768,6 +11804,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get defaultModelPageSummaryModelSubtitle => '用於生成對話摘要的模型，推薦使用快速且便宜的模型';
 
   @override
+  String get defaultModelPageSuggestionModelTitle => '聊天建議模型';
+
+  @override
+  String get defaultModelPageSuggestionModelSubtitle =>
+      '用於在助手回覆後生成繼續對話的建議氣泡。選擇模型後才會啟用。';
+
+  @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新頻率';
 
   @override
@@ -11823,6 +11866,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get defaultModelPageSummaryPromptHint => '輸入用於生成摘要的提示詞範本';
 
   @override
+  String get defaultModelPageSuggestionPromptHint => '輸入用於生成聊天建議的提示詞範本';
+
+  @override
   String get defaultModelPageTranslatePromptHint => '輸入用於翻譯的提示詞範本';
 
   @override
@@ -11848,6 +11894,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String defaultModelPageSuggestionVars(String contentVar, String localeVar) {
+    return '變數：對話內容：$contentVar，語言：$localeVar';
+  }
+
+  @override
   String get defaultModelPageCompressModelTitle => '壓縮模型';
 
   @override
@@ -11868,6 +11919,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageUseCurrentModel => '使用目前對話模型';
+
+  @override
+  String get defaultModelPageNotEnabled => '未啟用';
 
   @override
   String get translatePagePasteButton => '貼上';

@@ -396,6 +396,9 @@ class ChatService extends ChangeNotifier {
       truncateIndex: conversation.truncateIndex,
       assistantId: conversation.assistantId,
       versionSelections: Map<String, int>.from(conversation.versionSelections),
+      summary: conversation.summary,
+      lastSummarizedMessageCount: conversation.lastSummarizedMessageCount,
+      chatSuggestions: List<String>.of(conversation.chatSuggestions),
     );
     await _conversationsBox.put(restored.id, restored);
 
@@ -555,6 +558,52 @@ class ChatService extends ChangeNotifier {
 
     conversation.summary = null;
     conversation.lastSummarizedMessageCount = 0;
+    await conversation.save();
+    notifyListeners();
+  }
+
+  Future<void> updateConversationSuggestions(
+    String conversationId,
+    List<String> suggestions,
+  ) async {
+    if (!_initialized) return;
+
+    final clean = suggestions
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .take(3)
+        .toList();
+
+    if (_draftConversations.containsKey(conversationId)) {
+      final draft = _draftConversations[conversationId]!;
+      draft.chatSuggestions = clean;
+      notifyListeners();
+      return;
+    }
+
+    final conversation = _conversationsBox.get(conversationId);
+    if (conversation == null) return;
+
+    conversation.chatSuggestions = clean;
+    await conversation.save();
+    notifyListeners();
+  }
+
+  Future<void> clearConversationSuggestions(String conversationId) async {
+    if (!_initialized) return;
+
+    if (_draftConversations.containsKey(conversationId)) {
+      final draft = _draftConversations[conversationId]!;
+      if (draft.chatSuggestions.isEmpty) return;
+      draft.chatSuggestions = <String>[];
+      notifyListeners();
+      return;
+    }
+
+    final conversation = _conversationsBox.get(conversationId);
+    if (conversation == null || conversation.chatSuggestions.isEmpty) return;
+
+    conversation.chatSuggestions = <String>[];
     await conversation.save();
     notifyListeners();
   }
