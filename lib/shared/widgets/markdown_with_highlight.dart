@@ -100,7 +100,6 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     // Ensure fenced code blocks take precedence over headings and other blocks
     // so lines like "# comment" inside code fences are not parsed as headings.
     components.insert(0, FencedCodeBlockMd());
-    // HTML details may contain fenced code blocks, so it must be checked first.
     components.insert(0, DetailsHtmlMd());
     // Inline components: keep defaults but make link parsing line-scoped
     final inlineComponents = List<MarkdownComponent>.from(
@@ -2696,13 +2695,20 @@ class BackslashEscapeMd extends InlineMd {
 
 class DetailsHtmlMd extends BlockMd {
   @override
-  String get expString =>
-      r"<details(?:\s+[^>]*)?>\s*<summary(?:\s+[^>]*)?>[\s\S]*?<\/summary>[\s\S]*?<\/details>";
+  RegExp get exp => RegExp(
+    r'^\ *?(?:' + expString + r")$",
+    dotAll: true,
+    multiLine: true,
+    caseSensitive: false,
+  );
+
+  @override
+  String get expString => _detailsPattern(6);
 
   @override
   Widget build(BuildContext context, String text, GptMarkdownConfig config) {
     final match = RegExp(
-      r"^<details(?<attrs>[^>]*)>\s*<summary(?:\s+[^>]*)?>(?<summary>[\s\S]*?)<\/summary>(?<body>[\s\S]*?)<\/details>$",
+      r"^<details(?<attrs>[^>]*)>\s*<summary(?:\s+[^>]*)?>(?<summary>[\s\S]*?)<\/summary>(?<body>[\s\S]*)<\/details>$",
       caseSensitive: false,
       dotAll: true,
     ).firstMatch(text.trim());
@@ -2725,6 +2731,16 @@ class DetailsHtmlMd extends BlockMd {
       initiallyExpanded: initiallyExpanded,
       config: config,
     );
+  }
+
+  static String _detailsPattern(int depth) {
+    final open = r"<details(?:\s+[^>]*)?>";
+    final summary = r"\s*<summary(?:\s+[^>]*)?>[\s\S]*?<\/summary>";
+    if (depth <= 1) {
+      return '$open$summary(?:(?!<details\\b|<\\/details>)[\\s\\S])*<\\/details>';
+    }
+    final nested = _detailsPattern(depth - 1);
+    return '$open$summary(?:(?!<details\\b|<\\/details>)[\\s\\S]|$nested)*<\\/details>';
   }
 
   static String _plainHtmlText(String input) {

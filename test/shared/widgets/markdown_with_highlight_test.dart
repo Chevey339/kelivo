@@ -488,6 +488,63 @@ press5
     },
   );
 
+  testWidgets(
+    'MarkdownWithCodeHighlight renders nested details independently',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('''
+开头文本
+
+<details>
+<summary>第一层折叠</summary>
+
+普通内容...
+
+<details>
+<summary>第二层折叠</summary>
+
+深藏的内容在这里！
+
+</details>
+
+</details>
+
+结尾文本
+'''),
+      );
+      await tester.pump();
+
+      var richTexts = tester.widgetList<RichText>(find.byType(RichText));
+      var plainText = richTexts.map((w) => w.text.toPlainText()).join('\n');
+
+      expect(plainText, contains('开头文本'));
+      expect(find.text('第一层折叠'), findsOneWidget);
+      expect(find.text('第二层折叠'), findsNothing);
+      expect(find.text('普通内容...', findRichText: true), findsNothing);
+      expect(find.text('深藏的内容在这里！', findRichText: true), findsNothing);
+
+      await tester.tap(find.text('第一层折叠'));
+      await tester.pumpAndSettle();
+
+      richTexts = tester.widgetList<RichText>(find.byType(RichText));
+      plainText = richTexts.map((w) => w.text.toPlainText()).join('\n');
+
+      expect(plainText, contains('普通内容...'));
+      expect(find.text('第二层折叠'), findsOneWidget);
+      expect(find.text('深藏的内容在这里！', findRichText: true), findsNothing);
+
+      await tester.tap(find.text('第二层折叠'));
+      await tester.pumpAndSettle();
+
+      richTexts = tester.widgetList<RichText>(find.byType(RichText));
+      plainText = richTexts.map((w) => w.text.toPlainText()).join('\n');
+
+      expect(plainText, contains('深藏的内容在这里！'));
+      expect(plainText, contains('结尾文本'));
+      expect(plainText, isNot(contains('</details>')));
+    },
+  );
+
   testWidgets('MarkdownWithCodeHighlight renders basic inline HTML tags', (
     tester,
   ) async {
