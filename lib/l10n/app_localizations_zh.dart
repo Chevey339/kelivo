@@ -663,6 +663,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditPageRegexTab => '正则替换';
 
   @override
+  String get assistantEditPageLocalToolsTab => '本地工具';
+
+  @override
   String get assistantEditTabLayoutTooltip => '自定义标签页';
 
   @override
@@ -1891,6 +1894,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatMessageWidgetBuiltinSearch => '模型内置搜索';
 
   @override
+  String get chatMessageWidgetReadClipboard => '读取剪切板';
+
+  @override
+  String get chatMessageWidgetWriteClipboard => '写入剪切板';
+
+  @override
   String chatMessageWidgetToolCall(String name) {
     return '调用工具: $name';
   }
@@ -2435,6 +2444,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get defaultModelPageSummaryModelSubtitle => '用于生成对话摘要的模型，推荐使用快速且便宜的模型';
 
   @override
+  String get defaultModelPageSuggestionModelTitle => '聊天建议模型';
+
+  @override
+  String get defaultModelPageSuggestionModelSubtitle =>
+      '用于在助手回复后生成继续对话的建议气泡。选择模型后才会启用。';
+
+  @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新频率';
 
   @override
@@ -2490,6 +2506,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get defaultModelPageSummaryPromptHint => '输入用于生成摘要的提示词模板';
 
   @override
+  String get defaultModelPageSuggestionPromptHint => '输入用于生成聊天建议的提示词模板';
+
+  @override
   String get defaultModelPageTranslatePromptHint => '输入用于翻译的提示词模板';
 
   @override
@@ -2515,6 +2534,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String defaultModelPageSuggestionVars(String contentVar, String localeVar) {
+    return '变量：对话内容：$contentVar，语言：$localeVar';
+  }
+
+  @override
   String get defaultModelPageCompressModelTitle => '压缩模型';
 
   @override
@@ -2535,6 +2559,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageUseCurrentModel => '使用当前对话模型';
+
+  @override
+  String get defaultModelPageNotEnabled => '未启用';
 
   @override
   String get translatePagePasteButton => '粘贴';
@@ -3235,6 +3262,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesFieldCustomUrlOptional => '自定义 URL（可选）';
 
   @override
+  String get searchServicesDialogApiKey => 'API Key';
+
+  @override
+  String get searchServicesDialogModel => '模型';
+
+  @override
+  String get searchServicesDialogSystemPrompt => '系统提示词';
+
+  @override
   String get searchServicesAddDialogInstanceUrl => '实例 URL';
 
   @override
@@ -3922,6 +3958,13 @@ class AppLocalizationsZh extends AppLocalizations {
       'Serper Google 搜索 API。响应快速，支持国家/地区、语言、时间和页码过滤。';
 
   @override
+  String get searchServiceNameGrok => 'Grok';
+
+  @override
+  String get searchProviderGrokDescription =>
+      '通过 xAI Responses API 使用 Grok 搜索。调用网页和 X 搜索工具，并返回带引用的来源。';
+
+  @override
   String get searchServicesDialogCountryOptional => '国家/地区（可选）';
 
   @override
@@ -4066,6 +4109,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get assistantEditPageMemoryTab => '记忆';
+
+  @override
+  String get assistantEditLocalToolTimeInfoTitle => '时间信息';
+
+  @override
+  String get assistantEditLocalToolTimeInfoSubtitle =>
+      '读取设备日期、星期、时间、时区、UTC 偏移和时间戳。';
+
+  @override
+  String get assistantEditLocalToolClipboardTitle => '剪切板';
+
+  @override
+  String get assistantEditLocalToolClipboardSubtitle =>
+      '在明确需要时读取或写入设备剪切板中的纯文本。';
 
   @override
   String get assistantEditMemorySwitchTitle => '记忆';
@@ -5314,6 +5371,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditPageRegexTab => '正则替换';
 
   @override
+  String get assistantEditPageLocalToolsTab => '本地工具';
+
+  @override
   String get assistantEditTabLayoutTooltip => '自定义标签页';
 
   @override
@@ -6542,6 +6602,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatMessageWidgetBuiltinSearch => '模型内置搜索';
 
   @override
+  String get chatMessageWidgetReadClipboard => '读取剪切板';
+
+  @override
+  String get chatMessageWidgetWriteClipboard => '写入剪切板';
+
+  @override
   String chatMessageWidgetToolCall(String name) {
     return '调用工具: $name';
   }
@@ -7086,6 +7152,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get defaultModelPageSummaryModelSubtitle => '用于生成对话摘要的模型，推荐使用快速且便宜的模型';
 
   @override
+  String get defaultModelPageSuggestionModelTitle => '聊天建议模型';
+
+  @override
+  String get defaultModelPageSuggestionModelSubtitle =>
+      '用于在助手回复后生成继续对话的建议气泡。选择模型后才会启用。';
+
+  @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新频率';
 
   @override
@@ -7141,6 +7214,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get defaultModelPageSummaryPromptHint => '输入用于生成摘要的提示词模板';
 
   @override
+  String get defaultModelPageSuggestionPromptHint => '输入用于生成聊天建议的提示词模板';
+
+  @override
   String get defaultModelPageTranslatePromptHint => '输入用于翻译的提示词模板';
 
   @override
@@ -7166,6 +7242,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String defaultModelPageSuggestionVars(String contentVar, String localeVar) {
+    return '变量：对话内容：$contentVar，语言：$localeVar';
+  }
+
+  @override
   String get defaultModelPageCompressModelTitle => '压缩模型';
 
   @override
@@ -7186,6 +7267,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageUseCurrentModel => '使用当前对话模型';
+
+  @override
+  String get defaultModelPageNotEnabled => '未启用';
 
   @override
   String get translatePagePasteButton => '粘贴';
@@ -7886,6 +7970,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServicesFieldCustomUrlOptional => '自定义 URL（可选）';
 
   @override
+  String get searchServicesDialogApiKey => 'API Key';
+
+  @override
+  String get searchServicesDialogModel => '模型';
+
+  @override
+  String get searchServicesDialogSystemPrompt => '系统提示词';
+
+  @override
   String get searchServicesAddDialogInstanceUrl => '实例 URL';
 
   @override
@@ -8573,6 +8666,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'Serper Google 搜索 API。响应快速，支持国家/地区、语言、时间和页码过滤。';
 
   @override
+  String get searchServiceNameGrok => 'Grok';
+
+  @override
+  String get searchProviderGrokDescription =>
+      '通过 xAI Responses API 使用 Grok 搜索。调用网页和 X 搜索工具，并返回带引用的来源。';
+
+  @override
   String get searchServicesDialogCountryOptional => '国家/地区（可选）';
 
   @override
@@ -8717,6 +8817,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditPageMemoryTab => '记忆';
+
+  @override
+  String get assistantEditLocalToolTimeInfoTitle => '时间信息';
+
+  @override
+  String get assistantEditLocalToolTimeInfoSubtitle =>
+      '读取设备日期、星期、时间、时区、UTC 偏移和时间戳。';
+
+  @override
+  String get assistantEditLocalToolClipboardTitle => '剪切板';
+
+  @override
+  String get assistantEditLocalToolClipboardSubtitle =>
+      '在明确需要时读取或写入设备剪切板中的纯文本。';
 
   @override
   String get assistantEditMemorySwitchTitle => '记忆';
@@ -9965,6 +10079,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantEditPageRegexTab => '正則替換';
 
   @override
+  String get assistantEditPageLocalToolsTab => '本機工具';
+
+  @override
   String get assistantEditTabLayoutTooltip => '自訂標籤頁';
 
   @override
@@ -11192,6 +11309,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatMessageWidgetBuiltinSearch => '模型內建搜尋';
 
   @override
+  String get chatMessageWidgetReadClipboard => '讀取剪貼簿';
+
+  @override
+  String get chatMessageWidgetWriteClipboard => '寫入剪貼簿';
+
+  @override
   String chatMessageWidgetToolCall(String name) {
     return '呼叫工具: $name';
   }
@@ -11736,6 +11859,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get defaultModelPageSummaryModelSubtitle => '用於生成對話摘要的模型，推薦使用快速且便宜的模型';
 
   @override
+  String get defaultModelPageSuggestionModelTitle => '聊天建議模型';
+
+  @override
+  String get defaultModelPageSuggestionModelSubtitle =>
+      '用於在助手回覆後生成繼續對話的建議氣泡。選擇模型後才會啟用。';
+
+  @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新頻率';
 
   @override
@@ -11791,6 +11921,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get defaultModelPageSummaryPromptHint => '輸入用於生成摘要的提示詞範本';
 
   @override
+  String get defaultModelPageSuggestionPromptHint => '輸入用於生成聊天建議的提示詞範本';
+
+  @override
   String get defaultModelPageTranslatePromptHint => '輸入用於翻譯的提示詞範本';
 
   @override
@@ -11816,6 +11949,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String defaultModelPageSuggestionVars(String contentVar, String localeVar) {
+    return '變數：對話內容：$contentVar，語言：$localeVar';
+  }
+
+  @override
   String get defaultModelPageCompressModelTitle => '壓縮模型';
 
   @override
@@ -11836,6 +11974,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageUseCurrentModel => '使用目前對話模型';
+
+  @override
+  String get defaultModelPageNotEnabled => '未啟用';
 
   @override
   String get translatePagePasteButton => '貼上';
@@ -12535,6 +12676,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServicesFieldCustomUrlOptional => '自訂 URL（可選）';
 
   @override
+  String get searchServicesDialogApiKey => 'API Key';
+
+  @override
+  String get searchServicesDialogModel => '模型';
+
+  @override
+  String get searchServicesDialogSystemPrompt => '系統提示詞';
+
+  @override
   String get searchServicesAddDialogInstanceUrl => '實例 URL';
 
   @override
@@ -13223,6 +13373,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       'Serper Google 搜尋 API。回應快速，支援國家/地區、語言、時間和頁碼過濾。';
 
   @override
+  String get searchServiceNameGrok => 'Grok';
+
+  @override
+  String get searchProviderGrokDescription =>
+      '透過 xAI Responses API 使用 Grok 搜尋。呼叫網頁和 X 搜尋工具，並返回帶引用的來源。';
+
+  @override
   String get searchServicesDialogCountryOptional => '國家/地區（可選）';
 
   @override
@@ -13368,6 +13525,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditPageMemoryTab => '記憶';
+
+  @override
+  String get assistantEditLocalToolTimeInfoTitle => '時間資訊';
+
+  @override
+  String get assistantEditLocalToolTimeInfoSubtitle =>
+      '讀取裝置日期、星期、時間、時區、UTC 偏移和時間戳。';
+
+  @override
+  String get assistantEditLocalToolClipboardTitle => '剪貼簿';
+
+  @override
+  String get assistantEditLocalToolClipboardSubtitle =>
+      '在明確需要時讀取或寫入裝置剪貼簿中的純文字。';
 
   @override
   String get assistantEditMemorySwitchTitle => '記憶';

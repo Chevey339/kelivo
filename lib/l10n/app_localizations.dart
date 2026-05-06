@@ -1343,6 +1343,12 @@ abstract class AppLocalizations {
   /// **'Regex Replace'**
   String get assistantEditPageRegexTab;
 
+  /// No description provided for @assistantEditPageLocalToolsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Tools'**
+  String get assistantEditPageLocalToolsTab;
+
   /// No description provided for @assistantEditTabLayoutTooltip.
   ///
   /// In en, this message translates to:
@@ -3737,6 +3743,18 @@ abstract class AppLocalizations {
   /// **'Built-in Search'**
   String get chatMessageWidgetBuiltinSearch;
 
+  /// No description provided for @chatMessageWidgetReadClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Read Clipboard'**
+  String get chatMessageWidgetReadClipboard;
+
+  /// No description provided for @chatMessageWidgetWriteClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Write Clipboard'**
+  String get chatMessageWidgetWriteClipboard;
+
   /// No description provided for @chatMessageWidgetToolCall.
   ///
   /// In en, this message translates to:
@@ -4763,6 +4781,18 @@ abstract class AppLocalizations {
   /// **'Used for generating conversation summaries; prefer fast and cheap models'**
   String get defaultModelPageSummaryModelSubtitle;
 
+  /// No description provided for @defaultModelPageSuggestionModelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat Suggestions Model'**
+  String get defaultModelPageSuggestionModelTitle;
+
+  /// No description provided for @defaultModelPageSuggestionModelSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Used for follow-up suggestion bubbles after assistant replies. Disabled until a model is selected.'**
+  String get defaultModelPageSuggestionModelSubtitle;
+
   /// No description provided for @assistantEditRecentChatsSummaryFrequencyTitle.
   ///
   /// In en, this message translates to:
@@ -4859,6 +4889,12 @@ abstract class AppLocalizations {
   /// **'Enter prompt template for summary generation'**
   String get defaultModelPageSummaryPromptHint;
 
+  /// No description provided for @defaultModelPageSuggestionPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter prompt template for chat suggestions'**
+  String get defaultModelPageSuggestionPromptHint;
+
   /// No description provided for @defaultModelPageTranslatePromptHint.
   ///
   /// In en, this message translates to:
@@ -4898,6 +4934,12 @@ abstract class AppLocalizations {
     String userMessagesVar,
   );
 
+  /// No description provided for @defaultModelPageSuggestionVars.
+  ///
+  /// In en, this message translates to:
+  /// **'Variables: conversation: {contentVar}, language: {localeVar}'**
+  String defaultModelPageSuggestionVars(String contentVar, String localeVar);
+
   /// No description provided for @defaultModelPageCompressModelTitle.
   ///
   /// In en, this message translates to:
@@ -4933,6 +4975,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use current chat model'**
   String get defaultModelPageUseCurrentModel;
+
+  /// No description provided for @defaultModelPageNotEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enabled'**
+  String get defaultModelPageNotEnabled;
 
   /// No description provided for @translatePagePasteButton.
   ///
@@ -6296,6 +6344,24 @@ abstract class AppLocalizations {
   /// **'Custom URL (optional)'**
   String get searchServicesFieldCustomUrlOptional;
 
+  /// No description provided for @searchServicesDialogApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key'**
+  String get searchServicesDialogApiKey;
+
+  /// No description provided for @searchServicesDialogModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get searchServicesDialogModel;
+
+  /// No description provided for @searchServicesDialogSystemPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'System Prompt'**
+  String get searchServicesDialogSystemPrompt;
+
   /// No description provided for @searchServicesAddDialogInstanceUrl.
   ///
   /// In en, this message translates to:
@@ -7598,6 +7664,18 @@ abstract class AppLocalizations {
   /// **'Serper Google Search API. Fast web results with optional country, language, time, and page filters.'**
   String get searchProviderSerperDescription;
 
+  /// No description provided for @searchServiceNameGrok.
+  ///
+  /// In en, this message translates to:
+  /// **'Grok'**
+  String get searchServiceNameGrok;
+
+  /// No description provided for @searchProviderGrokDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Grok search via xAI Responses API. Uses web and X search tools and returns cited sources.'**
+  String get searchProviderGrokDescription;
+
   /// No description provided for @searchServicesDialogCountryOptional.
   ///
   /// In en, this message translates to:
@@ -7885,6 +7963,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Memory'**
   String get assistantEditPageMemoryTab;
+
+  /// No description provided for @assistantEditLocalToolTimeInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Time Info'**
+  String get assistantEditLocalToolTimeInfoTitle;
+
+  /// No description provided for @assistantEditLocalToolTimeInfoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the device date, weekday, time, timezone, UTC offset, and timestamp.'**
+  String get assistantEditLocalToolTimeInfoSubtitle;
+
+  /// No description provided for @assistantEditLocalToolClipboardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clipboard'**
+  String get assistantEditLocalToolClipboardTitle;
+
+  /// No description provided for @assistantEditLocalToolClipboardSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read or write plain text from the device clipboard when explicitly needed.'**
+  String get assistantEditLocalToolClipboardSubtitle;
 
   /// No description provided for @assistantEditMemorySwitchTitle.
   ///

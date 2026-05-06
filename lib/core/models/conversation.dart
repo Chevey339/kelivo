@@ -47,6 +47,10 @@ class Conversation extends HiveObject {
   @HiveField(11)
   int lastSummarizedMessageCount;
 
+  // LLM-generated quick follow-up suggestions for the latest assistant reply.
+  @HiveField(12)
+  List<String> chatSuggestions;
+
   Conversation({
     String? id,
     required this.title,
@@ -60,6 +64,7 @@ class Conversation extends HiveObject {
     Map<String, int>? versionSelections,
     this.summary,
     int? lastSummarizedMessageCount,
+    List<String>? chatSuggestions,
   }) : id = id ?? const Uuid().v4(),
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now(),
@@ -67,7 +72,8 @@ class Conversation extends HiveObject {
        mcpServerIds = mcpServerIds ?? [],
        truncateIndex = truncateIndex ?? -1,
        versionSelections = versionSelections ?? <String, int>{},
-       lastSummarizedMessageCount = lastSummarizedMessageCount ?? 0;
+       lastSummarizedMessageCount = lastSummarizedMessageCount ?? 0,
+       chatSuggestions = chatSuggestions ?? [];
 
   Conversation copyWith({
     String? id,
@@ -82,6 +88,7 @@ class Conversation extends HiveObject {
     Map<String, int>? versionSelections,
     String? summary,
     int? lastSummarizedMessageCount,
+    List<String>? chatSuggestions,
     bool clearSummary = false,
   }) {
     return Conversation(
@@ -98,6 +105,7 @@ class Conversation extends HiveObject {
       summary: clearSummary ? null : (summary ?? this.summary),
       lastSummarizedMessageCount:
           lastSummarizedMessageCount ?? this.lastSummarizedMessageCount,
+      chatSuggestions: chatSuggestions ?? this.chatSuggestions,
     );
   }
 
@@ -115,6 +123,7 @@ class Conversation extends HiveObject {
       'versionSelections': versionSelections,
       'summary': summary,
       'lastSummarizedMessageCount': lastSummarizedMessageCount,
+      'chatSuggestions': chatSuggestions,
     };
   }
 
@@ -138,6 +147,9 @@ class Conversation extends HiveObject {
       summary: json['summary'] as String?,
       lastSummarizedMessageCount:
           json['lastSummarizedMessageCount'] as int? ?? 0,
+      chatSuggestions:
+          (json['chatSuggestions'] as List?)?.cast<String>() ??
+          const <String>[],
     );
   }
 }

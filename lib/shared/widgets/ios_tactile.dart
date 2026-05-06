@@ -251,8 +251,10 @@ class _IosCardPressState extends State<IosCardPress> {
                     ..onTap = widget.onTap == null
                         ? null
                         : () {
-                            final sp = context.read<SettingsProvider>();
-                            if (widget.haptics && sp.hapticsOnCardTap) {
+                            if (widget.haptics &&
+                                context
+                                    .read<SettingsProvider>()
+                                    .hapticsOnCardTap) {
                               Haptics.soft();
                             }
                             widget.onTap!.call();

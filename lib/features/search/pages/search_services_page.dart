@@ -585,6 +585,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is PerplexityOptions) return 'perplexity';
     if (s is BochaOptions) return 'bocha';
     if (s is SerperOptions) return 'serper';
+    if (s is GrokOptions) return 'grok';
     return 'search';
   }
 
@@ -757,6 +758,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
       {'type': 'perplexity', 'name': l10n.searchServiceNamePerplexity},
       {'type': 'bocha', 'name': l10n.searchServiceNameBocha},
       {'type': 'serper', 'name': l10n.searchServiceNameSerper},
+      {'type': 'grok', 'name': l10n.searchServiceNameGrok},
     ];
     return ListView.builder(
       key: const ValueKey('service_list'),
@@ -819,6 +821,8 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
         return l10n.searchServiceNameBocha;
       case 'serper':
         return l10n.searchServiceNameSerper;
+      case 'grok':
+        return l10n.searchServiceNameGrok;
       default:
         return '';
     }
@@ -880,6 +884,8 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
       bool obscureText = false,
       String? initialValue,
       TextInputType? keyboardType,
+      int maxLines = 1,
+      int? minLines,
       String? Function(String?)? validator,
     }) {
       _controllers[key] ??= TextEditingController(text: initialValue);
@@ -894,6 +900,8 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
           controller: _controllers[key],
           obscureText: obscureText,
           keyboardType: keyboardType,
+          maxLines: obscureText ? 1 : maxLines,
+          minLines: obscureText ? null : minLines,
           style: const TextStyle(fontSize: 16),
           decoration: InputDecoration(
             labelText: label,
@@ -953,7 +961,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
         return [
           buildTextField(
             key: 'apiKey',
-            label: 'API Key',
+            label: l10n.searchServicesDialogApiKey,
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return l10n.searchServicesAddDialogApiKeyRequired;
@@ -1052,6 +1060,41 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
               }
               return null;
             },
+          ),
+        ];
+      case 'grok':
+        return [
+          buildTextField(
+            key: 'apiKey',
+            label: 'API Key',
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return l10n.searchServicesAddDialogApiKeyRequired;
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          buildTextField(
+            key: 'model',
+            label: l10n.searchServicesDialogModel,
+            hint: GrokOptions.defaultModel,
+            initialValue: GrokOptions.defaultModel,
+          ),
+          const SizedBox(height: 12),
+          buildTextField(
+            key: 'customUrl',
+            label: l10n.searchServicesFieldCustomUrlOptional,
+            hint: GrokOptions.defaultUrl,
+            initialValue: GrokOptions.defaultUrl,
+          ),
+          const SizedBox(height: 12),
+          buildTextField(
+            key: 'systemPrompt',
+            label: l10n.searchServicesDialogSystemPrompt,
+            initialValue: GrokOptions.defaultSystemPrompt,
+            minLines: 3,
+            maxLines: 5,
           ),
         ];
       case 'searxng':
@@ -1155,6 +1198,14 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
           tbs: (_controllers['tbs']?.text ?? '').trim(),
           page: pageText.isEmpty ? 1 : int.parse(pageText),
         );
+      case 'grok':
+        return GrokOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          model: _controllers['model']!.text.trim(),
+          customUrl: _controllers['customUrl']!.text.trim(),
+          systemPrompt: _controllers['systemPrompt']!.text,
+        );
       default:
         return BingLocalOptions(id: id);
     }
@@ -1219,6 +1270,15 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       _controllers['tbs'] = TextEditingController(text: service.tbs);
       _controllers['page'] = TextEditingController(
         text: service.page == 1 ? '' : service.page.toString(),
+      );
+    } else if (service is GrokOptions) {
+      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
+      _controllers['model'] = TextEditingController(text: service.model);
+      _controllers['customUrl'] = TextEditingController(
+        text: service.customUrl,
+      );
+      _controllers['systemPrompt'] = TextEditingController(
+        text: service.systemPrompt,
       );
     }
   }
@@ -1325,6 +1385,8 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       String? hint,
       bool obscureText = false,
       TextInputType? keyboardType,
+      int maxLines = 1,
+      int? minLines,
       String? Function(String?)? validator,
     }) {
       _controllers[key] = _controllers[key] ?? TextEditingController();
@@ -1339,6 +1401,8 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
           controller: _controllers[key],
           obscureText: obscureText,
           keyboardType: keyboardType,
+          maxLines: obscureText ? 1 : maxLines,
+          minLines: obscureText ? null : minLines,
           style: const TextStyle(fontSize: 16),
           decoration: InputDecoration(
             labelText: label,
@@ -1371,7 +1435,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       return [
         buildTextField(
           key: 'apiKey',
-          label: 'API Key',
+          label: l10n.searchServicesDialogApiKey,
           validator: (value) {
             if (value == null || value.isEmpty) {
               return l10n.searchServicesEditDialogApiKeyRequired;
@@ -1469,6 +1533,38 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
             }
             return null;
           },
+        ),
+      ];
+    } else if (service is GrokOptions) {
+      return [
+        buildTextField(
+          key: 'apiKey',
+          label: 'API Key',
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return l10n.searchServicesEditDialogApiKeyRequired;
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 12),
+        buildTextField(
+          key: 'model',
+          label: l10n.searchServicesDialogModel,
+          hint: GrokOptions.defaultModel,
+        ),
+        const SizedBox(height: 12),
+        buildTextField(
+          key: 'customUrl',
+          label: l10n.searchServicesFieldCustomUrlOptional,
+          hint: GrokOptions.defaultUrl,
+        ),
+        const SizedBox(height: 12),
+        buildTextField(
+          key: 'systemPrompt',
+          label: l10n.searchServicesDialogSystemPrompt,
+          minLines: 3,
+          maxLines: 5,
         ),
       ];
     } else if (service is SearXNGOptions) {
@@ -1589,6 +1685,14 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
         hl: (_controllers['hl']?.text ?? '').trim(),
         tbs: (_controllers['tbs']?.text ?? '').trim(),
         page: pageText.isEmpty ? 1 : int.parse(pageText),
+      );
+    } else if (service is GrokOptions) {
+      return GrokOptions(
+        id: service.id,
+        apiKey: _controllers['apiKey']!.text,
+        model: _controllers['model']!.text.trim(),
+        customUrl: _controllers['customUrl']!.text.trim(),
+        systemPrompt: _controllers['systemPrompt']!.text,
       );
     }
 

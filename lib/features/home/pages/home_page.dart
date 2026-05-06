@@ -1010,6 +1010,10 @@ class _HomePageState extends State<HomePage>
     required double bottomContentPadding,
     required EdgeInsetsGeometry dividerPadding,
   }) {
+    final settings = context.watch<SettingsProvider>();
+    final suggestionsEnabled =
+        settings.suggestionModelProvider != null &&
+        settings.suggestionModelId != null;
     return BackdropGroup(
       backdropKey: _messageListBackdropKey,
       child: MessageListView(
@@ -1027,6 +1031,10 @@ class _HomePageState extends State<HomePage>
         translations: _buildTranslationUiStates(),
         selecting: _controller.selecting,
         selectedItems: _controller.selectedItems,
+        suggestions: suggestionsEnabled
+            ? (_controller.currentConversation?.chatSuggestions ??
+                  const <String>[])
+            : const <String>[],
         bottomContentPadding: bottomContentPadding,
         dividerPadding: dividerPadding,
         streamingContentNotifier: _controller.streamingContentNotifier,
@@ -1052,6 +1060,7 @@ class _HomePageState extends State<HomePage>
         onShareMessage: (index, messages) =>
             _controller.shareMessage(index, messages),
         onSpeakMessage: (message) => _controller.speakMessage(message),
+        onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),
         onToggleSelection: (messageId, selected) {
           _controller.toggleSelection(messageId, selected);
         },

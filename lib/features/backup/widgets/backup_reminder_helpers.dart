@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../../icons/lucide_adapter.dart' as lucide;
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 
 String backupReminderFrequencyLabel(AppLocalizations l10n, int days) {
@@ -70,23 +71,16 @@ Future<int?> _showBackupReminderMobileTimePicker(
 }) async {
   final initial = _resolveInitialTimeMinutes(initialMinutes);
 
-  return showCupertinoModalPopup<int>(
+  return showModalBottomSheet<int>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (ctx) {
-      return SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: _BackupReminderTimeWheelPanel(
-              initialMinutes: initial,
-              isDesktop: false,
-              onCancel: () => Navigator.of(ctx).pop(),
-              onSave: (minutes) => Navigator.of(ctx).pop(minutes),
-            ),
-          ),
-        ),
+      return _BackupReminderTimeWheelPanel(
+        initialMinutes: initial,
+        isDesktop: false,
+        onCancel: () => Navigator.of(ctx).pop(),
+        onSave: (minutes) => Navigator.of(ctx).pop(minutes),
       );
     },
   );
@@ -184,56 +178,54 @@ class _BackupReminderTimeWheelPanelState
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final radius = widget.isDesktop
         ? BorderRadius.circular(18)
-        : const BorderRadius.vertical(top: Radius.circular(22));
+        : BorderRadius.circular(22);
     final borderColor = cs.outlineVariant.withValues(
       alpha: widget.isDesktop ? 0.24 : 0.12,
     );
     final selectedTime = backupReminderTimeLabel(context, _selectedMinutes);
+    final panelColor = widget.isDesktop
+        ? cs.surface
+        : (isDark ? const Color(0xFF1F2023) : const Color(0xFFF8F9FA));
 
-    return Material(
+    final panel = Material(
       color: Colors.transparent,
       child: Container(
+        key: widget.isDesktop
+            ? const ValueKey('backup-reminder-time-desktop-sheet')
+            : const ValueKey('backup-reminder-time-mobile-sheet'),
+        width: widget.isDesktop ? null : double.infinity,
+        margin: widget.isDesktop
+            ? EdgeInsets.zero
+            : EdgeInsets.only(left: 12, right: 12, bottom: 12 + bottomInset),
         decoration: BoxDecoration(
-          color: cs.surface,
+          color: panelColor,
           borderRadius: radius,
-          border: Border.all(color: borderColor),
-          boxShadow: [
-            BoxShadow(
-              color: cs.shadow.withValues(alpha: isDark ? 0.32 : 0.12),
-              blurRadius: widget.isDesktop ? 28 : 20,
-              offset: Offset(0, widget.isDesktop ? 16 : -4),
-            ),
-          ],
+          border: widget.isDesktop ? Border.all(color: borderColor) : null,
+          boxShadow: widget.isDesktop
+              ? [
+                  BoxShadow(
+                    color: cs.shadow.withValues(alpha: isDark ? 0.32 : 0.12),
+                    blurRadius: 28,
+                    offset: const Offset(0, 16),
+                  ),
+                ]
+              : null,
         ),
         child: ClipRRect(
           borderRadius: radius,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (!widget.isDesktop) ...[
-                const SizedBox(height: 8),
-                Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.onSurface.withValues(alpha: isDark ? 0.24 : 0.18),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ],
               _buildHeader(context, l10n, cs),
-              Divider(
-                height: 1,
-                color: cs.outlineVariant.withValues(alpha: 0.14),
-              ),
               Padding(
                 padding: EdgeInsets.fromLTRB(
                   widget.isDesktop ? 22 : 18,
-                  widget.isDesktop ? 18 : 14,
+                  widget.isDesktop ? 18 : 12,
                   widget.isDesktop ? 22 : 18,
-                  widget.isDesktop ? 8 : 10,
+                  widget.isDesktop ? 8 : 14,
                 ),
                 child: Column(
                   children: [
@@ -252,12 +244,15 @@ class _BackupReminderTimeWheelPanelState
                 ),
               ),
               if (widget.isDesktop) _buildDesktopActions(context, l10n, cs),
-              if (!widget.isDesktop) const SizedBox(height: 8),
+              if (!widget.isDesktop) _buildMobileActions(context, l10n, cs),
             ],
           ),
         ),
       ),
     );
+
+    if (widget.isDesktop) return panel;
+    return SafeArea(top: false, child: panel);
   }
 
   Widget _buildHeader(
@@ -282,38 +277,18 @@ class _BackupReminderTimeWheelPanelState
       );
     }
 
-    return SizedBox(
-      height: 52,
-      child: Row(
-        children: [
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            onPressed: widget.onCancel,
-            child: Text(
-              l10n.backupPageCancel,
-              style: TextStyle(color: cs.onSurface.withValues(alpha: 0.72)),
-            ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      child: Center(
+        child: Text(
+          l10n.backupReminderTimeTitle,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: cs.onSurface.withValues(alpha: 0.92),
           ),
-          Expanded(
-            child: Text(
-              l10n.backupReminderTimeTitle,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface,
-              ),
-            ),
-          ),
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            onPressed: _save,
-            child: Text(
-              l10n.backupPageSave,
-              style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -457,6 +432,66 @@ class _BackupReminderTimeWheelPanelState
               backgroundColor: cs.primary,
               foregroundColor: cs.primary,
               onTap: _save,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileActions(
+    BuildContext context,
+    AppLocalizations l10n,
+    ColorScheme cs,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      key: const ValueKey('backup-reminder-time-mobile-actions'),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: IosCardPress(
+              onTap: widget.onCancel,
+              haptics: false,
+              borderRadius: BorderRadius.circular(13),
+              baseColor: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : const Color(0xFFE7E9EC),
+              padding: const EdgeInsets.symmetric(vertical: 11),
+              child: Center(
+                child: Text(
+                  l10n.backupPageCancel,
+                  style: TextStyle(
+                    color: cs.onSurface.withValues(alpha: 0.74),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: IosCardPress(
+              onTap: _save,
+              haptics: false,
+              borderRadius: BorderRadius.circular(13),
+              baseColor: isDark
+                  ? Colors.white.withValues(alpha: 0.16)
+                  : const Color(0xFFDADDE2),
+              padding: const EdgeInsets.symmetric(vertical: 11),
+              child: Center(
+                child: Text(
+                  l10n.backupPageSave,
+                  style: TextStyle(
+                    color: cs.onSurface.withValues(alpha: 0.9),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
             ),
           ),
         ],

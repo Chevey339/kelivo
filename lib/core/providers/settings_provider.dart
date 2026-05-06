@@ -80,6 +80,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _ocrPromptKey = 'ocr_prompt_v1';
   static const String _summaryModelKey = 'summary_model_v1';
   static const String _summaryPromptKey = 'summary_prompt_v1';
+  static const String _suggestionModelKey = 'suggestion_model_v1';
+  static const String _suggestionPromptKey = 'suggestion_prompt_v1';
   static const String _compressModelKey = 'compress_model_v1';
   static const String _compressPromptKey = 'compress_prompt_v1';
   static const String _themePaletteKey = 'theme_palette_v1';
@@ -727,6 +729,20 @@ class SettingsProvider extends ChangeNotifier {
     _summaryPrompt = (summaryp == null || summaryp.trim().isEmpty)
         ? defaultSummaryPrompt
         : summaryp;
+    // load chat suggestion model
+    final suggestionSel = prefs.getString(_suggestionModelKey);
+    if (suggestionSel != null && suggestionSel.contains('::')) {
+      final parts = suggestionSel.split('::');
+      if (parts.length >= 2) {
+        _suggestionModelProvider = parts[0];
+        _suggestionModelId = parts.sublist(1).join('::');
+      }
+    }
+    // load chat suggestion prompt
+    final suggestionp = prefs.getString(_suggestionPromptKey);
+    _suggestionPrompt = (suggestionp == null || suggestionp.trim().isEmpty)
+        ? defaultSuggestionPrompt
+        : suggestionp;
     // load compress model
     final compressSel = prefs.getString(_compressModelKey);
     if (compressSel != null && compressSel.contains('::')) {
@@ -2189,6 +2205,12 @@ class SettingsProvider extends ChangeNotifier {
       await prefs.remove(_summaryModelKey);
       changed = true;
     }
+    if (_suggestionModelProvider == providerKey) {
+      _suggestionModelProvider = null;
+      _suggestionModelId = null;
+      await prefs.remove(_suggestionModelKey);
+      changed = true;
+    }
     if (_compressModelProvider == providerKey) {
       _compressModelProvider = null;
       _compressModelId = null;
@@ -2237,6 +2259,13 @@ class SettingsProvider extends ChangeNotifier {
       _summaryModelProvider = null;
       _summaryModelId = null;
       await prefs.remove(_summaryModelKey);
+      changed = true;
+    }
+    if (_suggestionModelProvider == providerKey &&
+        _suggestionModelId == modelId) {
+      _suggestionModelProvider = null;
+      _suggestionModelId = null;
+      await prefs.remove(_suggestionModelKey);
       changed = true;
     }
     if (_compressModelProvider == providerKey && _compressModelId == modelId) {
@@ -2292,6 +2321,11 @@ class SettingsProvider extends ChangeNotifier {
       _summaryModelProvider = null;
       _summaryModelId = null;
       await prefs.remove(_summaryModelKey);
+    }
+    if (_suggestionModelProvider == key) {
+      _suggestionModelProvider = null;
+      _suggestionModelId = null;
+      await prefs.remove(_suggestionModelKey);
     }
     if (_compressModelProvider == key) {
       _compressModelProvider = null;
@@ -2596,6 +2630,63 @@ Generate or update a brief summary of the user's questions and intentions.
 
   Future<void> resetSummaryPrompt() async =>
       setSummaryPrompt(defaultSummaryPrompt);
+
+  // Chat suggestion model and prompt. Null model means the feature is disabled.
+  String? _suggestionModelProvider;
+  String? _suggestionModelId;
+  String? get suggestionModelProvider => _suggestionModelProvider;
+  String? get suggestionModelId => _suggestionModelId;
+  String? get suggestionModelKey =>
+      (_suggestionModelProvider != null && _suggestionModelId != null)
+      ? '${_suggestionModelProvider!}::${_suggestionModelId!}'
+      : null;
+
+  static const String defaultSuggestionPrompt =
+      '''I will provide you with some chat content in the `<content>` block, including conversations between the User and the AI assistant.
+You need to act as the User to continue the conversation, generating 3 appropriate and contextually relevant responses or questions to the assistant.
+
+Rules:
+1. Reply directly with suggestions, do not add any formatting, and separate suggestions with newlines.
+2. Use {locale} language.
+3. Ensure each suggestion is valid and useful for continuing the conversation.
+4. Each suggestion should be concise.
+5. Imitate the user's previous conversational style.
+6. Act as a User, not an Assistant.
+
+<content>
+{content}
+</content>''';
+
+  String _suggestionPrompt = defaultSuggestionPrompt;
+  String get suggestionPrompt => _suggestionPrompt;
+
+  Future<void> setSuggestionModel(String providerKey, String modelId) async {
+    _suggestionModelProvider = providerKey;
+    _suggestionModelId = modelId;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_suggestionModelKey, '$providerKey::$modelId');
+  }
+
+  Future<void> resetSuggestionModel() async {
+    _suggestionModelProvider = null;
+    _suggestionModelId = null;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_suggestionModelKey);
+  }
+
+  Future<void> setSuggestionPrompt(String prompt) async {
+    _suggestionPrompt = prompt.trim().isEmpty
+        ? defaultSuggestionPrompt
+        : prompt;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_suggestionPromptKey, _suggestionPrompt);
+  }
+
+  Future<void> resetSuggestionPrompt() async =>
+      setSuggestionPrompt(defaultSuggestionPrompt);
 
   // Compress model and prompt
   String? _compressModelProvider;
@@ -3476,6 +3567,15 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._titleModelProvider = _titleModelProvider;
     copy._titleModelId = _titleModelId;
     copy._titlePrompt = _titlePrompt;
+    copy._summaryModelProvider = _summaryModelProvider;
+    copy._summaryModelId = _summaryModelId;
+    copy._summaryPrompt = _summaryPrompt;
+    copy._suggestionModelProvider = _suggestionModelProvider;
+    copy._suggestionModelId = _suggestionModelId;
+    copy._suggestionPrompt = _suggestionPrompt;
+    copy._compressModelProvider = _compressModelProvider;
+    copy._compressModelId = _compressModelId;
+    copy._compressPrompt = _compressPrompt;
     copy._translateModelProvider = _translateModelProvider;
     copy._translateModelId = _translateModelId;
     copy._translatePrompt = _translatePrompt;

@@ -673,6 +673,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditPageRegexTab => 'Regex Replace';
 
   @override
+  String get assistantEditPageLocalToolsTab => 'Local Tools';
+
+  @override
   String get assistantEditTabLayoutTooltip => 'Customize tabs';
 
   @override
@@ -1944,6 +1947,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatMessageWidgetBuiltinSearch => 'Built-in Search';
 
   @override
+  String get chatMessageWidgetReadClipboard => 'Read Clipboard';
+
+  @override
+  String get chatMessageWidgetWriteClipboard => 'Write Clipboard';
+
+  @override
   String chatMessageWidgetToolCall(String name) {
     return 'Tool Call: $name';
   }
@@ -2512,6 +2521,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Used for generating conversation summaries; prefer fast and cheap models';
 
   @override
+  String get defaultModelPageSuggestionModelTitle => 'Chat Suggestions Model';
+
+  @override
+  String get defaultModelPageSuggestionModelSubtitle =>
+      'Used for follow-up suggestion bubbles after assistant replies. Disabled until a model is selected.';
+
+  @override
   String get assistantEditRecentChatsSummaryFrequencyTitle =>
       'Summary Refresh Frequency';
 
@@ -2573,6 +2589,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter prompt template for summary generation';
 
   @override
+  String get defaultModelPageSuggestionPromptHint =>
+      'Enter prompt template for chat suggestions';
+
+  @override
   String get defaultModelPageTranslatePromptHint =>
       'Enter prompt template for translation';
 
@@ -2600,6 +2620,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String defaultModelPageSuggestionVars(String contentVar, String localeVar) {
+    return 'Variables: conversation: $contentVar, language: $localeVar';
+  }
+
+  @override
   String get defaultModelPageCompressModelTitle => 'Compress Model';
 
   @override
@@ -2622,6 +2647,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultModelPageUseCurrentModel => 'Use current chat model';
+
+  @override
+  String get defaultModelPageNotEnabled => 'Not enabled';
 
   @override
   String get translatePagePasteButton => 'Paste';
@@ -3339,6 +3367,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchServicesFieldCustomUrlOptional => 'Custom URL (optional)';
+
+  @override
+  String get searchServicesDialogApiKey => 'API Key';
+
+  @override
+  String get searchServicesDialogModel => 'Model';
+
+  @override
+  String get searchServicesDialogSystemPrompt => 'System Prompt';
 
   @override
   String get searchServicesAddDialogInstanceUrl => 'Instance URL';
@@ -4078,6 +4115,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Serper Google Search API. Fast web results with optional country, language, time, and page filters.';
 
   @override
+  String get searchServiceNameGrok => 'Grok';
+
+  @override
+  String get searchProviderGrokDescription =>
+      'Grok search via xAI Responses API. Uses web and X search tools and returns cited sources.';
+
+  @override
   String get searchServicesDialogCountryOptional => 'Country/region (optional)';
 
   @override
@@ -4226,6 +4270,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditPageMemoryTab => 'Memory';
+
+  @override
+  String get assistantEditLocalToolTimeInfoTitle => 'Time Info';
+
+  @override
+  String get assistantEditLocalToolTimeInfoSubtitle =>
+      'Read the device date, weekday, time, timezone, UTC offset, and timestamp.';
+
+  @override
+  String get assistantEditLocalToolClipboardTitle => 'Clipboard';
+
+  @override
+  String get assistantEditLocalToolClipboardSubtitle =>
+      'Read or write plain text from the device clipboard when explicitly needed.';
 
   @override
   String get assistantEditMemorySwitchTitle => 'Memory';

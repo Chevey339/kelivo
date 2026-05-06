@@ -95,6 +95,25 @@ class DefaultModelPage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _ModelCard(
+            icon: Lucide.MessagesSquare,
+            title: l10n.defaultModelPageSuggestionModelTitle,
+            subtitle: l10n.defaultModelPageSuggestionModelSubtitle,
+            modelProvider: settings.suggestionModelProvider,
+            modelId: settings.suggestionModelId,
+            disabledWhenUnset: true,
+            onReset: () async {
+              await settings.resetSuggestionModel();
+            },
+            onPick: () async {
+              final sel = await showModelSelector(context);
+              if (sel != null) {
+                await settings.setSuggestionModel(sel.providerKey, sel.modelId);
+              }
+            },
+            configAction: () => _showSuggestionPromptSheet(context),
+          ),
+          const SizedBox(height: 16),
+          _ModelCard(
             icon: Lucide.package2,
             title: l10n.defaultModelPageCompressModelTitle,
             subtitle: l10n.defaultModelPageCompressModelSubtitle,
@@ -146,8 +165,7 @@ class DefaultModelPage extends StatelessWidget {
             subtitle: l10n.defaultModelPageOcrModelSubtitle,
             modelProvider: settings.ocrModelProvider,
             modelId: settings.ocrModelId,
-            fallbackProvider: settings.currentModelProvider,
-            fallbackModelId: settings.currentModelId,
+            disabledWhenUnset: true,
             onReset: () async {
               await settings.resetOcrModel();
             },
@@ -613,6 +631,118 @@ class DefaultModelPage extends StatelessWidget {
       },
     );
   }
+
+  Future<void> _showSuggestionPromptSheet(BuildContext context) async {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.read<SettingsProvider>();
+    final controller = TextEditingController(text: settings.suggestionPrompt);
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 12,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: cs.onSurface.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  l10n.defaultModelPagePromptLabel,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: controller,
+                  maxLines: 8,
+                  decoration: InputDecoration(
+                    hintText: l10n.defaultModelPageSuggestionPromptHint,
+                    filled: true,
+                    fillColor: Theme.of(ctx).brightness == Brightness.dark
+                        ? Colors.white10
+                        : const Color(0xFFF2F3F5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: cs.primary.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () async {
+                        await settings.resetSuggestionPrompt();
+                        controller.text = settings.suggestionPrompt;
+                      },
+                      child: Text(l10n.defaultModelPageResetDefault),
+                    ),
+                    const Spacer(),
+                    FilledButton(
+                      onPressed: () async {
+                        await settings.setSuggestionPrompt(
+                          controller.text.trim(),
+                        );
+                        if (ctx.mounted) Navigator.of(ctx).pop();
+                      },
+                      child: Text(l10n.defaultModelPageSave),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  l10n.defaultModelPageSuggestionVars('{content}', '{locale}'),
+                  style: TextStyle(
+                    color: cs.onSurface.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _ModelCard extends StatelessWidget {
@@ -626,6 +756,7 @@ class _ModelCard extends StatelessWidget {
     this.onReset,
     this.fallbackProvider,
     this.fallbackModelId,
+    this.disabledWhenUnset = false,
     this.configAction,
   });
 
@@ -636,6 +767,7 @@ class _ModelCard extends StatelessWidget {
   final String? modelId;
   final String? fallbackProvider;
   final String? fallbackModelId;
+  final bool disabledWhenUnset;
   final VoidCallback onPick;
   final VoidCallback? onReset;
   final VoidCallback? configAction;
@@ -679,7 +811,9 @@ class _ModelCard extends StatelessWidget {
 
     // Override display text if using fallback
     if (usingFallback) {
-      modelDisplay = l10n.defaultModelPageUseCurrentModel;
+      modelDisplay = disabledWhenUnset
+          ? l10n.defaultModelPageNotEnabled
+          : l10n.defaultModelPageUseCurrentModel;
     }
     final baseBg = isDark
         ? Colors.white10

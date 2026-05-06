@@ -122,6 +122,32 @@ class DesktopDefaultModelPane extends StatelessWidget {
 
                   const SizedBox(height: 16),
                   _ModelCard(
+                    icon: lucide.Lucide.MessagesSquare,
+                    title: l10n.defaultModelPageSuggestionModelTitle,
+                    subtitle: l10n.defaultModelPageSuggestionModelSubtitle,
+                    modelProvider: settings.suggestionModelProvider,
+                    modelId: settings.suggestionModelId,
+                    disabledWhenUnset: true,
+                    onReset: () async {
+                      await context
+                          .read<SettingsProvider>()
+                          .resetSuggestionModel();
+                    },
+                    onPick: () async {
+                      final settingsProvider = context.read<SettingsProvider>();
+                      final sel = await showModelSelector(context);
+                      if (sel != null) {
+                        await settingsProvider.setSuggestionModel(
+                          sel.providerKey,
+                          sel.modelId,
+                        );
+                      }
+                    },
+                    configAction: () => _showSuggestionPromptDialog(context),
+                  ),
+
+                  const SizedBox(height: 16),
+                  _ModelCard(
                     icon: lucide.Lucide.package2,
                     title: l10n.defaultModelPageCompressModelTitle,
                     subtitle: l10n.defaultModelPageCompressModelSubtitle,
@@ -186,8 +212,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     subtitle: l10n.defaultModelPageOcrModelSubtitle,
                     modelProvider: settings.ocrModelProvider,
                     modelId: settings.ocrModelId,
-                    fallbackProvider: settings.currentModelProvider,
-                    fallbackModelId: settings.currentModelId,
+                    disabledWhenUnset: true,
                     onReset: () async {
                       await context.read<SettingsProvider>().resetOcrModel();
                     },
@@ -659,6 +684,99 @@ class DesktopDefaultModelPane extends StatelessWidget {
       },
     );
   }
+
+  Future<void> _showSuggestionPromptDialog(BuildContext context) async {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.read<SettingsProvider>();
+    final ctrl = TextEditingController(text: sp.suggestionPrompt);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: cs.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.defaultModelPagePromptLabel,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      _SmallIconBtn(
+                        icon: lucide.Lucide.X,
+                        onTap: () => Navigator.of(ctx).maybePop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _promptEditor(
+                    ctx,
+                    controller: ctrl,
+                    hintText: l10n.defaultModelPageSuggestionPromptHint,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _DeskIosButton(
+                        label: l10n.defaultModelPageResetDefault,
+                        filled: false,
+                        dense: true,
+                        onTap: () async {
+                          await sp.resetSuggestionPrompt();
+                          ctrl.text = sp.suggestionPrompt;
+                        },
+                      ),
+                      const Spacer(),
+                      _DeskIosButton(
+                        label: l10n.defaultModelPageSave,
+                        filled: true,
+                        dense: true,
+                        onTap: () async {
+                          await sp.setSuggestionPrompt(ctrl.text.trim());
+                          if (ctx.mounted) Navigator.of(ctx).maybePop();
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    l10n.defaultModelPageSuggestionVars(
+                      '{content}',
+                      '{locale}',
+                    ),
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _ModelCard extends StatefulWidget {
@@ -671,6 +789,7 @@ class _ModelCard extends StatefulWidget {
     required this.onPick,
     this.fallbackProvider,
     this.fallbackModelId,
+    this.disabledWhenUnset = false,
     this.onReset,
     this.configAction,
   });
@@ -682,6 +801,7 @@ class _ModelCard extends StatefulWidget {
   final String? modelId;
   final String? fallbackProvider;
   final String? fallbackModelId;
+  final bool disabledWhenUnset;
   final VoidCallback? onReset;
   final VoidCallback onPick;
   final VoidCallback? configAction;
@@ -727,7 +847,9 @@ class _ModelCardState extends State<_ModelCard> {
       }
     }
     if (usingFallback) {
-      modelDisplay = l10n.defaultModelPageUseCurrentModel;
+      modelDisplay = widget.disabledWhenUnset
+          ? l10n.defaultModelPageNotEnabled
+          : l10n.defaultModelPageUseCurrentModel;
     }
 
     final baseBg = isDark

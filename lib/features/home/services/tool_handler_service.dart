@@ -8,6 +8,7 @@ import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/search/search_tool_service.dart';
+import 'local_tools_service.dart';
 import 'tool_approval_service.dart';
 
 /// 工具调用处理服务
@@ -164,6 +165,14 @@ class ToolHandlerService {
     if (assistant?.enableMemory == true && supportsTools) {
       toolDefs.addAll(_buildMemoryToolDefinitions());
     }
+
+    // Local tools
+    toolDefs.addAll(
+      LocalToolsService.buildToolDefinitions(
+        assistant: assistant,
+        supportsTools: supportsTools,
+      ),
+    );
 
     // MCP tools
     final mcpTools = _buildMcpToolDefinitions(
@@ -329,6 +338,16 @@ class ToolHandlerService {
         final memoryResult = await _handleMemoryToolCall(name, args, assistant);
         if (memoryResult != null) {
           return memoryResult;
+        }
+
+        // Local tools
+        final localResult = await LocalToolsService.tryHandleToolCall(
+          name,
+          args,
+          assistant,
+        );
+        if (localResult != null) {
+          return localResult;
         }
 
         // Approval gate for MCP tools

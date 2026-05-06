@@ -324,6 +324,7 @@
   "assistantEditPageQuickPhraseTab": "Quick Phrase",
   "assistantEditPageCustomTab": "Custom",
   "assistantEditPageRegexTab": "Regex Replace",
+  "assistantEditPageLocalToolsTab": "Local Tools",
   "assistantEditTabLayoutTooltip": "Customize tabs",
   "assistantEditTabLayoutTitle": "Customize tabs",
   "assistantEditTabLayoutSubtitle": "Drag tabs to reorder. Turn off tabs you do not need.",
@@ -810,6 +811,8 @@
     }
   },
   "chatMessageWidgetBuiltinSearch": "Built-in Search",
+  "chatMessageWidgetReadClipboard": "Read Clipboard",
+  "chatMessageWidgetWriteClipboard": "Write Clipboard",
   "chatMessageWidgetToolCall": "Tool Call: {name}",
   "@chatMessageWidgetToolCall": {
     "placeholders": {
@@ -1081,6 +1084,8 @@
   "defaultModelPageTitleModelSubtitle": "Used for summarizing conversation titles; prefer fast & cheap models",
   "defaultModelPageSummaryModelTitle": "Summary Model",
   "defaultModelPageSummaryModelSubtitle": "Used for generating conversation summaries; prefer fast and cheap models",
+  "defaultModelPageSuggestionModelTitle": "Chat Suggestions Model",
+  "defaultModelPageSuggestionModelSubtitle": "Used for follow-up suggestion bubbles after assistant replies. Disabled until a model is selected.",
   "assistantEditRecentChatsSummaryFrequencyTitle": "Summary Refresh Frequency",
   "assistantEditRecentChatsSummaryFrequencyDescription": "Refresh recent-chat summaries after the selected number of new messages.",
   "assistantEditRecentChatsSummaryFrequencyOption": "Every {count}",
@@ -1104,6 +1109,7 @@
   "defaultModelPagePromptLabel": "Prompt",
   "defaultModelPageTitlePromptHint": "Enter prompt template for title summarization",
   "defaultModelPageSummaryPromptHint": "Enter prompt template for summary generation",
+  "defaultModelPageSuggestionPromptHint": "Enter prompt template for chat suggestions",
   "defaultModelPageTranslatePromptHint": "Enter prompt template for translation",
   "defaultModelPageOcrPromptHint": "Enter prompt template for OCR image understanding",
   "defaultModelPageResetDefault": "Reset to default",
@@ -1126,6 +1132,17 @@
         "type": "String"
       },
       "userMessagesVar": {
+        "type": "String"
+      }
+    }
+  },
+  "defaultModelPageSuggestionVars": "Variables: conversation: {contentVar}, language: {localeVar}",
+  "@defaultModelPageSuggestionVars": {
+    "placeholders": {
+      "contentVar": {
+        "type": "String"
+      },
+      "localeVar": {
         "type": "String"
       }
     }
@@ -1156,6 +1173,7 @@
     }
   },
   "defaultModelPageUseCurrentModel": "Use current chat model",
+  "defaultModelPageNotEnabled": "Not enabled",
   "translatePagePasteButton": "Paste",
   "translatePageCopyResult": "Copy result",
   "translatePageClearAll": "Clear All",
@@ -1418,6 +1436,9 @@
   "searchServicesAddDialogAdd": "Add",
   "searchServicesAddDialogApiKeyRequired": "API Key is required",
   "searchServicesFieldCustomUrlOptional": "Custom URL (optional)",
+  "searchServicesDialogApiKey": "API Key",
+  "searchServicesDialogModel": "Model",
+  "searchServicesDialogSystemPrompt": "System Prompt",
   "searchServicesAddDialogInstanceUrl": "Instance URL",
   "searchServicesAddDialogUrlRequired": "URL is required",
   "searchServicesAddDialogEnginesOptional": "Engines (optional)",
@@ -1687,6 +1708,8 @@
   "searchProviderBochaDescription": "Bocha web search API. Accurate web results with optional summaries.",
   "searchServiceNameSerper": "Serper",
   "searchProviderSerperDescription": "Serper Google Search API. Fast web results with optional country, language, time, and page filters.",
+  "searchServiceNameGrok": "Grok",
+  "searchProviderGrokDescription": "Grok search via xAI Responses API. Uses web and X search tools and returns cited sources.",
   "searchServicesDialogCountryOptional": "Country/region (optional)",
   "searchServicesDialogLanguageOptional": "Language (optional)",
   "searchServicesDialogTimeFilterOptional": "Time filter (optional)",
@@ -1742,6 +1765,10 @@
   "assistantEditQuickPhraseDescription": "Manage quick phrases for this assistant. Click the button below to add phrases.",
   "assistantEditManageQuickPhraseButton": "Manage Quick Phrases",
   "assistantEditPageMemoryTab": "Memory",
+  "assistantEditLocalToolTimeInfoTitle": "Time Info",
+  "assistantEditLocalToolTimeInfoSubtitle": "Read the device date, weekday, time, timezone, UTC offset, and timestamp.",
+  "assistantEditLocalToolClipboardTitle": "Clipboard",
+  "assistantEditLocalToolClipboardSubtitle": "Read or write plain text from the device clipboard when explicitly needed.",
   "assistantEditMemorySwitchTitle": "Memory",
   "assistantEditMemorySwitchDescription": "Allow the assistant to create and use memories across chats.",
   "assistantEditRecentChatsSwitchTitle": "Recent Chats Reference",

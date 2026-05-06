@@ -95,6 +95,9 @@ class ChatActions {
   /// Called when summary may need to be generated (every N messages).
   void Function(String conversationId)? onMaybeGenerateSummary;
 
+  /// Called when chat suggestions may need to be generated.
+  void Function(String conversationId)? onMaybeGenerateSuggestions;
+
   /// Called to schedule inline image sanitization.
   void Function(String messageId, String content, {bool immediate})?
   onScheduleImageSanitize;
@@ -1178,6 +1181,9 @@ class ChatActions {
 
     // Trigger summary generation check (actual logic in HomeViewModel)
     onMaybeGenerateSummary?.call(conversationId);
+
+    // Trigger follow-up suggestions after the final assistant reply is stored.
+    onMaybeGenerateSuggestions?.call(conversationId);
   }
 
   /// Handle stream error.

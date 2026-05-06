@@ -43,6 +43,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Reminder Time'), findsWidgets);
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('backup-reminder-time-mobile-sheet')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('backup-reminder-time-mobile-actions')),
+        findsOneWidget,
+      );
+      expect(find.byType(Divider), findsNothing);
       expect(find.byType(TextFormField), findsNothing);
       expect(find.byType(CupertinoPicker), findsNWidgets(2));
       _expectAllPickersLooping(tester);
@@ -51,6 +61,48 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(selectedMinutes, 23 * 60 + 59);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('mobile time picker cancel returns null', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      int? selectedMinutes = -1;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: Center(
+                  child: TextButton(
+                    onPressed: () async {
+                      selectedMinutes = await showBackupReminderTimePicker(
+                        context,
+                        initialMinutes: 0,
+                      );
+                    },
+                    child: const Text('open'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(selectedMinutes, isNull);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
