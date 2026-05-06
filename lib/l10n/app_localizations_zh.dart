@@ -663,6 +663,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditPageRegexTab => '正则替换';
 
   @override
+  String get assistantEditPageLocalToolsTab => '本地工具';
+
+  @override
   String get assistantEditTabLayoutTooltip => '自定义标签页';
 
   @override
@@ -1889,6 +1892,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatMessageWidgetBuiltinSearch => '模型内置搜索';
+
+  @override
+  String get chatMessageWidgetReadClipboard => '读取剪切板';
+
+  @override
+  String get chatMessageWidgetWriteClipboard => '写入剪切板';
 
   @override
   String chatMessageWidgetToolCall(String name) {
@@ -4102,6 +4111,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditPageMemoryTab => '记忆';
 
   @override
+  String get assistantEditLocalToolTimeInfoTitle => '时间信息';
+
+  @override
+  String get assistantEditLocalToolTimeInfoSubtitle =>
+      '读取设备日期、星期、时间、时区、UTC 偏移和时间戳。';
+
+  @override
+  String get assistantEditLocalToolClipboardTitle => '剪切板';
+
+  @override
+  String get assistantEditLocalToolClipboardSubtitle =>
+      '在明确需要时读取或写入设备剪切板中的纯文本。';
+
+  @override
   String get assistantEditMemorySwitchTitle => '记忆';
 
   @override
@@ -5348,6 +5371,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditPageRegexTab => '正则替换';
 
   @override
+  String get assistantEditPageLocalToolsTab => '本地工具';
+
+  @override
   String get assistantEditTabLayoutTooltip => '自定义标签页';
 
   @override
@@ -6574,6 +6600,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetBuiltinSearch => '模型内置搜索';
+
+  @override
+  String get chatMessageWidgetReadClipboard => '读取剪切板';
+
+  @override
+  String get chatMessageWidgetWriteClipboard => '写入剪切板';
 
   @override
   String chatMessageWidgetToolCall(String name) {
@@ -8787,6 +8819,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditPageMemoryTab => '记忆';
 
   @override
+  String get assistantEditLocalToolTimeInfoTitle => '时间信息';
+
+  @override
+  String get assistantEditLocalToolTimeInfoSubtitle =>
+      '读取设备日期、星期、时间、时区、UTC 偏移和时间戳。';
+
+  @override
+  String get assistantEditLocalToolClipboardTitle => '剪切板';
+
+  @override
+  String get assistantEditLocalToolClipboardSubtitle =>
+      '在明确需要时读取或写入设备剪切板中的纯文本。';
+
+  @override
   String get assistantEditMemorySwitchTitle => '记忆';
 
   @override
@@ -10033,6 +10079,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantEditPageRegexTab => '正則替換';
 
   @override
+  String get assistantEditPageLocalToolsTab => '本機工具';
+
+  @override
   String get assistantEditTabLayoutTooltip => '自訂標籤頁';
 
   @override
@@ -11258,6 +11307,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetBuiltinSearch => '模型內建搜尋';
+
+  @override
+  String get chatMessageWidgetReadClipboard => '讀取剪貼簿';
+
+  @override
+  String get chatMessageWidgetWriteClipboard => '寫入剪貼簿';
 
   @override
   String chatMessageWidgetToolCall(String name) {
@@ -13470,6 +13525,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditPageMemoryTab => '記憶';
+
+  @override
+  String get assistantEditLocalToolTimeInfoTitle => '時間資訊';
+
+  @override
+  String get assistantEditLocalToolTimeInfoSubtitle =>
+      '讀取裝置日期、星期、時間、時區、UTC 偏移和時間戳。';
+
+  @override
+  String get assistantEditLocalToolClipboardTitle => '剪貼簿';
+
+  @override
+  String get assistantEditLocalToolClipboardSubtitle =>
+      '在明確需要時讀取或寫入裝置剪貼簿中的純文字。';
 
   @override
   String get assistantEditMemorySwitchTitle => '記憶';

@@ -37,6 +37,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
+import '../../home/services/local_tools_service.dart';
 import '../../home/services/tool_approval_service.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
@@ -89,6 +90,8 @@ Uri? _tryNormalizeExternalUri(String raw) {
 }
 
 IconData _toolIconFor(String name) {
+  final localIcon = _localToolIconFor(name);
+  if (localIcon != null) return localIcon;
   switch (name) {
     case 'create_memory':
       return Lucide.bookHeart;
@@ -105,6 +108,30 @@ IconData _toolIconFor(String name) {
   }
 }
 
+IconData? _localToolIconFor(String name) {
+  return switch (name) {
+    LocalToolNames.timeInfo => Lucide.Calendar,
+    LocalToolNames.clipboard => Lucide.Clipboard,
+    _ => null,
+  };
+}
+
+String? _localToolTitleFor(
+  AppLocalizations l10n,
+  String name,
+  Map<String, dynamic> args,
+) {
+  return switch (name) {
+    LocalToolNames.timeInfo => l10n.assistantEditLocalToolTimeInfoTitle,
+    LocalToolNames.clipboard => switch ((args['action'] ?? '').toString()) {
+      'read' => l10n.chatMessageWidgetReadClipboard,
+      'write' => l10n.chatMessageWidgetWriteClipboard,
+      _ => l10n.assistantEditLocalToolClipboardTitle,
+    },
+    _ => null,
+  };
+}
+
 String _toolTitleFor(
   BuildContext context,
   String name,
@@ -112,6 +139,8 @@ String _toolTitleFor(
   required bool isResult,
 }) {
   final l10n = AppLocalizations.of(context)!;
+  final localToolTitle = _localToolTitleFor(l10n, name, args);
+  if (localToolTitle != null) return localToolTitle;
   switch (name) {
     case 'create_memory':
       return l10n.chatMessageWidgetCreateMemory;
@@ -3856,20 +3885,7 @@ class _ChainOfThoughtToolStep extends StatefulWidget {
 
 class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
   IconData _iconFor(String name) {
-    switch (name) {
-      case 'create_memory':
-        return Lucide.bookHeart;
-      case 'edit_memory':
-        return Lucide.bookHeart;
-      case 'delete_memory':
-        return Lucide.bookDashed;
-      case 'search_web':
-        return Lucide.Earth;
-      case 'builtin_search':
-        return Lucide.Search;
-      default:
-        return Lucide.Wrench;
-    }
+    return _toolIconFor(name);
   }
 
   String _titleFor(
@@ -3878,24 +3894,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
     Map<String, dynamic> args, {
     required bool isResult,
   }) {
-    final l10n = AppLocalizations.of(context)!;
-    switch (name) {
-      case 'create_memory':
-        return l10n.chatMessageWidgetCreateMemory;
-      case 'edit_memory':
-        return l10n.chatMessageWidgetEditMemory;
-      case 'delete_memory':
-        return l10n.chatMessageWidgetDeleteMemory;
-      case 'search_web':
-        final q = (args['query'] ?? '').toString();
-        return l10n.chatMessageWidgetWebSearch(q);
-      case 'builtin_search':
-        return l10n.chatMessageWidgetBuiltinSearch;
-      default:
-        return isResult
-            ? l10n.chatMessageWidgetToolResult(name)
-            : l10n.chatMessageWidgetToolCall(name);
-    }
+    return _toolTitleFor(context, name, args, isResult: isResult);
   }
 
   String _argsSummary(Map<String, dynamic> args) {
@@ -4141,20 +4140,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   }
 
   IconData _iconFor(String name) {
-    switch (name) {
-      case 'create_memory':
-        return Lucide.bookHeart;
-      case 'edit_memory':
-        return Lucide.bookHeart;
-      case 'delete_memory':
-        return Lucide.bookDashed;
-      case 'search_web':
-        return Lucide.Earth;
-      case 'builtin_search':
-        return Lucide.Search;
-      default:
-        return Lucide.Wrench;
-    }
+    return _toolIconFor(name);
   }
 
   String _titleFor(
@@ -4163,24 +4149,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     Map<String, dynamic> args, {
     required bool isResult,
   }) {
-    final l10n = AppLocalizations.of(context)!;
-    switch (name) {
-      case 'create_memory':
-        return l10n.chatMessageWidgetCreateMemory;
-      case 'edit_memory':
-        return l10n.chatMessageWidgetEditMemory;
-      case 'delete_memory':
-        return l10n.chatMessageWidgetDeleteMemory;
-      case 'search_web':
-        final q = (args['query'] ?? '').toString();
-        return l10n.chatMessageWidgetWebSearch(q);
-      case 'builtin_search':
-        return l10n.chatMessageWidgetBuiltinSearch;
-      default:
-        return isResult
-            ? l10n.chatMessageWidgetToolResult(name)
-            : l10n.chatMessageWidgetToolCall(name);
-    }
+    return _toolTitleFor(context, name, args, isResult: isResult);
   }
 
   /// Build a short argument summary for display in the approval card.

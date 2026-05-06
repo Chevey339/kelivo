@@ -12,6 +12,7 @@ void main() {
         'quickPhrase',
         'custom',
         'regex',
+        'localTools',
         'mcp',
       ]);
     });

@@ -324,6 +324,7 @@
   "assistantEditPageQuickPhraseTab": "Quick Phrase",
   "assistantEditPageCustomTab": "Custom",
   "assistantEditPageRegexTab": "Regex Replace",
+  "assistantEditPageLocalToolsTab": "Local Tools",
   "assistantEditTabLayoutTooltip": "Customize tabs",
   "assistantEditTabLayoutTitle": "Customize tabs",
   "assistantEditTabLayoutSubtitle": "Drag tabs to reorder. Turn off tabs you do not need.",
@@ -810,6 +811,8 @@
     }
   },
   "chatMessageWidgetBuiltinSearch": "Built-in Search",
+  "chatMessageWidgetReadClipboard": "Read Clipboard",
+  "chatMessageWidgetWriteClipboard": "Write Clipboard",
   "chatMessageWidgetToolCall": "Tool Call: {name}",
   "@chatMessageWidgetToolCall": {
     "placeholders": {
@@ -1762,6 +1765,10 @@
   "assistantEditQuickPhraseDescription": "Manage quick phrases for this assistant. Click the button below to add phrases.",
   "assistantEditManageQuickPhraseButton": "Manage Quick Phrases",
   "assistantEditPageMemoryTab": "Memory",
+  "assistantEditLocalToolTimeInfoTitle": "Time Info",
+  "assistantEditLocalToolTimeInfoSubtitle": "Read the device date, weekday, time, timezone, UTC offset, and timestamp.",
+  "assistantEditLocalToolClipboardTitle": "Clipboard",
+  "assistantEditLocalToolClipboardSubtitle": "Read or write plain text from the device clipboard when explicitly needed.",
   "assistantEditMemorySwitchTitle": "Memory",
   "assistantEditMemorySwitchDescription": "Allow the assistant to create and use memories across chats.",
   "assistantEditRecentChatsSwitchTitle": "Recent Chats Reference",

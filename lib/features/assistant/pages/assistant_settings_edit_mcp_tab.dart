@@ -48,11 +48,14 @@ class _McpTab extends StatelessWidget {
         _iosSectionCard(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
                 children: [
-                  Icon(Lucide.Hammer, size: 19, color: cs.primary),
-                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 36,
+                    child: Icon(Lucide.Hammer, size: 20, color: cs.primary),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

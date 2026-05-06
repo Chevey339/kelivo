@@ -1343,6 +1343,12 @@ abstract class AppLocalizations {
   /// **'Regex Replace'**
   String get assistantEditPageRegexTab;
 
+  /// No description provided for @assistantEditPageLocalToolsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Tools'**
+  String get assistantEditPageLocalToolsTab;
+
   /// No description provided for @assistantEditTabLayoutTooltip.
   ///
   /// In en, this message translates to:
@@ -3736,6 +3742,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Built-in Search'**
   String get chatMessageWidgetBuiltinSearch;
+
+  /// No description provided for @chatMessageWidgetReadClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Read Clipboard'**
+  String get chatMessageWidgetReadClipboard;
+
+  /// No description provided for @chatMessageWidgetWriteClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Write Clipboard'**
+  String get chatMessageWidgetWriteClipboard;
 
   /// No description provided for @chatMessageWidgetToolCall.
   ///
@@ -7945,6 +7963,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Memory'**
   String get assistantEditPageMemoryTab;
+
+  /// No description provided for @assistantEditLocalToolTimeInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Time Info'**
+  String get assistantEditLocalToolTimeInfoTitle;
+
+  /// No description provided for @assistantEditLocalToolTimeInfoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the device date, weekday, time, timezone, UTC offset, and timestamp.'**
+  String get assistantEditLocalToolTimeInfoSubtitle;
+
+  /// No description provided for @assistantEditLocalToolClipboardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clipboard'**
+  String get assistantEditLocalToolClipboardTitle;
+
+  /// No description provided for @assistantEditLocalToolClipboardSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read or write plain text from the device clipboard when explicitly needed.'**
+  String get assistantEditLocalToolClipboardSubtitle;
 
   /// No description provided for @assistantEditMemorySwitchTitle.
   ///

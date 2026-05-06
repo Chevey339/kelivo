@@ -35,6 +35,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../desktop/desktop_context_menu.dart';
+import '../../home/services/local_tools_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/emoji_picker_dialog.dart';
@@ -52,6 +53,7 @@ import 'assistant_regex_tab.dart';
 part 'assistant_settings_edit_basic_tab.dart';
 part 'assistant_settings_edit_prompt_tab.dart';
 part 'assistant_settings_edit_memory_tab.dart';
+part 'assistant_settings_edit_local_tools_tab.dart';
 part 'assistant_settings_edit_mcp_tab.dart';
 part 'assistant_settings_edit_quick_phrase_tab.dart';
 part 'assistant_settings_edit_custom_request_tab.dart';
@@ -88,7 +90,7 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
     _AssistantEditTabSpec(
       id: assistantEditTabPrompts,
       label: l10n.assistantEditPagePromptsTab,
-      icon: Lucide.MessageSquare,
+      icon: Lucide.FileText,
       child: _PromptTab(assistantId: assistantId),
     ),
     _AssistantEditTabSpec(
@@ -98,27 +100,33 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
       child: _MemoryTab(assistantId: assistantId),
     ),
     _AssistantEditTabSpec(
+      id: assistantEditTabLocalTools,
+      label: l10n.assistantEditPageLocalToolsTab,
+      icon: Lucide.Wrench,
+      child: _LocalToolsTab(assistantId: assistantId),
+    ),
+    _AssistantEditTabSpec(
       id: assistantEditTabMcp,
       label: l10n.assistantEditPageMcpTab,
-      icon: Lucide.Network,
+      icon: Lucide.Terminal,
       child: _McpTab(assistantId: assistantId),
     ),
     _AssistantEditTabSpec(
       id: assistantEditTabQuickPhrase,
       label: l10n.assistantEditPageQuickPhraseTab,
-      icon: Lucide.MessagesSquare,
+      icon: Lucide.Zap,
       child: _QuickPhraseTab(assistantId: assistantId),
     ),
     _AssistantEditTabSpec(
       id: assistantEditTabCustom,
       label: l10n.assistantEditPageCustomTab,
-      icon: Lucide.Code,
+      icon: Lucide.EthernetPort,
       child: _CustomRequestTab(assistantId: assistantId),
     ),
     _AssistantEditTabSpec(
       id: assistantEditTabRegex,
       label: l10n.assistantEditPageRegexTab,
-      icon: Lucide.TextSelect,
+      icon: Lucide.CaseSensitive,
       child: AssistantRegexTab(assistantId: assistantId),
     ),
   ];
@@ -1463,7 +1471,16 @@ class _IosButtonState extends State<_IosButton> {
 
 // ===== Desktop Assistant Dialog (reuses mobile tabs) =====
 
-enum _AssistantDesktopMenu { basic, prompts, memory, mcp, quick, custom, regex }
+enum _AssistantDesktopMenu {
+  basic,
+  prompts,
+  memory,
+  localTools,
+  mcp,
+  quick,
+  custom,
+  regex,
+}
 
 Future<void> showAssistantDesktopDialog(
   BuildContext context, {
@@ -1568,6 +1585,8 @@ class _DesktopAssistantDialogShellState
                         return _PromptTab(assistantId: widget.assistantId);
                       case _AssistantDesktopMenu.memory:
                         return _MemoryTab(assistantId: widget.assistantId);
+                      case _AssistantDesktopMenu.localTools:
+                        return _LocalToolsTab(assistantId: widget.assistantId);
                       case _AssistantDesktopMenu.mcp:
                         return _McpTab(assistantId: widget.assistantId);
                       case _AssistantDesktopMenu.quick:
@@ -1611,6 +1630,7 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
       (_AssistantDesktopMenu.basic, l10n.assistantEditPageBasicTab),
       (_AssistantDesktopMenu.prompts, l10n.assistantEditPagePromptsTab),
       (_AssistantDesktopMenu.memory, l10n.assistantEditPageMemoryTab),
+      (_AssistantDesktopMenu.localTools, l10n.assistantEditPageLocalToolsTab),
       (_AssistantDesktopMenu.mcp, l10n.assistantEditPageMcpTab),
       (_AssistantDesktopMenu.quick, l10n.assistantEditPageQuickPhraseTab),
       (_AssistantDesktopMenu.custom, l10n.assistantEditPageCustomTab),

@@ -673,6 +673,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditPageRegexTab => 'Regex Replace';
 
   @override
+  String get assistantEditPageLocalToolsTab => 'Local Tools';
+
+  @override
   String get assistantEditTabLayoutTooltip => 'Customize tabs';
 
   @override
@@ -1942,6 +1945,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatMessageWidgetBuiltinSearch => 'Built-in Search';
+
+  @override
+  String get chatMessageWidgetReadClipboard => 'Read Clipboard';
+
+  @override
+  String get chatMessageWidgetWriteClipboard => 'Write Clipboard';
 
   @override
   String chatMessageWidgetToolCall(String name) {
@@ -4261,6 +4270,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditPageMemoryTab => 'Memory';
+
+  @override
+  String get assistantEditLocalToolTimeInfoTitle => 'Time Info';
+
+  @override
+  String get assistantEditLocalToolTimeInfoSubtitle =>
+      'Read the device date, weekday, time, timezone, UTC offset, and timestamp.';
+
+  @override
+  String get assistantEditLocalToolClipboardTitle => 'Clipboard';
+
+  @override
+  String get assistantEditLocalToolClipboardSubtitle =>
+      'Read or write plain text from the device clipboard when explicitly needed.';
 
   @override
   String get assistantEditMemorySwitchTitle => 'Memory';

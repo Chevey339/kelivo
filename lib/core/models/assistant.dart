@@ -34,6 +34,7 @@ class Assistant {
   final String systemPrompt;
   final String messageTemplate; // e.g. "{{ message }}"
   final List<String> mcpServerIds; // bound MCP server IDs
+  final List<String> localToolIds; // enabled local tool IDs
   final String? background; // chat background (color/image ref)
   // Custom request overrides (per assistant)
   final List<Map<String, String>>
@@ -67,6 +68,7 @@ class Assistant {
     this.systemPrompt = '',
     this.messageTemplate = '{{ message }}',
     this.mcpServerIds = const <String>[],
+    this.localToolIds = const <String>[],
     this.background,
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
@@ -95,6 +97,7 @@ class Assistant {
     String? systemPrompt,
     String? messageTemplate,
     List<String>? mcpServerIds,
+    List<String>? localToolIds,
     String? background,
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
@@ -133,6 +136,7 @@ class Assistant {
       systemPrompt: systemPrompt ?? this.systemPrompt,
       messageTemplate: messageTemplate ?? this.messageTemplate,
       mcpServerIds: mcpServerIds ?? this.mcpServerIds,
+      localToolIds: localToolIds ?? this.localToolIds,
       background: clearBackground ? null : (background ?? this.background),
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
@@ -164,6 +168,7 @@ class Assistant {
     'systemPrompt': systemPrompt,
     'messageTemplate': messageTemplate,
     'mcpServerIds': mcpServerIds,
+    'localToolIds': localToolIds,
     'background': background,
     'customHeaders': customHeaders,
     'customBody': customBody,
@@ -193,6 +198,8 @@ class Assistant {
     messageTemplate: (json['messageTemplate'] as String?) ?? '{{ message }}',
     mcpServerIds:
         (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],
+    localToolIds:
+        (json['localToolIds'] as List?)?.cast<String>() ?? const <String>[],
     background: json['background'] as String?,
     customHeaders: (() {
       final raw = json['customHeaders'];
