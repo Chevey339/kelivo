@@ -81,6 +81,8 @@ class Lucide {
   static const IconData Eye = lucide.LucideIcons.eye;
   static const IconData EyeOff = lucide.LucideIcons.eyeOff;
   static const IconData Clipboard = lucide.LucideIcons.clipboard;
+  static const IconData ClipboardCheck = lucide.LucideIcons.clipboardCheck;
+  static const IconData ClipboardPen = lucide.LucideIcons.clipboardPen;
   static const IconData Sparkles = lucide.LucideIcons.sparkles;
   static const IconData Phone = lucide.LucideIcons.phone;
   static const IconData Code = lucide.LucideIcons.code;

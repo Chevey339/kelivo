@@ -322,15 +322,21 @@ void main() {
       expect(find.text('Tool Result: clipboard_tool'), findsNothing);
       expect(
         find.byWidgetPredicate(
-          (widget) => widget is Icon && widget.icon == Lucide.Calendar,
+          (widget) => widget is Icon && widget.icon == Lucide.clock,
         ),
         findsOneWidget,
       );
       expect(
         find.byWidgetPredicate(
-          (widget) => widget is Icon && widget.icon == Lucide.Clipboard,
+          (widget) => widget is Icon && widget.icon == Lucide.ClipboardCheck,
         ),
-        findsNWidgets(2),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Icon && widget.icon == Lucide.ClipboardPen,
+        ),
+        findsOneWidget,
       );
     });
 

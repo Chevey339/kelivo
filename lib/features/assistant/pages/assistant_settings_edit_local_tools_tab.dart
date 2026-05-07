@@ -37,7 +37,7 @@ class _LocalToolsTab extends StatelessWidget {
         _iosSectionCard(
           children: [
             _LocalToolRow(
-              icon: Lucide.Calendar,
+              icon: Lucide.clock,
               title: l10n.assistantEditLocalToolTimeInfoTitle,
               subtitle: l10n.assistantEditLocalToolTimeInfoSubtitle,
               enabled: timeEnabled,

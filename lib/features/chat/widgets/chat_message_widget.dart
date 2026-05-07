@@ -92,8 +92,8 @@ Uri? _tryNormalizeExternalUri(String raw) {
   return (cleanText.trim(), images);
 }
 
-IconData _toolIconFor(String name) {
-  final localIcon = _localToolIconFor(name);
+IconData _toolIconFor(String name, [Map<String, dynamic> args = const {}]) {
+  final localIcon = _localToolIconFor(name, args);
   if (localIcon != null) return localIcon;
   switch (name) {
     case 'create_memory':
@@ -111,13 +111,17 @@ IconData _toolIconFor(String name) {
   }
 }
 
-IconData? _localToolIconFor(String name) {
+IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
   if (name == LocalToolNames.askUser) {
     return Lucide.MessageCircleQuestionMark;
   }
   return switch (name) {
-    LocalToolNames.timeInfo => Lucide.Calendar,
-    LocalToolNames.clipboard => Lucide.Clipboard,
+    LocalToolNames.timeInfo => Lucide.clock,
+    LocalToolNames.clipboard => switch ((args['action'] ?? '').toString()) {
+      'read' => Lucide.ClipboardCheck,
+      'write' => Lucide.ClipboardPen,
+      _ => Lucide.Clipboard,
+    },
     _ => null,
   };
 }
@@ -299,7 +303,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                       child: Row(
                         children: [
                           Icon(
-                            _toolIconFor(part.toolName),
+                            _toolIconFor(part.toolName, part.arguments),
                             size: 18,
                             color: cs.primary,
                           ),
@@ -467,7 +471,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                   Row(
                     children: [
                       Icon(
-                        _toolIconFor(part.toolName),
+                        _toolIconFor(part.toolName, part.arguments),
                         size: 18,
                         color: cs.primary,
                       ),
@@ -3907,8 +3911,8 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
     }
   }
 
-  IconData _iconFor(String name) {
-    return _toolIconFor(name);
+  IconData _iconFor(String name, Map<String, dynamic> args) {
+    return _toolIconFor(name, args);
   }
 
   String _titleFor(
@@ -3995,10 +3999,18 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
     final approvalRequest = pendingRequest;
 
     final icon = _isAskUser
-        ? Icon(_iconFor(widget.part.toolName), size: 16, color: fg.strong)
+        ? Icon(
+            _iconFor(widget.part.toolName, widget.part.arguments),
+            size: 16,
+            color: fg.strong,
+          )
         : widget.part.loading && !isPendingApproval
         ? LoadingIndicator(height: 12, dotSize: 3, spacing: 2, color: fg.strong)
-        : Icon(_iconFor(widget.part.toolName), size: 16, color: fg.strong);
+        : Icon(
+            _iconFor(widget.part.toolName, widget.part.arguments),
+            size: 16,
+            color: fg.strong,
+          );
 
     final title = _titleFor(
       context,
@@ -4181,8 +4193,8 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     }
   }
 
-  IconData _iconFor(String name) {
-    return _toolIconFor(name);
+  IconData _iconFor(String name, Map<String, dynamic> args) {
+    return _toolIconFor(name, args);
   }
 
   String _titleFor(
@@ -4284,7 +4296,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                     height: 18,
                     child: Center(
                       child: Icon(
-                        _iconFor(widget.part.toolName),
+                        _iconFor(widget.part.toolName, widget.part.arguments),
                         size: 18,
                         color: fg.strong,
                       ),
@@ -4504,7 +4516,10 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                         child: Row(
                           children: [
                             Icon(
-                              _iconFor(widget.part.toolName),
+                              _iconFor(
+                                widget.part.toolName,
+                                widget.part.arguments,
+                              ),
                               size: 18,
                               color: cs.primary,
                             ),
@@ -4678,7 +4693,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                     Row(
                       children: [
                         Icon(
-                          _iconFor(widget.part.toolName),
+                          _iconFor(widget.part.toolName, widget.part.arguments),
                           size: 18,
                           color: cs.primary,
                         ),
