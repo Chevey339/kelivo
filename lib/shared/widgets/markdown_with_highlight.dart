@@ -782,12 +782,7 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     // Skips $$...$$ blocks, which are handled separately.
     // NOW SAFE: Code blocks are masked, so $variables in code won't be converted.
     if (enableMath && enableDollarLatex) {
-      // Require that the matched inline math does not cross table column separators (|)
-      // to avoid breaking markdown tables.
-      final inlineDollar = RegExp(r"(?<!\$)\$([^\$\n|]+?)\$(?!\$)");
-      out = out.replaceAllMapped(inlineDollar, (m) {
-        return "\\(${m[1]}\\)";
-      });
+      out = _replaceInlineDollarMath(out);
     }
 
     // Ensure display-math blocks stay as standalone blocks even when generated inline.
@@ -902,16 +897,127 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     bool displayMode = false,
   }) {
     final resolved = style ?? const TextStyle();
+    final normalizedTex = _normalizeMathTex(tex);
     try {
       return Math.tex(
-        tex,
+        normalizedTex,
         mathStyle: displayMode ? MathStyle.display : MathStyle.text,
         textStyle: resolved,
-        onErrorFallback: (_) => Text(tex, style: resolved),
+        onErrorFallback: (_) => Text(normalizedTex, style: resolved),
       );
     } catch (_) {
-      return Text(tex, style: resolved);
+      return Text(normalizedTex, style: resolved);
     }
+  }
+
+  static String _replaceInlineDollarMath(String input) {
+    final buf = StringBuffer();
+    var i = 0;
+    while (i < input.length) {
+      if (input.codeUnitAt(i) == 0x24 &&
+          !_isEscaped(input, i) &&
+          !_isDoubleDollar(input, i) &&
+          _canOpenDollarMath(input, i)) {
+        final close = _findClosingDollarMath(input, i + 1);
+        if (close != -1) {
+          final body = input.substring(i + 1, close);
+          buf
+            ..write(r'\(')
+            ..write(body)
+            ..write(r'\)');
+          i = close + 1;
+          continue;
+        }
+      }
+      buf.writeCharCode(input.codeUnitAt(i));
+      i++;
+    }
+    return buf.toString();
+  }
+
+  static int _findClosingDollarMath(String input, int start) {
+    for (var i = start; i < input.length; i++) {
+      final ch = input.codeUnitAt(i);
+      if (ch == 0x0A) return -1;
+      if (ch == 0x5C) {
+        i++;
+        continue;
+      }
+      if (ch != 0x24 || _isDoubleDollar(input, i)) continue;
+
+      final body = input.substring(start, i);
+      if (_isValidDollarMathBody(body) && _canCloseDollarMath(input, i)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  static bool _isValidDollarMathBody(String body) {
+    if (body.isEmpty) return false;
+    if (_isWhitespaceCodeUnit(body.codeUnitAt(0))) return false;
+    if (_isWhitespaceCodeUnit(body.codeUnitAt(body.length - 1))) return false;
+    return !_containsUnescapedPipe(body);
+  }
+
+  static bool _containsUnescapedPipe(String input) {
+    for (var i = 0; i < input.length; i++) {
+      final ch = input.codeUnitAt(i);
+      if (ch == 0x5C) {
+        i++;
+        continue;
+      }
+      if (ch == 0x7C) return true;
+    }
+    return false;
+  }
+
+  static bool _canOpenDollarMath(String input, int index) {
+    if (index == 0) return true;
+    final prev = input.codeUnitAt(index - 1);
+    return _isWhitespaceCodeUnit(prev) || prev == 0x28;
+  }
+
+  static bool _canCloseDollarMath(String input, int index) {
+    final nextIndex = index + 1;
+    if (nextIndex >= input.length) return true;
+    final next = input.codeUnitAt(nextIndex);
+    return next != 0x24 && !_isAsciiLetterOrDigit(next);
+  }
+
+  static bool _isDoubleDollar(String input, int index) {
+    return (index > 0 && input.codeUnitAt(index - 1) == 0x24) ||
+        (index + 1 < input.length && input.codeUnitAt(index + 1) == 0x24);
+  }
+
+  static bool _isEscaped(String input, int index) {
+    var backslashes = 0;
+    for (var i = index - 1; i >= 0 && input.codeUnitAt(i) == 0x5C; i--) {
+      backslashes++;
+    }
+    return backslashes.isOdd;
+  }
+
+  static bool _isWhitespaceCodeUnit(int codeUnit) {
+    return codeUnit == 0x20 ||
+        codeUnit == 0x09 ||
+        codeUnit == 0x0A ||
+        codeUnit == 0x0D;
+  }
+
+  static bool _isAsciiLetterOrDigit(int codeUnit) {
+    return (codeUnit >= 0x30 && codeUnit <= 0x39) ||
+        (codeUnit >= 0x41 && codeUnit <= 0x5A) ||
+        (codeUnit >= 0x61 && codeUnit <= 0x7A);
+  }
+
+  static String _normalizeMathTex(String tex) {
+    return tex.replaceAllMapped(RegExp(r'\\\|([\s\S]*?)\\\|'), (match) {
+      final body = match.group(1) ?? '';
+      return r'\lVert '
+          '$body'
+          r' \rVert';
+    });
   }
 
   static String _softBreakInline(String input) {
@@ -2229,14 +2335,20 @@ class InlineLatexScrollableMd extends InlineMd {
 /// Inline LaTeX for dollar delimiters only: `$...$`
 class InlineLatexDollarScrollableMd extends InlineMd {
   @override
-  RegExp get exp => RegExp(r"(?:(?<!\$)\$([^\$\n]+?)\$(?!\$))");
+  RegExp get exp => RegExp(
+    r"(^|[ \t\r\n(])(?<!\\)(?<!\$)\$((?:\\.|[^\$\\\n|])+?)\$(?!\$)(?![A-Za-z0-9])",
+  );
 
   @override
   InlineSpan span(BuildContext context, String text, GptMarkdownConfig config) {
     final m = exp.firstMatch(text);
     if (m == null) return TextSpan(text: text, style: config.style);
-    final body = (m.group(1) ?? '').trim();
+    final prefix = m.group(1) ?? '';
+    final body = (m.group(2) ?? '').trim();
     if (body.isEmpty) return TextSpan(text: text, style: config.style);
+    if (!MarkdownWithCodeHighlight._isValidDollarMathBody(m.group(2) ?? '')) {
+      return TextSpan(text: text, style: config.style);
+    }
     final math = MarkdownWithCodeHighlight._renderMath(
       body,
       style: () {
@@ -2245,9 +2357,15 @@ class InlineLatexDollarScrollableMd extends InlineMd {
         return base.copyWith(fontSize: baseSize * 1.2);
       }(),
     );
-    return WidgetSpan(
-      alignment: PlaceholderAlignment.middle,
-      child: SelectionContainer.disabled(child: math),
+    return TextSpan(
+      style: config.style,
+      children: [
+        if (prefix.isNotEmpty) TextSpan(text: prefix, style: config.style),
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: SelectionContainer.disabled(child: math),
+        ),
+      ],
     );
   }
 }

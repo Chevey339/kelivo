@@ -158,6 +158,64 @@ void main() {
   });
 
   testWidgets(
+    r'MarkdownWithCodeHighlight renders escaped-pipe dollar math as math',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'已知 $q$ 是 $\mathbb{R}^n$ 上的多项式。对所有满足 $\|x\|=1$ 的 $x$，有 $p(x)=q(x)$。',
+        ),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNWidgets(5));
+      expect(find.textContaining(r'\|x\|=1'), findsNothing);
+      expect(find.textContaining(r'\lVert x \rVert'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight follows GitHub-like dollar math boundaries',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+分别$10和$20
+
+分别 $10和$ 20
+
+分别$10$和$20$
+
+分别 $10$ 和$20$
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNWidgets(2));
+      expect(find.textContaining(r'分别$10和$20'), findsOneWidget);
+      expect(find.textContaining(r'分别$10$和$20$'), findsOneWidget);
+      expect(find.textContaining(r'和$20$'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps table pipes from widening dollar math',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+| A | B |
+| - | - |
+| $a$ | b |
+| $a|b$ | c |
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining(r'$a'), findsOneWidget);
+      expect(find.textContaining(r'b$'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight disables all math rendering by setting',
     (tester) async {
       late SettingsProvider settings;
