@@ -218,5 +218,101 @@ void main() {
         );
       },
     );
+
+    test('empty streamed tool call id is replaced with local id', () async {
+      final toolCallIds = <String?>[];
+      var requestCount = 0;
+
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestCount += 1;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+          charset: 'utf-8',
+        );
+
+        if (requestCount == 1) {
+          request.response.write(
+            'data: ${jsonEncode({
+              'id': 'cmpl-empty-tool-id',
+              'object': 'chat.completion.chunk',
+              'created': 0,
+              'model': 'kimi-k2-thinking',
+              'choices': [
+                {
+                  'index': 0,
+                  'delta': {
+                    'role': 'assistant',
+                    'tool_calls': [
+                      {
+                        'index': 0,
+                        'id': '',
+                        'type': 'function',
+                        'function': {'name': 'date', 'arguments': '{}'},
+                      },
+                    ],
+                  },
+                  'finish_reason': 'tool_calls',
+                },
+              ],
+            })}\n\n',
+          );
+        } else {
+          request.response.write(
+            'data: ${jsonEncode({
+              'id': 'cmpl-empty-tool-id-2',
+              'object': 'chat.completion.chunk',
+              'created': 0,
+              'model': 'kimi-k2-thinking',
+              'choices': [
+                {
+                  'index': 0,
+                  'delta': {'role': 'assistant', 'content': 'done'},
+                  'finish_reason': 'stop',
+                },
+              ],
+            })}\n\n',
+          );
+        }
+
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+      });
+
+      final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _moonshotConfig(baseUrl),
+        modelId: 'kimi-k2-thinking',
+        messages: const [
+          {'role': 'user', 'content': '今天几号？'},
+        ],
+        tools: const [
+          {
+            'type': 'function',
+            'function': {
+              'name': 'date',
+              'description': 'Get current date',
+              'parameters': {
+                'type': 'object',
+                'properties': <String, dynamic>{},
+              },
+            },
+          },
+        ],
+        onToolCall: (name, args, {toolCallId}) async {
+          toolCallIds.add(toolCallId);
+          return '2026-03-27';
+        },
+      ).toList();
+
+      expect(chunks.last.isDone, isTrue);
+      expect(toolCallIds.single, isNotEmpty);
+    });
   });
 }

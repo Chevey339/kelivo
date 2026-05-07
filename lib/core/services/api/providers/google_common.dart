@@ -549,8 +549,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           final args =
               (call['args'] as Map?)?.cast<String, dynamic>() ??
               const <String, dynamic>{};
-          // Prefer API-provided id (part-level), fall back to synthetic
-          final partId = fc['id']?.toString() ?? 'fn_$idx';
+          // Prefer API-provided id (part-level), fall back to synthetic.
+          final partId = _effectiveToolCallId(fc['id'], 'fn', idx);
           yield ChatStreamChunk(
             content: '',
             isDone: false,
@@ -1272,8 +1272,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                   }
                   // Prefer API-provided id (part-level), fall back to synthetic
                   final apiId = p['id']?.toString();
-                  final id =
-                      apiId ?? 'call_${DateTime.now().microsecondsSinceEpoch}';
+                  final id = _effectiveToolCallId(apiId, 'call', p.hashCode);
 
                   // Capture thought signature (Gemini 3 Pro requirement)
                   // Preserve exact key/value as received

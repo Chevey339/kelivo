@@ -656,6 +656,8 @@ class HomePageController extends ChangeNotifier {
     ToolUIPart part,
     AskUserResult result,
   ) async {
+    if (currentConversation == null || isCurrentConversationLoading) return;
+
     final content = result.toJsonString();
     await _chatService.upsertToolEvent(
       message.id,
@@ -688,7 +690,6 @@ class HomePageController extends ChangeNotifier {
     _streamController.setToolParts(message.id, parts);
     notifyListeners();
 
-    if (currentConversation == null || isCurrentConversationLoading) return;
     await _viewModel.continueAssistantMessageAfterToolAnswer(
       message,
       allowImagesApiRouting: _mediaController.allowImagesApiRouting,

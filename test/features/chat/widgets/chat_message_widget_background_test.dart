@@ -590,5 +590,56 @@ void main() {
           jsonDecode(submittedResult!.toJsonString()) as Map<String, dynamic>;
       expect(payload['answers']['scope']['value'], 'Complete');
     });
+
+    testWidgets('restored ask user card does not submit while disabled', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      var submitted = false;
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: 'Let me ask first.',
+              conversationId: 'conversation-ask-user-disabled',
+              isStreaming: true,
+            ),
+            showModelIcon: false,
+            canSubmitRecoveredAskUserAnswer: false,
+            onRecoveredAskUserAnswer: (part, result) async {
+              submitted = true;
+            },
+            toolParts: const [
+              ToolUIPart(
+                id: 'ask-disabled',
+                toolName: 'ask_user_input_v0',
+                arguments: {
+                  'questions': [
+                    {
+                      'id': 'scope',
+                      'question': 'Choose scope?',
+                      'type': 'single',
+                      'options': ['Minimal', 'Complete'],
+                    },
+                  ],
+                },
+                loading: true,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('Complete'));
+      await tester.pump();
+      await tester.tap(find.text('Submit answer'));
+      await tester.pump();
+
+      expect(submitted, isFalse);
+    });
   });
 }

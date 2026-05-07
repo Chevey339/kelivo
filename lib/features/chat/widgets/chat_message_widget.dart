@@ -631,6 +631,7 @@ class ChatMessageWidget extends StatefulWidget {
   final ValueChanged<String>? onSuggestionTap;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAskUserAnswer;
+  final bool canSubmitRecoveredAskUserAnswer;
 
   const ChatMessageWidget({
     super.key,
@@ -673,6 +674,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.suggestions = const <String>[],
     this.onSuggestionTap,
     this.onRecoveredAskUserAnswer,
+    this.canSubmitRecoveredAskUserAnswer = true,
   });
 
   @override
@@ -1211,6 +1213,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       child: _ToolCallItem(
         part: part,
         onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
+        canSubmitRecoveredAnswer: widget.canSubmitRecoveredAskUserAnswer,
       ),
     );
   }
@@ -2198,6 +2201,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   _ChainOfThoughtCard(
                     steps: block.steps,
                     onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
+                    canSubmitRecoveredAnswer:
+                        widget.canSubmitRecoveredAskUserAnswer,
                   ),
                 );
               }
@@ -3468,11 +3473,16 @@ const double _timelineBottomLineStart =
     _timelineStepPaddingV + _timelineIconSize + _timelineLineGap;
 
 class _ChainOfThoughtCard extends StatefulWidget {
-  const _ChainOfThoughtCard({required this.steps, this.onRecoveredAnswer});
+  const _ChainOfThoughtCard({
+    required this.steps,
+    this.onRecoveredAnswer,
+    this.canSubmitRecoveredAnswer = true,
+  });
 
   final List<_TimelineStepData> steps;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
+  final bool canSubmitRecoveredAnswer;
 
   @override
   State<_ChainOfThoughtCard> createState() => _ChainOfThoughtCardState();
@@ -3575,6 +3585,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                 isFirst: index == 0,
                 isLast: index == visibleSteps.length - 1,
                 onRecoveredAnswer: widget.onRecoveredAnswer,
+                canSubmitRecoveredAnswer: widget.canSubmitRecoveredAnswer,
               );
             }),
           ],
@@ -3907,6 +3918,7 @@ class _ChainOfThoughtToolStep extends StatefulWidget {
     required this.isFirst,
     required this.isLast,
     this.onRecoveredAnswer,
+    this.canSubmitRecoveredAnswer = true,
   });
 
   final ToolUIPart part;
@@ -3914,6 +3926,7 @@ class _ChainOfThoughtToolStep extends StatefulWidget {
   final bool isLast;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
+  final bool canSubmitRecoveredAnswer;
 
   @override
   State<_ChainOfThoughtToolStep> createState() =>
@@ -4068,6 +4081,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
             part: widget.part,
             compact: true,
             onRecoveredAnswer: widget.onRecoveredAnswer,
+            canSubmitRecoveredAnswer: widget.canSubmitRecoveredAnswer,
           )
         : !shouldShowSummary || summaryText.trim().isEmpty
         ? null
@@ -4138,10 +4152,15 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
 }
 
 class _ToolCallItem extends StatefulWidget {
-  const _ToolCallItem({required this.part, this.onRecoveredAnswer});
+  const _ToolCallItem({
+    required this.part,
+    this.onRecoveredAnswer,
+    this.canSubmitRecoveredAnswer = true,
+  });
   final ToolUIPart part;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
+  final bool canSubmitRecoveredAnswer;
 
   @override
   State<_ToolCallItem> createState() => _ToolCallItemState();
@@ -4250,6 +4269,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
       return _AskUserToolCard(
         part: widget.part,
         onRecoveredAnswer: widget.onRecoveredAnswer,
+        canSubmitRecoveredAnswer: widget.canSubmitRecoveredAnswer,
       );
     }
 
@@ -4849,11 +4869,16 @@ class _ToolCallItemState extends State<_ToolCallItem> {
 }
 
 class _AskUserToolCard extends StatefulWidget {
-  const _AskUserToolCard({required this.part, this.onRecoveredAnswer});
+  const _AskUserToolCard({
+    required this.part,
+    this.onRecoveredAnswer,
+    this.canSubmitRecoveredAnswer = true,
+  });
 
   final ToolUIPart part;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
+  final bool canSubmitRecoveredAnswer;
 
   @override
   State<_AskUserToolCard> createState() => _AskUserToolCardState();
@@ -4947,6 +4972,7 @@ class _AskUserToolCardState extends State<_AskUserToolCard> {
                     child: _AskUserInlineBody(
                       part: widget.part,
                       onRecoveredAnswer: widget.onRecoveredAnswer,
+                      canSubmitRecoveredAnswer: widget.canSubmitRecoveredAnswer,
                     ),
                   )
                 : const SizedBox.shrink(),
@@ -4962,12 +4988,14 @@ class _AskUserInlineBody extends StatefulWidget {
     required this.part,
     this.compact = false,
     this.onRecoveredAnswer,
+    this.canSubmitRecoveredAnswer = true,
   });
 
   final ToolUIPart part;
   final bool compact;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
+  final bool canSubmitRecoveredAnswer;
 
   @override
   State<_AskUserInlineBody> createState() => _AskUserInlineBodyState();
@@ -5096,7 +5124,11 @@ class _AskUserInlineBodyState extends State<_AskUserInlineBody> {
     }
 
     final onRecoveredAnswer = widget.onRecoveredAnswer;
-    if (onRecoveredAnswer == null || _submittingRecovered) return;
+    if (onRecoveredAnswer == null ||
+        !widget.canSubmitRecoveredAnswer ||
+        _submittingRecovered) {
+      return;
+    }
     setState(() => _submittingRecovered = true);
     try {
       await onRecoveredAnswer(widget.part, AskUserResult.answer(answers));
@@ -5196,6 +5228,7 @@ class _AskUserInlineBodyState extends State<_AskUserInlineBody> {
             onTap:
                 _canSubmit(questions) &&
                     !_submittingRecovered &&
+                    widget.canSubmitRecoveredAnswer &&
                     (pendingRequest != null || widget.onRecoveredAnswer != null)
                 ? () =>
                       _submitAnswers(askUserService, questions, pendingRequest)

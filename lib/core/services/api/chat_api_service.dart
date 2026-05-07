@@ -41,6 +41,16 @@ typedef ToolCallHandler =
       String? toolCallId,
     });
 
+String _effectiveToolCallId(
+  dynamic rawId,
+  String fallbackPrefix,
+  Object index,
+) {
+  final id = rawId?.toString().trim() ?? '';
+  if (id.isNotEmpty) return id;
+  return '${fallbackPrefix}_${DateTime.now().microsecondsSinceEpoch}_$index';
+}
+
 class ChatApiService {
   static const String _aihubmixAppCode = 'ZKRT3588';
   static final Map<String, CancelToken> _activeCancelTokens =
