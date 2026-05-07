@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
@@ -33,6 +34,7 @@ Widget _buildHarness({
   return MultiProvider(
     providers: [
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+      ChangeNotifierProvider(create: (_) => TtsProvider()),
       ChangeNotifierProvider(create: (_) => ToolApprovalService()),
       ChangeNotifierProvider<AskUserInteractionService>.value(
         value: askUserService ?? AskUserInteractionService(),
@@ -329,6 +331,94 @@ void main() {
           (widget) => widget is Icon && widget.icon == Lucide.Clipboard,
         ),
         findsNWidgets(2),
+      );
+    });
+
+    testWidgets('unclosed think tag remains visible as assistant content', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: '<think>literal answer',
+              conversationId: 'conversation-unclosed-think',
+            ),
+            showModelIcon: false,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('<think>literal answer'), findsOneWidget);
+      expect(find.text('Deep Thinking'), findsNothing);
+    });
+
+    testWidgets(
+      'structured reasoning keeps literal think block in assistant content',
+      (tester) async {
+        final settings = _createSettings(
+          ChatMessageBackgroundStyle.defaultStyle,
+        );
+
+        await tester.pumpWidget(
+          _buildHarness(
+            settings: settings,
+            child: ChatMessageWidget(
+              message: ChatMessage(
+                role: 'assistant',
+                content: '正文 <think>literal</think> 继续显示',
+                conversationId: 'conversation-structured-think',
+              ),
+              showModelIcon: false,
+              reasoningSegments: const [
+                ReasoningSegment(text: '结构化思考', expanded: true, loading: false),
+              ],
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(find.text('Deep Thinking'), findsOneWidget);
+        expect(find.textContaining('结构化思考'), findsOneWidget);
+        expect(
+          find.textContaining('正文 <think>literal</think> 继续显示'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('closed legacy think block renders as thinking card', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: '<think>legacy reasoning</think>Final answer',
+              conversationId: 'conversation-legacy-think',
+            ),
+            showModelIcon: false,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Deep Thinking'), findsOneWidget);
+      expect(find.textContaining('Final answer'), findsOneWidget);
+      expect(
+        find.textContaining('<think>legacy reasoning</think>'),
+        findsNothing,
       );
     });
 

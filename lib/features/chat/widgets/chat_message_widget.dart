@@ -41,6 +41,7 @@ import '../../../shared/widgets/emoji_text.dart';
 import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../home/services/tool_approval_service.dart';
+import '../utils/thinking_tag_parser.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
 
@@ -682,11 +683,6 @@ class ChatMessageWidget extends StatefulWidget {
 }
 
 class _ChatMessageWidgetState extends State<ChatMessageWidget> {
-  // Match vendor inline thinking blocks: <think>...</think> or <thought>...</thought> (or until end)
-  static final RegExp _thinkingRegex = RegExp(
-    r"<(?:think|thought)>([\s\S]*?)(?:</(?:think|thought)>|$)",
-    dotAll: true,
-  );
   final DateFormat _dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
   final ScrollController _reasoningScroll = ScrollController();
   bool _tickActive = false;
@@ -716,30 +712,16 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     // Determine initial state for inline <think> card BEFORE first paint to avoid
     // post-frame size changes that can cause list scroll jitter/snapping.
     try {
-      // Check whether this message is using inline <think> content
-      final extracted = _thinkingRegex
-          .allMatches(widget.message.content)
-          .map((m) => (m.group(1) ?? '').trim())
-          .where((s) => s.isNotEmpty)
-          .join('\n\n');
+      final parsed = _legacyInlineThinkingFor(widget);
+      final extracted = parsed.thinkingTexts.join('\n\n');
       final usingInlineThink =
           (widget.reasoningText == null || widget.reasoningText!.isEmpty) &&
           extracted.isNotEmpty;
-      final loading =
-          usingInlineThink &&
-          widget.message.isStreaming &&
-          !widget.message.content.contains('</think>');
-
       if (usingInlineThink && _inlineThinkExpanded == null) {
         final autoCollapse = context
             .read<SettingsProvider>()
             .autoCollapseThinking;
-        // While loading we default to expanded; once finished honor auto-collapse.
-        _inlineThinkExpanded = loading
-            ? true
-            : !autoCollapse
-            ? true
-            : false;
+        _inlineThinkExpanded = !autoCollapse ? true : false;
       }
     } catch (_) {
       // If anything fails here, fall back to later update logic.
@@ -756,44 +738,31 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
   void _applyAutoCollapseInlineThinkIfFinished({ChatMessageWidget? oldWidget}) {
     if (!mounted) return;
-    // Determine if using inline <think>
-    final newExtracted = _thinkingRegex
-        .allMatches(widget.message.content)
-        .map((m) => (m.group(1) ?? '').trim())
-        .where((s) => s.isNotEmpty)
-        .join('\n\n');
+    final newExtracted = _legacyInlineThinkingFor(
+      widget,
+    ).thinkingTexts.join('\n\n');
     final usingInlineThinkNew =
         (widget.reasoningText == null || widget.reasoningText!.isEmpty) &&
         newExtracted.isNotEmpty;
-    final loadingNew =
-        usingInlineThinkNew &&
-        widget.message.isStreaming &&
-        !widget.message.content.contains('</think>');
 
-    bool loadingOld = false;
+    bool usingInlineThinkOld = false;
     if (oldWidget != null) {
-      final oldExtracted = _thinkingRegex
-          .allMatches(oldWidget.message.content)
-          .map((m) => (m.group(1) ?? '').trim())
-          .where((s) => s.isNotEmpty)
-          .join('\n\n');
-      final usingInlineThinkOld =
+      final oldExtracted = _legacyInlineThinkingFor(
+        oldWidget,
+      ).thinkingTexts.join('\n\n');
+      usingInlineThinkOld =
           (oldWidget.reasoningText == null ||
               oldWidget.reasoningText!.isEmpty) &&
           oldExtracted.isNotEmpty;
-      loadingOld =
-          usingInlineThinkOld &&
-          oldWidget.message.isStreaming &&
-          !oldWidget.message.content.contains('</think>');
     }
 
     final autoCollapse = context.read<SettingsProvider>().autoCollapseThinking;
 
     // If finished now (not loading), inline think is used, and auto-collapse is on
     // Only collapse when user hasn't manually toggled; also if we don't yet have a chosen state.
-    final finishedNow = usingInlineThinkNew && !loadingNew;
+    final finishedNow = usingInlineThinkNew;
     final justFinished = oldWidget != null
-        ? (loadingOld && finishedNow)
+        ? (!usingInlineThinkOld && finishedNow)
         : finishedNow;
 
     if (autoCollapse && finishedNow && justFinished) {
@@ -806,7 +775,6 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     // On first mount where already finished and no user choice yet, honor autoCollapse
     if (oldWidget == null &&
         usingInlineThinkNew &&
-        !loadingNew &&
         _inlineThinkExpanded == null) {
       if (autoCollapse) {
         if (mounted) setState(() => _inlineThinkExpanded = false);
@@ -827,6 +795,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     } else {
       if (_ticker.isActive) _ticker.stop();
     }
+  }
+
+  ThinkingTagParseResult _legacyInlineThinkingFor(ChatMessageWidget widget) {
+    if ((widget.reasoningText?.isNotEmpty ?? false) ||
+        widget.reasoningLoading ||
+        (widget.reasoningSegments?.isNotEmpty ?? false)) {
+      return ThinkingTagParseResult(
+        visibleContent: widget.message.content,
+        thinkingTexts: const <String>[],
+      );
+    }
+    return ThinkingTagParser.parseLegacyInlineBlocks(widget.message.content);
   }
 
   String _assistantNameFallback() {
@@ -2009,16 +1989,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final settings = context.watch<SettingsProvider>();
     final assistant = _assistantForMessage();
 
-    // Extract vendor inline <think>...</think> content (if present)
-    final extractedThinking = _thinkingRegex
-        .allMatches(widget.message.content)
-        .map((m) => (m.group(1) ?? '').trim())
-        .where((s) => s.isNotEmpty)
-        .join('\n\n');
-    // Remove all <think> blocks from the visible assistant content
-    final contentWithoutThink = extractedThinking.isNotEmpty
-        ? widget.message.content.replaceAll(_thinkingRegex, '').trim()
-        : widget.message.content;
+    final parsedInlineThinking = _legacyInlineThinkingFor(widget);
+    final extractedThinking = parsedInlineThinking.thinkingTexts.join('\n\n');
+    final contentWithoutThink = parsedInlineThinking.visibleContent;
     final visualContent = applyAssistantRegexes(
       contentWithoutThink,
       assistant: assistant,
@@ -2130,12 +2103,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             final effectiveExpanded = usingInlineThink
                 ? (_inlineThinkExpanded ?? true)
                 : widget.reasoningExpanded;
-            final collapsedNow =
-                usingInlineThink && (_inlineThinkExpanded == false);
             final effectiveLoading = usingInlineThink
-                ? (widget.message.isStreaming &&
-                      !widget.message.content.contains('</think>') &&
-                      !collapsedNow)
+                ? false
                 : (widget.reasoningFinishedAt == null);
 
             List<ReasoningSegment>? effectiveReasoningSegments =

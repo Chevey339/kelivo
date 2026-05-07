@@ -32,14 +32,9 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/widgets/model_icon.dart';
+import '../utils/thinking_tag_parser.dart';
 import 'chat_message_widget.dart'
     show ChatMessageWidget, ToolUIPart, ReasoningSegment;
-
-// Regular expression to extract thinking content from message
-final RegExp thinkingRegex = RegExp(
-  r"<(?:think|thought)>([\s\S]*?)(?:</(?:think|thought)>|$)",
-  dotAll: true,
-);
 
 // Shared helpers
 String _guessImageMime(String path) {
@@ -196,11 +191,8 @@ class _ThinkingExportData {
 }
 
 _ThinkingExportData _thinkingExportDataForMessage(ChatMessage message) {
-  // Always strip <think> blocks from the visible content for exports, so users
-  // don't accidentally leak thinking content when "Show thinking content" is off.
-  final cleanedContent = message.content.replaceAll(thinkingRegex, '').trim();
-
   final thinkingTexts = <String>[];
+  var cleanedContent = message.content.trim();
 
   // Prefer structured reasoning segments (may include multiple blocks).
   final segJson = (message.reasoningSegmentsJson ?? '').trim();
@@ -208,26 +200,21 @@ _ThinkingExportData _thinkingExportDataForMessage(ChatMessage message) {
     try {
       final decoded = jsonDecode(segJson);
       if (decoded is List) {
-        for (final item in decoded) {
-          if (item is Map) {
-            final t = (item['text']?.toString() ?? '').trim();
-            if (t.isNotEmpty) thinkingTexts.add(t);
-          }
-        }
+        _addReasoningSegmentTexts(thinkingTexts, decoded);
+      } else if (decoded is Map) {
+        _addReasoningSegmentTexts(
+          thinkingTexts,
+          decoded['segments'] as List? ?? const <dynamic>[],
+        );
       }
     } catch (_) {}
   }
 
   // Fall back to <think> tags if segments are not available.
   if (thinkingTexts.isEmpty) {
-    final thinkingMatches = thinkingRegex.allMatches(message.content);
-    if (thinkingMatches.isNotEmpty) {
-      final texts = thinkingMatches
-          .map((m) => (m.group(1) ?? '').trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
-      thinkingTexts.addAll(texts);
-    }
+    final parsed = ThinkingTagParser.parseLegacyInlineBlocks(message.content);
+    cleanedContent = parsed.visibleContent;
+    thinkingTexts.addAll(parsed.thinkingTexts);
   }
 
   // Fall back to the legacy reasoningText field.
@@ -240,6 +227,15 @@ _ThinkingExportData _thinkingExportDataForMessage(ChatMessage message) {
     cleanedContent: cleanedContent,
     thinkingTexts: thinkingTexts,
   );
+}
+
+void _addReasoningSegmentTexts(List<String> output, List<dynamic> segments) {
+  for (final item in segments) {
+    if (item is Map) {
+      final t = (item['text']?.toString() ?? '').trim();
+      if (t.isNotEmpty) output.add(t);
+    }
+  }
 }
 
 class _ExportReasoningPayload {
