@@ -6,8 +6,10 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/search/search_tool_service.dart';
+import 'ask_user_interaction_service.dart';
 import 'local_tools_service.dart';
 import 'tool_approval_service.dart';
 
@@ -315,10 +317,11 @@ class ToolHandlerService {
   /// - Search tool calls
   /// - Memory tool calls (create/edit/delete)
   /// - MCP tool calls
-  Future<String> Function(String, Map<String, dynamic>)? buildToolCallHandler(
+  ToolCallHandler? buildToolCallHandler(
     SettingsProvider settings,
     Assistant? assistant, {
     ToolApprovalService? approvalService,
+    AskUserInteractionService? askUserService,
   }) {
     final mcp = contextProvider.read<McpProvider>();
     final toolSvc = contextProvider.read<McpToolService>();
@@ -326,7 +329,7 @@ class ToolHandlerService {
     // use_build_context_synchronously warning
     final assistantProvider = contextProvider.read<AssistantProvider>();
 
-    return (name, args) async {
+    return (name, args, {toolCallId}) async {
       try {
         // Search tool
         if (name == SearchToolService.toolName && settings.searchEnabled) {
@@ -348,6 +351,35 @@ class ToolHandlerService {
         );
         if (localResult != null) {
           return localResult;
+        }
+
+        if (name == LocalToolNames.askUser &&
+            assistant != null &&
+            assistant.localToolIds.contains(LocalToolNames.askUser)) {
+          if (askUserService == null) {
+            return jsonEncode({
+              'type': 'tool_error',
+              'error': 'ask_user_unavailable',
+              'message': 'Ask user interaction service is unavailable.',
+              'tool': name,
+            });
+          }
+          try {
+            final result = await askUserService.requestAnswer(
+              toolCallId: (toolCallId?.trim().isNotEmpty == true)
+                  ? toolCallId!.trim()
+                  : '${name}_${DateTime.now().microsecondsSinceEpoch}',
+              arguments: args,
+            );
+            return result.toJsonString();
+          } on AskUserInvalidRequestException catch (e) {
+            return jsonEncode({
+              'type': 'tool_error',
+              'error': 'invalid_ask_user_request',
+              'message': e.message,
+              'tool': name,
+            });
+          }
         }
 
         // Approval gate for MCP tools

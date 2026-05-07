@@ -9,6 +9,7 @@ class LocalToolNames {
 
   static const String timeInfo = 'get_time_info';
   static const String clipboard = 'clipboard_tool';
+  static const String askUser = 'ask_user_input_v0';
 }
 
 class LocalToolsService {
@@ -56,6 +57,54 @@ class LocalToolsService {
               },
             },
             'required': ['action'],
+          },
+        },
+      });
+    }
+    if (assistant.localToolIds.contains(LocalToolNames.askUser)) {
+      tools.add(const {
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.askUser,
+          'description':
+              'Ask the user one or more short choice questions when you need clarification, additional information, or a decision before continuing. Supports single-choice and multi-choice questions. The UI will provide Other and Skip options automatically, so do not include those options yourself.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'questions': {
+                'type': 'array',
+                'description': 'One to four questions to ask the user.',
+                'items': {
+                  'type': 'object',
+                  'properties': {
+                    'id': {
+                      'type': 'string',
+                      'description':
+                          'Unique stable identifier for this question.',
+                    },
+                    'question': {
+                      'type': 'string',
+                      'description':
+                          'The full question text shown to the user.',
+                    },
+                    'type': {
+                      'type': 'string',
+                      'enum': ['single', 'multi'],
+                      'description':
+                          'Answer type: single choice or multi choice.',
+                    },
+                    'options': {
+                      'type': 'array',
+                      'description':
+                          'Suggested options for the user to choose from.',
+                      'items': {'type': 'string'},
+                    },
+                  },
+                  'required': ['id', 'question'],
+                },
+              },
+            },
+            'required': ['questions'],
           },
         },
       });

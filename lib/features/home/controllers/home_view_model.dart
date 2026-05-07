@@ -405,6 +405,36 @@ class HomeViewModel extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> continueAssistantMessageAfterToolAnswer(
+    ChatMessage message, {
+    bool allowImagesApiRouting = true,
+  }) async {
+    final conversation = currentConversation;
+    if (conversation == null) {
+      return false;
+    }
+
+    _chatActions.onScheduleImageSanitize = onScheduleImageSanitize;
+    await _clearSuggestionsFor(conversation.id);
+
+    final result = await _chatActions.continueAssistantMessageAfterToolAnswer(
+      message: message,
+      conversation: conversation,
+      allowImagesApiRouting: allowImagesApiRouting,
+    );
+
+    if (!result.success) {
+      if (result.errorMessage == 'no_model') {
+        onWarning?.call('no_model');
+      } else {
+        onError?.call(result.errorMessage ?? 'unknown_error');
+      }
+      return false;
+    }
+
+    return true;
+  }
+
   /// Cancel the active streaming.
   Future<void> cancelStreaming() async {
     await _chatActions.cancelStreaming(currentConversation);

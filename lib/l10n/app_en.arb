@@ -1769,6 +1769,8 @@
   "assistantEditLocalToolTimeInfoSubtitle": "Read the device date, weekday, time, timezone, UTC offset, and timestamp.",
   "assistantEditLocalToolClipboardTitle": "Clipboard",
   "assistantEditLocalToolClipboardSubtitle": "Read or write plain text from the device clipboard when explicitly needed.",
+  "assistantEditLocalToolAskUserTitle": "Ask User",
+  "assistantEditLocalToolAskUserSubtitle": "Let the assistant ask short questions and continue after you answer.",
   "assistantEditMemorySwitchTitle": "Memory",
   "assistantEditMemorySwitchDescription": "Allow the assistant to create and use memories across chats.",
   "assistantEditRecentChatsSwitchTitle": "Recent Chats Reference",
@@ -2014,6 +2016,20 @@
   "toolApprovalDenyTitle": "Deny tool call",
   "toolApprovalDenyHint": "Reason (optional)",
   "toolApprovalDeniedMessage": "Tool call \"{toolName}\" was denied by user. Reason: {reason}",
+  "askUserCardSubmit": "Submit answer",
+  "askUserCardCustomHint": "Type your answer",
+  "askUserCardSomethingElse": "Something else",
+  "askUserCardSkip": "Skip",
+  "askUserCardSkipped": "Skipped",
+  "askUserCardAnswered": "Answered",
+  "askUserCardInactive": "This question is no longer active. Regenerate or continue the conversation.",
+  "askUserCardCancelled": "Question cancelled",
+  "askUserCardQuestionCount": "Ask {count} questions",
+  "@askUserCardQuestionCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "tokenDetailPromptTokens": "{count} tokens",
   "@tokenDetailPromptTokens": {
     "placeholders": {

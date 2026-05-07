@@ -139,6 +139,61 @@ void main() {
       expect(finalAssistantMessage.containsKey('reasoning_content'), isFalse);
     });
 
+    test('恢复工具回答续写时只发送 tool call 和 tool result', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService({
+          'a1': [
+            {
+              'id': 'call_1',
+              'name': 'ask_user_input_v0',
+              'arguments': {
+                'questions': [
+                  {
+                    'id': 'scope',
+                    'question': '选哪个范围？',
+                    'type': 'single',
+                    'options': ['最小', '完整'],
+                  },
+                ],
+              },
+              'content':
+                  '{"type":"ask_user_answer","answers":{"scope":{"type":"single","value":"完整","custom":false,"skipped":false}}}',
+            },
+          ],
+        }),
+        contextProvider: _FakeBuildContext(),
+      );
+
+      final apiMessages = service.buildApiMessages(
+        messages: [
+          _message(id: 'u1', role: 'user', content: '开始吧'),
+          _message(id: 'a1', role: 'assistant', content: ''),
+        ],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+        includeToolMessages: true,
+      );
+
+      expect(
+        apiMessages.where(
+          (message) =>
+              message['role'] == 'assistant' && message['tool_calls'] == null,
+        ),
+        isEmpty,
+      );
+      expect(
+        apiMessages.where(
+          (message) =>
+              message['role'] == 'assistant' && message['tool_calls'] is List,
+        ),
+        hasLength(1),
+      );
+      expect(
+        apiMessages.where((message) => message['role'] == 'tool'),
+        hasLength(1),
+      );
+    });
+
     test('传入消息缺少 reasoningText 时会从已持久化消息兜底回填', () {
       final persistedAssistant = _message(
         id: 'a1',

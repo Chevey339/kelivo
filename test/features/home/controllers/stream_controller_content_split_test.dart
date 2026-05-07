@@ -59,6 +59,42 @@ void main() {
     );
   }
 
+  StreamingState buildStreamingStateWithContent(
+    SettingsProvider settings,
+    String content,
+  ) {
+    final message = ChatMessage(
+      id: 'assistant-message',
+      role: 'assistant',
+      content: content,
+      conversationId: 'conversation-1',
+      isStreaming: true,
+    );
+    return StreamingState(
+      GenerationContext(
+        assistantMessage: message,
+        apiMessages: const [],
+        userImagePaths: const [],
+        allowImagesApiRouting: false,
+        providerKey: 'test',
+        modelId: 'test-model',
+        assistant: null,
+        settings: settings,
+        config: ProviderConfig(
+          id: 'test',
+          enabled: true,
+          name: 'Test',
+          apiKey: '',
+          baseUrl: '',
+        ),
+        toolDefs: const [],
+        supportsReasoning: true,
+        enableReasoning: true,
+        streamOutput: true,
+      ),
+    );
+  }
+
   test('v2 reasoning payload preserves content split metadata', () {
     final controller = buildController();
     final segment = ReasoningSegmentData()
@@ -95,6 +131,13 @@ void main() {
 
     expect(controller.deserializeReasoningSegments(json), hasLength(1));
     expect(controller.deserializeContentSplits(json), isNull);
+  });
+
+  test('StreamingState resumes from existing assistant content', () {
+    final settings = SettingsProvider();
+    final state = buildStreamingStateWithContent(settings, '先确认一下。');
+
+    expect(state.fullContentRaw, '先确认一下。');
   });
 
   test(

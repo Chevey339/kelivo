@@ -15,6 +15,9 @@ class _LocalToolsTab extends StatelessWidget {
     final clipboardEnabled = assistant.localToolIds.contains(
       LocalToolNames.clipboard,
     );
+    final askUserEnabled = assistant.localToolIds.contains(
+      LocalToolNames.askUser,
+    );
 
     Future<void> updateTool(String toolId, bool value) {
       final ids = assistant.localToolIds.toSet();
@@ -47,6 +50,14 @@ class _LocalToolsTab extends StatelessWidget {
               subtitle: l10n.assistantEditLocalToolClipboardSubtitle,
               enabled: clipboardEnabled,
               onChanged: (value) => updateTool(LocalToolNames.clipboard, value),
+            ),
+            _iosDivider(context),
+            _LocalToolRow(
+              icon: Lucide.MessageCircleQuestionMark,
+              title: l10n.assistantEditLocalToolAskUserTitle,
+              subtitle: l10n.assistantEditLocalToolAskUserSubtitle,
+              enabled: askUserEnabled,
+              onChanged: (value) => updateTool(LocalToolNames.askUser, value),
             ),
           ],
         ),

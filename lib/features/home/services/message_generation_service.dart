@@ -5,6 +5,7 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/model_override_payload_parser.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
@@ -13,6 +14,7 @@ import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/generation_controller.dart';
+import 'ask_user_interaction_service.dart';
 import 'message_builder_service.dart';
 import 'tool_approval_service.dart';
 
@@ -49,7 +51,7 @@ Map<String, String>? buildConversationRequestHeaders({
 class PreparedGeneration {
   final List<Map<String, dynamic>> apiMessages;
   final List<Map<String, dynamic>> toolDefs;
-  final Future<String> Function(String, Map<String, dynamic>)? onToolCall;
+  final ToolCallHandler? onToolCall;
   final bool hasBuiltInSearch;
   final List<String> lastUserImagePaths;
 
@@ -118,6 +120,7 @@ class MessageGenerationService {
     required String providerKey,
     required String modelId,
     ToolApprovalService? approvalService,
+    AskUserInteractionService? askUserService,
   }) async {
     final cfg = settings.getProviderConfig(providerKey);
     final kind = ProviderConfig.classify(
@@ -205,6 +208,7 @@ class MessageGenerationService {
             settings,
             assistant,
             approvalService: approvalService,
+            askUserService: askUserService,
           )
         : null;
 

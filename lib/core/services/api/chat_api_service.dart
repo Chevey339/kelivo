@@ -34,6 +34,13 @@ part 'providers/google_gemini.dart';
 part 'providers/google_vertex.dart';
 part 'providers/claude_official.dart';
 
+typedef ToolCallHandler =
+    Future<String> Function(
+      String name,
+      Map<String, dynamic> args, {
+      String? toolCallId,
+    });
+
 class ChatApiService {
   static const String _aihubmixAppCode = 'ZKRT3588';
   static final Map<String, CancelToken> _activeCancelTokens =
@@ -390,7 +397,7 @@ class ChatApiService {
     double? topP,
     int? maxTokens,
     List<Map<String, dynamic>>? tools,
-    Future<String> Function(String name, Map<String, dynamic> args)? onToolCall,
+    ToolCallHandler? onToolCall,
     Map<String, String>? extraHeaders,
     Map<String, dynamic>? extraBody,
     bool stream = true,

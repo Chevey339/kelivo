@@ -11,7 +11,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexStream(
   double? topP,
   int? maxTokens,
   List<Map<String, dynamic>>? tools,
-  Future<String> Function(String, Map<String, dynamic>)? onToolCall,
+  ToolCallHandler? onToolCall,
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
   bool stream = true,
@@ -122,7 +122,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
   double? topP,
   int? maxTokens,
   List<Map<String, dynamic>>? tools,
-  Future<String> Function(String, Map<String, dynamic>)? onToolCall,
+  ToolCallHandler? onToolCall,
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
   bool stream = true,
@@ -453,7 +453,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
         for (final e in toolUses.entries) {
           final name = (e.value['name'] ?? '').toString();
           final args = (e.value['args'] as Map<String, dynamic>);
-          final res = await onToolCall(name, args);
+          final res = await onToolCall(name, args, toolCallId: e.key);
           results.add({
             'type': 'tool_result',
             'tool_use_id': e.key,
@@ -810,7 +810,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
                 }
               }
               if (onToolCall != null) {
-                final res = await onToolCall(name, args);
+                final res = await onToolCall(name, args, toolCallId: id);
                 toolResultsContent[id] = res;
                 yield ChatStreamChunk(
                   content: '',
@@ -920,7 +920,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       }
       String res = toolResultsContent[id] ?? '';
       if (res.isEmpty && onToolCall != null) {
-        res = await onToolCall(name, args);
+        res = await onToolCall(name, args, toolCallId: id);
       }
       toolResultsBlocks.add({
         'type': 'tool_result',

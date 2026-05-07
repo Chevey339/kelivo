@@ -7988,6 +7988,18 @@ abstract class AppLocalizations {
   /// **'Read or write plain text from the device clipboard when explicitly needed.'**
   String get assistantEditLocalToolClipboardSubtitle;
 
+  /// No description provided for @assistantEditLocalToolAskUserTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask User'**
+  String get assistantEditLocalToolAskUserTitle;
+
+  /// No description provided for @assistantEditLocalToolAskUserSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the assistant ask short questions and continue after you answer.'**
+  String get assistantEditLocalToolAskUserSubtitle;
+
   /// No description provided for @assistantEditMemorySwitchTitle.
   ///
   /// In en, this message translates to:
@@ -9049,6 +9061,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tool call \"{toolName}\" was denied by user. Reason: {reason}'**
   String toolApprovalDeniedMessage(Object reason, Object toolName);
+
+  /// No description provided for @askUserCardSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit answer'**
+  String get askUserCardSubmit;
+
+  /// No description provided for @askUserCardCustomHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type your answer'**
+  String get askUserCardCustomHint;
+
+  /// No description provided for @askUserCardSomethingElse.
+  ///
+  /// In en, this message translates to:
+  /// **'Something else'**
+  String get askUserCardSomethingElse;
+
+  /// No description provided for @askUserCardSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get askUserCardSkip;
+
+  /// No description provided for @askUserCardSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get askUserCardSkipped;
+
+  /// No description provided for @askUserCardAnswered.
+  ///
+  /// In en, this message translates to:
+  /// **'Answered'**
+  String get askUserCardAnswered;
+
+  /// No description provided for @askUserCardInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'This question is no longer active. Regenerate or continue the conversation.'**
+  String get askUserCardInactive;
+
+  /// No description provided for @askUserCardCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Question cancelled'**
+  String get askUserCardCancelled;
+
+  /// No description provided for @askUserCardQuestionCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask {count} questions'**
+  String askUserCardQuestionCount(int count);
 
   /// No description provided for @tokenDetailPromptTokens.
   ///

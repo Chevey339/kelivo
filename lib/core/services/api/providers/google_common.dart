@@ -217,7 +217,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   double? topP,
   int? maxTokens,
   List<Map<String, dynamic>>? tools,
-  Future<String> Function(String, Map<String, dynamic>)? onToolCall,
+  ToolCallHandler? onToolCall,
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
   bool stream = true,
@@ -558,7 +558,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
             usage: totalUsage,
             toolCalls: [ToolCallInfo(id: partId, name: name, arguments: args)],
           );
-          final res = await onToolCall(name, args);
+          final res = await onToolCall(name, args, toolCallId: partId);
           yield ChatStreamChunk(
             content: '',
             isDone: false,
@@ -1312,7 +1312,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                   );
                   String resText = '';
                   if (onToolCall != null) {
-                    resText = await onToolCall(name, args);
+                    resText = await onToolCall(name, args, toolCallId: id);
                     yield ChatStreamChunk(
                       content: '',
                       isDone: false,

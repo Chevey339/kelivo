@@ -181,7 +181,7 @@ void main() {
               },
             },
           ],
-          onToolCall: (name, args) async {
+          onToolCall: (name, args, {toolCallId}) async {
             toolInvocations.add({'name': name, 'args': args});
             return '2026-03-27';
           },

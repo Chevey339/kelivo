@@ -33,10 +33,12 @@ import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/models/assistant_regex.dart';
+import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
+import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../home/services/tool_approval_service.dart';
 import 'chat_suggestion_bubbles.dart';
@@ -109,6 +111,9 @@ IconData _toolIconFor(String name) {
 }
 
 IconData? _localToolIconFor(String name) {
+  if (name == LocalToolNames.askUser) {
+    return Lucide.MessageCircleQuestionMark;
+  }
   return switch (name) {
     LocalToolNames.timeInfo => Lucide.Calendar,
     LocalToolNames.clipboard => Lucide.Clipboard,
@@ -121,6 +126,9 @@ String? _localToolTitleFor(
   String name,
   Map<String, dynamic> args,
 ) {
+  if (name == LocalToolNames.askUser) {
+    return _askUserToolTitleFor(l10n, args);
+  }
   return switch (name) {
     LocalToolNames.timeInfo => l10n.assistantEditLocalToolTimeInfoTitle,
     LocalToolNames.clipboard => switch ((args['action'] ?? '').toString()) {
@@ -132,6 +140,15 @@ String? _localToolTitleFor(
   };
 }
 
+String _askUserToolTitleFor(AppLocalizations l10n, Map<String, dynamic> args) {
+  final questions = AskUserInteractionService.normalizeQuestions(args);
+  if (questions.length == 1) return questions.first.question;
+  if (questions.length > 1) {
+    return l10n.askUserCardQuestionCount(questions.length);
+  }
+  return l10n.assistantEditLocalToolAskUserTitle;
+}
+
 String _toolTitleFor(
   BuildContext context,
   String name,
@@ -139,6 +156,9 @@ String _toolTitleFor(
   required bool isResult,
 }) {
   final l10n = AppLocalizations.of(context)!;
+  if (name == LocalToolNames.askUser) {
+    return _askUserToolTitleFor(l10n, args);
+  }
   final localToolTitle = _localToolTitleFor(l10n, name, args);
   if (localToolTitle != null) return localToolTitle;
   switch (name) {
@@ -609,6 +629,8 @@ class ChatMessageWidget extends StatefulWidget {
   final bool isProcessingFiles;
   final List<String> suggestions;
   final ValueChanged<String>? onSuggestionTap;
+  final Future<void> Function(ToolUIPart part, AskUserResult result)?
+  onRecoveredAskUserAnswer;
 
   const ChatMessageWidget({
     super.key,
@@ -650,6 +672,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.isProcessingFiles = false,
     this.suggestions = const <String>[],
     this.onSuggestionTap,
+    this.onRecoveredAskUserAnswer,
   });
 
   @override
@@ -1185,7 +1208,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: _ToolCallItem(part: part),
+      child: _ToolCallItem(
+        part: part,
+        onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
+      ),
     );
   }
 
@@ -2168,7 +2194,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   _buildAssistantTextBlock(context, block.text!, settings),
                 );
               } else if (block.steps.isNotEmpty) {
-                widgets.add(_ChainOfThoughtCard(steps: block.steps));
+                widgets.add(
+                  _ChainOfThoughtCard(
+                    steps: block.steps,
+                    onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
+                  ),
+                );
               }
               if (i != renderBlocks.length - 1) {
                 widgets.add(const SizedBox(height: 8));
@@ -3437,9 +3468,11 @@ const double _timelineBottomLineStart =
     _timelineStepPaddingV + _timelineIconSize + _timelineLineGap;
 
 class _ChainOfThoughtCard extends StatefulWidget {
-  const _ChainOfThoughtCard({required this.steps});
+  const _ChainOfThoughtCard({required this.steps, this.onRecoveredAnswer});
 
   final List<_TimelineStepData> steps;
+  final Future<void> Function(ToolUIPart part, AskUserResult result)?
+  onRecoveredAnswer;
 
   @override
   State<_ChainOfThoughtCard> createState() => _ChainOfThoughtCardState();
@@ -3541,6 +3574,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                 part: step.tool!,
                 isFirst: index == 0,
                 isLast: index == visibleSteps.length - 1,
+                onRecoveredAnswer: widget.onRecoveredAnswer,
               );
             }),
           ],
@@ -3872,11 +3906,14 @@ class _ChainOfThoughtToolStep extends StatefulWidget {
     required this.part,
     required this.isFirst,
     required this.isLast,
+    this.onRecoveredAnswer,
   });
 
   final ToolUIPart part;
   final bool isFirst;
   final bool isLast;
+  final Future<void> Function(ToolUIPart part, AskUserResult result)?
+  onRecoveredAnswer;
 
   @override
   State<_ChainOfThoughtToolStep> createState() =>
@@ -3884,6 +3921,23 @@ class _ChainOfThoughtToolStep extends StatefulWidget {
 }
 
 class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
+  bool get _isAskUser => widget.part.toolName == LocalToolNames.askUser;
+  bool? _askUserExpanded;
+
+  bool get _askUserAnswered =>
+      widget.part.content?.trim().isNotEmpty == true && !widget.part.loading;
+
+  @override
+  void didUpdateWidget(covariant _ChainOfThoughtToolStep oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final wasAnswered =
+        oldWidget.part.content?.trim().isNotEmpty == true &&
+        !oldWidget.part.loading;
+    if (_isAskUser && !wasAnswered && _askUserAnswered) {
+      _askUserExpanded = true;
+    }
+  }
+
   IconData _iconFor(String name) {
     return _toolIconFor(name);
   }
@@ -3971,7 +4025,9 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
     final isPendingApproval = pendingRequest != null;
     final approvalRequest = pendingRequest;
 
-    final icon = widget.part.loading && !isPendingApproval
+    final icon = _isAskUser
+        ? Icon(_iconFor(widget.part.toolName), size: 16, color: fg.strong)
+        : widget.part.loading && !isPendingApproval
         ? LoadingIndicator(height: 12, dotSize: 3, spacing: 2, color: fg.strong)
         : Icon(_iconFor(widget.part.toolName), size: 16, color: fg.strong);
 
@@ -3982,7 +4038,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
       isResult: !widget.part.loading && !isPendingApproval,
     );
     final label = _Shimmer(
-      enabled: widget.part.loading,
+      enabled: widget.part.loading && !_isAskUser,
       child: Text(
         title,
         maxLines: 2,
@@ -4006,7 +4062,14 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
                   '')
               .toString();
     final bool shouldShowSummary = settings.showToolResultSummary;
-    final Widget? content = !shouldShowSummary || summaryText.trim().isEmpty
+    final askUserExpanded = _askUserExpanded ?? true;
+    final Widget? content = _isAskUser
+        ? _AskUserInlineBody(
+            part: widget.part,
+            compact: true,
+            onRecoveredAnswer: widget.onRecoveredAnswer,
+          )
+        : !shouldShowSummary || summaryText.trim().isEmpty
         ? null
         : Text(
             summaryText.trim(),
@@ -4057,18 +4120,28 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
       label: label,
       isFirst: widget.isFirst,
       isLast: widget.isLast,
-      onTap: () => _showDetail(context),
+      onTap: _isAskUser
+          ? () => setState(() => _askUserExpanded = !askUserExpanded)
+          : () => _showDetail(context),
       extra: extra,
-      indicator: Icon(Lucide.ChevronRight, size: 16, color: fg.muted),
+      indicator: _isAskUser
+          ? Icon(
+              askUserExpanded ? Lucide.ChevronUp : Lucide.ChevronDown,
+              size: 16,
+              color: fg.muted,
+            )
+          : Icon(Lucide.ChevronRight, size: 16, color: fg.muted),
       content: content,
-      contentVisible: content != null,
+      contentVisible: content != null && (!_isAskUser || askUserExpanded),
     );
   }
 }
 
 class _ToolCallItem extends StatefulWidget {
-  const _ToolCallItem({required this.part});
+  const _ToolCallItem({required this.part, this.onRecoveredAnswer});
   final ToolUIPart part;
+  final Future<void> Function(ToolUIPart part, AskUserResult result)?
+  onRecoveredAnswer;
 
   @override
   State<_ToolCallItem> createState() => _ToolCallItemState();
@@ -4172,6 +4245,13 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     final fg = _chatSurfaceForegroundPalette(context);
     final hasImages = _imagePaths.isNotEmpty;
     final l10n = AppLocalizations.of(context)!;
+
+    if (widget.part.toolName == LocalToolNames.askUser) {
+      return _AskUserToolCard(
+        part: widget.part,
+        onRecoveredAnswer: widget.onRecoveredAnswer,
+      );
+    }
 
     // Check if this tool call is pending approval
     final approvalService = context.watch<ToolApprovalService>();
@@ -4768,6 +4848,762 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   }
 }
 
+class _AskUserToolCard extends StatefulWidget {
+  const _AskUserToolCard({required this.part, this.onRecoveredAnswer});
+
+  final ToolUIPart part;
+  final Future<void> Function(ToolUIPart part, AskUserResult result)?
+  onRecoveredAnswer;
+
+  @override
+  State<_AskUserToolCard> createState() => _AskUserToolCardState();
+}
+
+class _AskUserToolCardState extends State<_AskUserToolCard> {
+  bool? _expanded;
+
+  bool get _answered =>
+      widget.part.content?.trim().isNotEmpty == true && !widget.part.loading;
+
+  @override
+  void didUpdateWidget(covariant _AskUserToolCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final wasAnswered =
+        oldWidget.part.content?.trim().isNotEmpty == true &&
+        !oldWidget.part.loading;
+    if (!wasAnswered && _answered) {
+      _expanded = true;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fg = _chatSurfaceForegroundPalette(context);
+    final l10n = AppLocalizations.of(context)!;
+    final expanded = _expanded ?? true;
+    return _buildSharedChatSurface(
+      context,
+      borderRadius: BorderRadius.circular(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      defaultColor: cs.primaryContainer.withValues(alpha: isDark ? 0.25 : 0.30),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IosCardPress(
+            onTap: () => setState(() => _expanded = !expanded),
+            borderRadius: BorderRadius.circular(10),
+            baseColor: Colors.transparent,
+            pressedScale: 1,
+            padding: EdgeInsets.zero,
+            child: Row(
+              children: [
+                Icon(
+                  Lucide.MessageCircleQuestionMark,
+                  size: 18,
+                  color: fg.strong,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _askUserToolTitleFor(l10n, widget.part.arguments),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: fg.strong,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (_answered) ...[
+                  Text(
+                    l10n.askUserCardAnswered,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: fg.muted,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Icon(
+                  expanded ? Lucide.ChevronUp : Lucide.ChevronDown,
+                  size: 16,
+                  color: fg.muted,
+                ),
+              ],
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topLeft,
+            child: expanded
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: _AskUserInlineBody(
+                      part: widget.part,
+                      onRecoveredAnswer: widget.onRecoveredAnswer,
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AskUserInlineBody extends StatefulWidget {
+  const _AskUserInlineBody({
+    required this.part,
+    this.compact = false,
+    this.onRecoveredAnswer,
+  });
+
+  final ToolUIPart part;
+  final bool compact;
+  final Future<void> Function(ToolUIPart part, AskUserResult result)?
+  onRecoveredAnswer;
+
+  @override
+  State<_AskUserInlineBody> createState() => _AskUserInlineBodyState();
+}
+
+class _AskUserInlineBodyState extends State<_AskUserInlineBody> {
+  final Map<String, String> _singleAnswers = <String, String>{};
+  final Map<String, Set<String>> _multiAnswers = <String, Set<String>>{};
+  final Map<String, TextEditingController> _textControllers =
+      <String, TextEditingController>{};
+  final Set<String> _skippedQuestions = <String>{};
+  bool _submittingRecovered = false;
+
+  @override
+  void dispose() {
+    for (final controller in _textControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  TextEditingController _controllerFor(String id) {
+    return _textControllers.putIfAbsent(id, TextEditingController.new);
+  }
+
+  bool _hasAnswer(AskUserQuestion question) {
+    if (_skippedQuestions.contains(question.id)) return true;
+    final textValue = _controllerFor(question.id).text.trim();
+    if (textValue.isNotEmpty) return true;
+    return switch (question.kind) {
+      AskUserQuestionKind.single =>
+        (_singleAnswers[question.id] ?? '').trim().isNotEmpty,
+      AskUserQuestionKind.multi =>
+        (_multiAnswers[question.id] ?? const <String>{}).isNotEmpty,
+    };
+  }
+
+  bool _canSubmit(List<AskUserQuestion> questions) {
+    return questions.isNotEmpty && questions.every(_hasAnswer);
+  }
+
+  Map<String, AskUserAnswerValue> _buildAnswers(
+    List<AskUserQuestion> questions,
+  ) {
+    final out = <String, AskUserAnswerValue>{};
+    for (final question in questions) {
+      if (_skippedQuestions.contains(question.id)) {
+        out[question.id] = AskUserAnswerValue.skipped(kind: question.kind);
+        continue;
+      }
+      final textValue = _controllerFor(question.id).text.trim();
+      switch (question.kind) {
+        case AskUserQuestionKind.single:
+          final selected = _singleAnswers[question.id] ?? '';
+          if (textValue.isNotEmpty && textValue != selected) {
+            out[question.id] = AskUserAnswerValue.single(
+              value: textValue,
+              custom: true,
+            );
+            break;
+          }
+          out[question.id] = AskUserAnswerValue.single(
+            value: selected,
+            custom: false,
+          );
+          break;
+        case AskUserQuestionKind.multi:
+          final selectedValues =
+              (_multiAnswers[question.id] ?? const <String>{}).toList();
+          if (textValue.isNotEmpty && !selectedValues.contains(textValue)) {
+            selectedValues.add(textValue);
+            out[question.id] = AskUserAnswerValue.multi(
+              value: selectedValues,
+              custom: true,
+            );
+            break;
+          }
+          out[question.id] = AskUserAnswerValue.multi(
+            value: selectedValues,
+            custom: false,
+          );
+          break;
+      }
+    }
+    return out;
+  }
+
+  String _answerLabel(
+    BuildContext context,
+    AskUserQuestion question,
+    Map<dynamic, dynamic> answers,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final raw = answers[question.id];
+    if (raw is! Map) return '';
+    if (raw['skipped'] == true) return l10n.askUserCardSkipped;
+    final value = raw['value'];
+    if (value is List) {
+      return value.map((item) => item.toString()).join(', ');
+    }
+    return value?.toString() ?? '';
+  }
+
+  Map<dynamic, dynamic> _answeredValues(String content) {
+    try {
+      final payload = jsonDecode(content) as Map<String, dynamic>;
+      final answers = payload['answers'];
+      if (answers is Map) return answers;
+    } catch (_) {}
+    return const <dynamic, dynamic>{};
+  }
+
+  void _clearSkip(String questionId) {
+    _skippedQuestions.remove(questionId);
+  }
+
+  Future<void> _submitAnswers(
+    AskUserInteractionService askUserService,
+    List<AskUserQuestion> questions,
+    AskUserRequest? pendingRequest,
+  ) async {
+    final answers = _buildAnswers(questions);
+    if (pendingRequest != null) {
+      askUserService.answer(widget.part.id, answers);
+      return;
+    }
+
+    final onRecoveredAnswer = widget.onRecoveredAnswer;
+    if (onRecoveredAnswer == null || _submittingRecovered) return;
+    setState(() => _submittingRecovered = true);
+    try {
+      await onRecoveredAnswer(widget.part, AskUserResult.answer(answers));
+    } finally {
+      if (mounted) setState(() => _submittingRecovered = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = _chatSurfaceForegroundPalette(context);
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final askUserService = context.watch<AskUserInteractionService>();
+    final pendingRequest = askUserService.pendingRequests[widget.part.id];
+    final storedQuestions = AskUserInteractionService.normalizeQuestions(
+      widget.part.arguments,
+    );
+    final questions = pendingRequest?.questions ?? storedQuestions;
+    final answered = widget.part.content?.trim().isNotEmpty == true;
+    final invalid = questions.isEmpty && !answered;
+    final answeredValues = answered
+        ? _answeredValues(widget.part.content ?? '')
+        : const <dynamic, dynamic>{};
+
+    final children = <Widget>[
+      if (invalid)
+        Text(
+          l10n.askUserCardInactive,
+          style: TextStyle(fontSize: 12, height: 1.35, color: fg.body),
+        )
+      else if (answered)
+        for (final question in questions) ...[
+          _AskUserAnsweredQuestion(
+            question: question,
+            answer: _answerLabel(context, question, answeredValues),
+          ),
+          if (question != questions.last) const SizedBox(height: 10),
+        ]
+      else ...[
+        for (final question in questions) ...[
+          _AskUserQuestionView(
+            question: question,
+            selectedSingle: _singleAnswers[question.id],
+            selectedMulti: _multiAnswers[question.id] ?? const <String>{},
+            textController: _controllerFor(question.id),
+            skipped: _skippedQuestions.contains(question.id),
+            showQuestionText: true,
+            onOtherChanged: (value) {
+              setState(() {
+                _clearSkip(question.id);
+                if (question.kind == AskUserQuestionKind.single &&
+                    value.trim().isNotEmpty) {
+                  _singleAnswers.remove(question.id);
+                }
+              });
+            },
+            onSelectSingle: (value) {
+              setState(() {
+                _clearSkip(question.id);
+                _singleAnswers[question.id] = value;
+                _controllerFor(question.id).clear();
+              });
+            },
+            onToggleMulti: (value) {
+              setState(() {
+                _clearSkip(question.id);
+                final set = _multiAnswers[question.id]?.toSet() ?? <String>{};
+                if (set.contains(value)) {
+                  set.remove(value);
+                } else {
+                  set.add(value);
+                }
+                _multiAnswers[question.id] = set;
+              });
+            },
+            onToggleSkip: () {
+              setState(() {
+                if (_skippedQuestions.contains(question.id)) {
+                  _skippedQuestions.remove(question.id);
+                } else {
+                  _singleAnswers.remove(question.id);
+                  _multiAnswers.remove(question.id);
+                  _controllerFor(question.id).clear();
+                  _skippedQuestions.add(question.id);
+                }
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+        ],
+        Align(
+          alignment: Alignment.centerRight,
+          child: _AskUserSubmitButton(
+            label: l10n.askUserCardSubmit,
+            color: cs.primary,
+            onTap:
+                _canSubmit(questions) &&
+                    !_submittingRecovered &&
+                    (pendingRequest != null || widget.onRecoveredAnswer != null)
+                ? () =>
+                      _submitAnswers(askUserService, questions, pendingRequest)
+                : null,
+          ),
+        ),
+      ],
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+  }
+}
+
+class _AskUserQuestionView extends StatelessWidget {
+  const _AskUserQuestionView({
+    required this.question,
+    required this.selectedSingle,
+    required this.selectedMulti,
+    required this.textController,
+    required this.skipped,
+    required this.showQuestionText,
+    required this.onOtherChanged,
+    required this.onSelectSingle,
+    required this.onToggleMulti,
+    required this.onToggleSkip,
+  });
+
+  final AskUserQuestion question;
+  final String? selectedSingle;
+  final Set<String> selectedMulti;
+  final TextEditingController textController;
+  final bool skipped;
+  final bool showQuestionText;
+  final ValueChanged<String> onOtherChanged;
+  final ValueChanged<String> onSelectSingle;
+  final ValueChanged<String> onToggleMulti;
+  final VoidCallback onToggleSkip;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = _chatSurfaceForegroundPalette(context);
+    final isMulti = question.kind == AskUserQuestionKind.multi;
+    final questionText = Text(
+      question.question,
+      style: TextStyle(fontSize: 13, height: 1.35, color: fg.body),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: showQuestionText ? questionText : const SizedBox()),
+            const SizedBox(width: 8),
+            _AskUserSkipPill(selected: skipped, onTap: onToggleSkip),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (question.options.isNotEmpty) ...[
+          for (final entry in question.options.asMap().entries) ...[
+            _AskUserOptionRow(
+              index: entry.key + 1,
+              label: entry.value,
+              multi: isMulti,
+              selected: isMulti
+                  ? selectedMulti.contains(entry.value)
+                  : selectedSingle == entry.value,
+              disabled: skipped,
+              onTap: () => isMulti
+                  ? onToggleMulti(entry.value)
+                  : onSelectSingle(entry.value),
+            ),
+            const SizedBox(height: 7),
+          ],
+        ],
+        _AskUserOtherRow(
+          index: question.options.length + 1,
+          multi: isMulti,
+          selected: textController.text.trim().isNotEmpty,
+          controller: textController,
+          disabled: skipped,
+          onChanged: onOtherChanged,
+        ),
+      ],
+    );
+  }
+}
+
+class _AskUserAnsweredQuestion extends StatelessWidget {
+  const _AskUserAnsweredQuestion({
+    required this.question,
+    required this.answer,
+  });
+
+  final AskUserQuestion question;
+  final String answer;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final fg = _chatSurfaceForegroundPalette(context);
+    final displayAnswer = answer.trim().isEmpty
+        ? AppLocalizations.of(context)!.askUserCardSkipped
+        : answer.trim();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            question.question,
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.35,
+              color: fg.body,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            displayAnswer,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.35,
+              color: cs.primary.withValues(alpha: 0.86),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AskUserOptionRow extends StatelessWidget {
+  const _AskUserOptionRow({
+    required this.index,
+    required this.label,
+    required this.multi,
+    required this.selected,
+    required this.disabled,
+    required this.onTap,
+  });
+
+  final int index;
+  final String label;
+  final bool multi;
+  final bool selected;
+  final bool disabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final fg = _chatSurfaceForegroundPalette(context);
+    final bg = selected
+        ? cs.primary.withValues(alpha: 0.09)
+        : Colors.transparent;
+    return IosCardPress(
+      borderRadius: BorderRadius.circular(14),
+      baseColor: bg,
+      pressedScale: disabled ? 1 : 0.995,
+      padding: EdgeInsets.zero,
+      onTap: disabled ? null : onTap,
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(minHeight: 40),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: bg,
+        ),
+        child: Row(
+          children: [
+            if (multi)
+              IosCheckbox(
+                value: selected,
+                onChanged: disabled ? null : (_) => onTap(),
+                size: 18,
+                hitTestSize: 24,
+                activeColor: cs.primary,
+                semanticLabel: label,
+              )
+            else
+              _AskUserIndexBadge(index: index, selected: selected),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.25,
+                  fontWeight: FontWeight.w500,
+                  color: selected ? cs.primary : fg.strong,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AskUserOtherRow extends StatelessWidget {
+  const _AskUserOtherRow({
+    required this.index,
+    required this.multi,
+    required this.selected,
+    required this.controller,
+    required this.disabled,
+    required this.onChanged,
+  });
+
+  final int index;
+  final bool multi;
+  final bool selected;
+  final TextEditingController controller;
+  final bool disabled;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final fg = _chatSurfaceForegroundPalette(context);
+    final l10n = AppLocalizations.of(context)!;
+    final effectiveSelected = selected;
+    final bg = effectiveSelected
+        ? cs.primary.withValues(alpha: 0.09)
+        : Colors.transparent;
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (multi)
+            IgnorePointer(
+              child: IosCheckbox(
+                value: effectiveSelected,
+                onChanged: disabled ? null : (_) {},
+                size: 18,
+                hitTestSize: 24,
+                activeColor: cs.primary,
+                semanticLabel: l10n.askUserCardSomethingElse,
+              ),
+            )
+          else
+            _AskUserIndexBadge(index: index, selected: effectiveSelected),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              enabled: !disabled,
+              controller: controller,
+              minLines: 1,
+              maxLines: 2,
+              onChanged: onChanged,
+              decoration: InputDecoration(
+                hintText: l10n.askUserCardCustomHint,
+                isDense: true,
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+              style: TextStyle(fontSize: 13, height: 1.25, color: fg.strong),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AskUserIndexBadge extends StatelessWidget {
+  const _AskUserIndexBadge({required this.index, required this.selected});
+
+  final int index;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final fg = _chatSurfaceForegroundPalette(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: 24,
+      height: 24,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: selected
+            ? cs.primary.withValues(alpha: 0.13)
+            : cs.onSurface.withValues(alpha: isDark ? 0.08 : 0.05),
+        border: Border.all(
+          color: selected
+              ? cs.primary.withValues(alpha: 0.28)
+              : cs.onSurface.withValues(alpha: isDark ? 0.10 : 0.07),
+        ),
+      ),
+      child: Text(
+        '$index',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: selected ? cs.primary : fg.muted,
+        ),
+      ),
+    );
+  }
+}
+
+class _AskUserSkipPill extends StatelessWidget {
+  const _AskUserSkipPill({required this.selected, required this.onTap});
+
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final fg = _chatSurfaceForegroundPalette(context);
+    final l10n = AppLocalizations.of(context)!;
+    return IosCardPress(
+      borderRadius: BorderRadius.circular(7),
+      baseColor: Colors.transparent,
+      pressedScale: 0.98,
+      padding: EdgeInsets.zero,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        child: Text(
+          l10n.askUserCardSkip,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: selected ? cs.primary.withValues(alpha: 0.78) : fg.muted,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AskUserSubmitButton extends StatelessWidget {
+  const _AskUserSubmitButton({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    final cs = Theme.of(context).colorScheme;
+    return IosCardPress(
+      borderRadius: BorderRadius.circular(14),
+      baseColor: enabled
+          ? color.withValues(alpha: 0.86)
+          : cs.surfaceContainerHighest.withValues(alpha: 0.45),
+      pressedScale: enabled ? 0.985 : 1,
+      padding: EdgeInsets.zero,
+      onTap: onTap,
+      child: Container(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(14)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Lucide.ArrowUp,
+              size: 15,
+              color: enabled
+                  ? cs.onPrimary
+                  : cs.onSurface.withValues(alpha: 0.38),
+            ),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: enabled
+                    ? cs.onPrimary
+                    : cs.onSurface.withValues(alpha: 0.38),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Tactile button for tool approval actions (approve / deny).
 class _ApprovalButton extends StatelessWidget {
   const _ApprovalButton({
@@ -4779,7 +5615,7 @@ class _ApprovalButton extends StatelessWidget {
 
   final String label;
   final Color color;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   /// When true, uses a solid fill background; when false, outline style.
   final bool filled;
@@ -4787,6 +5623,7 @@ class _ApprovalButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final enabled = onTap != null;
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -4807,7 +5644,7 @@ class _ApprovalButton extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: color,
+            color: enabled ? color : color.withValues(alpha: 0.45),
           ),
         ),
       ),

@@ -13,7 +13,11 @@ void main() {
     const localToolsAssistant = Assistant(
       id: 'a1',
       name: 'Assistant',
-      localToolIds: [LocalToolNames.timeInfo, LocalToolNames.clipboard],
+      localToolIds: [
+        LocalToolNames.timeInfo,
+        LocalToolNames.clipboard,
+        LocalToolNames.askUser,
+      ],
     );
 
     setUp(() {
@@ -77,12 +81,25 @@ void main() {
         expect(enabled.map((tool) => tool['function']['name']), const [
           LocalToolNames.timeInfo,
           LocalToolNames.clipboard,
+          LocalToolNames.askUser,
         ]);
         expect(enabled.first['function']['parameters']['properties'], isEmpty);
         expect(
-          enabled
-              .last['function']['parameters']['properties']['action']['enum'],
+          enabled[1]['function']['parameters']['properties']['action']['enum'],
           const ['read', 'write'],
+        );
+        final askUserParameters = enabled[2]['function']['parameters'];
+        expect(askUserParameters['required'], const ['questions']);
+        final questionSchema =
+            askUserParameters['properties']['questions']['items'];
+        expect(questionSchema['required'], const ['id', 'question']);
+        expect(questionSchema['properties']['type']['enum'], const [
+          'single',
+          'multi',
+        ]);
+        expect(
+          questionSchema['properties']['options']['items']['type'],
+          'string',
         );
       },
     );

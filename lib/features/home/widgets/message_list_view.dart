@@ -11,6 +11,7 @@ import '../../chat/widgets/chat_message_widget.dart';
 import '../../chat/widgets/message_more_sheet.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/streaming_content_notifier.dart';
+import '../services/ask_user_interaction_service.dart';
 import '../utils/chat_layout_constants.dart';
 import 'model_icon.dart';
 
@@ -35,6 +36,12 @@ typedef OnShareMessage =
     void Function(int messageIndex, List<ChatMessage> messages);
 typedef OnSpeakMessage = Future<void> Function(ChatMessage message);
 typedef OnSuggestionTap = void Function(String suggestion);
+typedef OnRecoveredAskUserAnswer =
+    Future<void> Function(
+      ChatMessage message,
+      ToolUIPart part,
+      AskUserResult result,
+    );
 
 /// Data class for reasoning UI state
 class ReasoningUiState {
@@ -104,6 +111,7 @@ class MessageListView extends StatelessWidget {
     this.onSpeakMessage,
     this.suggestions = const <String>[],
     this.onSuggestionTap,
+    this.onRecoveredAskUserAnswer,
     this.onToggleSelection,
     this.onToggleReasoning,
     this.onToggleTranslation,
@@ -164,6 +172,7 @@ class MessageListView extends StatelessWidget {
   final OnSpeakMessage? onSpeakMessage;
   final List<String> suggestions;
   final OnSuggestionTap? onSuggestionTap;
+  final OnRecoveredAskUserAnswer? onRecoveredAskUserAnswer;
   final void Function(String messageId, bool selected)? onToggleSelection;
   final void Function(String messageId)? onToggleReasoning;
   final void Function(String messageId)? onToggleTranslation;
@@ -658,6 +667,9 @@ class MessageListView extends StatelessWidget {
       isProcessingFiles: isProcessingFiles,
       suggestions: suggestions,
       onSuggestionTap: onSuggestionTap,
+      onRecoveredAskUserAnswer: onRecoveredAskUserAnswer == null
+          ? null
+          : (part, result) => onRecoveredAskUserAnswer!(message, part, result),
     );
   }
 }

@@ -4286,6 +4286,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Read or write plain text from the device clipboard when explicitly needed.';
 
   @override
+  String get assistantEditLocalToolAskUserTitle => 'Ask User';
+
+  @override
+  String get assistantEditLocalToolAskUserSubtitle =>
+      'Let the assistant ask short questions and continue after you answer.';
+
+  @override
   String get assistantEditMemorySwitchTitle => 'Memory';
 
   @override
@@ -4854,6 +4861,36 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String toolApprovalDeniedMessage(Object reason, Object toolName) {
     return 'Tool call \"$toolName\" was denied by user. Reason: $reason';
+  }
+
+  @override
+  String get askUserCardSubmit => 'Submit answer';
+
+  @override
+  String get askUserCardCustomHint => 'Type your answer';
+
+  @override
+  String get askUserCardSomethingElse => 'Something else';
+
+  @override
+  String get askUserCardSkip => 'Skip';
+
+  @override
+  String get askUserCardSkipped => 'Skipped';
+
+  @override
+  String get askUserCardAnswered => 'Answered';
+
+  @override
+  String get askUserCardInactive =>
+      'This question is no longer active. Regenerate or continue the conversation.';
+
+  @override
+  String get askUserCardCancelled => 'Question cancelled';
+
+  @override
+  String askUserCardQuestionCount(int count) {
+    return 'Ask $count questions';
   }
 
   @override

@@ -35,6 +35,7 @@ import 'scroll_controller.dart' as scroll_ctrl;
 import 'home_view_model.dart';
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
+import '../services/ask_user_interaction_service.dart';
 import '../services/ocr_service.dart';
 import '../services/translation_service.dart';
 import '../services/file_upload_service.dart';
@@ -648,6 +649,50 @@ class HomePageController extends ChangeNotifier {
     if (success) {
       notifyListeners();
     }
+  }
+
+  Future<void> submitRecoveredAskUserAnswer(
+    ChatMessage message,
+    ToolUIPart part,
+    AskUserResult result,
+  ) async {
+    final content = result.toJsonString();
+    await _chatService.upsertToolEvent(
+      message.id,
+      id: part.id,
+      name: part.toolName,
+      arguments: part.arguments,
+      content: content,
+    );
+
+    final parts = List<ToolUIPart>.of(
+      _streamController.getToolParts(message.id) ?? const <ToolUIPart>[],
+    );
+    final idx = parts.indexWhere(
+      (candidate) =>
+          candidate.id == part.id ||
+          (candidate.id.isEmpty && candidate.toolName == part.toolName),
+    );
+    final answeredPart = ToolUIPart(
+      id: part.id,
+      toolName: part.toolName,
+      arguments: part.arguments,
+      content: content,
+      loading: false,
+    );
+    if (idx >= 0) {
+      parts[idx] = answeredPart;
+    } else {
+      parts.add(answeredPart);
+    }
+    _streamController.setToolParts(message.id, parts);
+    notifyListeners();
+
+    if (currentConversation == null || isCurrentConversationLoading) return;
+    await _viewModel.continueAssistantMessageAfterToolAnswer(
+      message,
+      allowImagesApiRouting: _mediaController.allowImagesApiRouting,
+    );
   }
 
   Future<void> cancelStreaming() async {
