@@ -1061,8 +1061,6 @@ class _HomePageState extends State<HomePage>
             _controller.shareMessage(index, messages),
         onSpeakMessage: (message) => _controller.speakMessage(message),
         onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),
-        canSubmitRecoveredAskUserAnswer:
-            !_controller.isCurrentConversationLoading,
         onRecoveredAskUserAnswer: (message, part, result) =>
             _controller.submitRecoveredAskUserAnswer(message, part, result),
         onToggleSelection: (messageId, selected) {

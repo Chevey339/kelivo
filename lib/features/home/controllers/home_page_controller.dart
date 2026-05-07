@@ -656,7 +656,7 @@ class HomePageController extends ChangeNotifier {
     ToolUIPart part,
     AskUserResult result,
   ) async {
-    if (currentConversation == null || isCurrentConversationLoading) return;
+    if (currentConversation == null) return;
 
     final content = result.toJsonString();
     await _chatService.upsertToolEvent(

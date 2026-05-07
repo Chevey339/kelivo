@@ -112,7 +112,6 @@ class MessageListView extends StatelessWidget {
     this.suggestions = const <String>[],
     this.onSuggestionTap,
     this.onRecoveredAskUserAnswer,
-    this.canSubmitRecoveredAskUserAnswer = true,
     this.onToggleSelection,
     this.onToggleReasoning,
     this.onToggleTranslation,
@@ -174,7 +173,6 @@ class MessageListView extends StatelessWidget {
   final List<String> suggestions;
   final OnSuggestionTap? onSuggestionTap;
   final OnRecoveredAskUserAnswer? onRecoveredAskUserAnswer;
-  final bool canSubmitRecoveredAskUserAnswer;
   final void Function(String messageId, bool selected)? onToggleSelection;
   final void Function(String messageId)? onToggleReasoning;
   final void Function(String messageId)? onToggleTranslation;
@@ -669,7 +667,6 @@ class MessageListView extends StatelessWidget {
       isProcessingFiles: isProcessingFiles,
       suggestions: suggestions,
       onSuggestionTap: onSuggestionTap,
-      canSubmitRecoveredAskUserAnswer: canSubmitRecoveredAskUserAnswer,
       onRecoveredAskUserAnswer: onRecoveredAskUserAnswer == null
           ? null
           : (part, result) => onRecoveredAskUserAnswer!(message, part, result),
