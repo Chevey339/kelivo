@@ -95,7 +95,7 @@ class ChatScrollController {
     // Wire auto-follow callback for zero-lag bottom pinning
     if (scrollController is ChatAutoFollowScrollController) {
       scrollController.shouldAutoFollow = () =>
-          _autoStickToBottom && !_isUserScrolling;
+          _getAutoScrollEnabled() && _autoStickToBottom && !_isUserScrolling;
     }
   }
 
@@ -328,7 +328,7 @@ class ChatScrollController {
   /// lightweight safety-net for edge cases (e.g. plain ScrollController).
   void autoScrollToBottomIfNeeded() {
     final enabled = _getAutoScrollEnabled();
-    if (!enabled && !_autoStickToBottom) return;
+    if (!enabled || !_autoStickToBottom) return;
     // With the custom ScrollPosition, bottom-pinning happens inside
     // applyContentDimensions (during layout, before paint). No post-frame
     // callback needed for the streaming path.

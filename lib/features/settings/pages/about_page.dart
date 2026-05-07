@@ -6,12 +6,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../icons/lucide_adapter.dart';
-import 'package:haptic_feedback/haptic_feedback.dart' as hf;
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
-import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 import 'debug_page.dart';
 import 'log_viewer_page.dart';
@@ -100,12 +98,8 @@ class _AboutPageState extends State<AboutPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        // Local state for preview controls inside the sheet
-        bool iosSwitchValue = false;
         return StatefulBuilder(
           builder: (dialogContext, dialogSetState) {
-            int testCounter = 0;
-
             return SafeArea(
               child: FractionallySizedBox(
                 heightFactor: 0.7,
@@ -756,42 +750,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
             child: icon,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TestButton extends StatelessWidget {
-  const _TestButton({
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Material(
-      color: color.withValues(alpha: isDark ? 0.2 : 0.1),
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: isDark ? color : color.withValues(alpha: 0.9),
-            ),
           ),
         ),
       ),
