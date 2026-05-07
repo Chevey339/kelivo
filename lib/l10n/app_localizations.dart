@@ -6887,8 +6887,38 @@ abstract class AppLocalizations {
   /// No description provided for @displaySettingsPageMessageNavButtonsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Show quick jump buttons when scrolling'**
+  /// **'Choose when quick jump buttons appear'**
   String get displaySettingsPageMessageNavButtonsSubtitle;
+
+  /// No description provided for @displaySettingsPageMessageNavButtonsModeAlways.
+  ///
+  /// In en, this message translates to:
+  /// **'Always show'**
+  String get displaySettingsPageMessageNavButtonsModeAlways;
+
+  /// No description provided for @displaySettingsPageMessageNavButtonsModeScroll.
+  ///
+  /// In en, this message translates to:
+  /// **'Show while scrolling'**
+  String get displaySettingsPageMessageNavButtonsModeScroll;
+
+  /// No description provided for @displaySettingsPageMessageNavButtonsModeHover.
+  ///
+  /// In en, this message translates to:
+  /// **'Show on mouse hover'**
+  String get displaySettingsPageMessageNavButtonsModeHover;
+
+  /// No description provided for @displaySettingsPageMessageNavButtonsModeScrollAndHover.
+  ///
+  /// In en, this message translates to:
+  /// **'Show while scrolling or hovering'**
+  String get displaySettingsPageMessageNavButtonsModeScrollAndHover;
+
+  /// No description provided for @displaySettingsPageMessageNavButtonsModeNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never show'**
+  String get displaySettingsPageMessageNavButtonsModeNever;
 
   /// No description provided for @displaySettingsPageUseNewAssistantAvatarUxTitle.
   ///

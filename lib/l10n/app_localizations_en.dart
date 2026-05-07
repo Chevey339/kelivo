@@ -3685,7 +3685,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get displaySettingsPageMessageNavButtonsSubtitle =>
-      'Show quick jump buttons when scrolling';
+      'Choose when quick jump buttons appear';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeAlways => 'Always show';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScroll =>
+      'Show while scrolling';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeHover =>
+      'Show on mouse hover';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScrollAndHover =>
+      'Show while scrolling or hovering';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeNever => 'Never show';
 
   @override
   String get displaySettingsPageUseNewAssistantAvatarUxTitle =>

@@ -378,6 +378,7 @@ class _HomePageState extends State<HomePage>
   final GlobalKey _inputBarKey = GlobalKey();
   final GlobalKey _selectionMiniMapKey = GlobalKey();
   final GlobalKey _selectionExportBarKey = GlobalKey();
+  bool _scrollNavHovering = false;
   StreamSubscription<String>? _processTextSub;
 
   // ============================================================================
@@ -1187,15 +1188,47 @@ class _HomePageState extends State<HomePage>
   Widget _buildScrollButtons() {
     return Builder(
       builder: (context) {
-        final showSetting = context
-            .watch<SettingsProvider>()
-            .showMessageNavButtons;
+        final settings = context.watch<SettingsProvider>();
         if (_controller.selecting) return const SizedBox.shrink();
-        if (!showSetting || _controller.messages.isEmpty) {
+        if (_controller.messages.isEmpty) {
           return const SizedBox.shrink();
         }
+        var visible = _controller.scrollCtrl.showNavButtons;
+        var hoverEnabled = false;
+        if (_controller.isDesktopPlatform) {
+          switch (settings.desktopMessageNavButtonsMode) {
+            case DesktopMessageNavButtonsMode.always:
+              visible = true;
+              break;
+            case DesktopMessageNavButtonsMode.scroll:
+              visible = _controller.scrollCtrl.showNavButtons;
+              break;
+            case DesktopMessageNavButtonsMode.hover:
+              visible = _scrollNavHovering;
+              hoverEnabled = true;
+              break;
+            case DesktopMessageNavButtonsMode.scrollAndHover:
+              visible =
+                  _controller.scrollCtrl.showNavButtons || _scrollNavHovering;
+              hoverEnabled = true;
+              break;
+            case DesktopMessageNavButtonsMode.never:
+              return const SizedBox.shrink();
+          }
+        } else {
+          if (!settings.showMessageNavButtons) {
+            return const SizedBox.shrink();
+          }
+        }
         return ScrollNavButtonsPanel(
-          visible: _controller.scrollCtrl.showNavButtons,
+          visible: visible,
+          hoverEnabled: hoverEnabled,
+          onHoverChanged: hoverEnabled
+              ? (hovering) {
+                  if (_scrollNavHovering == hovering) return;
+                  setState(() => _scrollNavHovering = hovering);
+                }
+              : null,
           bottomOffset: _controller.inputBarHeight + 12,
           onScrollToTop: _controller.scrollToTop,
           onPreviousMessage: _controller.jumpToPreviousQuestion,

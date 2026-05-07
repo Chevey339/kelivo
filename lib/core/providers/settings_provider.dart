@@ -28,6 +28,15 @@ enum DesktopTopicPosition { left, right }
 // Desktop: send message shortcut
 enum DesktopSendShortcut { enter, ctrlEnter }
 
+// Desktop: message navigation buttons visibility mode
+enum DesktopMessageNavButtonsMode {
+  always,
+  scroll,
+  hover,
+  scrollAndHover,
+  never,
+}
+
 enum _MigrationResult { noChange, applied, failed }
 
 class SettingsProvider extends ChangeNotifier {
@@ -113,6 +122,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowRegenerateConfirmDialogKey =
       'display_show_regenerate_confirm_dialog_v1';
   static const String _displayShowMessageNavKey = 'display_show_message_nav_v1';
+  static const String _displayDesktopMessageNavButtonsModeKey =
+      'display_desktop_message_nav_buttons_mode_v1';
   static const String _displayUseNewAssistantAvatarUxKey =
       'display_use_new_assistant_avatar_ux_v1';
   static const String _displayShowProviderInModelCapsuleKey =
@@ -797,6 +808,10 @@ class SettingsProvider extends ChangeNotifier {
     _showRegenerateConfirmDialog =
         prefs.getBool(_displayShowRegenerateConfirmDialogKey) ?? true;
     _showMessageNavButtons = prefs.getBool(_displayShowMessageNavKey) ?? true;
+    _desktopMessageNavButtonsMode = _parseDesktopMessageNavButtonsMode(
+      prefs.getString(_displayDesktopMessageNavButtonsModeKey),
+      legacyEnabled: _showMessageNavButtons,
+    );
     _useNewAssistantAvatarUx =
         prefs.getBool(_displayUseNewAssistantAvatarUxKey) ?? false;
     _showProviderInModelCapsule =
@@ -3086,6 +3101,64 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setString(_desktopSendShortcutKey, str);
   }
 
+  // Desktop: message navigation buttons visibility mode
+  DesktopMessageNavButtonsMode _desktopMessageNavButtonsMode =
+      DesktopMessageNavButtonsMode.scroll;
+  DesktopMessageNavButtonsMode get desktopMessageNavButtonsMode =>
+      _desktopMessageNavButtonsMode;
+
+  Future<void> setDesktopMessageNavButtonsMode(
+    DesktopMessageNavButtonsMode mode,
+  ) async {
+    if (_desktopMessageNavButtonsMode == mode) return;
+    _desktopMessageNavButtonsMode = mode;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _displayDesktopMessageNavButtonsModeKey,
+      _desktopMessageNavButtonsModeToString(mode),
+    );
+  }
+
+  DesktopMessageNavButtonsMode _parseDesktopMessageNavButtonsMode(
+    String? raw, {
+    required bool legacyEnabled,
+  }) {
+    switch (raw) {
+      case 'always':
+        return DesktopMessageNavButtonsMode.always;
+      case 'scroll':
+        return DesktopMessageNavButtonsMode.scroll;
+      case 'hover':
+        return DesktopMessageNavButtonsMode.hover;
+      case 'scrollAndHover':
+        return DesktopMessageNavButtonsMode.scrollAndHover;
+      case 'never':
+        return DesktopMessageNavButtonsMode.never;
+      default:
+        return legacyEnabled
+            ? DesktopMessageNavButtonsMode.scroll
+            : DesktopMessageNavButtonsMode.never;
+    }
+  }
+
+  String _desktopMessageNavButtonsModeToString(
+    DesktopMessageNavButtonsMode mode,
+  ) {
+    switch (mode) {
+      case DesktopMessageNavButtonsMode.always:
+        return 'always';
+      case DesktopMessageNavButtonsMode.scroll:
+        return 'scroll';
+      case DesktopMessageNavButtonsMode.hover:
+        return 'hover';
+      case DesktopMessageNavButtonsMode.scrollAndHover:
+        return 'scrollAndHover';
+      case DesktopMessageNavButtonsMode.never:
+        return 'never';
+    }
+  }
+
   // Display: chat font scale (0.5 - 1.5, default 1.0)
   double _chatFontScale = 1.0;
   double get chatFontScale => _chatFontScale;
@@ -3624,6 +3697,8 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._newChatOnLaunch = _newChatOnLaunch;
     copy._newChatOnAssistantSwitch = _newChatOnAssistantSwitch;
     copy._newChatAfterDelete = _newChatAfterDelete;
+    copy._desktopSendShortcut = _desktopSendShortcut;
+    copy._desktopMessageNavButtonsMode = _desktopMessageNavButtonsMode;
     copy._chatFontScale = _chatFontScale;
     copy._autoScrollEnabled = _autoScrollEnabled;
     copy._autoScrollIdleSeconds = _autoScrollIdleSeconds;

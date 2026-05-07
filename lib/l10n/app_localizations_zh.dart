@@ -3551,7 +3551,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageMessageNavButtonsTitle => '消息导航按钮';
 
   @override
-  String get displaySettingsPageMessageNavButtonsSubtitle => '滚动时显示快速跳转按钮';
+  String get displaySettingsPageMessageNavButtonsSubtitle => '选择快速跳转按钮的显示时机';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeAlways => '始终显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScroll => '滚动时显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeHover => '鼠标悬停时显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScrollAndHover =>
+      '滚动和鼠标悬停时显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeNever => '永不显示';
 
   @override
   String get displaySettingsPageUseNewAssistantAvatarUxTitle => '聊天标题栏显示助手头像';
@@ -8347,7 +8363,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageMessageNavButtonsTitle => '消息导航按钮';
 
   @override
-  String get displaySettingsPageMessageNavButtonsSubtitle => '滚动时显示快速跳转按钮';
+  String get displaySettingsPageMessageNavButtonsSubtitle => '选择快速跳转按钮的显示时机';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeAlways => '始终显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScroll => '滚动时显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeHover => '鼠标悬停时显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScrollAndHover =>
+      '滚动和鼠标悬停时显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeNever => '永不显示';
 
   @override
   String get displaySettingsPageUseNewAssistantAvatarUxTitle => '聊天标题栏显示助手头像';
@@ -13141,7 +13173,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageMessageNavButtonsTitle => '訊息導航按鈕';
 
   @override
-  String get displaySettingsPageMessageNavButtonsSubtitle => '滾動時顯示快速跳轉按鈕';
+  String get displaySettingsPageMessageNavButtonsSubtitle => '選擇快速跳轉按鈕的顯示時機';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeAlways => '始終顯示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScroll => '滾動時顯示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeHover => '滑鼠懸停時顯示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScrollAndHover =>
+      '滾動和滑鼠懸停時顯示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeNever => '永不顯示';
 
   @override
   String get displaySettingsPageUseNewAssistantAvatarUxTitle => '聊天標題欄顯示助手頭像';
