@@ -4922,4 +4922,62 @@ class AppLocalizationsEn extends AppLocalizations {
   String tokenDetailTotalTokens(int count) {
     return '$count tokens';
   }
+
+  @override
+  String get debugPageTitle => 'Debug';
+
+  @override
+  String get debugPageConversationToolsTitle => 'Conversation tools';
+
+  @override
+  String get debugPageCreateOversizedConversationButton =>
+      'Create oversized conversation (30 MB)';
+
+  @override
+  String get debugPageCreateManyMessagesConversationButton =>
+      'Create 1024-message conversation';
+
+  @override
+  String get debugPageCreatingButton => 'Creating...';
+
+  @override
+  String get debugPageCreatingOversizedConversation =>
+      'Creating a 30 MB oversized conversation...';
+
+  @override
+  String get debugPageCreatingManyMessagesConversation =>
+      'Creating a 1024-message conversation...';
+
+  @override
+  String get debugPageNoCurrentAssistant =>
+      'No current assistant. Create or select an assistant first.';
+
+  @override
+  String debugPageConversationCreated(int count) {
+    return 'Created debug conversation with $count messages.';
+  }
+
+  @override
+  String debugPageCreateConversationFailed(String error) {
+    return 'Failed to create debug conversation: $error';
+  }
+
+  @override
+  String debugPageOversizedConversationTitle(int sizeMB) {
+    return 'Oversized conversation test ($sizeMB MB)';
+  }
+
+  @override
+  String debugPageManyMessagesConversationTitle(int count) {
+    return '$count-message conversation test';
+  }
+
+  @override
+  String get debugPageOversizedConversationSeedText =>
+      'This is long debug text for reproducing slow rendering in oversized conversations. It includes repeated Markdown-like text, punctuation, CJK content, and plain words so chat rendering, storage, and scrolling can be profiled.';
+
+  @override
+  String debugPageManyMessagesSeedText(String role, int index) {
+    return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
+  }
 }

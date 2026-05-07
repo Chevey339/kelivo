@@ -1672,5 +1672,57 @@
   "tokenDetailCompletionTokens": "{count} tokens",
   "tokenDetailSpeed": "{value} tok/s",
   "tokenDetailDuration": "{value}s",
-  "tokenDetailTotalTokens": "{count} tokens"
+  "tokenDetailTotalTokens": "{count} tokens",
+  "debugPageTitle": "Debug",
+  "debugPageConversationToolsTitle": "对话工具",
+  "debugPageCreateOversizedConversationButton": "创建超大对话（30 MB）",
+  "debugPageCreateManyMessagesConversationButton": "创建 1024 条消息的对话",
+  "debugPageCreatingButton": "创建中...",
+  "debugPageCreatingOversizedConversation": "正在创建 30 MB 超大对话...",
+  "debugPageCreatingManyMessagesConversation": "正在创建 1024 条消息的对话...",
+  "debugPageNoCurrentAssistant": "当前没有助手。请先创建或选择一个助手。",
+  "debugPageConversationCreated": "已创建包含 {count} 条消息的调试对话。",
+  "@debugPageConversationCreated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "debugPageCreateConversationFailed": "创建调试对话失败：{error}",
+  "@debugPageCreateConversationFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "debugPageOversizedConversationTitle": "超大对话测试（{sizeMB} MB）",
+  "@debugPageOversizedConversationTitle": {
+    "placeholders": {
+      "sizeMB": {
+        "type": "int"
+      }
+    }
+  },
+  "debugPageManyMessagesConversationTitle": "{count} 条消息测试",
+  "@debugPageManyMessagesConversationTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "debugPageOversizedConversationSeedText": "这是一段用于复现超大对话渲染卡顿的长调试文本。它包含重复的 Markdown 风格文本、标点、中文内容和普通词语，方便测试聊天渲染、存储和滚动性能。",
+  "debugPageManyMessagesSeedText": "{role} 消息 #{index}：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。",
+  "@debugPageManyMessagesSeedText": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      },
+      "index": {
+        "type": "int"
+      }
+    }
+  }
 }

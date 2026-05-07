@@ -4745,6 +4745,59 @@ class AppLocalizationsZh extends AppLocalizations {
   String tokenDetailTotalTokens(int count) {
     return '$count tokens';
   }
+
+  @override
+  String get debugPageTitle => 'Debug';
+
+  @override
+  String get debugPageConversationToolsTitle => '对话工具';
+
+  @override
+  String get debugPageCreateOversizedConversationButton => '创建超大对话（30 MB）';
+
+  @override
+  String get debugPageCreateManyMessagesConversationButton => '创建 1024 条消息的对话';
+
+  @override
+  String get debugPageCreatingButton => '创建中...';
+
+  @override
+  String get debugPageCreatingOversizedConversation => '正在创建 30 MB 超大对话...';
+
+  @override
+  String get debugPageCreatingManyMessagesConversation => '正在创建 1024 条消息的对话...';
+
+  @override
+  String get debugPageNoCurrentAssistant => '当前没有助手。请先创建或选择一个助手。';
+
+  @override
+  String debugPageConversationCreated(int count) {
+    return '已创建包含 $count 条消息的调试对话。';
+  }
+
+  @override
+  String debugPageCreateConversationFailed(String error) {
+    return '创建调试对话失败：$error';
+  }
+
+  @override
+  String debugPageOversizedConversationTitle(int sizeMB) {
+    return '超大对话测试（$sizeMB MB）';
+  }
+
+  @override
+  String debugPageManyMessagesConversationTitle(int count) {
+    return '$count 条消息测试';
+  }
+
+  @override
+  String get debugPageOversizedConversationSeedText =>
+      '这是一段用于复现超大对话渲染卡顿的长调试文本。它包含重复的 Markdown 风格文本、标点、中文内容和普通词语，方便测试聊天渲染、存储和滚动性能。';
+
+  @override
+  String debugPageManyMessagesSeedText(String role, int index) {
+    return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -9488,6 +9541,59 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String tokenDetailTotalTokens(int count) {
     return '$count tokens';
   }
+
+  @override
+  String get debugPageTitle => 'Debug';
+
+  @override
+  String get debugPageConversationToolsTitle => '对话工具';
+
+  @override
+  String get debugPageCreateOversizedConversationButton => '创建超大对话（30 MB）';
+
+  @override
+  String get debugPageCreateManyMessagesConversationButton => '创建 1024 条消息的对话';
+
+  @override
+  String get debugPageCreatingButton => '创建中...';
+
+  @override
+  String get debugPageCreatingOversizedConversation => '正在创建 30 MB 超大对话...';
+
+  @override
+  String get debugPageCreatingManyMessagesConversation => '正在创建 1024 条消息的对话...';
+
+  @override
+  String get debugPageNoCurrentAssistant => '当前没有助手。请先创建或选择一个助手。';
+
+  @override
+  String debugPageConversationCreated(int count) {
+    return '已创建包含 $count 条消息的调试对话。';
+  }
+
+  @override
+  String debugPageCreateConversationFailed(String error) {
+    return '创建调试对话失败：$error';
+  }
+
+  @override
+  String debugPageOversizedConversationTitle(int sizeMB) {
+    return '超大对话测试（$sizeMB MB）';
+  }
+
+  @override
+  String debugPageManyMessagesConversationTitle(int count) {
+    return '$count 条消息测试';
+  }
+
+  @override
+  String get debugPageOversizedConversationSeedText =>
+      '这是一段用于复现超大对话渲染卡顿的长调试文本。它包含重复的 Markdown 风格文本、标点、中文内容和普通词语，方便测试聊天渲染、存储和滚动性能。';
+
+  @override
+  String debugPageManyMessagesSeedText(String role, int index) {
+    return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -14230,5 +14336,58 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String tokenDetailTotalTokens(int count) {
     return '$count tokens';
+  }
+
+  @override
+  String get debugPageTitle => 'Debug';
+
+  @override
+  String get debugPageConversationToolsTitle => '對話工具';
+
+  @override
+  String get debugPageCreateOversizedConversationButton => '建立超大對話（30 MB）';
+
+  @override
+  String get debugPageCreateManyMessagesConversationButton => '建立 1024 條訊息的對話';
+
+  @override
+  String get debugPageCreatingButton => '建立中...';
+
+  @override
+  String get debugPageCreatingOversizedConversation => '正在建立 30 MB 超大對話...';
+
+  @override
+  String get debugPageCreatingManyMessagesConversation => '正在建立 1024 條訊息的對話...';
+
+  @override
+  String get debugPageNoCurrentAssistant => '目前沒有助手。請先建立或選擇一個助手。';
+
+  @override
+  String debugPageConversationCreated(int count) {
+    return '已建立包含 $count 條訊息的調試對話。';
+  }
+
+  @override
+  String debugPageCreateConversationFailed(String error) {
+    return '建立調試對話失敗：$error';
+  }
+
+  @override
+  String debugPageOversizedConversationTitle(int sizeMB) {
+    return '超大對話測試（$sizeMB MB）';
+  }
+
+  @override
+  String debugPageManyMessagesConversationTitle(int count) {
+    return '$count 條訊息測試';
+  }
+
+  @override
+  String get debugPageOversizedConversationSeedText =>
+      '這是一段用於復現超大對話渲染卡頓的長調試文字。它包含重複的 Markdown 風格文字、標點、中文內容和普通詞語，方便測試聊天渲染、儲存和捲動效能。';
+
+  @override
+  String debugPageManyMessagesSeedText(String role, int index) {
+    return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
 }

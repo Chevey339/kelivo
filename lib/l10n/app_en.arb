@@ -2066,5 +2066,45 @@
     "placeholders": {
       "count": {"type": "int"}
     }
+  },
+  "debugPageTitle": "Debug",
+  "debugPageConversationToolsTitle": "Conversation tools",
+  "debugPageCreateOversizedConversationButton": "Create oversized conversation (30 MB)",
+  "debugPageCreateManyMessagesConversationButton": "Create 1024-message conversation",
+  "debugPageCreatingButton": "Creating...",
+  "debugPageCreatingOversizedConversation": "Creating a 30 MB oversized conversation...",
+  "debugPageCreatingManyMessagesConversation": "Creating a 1024-message conversation...",
+  "debugPageNoCurrentAssistant": "No current assistant. Create or select an assistant first.",
+  "debugPageConversationCreated": "Created debug conversation with {count} messages.",
+  "@debugPageConversationCreated": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "debugPageCreateConversationFailed": "Failed to create debug conversation: {error}",
+  "@debugPageCreateConversationFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "debugPageOversizedConversationTitle": "Oversized conversation test ({sizeMB} MB)",
+  "@debugPageOversizedConversationTitle": {
+    "placeholders": {
+      "sizeMB": {"type": "int"}
+    }
+  },
+  "debugPageManyMessagesConversationTitle": "{count}-message conversation test",
+  "@debugPageManyMessagesConversationTitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "debugPageOversizedConversationSeedText": "This is long debug text for reproducing slow rendering in oversized conversations. It includes repeated Markdown-like text, punctuation, CJK content, and plain words so chat rendering, storage, and scrolling can be profiled.",
+  "debugPageManyMessagesSeedText": "{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.",
+  "@debugPageManyMessagesSeedText": {
+    "placeholders": {
+      "role": {"type": "String"},
+      "index": {"type": "int"}
+    }
   }
 }
