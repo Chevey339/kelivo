@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/features/settings/services/debug_conversation_factory.dart';
@@ -56,6 +58,40 @@ void main() {
       },
     );
 
+    test('creates a long reasoning conversation with assistant thinking', () {
+      final seed = DebugConversationFactory.createLongReasoningConversation(
+        title: 'reasoning',
+        assistantId: 'assistant-thinking',
+        messageCount: 64,
+      );
+
+      expect(seed.conversation.assistantId, 'assistant-thinking');
+      expect(seed.messages, hasLength(64));
+      expect(seed.conversation.messageIds, [
+        for (final message in seed.messages) message.id,
+      ]);
+
+      final assistantMessages = seed.messages.where(
+        (message) => message.role == 'assistant',
+      );
+      expect(assistantMessages, hasLength(32));
+      for (final message in assistantMessages) {
+        expect(message.reasoningText, isNotEmpty);
+        expect(message.reasoningStartAt, isNotNull);
+        expect(message.reasoningFinishedAt, isNotNull);
+        expect(message.reasoningSegmentsJson, contains('"segments"'));
+        expect(message.reasoningSegmentsJson, contains(message.reasoningText));
+
+        final reasoningPayload =
+            jsonDecode(message.reasoningSegmentsJson!) as Map<String, dynamic>;
+        final contentSplits =
+            reasoningPayload['contentSplits'] as Map<String, dynamic>;
+        expect(contentSplits['offsets'], [0]);
+        expect(contentSplits['reasoningCounts'], [1]);
+        expect(contentSplits['toolCounts'], [0]);
+      }
+    });
+
     test('rejects invalid generation sizes', () {
       expect(
         () => DebugConversationFactory.createOversizedConversation(
@@ -72,6 +108,15 @@ void main() {
           title: 'invalid',
           assistantId: null,
           contentBuilder: (index, role) => '$role-$index',
+          messageCount: 0,
+        ),
+        throwsArgumentError,
+      );
+
+      expect(
+        () => DebugConversationFactory.createLongReasoningConversation(
+          title: 'invalid',
+          assistantId: null,
           messageCount: 0,
         ),
         throwsArgumentError,
