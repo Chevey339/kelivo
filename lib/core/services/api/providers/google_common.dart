@@ -217,7 +217,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   double? topP,
   int? maxTokens,
   List<Map<String, dynamic>>? tools,
-  Future<String> Function(String, Map<String, dynamic>)? onToolCall,
+  ToolCallHandler? onToolCall,
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
   bool stream = true,
@@ -549,8 +549,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           final args =
               (call['args'] as Map?)?.cast<String, dynamic>() ??
               const <String, dynamic>{};
-          // Prefer API-provided id (part-level), fall back to synthetic
-          final partId = fc['id']?.toString() ?? 'fn_$idx';
+          // Prefer API-provided id (part-level), fall back to synthetic.
+          final partId = _effectiveToolCallId(fc['id'], 'fn', idx);
           yield ChatStreamChunk(
             content: '',
             isDone: false,
@@ -558,7 +558,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
             usage: totalUsage,
             toolCalls: [ToolCallInfo(id: partId, name: name, arguments: args)],
           );
-          final res = await onToolCall(name, args);
+          final res = await onToolCall(name, args, toolCallId: partId);
           yield ChatStreamChunk(
             content: '',
             isDone: false,
@@ -1272,8 +1272,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                   }
                   // Prefer API-provided id (part-level), fall back to synthetic
                   final apiId = p['id']?.toString();
-                  final id =
-                      apiId ?? 'call_${DateTime.now().microsecondsSinceEpoch}';
+                  final id = _effectiveToolCallId(apiId, 'call', p.hashCode);
 
                   // Capture thought signature (Gemini 3 Pro requirement)
                   // Preserve exact key/value as received
@@ -1312,7 +1311,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                   );
                   String resText = '';
                   if (onToolCall != null) {
-                    resText = await onToolCall(name, args);
+                    resText = await onToolCall(name, args, toolCallId: id);
                     yield ChatStreamChunk(
                       content: '',
                       isDone: false,

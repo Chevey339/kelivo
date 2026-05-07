@@ -373,6 +373,23 @@ class ChatController extends ChangeNotifier {
     return _collapsedIdToIndex?[id] ?? -1;
   }
 
+  static List<ChatMessage> selectedCollapsedMessagesForExport({
+    required Iterable<ChatMessage> collapsedMessages,
+    required Set<String> selectedIds,
+    required Iterable<ChatMessage> storedMessages,
+  }) {
+    if (selectedIds.isEmpty) return const <ChatMessage>[];
+
+    final storedById = <String, ChatMessage>{
+      for (final message in storedMessages) message.id: message,
+    };
+
+    return [
+      for (final message in collapsedMessages)
+        if (selectedIds.contains(message.id)) storedById[message.id] ?? message,
+    ];
+  }
+
   /// Get messages grouped by groupId (cached).
   Map<String, List<ChatMessage>> get groupedMessages {
     return _groupCache ??= groupMessagesByGroup();

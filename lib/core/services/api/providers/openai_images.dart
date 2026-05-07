@@ -9,6 +9,7 @@ bool _supportsOpenAIImageGenerations(String modelId) {
   final normalized = modelId.toLowerCase();
   return normalized.startsWith('gpt-image-') ||
       normalized.startsWith('chatgpt-image-') ||
+      normalized == 'sensenova-u1-fast' ||
       normalized == 'dall-e-2' ||
       normalized == 'dall-e-3';
 }

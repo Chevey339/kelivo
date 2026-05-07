@@ -1207,7 +1207,7 @@ class GenerationContext {
   final SettingsProvider settings;
   final ProviderConfig config;
   final List<Map<String, dynamic>> toolDefs;
-  final Future<String> Function(String, Map<String, dynamic>)? onToolCall;
+  final ToolCallHandler? onToolCall;
   final Map<String, String>? extraHeaders;
   final Map<String, dynamic>? extraBody;
   final bool supportsReasoning;
@@ -1218,10 +1218,10 @@ class GenerationContext {
 
 /// State object for streaming message generation.
 class StreamingState {
-  StreamingState(this.ctx);
+  StreamingState(this.ctx) : fullContentRaw = ctx.assistantMessage.content;
 
   final GenerationContext ctx;
-  String fullContentRaw = '';
+  String fullContentRaw;
   int totalTokens = 0;
   TokenUsage? usage;
   String bufferedReasoning = '';

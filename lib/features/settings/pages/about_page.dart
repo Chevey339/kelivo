@@ -6,13 +6,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../icons/lucide_adapter.dart';
-import 'package:haptic_feedback/haptic_feedback.dart' as hf;
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
-import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
+import 'debug_page.dart';
 import 'log_viewer_page.dart';
 
 class AboutPage extends StatefulWidget {
@@ -99,12 +98,8 @@ class _AboutPageState extends State<AboutPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        // Local state for preview controls inside the sheet
-        bool iosSwitchValue = false;
         return StatefulBuilder(
           builder: (dialogContext, dialogSetState) {
-            int testCounter = 0;
-
             return SafeArea(
               child: FractionallySizedBox(
                 heightFactor: 0.7,
@@ -265,265 +260,6 @@ class _AboutPageState extends State<AboutPage> {
                               ],
                               const SizedBox(height: 24),
                               const Divider(),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Toast Notification Test Area',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: cs.onSurface,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                alignment: WrapAlignment.center,
-                                children: [
-                                  _TestButton(
-                                    label: 'Success',
-                                    color: const Color(0xFF34C759),
-                                    onTap: () {
-                                      testCounter++;
-                                      showAppSnackBar(
-                                        context,
-                                        message:
-                                            'Operation completed successfully! #$testCounter',
-                                        type: NotificationType.success,
-                                      );
-                                    },
-                                  ),
-                                  _TestButton(
-                                    label: 'Error',
-                                    color: const Color(0xFFFF3B30),
-                                    onTap: () {
-                                      testCounter++;
-                                      showAppSnackBar(
-                                        context,
-                                        message:
-                                            'An error occurred. Please try again. #$testCounter',
-                                        type: NotificationType.error,
-                                      );
-                                    },
-                                  ),
-                                  _TestButton(
-                                    label: 'Warning',
-                                    color: const Color(0xFFFF9500),
-                                    onTap: () {
-                                      testCounter++;
-                                      showAppSnackBar(
-                                        context,
-                                        message:
-                                            'Warning: Low battery detected #$testCounter',
-                                        type: NotificationType.warning,
-                                      );
-                                    },
-                                  ),
-                                  _TestButton(
-                                    label: 'Info',
-                                    color: cs.primary,
-                                    onTap: () {
-                                      testCounter++;
-                                      showAppSnackBar(
-                                        context,
-                                        message:
-                                            'New message received #$testCounter',
-                                        type: NotificationType.info,
-                                      );
-                                    },
-                                  ),
-                                  _TestButton(
-                                    label: 'With Action',
-                                    color: cs.secondary,
-                                    onTap: () {
-                                      testCounter++;
-                                      showAppSnackBar(
-                                        context,
-                                        message:
-                                            'File downloaded #$testCounter',
-                                        type: NotificationType.success,
-                                        actionLabel: 'Open',
-                                        onAction: () {
-                                          showAppSnackBar(
-                                            context,
-                                            message: 'Opening file...',
-                                            type: NotificationType.info,
-                                          );
-                                        },
-                                      );
-                                    },
-                                  ),
-                                  _TestButton(
-                                    label: 'Long Message',
-                                    color: cs.tertiary,
-                                    onTap: () {
-                                      testCounter++;
-                                      showAppSnackBar(
-                                        context,
-                                        message:
-                                            'This is a very long message that demonstrates how the toast notification handles multiline text gracefully #$testCounter',
-                                        type: NotificationType.info,
-                                        duration: const Duration(seconds: 5),
-                                      );
-                                    },
-                                  ),
-                                  _TestButton(
-                                    label: 'Quick Burst',
-                                    color: cs.onSurface.withValues(alpha: 0.7),
-                                    onTap: () {
-                                      for (int i = 0; i < 5; i++) {
-                                        Future.delayed(
-                                          Duration(milliseconds: i * 100),
-                                          () {
-                                            if (mounted) {
-                                              showAppSnackBar(
-                                                context,
-                                                message:
-                                                    'Rapid notification ${i + 1}',
-                                                type: NotificationType.info,
-                                                duration: const Duration(
-                                                  seconds: 2,
-                                                ),
-                                              );
-                                            }
-                                          },
-                                        );
-                                      }
-                                    },
-                                  ),
-                                  _TestButton(
-                                    label: 'Dismiss All',
-                                    color: cs.error,
-                                    onTap: () {
-                                      AppSnackBarManager().dismissAll();
-                                    },
-                                  ),
-                                ],
-                              ),
-                              // Removed vibration/flutter_vibrate sections.
-                              const SizedBox(height: 24),
-                              const Divider(),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Haptic Feedback (Plugin) Test',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: cs.onSurface,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                alignment: WrapAlignment.center,
-                                children: [
-                                  for (final e in [
-                                    ['success', hf.HapticsType.success],
-                                    ['warning', hf.HapticsType.warning],
-                                    ['error', hf.HapticsType.error],
-                                    ['light', hf.HapticsType.light],
-                                    ['medium', hf.HapticsType.medium],
-                                    ['heavy', hf.HapticsType.heavy],
-                                    ['rigid', hf.HapticsType.rigid],
-                                    ['soft', hf.HapticsType.soft],
-                                    ['selection', hf.HapticsType.selection],
-                                  ])
-                                    _TestButton(
-                                      label: e[0] as String,
-                                      color: cs.primary,
-                                      onTap: () async {
-                                        if (!context
-                                            .read<SettingsProvider>()
-                                            .hapticsGlobalEnabled) {
-                                          return;
-                                        }
-                                        try {
-                                          final can =
-                                              await hf.Haptics.canVibrate();
-                                          if (can) {
-                                            await hf.Haptics.vibrate(
-                                              e[1] as hf.HapticsType,
-                                            );
-                                          }
-                                        } catch (_) {}
-                                      },
-                                    ),
-                                  _TestButton(
-                                    label: 'Play All',
-                                    color: cs.secondary,
-                                    onTap: () async {
-                                      if (!context
-                                          .read<SettingsProvider>()
-                                          .hapticsGlobalEnabled) {
-                                        return;
-                                      }
-                                      try {
-                                        final can =
-                                            await hf.Haptics.canVibrate();
-                                        if (!can) return;
-                                        final types = <hf.HapticsType>[
-                                          hf.HapticsType.success,
-                                          hf.HapticsType.warning,
-                                          hf.HapticsType.error,
-                                          hf.HapticsType.light,
-                                          hf.HapticsType.medium,
-                                          hf.HapticsType.heavy,
-                                          hf.HapticsType.rigid,
-                                          hf.HapticsType.soft,
-                                          hf.HapticsType.selection,
-                                        ];
-                                        for (final t in types) {
-                                          await hf.Haptics.vibrate(t);
-                                          await Future.delayed(
-                                            const Duration(milliseconds: 180),
-                                          );
-                                        }
-                                      } catch (_) {}
-                                    },
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 24),
-                              const Divider(),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Custom Switch Preview',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: cs.onSurface,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Material(
-                                color: Colors.transparent,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                    vertical: 6,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Text(
-                                        'iOS‑style switch',
-                                        style: TextStyle(
-                                          color: cs.onSurface.withValues(
-                                            alpha: 0.9,
-                                          ),
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      IosSwitch(
-                                        value: iosSwitchValue,
-                                        onChanged: (v) => dialogSetState(
-                                          () => iosSwitchValue = v,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
                         ),
@@ -542,6 +278,13 @@ class _AboutPageState extends State<AboutPage> {
         );
       },
     );
+  }
+
+  void _openDebugPage() {
+    Haptics.medium();
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const DebugPage()));
   }
 
   @override
@@ -576,14 +319,18 @@ class _AboutPageState extends State<AboutPage> {
                 ),
                 child: Row(
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                        width: 54,
-                        height: 54,
-                        child: Image.asset(
-                          'assets/app_icon.png',
-                          fit: BoxFit.cover,
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onLongPress: _openDebugPage,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: 54,
+                          height: 54,
+                          child: Image.asset(
+                            'assets/app_icon.png',
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                     ),
@@ -1003,42 +750,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
             child: icon,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TestButton extends StatelessWidget {
-  const _TestButton({
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Material(
-      color: color.withValues(alpha: isDark ? 0.2 : 0.1),
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: isDark ? color : color.withValues(alpha: 0.9),
-            ),
           ),
         ),
       ),

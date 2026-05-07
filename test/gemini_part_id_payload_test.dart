@@ -160,7 +160,7 @@ void main() {
             request.response.write(
               'data: ${jsonEncode(_streamChunk([
                 {
-                  'id': 'api_call_live',
+                  'id': '',
                   'functionCall': {
                     'name': 'fetch_markdown',
                     'args': {'url': 'https://example.com'},
@@ -188,6 +188,7 @@ void main() {
           fail('Unexpected request count: $requestCount');
         });
 
+        final seenToolCallIds = <String?>[];
         final chunks = await ChatApiService.sendMessageStream(
           config: _geminiConfig(
             'http://${server.address.address}:${server.port}/v1beta',
@@ -213,10 +214,14 @@ void main() {
               ],
             },
           ],
-          onToolCall: (name, args) async => '{"result":"ok"}',
+          onToolCall: (name, args, {toolCallId}) async {
+            seenToolCallIds.add(toolCallId);
+            return '{"result":"ok"}';
+          },
         ).toList();
 
         expect(chunks.last.isDone, isTrue);
+        expect(seenToolCallIds.single, isNotEmpty);
         expect(requestCount, 2);
         expect(requestBodies, hasLength(2));
         _expectNoGooglePartIds(requestBodies[1]);
@@ -288,7 +293,7 @@ void main() {
         messages: [
           {'role': 'user', 'content': 'inspect [image:${file.path}]'},
         ],
-        onToolCall: (name, args) async => '{"result":"ok"}',
+        onToolCall: (name, args, {toolCallId}) async => '{"result":"ok"}',
       ).toList();
 
       expect(chunks.last.isDone, isTrue);

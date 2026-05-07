@@ -3685,7 +3685,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get displaySettingsPageMessageNavButtonsSubtitle =>
-      'Show quick jump buttons when scrolling';
+      'Choose when quick jump buttons appear';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeAlways => 'Always show';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScroll =>
+      'Show while scrolling';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeHover =>
+      'Show on mouse hover';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScrollAndHover =>
+      'Show while scrolling or hovering';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeNever => 'Never show';
 
   @override
   String get displaySettingsPageUseNewAssistantAvatarUxTitle =>
@@ -4286,6 +4304,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Read or write plain text from the device clipboard when explicitly needed.';
 
   @override
+  String get assistantEditLocalToolAskUserTitle => 'Ask User';
+
+  @override
+  String get assistantEditLocalToolAskUserSubtitle =>
+      'Let the assistant ask short questions and continue after you answer.';
+
+  @override
   String get assistantEditMemorySwitchTitle => 'Memory';
 
   @override
@@ -4857,6 +4882,36 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get askUserCardSubmit => 'Submit answer';
+
+  @override
+  String get askUserCardCustomHint => 'Type your answer';
+
+  @override
+  String get askUserCardSomethingElse => 'Something else';
+
+  @override
+  String get askUserCardSkip => 'Skip';
+
+  @override
+  String get askUserCardSkipped => 'Skipped';
+
+  @override
+  String get askUserCardAnswered => 'Answered';
+
+  @override
+  String get askUserCardInactive =>
+      'This question is no longer active. Regenerate or continue the conversation.';
+
+  @override
+  String get askUserCardCancelled => 'Question cancelled';
+
+  @override
+  String askUserCardQuestionCount(int count) {
+    return 'Ask $count questions';
+  }
+
+  @override
   String tokenDetailPromptTokens(int count) {
     return '$count tokens';
   }
@@ -4884,5 +4939,63 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String tokenDetailTotalTokens(int count) {
     return '$count tokens';
+  }
+
+  @override
+  String get debugPageTitle => 'Debug';
+
+  @override
+  String get debugPageConversationToolsTitle => 'Conversation tools';
+
+  @override
+  String get debugPageCreateOversizedConversationButton =>
+      'Create oversized conversation (30 MB)';
+
+  @override
+  String get debugPageCreateManyMessagesConversationButton =>
+      'Create 1024-message conversation';
+
+  @override
+  String get debugPageCreatingButton => 'Creating...';
+
+  @override
+  String get debugPageCreatingOversizedConversation =>
+      'Creating a 30 MB oversized conversation...';
+
+  @override
+  String get debugPageCreatingManyMessagesConversation =>
+      'Creating a 1024-message conversation...';
+
+  @override
+  String get debugPageNoCurrentAssistant =>
+      'No current assistant. Create or select an assistant first.';
+
+  @override
+  String debugPageConversationCreated(int count) {
+    return 'Created debug conversation with $count messages.';
+  }
+
+  @override
+  String debugPageCreateConversationFailed(String error) {
+    return 'Failed to create debug conversation: $error';
+  }
+
+  @override
+  String debugPageOversizedConversationTitle(int sizeMB) {
+    return 'Oversized conversation test ($sizeMB MB)';
+  }
+
+  @override
+  String debugPageManyMessagesConversationTitle(int count) {
+    return '$count-message conversation test';
+  }
+
+  @override
+  String get debugPageOversizedConversationSeedText =>
+      'This is long debug text for reproducing slow rendering in oversized conversations. It includes repeated Markdown-like text, punctuation, CJK content, and plain words so chat rendering, storage, and scrolling can be profiled.';
+
+  @override
+  String debugPageManyMessagesSeedText(String role, int index) {
+    return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }
 }

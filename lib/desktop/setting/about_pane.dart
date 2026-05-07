@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
+import '../../features/settings/pages/debug_page.dart';
 
 class DesktopAboutPane extends StatefulWidget {
   const DesktopAboutPane({super.key});
@@ -133,7 +134,14 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
               const SizedBox(height: 8),
 
               // App header
-              _AppHeaderCard(description: l10n.aboutPageAppDescription),
+              _AppHeaderCard(
+                description: l10n.aboutPageAppDescription,
+                onIconLongPress: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const DebugPage()),
+                  );
+                },
+              ),
 
               const SizedBox(height: 16),
 
@@ -203,8 +211,11 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
 }
 
 class _AppHeaderCard extends StatefulWidget {
-  const _AppHeaderCard({required this.description});
+  const _AppHeaderCard({required this.description, this.onIconLongPress});
+
   final String description;
+  final VoidCallback? onIconLongPress;
+
   @override
   State<_AppHeaderCard> createState() => _AppHeaderCardState();
 }
@@ -253,14 +264,18 @@ class _AppHeaderCardState extends State<_AppHeaderCard> {
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
               child: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: SizedBox(
-                      width: 54,
-                      height: 54,
-                      child: Image.asset(
-                        'assets/app_icon.png',
-                        fit: BoxFit.cover,
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onLongPress: widget.onIconLongPress,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        width: 54,
+                        height: 54,
+                        child: Image.asset(
+                          'assets/app_icon.png',
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                   ),

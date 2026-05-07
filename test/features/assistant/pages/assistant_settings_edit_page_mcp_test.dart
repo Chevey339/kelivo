@@ -9,6 +9,7 @@ import 'package:Kelivo/core/providers/memory_provider.dart';
 import 'package:Kelivo/core/providers/quick_phrase_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/assistant/pages/assistant_settings_edit_page.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
 const _assistantId = 'assistant-mcp-test';
@@ -66,6 +67,40 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('MCP'), findsOneWidget);
+  });
+
+  testWidgets('assistant local tools page uses clock icon for time info', (
+    tester,
+  ) async {
+    _seedPreferences();
+    final assistantProvider = await _createAssistantProvider(tester);
+
+    await tester.pumpWidget(
+      _buildHarness(
+        assistantProvider: assistantProvider,
+        child: const AssistantSettingsEditPage(assistantId: _assistantId),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('Local Tools'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Time Info'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is Icon && widget.icon == Lucide.clock,
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is Icon && widget.icon == Lucide.Calendar,
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('assistant desktop dialog shows MCP menu item', (tester) async {

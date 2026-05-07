@@ -6887,8 +6887,38 @@ abstract class AppLocalizations {
   /// No description provided for @displaySettingsPageMessageNavButtonsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Show quick jump buttons when scrolling'**
+  /// **'Choose when quick jump buttons appear'**
   String get displaySettingsPageMessageNavButtonsSubtitle;
+
+  /// No description provided for @displaySettingsPageMessageNavButtonsModeAlways.
+  ///
+  /// In en, this message translates to:
+  /// **'Always show'**
+  String get displaySettingsPageMessageNavButtonsModeAlways;
+
+  /// No description provided for @displaySettingsPageMessageNavButtonsModeScroll.
+  ///
+  /// In en, this message translates to:
+  /// **'Show while scrolling'**
+  String get displaySettingsPageMessageNavButtonsModeScroll;
+
+  /// No description provided for @displaySettingsPageMessageNavButtonsModeHover.
+  ///
+  /// In en, this message translates to:
+  /// **'Show on mouse hover'**
+  String get displaySettingsPageMessageNavButtonsModeHover;
+
+  /// No description provided for @displaySettingsPageMessageNavButtonsModeScrollAndHover.
+  ///
+  /// In en, this message translates to:
+  /// **'Show while scrolling or hovering'**
+  String get displaySettingsPageMessageNavButtonsModeScrollAndHover;
+
+  /// No description provided for @displaySettingsPageMessageNavButtonsModeNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never show'**
+  String get displaySettingsPageMessageNavButtonsModeNever;
 
   /// No description provided for @displaySettingsPageUseNewAssistantAvatarUxTitle.
   ///
@@ -7988,6 +8018,18 @@ abstract class AppLocalizations {
   /// **'Read or write plain text from the device clipboard when explicitly needed.'**
   String get assistantEditLocalToolClipboardSubtitle;
 
+  /// No description provided for @assistantEditLocalToolAskUserTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask User'**
+  String get assistantEditLocalToolAskUserTitle;
+
+  /// No description provided for @assistantEditLocalToolAskUserSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the assistant ask short questions and continue after you answer.'**
+  String get assistantEditLocalToolAskUserSubtitle;
+
   /// No description provided for @assistantEditMemorySwitchTitle.
   ///
   /// In en, this message translates to:
@@ -9050,6 +9092,60 @@ abstract class AppLocalizations {
   /// **'Tool call \"{toolName}\" was denied by user. Reason: {reason}'**
   String toolApprovalDeniedMessage(Object reason, Object toolName);
 
+  /// No description provided for @askUserCardSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit answer'**
+  String get askUserCardSubmit;
+
+  /// No description provided for @askUserCardCustomHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type your answer'**
+  String get askUserCardCustomHint;
+
+  /// No description provided for @askUserCardSomethingElse.
+  ///
+  /// In en, this message translates to:
+  /// **'Something else'**
+  String get askUserCardSomethingElse;
+
+  /// No description provided for @askUserCardSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get askUserCardSkip;
+
+  /// No description provided for @askUserCardSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get askUserCardSkipped;
+
+  /// No description provided for @askUserCardAnswered.
+  ///
+  /// In en, this message translates to:
+  /// **'Answered'**
+  String get askUserCardAnswered;
+
+  /// No description provided for @askUserCardInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'This question is no longer active. Regenerate or continue the conversation.'**
+  String get askUserCardInactive;
+
+  /// No description provided for @askUserCardCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Question cancelled'**
+  String get askUserCardCancelled;
+
+  /// No description provided for @askUserCardQuestionCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask {count} questions'**
+  String askUserCardQuestionCount(int count);
+
   /// No description provided for @tokenDetailPromptTokens.
   ///
   /// In en, this message translates to:
@@ -9085,6 +9181,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} tokens'**
   String tokenDetailTotalTokens(int count);
+
+  /// No description provided for @debugPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Debug'**
+  String get debugPageTitle;
+
+  /// No description provided for @debugPageConversationToolsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation tools'**
+  String get debugPageConversationToolsTitle;
+
+  /// No description provided for @debugPageCreateOversizedConversationButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Create oversized conversation (30 MB)'**
+  String get debugPageCreateOversizedConversationButton;
+
+  /// No description provided for @debugPageCreateManyMessagesConversationButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Create 1024-message conversation'**
+  String get debugPageCreateManyMessagesConversationButton;
+
+  /// No description provided for @debugPageCreatingButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating...'**
+  String get debugPageCreatingButton;
+
+  /// No description provided for @debugPageCreatingOversizedConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating a 30 MB oversized conversation...'**
+  String get debugPageCreatingOversizedConversation;
+
+  /// No description provided for @debugPageCreatingManyMessagesConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating a 1024-message conversation...'**
+  String get debugPageCreatingManyMessagesConversation;
+
+  /// No description provided for @debugPageNoCurrentAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'No current assistant. Create or select an assistant first.'**
+  String get debugPageNoCurrentAssistant;
+
+  /// No description provided for @debugPageConversationCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Created debug conversation with {count} messages.'**
+  String debugPageConversationCreated(int count);
+
+  /// No description provided for @debugPageCreateConversationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create debug conversation: {error}'**
+  String debugPageCreateConversationFailed(String error);
+
+  /// No description provided for @debugPageOversizedConversationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Oversized conversation test ({sizeMB} MB)'**
+  String debugPageOversizedConversationTitle(int sizeMB);
+
+  /// No description provided for @debugPageManyMessagesConversationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}-message conversation test'**
+  String debugPageManyMessagesConversationTitle(int count);
+
+  /// No description provided for @debugPageOversizedConversationSeedText.
+  ///
+  /// In en, this message translates to:
+  /// **'This is long debug text for reproducing slow rendering in oversized conversations. It includes repeated Markdown-like text, punctuation, CJK content, and plain words so chat rendering, storage, and scrolling can be profiled.'**
+  String get debugPageOversizedConversationSeedText;
+
+  /// No description provided for @debugPageManyMessagesSeedText.
+  ///
+  /// In en, this message translates to:
+  /// **'{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.'**
+  String debugPageManyMessagesSeedText(String role, int index);
 }
 
 class _AppLocalizationsDelegate

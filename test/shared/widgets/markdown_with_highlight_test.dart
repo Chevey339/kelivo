@@ -158,6 +158,64 @@ void main() {
   });
 
   testWidgets(
+    r'MarkdownWithCodeHighlight renders escaped-pipe dollar math as math',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'已知 $q$ 是 $\mathbb{R}^n$ 上的多项式。对所有满足 $\|x\|=1$ 的 $x$，有 $p(x)=q(x)$。',
+        ),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNWidgets(5));
+      expect(find.textContaining(r'\|x\|=1'), findsNothing);
+      expect(find.textContaining(r'\lVert x \rVert'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight follows GitHub-like dollar math boundaries',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+分别$10和$20
+
+分别 $10和$ 20
+
+分别$10$和$20$
+
+分别 $10$ 和$20$
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNWidgets(2));
+      expect(find.textContaining(r'分别$10和$20'), findsOneWidget);
+      expect(find.textContaining(r'分别$10$和$20$'), findsOneWidget);
+      expect(find.textContaining(r'和$20$'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps table pipes from widening dollar math',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+| A | B |
+| - | - |
+| $a$ | b |
+| $a|b$ | c |
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining(r'$a'), findsOneWidget);
+      expect(find.textContaining(r'b$'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight disables all math rendering by setting',
     (tester) async {
       late SettingsProvider settings;
@@ -485,6 +543,63 @@ press5
       await tester.pumpAndSettle();
 
       expect(find.text('隐藏内容', findRichText: true), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight renders nested details independently',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('''
+开头文本
+
+<details>
+<summary>第一层折叠</summary>
+
+普通内容...
+
+<details>
+<summary>第二层折叠</summary>
+
+深藏的内容在这里！
+
+</details>
+
+</details>
+
+结尾文本
+'''),
+      );
+      await tester.pump();
+
+      var richTexts = tester.widgetList<RichText>(find.byType(RichText));
+      var plainText = richTexts.map((w) => w.text.toPlainText()).join('\n');
+
+      expect(plainText, contains('开头文本'));
+      expect(find.text('第一层折叠'), findsOneWidget);
+      expect(find.text('第二层折叠'), findsNothing);
+      expect(find.text('普通内容...', findRichText: true), findsNothing);
+      expect(find.text('深藏的内容在这里！', findRichText: true), findsNothing);
+
+      await tester.tap(find.text('第一层折叠'));
+      await tester.pumpAndSettle();
+
+      richTexts = tester.widgetList<RichText>(find.byType(RichText));
+      plainText = richTexts.map((w) => w.text.toPlainText()).join('\n');
+
+      expect(plainText, contains('普通内容...'));
+      expect(find.text('第二层折叠'), findsOneWidget);
+      expect(find.text('深藏的内容在这里！', findRichText: true), findsNothing);
+
+      await tester.tap(find.text('第二层折叠'));
+      await tester.pumpAndSettle();
+
+      richTexts = tester.widgetList<RichText>(find.byType(RichText));
+      plainText = richTexts.map((w) => w.text.toPlainText()).join('\n');
+
+      expect(plainText, contains('深藏的内容在这里！'));
+      expect(plainText, contains('结尾文本'));
+      expect(plainText, isNot(contains('</details>')));
     },
   );
 

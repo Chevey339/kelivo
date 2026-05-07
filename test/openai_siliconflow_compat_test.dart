@@ -218,7 +218,7 @@ void main() {
               },
             },
           ],
-          onToolCall: (_, __) async => '2026-03-27',
+          onToolCall: (_, __, {toolCallId}) async => '2026-03-27',
         ).toList();
 
         expect(requestBodies, hasLength(2));
@@ -357,7 +357,7 @@ void main() {
               },
             },
           ],
-          onToolCall: (_, __) async => '2026-03-27',
+          onToolCall: (_, __, {toolCallId}) async => '2026-03-27',
           stream: false,
         ).toList();
 

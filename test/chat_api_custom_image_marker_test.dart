@@ -147,7 +147,7 @@ void main() {
                 },
               },
             ],
-            onToolCall: (_, __) async => 'metadata',
+            onToolCall: (_, __, {toolCallId}) async => 'metadata',
             stream: false,
           ).toList();
         });
@@ -207,7 +207,7 @@ void main() {
                     },
                   },
                 ],
-                onToolCall: (_, __) async => 'metadata',
+                onToolCall: (_, __, {toolCallId}) async => 'metadata',
               ).toList();
             });
 

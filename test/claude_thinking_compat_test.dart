@@ -549,7 +549,7 @@ void main() {
           {'role': 'user', 'content': 'inspect'},
         ],
         userImagePaths: [file.path],
-        onToolCall: (name, args) async => '{"result":"ok"}',
+        onToolCall: (name, args, {toolCallId}) async => '{"result":"ok"}',
         stream: false,
       ).toList();
 

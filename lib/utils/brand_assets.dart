@@ -49,6 +49,7 @@ class BrandAssets {
         MapEntry(RegExp(r'aliyun|阿里云|百炼'), 'alibabacloud-color.svg'),
         MapEntry(RegExp(r'bytedance|火山'), 'bytedance-color.svg'),
         MapEntry(RegExp(r'silicon|硅基'), 'siliconflow-color.svg'),
+        MapEntry(RegExp(r'sensenova|sensetime|商汤|日日新'), 'sensenova-color.svg'),
         MapEntry(RegExp(r'aihubmix'), 'aihubmix-color.svg'),
         MapEntry(RegExp(r'ollama'), 'ollama.svg'),
         MapEntry(RegExp(r'github'), 'github.svg'),

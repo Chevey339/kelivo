@@ -653,7 +653,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   double? topP,
   int? maxTokens,
   List<Map<String, dynamic>>? tools,
-  Future<String> Function(String, Map<String, dynamic>)? onToolCall,
+  ToolCallHandler? onToolCall,
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
   bool stream = true,
@@ -1345,7 +1345,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           final callInfos = <ToolCallInfo>[];
           for (int i = 0; i < tcs.length; i++) {
             final t = (tcs[i] as Map).cast<String, dynamic>();
-            final id = (t['id'] ?? 'call_$i').toString();
+            final id = _effectiveToolCallId(t['id'], 'call', i);
             final f =
                 (t['function'] as Map?)?.cast<String, dynamic>() ??
                 const <String, dynamic>{};
@@ -1376,7 +1376,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           final results = <Map<String, dynamic>>[];
           final resultsInfo = <ToolResultInfo>[];
           for (final c in callInfos) {
-            final res = await onToolCall(c.name, c.arguments);
+            final res = await onToolCall(c.name, c.arguments, toolCallId: c.id);
             results.add({'tool_call_id': c.id, 'content': res});
             resultsInfo.add(
               ToolResultInfo(
@@ -1552,7 +1552,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           final callInfos = <ToolCallInfo>[];
           final toolMsgs = <Map<String, dynamic>>[];
           toolAcc.forEach((idx, m) {
-            final id = (m['id'] ?? 'call_$idx');
+            final id = _effectiveToolCallId(m['id'], 'call', idx);
             final name = (m['name'] ?? '');
             Map<String, dynamic> args;
             try {
@@ -1590,7 +1590,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             final name = m['__name'] as String;
             final id = m['__id'] as String;
             final args = (m['__args'] as Map<String, dynamic>);
-            final res = await onToolCall(name, args);
+            final res = await onToolCall(name, args, toolCallId: id);
             results.add({'tool_call_id': id, 'content': res});
             resultsInfo.add(
               ToolResultInfo(id: id, name: name, arguments: args, content: res),
@@ -2018,7 +2018,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               final callInfos2 = <ToolCallInfo>[];
               final toolMsgs2 = <Map<String, dynamic>>[];
               toolAcc2.forEach((idx, m) {
-                final id = (m['id'] ?? 'call_$idx');
+                final id = _effectiveToolCallId(m['id'], 'call', idx);
                 final name = (m['name'] ?? '');
                 Map<String, dynamic> args;
                 try {
@@ -2052,7 +2052,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 final name = m['__name'] as String;
                 final id = m['__id'] as String;
                 final args = (m['__args'] as Map<String, dynamic>);
-                final res = await onToolCall(name, args);
+                final res = await onToolCall(name, args, toolCallId: id);
                 results2.add({'tool_call_id': id, 'content': res});
                 resultsInfo2.add(
                   ToolResultInfo(
@@ -2317,18 +2317,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   } catch (_) {
                     args = <String, dynamic>{};
                   }
+                  final id = _effectiveToolCallId(callId, 'call', idx);
                   callInfos.add(
-                    ToolCallInfo(
-                      id: callId.isNotEmpty ? callId : 'call_$idx',
-                      name: name,
-                      arguments: args,
-                    ),
+                    ToolCallInfo(id: id, name: name, arguments: args),
                   );
-                  msgs.add({
-                    '__id': callId.isNotEmpty ? callId : 'call_$idx',
-                    '__name': name,
-                    '__args': args,
-                  });
+                  msgs.add({'__id': id, '__name': name, '__args': args});
                 }
               } else {
                 int idx = 0;
@@ -2340,7 +2333,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   } catch (_) {
                     args = <String, dynamic>{};
                   }
-                  final id2 = key.isNotEmpty ? key : 'call_$idx';
+                  final id2 = _effectiveToolCallId(key, 'call', idx);
                   callInfos.add(
                     ToolCallInfo(
                       id: id2,
@@ -2374,7 +2367,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 final nm = m['__name'] as String;
                 final id2 = m['__id'] as String;
                 final args = (m['__args'] as Map<String, dynamic>);
-                final res = await onToolCall(nm, args);
+                final res = await onToolCall(nm, args, toolCallId: id2);
                 resultsInfo.add(
                   ToolResultInfo(
                     id: id2,
@@ -2636,18 +2629,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   } catch (_) {
                     args2 = <String, dynamic>{};
                   }
+                  final id2 = _effectiveToolCallId(callId2, 'call', idx2);
                   callInfos2.add(
-                    ToolCallInfo(
-                      id: callId2.isNotEmpty ? callId2 : 'call_$idx2',
-                      name: name2,
-                      arguments: args2,
-                    ),
+                    ToolCallInfo(id: id2, name: name2, arguments: args2),
                   );
-                  msgs2.add({
-                    '__id': callId2.isNotEmpty ? callId2 : 'call_$idx2',
-                    '__name': name2,
-                    '__args': args2,
-                  });
+                  msgs2.add({'__id': id2, '__name': name2, '__args': args2});
                 }
                 if (callInfos2.isNotEmpty) {
                   final approxTotal =
@@ -2667,7 +2653,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   final nm = m['__name'] as String;
                   final id2 = m['__id'] as String;
                   final args2 = (m['__args'] as Map<String, dynamic>);
-                  final res2 = await onToolCall(nm, args2);
+                  final res2 = await onToolCall(nm, args2, toolCallId: id2);
                   resultsInfo2.add(
                     ToolResultInfo(
                       id: id2,
@@ -2931,7 +2917,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               final entry = toolAcc.putIfAbsent(
                 idx,
                 () => {
-                  'id': id.isEmpty ? 'call_$idx' : id,
+                  'id': _effectiveToolCallId(id, 'call', idx),
                   'name': name,
                   'args': argsStr,
                 },
@@ -2982,7 +2968,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           final callInfos = <ToolCallInfo>[];
           final toolMsgs = <Map<String, dynamic>>[];
           toolAcc.forEach((idx, m) {
-            final id = (m['id'] ?? 'call_$idx');
+            final id = _effectiveToolCallId(m['id'], 'call', idx);
             final name = (m['name'] ?? '');
             Map<String, dynamic> args;
             try {
@@ -3018,7 +3004,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             final name = m['__name'] as String;
             final id = m['__id'] as String;
             final args = (m['__args'] as Map<String, dynamic>);
-            final res = await onToolCall(name, args);
+            final res = await onToolCall(name, args, toolCallId: id);
             results.add({'tool_call_id': id, 'content': res});
             resultsInfo.add(
               ToolResultInfo(id: id, name: name, arguments: args, content: res),
@@ -3436,7 +3422,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       final entry = toolAcc2.putIfAbsent(
                         idx,
                         () => {
-                          'id': id.isEmpty ? 'call_$idx' : id,
+                          'id': _effectiveToolCallId(id, 'call', idx),
                           'name': name,
                           'args': argsStr,
                         },
@@ -3457,7 +3443,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               final callInfos2 = <ToolCallInfo>[];
               final toolMsgs2 = <Map<String, dynamic>>[];
               toolAcc2.forEach((idx, m) {
-                final id = (m['id'] ?? 'call_$idx');
+                final id = _effectiveToolCallId(m['id'], 'call', idx);
                 final name = (m['name'] ?? '');
                 Map<String, dynamic> args;
                 try {
@@ -3491,7 +3477,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 final name = m['__name'] as String;
                 final id = m['__id'] as String;
                 final args = (m['__args'] as Map<String, dynamic>);
-                final res = await onToolCall(name, args);
+                final res = await onToolCall(name, args, toolCallId: id);
                 results2.add({'tool_call_id': id, 'content': res});
                 resultsInfo2.add(
                   ToolResultInfo(
@@ -3564,7 +3550,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               final callInfos = <ToolCallInfo>[];
               final toolMsgs = <Map<String, dynamic>>[];
               toolAcc.forEach((idx, m) {
-                final id = (m['id'] ?? 'call_$idx');
+                final id = _effectiveToolCallId(m['id'], 'call', idx);
                 final name = (m['name'] ?? '');
                 Map<String, dynamic> args;
                 try {
@@ -3602,7 +3588,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 final name = m['__name'] as String;
                 final id = m['__id'] as String;
                 final args = (m['__args'] as Map<String, dynamic>);
-                final res = await onToolCall(name, args);
+                final res = await onToolCall(name, args, toolCallId: id);
                 results.add({'tool_call_id': id, 'content': res});
                 resultsInfo.add(
                   ToolResultInfo(
@@ -3994,7 +3980,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                           final entry = toolAcc2.putIfAbsent(
                             idx,
                             () => {
-                              'id': id.isEmpty ? 'call_$idx' : id,
+                              'id': _effectiveToolCallId(id, 'call', idx),
                               'name': name,
                               'args': argsStr,
                             },
@@ -4016,7 +4002,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   final callInfos2 = <ToolCallInfo>[];
                   final toolMsgs2 = <Map<String, dynamic>>[];
                   toolAcc2.forEach((idx, m) {
-                    final id = (m['id'] ?? 'call_$idx');
+                    final id = _effectiveToolCallId(m['id'], 'call', idx);
                     final name = (m['name'] ?? '');
                     Map<String, dynamic> args;
                     try {
@@ -4050,7 +4036,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     final name = m['__name'] as String;
                     final id = m['__id'] as String;
                     final args = (m['__args'] as Map<String, dynamic>);
-                    final res = await onToolCall(name, args);
+                    final res = await onToolCall(name, args, toolCallId: id);
                     results2.add({'tool_call_id': id, 'content': res});
                     resultsInfo2.add(
                       ToolResultInfo(

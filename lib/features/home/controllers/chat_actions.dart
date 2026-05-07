@@ -12,6 +12,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
+import '../services/ask_user_interaction_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/tool_approval_service.dart';
 import 'chat_controller.dart';
@@ -275,8 +276,12 @@ class ChatActions {
     final assistantId = assistant?.id;
     // Capture approval service reference before async gap
     ToolApprovalService? approvalService;
+    AskUserInteractionService? askUserService;
     try {
       approvalService = contextProvider.read<ToolApprovalService>();
+    } catch (_) {}
+    try {
+      askUserService = contextProvider.read<AskUserInteractionService>();
     } catch (_) {}
     final modelConfig = messageGenerationService.getModelConfig(
       settings,
@@ -355,6 +360,7 @@ class ChatActions {
             providerKey: providerKey,
             modelId: modelId,
             approvalService: approvalService,
+            askUserService: askUserService,
           );
 
       // Build user image paths
@@ -414,8 +420,12 @@ class ChatActions {
         .currentAssistant;
     // Capture approval service reference before async gap
     ToolApprovalService? regenApprovalService;
+    AskUserInteractionService? regenAskUserService;
     try {
       regenApprovalService = contextProvider.read<ToolApprovalService>();
+    } catch (_) {}
+    try {
+      regenAskUserService = contextProvider.read<AskUserInteractionService>();
     } catch (_) {}
 
     await cancelStreaming(conversation);
@@ -534,6 +544,7 @@ class ChatActions {
           providerKey: providerKey,
           modelId: modelId,
           approvalService: regenApprovalService,
+          askUserService: regenAskUserService,
         );
 
     // Build user image paths
@@ -564,6 +575,102 @@ class ChatActions {
     return ChatActionResult.success(assistantMessage);
   }
 
+  Future<ChatActionResult> continueAssistantMessageAfterToolAnswer({
+    required ChatMessage message,
+    required Conversation conversation,
+    bool allowImagesApiRouting = true,
+  }) async {
+    final settings = contextProvider.read<SettingsProvider>();
+    final assistant = contextProvider
+        .read<AssistantProvider>()
+        .currentAssistant;
+    ToolApprovalService? approvalService;
+    AskUserInteractionService? askUserService;
+    try {
+      approvalService = contextProvider.read<ToolApprovalService>();
+    } catch (_) {}
+    try {
+      askUserService = contextProvider.read<AskUserInteractionService>();
+    } catch (_) {}
+
+    final idx = _messages.indexWhere((candidate) => candidate.id == message.id);
+    if (idx < 0 || message.role != 'assistant') {
+      return ChatActionResult.error('message_not_found');
+    }
+
+    final modelConfig = messageGenerationService.getModelConfig(
+      settings,
+      assistant,
+    );
+    if (modelConfig.providerKey == null || modelConfig.modelId == null) {
+      return ChatActionResult.noModel();
+    }
+    final providerKey = modelConfig.providerKey!;
+    final modelId = modelConfig.modelId!;
+
+    final streamingMessage = _messages[idx].copyWith(isStreaming: true);
+    _messages[idx] = streamingMessage;
+    await chatService.updateMessage(streamingMessage.id, isStreaming: true);
+    onMessagesChanged?.call();
+    _setConversationLoading(conversation.id, true);
+
+    final supportsReasoning = _isReasoningModel(providerKey, modelId);
+    final enableReasoning =
+        supportsReasoning &&
+        _isReasoningEnabled(
+          assistant?.thinkingBudget ?? settings.thinkingBudget,
+        );
+
+    try {
+      final apiContextMessages = List<ChatMessage>.of(_messages);
+      apiContextMessages[idx] = streamingMessage.copyWith(content: '');
+      final prepared = await messageGenerationService
+          .prepareApiMessagesWithInjections(
+            messages: apiContextMessages,
+            versionSelections: _versionSelections,
+            currentConversation: conversation,
+            settings: settings,
+            assistant: assistant,
+            assistantId: assistant?.id,
+            providerKey: providerKey,
+            modelId: modelId,
+            approvalService: approvalService,
+            askUserService: askUserService,
+          );
+
+      final userImagePaths = messageGenerationService.buildUserImagePaths(
+        input: null,
+        lastUserImagePaths: prepared.lastUserImagePaths,
+        settings: settings,
+        providerKey: providerKey,
+        modelId: modelId,
+      );
+
+      final ctx = messageGenerationService.buildGenerationContext(
+        assistantMessage: streamingMessage,
+        prepared: prepared,
+        userImagePaths: userImagePaths,
+        allowImagesApiRouting: allowImagesApiRouting,
+        providerKey: providerKey,
+        modelId: modelId,
+        assistant: assistant,
+        settings: settings,
+        supportsReasoning: supportsReasoning,
+        enableReasoning: enableReasoning,
+        generateTitleOnFinish: false,
+      );
+
+      await _executeGeneration(ctx);
+      return ChatActionResult.success(streamingMessage);
+    } catch (e) {
+      streamController.markStreamingEnded(streamingMessage.id);
+      _messages[idx] = streamingMessage.copyWith(isStreaming: false);
+      await chatService.updateMessage(streamingMessage.id, isStreaming: false);
+      _setConversationLoading(conversation.id, false);
+      return ChatActionResult.error(e.toString());
+    }
+  }
+
   // ============================================================================
   // Cancel Streaming
   // ============================================================================
@@ -578,6 +685,11 @@ class ChatActions {
       contextProvider.read<ToolApprovalService>().cancelAll();
     } catch (_) {
       // ToolApprovalService may not be registered yet
+    }
+    try {
+      contextProvider.read<AskUserInteractionService>().cancelAll();
+    } catch (_) {
+      // AskUserInteractionService may not be registered yet
     }
 
     // Reset file processing state on cancel
@@ -654,6 +766,15 @@ class ChatActions {
     final state = stream_ctrl.StreamingState(ctx);
     final assistant = ctx.assistant;
     final conversationId = state.conversationId;
+    final existingSplit = streamController.getContentSplitData(state.messageId);
+    if (existingSplit != null) {
+      state.contentSplitOffsets = List<int>.of(existingSplit.offsets);
+      state.reasoningCountAtSplit = List<int>.of(existingSplit.reasoningCounts);
+      state.toolCountAtSplit = List<int>.of(existingSplit.toolCounts);
+    }
+    if (streamController.getToolPartsCount(state.messageId) > 0) {
+      state.hadThinkingBlock = true;
+    }
 
     // Mark this message as actively streaming to suppress UI rebuilds
     streamController.markStreamingStarted(state.messageId);

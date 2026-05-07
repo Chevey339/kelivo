@@ -1193,7 +1193,12 @@
   "displaySettingsPageShowUpdatesTitle": "顯示更新",
   "displaySettingsPageShowUpdatesSubtitle": "顯示應用程式更新通知",
   "displaySettingsPageMessageNavButtonsTitle": "訊息導航按鈕",
-  "displaySettingsPageMessageNavButtonsSubtitle": "滾動時顯示快速跳轉按鈕",
+  "displaySettingsPageMessageNavButtonsSubtitle": "選擇快速跳轉按鈕的顯示時機",
+  "displaySettingsPageMessageNavButtonsModeAlways": "始終顯示",
+  "displaySettingsPageMessageNavButtonsModeScroll": "滾動時顯示",
+  "displaySettingsPageMessageNavButtonsModeHover": "滑鼠懸停時顯示",
+  "displaySettingsPageMessageNavButtonsModeScrollAndHover": "滾動和滑鼠懸停時顯示",
+  "displaySettingsPageMessageNavButtonsModeNever": "永不顯示",
   "displaySettingsPageUseNewAssistantAvatarUxTitle": "聊天標題欄顯示助手頭像",
   "displaySettingsPageHapticsOnSidebarTitle": "側邊欄觸覺回饋",
   "displaySettingsPageHapticsOnSidebarSubtitle": "開啟/關閉側邊欄時啟用觸覺回饋",
@@ -1409,6 +1414,8 @@
   "assistantEditLocalToolTimeInfoSubtitle": "讀取裝置日期、星期、時間、時區、UTC 偏移和時間戳。",
   "assistantEditLocalToolClipboardTitle": "剪貼簿",
   "assistantEditLocalToolClipboardSubtitle": "在明確需要時讀取或寫入裝置剪貼簿中的純文字。",
+  "assistantEditLocalToolAskUserTitle": "詢問使用者",
+  "assistantEditLocalToolAskUserSubtitle": "允許助手提出簡短問題，並在你回答後繼續生成。",
   "assistantEditMemorySwitchTitle": "記憶",
   "assistantEditMemorySwitchDescription": "允許助理主動儲存並在對話間引用使用者相關資訊",
   "assistantEditOutlineModeTitle": "二級列表樣式",
@@ -1650,10 +1657,71 @@
   "toolApprovalDenyTitle": "拒絕工具調用",
   "toolApprovalDenyHint": "原因（可選）",
   "toolApprovalDeniedMessage": "工具調用 \"{toolName}\" 已被使用者拒絕。原因：{reason}",
+  "askUserCardSubmit": "提交回答",
+  "askUserCardCustomHint": "輸入你的回答",
+  "askUserCardSomethingElse": "其他",
+  "askUserCardSkip": "跳過",
+  "askUserCardSkipped": "已跳過",
+  "askUserCardAnswered": "已回答",
+  "askUserCardInactive": "這個問題已不再活動。請重新生成或繼續對話。",
+  "askUserCardCancelled": "問題已取消",
+  "askUserCardQuestionCount": "詢問 {count} 個問題",
   "tokenDetailPromptTokens": "{count} tokens",
   "tokenDetailPromptTokensWithCache": "{count} tokens ({cached} cached)",
   "tokenDetailCompletionTokens": "{count} tokens",
   "tokenDetailSpeed": "{value} tok/s",
   "tokenDetailDuration": "{value}s",
-  "tokenDetailTotalTokens": "{count} tokens"
+  "tokenDetailTotalTokens": "{count} tokens",
+  "debugPageTitle": "Debug",
+  "debugPageConversationToolsTitle": "對話工具",
+  "debugPageCreateOversizedConversationButton": "建立超大對話（30 MB）",
+  "debugPageCreateManyMessagesConversationButton": "建立 1024 條訊息的對話",
+  "debugPageCreatingButton": "建立中...",
+  "debugPageCreatingOversizedConversation": "正在建立 30 MB 超大對話...",
+  "debugPageCreatingManyMessagesConversation": "正在建立 1024 條訊息的對話...",
+  "debugPageNoCurrentAssistant": "目前沒有助手。請先建立或選擇一個助手。",
+  "debugPageConversationCreated": "已建立包含 {count} 條訊息的調試對話。",
+  "@debugPageConversationCreated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "debugPageCreateConversationFailed": "建立調試對話失敗：{error}",
+  "@debugPageCreateConversationFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "debugPageOversizedConversationTitle": "超大對話測試（{sizeMB} MB）",
+  "@debugPageOversizedConversationTitle": {
+    "placeholders": {
+      "sizeMB": {
+        "type": "int"
+      }
+    }
+  },
+  "debugPageManyMessagesConversationTitle": "{count} 條訊息測試",
+  "@debugPageManyMessagesConversationTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "debugPageOversizedConversationSeedText": "這是一段用於復現超大對話渲染卡頓的長調試文字。它包含重複的 Markdown 風格文字、標點、中文內容和普通詞語，方便測試聊天渲染、儲存和捲動效能。",
+  "debugPageManyMessagesSeedText": "{role} 訊息 #{index}：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。",
+  "@debugPageManyMessagesSeedText": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      },
+      "index": {
+        "type": "int"
+      }
+    }
+  }
 }

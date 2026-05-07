@@ -3551,7 +3551,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageMessageNavButtonsTitle => '消息导航按钮';
 
   @override
-  String get displaySettingsPageMessageNavButtonsSubtitle => '滚动时显示快速跳转按钮';
+  String get displaySettingsPageMessageNavButtonsSubtitle => '选择快速跳转按钮的显示时机';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeAlways => '始终显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScroll => '滚动时显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeHover => '鼠标悬停时显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScrollAndHover =>
+      '滚动和鼠标悬停时显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeNever => '永不显示';
 
   @override
   String get displaySettingsPageUseNewAssistantAvatarUxTitle => '聊天标题栏显示助手头像';
@@ -4125,6 +4141,12 @@ class AppLocalizationsZh extends AppLocalizations {
       '在明确需要时读取或写入设备剪切板中的纯文本。';
 
   @override
+  String get assistantEditLocalToolAskUserTitle => '询问用户';
+
+  @override
+  String get assistantEditLocalToolAskUserSubtitle => '允许助手提出简短问题，并在你回答后继续生成。';
+
+  @override
   String get assistantEditMemorySwitchTitle => '记忆';
 
   @override
@@ -4682,6 +4704,35 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get askUserCardSubmit => '提交回答';
+
+  @override
+  String get askUserCardCustomHint => '输入你的回答';
+
+  @override
+  String get askUserCardSomethingElse => '其他';
+
+  @override
+  String get askUserCardSkip => '跳过';
+
+  @override
+  String get askUserCardSkipped => '已跳过';
+
+  @override
+  String get askUserCardAnswered => '已回答';
+
+  @override
+  String get askUserCardInactive => '这个问题已不再活动。请重新生成或继续对话。';
+
+  @override
+  String get askUserCardCancelled => '问题已取消';
+
+  @override
+  String askUserCardQuestionCount(int count) {
+    return '询问 $count 个问题';
+  }
+
+  @override
   String tokenDetailPromptTokens(int count) {
     return '$count tokens';
   }
@@ -4709,6 +4760,59 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String tokenDetailTotalTokens(int count) {
     return '$count tokens';
+  }
+
+  @override
+  String get debugPageTitle => 'Debug';
+
+  @override
+  String get debugPageConversationToolsTitle => '对话工具';
+
+  @override
+  String get debugPageCreateOversizedConversationButton => '创建超大对话（30 MB）';
+
+  @override
+  String get debugPageCreateManyMessagesConversationButton => '创建 1024 条消息的对话';
+
+  @override
+  String get debugPageCreatingButton => '创建中...';
+
+  @override
+  String get debugPageCreatingOversizedConversation => '正在创建 30 MB 超大对话...';
+
+  @override
+  String get debugPageCreatingManyMessagesConversation => '正在创建 1024 条消息的对话...';
+
+  @override
+  String get debugPageNoCurrentAssistant => '当前没有助手。请先创建或选择一个助手。';
+
+  @override
+  String debugPageConversationCreated(int count) {
+    return '已创建包含 $count 条消息的调试对话。';
+  }
+
+  @override
+  String debugPageCreateConversationFailed(String error) {
+    return '创建调试对话失败：$error';
+  }
+
+  @override
+  String debugPageOversizedConversationTitle(int sizeMB) {
+    return '超大对话测试（$sizeMB MB）';
+  }
+
+  @override
+  String debugPageManyMessagesConversationTitle(int count) {
+    return '$count 条消息测试';
+  }
+
+  @override
+  String get debugPageOversizedConversationSeedText =>
+      '这是一段用于复现超大对话渲染卡顿的长调试文本。它包含重复的 Markdown 风格文本、标点、中文内容和普通词语，方便测试聊天渲染、存储和滚动性能。';
+
+  @override
+  String debugPageManyMessagesSeedText(String role, int index) {
+    return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
 }
 
@@ -8259,7 +8363,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageMessageNavButtonsTitle => '消息导航按钮';
 
   @override
-  String get displaySettingsPageMessageNavButtonsSubtitle => '滚动时显示快速跳转按钮';
+  String get displaySettingsPageMessageNavButtonsSubtitle => '选择快速跳转按钮的显示时机';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeAlways => '始终显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScroll => '滚动时显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeHover => '鼠标悬停时显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScrollAndHover =>
+      '滚动和鼠标悬停时显示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeNever => '永不显示';
 
   @override
   String get displaySettingsPageUseNewAssistantAvatarUxTitle => '聊天标题栏显示助手头像';
@@ -8833,6 +8953,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '在明确需要时读取或写入设备剪切板中的纯文本。';
 
   @override
+  String get assistantEditLocalToolAskUserTitle => '询问用户';
+
+  @override
+  String get assistantEditLocalToolAskUserSubtitle => '允许助手提出简短问题，并在你回答后继续生成。';
+
+  @override
   String get assistantEditMemorySwitchTitle => '记忆';
 
   @override
@@ -9390,6 +9516,35 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String get askUserCardSubmit => '提交回答';
+
+  @override
+  String get askUserCardCustomHint => '输入你的回答';
+
+  @override
+  String get askUserCardSomethingElse => '其他';
+
+  @override
+  String get askUserCardSkip => '跳过';
+
+  @override
+  String get askUserCardSkipped => '已跳过';
+
+  @override
+  String get askUserCardAnswered => '已回答';
+
+  @override
+  String get askUserCardInactive => '这个问题已不再活动。请重新生成或继续对话。';
+
+  @override
+  String get askUserCardCancelled => '问题已取消';
+
+  @override
+  String askUserCardQuestionCount(int count) {
+    return '询问 $count 个问题';
+  }
+
+  @override
   String tokenDetailPromptTokens(int count) {
     return '$count tokens';
   }
@@ -9417,6 +9572,59 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String tokenDetailTotalTokens(int count) {
     return '$count tokens';
+  }
+
+  @override
+  String get debugPageTitle => 'Debug';
+
+  @override
+  String get debugPageConversationToolsTitle => '对话工具';
+
+  @override
+  String get debugPageCreateOversizedConversationButton => '创建超大对话（30 MB）';
+
+  @override
+  String get debugPageCreateManyMessagesConversationButton => '创建 1024 条消息的对话';
+
+  @override
+  String get debugPageCreatingButton => '创建中...';
+
+  @override
+  String get debugPageCreatingOversizedConversation => '正在创建 30 MB 超大对话...';
+
+  @override
+  String get debugPageCreatingManyMessagesConversation => '正在创建 1024 条消息的对话...';
+
+  @override
+  String get debugPageNoCurrentAssistant => '当前没有助手。请先创建或选择一个助手。';
+
+  @override
+  String debugPageConversationCreated(int count) {
+    return '已创建包含 $count 条消息的调试对话。';
+  }
+
+  @override
+  String debugPageCreateConversationFailed(String error) {
+    return '创建调试对话失败：$error';
+  }
+
+  @override
+  String debugPageOversizedConversationTitle(int sizeMB) {
+    return '超大对话测试（$sizeMB MB）';
+  }
+
+  @override
+  String debugPageManyMessagesConversationTitle(int count) {
+    return '$count 条消息测试';
+  }
+
+  @override
+  String get debugPageOversizedConversationSeedText =>
+      '这是一段用于复现超大对话渲染卡顿的长调试文本。它包含重复的 Markdown 风格文本、标点、中文内容和普通词语，方便测试聊天渲染、存储和滚动性能。';
+
+  @override
+  String debugPageManyMessagesSeedText(String role, int index) {
+    return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
 }
 
@@ -12965,7 +13173,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageMessageNavButtonsTitle => '訊息導航按鈕';
 
   @override
-  String get displaySettingsPageMessageNavButtonsSubtitle => '滾動時顯示快速跳轉按鈕';
+  String get displaySettingsPageMessageNavButtonsSubtitle => '選擇快速跳轉按鈕的顯示時機';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeAlways => '始終顯示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScroll => '滾動時顯示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeHover => '滑鼠懸停時顯示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeScrollAndHover =>
+      '滾動和滑鼠懸停時顯示';
+
+  @override
+  String get displaySettingsPageMessageNavButtonsModeNever => '永不顯示';
 
   @override
   String get displaySettingsPageUseNewAssistantAvatarUxTitle => '聊天標題欄顯示助手頭像';
@@ -13541,6 +13765,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '在明確需要時讀取或寫入裝置剪貼簿中的純文字。';
 
   @override
+  String get assistantEditLocalToolAskUserTitle => '詢問使用者';
+
+  @override
+  String get assistantEditLocalToolAskUserSubtitle => '允許助手提出簡短問題，並在你回答後繼續生成。';
+
+  @override
   String get assistantEditMemorySwitchTitle => '記憶';
 
   @override
@@ -14098,6 +14328,35 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String get askUserCardSubmit => '提交回答';
+
+  @override
+  String get askUserCardCustomHint => '輸入你的回答';
+
+  @override
+  String get askUserCardSomethingElse => '其他';
+
+  @override
+  String get askUserCardSkip => '跳過';
+
+  @override
+  String get askUserCardSkipped => '已跳過';
+
+  @override
+  String get askUserCardAnswered => '已回答';
+
+  @override
+  String get askUserCardInactive => '這個問題已不再活動。請重新生成或繼續對話。';
+
+  @override
+  String get askUserCardCancelled => '問題已取消';
+
+  @override
+  String askUserCardQuestionCount(int count) {
+    return '詢問 $count 個問題';
+  }
+
+  @override
   String tokenDetailPromptTokens(int count) {
     return '$count tokens';
   }
@@ -14125,5 +14384,58 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String tokenDetailTotalTokens(int count) {
     return '$count tokens';
+  }
+
+  @override
+  String get debugPageTitle => 'Debug';
+
+  @override
+  String get debugPageConversationToolsTitle => '對話工具';
+
+  @override
+  String get debugPageCreateOversizedConversationButton => '建立超大對話（30 MB）';
+
+  @override
+  String get debugPageCreateManyMessagesConversationButton => '建立 1024 條訊息的對話';
+
+  @override
+  String get debugPageCreatingButton => '建立中...';
+
+  @override
+  String get debugPageCreatingOversizedConversation => '正在建立 30 MB 超大對話...';
+
+  @override
+  String get debugPageCreatingManyMessagesConversation => '正在建立 1024 條訊息的對話...';
+
+  @override
+  String get debugPageNoCurrentAssistant => '目前沒有助手。請先建立或選擇一個助手。';
+
+  @override
+  String debugPageConversationCreated(int count) {
+    return '已建立包含 $count 條訊息的調試對話。';
+  }
+
+  @override
+  String debugPageCreateConversationFailed(String error) {
+    return '建立調試對話失敗：$error';
+  }
+
+  @override
+  String debugPageOversizedConversationTitle(int sizeMB) {
+    return '超大對話測試（$sizeMB MB）';
+  }
+
+  @override
+  String debugPageManyMessagesConversationTitle(int count) {
+    return '$count 條訊息測試';
+  }
+
+  @override
+  String get debugPageOversizedConversationSeedText =>
+      '這是一段用於復現超大對話渲染卡頓的長調試文字。它包含重複的 Markdown 風格文字、標點、中文內容和普通詞語，方便測試聊天渲染、儲存和捲動效能。';
+
+  @override
+  String debugPageManyMessagesSeedText(String role, int index) {
+    return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
 }
