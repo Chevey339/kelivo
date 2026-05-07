@@ -1191,7 +1191,6 @@ class HomeViewModel extends ChangeNotifier {
           _chatService.getConversation(conversationId),
         );
         notifyListeners();
-        onScrollToBottom?.call();
       }
     } catch (e) {
       FlutterLogger.log(
