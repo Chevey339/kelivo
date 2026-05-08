@@ -319,6 +319,10 @@
   "codeBlockCollapseButton": "摺疊",
   "codeBlockExpandButton": "展開",
   "codeBlockDefaultFileNameStem": "程式碼",
+  "markdownTableLabel": "表格",
+  "markdownTableExportCsvTooltip": "匯出 CSV",
+  "markdownTableDefaultFileNameStem": "表格",
+  "markdownTableCopiedCsvSnackbar": "已複製 CSV，長按複製可複製為圖片",
   "codeBlockCollapsedLines": "… 已摺疊 {n} 行",
   "@codeBlockCollapsedLines": {
     "placeholders": {

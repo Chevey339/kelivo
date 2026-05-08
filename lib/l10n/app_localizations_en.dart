@@ -1205,6 +1205,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get codeBlockDefaultFileNameStem => 'code';
 
   @override
+  String get markdownTableLabel => 'Table';
+
+  @override
+  String get markdownTableExportCsvTooltip => 'Export CSV';
+
+  @override
+  String get markdownTableDefaultFileNameStem => 'table';
+
+  @override
+  String get markdownTableCopiedCsvSnackbar =>
+      'CSV copied. Long press Copy to copy as image.';
+
+  @override
   String codeBlockCollapsedLines(int n) {
     return '… $n lines folded';
   }

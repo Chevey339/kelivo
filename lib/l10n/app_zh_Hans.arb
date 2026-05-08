@@ -340,6 +340,10 @@
   "codeBlockCollapseButton": "折叠",
   "codeBlockExpandButton": "展开",
   "codeBlockDefaultFileNameStem": "代码",
+  "markdownTableLabel": "表格",
+  "markdownTableExportCsvTooltip": "导出 CSV",
+  "markdownTableDefaultFileNameStem": "表格",
+  "markdownTableCopiedCsvSnackbar": "已复制 CSV，长按复制可复制为图片",
   "codeBlockCollapsedLines": "… 已折叠 {n} 行",
   "@codeBlockCollapsedLines": {
     "placeholders": {

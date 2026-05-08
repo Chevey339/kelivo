@@ -506,6 +506,10 @@
   "codeBlockCollapseButton": "Collapse",
   "codeBlockExpandButton": "Expand",
   "codeBlockDefaultFileNameStem": "code",
+  "markdownTableLabel": "Table",
+  "markdownTableExportCsvTooltip": "Export CSV",
+  "markdownTableDefaultFileNameStem": "table",
+  "markdownTableCopiedCsvSnackbar": "CSV copied. Long press Copy to copy as image.",
   "codeBlockCollapsedLines": "… {n} lines folded",
   "@codeBlockCollapsedLines": {
     "placeholders": {

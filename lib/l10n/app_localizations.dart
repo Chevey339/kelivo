@@ -2351,6 +2351,30 @@ abstract class AppLocalizations {
   /// **'code'**
   String get codeBlockDefaultFileNameStem;
 
+  /// No description provided for @markdownTableLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Table'**
+  String get markdownTableLabel;
+
+  /// No description provided for @markdownTableExportCsvTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Export CSV'**
+  String get markdownTableExportCsvTooltip;
+
+  /// No description provided for @markdownTableDefaultFileNameStem.
+  ///
+  /// In en, this message translates to:
+  /// **'table'**
+  String get markdownTableDefaultFileNameStem;
+
+  /// No description provided for @markdownTableCopiedCsvSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'CSV copied. Long press Copy to copy as image.'**
+  String get markdownTableCopiedCsvSnackbar;
+
   /// No description provided for @codeBlockCollapsedLines.
   ///
   /// In en, this message translates to:

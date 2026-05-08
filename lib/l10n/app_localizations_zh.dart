@@ -1173,6 +1173,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get codeBlockDefaultFileNameStem => '代码';
 
   @override
+  String get markdownTableLabel => '表格';
+
+  @override
+  String get markdownTableExportCsvTooltip => '导出 CSV';
+
+  @override
+  String get markdownTableDefaultFileNameStem => '表格';
+
+  @override
+  String get markdownTableCopiedCsvSnackbar => '已复制 CSV，长按复制可复制为图片';
+
+  @override
   String codeBlockCollapsedLines(int n) {
     return '… 已折叠 $n 行';
   }
@@ -5985,6 +5997,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get codeBlockDefaultFileNameStem => '代码';
 
   @override
+  String get markdownTableLabel => '表格';
+
+  @override
+  String get markdownTableExportCsvTooltip => '导出 CSV';
+
+  @override
+  String get markdownTableDefaultFileNameStem => '表格';
+
+  @override
+  String get markdownTableCopiedCsvSnackbar => '已复制 CSV，长按复制可复制为图片';
+
+  @override
   String codeBlockCollapsedLines(int n) {
     return '… 已折叠 $n 行';
   }
@@ -10795,6 +10819,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get codeBlockDefaultFileNameStem => '程式碼';
+
+  @override
+  String get markdownTableLabel => '表格';
+
+  @override
+  String get markdownTableExportCsvTooltip => '匯出 CSV';
+
+  @override
+  String get markdownTableDefaultFileNameStem => '表格';
+
+  @override
+  String get markdownTableCopiedCsvSnackbar => '已複製 CSV，長按複製可複製為圖片';
 
   @override
   String codeBlockCollapsedLines(int n) {
