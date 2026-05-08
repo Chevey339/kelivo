@@ -1173,6 +1173,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get codeBlockDefaultFileNameStem => '代码';
 
   @override
+  String get markdownTableLabel => '表格';
+
+  @override
+  String get markdownTableExportCsvTooltip => '导出 CSV';
+
+  @override
+  String get markdownTableDefaultFileNameStem => '表格';
+
+  @override
+  String get markdownTableCopiedCsvSnackbar => '已复制 CSV，长按复制可复制为图片';
+
+  @override
   String codeBlockCollapsedLines(int n) {
     return '… 已折叠 $n 行';
   }
@@ -4775,6 +4787,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get debugPageCreateManyMessagesConversationButton => '创建 1024 条消息的对话';
 
   @override
+  String get debugPageCreateDailyMixedMarkdownConversationButton =>
+      '创建 3000 条日常混合 Markdown 消息';
+
+  @override
+  String get debugPageCreateLongReasoningConversationButton =>
+      '创建长思考链对话（128 条）';
+
+  @override
   String get debugPageCreatingButton => '创建中...';
 
   @override
@@ -4782,6 +4802,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get debugPageCreatingManyMessagesConversation => '正在创建 1024 条消息的对话...';
+
+  @override
+  String get debugPageCreatingDailyMixedMarkdownConversation =>
+      '正在创建 3000 条日常混合 Markdown 对话...';
+
+  @override
+  String get debugPageCreatingLongReasoningConversation => '正在创建长思考链调试对话...';
 
   @override
   String get debugPageNoCurrentAssistant => '当前没有助手。请先创建或选择一个助手。';
@@ -4804,6 +4831,16 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String debugPageManyMessagesConversationTitle(int count) {
     return '$count 条消息测试';
+  }
+
+  @override
+  String debugPageDailyMixedMarkdownConversationTitle(int count) {
+    return '$count 条日常混合 Markdown 消息测试';
+  }
+
+  @override
+  String debugPageLongReasoningConversationTitle(int count) {
+    return '$count 条长思考链测试';
   }
 
   @override
@@ -5983,6 +6020,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get codeBlockDefaultFileNameStem => '代码';
+
+  @override
+  String get markdownTableLabel => '表格';
+
+  @override
+  String get markdownTableExportCsvTooltip => '导出 CSV';
+
+  @override
+  String get markdownTableDefaultFileNameStem => '表格';
+
+  @override
+  String get markdownTableCopiedCsvSnackbar => '已复制 CSV，长按复制可复制为图片';
 
   @override
   String codeBlockCollapsedLines(int n) {
@@ -9587,6 +9636,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get debugPageCreateManyMessagesConversationButton => '创建 1024 条消息的对话';
 
   @override
+  String get debugPageCreateDailyMixedMarkdownConversationButton =>
+      '创建 3000 条日常混合 Markdown 消息';
+
+  @override
+  String get debugPageCreateLongReasoningConversationButton =>
+      '创建长思考链对话（128 条）';
+
+  @override
   String get debugPageCreatingButton => '创建中...';
 
   @override
@@ -9594,6 +9651,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get debugPageCreatingManyMessagesConversation => '正在创建 1024 条消息的对话...';
+
+  @override
+  String get debugPageCreatingDailyMixedMarkdownConversation =>
+      '正在创建 3000 条日常混合 Markdown 对话...';
+
+  @override
+  String get debugPageCreatingLongReasoningConversation => '正在创建长思考链调试对话...';
 
   @override
   String get debugPageNoCurrentAssistant => '当前没有助手。请先创建或选择一个助手。';
@@ -9616,6 +9680,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String debugPageManyMessagesConversationTitle(int count) {
     return '$count 条消息测试';
+  }
+
+  @override
+  String debugPageDailyMixedMarkdownConversationTitle(int count) {
+    return '$count 条日常混合 Markdown 消息测试';
+  }
+
+  @override
+  String debugPageLongReasoningConversationTitle(int count) {
+    return '$count 条长思考链测试';
   }
 
   @override
@@ -10795,6 +10869,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get codeBlockDefaultFileNameStem => '程式碼';
+
+  @override
+  String get markdownTableLabel => '表格';
+
+  @override
+  String get markdownTableExportCsvTooltip => '匯出 CSV';
+
+  @override
+  String get markdownTableDefaultFileNameStem => '表格';
+
+  @override
+  String get markdownTableCopiedCsvSnackbar => '已複製 CSV，長按複製可複製為圖片';
 
   @override
   String codeBlockCollapsedLines(int n) {
@@ -14399,6 +14485,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get debugPageCreateManyMessagesConversationButton => '建立 1024 條訊息的對話';
 
   @override
+  String get debugPageCreateDailyMixedMarkdownConversationButton =>
+      '建立 3000 條日常混合 Markdown 訊息';
+
+  @override
+  String get debugPageCreateLongReasoningConversationButton =>
+      '建立長思考鏈對話（128 條）';
+
+  @override
   String get debugPageCreatingButton => '建立中...';
 
   @override
@@ -14406,6 +14500,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get debugPageCreatingManyMessagesConversation => '正在建立 1024 條訊息的對話...';
+
+  @override
+  String get debugPageCreatingDailyMixedMarkdownConversation =>
+      '正在建立 3000 條日常混合 Markdown 對話...';
+
+  @override
+  String get debugPageCreatingLongReasoningConversation => '正在建立長思考鏈調試對話...';
 
   @override
   String get debugPageNoCurrentAssistant => '目前沒有助手。請先建立或選擇一個助手。';
@@ -14428,6 +14529,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String debugPageManyMessagesConversationTitle(int count) {
     return '$count 條訊息測試';
+  }
+
+  @override
+  String debugPageDailyMixedMarkdownConversationTitle(int count) {
+    return '$count 條日常混合 Markdown 訊息測試';
+  }
+
+  @override
+  String debugPageLongReasoningConversationTitle(int count) {
+    return '$count 條長思考鏈測試';
   }
 
   @override

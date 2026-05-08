@@ -18,6 +18,7 @@ class Lucide {
   static const IconData ArrowLeft = lucide.LucideIcons.arrowLeft;
   static const IconData Camera = lucide.LucideIcons.camera;
   static const IconData Image = lucide.LucideIcons.image;
+  static const IconData ImageDown = lucide.LucideIcons.imageDown;
   static const IconData Brush = lucide.LucideIcons.brush;
   static const IconData Crop = lucide.LucideIcons.crop;
   static const IconData Upload = lucide.LucideIcons.upload;

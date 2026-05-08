@@ -80,16 +80,55 @@ void main() {
         expect(message.reasoningStartAt, isNotNull);
         expect(message.reasoningFinishedAt, isNotNull);
         expect(message.reasoningSegmentsJson, contains('"segments"'));
-        expect(message.reasoningSegmentsJson, contains(message.reasoningText));
 
         final reasoningPayload =
             jsonDecode(message.reasoningSegmentsJson!) as Map<String, dynamic>;
+        final segments = reasoningPayload['segments'] as List<dynamic>;
+        final firstSegment = segments.first as Map<String, dynamic>;
+        expect(firstSegment['text'], message.reasoningText);
+
         final contentSplits =
             reasoningPayload['contentSplits'] as Map<String, dynamic>;
         expect(contentSplits['offsets'], [0]);
         expect(contentSplits['reasoningCounts'], [1]);
         expect(contentSplits['toolCounts'], [0]);
       }
+    });
+
+    test('creates 3000 mixed daily markdown messages', () {
+      final seed =
+          DebugConversationFactory.createDailyMixedMarkdownConversation(
+            title: 'daily mixed',
+            assistantId: 'assistant-daily',
+          );
+
+      expect(seed.conversation.assistantId, 'assistant-daily');
+      expect(seed.messages, hasLength(3000));
+      expect(seed.conversation.messageIds, [
+        for (final message in seed.messages) message.id,
+      ]);
+      expect(seed.totalContentBytes, greaterThan(0));
+
+      final userMessages = seed.messages.where(
+        (message) => message.role == 'user',
+      );
+      final assistantMessages = seed.messages.where(
+        (message) => message.role == 'assistant',
+      );
+      expect(userMessages, hasLength(1500));
+      expect(assistantMessages, hasLength(1500));
+      expect(
+        seed.messages.any((message) => message.content.contains('```')),
+        isTrue,
+      );
+      expect(
+        seed.messages.any((message) => message.content.contains('|')),
+        isTrue,
+      );
+      expect(
+        seed.messages.any((message) => message.content.contains('- [')),
+        isTrue,
+      );
     });
 
     test('rejects invalid generation sizes', () {
@@ -108,6 +147,15 @@ void main() {
           title: 'invalid',
           assistantId: null,
           contentBuilder: (index, role) => '$role-$index',
+          messageCount: 0,
+        ),
+        throwsArgumentError,
+      );
+
+      expect(
+        () => DebugConversationFactory.createDailyMixedMarkdownConversation(
+          title: 'invalid',
+          assistantId: null,
           messageCount: 0,
         ),
         throwsArgumentError,
