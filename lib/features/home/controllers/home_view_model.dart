@@ -10,6 +10,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
@@ -643,6 +644,33 @@ class HomeViewModel extends ChangeNotifier {
       }
     } catch (_) {}
 
+    onScrollToBottom?.call();
+  }
+
+  Future<void> toggleTemporaryConversation() async {
+    final convo = currentConversation;
+    if (convo == null || messages.isNotEmpty) return;
+
+    await _chatActions.flushConversationProgress(currentConversation);
+    if (!_contextProvider.mounted) return;
+
+    isProcessingFiles.value = false;
+
+    if (_chatService.isTemporaryConversation(convo.id)) {
+      await createNewConversation();
+      return;
+    }
+
+    final ap = _contextProvider.read<AssistantProvider>();
+    final conversation = await _chatService.createDraftConversation(
+      title: AppLocalizations.of(_contextProvider)!.temporaryChatTitle,
+      assistantId: ap.currentAssistantId,
+      temporary: true,
+    );
+
+    _chatController.setCurrentConversation(conversation);
+    _streamController.clearAllState();
+    notifyListeners();
     onScrollToBottom?.call();
   }
 

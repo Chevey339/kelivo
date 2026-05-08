@@ -68,6 +68,48 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
+class _TemporaryConversationEmptyState extends StatelessWidget {
+  const _TemporaryConversationEmptyState({required this.bottomContentPadding});
+
+  final double bottomContentPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(32, 24, 32, bottomContentPadding + 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Lucide.HatGlasses,
+                size: 72,
+                color: cs.onSurface.withValues(alpha: 0.42),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                l10n.temporaryChatEmptyMessage,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  height: 1.45,
+                  color: cs.onSurface.withValues(alpha: 0.68),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 String _compressContextErrorMessage(AppLocalizations l10n, String error) {
   return switch (error) {
     'no_messages' => l10n.compressContextNoMessages,
@@ -529,8 +571,9 @@ class _HomePageState extends State<HomePage>
 
     final modelInfo = getModelDisplayInfo(settings, assistant: assistant);
 
-    final title =
-        ((_controller.currentConversation?.title ?? '').trim().isNotEmpty)
+    final title = _controller.isTemporaryConversation
+        ? AppLocalizations.of(context)!.temporaryChatTitle
+        : ((_controller.currentConversation?.title ?? '').trim().isNotEmpty)
         ? _controller.currentConversation!.title
         : _controller.titleForLocale();
 
@@ -607,6 +650,15 @@ class _HomePageState extends State<HomePage>
           _controller.forceScrollToBottomSoon(animate: false);
         }
       },
+      onToggleTemporaryConversation: () async {
+        await _controller.toggleTemporaryConversation();
+        if (mounted) {
+          _controller.forceScrollToBottomSoon(animate: false);
+        }
+      },
+      canToggleTemporaryConversation:
+          _controller.canToggleTemporaryConversation,
+      temporaryConversationEnabled: _controller.isTemporaryConversation,
       onSelectModel: () => showModelSelectSheet(context),
       globalSearchMode: _controller.isGlobalSearchMode,
       globalSearchQuery: _controller.globalSearchQuery,
@@ -742,6 +794,13 @@ class _HomePageState extends State<HomePage>
         await _controller.createNewConversationAnimated();
         if (mounted) _controller.forceScrollToBottomSoon(animate: false);
       },
+      onToggleTemporaryConversation: () async {
+        await _controller.toggleTemporaryConversation();
+        if (mounted) _controller.forceScrollToBottomSoon(animate: false);
+      },
+      canToggleTemporaryConversation:
+          _controller.canToggleTemporaryConversation,
+      temporaryConversationEnabled: _controller.isTemporaryConversation,
       globalSearchMode: _controller.isGlobalSearchMode,
       globalSearchQuery: _controller.globalSearchQuery,
       onGlobalSearchQueryChanged: _controller.setGlobalSearchQuery,
@@ -1011,6 +1070,13 @@ class _HomePageState extends State<HomePage>
     required double bottomContentPadding,
     required EdgeInsetsGeometry dividerPadding,
   }) {
+    if (_controller.isTemporaryConversation &&
+        _controller.chatController.collapsedMessages.isEmpty) {
+      return _TemporaryConversationEmptyState(
+        bottomContentPadding: bottomContentPadding,
+      );
+    }
+
     final settings = context.watch<SettingsProvider>();
     final suggestionsEnabled =
         settings.suggestionModelProvider != null &&

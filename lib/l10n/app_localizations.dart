@@ -7772,6 +7772,24 @@ abstract class AppLocalizations {
   /// **'New Chat'**
   String get titleForLocale;
 
+  /// No description provided for @temporaryChatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary Chat'**
+  String get temporaryChatTitle;
+
+  /// No description provided for @temporaryChatEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary chats do not appear in history and will be deleted completely after you leave.'**
+  String get temporaryChatEmptyMessage;
+
+  /// No description provided for @temporaryChatToggleTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle temporary chat'**
+  String get temporaryChatToggleTooltip;
+
   /// No description provided for @quickPhraseBackTooltip.
   ///
   /// In en, this message translates to:

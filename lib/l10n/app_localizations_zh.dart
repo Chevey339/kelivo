@@ -4014,6 +4014,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get titleForLocale => '新对话';
 
   @override
+  String get temporaryChatTitle => '临时对话';
+
+  @override
+  String get temporaryChatEmptyMessage => '临时对话不显示在历史记录，退出后将被完全删除';
+
+  @override
+  String get temporaryChatToggleTooltip => '切换临时对话';
+
+  @override
   String get quickPhraseBackTooltip => '返回';
 
   @override
@@ -8863,6 +8872,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get titleForLocale => '新对话';
 
   @override
+  String get temporaryChatTitle => '临时对话';
+
+  @override
+  String get temporaryChatEmptyMessage => '临时对话不显示在历史记录，退出后将被完全删除';
+
+  @override
+  String get temporaryChatToggleTooltip => '切换临时对话';
+
+  @override
   String get quickPhraseBackTooltip => '返回';
 
   @override
@@ -13709,6 +13727,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get titleForLocale => '新對話';
+
+  @override
+  String get temporaryChatTitle => '臨時對話';
+
+  @override
+  String get temporaryChatEmptyMessage => '臨時對話不會顯示在歷史記錄中，退出後將被完全刪除';
+
+  @override
+  String get temporaryChatToggleTooltip => '切換臨時對話';
 
   @override
   String get quickPhraseBackTooltip => '返回';

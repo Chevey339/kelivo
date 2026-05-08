@@ -4175,6 +4175,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get titleForLocale => 'New Chat';
 
   @override
+  String get temporaryChatTitle => 'Temporary Chat';
+
+  @override
+  String get temporaryChatEmptyMessage =>
+      'Temporary chats do not appear in history and will be deleted completely after you leave.';
+
+  @override
+  String get temporaryChatToggleTooltip => 'Toggle temporary chat';
+
+  @override
   String get quickPhraseBackTooltip => 'Back';
 
   @override

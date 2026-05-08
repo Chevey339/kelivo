@@ -48,7 +48,10 @@ class HomeDesktopScaffold extends StatelessWidget {
     required this.onSelectConversation,
     required this.onNewConversation,
     required this.onCreateNewConversation,
+    required this.onToggleTemporaryConversation,
     required this.onSelectModel,
+    required this.canToggleTemporaryConversation,
+    required this.temporaryConversationEnabled,
     required this.globalSearchMode,
     required this.globalSearchQuery,
     required this.onGlobalSearchQueryChanged,
@@ -83,7 +86,10 @@ class HomeDesktopScaffold extends StatelessWidget {
   final void Function(String id) onSelectConversation;
   final VoidCallback onNewConversation;
   final Future<void> Function() onCreateNewConversation;
+  final Future<void> Function() onToggleTemporaryConversation;
   final VoidCallback onSelectModel;
+  final bool canToggleTemporaryConversation;
+  final bool temporaryConversationEnabled;
   final bool globalSearchMode;
   final String globalSearchQuery;
   final ValueChanged<String> onGlobalSearchQueryChanged;
@@ -548,9 +554,26 @@ class HomeDesktopScaffold extends StatelessWidget {
         size: 20,
         padding: const EdgeInsets.all(8),
         minSize: 40,
-        icon: Lucide.MessageCirclePlus,
+        semanticLabel: canToggleTemporaryConversation
+            ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
+            : AppLocalizations.of(context)!.titleForLocale,
+        icon: canToggleTemporaryConversation && !temporaryConversationEnabled
+            ? Lucide.MessageCircleDashed
+            : Lucide.MessageCirclePlus,
+        builder: canToggleTemporaryConversation && temporaryConversationEnabled
+            ? (color) => SvgPicture.asset(
+                'assets/icons/temporary_chat_checked.svg',
+                width: 20,
+                height: 20,
+                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+              )
+            : null,
         onTap: () async {
-          await onCreateNewConversation();
+          if (canToggleTemporaryConversation) {
+            await onToggleTemporaryConversation();
+          } else {
+            await onCreateNewConversation();
+          }
         },
       ),
       const SizedBox(width: 6),
