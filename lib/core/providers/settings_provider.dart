@@ -64,6 +64,7 @@ class SettingsProvider extends ChangeNotifier {
     'Claude',
     'Grok',
     'ByteDance',
+    'Fireworks AI',
   ];
   static const Set<String> _builtInProviderKeys = {
     ..._builtInProviderKeysInOrder,
@@ -4205,6 +4206,9 @@ class ProviderConfig {
       return 'https://api.x.ai/v1';
     }
     if (k.contains('deepseek')) return 'https://api.deepseek.com/v1';
+    if (k.contains('fireworks')) {
+      return 'https://api.fireworks.ai/inference/v1';
+    }
     if (RegExp(r'zhipu|智谱|glm').hasMatch(k)) {
       return 'https://open.bigmodel.cn/api/paas/v4';
     }
