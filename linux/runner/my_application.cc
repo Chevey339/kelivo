@@ -15,11 +15,44 @@ struct _MyApplication {
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
+static gchar* get_executable_directory() {
+  gchar* executable_path = g_file_read_link("/proc/self/exe", nullptr);
+  if (executable_path == nullptr) {
+    return g_get_current_dir();
+  }
+
+  gchar* executable_directory = g_path_get_dirname(executable_path);
+  g_free(executable_path);
+  return executable_directory;
+}
+
+static GdkPixbuf* load_window_icon() {
+  g_autofree gchar* executable_directory = get_executable_directory();
+  g_autofree gchar* icon_path = g_build_filename(executable_directory, "data",
+                                                 "flutter_assets", "assets",
+                                                 "app_icon.png", nullptr);
+
+  GError* error = nullptr;
+  GdkPixbuf* icon = gdk_pixbuf_new_from_file_at_scale(icon_path, 16, 16, TRUE,
+                                                      &error);
+  if (icon == nullptr) {
+    g_warning("Failed to load window icon: %s",
+              error != nullptr ? error->message : "unknown error");
+  }
+  g_clear_error(&error);
+  return icon;
+}
+
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
+  gtk_window_set_icon_name(window, "kelivo");
+  g_autoptr(GdkPixbuf) window_icon = load_window_icon();
+  if (window_icon != nullptr) {
+    gtk_window_set_icon(window, window_icon);
+  }
 
   // Use a header bar when running in GNOME as this is the common style used
   // by applications and is the setup most users will be using (e.g. Ubuntu
@@ -41,6 +74,12 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
+    if (window_icon != nullptr) {
+      GtkWidget* title_icon = gtk_image_new_from_pixbuf(window_icon);
+      gtk_widget_set_size_request(title_icon, 16, 16);
+      gtk_widget_show(title_icon);
+      gtk_header_bar_pack_start(header_bar, title_icon);
+    }
     gtk_header_bar_set_title(header_bar, "kelivo");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
