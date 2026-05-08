@@ -2080,9 +2080,13 @@
   "debugPageConversationToolsTitle": "Conversation tools",
   "debugPageCreateOversizedConversationButton": "Create oversized conversation (30 MB)",
   "debugPageCreateManyMessagesConversationButton": "Create 1024-message conversation",
+  "debugPageCreateDailyMixedMarkdownConversationButton": "Create 3000 daily mixed Markdown messages",
+  "debugPageCreateLongReasoningConversationButton": "Create long reasoning conversation (128 messages)",
   "debugPageCreatingButton": "Creating...",
   "debugPageCreatingOversizedConversation": "Creating a 30 MB oversized conversation...",
   "debugPageCreatingManyMessagesConversation": "Creating a 1024-message conversation...",
+  "debugPageCreatingDailyMixedMarkdownConversation": "Creating a 3000-message daily mixed Markdown conversation...",
+  "debugPageCreatingLongReasoningConversation": "Creating a long reasoning debug conversation...",
   "debugPageNoCurrentAssistant": "No current assistant. Create or select an assistant first.",
   "debugPageConversationCreated": "Created debug conversation with {count} messages.",
   "@debugPageConversationCreated": {
@@ -2104,6 +2108,18 @@
   },
   "debugPageManyMessagesConversationTitle": "{count}-message conversation test",
   "@debugPageManyMessagesConversationTitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "debugPageDailyMixedMarkdownConversationTitle": "{count}-message daily mixed Markdown test",
+  "@debugPageDailyMixedMarkdownConversationTitle": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "debugPageLongReasoningConversationTitle": "{count}-message long reasoning test",
+  "@debugPageLongReasoningConversationTitle": {
     "placeholders": {
       "count": {"type": "int"}
     }

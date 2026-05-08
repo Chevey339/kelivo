@@ -1686,9 +1686,13 @@
   "debugPageConversationToolsTitle": "对话工具",
   "debugPageCreateOversizedConversationButton": "创建超大对话（30 MB）",
   "debugPageCreateManyMessagesConversationButton": "创建 1024 条消息的对话",
+  "debugPageCreateDailyMixedMarkdownConversationButton": "创建 3000 条日常混合 Markdown 消息",
+  "debugPageCreateLongReasoningConversationButton": "创建长思考链对话（128 条）",
   "debugPageCreatingButton": "创建中...",
   "debugPageCreatingOversizedConversation": "正在创建 30 MB 超大对话...",
   "debugPageCreatingManyMessagesConversation": "正在创建 1024 条消息的对话...",
+  "debugPageCreatingDailyMixedMarkdownConversation": "正在创建 3000 条日常混合 Markdown 对话...",
+  "debugPageCreatingLongReasoningConversation": "正在创建长思考链调试对话...",
   "debugPageNoCurrentAssistant": "当前没有助手。请先创建或选择一个助手。",
   "debugPageConversationCreated": "已创建包含 {count} 条消息的调试对话。",
   "@debugPageConversationCreated": {
@@ -1716,6 +1720,22 @@
   },
   "debugPageManyMessagesConversationTitle": "{count} 条消息测试",
   "@debugPageManyMessagesConversationTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "debugPageDailyMixedMarkdownConversationTitle": "{count} 条日常混合 Markdown 消息测试",
+  "@debugPageDailyMixedMarkdownConversationTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "debugPageLongReasoningConversationTitle": "{count} 条长思考链测试",
+  "@debugPageLongReasoningConversationTitle": {
     "placeholders": {
       "count": {
         "type": "int"

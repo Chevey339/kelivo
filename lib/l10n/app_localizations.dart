@@ -9230,6 +9230,18 @@ abstract class AppLocalizations {
   /// **'Create 1024-message conversation'**
   String get debugPageCreateManyMessagesConversationButton;
 
+  /// No description provided for @debugPageCreateDailyMixedMarkdownConversationButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Create 3000 daily mixed Markdown messages'**
+  String get debugPageCreateDailyMixedMarkdownConversationButton;
+
+  /// No description provided for @debugPageCreateLongReasoningConversationButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Create long reasoning conversation (128 messages)'**
+  String get debugPageCreateLongReasoningConversationButton;
+
   /// No description provided for @debugPageCreatingButton.
   ///
   /// In en, this message translates to:
@@ -9247,6 +9259,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Creating a 1024-message conversation...'**
   String get debugPageCreatingManyMessagesConversation;
+
+  /// No description provided for @debugPageCreatingDailyMixedMarkdownConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating a 3000-message daily mixed Markdown conversation...'**
+  String get debugPageCreatingDailyMixedMarkdownConversation;
+
+  /// No description provided for @debugPageCreatingLongReasoningConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating a long reasoning debug conversation...'**
+  String get debugPageCreatingLongReasoningConversation;
 
   /// No description provided for @debugPageNoCurrentAssistant.
   ///
@@ -9277,6 +9301,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count}-message conversation test'**
   String debugPageManyMessagesConversationTitle(int count);
+
+  /// No description provided for @debugPageDailyMixedMarkdownConversationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}-message daily mixed Markdown test'**
+  String debugPageDailyMixedMarkdownConversationTitle(int count);
+
+  /// No description provided for @debugPageLongReasoningConversationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}-message long reasoning test'**
+  String debugPageLongReasoningConversationTitle(int count);
 
   /// No description provided for @debugPageOversizedConversationSeedText.
   ///

@@ -4969,6 +4969,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Create 1024-message conversation';
 
   @override
+  String get debugPageCreateDailyMixedMarkdownConversationButton =>
+      'Create 3000 daily mixed Markdown messages';
+
+  @override
+  String get debugPageCreateLongReasoningConversationButton =>
+      'Create long reasoning conversation (128 messages)';
+
+  @override
   String get debugPageCreatingButton => 'Creating...';
 
   @override
@@ -4978,6 +4986,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get debugPageCreatingManyMessagesConversation =>
       'Creating a 1024-message conversation...';
+
+  @override
+  String get debugPageCreatingDailyMixedMarkdownConversation =>
+      'Creating a 3000-message daily mixed Markdown conversation...';
+
+  @override
+  String get debugPageCreatingLongReasoningConversation =>
+      'Creating a long reasoning debug conversation...';
 
   @override
   String get debugPageNoCurrentAssistant =>
@@ -5001,6 +5017,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String debugPageManyMessagesConversationTitle(int count) {
     return '$count-message conversation test';
+  }
+
+  @override
+  String debugPageDailyMixedMarkdownConversationTitle(int count) {
+    return '$count-message daily mixed Markdown test';
+  }
+
+  @override
+  String debugPageLongReasoningConversationTitle(int count) {
+    return '$count-message long reasoning test';
   }
 
   @override

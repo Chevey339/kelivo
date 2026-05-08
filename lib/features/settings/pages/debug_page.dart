@@ -27,6 +27,11 @@ const debugCreateManyMessagesConversationButtonKey = Key(
 );
 
 @visibleForTesting
+const debugCreateDailyMixedMarkdownConversationButtonKey = Key(
+  'debug_create_daily_mixed_markdown_conversation_button',
+);
+
+@visibleForTesting
 const debugCreateLongReasoningConversationButtonKey = Key(
   'debug_create_long_reasoning_conversation_button',
 );
@@ -68,10 +73,27 @@ class _DebugPageState extends State<DebugPage> {
   Future<void> _createLongReasoningConversation() async {
     await _runAction(
       action: _DebugAction.longReasoning,
-      busyMessage: (_) => '正在创建长思考链调试对话...',
-      createSeed: (_, assistantId) =>
+      busyMessage: (l10n) => l10n.debugPageCreatingLongReasoningConversation,
+      createSeed: (l10n, assistantId) =>
           DebugConversationFactory.createLongReasoningConversation(
-            title: '长思考链调试对话',
+            title: l10n.debugPageLongReasoningConversationTitle(
+              DebugConversationFactory.longReasoningMessagesCount,
+            ),
+            assistantId: assistantId,
+          ),
+    );
+  }
+
+  Future<void> _createDailyMixedMarkdownConversation() async {
+    await _runAction(
+      action: _DebugAction.dailyMixedMarkdown,
+      busyMessage: (l10n) =>
+          l10n.debugPageCreatingDailyMixedMarkdownConversation,
+      createSeed: (l10n, assistantId) =>
+          DebugConversationFactory.createDailyMixedMarkdownConversation(
+            title: l10n.debugPageDailyMixedMarkdownConversationTitle(
+              DebugConversationFactory.dailyMixedMarkdownMessagesCount,
+            ),
             assistantId: assistantId,
           ),
     );
@@ -170,10 +192,21 @@ class _DebugPageState extends State<DebugPage> {
               ),
               const SizedBox(height: 12),
               IosTileButton(
+                key: debugCreateDailyMixedMarkdownConversationButtonKey,
+                label: _runningAction == _DebugAction.dailyMixedMarkdown
+                    ? l10n.debugPageCreatingButton
+                    : l10n.debugPageCreateDailyMixedMarkdownConversationButton,
+                icon: Lucide.FileText,
+                backgroundColor: cs.primary,
+                enabled: !_isBusy,
+                onTap: _createDailyMixedMarkdownConversation,
+              ),
+              const SizedBox(height: 12),
+              IosTileButton(
                 key: debugCreateLongReasoningConversationButtonKey,
                 label: _runningAction == _DebugAction.longReasoning
                     ? l10n.debugPageCreatingButton
-                    : '创建长思考链对话（128 条）',
+                    : l10n.debugPageCreateLongReasoningConversationButton,
                 icon: Lucide.Brain,
                 backgroundColor: cs.primary,
                 enabled: !_isBusy,
@@ -187,7 +220,7 @@ class _DebugPageState extends State<DebugPage> {
   }
 }
 
-enum _DebugAction { oversized, manyMessages, longReasoning }
+enum _DebugAction { oversized, manyMessages, dailyMixedMarkdown, longReasoning }
 
 class _DebugSectionCard extends StatelessWidget {
   const _DebugSectionCard({required this.title, required this.children});

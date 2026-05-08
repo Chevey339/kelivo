@@ -112,6 +112,48 @@ void main() {
     },
   );
 
+  testWidgets(
+    'DebugPage creates a 3000-message daily mixed markdown conversation',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final assistantProvider = _FakeAssistantProvider();
+      final chatService = _FakeChatService();
+
+      await tester.pumpWidget(
+        _harness(
+          assistantProvider: assistantProvider,
+          chatService: chatService,
+          home: const DebugPage(),
+        ),
+      );
+      await tester.pump();
+
+      final button = tester.widget<IosTileButton>(
+        find.byKey(debugCreateDailyMixedMarkdownConversationButtonKey),
+      );
+      button.onTap();
+      await tester.pump();
+
+      expect(chatService.restoredConversation?.assistantId, 'assistant-debug');
+      expect(chatService.restoredMessages, hasLength(3000));
+      expect(
+        chatService.restoredMessages!.any(
+          (message) => message.content.contains('```'),
+        ),
+        isTrue,
+      );
+      expect(
+        chatService.restoredMessages!.any(
+          (message) => message.content.contains('- ['),
+        ),
+        isTrue,
+      );
+
+      AppSnackBarManager().dismissAll();
+      await tester.pump(const Duration(seconds: 4));
+    },
+  );
+
   testWidgets('DebugPage creates a long reasoning conversation', (
     tester,
   ) async {
