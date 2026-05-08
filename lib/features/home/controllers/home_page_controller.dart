@@ -1078,12 +1078,13 @@ class HomePageController extends ChangeNotifier {
   }
 
   List<ChatMessage> _selectedCollapsedMessages() {
-    final collapsed = _chatController.collapsedMessages;
-    final selected = <ChatMessage>[];
-    for (final m in collapsed) {
-      if (_selectedItems.contains(m.id)) selected.add(m);
-    }
-    return selected;
+    final convo = currentConversation;
+    if (convo == null) return const <ChatMessage>[];
+    return ChatController.selectedCollapsedMessagesForExport(
+      collapsedMessages: _chatController.collapsedMessages,
+      selectedIds: _selectedItems,
+      storedMessages: _chatService.getMessages(convo.id),
+    );
   }
 
   Future<void> exportSelectedAsMarkdown() async {
@@ -1170,11 +1171,7 @@ class HomePageController extends ChangeNotifier {
   Future<void> confirmSelection() async {
     final convo = currentConversation;
     if (convo == null) return;
-    final collapsed = _chatController.collapsedMessages;
-    final selected = <ChatMessage>[];
-    for (final m in collapsed) {
-      if (_selectedItems.contains(m.id)) selected.add(m);
-    }
+    final selected = _selectedCollapsedMessages();
     if (selected.isEmpty) {
       final l10n = AppLocalizations.of(_context)!;
       showAppSnackBar(

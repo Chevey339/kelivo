@@ -26,6 +26,11 @@ const debugCreateManyMessagesConversationButtonKey = Key(
   'debug_create_many_messages_conversation_button',
 );
 
+@visibleForTesting
+const debugCreateLongReasoningConversationButtonKey = Key(
+  'debug_create_long_reasoning_conversation_button',
+);
+
 class _DebugPageState extends State<DebugPage> {
   _DebugAction? _runningAction;
 
@@ -56,6 +61,18 @@ class _DebugPageState extends State<DebugPage> {
             assistantId: assistantId,
             contentBuilder: (index, role) =>
                 l10n.debugPageManyMessagesSeedText(role, index + 1),
+          ),
+    );
+  }
+
+  Future<void> _createLongReasoningConversation() async {
+    await _runAction(
+      action: _DebugAction.longReasoning,
+      busyMessage: (_) => '正在创建长思考链调试对话...',
+      createSeed: (_, assistantId) =>
+          DebugConversationFactory.createLongReasoningConversation(
+            title: '长思考链调试对话',
+            assistantId: assistantId,
           ),
     );
   }
@@ -151,6 +168,17 @@ class _DebugPageState extends State<DebugPage> {
                 enabled: !_isBusy,
                 onTap: _createManyMessagesConversation,
               ),
+              const SizedBox(height: 12),
+              IosTileButton(
+                key: debugCreateLongReasoningConversationButtonKey,
+                label: _runningAction == _DebugAction.longReasoning
+                    ? l10n.debugPageCreatingButton
+                    : '创建长思考链对话（128 条）',
+                icon: Lucide.Brain,
+                backgroundColor: cs.primary,
+                enabled: !_isBusy,
+                onTap: _createLongReasoningConversation,
+              ),
             ],
           ),
         ],
@@ -159,7 +187,7 @@ class _DebugPageState extends State<DebugPage> {
   }
 }
 
-enum _DebugAction { oversized, manyMessages }
+enum _DebugAction { oversized, manyMessages, longReasoning }
 
 class _DebugSectionCard extends StatelessWidget {
   const _DebugSectionCard({required this.title, required this.children});

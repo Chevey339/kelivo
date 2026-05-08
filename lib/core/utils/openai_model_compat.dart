@@ -49,6 +49,13 @@ const OpenAIReasoningSupport _gpt54Support = OpenAIReasoningSupport(
 const OpenAIReasoningSupport _gpt54ProSupport = OpenAIReasoningSupport(
   supportedEfforts: <String>['medium', 'high', 'xhigh'],
 );
+const OpenAIReasoningSupport _gpt55Support = OpenAIReasoningSupport(
+  supportedEfforts: <String>['none', 'low', 'medium', 'high', 'xhigh'],
+  samplingRequiresNone: true,
+);
+const OpenAIReasoningSupport _gpt55ProSupport = OpenAIReasoningSupport(
+  supportedEfforts: <String>['medium', 'high', 'xhigh'],
+);
 const OpenAIReasoningSupport _deepSeekSupport = OpenAIReasoningSupport(
   supportedEfforts: <String>['low', 'medium', 'high', 'xhigh'],
 );
@@ -151,6 +158,15 @@ OpenAIReasoningSupport? openAIReasoningSupport(String modelId) {
   if (normalized.contains('deepseek')) return _deepSeekSupport;
   if (!isOpenAIGpt5FamilyModel(normalized)) return null;
 
+  if (_matchesModel(normalized, r'^gpt-5\.5-pro(?:$|[-.])')) {
+    return _gpt55ProSupport;
+  }
+  if (_matchesModel(normalized, r'^gpt-5\.5-(?:codex|chat-latest)(?:$|[-.])')) {
+    return null;
+  }
+  if (_matchesModel(normalized, r'^gpt-5\.5(?:$|[-.])')) {
+    return _gpt55Support;
+  }
   if (_matchesModel(normalized, r'^gpt-5\.4-pro(?:$|[-.])')) {
     return _gpt54ProSupport;
   }
