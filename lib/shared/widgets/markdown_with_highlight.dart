@@ -747,7 +747,14 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
   static bool _canOpenDollarMath(String input, int index) {
     if (index == 0) return true;
     final prev = input.codeUnitAt(index - 1);
-    return _isWhitespaceCodeUnit(prev) || prev == 0x28;
+    return _isWhitespaceCodeUnit(prev) || _isDollarMathOpeningBoundary(prev);
+  }
+
+  static bool _isDollarMathOpeningBoundary(int codeUnit) {
+    if (codeUnit == 0x28) return true; // (
+    if (codeUnit == 0x3A) return true; // :
+    if (codeUnit == 0xFF1A) return true; // full-width colon
+    return false;
   }
 
   static bool _canCloseDollarMath(String input, int index) {

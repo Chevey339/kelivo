@@ -381,6 +381,29 @@ void main() {
   );
 
   testWidgets(
+    'MarkdownWithCodeHighlight renders dollar math after prose punctuation',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+## 九、数学公式测试（需渲染器支持）
+
+行内公式：$E = mc^2$
+
+块级公式：
+
+$$
+\int_{a}^{b} f(x) \, dx = F(b) - F(a)
+$$
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNWidgets(2));
+      expect(find.textContaining(r'$E = mc^2$'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps table pipes from widening dollar math',
     (tester) async {
       await tester.pumpWidget(
