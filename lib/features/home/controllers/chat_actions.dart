@@ -142,6 +142,63 @@ class ChatActions {
     return messageGenerationService.isReasoningEnabled(budget);
   }
 
+  @visibleForTesting
+  static StreamSubscription<T> listenSequentiallyToStream<T>({
+    required Stream<T> stream,
+    required Future<void> Function(T chunk) onData,
+    required Future<void> Function(Object error, StackTrace stackTrace) onError,
+    required Future<void> Function() onDone,
+  }) {
+    late final StreamSubscription<T> subscription;
+    var terminalStarted = false;
+
+    Future<void> handleError(Object error, StackTrace stackTrace) async {
+      if (terminalStarted) return;
+      terminalStarted = true;
+      try {
+        await onError(error, stackTrace);
+      } finally {
+        await subscription.cancel();
+      }
+    }
+
+    Future<void> handleDone() async {
+      if (terminalStarted) return;
+      terminalStarted = true;
+      try {
+        await onDone();
+      } catch (error, stackTrace) {
+        terminalStarted = false;
+        await handleError(error, stackTrace);
+      }
+    }
+
+    subscription = stream.listen(
+      (chunk) {
+        if (terminalStarted) return;
+        subscription.pause();
+        Future<void>.sync(() => onData(chunk)).then(
+          (_) {
+            if (!terminalStarted) {
+              subscription.resume();
+            }
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            unawaited(handleError(error, stackTrace));
+          },
+        );
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        unawaited(handleError(error, stackTrace));
+      },
+      onDone: () {
+        unawaited(handleDone());
+      },
+      cancelOnError: true,
+    );
+    return subscription;
+  }
+
   bool _supportsAudioAttachmentsForProvider(
     SettingsProvider settings, {
     required String providerKey,
@@ -800,21 +857,11 @@ class ChatActions {
       );
 
       await _conversationStreams[conversationId]?.cancel();
-      // Use a StreamSubscription that processes chunks sequentially.
-      // With the default listen() + async callback, Dart does NOT await the
-      // returned Future, so multiple chunks interleave at await points. This
-      // causes later-resuming handlers to overwrite final content with stale
-      // partial snapshots. By pausing/resuming the subscription around each
-      // async handler, we ensure serial processing.
-      late final StreamSubscription<ChatStreamChunk> sub;
-      sub = stream.listen(
-        (chunk) {
-          sub.pause();
-          _handleStreamChunk(chunk, state).whenComplete(() => sub.resume());
-        },
-        onError: (e) => _handleStreamError(e, state),
+      final sub = listenSequentiallyToStream<ChatStreamChunk>(
+        stream: stream,
+        onData: (chunk) => _handleStreamChunk(chunk, state),
+        onError: (error, stackTrace) => _handleStreamError(error, state),
         onDone: () => _handleStreamDone(state),
-        cancelOnError: true,
       );
       _conversationStreams[conversationId] = sub;
     } catch (e) {
