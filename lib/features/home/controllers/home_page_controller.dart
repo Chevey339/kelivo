@@ -641,6 +641,21 @@ class HomePageController extends ChangeNotifier {
   }) async {
     if (currentConversation == null) return;
 
+    final collapsedIndex = _chatController.indexOfCollapsedMessageId(
+      message.id,
+    );
+    final anchorIndex = message.role == 'assistant'
+        ? _findPreviousVisibleUserMessageIndex(collapsedIndex)
+        : collapsedIndex;
+    if (anchorIndex >= 0) {
+      _scrollCtrl.suspendAutoStickForUserInteraction(
+        anchorIndex: anchorIndex,
+        anchorAlignment: 0,
+      );
+    } else {
+      _scrollCtrl.handleUserScrollIntent();
+    }
+
     final settings = _context.read<SettingsProvider>();
     if (settings.regenerateDeleteTrailingMessages) {
       final versioning = _messageGenerationService
@@ -665,6 +680,15 @@ class HomePageController extends ChangeNotifier {
     if (success) {
       notifyListeners();
     }
+  }
+
+  int _findPreviousVisibleUserMessageIndex(int startIndex) {
+    final collapsed = _chatController.collapsedMessages;
+    if (startIndex < 0 || collapsed.isEmpty) return -1;
+    for (var i = startIndex.clamp(0, collapsed.length - 1); i >= 0; i--) {
+      if (collapsed[i].role == 'user') return i;
+    }
+    return -1;
   }
 
   Future<void> submitRecoveredAskUserAnswer(

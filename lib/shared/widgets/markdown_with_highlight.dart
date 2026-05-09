@@ -41,11 +41,13 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     required this.text,
     this.onCitationTap,
     this.baseStyle,
+    this.onUserResizesContent,
   });
 
   final String text;
   final void Function(String id)? onCitationTap;
   final TextStyle? baseStyle; // optional override for base markdown text style
+  final VoidCallback? onUserResizesContent;
 
   // Tunable: list scaling compensation exponent.
   // When chat scale s != 1.0, lists often feel slightly off compared to body.
@@ -102,8 +104,14 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     components.insert(0, AtxHeadingMd());
     // Ensure fenced code blocks take precedence over headings and other blocks
     // so lines like "# comment" inside code fences are not parsed as headings.
-    components.insert(0, FencedCodeBlockMd());
-    components.insert(0, DetailsHtmlMd());
+    components.insert(
+      0,
+      FencedCodeBlockMd(onUserResizesContent: onUserResizesContent),
+    );
+    components.insert(
+      0,
+      DetailsHtmlMd(onUserResizesContent: onUserResizesContent),
+    );
     // Inline components: keep defaults but make link parsing line-scoped
     final inlineComponents = List<MarkdownComponent>.from(
       MarkdownComponent.inlineComponents,
@@ -389,7 +397,11 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
         } else if (lang.toLowerCase() == 'plantuml') {
           return PlantUMLBlock(code: code);
         }
-        return _CollapsibleCodeBlock(language: lang, code: code);
+        return _CollapsibleCodeBlock(
+          language: lang,
+          code: code,
+          onUserResizesContent: onUserResizesContent,
+        );
       },
     );
 
@@ -922,8 +934,13 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
 class _CollapsibleCodeBlock extends StatefulWidget {
   final String language;
   final String code;
+  final VoidCallback? onUserResizesContent;
 
-  const _CollapsibleCodeBlock({required this.language, required this.code});
+  const _CollapsibleCodeBlock({
+    required this.language,
+    required this.code,
+    this.onUserResizesContent,
+  });
 
   @override
   State<_CollapsibleCodeBlock> createState() => _CollapsibleCodeBlockState();
@@ -1187,6 +1204,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
   }
 
   void _toggleExpanded(SettingsProvider settings) {
+    widget.onUserResizesContent?.call();
     final nextExpanded = !_isEffectivelyExpanded(settings);
     setState(() {
       _manuallyToggled = true;
@@ -2683,6 +2701,10 @@ class SoftHrLine extends BlockMd {
 
 // Robust fenced code block that takes precedence over other blocks
 class FencedCodeBlockMd extends BlockMd {
+  FencedCodeBlockMd({this.onUserResizesContent});
+
+  final VoidCallback? onUserResizesContent;
+
   @override
   // CommonMark-style fences:
   // - fence length is variable (>= 3)
@@ -2704,7 +2726,11 @@ class FencedCodeBlockMd extends BlockMd {
     } else if (langLower == 'plantuml') {
       return PlantUMLBlock(code: code);
     }
-    return _CollapsibleCodeBlock(language: lang, code: code);
+    return _CollapsibleCodeBlock(
+      language: lang,
+      code: code,
+      onUserResizesContent: onUserResizesContent,
+    );
   }
 }
 
@@ -3256,6 +3282,10 @@ class BackslashEscapeMd extends InlineMd {
 }
 
 class DetailsHtmlMd extends BlockMd {
+  DetailsHtmlMd({this.onUserResizesContent});
+
+  final VoidCallback? onUserResizesContent;
+
   @override
   RegExp get exp => RegExp(
     r'^\ *?(?:' + expString + r")$",
@@ -3292,6 +3322,7 @@ class DetailsHtmlMd extends BlockMd {
       body: body,
       initiallyExpanded: initiallyExpanded,
       config: config,
+      onUserResizesContent: onUserResizesContent,
     );
   }
 
@@ -3319,12 +3350,14 @@ class _DetailsHtmlBlock extends StatefulWidget {
     required this.body,
     required this.initiallyExpanded,
     required this.config,
+    this.onUserResizesContent,
   });
 
   final String summary;
   final String body;
   final bool initiallyExpanded;
   final GptMarkdownConfig config;
+  final VoidCallback? onUserResizesContent;
 
   @override
   State<_DetailsHtmlBlock> createState() => _DetailsHtmlBlockState();
@@ -3367,7 +3400,10 @@ class _DetailsHtmlBlockState extends State<_DetailsHtmlBlock> {
         mainAxisSize: MainAxisSize.min,
         children: [
           IosCardPress(
-            onTap: () => setState(() => _expanded = !_expanded),
+            onTap: () {
+              widget.onUserResizesContent?.call();
+              setState(() => _expanded = !_expanded);
+            },
             baseColor: Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),

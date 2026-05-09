@@ -267,4 +267,55 @@ void main() {
 
     isProcessingFiles.dispose();
   });
+
+  testWidgets('触摸消息列表会通知用户滚动意图', (tester) async {
+    final scrollControllers = ChatIndexedScrollControllers();
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    final messages = List<ChatMessage>.generate(
+      40,
+      (index) => ChatMessage(
+        id: 'message-$index',
+        role: index.isEven ? 'user' : 'assistant',
+        content: 'Message $index',
+        conversationId: 'conversation-1',
+      ),
+    );
+    var intentCount = 0;
+
+    await tester.pumpWidget(
+      _harness(
+        MessageListView(
+          scrollControllers: scrollControllers,
+          messages: messages,
+          byGroup: {
+            for (final message in messages) message.id: [message],
+          },
+          versionSelections: const {},
+          reasoning: const {},
+          reasoningSegments: const {},
+          contentSplits: const {},
+          toolParts: const {},
+          translations: const {},
+          selecting: false,
+          selectedItems: const {},
+          dividerPadding: EdgeInsets.zero,
+          isProcessingFiles: isProcessingFiles,
+          onUserScrollIntent: () {
+            intentCount++;
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(ScrollablePositionedList)),
+    );
+    await tester.pump();
+    await gesture.up();
+
+    expect(intentCount, 1);
+
+    isProcessingFiles.dispose();
+  });
 }

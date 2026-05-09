@@ -69,6 +69,7 @@ class ChatScrollPositionTracker {
   ChatVisibleRange _visibleRange = ChatVisibleRange.empty;
   bool _isUserScrolling = false;
   bool _isProgrammaticScroll = false;
+  double _lastUserScrollDelta = 0;
   int _jumpGeneration = 0;
 
   ChatVisibleRange get visibleRange => _visibleRange;
@@ -78,6 +79,15 @@ class ChatScrollPositionTracker {
   int get lastVisibleIndex => _visibleRange.lastIndex;
   bool get isAtTop => _visibleRange.isAtTop;
   bool get isAtBottom => _visibleRange.isAtBottom;
+  bool get lastUserScrollWasTowardBottom => _lastUserScrollDelta > 0;
+
+  double? leadingEdgeForIndex(int index) {
+    for (final position
+        in _controllers.itemPositionsListener.itemPositions.value) {
+      if (position.index == index) return position.itemLeadingEdge;
+    }
+    return null;
+  }
 
   void _onPositionsChanged() {
     final count = _itemCount();
@@ -146,6 +156,7 @@ class ChatScrollPositionTracker {
   void _onOffsetChanged(double delta) {
     if (delta.abs() < 0.5) return;
     if (_isProgrammaticScroll) return;
+    _lastUserScrollDelta = delta;
     if (!_isUserScrolling) {
       _isUserScrolling = true;
       _onChanged();
@@ -183,6 +194,7 @@ class ChatScrollPositionTracker {
     final target = index.clamp(0, count);
     final generation = ++_jumpGeneration;
     _isUserScrolling = false;
+    _lastUserScrollDelta = 0;
     _isProgrammaticScroll = true;
     _scrollIdleTimer?.cancel();
 
@@ -211,6 +223,7 @@ class ChatScrollPositionTracker {
 
   void resetUserScrolling() {
     _isUserScrolling = false;
+    _lastUserScrollDelta = 0;
     _scrollIdleTimer?.cancel();
     _onChanged();
   }

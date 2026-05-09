@@ -1070,6 +1070,12 @@ class _HomePageState extends State<HomePage>
         onToggleReasoningSegment: (messageId, segmentIndex) {
           _controller.toggleReasoningSegment(messageId, segmentIndex);
         },
+        onUserScrollIntent: _controller.scrollCtrl.handleUserScrollIntent,
+        onUserResizesMessageContent: (message, index) {
+          _controller.scrollCtrl.suspendAutoStickForUserInteraction(
+            anchorIndex: index,
+          );
+        },
         onMessageVisible: _controller.restoreVisibleMessageUiState,
         onBottomAnchorAlignmentChanged: _controller.updateBottomAnchorAlignment,
       ),

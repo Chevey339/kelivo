@@ -636,6 +636,7 @@ class ChatMessageWidget extends StatefulWidget {
   final ValueChanged<String>? onSuggestionTap;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAskUserAnswer;
+  final VoidCallback? onUserResizesMessageContent;
 
   const ChatMessageWidget({
     super.key,
@@ -678,6 +679,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.suggestions = const <String>[],
     this.onSuggestionTap,
     this.onRecoveredAskUserAnswer,
+    this.onUserResizesMessageContent,
   });
 
   @override
@@ -1195,6 +1197,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       child: _ToolCallItem(
         part: part,
         onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
+        onUserResizesMessageContent: widget.onUserResizesMessageContent,
       ),
     );
   }
@@ -1306,6 +1309,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               ),
                               child: MarkdownWithCodeHighlight(
                                 text: visualText,
+                                onUserResizesContent:
+                                    widget.onUserResizesMessageContent,
                                 baseStyle: TextStyle(
                                   fontSize: baseUser,
                                   height: 1.45,
@@ -1782,6 +1787,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       assistantContent = MarkdownWithCodeHighlight(
         text: visualContent,
         onCitationTap: (id) => _handleCitationTap(id),
+        onUserResizesContent: widget.onUserResizesMessageContent,
         baseStyle: TextStyle(fontSize: baseAssistant, height: 1.5),
       );
     } else {
@@ -2122,12 +2128,16 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   finishedAt: usingInlineThink
                       ? null
                       : widget.reasoningFinishedAt,
+                  onResizeContent: widget.onUserResizesMessageContent,
                   onToggle: usingInlineThink
-                      ? () => setState(() {
-                          _inlineThinkExpanded =
-                              !(_inlineThinkExpanded ?? true);
-                          _inlineThinkManuallyToggled = true;
-                        })
+                      ? () {
+                          widget.onUserResizesMessageContent?.call();
+                          setState(() {
+                            _inlineThinkExpanded =
+                                !(_inlineThinkExpanded ?? true);
+                            _inlineThinkManuallyToggled = true;
+                          });
+                        }
                       : widget.onToggleReasoning,
                 ),
               ];
@@ -2171,6 +2181,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   _ChainOfThoughtCard(
                     steps: block.steps,
                     onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
+                    onUserResizesMessageContent:
+                        widget.onUserResizesMessageContent,
                   ),
                 );
               }
@@ -2304,6 +2316,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                             text: translationText,
                                             onCitationTap: (id) =>
                                                 _handleCitationTap(id),
+                                            onUserResizesContent: widget
+                                                .onUserResizesMessageContent,
                                             baseStyle: TextStyle(
                                               fontSize: baseTranslation,
                                               height: 1.4,
@@ -3374,6 +3388,7 @@ class ReasoningSegment {
   final bool loading;
   final DateTime? startAt;
   final DateTime? finishedAt;
+  final VoidCallback? onResizeContent;
   final VoidCallback? onToggle;
   // Index of the first tool call that occurs after this segment starts.
   final int toolStartIndex;
@@ -3384,6 +3399,7 @@ class ReasoningSegment {
     required this.loading,
     this.startAt,
     this.finishedAt,
+    this.onResizeContent,
     this.onToggle,
     this.toolStartIndex = 0,
   });
@@ -3441,11 +3457,16 @@ const double _timelineBottomLineStart =
     _timelineStepPaddingV + _timelineIconSize + _timelineLineGap;
 
 class _ChainOfThoughtCard extends StatefulWidget {
-  const _ChainOfThoughtCard({required this.steps, this.onRecoveredAnswer});
+  const _ChainOfThoughtCard({
+    required this.steps,
+    this.onRecoveredAnswer,
+    this.onUserResizesMessageContent,
+  });
 
   final List<_TimelineStepData> steps;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
+  final VoidCallback? onUserResizesMessageContent;
 
   @override
   State<_ChainOfThoughtCard> createState() => _ChainOfThoughtCardState();
@@ -3495,7 +3516,10 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
           children: [
             if (canCollapse)
               IosCardPress(
-                onTap: () => setState(() => _showAllSteps = !_showAllSteps),
+                onTap: () {
+                  widget.onUserResizesMessageContent?.call();
+                  setState(() => _showAllSteps = !_showAllSteps);
+                },
                 borderRadius: BorderRadius.circular(12),
                 baseColor: Colors.transparent,
                 pressedScale: 1,
@@ -3541,6 +3565,8 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                   step: step.reasoning!,
                   isFirst: index == 0,
                   isLast: index == visibleSteps.length - 1,
+                  onUserResizesMessageContent:
+                      widget.onUserResizesMessageContent,
                 );
               }
               return _ChainOfThoughtToolStep(
@@ -3548,6 +3574,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                 isFirst: index == 0,
                 isLast: index == visibleSteps.length - 1,
                 onRecoveredAnswer: widget.onRecoveredAnswer,
+                onUserResizesMessageContent: widget.onUserResizesMessageContent,
               );
             }),
           ],
@@ -3661,11 +3688,13 @@ class _ChainOfThoughtReasoningStep extends StatefulWidget {
     required this.step,
     required this.isFirst,
     required this.isLast,
+    this.onUserResizesMessageContent,
   });
 
   final ReasoningSegment step;
   final bool isFirst;
   final bool isLast;
+  final VoidCallback? onUserResizesMessageContent;
 
   @override
   State<_ChainOfThoughtReasoningStep> createState() =>
@@ -3802,6 +3831,9 @@ class _ChainOfThoughtReasoningStepState
         return RepaintBoundary(
           child: MarkdownWithCodeHighlight(
             text: text.isNotEmpty ? text : '…',
+            onUserResizesContent:
+                widget.step.onResizeContent ??
+                widget.onUserResizesMessageContent,
             baseStyle: const TextStyle(fontSize: 12.5, height: 1.32),
           ),
         );
@@ -3880,6 +3912,7 @@ class _ChainOfThoughtToolStep extends StatefulWidget {
     required this.isFirst,
     required this.isLast,
     this.onRecoveredAnswer,
+    this.onUserResizesMessageContent,
   });
 
   final ToolUIPart part;
@@ -3887,6 +3920,7 @@ class _ChainOfThoughtToolStep extends StatefulWidget {
   final bool isLast;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
+  final VoidCallback? onUserResizesMessageContent;
 
   @override
   State<_ChainOfThoughtToolStep> createState() =>
@@ -4102,7 +4136,10 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
       isFirst: widget.isFirst,
       isLast: widget.isLast,
       onTap: _isAskUser
-          ? () => setState(() => _askUserExpanded = !askUserExpanded)
+          ? () {
+              widget.onUserResizesMessageContent?.call();
+              setState(() => _askUserExpanded = !askUserExpanded);
+            }
           : () => _showDetail(context),
       extra: extra,
       indicator: _isAskUser
@@ -4119,10 +4156,16 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
 }
 
 class _ToolCallItem extends StatefulWidget {
-  const _ToolCallItem({required this.part, this.onRecoveredAnswer});
+  const _ToolCallItem({
+    required this.part,
+    this.onRecoveredAnswer,
+    this.onUserResizesMessageContent,
+  });
+
   final ToolUIPart part;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
+  final VoidCallback? onUserResizesMessageContent;
 
   @override
   State<_ToolCallItem> createState() => _ToolCallItemState();
@@ -4231,6 +4274,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
       return _AskUserToolCard(
         part: widget.part,
         onRecoveredAnswer: widget.onRecoveredAnswer,
+        onUserResizesMessageContent: widget.onUserResizesMessageContent,
       );
     }
 
@@ -4833,11 +4877,16 @@ class _ToolCallItemState extends State<_ToolCallItem> {
 }
 
 class _AskUserToolCard extends StatefulWidget {
-  const _AskUserToolCard({required this.part, this.onRecoveredAnswer});
+  const _AskUserToolCard({
+    required this.part,
+    this.onRecoveredAnswer,
+    this.onUserResizesMessageContent,
+  });
 
   final ToolUIPart part;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
+  final VoidCallback? onUserResizesMessageContent;
 
   @override
   State<_AskUserToolCard> createState() => _AskUserToolCardState();
@@ -4876,7 +4925,10 @@ class _AskUserToolCardState extends State<_AskUserToolCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           IosCardPress(
-            onTap: () => setState(() => _expanded = !expanded),
+            onTap: () {
+              widget.onUserResizesMessageContent?.call();
+              setState(() => _expanded = !expanded);
+            },
             borderRadius: BorderRadius.circular(10),
             baseColor: Colors.transparent,
             pressedScale: 1,
@@ -5964,7 +6016,6 @@ class _ReasoningSectionState extends State<_ReasoningSection>
     final settings = context.watch<SettingsProvider>();
     final loading = widget.loading;
 
-    // Android-like surface style
     final curve = const Cubic(0.2, 0.8, 0.2, 1);
 
     // Build a compact header with optional scrolling preview when loading

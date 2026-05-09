@@ -44,6 +44,8 @@ typedef OnRecoveredAskUserAnswer =
       ToolUIPart part,
       AskUserResult result,
     );
+typedef OnUserResizesMessageContent =
+    void Function(ChatMessage message, int index);
 
 /// Data class for reasoning UI state
 class ReasoningUiState {
@@ -118,6 +120,8 @@ class MessageListView extends StatefulWidget {
     this.onToggleReasoning,
     this.onToggleTranslation,
     this.onToggleReasoningSegment,
+    this.onUserScrollIntent,
+    this.onUserResizesMessageContent,
     this.onMessageVisible,
     this.onBottomAnchorAlignmentChanged,
     this.buildPinnedStreamingIndicator,
@@ -182,6 +186,8 @@ class MessageListView extends StatefulWidget {
   final void Function(String messageId)? onToggleTranslation;
   final void Function(String messageId, int segmentIndex)?
   onToggleReasoningSegment;
+  final VoidCallback? onUserScrollIntent;
+  final OnUserResizesMessageContent? onUserResizesMessageContent;
   final void Function(ChatMessage message, int index)? onMessageVisible;
   final ValueChanged<double>? onBottomAnchorAlignmentChanged;
   final Widget Function()? buildPinnedStreamingIndicator;
@@ -370,42 +376,51 @@ class _MessageListViewState extends State<MessageListView> {
                   bottomPadding: bottomPadding,
                 );
             widget.onBottomAnchorAlignmentChanged?.call(bottomAnchorAlignment);
-            final list = ScrollablePositionedList.builder(
-              itemScrollController:
-                  widget.scrollControllers.itemScrollController,
-              itemPositionsListener:
-                  widget.scrollControllers.itemPositionsListener,
-              scrollOffsetListener:
-                  widget.scrollControllers.scrollOffsetListener,
-              initialScrollIndex: bottomAnchorIndex,
-              initialAlignment: bottomAnchorAlignment,
-              padding: EdgeInsets.fromLTRB(horizontalPad, 8, horizontalPad, 0),
-              itemCount: itemCount,
-              minCacheExtent: scrollCacheExtent,
-              addAutomaticKeepAlives: false,
-              addRepaintBoundaries: true,
-              itemBuilder: (context, index) {
-                if (index == bottomAnchorIndex) {
+            final list = Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (_) => widget.onUserScrollIntent?.call(),
+              child: ScrollablePositionedList.builder(
+                itemScrollController:
+                    widget.scrollControllers.itemScrollController,
+                itemPositionsListener:
+                    widget.scrollControllers.itemPositionsListener,
+                scrollOffsetListener:
+                    widget.scrollControllers.scrollOffsetListener,
+                initialScrollIndex: bottomAnchorIndex,
+                initialAlignment: bottomAnchorAlignment,
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPad,
+                  8,
+                  horizontalPad,
+                  0,
+                ),
+                itemCount: itemCount,
+                minCacheExtent: scrollCacheExtent,
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
+                itemBuilder: (context, index) {
+                  if (index == bottomAnchorIndex) {
+                    widget.itemBuildObserver?.call(index);
+                    return SizedBox(
+                      key: const ValueKey('message-list-bottom-anchor'),
+                      height: bottomPadding,
+                    );
+                  }
+                  if (index < 0 || index >= widget.messages.length) {
+                    return const SizedBox.shrink();
+                  }
                   widget.itemBuildObserver?.call(index);
-                  return SizedBox(
-                    key: const ValueKey('message-list-bottom-anchor'),
-                    height: bottomPadding,
+                  _scheduleVisibleMessage(widget.messages[index], index);
+                  return _buildMessageItem(
+                    context,
+                    index: index,
+                    isProcessingFiles: isProcessing,
+                    settings: settings,
+                    assistant: assistant,
+                    latestAssistantIndex: latestAssistantIndex,
                   );
-                }
-                if (index < 0 || index >= widget.messages.length) {
-                  return const SizedBox.shrink();
-                }
-                widget.itemBuildObserver?.call(index);
-                _scheduleVisibleMessage(widget.messages[index], index);
-                return _buildMessageItem(
-                  context,
-                  index: index,
-                  isProcessingFiles: isProcessing,
-                  settings: settings,
-                  assistant: assistant,
-                  latestAssistantIndex: latestAssistantIndex,
-                );
-              },
+                },
+              ),
             );
 
             return Stack(
@@ -738,14 +753,20 @@ class _MessageListViewState extends State<MessageListView> {
       reasoningStartAt: (message.role == 'assistant') ? r?.startAt : null,
       reasoningFinishedAt: (message.role == 'assistant') ? r?.finishedAt : null,
       onToggleReasoning: (message.role == 'assistant' && r != null)
-          ? () => widget.onToggleReasoning?.call(message.id)
+          ? () {
+              widget.onUserResizesMessageContent?.call(message, index);
+              widget.onToggleReasoning?.call(message.id);
+            }
           : null,
       translationExpanded: t?.expanded ?? true,
       onToggleTranslation:
           (message.translation != null &&
               message.translation!.isNotEmpty &&
               t != null)
-          ? () => widget.onToggleTranslation?.call(message.id)
+          ? () {
+              widget.onUserResizesMessageContent?.call(message, index);
+              widget.onToggleTranslation?.call(message.id);
+            }
           : null,
       onRegenerate: message.role == 'assistant'
           ? () => widget.onRegenerateMessage?.call(message)
@@ -812,10 +833,22 @@ class _MessageListViewState extends State<MessageListView> {
                           entry.value.text.isNotEmpty,
                       startAt: entry.value.startAt,
                       finishedAt: entry.value.finishedAt,
-                      onToggle: () => widget.onToggleReasoningSegment?.call(
-                        message.id,
-                        entry.key,
-                      ),
+                      onResizeContent: () {
+                        widget.onUserResizesMessageContent?.call(
+                          message,
+                          index,
+                        );
+                      },
+                      onToggle: () {
+                        widget.onUserResizesMessageContent?.call(
+                          message,
+                          index,
+                        );
+                        widget.onToggleReasoningSegment?.call(
+                          message.id,
+                          entry.key,
+                        );
+                      },
                       toolStartIndex: entry.value.toolStartIndex,
                     ),
                   )
@@ -829,6 +862,8 @@ class _MessageListViewState extends State<MessageListView> {
           ? null
           : (part, result) =>
                 widget.onRecoveredAskUserAnswer!(message, part, result),
+      onUserResizesMessageContent: () =>
+          widget.onUserResizesMessageContent?.call(message, index),
     );
   }
 }

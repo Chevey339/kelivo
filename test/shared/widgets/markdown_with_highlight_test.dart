@@ -35,6 +35,7 @@ Widget _markdownHarness(
   String text, {
   double? width,
   Map<String, Object>? preferences,
+  VoidCallback? onUserResizesContent,
 }) {
   SharedPreferences.setMockInitialValues(preferences ?? {});
   return ChangeNotifierProvider(
@@ -44,12 +45,18 @@ Widget _markdownHarness(
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: width == null
-            ? MarkdownWithCodeHighlight(text: text)
+            ? MarkdownWithCodeHighlight(
+                text: text,
+                onUserResizesContent: onUserResizesContent,
+              )
             : Align(
                 alignment: Alignment.topLeft,
                 child: SizedBox(
                   width: width,
-                  child: MarkdownWithCodeHighlight(text: text),
+                  child: MarkdownWithCodeHighlight(
+                    text: text,
+                    onUserResizesContent: onUserResizesContent,
+                  ),
                 ),
               ),
       ),
@@ -544,9 +551,9 @@ void main() {}
       _markdownHarness(
         '''
 ```dart
-line1
-line2
-line3
+toggleOnly1
+toggleOnly2
+toggleOnly3
 ```
 ''',
         preferences: const {
@@ -559,14 +566,67 @@ line3
     await tester.pumpAndSettle();
 
     expect(find.text('Expand'), findsOneWidget);
-    expect(find.textContaining('line3'), findsNothing);
+    expect(find.textContaining('toggleOnly3'), findsNothing);
     expect(find.textContaining('folded'), findsNothing);
 
     await tester.tap(find.text('Expand'));
     await tester.pumpAndSettle();
 
     expect(find.text('Collapse'), findsOneWidget);
-    expect(find.textContaining('line3'), findsOneWidget);
+    expect(find.textContaining('toggleOnly3'), findsOneWidget);
+  });
+
+  testWidgets('MarkdownWithCodeHighlight notifies before code block resize', (
+    tester,
+  ) async {
+    var resizeCalls = 0;
+
+    await tester.pumpWidget(
+      _markdownHarness(
+        '''
+```dart
+resizeOnly1
+resizeOnly2
+resizeOnly3
+```
+''',
+        preferences: const {
+          'display_auto_collapse_code_block_v1': true,
+          'display_auto_collapse_code_block_lines_v1': 2,
+        },
+        onUserResizesContent: () => resizeCalls++,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.pumpAndSettle();
+
+    expect(resizeCalls, 0);
+
+    await tester.tap(find.text('Expand'));
+    await tester.pump();
+
+    expect(resizeCalls, 1);
+  });
+
+  testWidgets('MarkdownWithCodeHighlight notifies before details resize', (
+    tester,
+  ) async {
+    var resizeCalls = 0;
+
+    await tester.pumpWidget(
+      _markdownHarness(
+        '<details><summary>更多信息</summary>隐藏内容</details>',
+        onUserResizesContent: () => resizeCalls++,
+      ),
+    );
+    await tester.pump();
+
+    expect(resizeCalls, 0);
+
+    await tester.tap(find.text('更多信息'));
+    await tester.pump();
+
+    expect(resizeCalls, 1);
   });
 
   testWidgets(

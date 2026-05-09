@@ -35,7 +35,7 @@ class ChatScrollController {
       controllers: indexedControllers,
       itemCount: getItemCount,
       onChanged: _onScrollPositionChanged,
-      scrollIdleDelay: Duration(seconds: getAutoScrollIdleSeconds()),
+      scrollIdleDelay: const Duration(milliseconds: 180),
     );
   }
 
@@ -73,13 +73,22 @@ class ChatScrollController {
   bool _autoStickToBottom = true;
   bool get autoStickToBottom => _autoStickToBottom;
 
+  /// Blocks implicit bottom sticking while the user is reading/editing away
+  /// from the live tail. Explicit bottom navigation clears this.
+  bool _autoStickSuspendedByUser = false;
+
   /// Timer for detecting end of user scroll.
   Timer? _userScrollTimer;
+  bool _hasUserScrollMovementSinceIntent = false;
 
   /// Coalesces repeated bottom scroll requests during streaming into one
   /// jump per frame.
   bool _bottomScrollScheduled = false;
   bool _pendingBottomScrollAnimation = false;
+  bool _pendingBottomScrollRequiresAutoStick = false;
+  int _bottomScrollGeneration = 0;
+  final List<Timer> _anchorMaintenanceTimers = <Timer>[];
+  bool _disposed = false;
 
   /// Anchor for chained "jump to previous question" navigation.
   String? _lastJumpUserMessageId;
@@ -125,7 +134,8 @@ class ChatScrollController {
     final nearBottom = isNearBottom();
     if (!nearBottom) {
       _autoStickToBottom = false;
-    } else if (!_isUserScrolling) {
+    } else if (!_isUserScrolling && !_autoStickSuspendedByUser) {
+      _autoStickSuspendedByUser = false;
       final enabled = _getAutoScrollEnabled();
       if (enabled || _autoStickToBottom) {
         _autoStickToBottom = true;
@@ -137,6 +147,8 @@ class ChatScrollController {
     var needsNotify = false;
     final userScrolling = _positionTracker.isUserScrolling;
     if (userScrolling) {
+      _cancelPendingBottomScrollsForUser();
+      _hasUserScrollMovementSinceIntent = true;
       _isUserScrolling = true;
       _autoStickToBottom = false;
       _lastJumpUserMessageId = null;
@@ -156,11 +168,22 @@ class ChatScrollController {
     final atBottom = _positionTracker.isAtBottom;
     if (!atBottom) {
       _autoStickToBottom = false;
-    } else if (_isUserScrolling) {
+    } else if (!userScrolling &&
+        _isUserScrolling &&
+        _hasUserScrollMovementSinceIntent &&
+        _positionTracker.lastUserScrollWasTowardBottom &&
+        (_getAutoScrollEnabled() || _autoStickToBottom)) {
       _isUserScrolling = false;
+      _autoStickSuspendedByUser = false;
+      _hasUserScrollMovementSinceIntent = false;
       _userScrollTimer?.cancel();
       _autoStickToBottom = true;
-    } else if (_getAutoScrollEnabled() || _autoStickToBottom) {
+    } else if (!userScrolling &&
+        !_isUserScrolling &&
+        !_autoStickSuspendedByUser &&
+        (_getAutoScrollEnabled() || _autoStickToBottom)) {
+      _autoStickSuspendedByUser = false;
+      _hasUserScrollMovementSinceIntent = false;
       _autoStickToBottom = true;
     }
 
@@ -180,6 +203,10 @@ class ChatScrollController {
     _navButtonsHideTimer = Timer(
       const Duration(milliseconds: _navButtonsHideDelayMs),
       () {
+        if (_positionTracker.isUserScrolling) {
+          _resetNavButtonsHideTimer();
+          return;
+        }
         if (_showNavButtons) {
           _showNavButtons = false;
           _onStateChanged();
@@ -214,6 +241,8 @@ class ChatScrollController {
   ///
   /// [animate] - Whether to animate the scroll (default: true).
   void scrollToBottom({bool animate = true}) {
+    _autoStickSuspendedByUser = false;
+    _hasUserScrollMovementSinceIntent = false;
     _autoStickToBottom = true;
     _scheduleScrollToBottom(animate: animate);
   }
@@ -221,15 +250,26 @@ class ChatScrollController {
   void _scheduleScrollToBottom({
     required bool animate,
     bool deferUntilNextFrame = false,
+    bool requireAutoStick = false,
   }) {
     _pendingBottomScrollAnimation = _pendingBottomScrollAnimation || animate;
+    _pendingBottomScrollRequiresAutoStick = _bottomScrollScheduled
+        ? _pendingBottomScrollRequiresAutoStick && requireAutoStick
+        : requireAutoStick;
     if (_bottomScrollScheduled) return;
     _bottomScrollScheduled = true;
+    final generation = _bottomScrollGeneration;
     void flush() {
+      if (generation != _bottomScrollGeneration) return;
       _bottomScrollScheduled = false;
       final shouldAnimate = _pendingBottomScrollAnimation;
+      final shouldRequireAutoStick = _pendingBottomScrollRequiresAutoStick;
       _pendingBottomScrollAnimation = false;
-      unawaited(_animateToBottom(animate: shouldAnimate));
+      _pendingBottomScrollRequiresAutoStick = false;
+      if (shouldRequireAutoStick && !_autoStickToBottom) return;
+      unawaited(
+        _animateToBottom(animate: shouldAnimate, generation: generation),
+      );
     }
 
     if (hasClients && !deferUntilNextFrame) {
@@ -241,6 +281,8 @@ class ChatScrollController {
 
   /// Force scroll to bottom (used when user explicitly clicks the button).
   void forceScrollToBottom() {
+    _autoStickSuspendedByUser = false;
+    _hasUserScrollMovementSinceIntent = false;
     _isUserScrolling = false;
     _userScrollTimer?.cancel();
     _lastJumpUserMessageId = null;
@@ -254,10 +296,14 @@ class ChatScrollController {
     bool animate = true,
     Duration postSwitchDelay = const Duration(milliseconds: 220),
   }) {
+    _autoStickSuspendedByUser = false;
+    _hasUserScrollMovementSinceIntent = false;
     _isUserScrolling = false;
     _userScrollTimer?.cancel();
     scrollToBottom(animate: animate);
+    final generation = _bottomScrollGeneration;
     Future.delayed(postSwitchDelay, () {
+      if (_disposed || generation != _bottomScrollGeneration) return;
       scrollToBottom(animate: animate);
     });
   }
@@ -265,7 +311,9 @@ class ChatScrollController {
   /// Ensure scroll reaches bottom even after widget tree transitions.
   void scrollToBottomSoon({bool animate = true}) {
     scrollToBottom(animate: animate);
+    final generation = _bottomScrollGeneration;
     Future.delayed(const Duration(milliseconds: 120), () {
+      if (_disposed || generation != _bottomScrollGeneration) return;
       scrollToBottom(animate: animate);
     });
   }
@@ -274,25 +322,123 @@ class ChatScrollController {
   void autoScrollToBottomIfNeeded() {
     final enabled = _getAutoScrollEnabled();
     if (!enabled || !_autoStickToBottom) return;
-    scrollToBottom(animate: false);
+    _scheduleScrollToBottom(animate: false, requireAutoStick: true);
   }
 
   /// Keep the list pinned after messages are inserted while the user is still
   /// at the bottom. This covers empty/new conversations before streaming ticks.
   void followBottomAfterContentChange() {
     refreshAutoStickToBottom();
-    if (!_autoStickToBottom && _getShouldAutoStickToBottom()) {
+    if (!_autoStickToBottom &&
+        !_isUserScrolling &&
+        !_autoStickSuspendedByUser &&
+        _getShouldAutoStickToBottom()) {
       _autoStickToBottom = true;
     }
     if (!_autoStickToBottom) return;
-    _scheduleScrollToBottom(animate: false, deferUntilNextFrame: true);
+    _scheduleScrollToBottom(
+      animate: false,
+      deferUntilNextFrame: true,
+      requireAutoStick: true,
+    );
+  }
+
+  /// Temporarily disables automatic bottom following for user-triggered UI
+  /// expansion/collapse that can resize message content.
+  void suspendAutoStickForUserInteraction({
+    int? anchorIndex,
+    double? anchorAlignment,
+  }) {
+    handleUserScrollIntent();
+    final generation = _bottomScrollGeneration;
+    if (anchorIndex != null && hasClients) {
+      final alignment =
+          anchorAlignment ?? _positionTracker.leadingEdgeForIndex(anchorIndex);
+      if (alignment != null && alignment >= 0) {
+        final clampedAlignment = alignment.clamp(0.0, 1.0);
+        unawaited(
+          _positionTracker.scrollToIndex(
+            index: anchorIndex,
+            alignment: clampedAlignment,
+            animate: false,
+          ),
+        );
+        _maintainAnchorDuringResize(
+          index: anchorIndex,
+          alignment: clampedAlignment,
+          generation: generation,
+        );
+      }
+    }
+  }
+
+  void handleUserScrollIntent() {
+    _cancelPendingBottomScrollsForUser();
+    _hasUserScrollMovementSinceIntent = false;
+    _isUserScrolling = true;
+    _autoStickToBottom = false;
+    _lastJumpUserMessageId = null;
+    _userScrollTimer?.cancel();
+    final secs = _getAutoScrollIdleSeconds();
+    _userScrollTimer = Timer(Duration(seconds: secs), () {
+      _isUserScrolling = false;
+      refreshAutoStickToBottom();
+    });
+  }
+
+  void _cancelPendingBottomScrollsForUser() {
+    _autoStickSuspendedByUser = true;
+    _bottomScrollGeneration++;
+    _bottomScrollScheduled = false;
+    _pendingBottomScrollAnimation = false;
+    _pendingBottomScrollRequiresAutoStick = true;
+  }
+
+  void _maintainAnchorDuringResize({
+    required int index,
+    required double alignment,
+    required int generation,
+  }) {
+    _cancelAnchorMaintenanceTimers();
+
+    void maintain() {
+      if (_disposed) return;
+      if (generation != _bottomScrollGeneration) return;
+      if (!hasClients) return;
+      unawaited(
+        _positionTracker.scrollToIndex(
+          index: index,
+          alignment: alignment,
+          animate: false,
+        ),
+      );
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => maintain());
+    for (final delay in const <Duration>[
+      Duration(milliseconds: 80),
+      Duration(milliseconds: 180),
+      Duration(milliseconds: 320),
+    ]) {
+      _anchorMaintenanceTimers.add(Timer(delay, maintain));
+    }
+  }
+
+  void _cancelAnchorMaintenanceTimers() {
+    for (final timer in _anchorMaintenanceTimers) {
+      timer.cancel();
+    }
+    _anchorMaintenanceTimers.clear();
   }
 
   /// Animate or jump to the bottom of the scroll view.
   ///
   /// Used for explicit scroll-to-bottom requests (user-triggered button,
   /// conversation switch, etc.).
-  Future<void> _animateToBottom({bool animate = true}) async {
+  Future<void> _animateToBottom({
+    bool animate = true,
+    required int generation,
+  }) async {
     final target = _getItemCount();
     if (target < 0) return;
     if (!_hasOverflowingContent()) {
@@ -301,6 +447,7 @@ class ChatScrollController {
         alignment: 0,
         animate: false,
       );
+      if (generation != _bottomScrollGeneration) return;
       _updateJumpToBottomVisibility(false);
       _autoStickToBottom = true;
       return;
@@ -313,6 +460,7 @@ class ChatScrollController {
       animate: useAnimation,
       duration: const Duration(milliseconds: 250),
     );
+    if (generation != _bottomScrollGeneration) return;
     _updateJumpToBottomVisibility(false);
     _autoStickToBottom = true;
   }
@@ -493,6 +641,8 @@ class ChatScrollController {
   /// Reset user scrolling state (e.g., when force scrolling).
   void resetUserScrolling() {
     _isUserScrolling = false;
+    _autoStickSuspendedByUser = false;
+    _hasUserScrollMovementSinceIntent = false;
     _userScrollTimer?.cancel();
     _positionTracker.resetUserScrolling();
   }
@@ -503,8 +653,10 @@ class ChatScrollController {
 
   /// Dispose of resources.
   void dispose() {
+    _disposed = true;
     _positionTracker.dispose();
     _userScrollTimer?.cancel();
     _navButtonsHideTimer?.cancel();
+    _cancelAnchorMaintenanceTimers();
   }
 }
