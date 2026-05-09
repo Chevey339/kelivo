@@ -141,6 +141,10 @@ class HomeViewModel extends ChangeNotifier {
   /// Called when scrolling to bottom is needed.
   VoidCallback? onScrollToBottom;
 
+  /// Called after messages are inserted or removed so the UI can keep the
+  /// current bottom pin without waiting for streaming ticks.
+  VoidCallback? onMessagesChangedScrollFollow;
+
   /// Called for haptic feedback.
   VoidCallback? onHapticFeedback;
 
@@ -190,6 +194,7 @@ class HomeViewModel extends ChangeNotifier {
   void _onMessagesChanged() {
     _chatController.invalidateCache();
     notifyListeners();
+    onMessagesChangedScrollFollow?.call();
   }
 
   void _onLoadingChanged(String conversationId, bool loading) {

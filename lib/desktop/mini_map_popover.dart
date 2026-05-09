@@ -309,7 +309,6 @@ class _MiniMapList extends StatelessWidget {
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
             primary: false,
-            shrinkWrap: true,
             itemCount: pairs.length,
             itemBuilder: (context, index) {
               final p = pairs[index];
@@ -356,7 +355,6 @@ class _MiniMapList extends StatelessWidget {
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
           primary: false,
-          shrinkWrap: true,
           itemCount: pairs.length,
           itemBuilder: (context, index) {
             final p = pairs[index];

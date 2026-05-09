@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:scrollview_observer/scrollview_observer.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../../core/models/chat_message.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -9,6 +9,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../chat/widgets/message_more_sheet.dart';
+import '../controllers/chat_scroll_position.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/streaming_content_notifier.dart';
 import '../services/ask_user_interaction_service.dart';
@@ -73,13 +74,13 @@ class TranslationUiState {
 /// Widget that displays the chat message list.
 ///
 /// Accepts pre-collapsed messages and pre-computed byGroup from the controller
-/// to avoid redundant computation on every build. Wraps the ListView with
-/// ListViewObserver for precise index-based scroll navigation.
+/// to avoid redundant computation on every build. Uses index-based scrolling
+/// so large dynamic-height conversations can open and jump without building
+/// every earlier message first.
 class MessageListView extends StatelessWidget {
   const MessageListView({
     super.key,
-    required this.scrollController,
-    required this.observerController,
+    required this.scrollControllers,
     required this.messages,
     required this.byGroup,
     required this.versionSelections,
@@ -116,11 +117,13 @@ class MessageListView extends StatelessWidget {
     this.onToggleReasoning,
     this.onToggleTranslation,
     this.onToggleReasoningSegment,
+    this.onMessageVisible,
+    this.onBottomAnchorAlignmentChanged,
     this.buildPinnedStreamingIndicator,
+    this.itemBuildObserver,
   });
 
-  final ScrollController scrollController;
-  final ListObserverController observerController;
+  final ChatIndexedScrollControllers scrollControllers;
 
   /// Pre-collapsed messages (from ChatController.collapsedMessages).
   final List<ChatMessage> messages;
@@ -178,7 +181,18 @@ class MessageListView extends StatelessWidget {
   final void Function(String messageId)? onToggleTranslation;
   final void Function(String messageId, int segmentIndex)?
   onToggleReasoningSegment;
+  final void Function(ChatMessage message, int index)? onMessageVisible;
+  final ValueChanged<double>? onBottomAnchorAlignmentChanged;
   final Widget Function()? buildPinnedStreamingIndicator;
+  final ValueChanged<int>? itemBuildObserver;
+
+  static double bottomAnchorAlignmentFor({
+    required double viewportHeight,
+    required double bottomPadding,
+  }) {
+    if (viewportHeight <= 0) return 1;
+    return ((viewportHeight - bottomPadding) / viewportHeight).clamp(0.0, 1.0);
+  }
 
   /// Build the context divider widget shown at truncate position.
   Widget _buildContextDivider(BuildContext context) {
@@ -226,20 +240,38 @@ class MessageListView extends StatelessWidget {
         return ValueListenableBuilder<bool>(
           valueListenable: isProcessingFiles,
           builder: (context, isProcessing, child) {
-            final list = ListView.builder(
-              controller: scrollController,
-              padding: EdgeInsets.fromLTRB(
-                horizontalPad,
-                8,
-                horizontalPad,
-                bottomContentPadding + (isPinnedIndicatorActive ? 12 : 0),
-              ),
-              itemCount: messages.length,
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            final bottomPadding =
+                bottomContentPadding + (isPinnedIndicatorActive ? 12 : 0);
+            final itemCount = messages.length + 1;
+            final bottomAnchorIndex = itemCount - 1;
+            final bottomAnchorAlignment = bottomAnchorAlignmentFor(
+              viewportHeight: constraints.maxHeight,
+              bottomPadding: bottomPadding,
+            );
+            onBottomAnchorAlignmentChanged?.call(bottomAnchorAlignment);
+            final list = ScrollablePositionedList.builder(
+              itemScrollController: scrollControllers.itemScrollController,
+              itemPositionsListener: scrollControllers.itemPositionsListener,
+              scrollOffsetListener: scrollControllers.scrollOffsetListener,
+              initialScrollIndex: bottomAnchorIndex,
+              initialAlignment: bottomAnchorAlignment,
+              padding: EdgeInsets.fromLTRB(horizontalPad, 8, horizontalPad, 0),
+              itemCount: itemCount,
+              minCacheExtent: 0,
+              addAutomaticKeepAlives: false,
               itemBuilder: (context, index) {
+                if (index == bottomAnchorIndex) {
+                  itemBuildObserver?.call(index);
+                  return SizedBox(
+                    key: const ValueKey('message-list-bottom-anchor'),
+                    height: bottomPadding,
+                  );
+                }
                 if (index < 0 || index >= messages.length) {
                   return const SizedBox.shrink();
                 }
+                itemBuildObserver?.call(index);
+                onMessageVisible?.call(messages[index], index);
                 return _buildMessageItem(
                   context,
                   index: index,
@@ -248,14 +280,9 @@ class MessageListView extends StatelessWidget {
               },
             );
 
-            final observedList = ListViewObserver(
-              controller: observerController,
-              child: list,
-            );
-
             return Stack(
               children: [
-                observedList,
+                list,
                 if (isPinnedIndicatorActive &&
                     buildPinnedStreamingIndicator != null)
                   buildPinnedStreamingIndicator!(),

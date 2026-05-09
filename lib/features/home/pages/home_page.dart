@@ -57,7 +57,6 @@ import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
 import '../controllers/home_page_controller.dart';
 import '../controllers/home_view_model.dart';
-import '../controllers/scroll_controller.dart' as scroll_ctrl;
 import 'home_mobile_layout.dart';
 import 'home_desktop_layout.dart';
 
@@ -372,8 +371,6 @@ class _HomePageState extends State<HomePage>
   final FocusNode _inputFocus = FocusNode();
   final TextEditingController _inputController = TextEditingController();
   final ChatInputBarController _mediaController = ChatInputBarController();
-  final scroll_ctrl.ChatAutoFollowScrollController _scrollController =
-      scroll_ctrl.ChatAutoFollowScrollController();
   final BackdropKey _messageListBackdropKey = BackdropKey();
   final GlobalKey _inputBarKey = GlobalKey();
   final GlobalKey _selectionMiniMapKey = GlobalKey();
@@ -406,7 +403,6 @@ class _HomePageState extends State<HomePage>
       inputFocus: _inputFocus,
       inputController: _inputController,
       mediaController: _mediaController,
-      scrollController: _scrollController,
     );
 
     _controller.addListener(_onControllerChanged);
@@ -456,7 +452,6 @@ class _HomePageState extends State<HomePage>
     _drawerController.removeListener(_onDrawerValueChanged);
     _inputFocus.dispose();
     _inputController.dispose();
-    _scrollController.dispose();
     _controller.dispose();
     routeObserver.unsubscribe(this);
     super.dispose();
@@ -1019,8 +1014,7 @@ class _HomePageState extends State<HomePage>
       backdropKey: _messageListBackdropKey,
       child: MessageListView(
         isProcessingFiles: _controller.isProcessingFiles,
-        scrollController: _scrollController,
-        observerController: _controller.scrollCtrl.observerController,
+        scrollControllers: _controller.chatScrollControllers,
         messages: _controller.chatController.collapsedMessages,
         byGroup: _controller.chatController.groupedMessages,
         versionSelections: _controller.versionSelections,
@@ -1076,6 +1070,8 @@ class _HomePageState extends State<HomePage>
         onToggleReasoningSegment: (messageId, segmentIndex) {
           _controller.toggleReasoningSegment(messageId, segmentIndex);
         },
+        onMessageVisible: _controller.restoreVisibleMessageUiState,
+        onBottomAnchorAlignmentChanged: _controller.updateBottomAnchorAlignment,
       ),
     );
   }

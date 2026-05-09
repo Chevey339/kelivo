@@ -31,6 +31,7 @@ import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import 'chat_controller.dart';
 import 'stream_controller.dart' as stream_ctrl;
 import 'generation_controller.dart';
+import 'chat_scroll_position.dart';
 import 'scroll_controller.dart' as scroll_ctrl;
 import 'home_view_model.dart';
 import '../services/message_builder_service.dart';
@@ -68,15 +69,13 @@ class HomePageController extends ChangeNotifier {
     required FocusNode inputFocus,
     required TextEditingController inputController,
     required ChatInputBarController mediaController,
-    required ScrollController scrollController,
   }) : _context = context,
        _vsync = vsync,
        _scaffoldKey = scaffoldKey,
        _inputBarKey = inputBarKey,
        _inputFocus = inputFocus,
        _inputController = inputController,
-       _mediaController = mediaController,
-       _scrollController = scrollController {
+       _mediaController = mediaController {
     _initialize();
   }
 
@@ -91,7 +90,6 @@ class HomePageController extends ChangeNotifier {
   final FocusNode _inputFocus;
   final TextEditingController _inputController;
   final ChatInputBarController _mediaController;
-  final ScrollController _scrollController;
 
   // ============================================================================
   // Services & Controllers (created internally)
@@ -108,6 +106,8 @@ class HomePageController extends ChangeNotifier {
   late TranslationService _translationService;
   late FileUploadService _fileUploadService;
   late scroll_ctrl.ChatScrollController _scrollCtrl;
+  final ChatIndexedScrollControllers _chatScrollControllers =
+      ChatIndexedScrollControllers();
 
   McpProvider? _mcpProvider;
   StreamSubscription<ChatAction>? _chatActionSub;
@@ -128,7 +128,7 @@ class HomePageController extends ChangeNotifier {
   final Map<String, TranslationData> _translations =
       <String, TranslationData>{};
 
-  // Note: GlobalKey-based message navigation removed; using ListObserverController instead.
+  // Note: GlobalKey-based message navigation removed; using index scrolling.
 
   // Selection mode
   bool _selecting = false;
@@ -161,8 +161,14 @@ class HomePageController extends ChangeNotifier {
   String? _spotlightMessageId;
   int _spotlightToken = 0;
 
+  // Restored lazily as visible message widgets are built. This keeps opening
+  // very large imported conversations from synchronously walking all messages.
+  final Set<String> _restoredMessageUiStateIds = <String>{};
+  bool _messageUiStateNotifyScheduled = false;
+
   // Input bar measurement
   double _inputBarHeight = 72;
+  double _bottomAnchorAlignment = 1.0;
 
   // Animation tuning
   static const Duration _postSwitchScrollDelay = Duration(milliseconds: 220);
@@ -178,7 +184,8 @@ class HomePageController extends ChangeNotifier {
   FocusNode get inputFocus => _inputFocus;
   TextEditingController get inputController => _inputController;
   ChatInputBarController get mediaController => _mediaController;
-  ScrollController get scrollController => _scrollController;
+  ChatIndexedScrollControllers get chatScrollControllers =>
+      _chatScrollControllers;
   Animation<double> get convoFade => _convoFade;
   AnimationController get convoFadeController => _convoFadeController;
 
@@ -362,6 +369,8 @@ class HomePageController extends ChangeNotifier {
       }
     };
     _viewModel.onScrollToBottom = () => _scrollToBottomSoon();
+    _viewModel.onMessagesChangedScrollFollow = () =>
+        _scrollCtrl.followBottomAfterContentChange();
     _viewModel.onHapticFeedback = () {
       try {
         final settings = _context.read<SettingsProvider>();
@@ -377,7 +386,7 @@ class HomePageController extends ChangeNotifier {
           );
         };
     _viewModel.onConversationSwitched = () {
-      _restoreMessageUiState();
+      _prepareMessageUiStateForConversation();
       _scrollToBottom(animate: false);
     };
     _viewModel.onStreamFinished = () {
@@ -397,12 +406,15 @@ class HomePageController extends ChangeNotifier {
 
   void _initializeScrollController() {
     _scrollCtrl = scroll_ctrl.ChatScrollController(
-      scrollController: _scrollController,
+      indexedControllers: _chatScrollControllers,
       onStateChanged: () => notifyListeners(),
+      getShouldAutoStickToBottom: () => _shouldAutoStickToBottom(),
       getAutoScrollEnabled: () =>
           _context.read<SettingsProvider>().autoScrollEnabled,
       getAutoScrollIdleSeconds: () =>
           _context.read<SettingsProvider>().autoScrollIdleSeconds,
+      getItemCount: () => _chatController.collapsedMessages.length,
+      getBottomAnchorAlignment: () => _bottomAnchorAlignment,
     );
   }
 
@@ -548,7 +560,7 @@ class HomePageController extends ChangeNotifier {
         _chatService.setCurrentConversation(recent.id);
         _chatController.setCurrentConversation(recent);
         _streamController.clearGeminiThoughtSigs();
-        _restoreMessageUiState();
+        _prepareMessageUiStateForConversation();
         notifyListeners();
         _scrollToBottomSoon(animate: false);
       }
@@ -766,6 +778,7 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> _createNewConversation() async {
     _translations.clear();
+    _restoredMessageUiStateIds.clear();
     await _viewModel.createNewConversation();
     notifyListeners();
     _scrollToBottomSoon(animate: false);
@@ -1472,6 +1485,58 @@ class HomePageController extends ChangeNotifier {
     _scrollCtrl.scrollToTop(animate: animate);
   }
 
+  void restoreVisibleMessageUiState(ChatMessage message, int index) {
+    if (!_restoredMessageUiStateIds.add(message.id)) return;
+
+    var needsRebuild = false;
+    if (message.translation != null && message.translation!.isNotEmpty) {
+      _translations.putIfAbsent(message.id, () {
+        final td = TranslationData();
+        td.expanded = false;
+        needsRebuild = true;
+        return td;
+      });
+    }
+
+    if (message.role != 'assistant') {
+      if (needsRebuild) _scheduleMessageUiStateNotify();
+      return;
+    }
+    _streamController.restoreMessageUiState(
+      message,
+      getToolEventsFromDb: (id) => _chatService.getToolEvents(id),
+      getGeminiThoughtSigFromDb: (id) =>
+          _chatService.getGeminiThoughtSignature(id),
+    );
+
+    if (index < 0 || index >= messages.length) return;
+    if (messages[index].id != message.id) return;
+
+    final cleanedContent = _streamController.captureGeminiThoughtSignature(
+      messages[index].content,
+      message.id,
+    );
+    if (cleanedContent != messages[index].content) {
+      messages[index] = messages[index].copyWith(content: cleanedContent);
+      unawaited(
+        _chatService.updateMessage(message.id, content: cleanedContent),
+      );
+      _chatController.invalidateCache();
+      needsRebuild = true;
+    }
+
+    _scheduleInlineImageSanitize(
+      message.id,
+      latestContent: messages[index].content,
+      immediate: true,
+    );
+    if (needsRebuild) _scheduleMessageUiStateNotify();
+  }
+
+  void updateBottomAnchorAlignment(double alignment) {
+    _bottomAnchorAlignment = alignment;
+  }
+
   // ============================================================================
   // Public Methods - Model Checks
   // ============================================================================
@@ -1519,6 +1584,12 @@ class HomePageController extends ChangeNotifier {
     if (!_scrollCtrl.hasEnoughContentToScroll(56.0)) return false;
     if (!_scrollCtrl.isNearBottom(48)) return false;
     return true;
+  }
+
+  bool _shouldAutoStickToBottom() {
+    if (_scrollCtrl.isUserScrolling) return false;
+    if (!_scrollCtrl.hasEnoughContentToScroll(56.0)) return true;
+    return _scrollCtrl.isNearBottom(48);
   }
 
   /// Transform raw content using assistant regexes.
@@ -1570,42 +1641,21 @@ class HomePageController extends ChangeNotifier {
   void _scrollToBottomSoon({bool animate = true}) =>
       _scrollCtrl.scrollToBottomSoon(animate: animate);
 
-  // _getViewportBounds removed: ListObserverController handles visibility.
+  // _getViewportBounds removed: index position tracking handles visibility.
 
-  void _restoreMessageUiState() {
-    for (int i = 0; i < messages.length; i++) {
-      final m = messages[i];
-      if (m.role == 'assistant') {
-        _streamController.restoreMessageUiState(
-          m,
-          getToolEventsFromDb: (id) => _chatService.getToolEvents(id),
-          getGeminiThoughtSigFromDb: (id) =>
-              _chatService.getGeminiThoughtSignature(id),
-        );
+  void _prepareMessageUiStateForConversation() {
+    _translations.clear();
+    _restoredMessageUiStateIds.clear();
+    _messageUiStateNotifyScheduled = false;
+  }
 
-        final cleanedContent = _streamController.captureGeminiThoughtSignature(
-          m.content,
-          m.id,
-        );
-        if (cleanedContent != m.content) {
-          final updated = m.copyWith(content: cleanedContent);
-          messages[i] = updated;
-          unawaited(_chatService.updateMessage(m.id, content: cleanedContent));
-        }
-
-        _scheduleInlineImageSanitize(
-          m.id,
-          latestContent: messages[i].content,
-          immediate: true,
-        );
-      }
-
-      if (m.translation != null && m.translation!.isNotEmpty) {
-        final td = TranslationData();
-        td.expanded = false;
-        _translations[m.id] = td;
-      }
-    }
+  void _scheduleMessageUiStateNotify() {
+    if (_messageUiStateNotifyScheduled) return;
+    _messageUiStateNotifyScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _messageUiStateNotifyScheduled = false;
+      if (_context.mounted) notifyListeners();
+    });
   }
 
   void _scheduleInlineImageSanitize(
