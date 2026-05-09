@@ -156,6 +156,7 @@ void main() {
     );
     expect(list.initialScrollIndex, messages.length);
     expect(list.initialAlignment, closeTo(1 - 144 / 844, 0.001));
+    expect(list.minCacheExtent, closeTo(720, 0.001));
     expect(builtIndexes, isNotEmpty);
     expect(builtIndexes.contains(messages.length), isTrue);
     expect(

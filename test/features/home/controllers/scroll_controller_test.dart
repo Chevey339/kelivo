@@ -177,6 +177,49 @@ void main() {
       chatScrollController.dispose();
     });
 
+    testWidgets('手动滚动中按钮状态不变时不重复通知页面', (tester) async {
+      const itemCount = 3000;
+      var stateChangeCount = 0;
+      final scrollControllers = ChatIndexedScrollControllers();
+      final chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {
+          stateChangeCount++;
+        },
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => true,
+        getAutoScrollIdleSeconds: () => 8,
+        getItemCount: () => itemCount,
+        getBottomAnchorAlignment: () => 1,
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: itemCount,
+          initialScrollIndex: 1200,
+          itemBuilder: (context, index) {
+            return SizedBox(height: 56, child: Text('Message $index'));
+          },
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      stateChangeCount = 0;
+
+      await tester.drag(
+        find.byType(ScrollablePositionedList),
+        const Offset(0, -360),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(chatScrollController.showNavButtons, isTrue);
+      expect(stateChangeCount, 1);
+
+      chatScrollController.dispose();
+    });
+
     testWidgets('滚到底部时底部锚点完整可见', (tester) async {
       const messageCount = 40;
       const bottomAnchorHeight = 120.0;

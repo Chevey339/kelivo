@@ -134,6 +134,7 @@ class ChatScrollController {
   }
 
   void _onScrollPositionChanged() {
+    var needsNotify = false;
     final userScrolling = _positionTracker.isUserScrolling;
     if (userScrolling) {
       _isUserScrolling = true;
@@ -141,6 +142,7 @@ class ChatScrollController {
       _lastJumpUserMessageId = null;
       if (!_showNavButtons) {
         _showNavButtons = true;
+        needsNotify = true;
       }
       _resetNavButtonsHideTimer();
       _userScrollTimer?.cancel();
@@ -148,7 +150,6 @@ class ChatScrollController {
       _userScrollTimer = Timer(Duration(seconds: secs), () {
         _isUserScrolling = false;
         refreshAutoStickToBottom();
-        _onStateChanged();
       });
     }
 
@@ -163,8 +164,14 @@ class ChatScrollController {
       _autoStickToBottom = true;
     }
 
-    _showJumpToBottom = !atBottom;
-    _onStateChanged();
+    final showJumpToBottom = !atBottom;
+    if (_showJumpToBottom != showJumpToBottom) {
+      _showJumpToBottom = showJumpToBottom;
+      needsNotify = true;
+    }
+    if (needsNotify) {
+      _onStateChanged();
+    }
   }
 
   /// Reset the auto-hide timer for navigation buttons.

@@ -187,6 +187,13 @@ class MessageListView extends StatefulWidget {
   final Widget Function()? buildPinnedStreamingIndicator;
   final ValueChanged<int>? itemBuildObserver;
 
+  static const double maxScrollCacheExtent = 720.0;
+
+  static double scrollCacheExtentFor(double viewportHeight) {
+    if (viewportHeight <= 0) return 0;
+    return (viewportHeight * 0.9).clamp(0.0, maxScrollCacheExtent);
+  }
+
   static double bottomAnchorAlignmentFor({
     required double viewportHeight,
     required double bottomPadding,
@@ -345,6 +352,9 @@ class _MessageListViewState extends State<MessageListView> {
         final horizontalPad =
             ((constraints.maxWidth - ChatLayoutConstants.maxContentWidth) / 2)
                 .clamp(0.0, double.infinity);
+        final scrollCacheExtent = MessageListView.scrollCacheExtentFor(
+          constraints.maxHeight,
+        );
 
         return ValueListenableBuilder<bool>(
           valueListenable: widget.isProcessingFiles,
@@ -371,7 +381,7 @@ class _MessageListViewState extends State<MessageListView> {
               initialAlignment: bottomAnchorAlignment,
               padding: EdgeInsets.fromLTRB(horizontalPad, 8, horizontalPad, 0),
               itemCount: itemCount,
-              minCacheExtent: 0,
+              minCacheExtent: scrollCacheExtent,
               addAutomaticKeepAlives: false,
               addRepaintBoundaries: true,
               itemBuilder: (context, index) {
