@@ -257,6 +257,10 @@ class HomePageController extends ChangeNotifier {
     super.notifyListeners();
   }
 
+  void _notifyUiStateChanged() {
+    super.notifyListeners();
+  }
+
   // ============================================================================
   // Initialization
   // ============================================================================
@@ -407,7 +411,7 @@ class HomePageController extends ChangeNotifier {
   void _initializeScrollController() {
     _scrollCtrl = scroll_ctrl.ChatScrollController(
       indexedControllers: _chatScrollControllers,
-      onStateChanged: () => notifyListeners(),
+      onStateChanged: _notifyUiStateChanged,
       getShouldAutoStickToBottom: () => _shouldAutoStickToBottom(),
       getAutoScrollEnabled: () =>
           _context.read<SettingsProvider>().autoScrollEnabled,

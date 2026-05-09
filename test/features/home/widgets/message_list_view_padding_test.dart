@@ -168,6 +168,62 @@ void main() {
     isProcessingFiles.dispose();
   });
 
+  testWidgets('可见消息状态恢复不会因同一列表重建重复触发', (tester) async {
+    final scrollControllers = ChatIndexedScrollControllers();
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    final messages = List<ChatMessage>.generate(
+      40,
+      (index) => ChatMessage(
+        id: 'message-$index',
+        role: index.isEven ? 'user' : 'assistant',
+        content: 'Message $index',
+        conversationId: 'conversation-1',
+      ),
+    );
+    final visibleCalls = <String>[];
+
+    Widget buildList() {
+      return _harness(
+        MessageListView(
+          scrollControllers: scrollControllers,
+          messages: messages,
+          byGroup: {
+            for (final message in messages) message.id: [message],
+          },
+          versionSelections: const {},
+          reasoning: const {},
+          reasoningSegments: const {},
+          contentSplits: const {},
+          toolParts: const {},
+          translations: const {},
+          selecting: false,
+          selectedItems: const {},
+          dividerPadding: EdgeInsets.zero,
+          isProcessingFiles: isProcessingFiles,
+          onMessageVisible: (message, index) {
+            visibleCalls.add(message.id);
+          },
+        ),
+      );
+    }
+
+    await tester.pumpWidget(buildList());
+    for (var i = 0; i < 6; i++) {
+      await tester.pump();
+    }
+    final firstCallCount = visibleCalls.length;
+    expect(firstCallCount, greaterThan(0));
+
+    await tester.pumpWidget(buildList());
+    for (var i = 0; i < 6; i++) {
+      await tester.pump();
+    }
+
+    expect(visibleCalls.length, firstCallCount);
+
+    isProcessingFiles.dispose();
+  });
+
   testWidgets('消息列表保持正向滚动而不是反向列表', (tester) async {
     final scrollControllers = ChatIndexedScrollControllers();
     final isProcessingFiles = ValueNotifier<bool>(false);

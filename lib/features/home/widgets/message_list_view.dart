@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../chat/widgets/chat_message_widget.dart';
@@ -77,7 +78,7 @@ class TranslationUiState {
 /// to avoid redundant computation on every build. Uses index-based scrolling
 /// so large dynamic-height conversations can open and jump without building
 /// every earlier message first.
-class MessageListView extends StatelessWidget {
+class MessageListView extends StatefulWidget {
   const MessageListView({
     super.key,
     required this.scrollControllers,
@@ -194,6 +195,100 @@ class MessageListView extends StatelessWidget {
     return ((viewportHeight - bottomPadding) / viewportHeight).clamp(0.0, 1.0);
   }
 
+  @override
+  State<MessageListView> createState() => _MessageListViewState();
+}
+
+class _MessageListSettingsSnapshot {
+  const _MessageListSettingsSnapshot({
+    required this.chatFontScale,
+    required this.showModelIcon,
+    required this.showUserAvatar,
+    required this.showTokenStats,
+  });
+
+  final double chatFontScale;
+  final bool showModelIcon;
+  final bool showUserAvatar;
+  final bool showTokenStats;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _MessageListSettingsSnapshot &&
+        other.chatFontScale == chatFontScale &&
+        other.showModelIcon == showModelIcon &&
+        other.showUserAvatar == showUserAvatar &&
+        other.showTokenStats == showTokenStats;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(chatFontScale, showModelIcon, showUserAvatar, showTokenStats);
+}
+
+class _MessageListViewState extends State<MessageListView> {
+  final Set<String> _reportedVisibleMessageIds = <String>{};
+  final List<(ChatMessage, int)> _pendingVisibleMessages =
+      <(ChatMessage, int)>[];
+  bool _visibleFlushScheduled = false;
+
+  @override
+  void didUpdateWidget(covariant MessageListView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.messages, widget.messages)) {
+      if (_conversationIdFor(oldWidget.messages) !=
+          _conversationIdFor(widget.messages)) {
+        _reportedVisibleMessageIds.clear();
+        _pendingVisibleMessages.clear();
+        return;
+      }
+      final currentIds = widget.messages.map((message) => message.id).toSet();
+      _reportedVisibleMessageIds.removeWhere((id) => !currentIds.contains(id));
+    }
+  }
+
+  String? _conversationIdFor(List<ChatMessage> messages) {
+    return messages.isEmpty ? null : messages.first.conversationId;
+  }
+
+  @override
+  void dispose() {
+    _pendingVisibleMessages.clear();
+    super.dispose();
+  }
+
+  void _scheduleVisibleMessage(ChatMessage message, int index) {
+    if (widget.onMessageVisible == null) return;
+    if (!_reportedVisibleMessageIds.add(message.id)) return;
+    _pendingVisibleMessages.add((message, index));
+    if (_visibleFlushScheduled) return;
+    _visibleFlushScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _visibleFlushScheduled = false;
+      if (!mounted) {
+        _pendingVisibleMessages.clear();
+        return;
+      }
+      if (_pendingVisibleMessages.isEmpty) return;
+
+      final pending = List<(ChatMessage, int)>.of(_pendingVisibleMessages);
+      _pendingVisibleMessages.clear();
+      final callback = widget.onMessageVisible;
+      if (callback == null) return;
+      for (final (message, index) in pending) {
+        callback(message, index);
+      }
+    });
+  }
+
+  int _latestAssistantMessageIndex() {
+    for (var i = widget.messages.length - 1; i >= 0; i--) {
+      final message = widget.messages[i];
+      if (message.role == 'assistant' && !message.isStreaming) return i;
+    }
+    return -1;
+  }
+
   /// Build the context divider widget shown at truncate position.
   Widget _buildContextDivider(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -231,6 +326,20 @@ class MessageListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context
+        .select<SettingsProvider, _MessageListSettingsSnapshot>(
+          (settings) => _MessageListSettingsSnapshot(
+            chatFontScale: settings.chatFontScale,
+            showModelIcon: settings.showModelIcon,
+            showUserAvatar: settings.showUserAvatar,
+            showTokenStats: settings.showTokenStats,
+          ),
+        );
+    final assistant = context.select<AssistantProvider, Assistant?>(
+      (provider) => provider.currentAssistant,
+    );
+    final latestAssistantIndex = _latestAssistantMessageIndex();
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final horizontalPad =
@@ -238,44 +347,53 @@ class MessageListView extends StatelessWidget {
                 .clamp(0.0, double.infinity);
 
         return ValueListenableBuilder<bool>(
-          valueListenable: isProcessingFiles,
+          valueListenable: widget.isProcessingFiles,
           builder: (context, isProcessing, child) {
             final bottomPadding =
-                bottomContentPadding + (isPinnedIndicatorActive ? 12 : 0);
-            final itemCount = messages.length + 1;
+                widget.bottomContentPadding +
+                (widget.isPinnedIndicatorActive ? 12 : 0);
+            final itemCount = widget.messages.length + 1;
             final bottomAnchorIndex = itemCount - 1;
-            final bottomAnchorAlignment = bottomAnchorAlignmentFor(
-              viewportHeight: constraints.maxHeight,
-              bottomPadding: bottomPadding,
-            );
-            onBottomAnchorAlignmentChanged?.call(bottomAnchorAlignment);
+            final bottomAnchorAlignment =
+                MessageListView.bottomAnchorAlignmentFor(
+                  viewportHeight: constraints.maxHeight,
+                  bottomPadding: bottomPadding,
+                );
+            widget.onBottomAnchorAlignmentChanged?.call(bottomAnchorAlignment);
             final list = ScrollablePositionedList.builder(
-              itemScrollController: scrollControllers.itemScrollController,
-              itemPositionsListener: scrollControllers.itemPositionsListener,
-              scrollOffsetListener: scrollControllers.scrollOffsetListener,
+              itemScrollController:
+                  widget.scrollControllers.itemScrollController,
+              itemPositionsListener:
+                  widget.scrollControllers.itemPositionsListener,
+              scrollOffsetListener:
+                  widget.scrollControllers.scrollOffsetListener,
               initialScrollIndex: bottomAnchorIndex,
               initialAlignment: bottomAnchorAlignment,
               padding: EdgeInsets.fromLTRB(horizontalPad, 8, horizontalPad, 0),
               itemCount: itemCount,
               minCacheExtent: 0,
               addAutomaticKeepAlives: false,
+              addRepaintBoundaries: true,
               itemBuilder: (context, index) {
                 if (index == bottomAnchorIndex) {
-                  itemBuildObserver?.call(index);
+                  widget.itemBuildObserver?.call(index);
                   return SizedBox(
                     key: const ValueKey('message-list-bottom-anchor'),
                     height: bottomPadding,
                   );
                 }
-                if (index < 0 || index >= messages.length) {
+                if (index < 0 || index >= widget.messages.length) {
                   return const SizedBox.shrink();
                 }
-                itemBuildObserver?.call(index);
-                onMessageVisible?.call(messages[index], index);
+                widget.itemBuildObserver?.call(index);
+                _scheduleVisibleMessage(widget.messages[index], index);
                 return _buildMessageItem(
                   context,
                   index: index,
                   isProcessingFiles: isProcessing,
+                  settings: settings,
+                  assistant: assistant,
+                  latestAssistantIndex: latestAssistantIndex,
                 );
               },
             );
@@ -283,9 +401,9 @@ class MessageListView extends StatelessWidget {
             return Stack(
               children: [
                 list,
-                if (isPinnedIndicatorActive &&
-                    buildPinnedStreamingIndicator != null)
-                  buildPinnedStreamingIndicator!(),
+                if (widget.isPinnedIndicatorActive &&
+                    widget.buildPinnedStreamingIndicator != null)
+                  widget.buildPinnedStreamingIndicator!(),
               ],
             );
           },
@@ -298,40 +416,42 @@ class MessageListView extends StatelessWidget {
     BuildContext context, {
     required int index,
     required bool isProcessingFiles,
+    required _MessageListSettingsSnapshot settings,
+    required Assistant? assistant,
+    required int latestAssistantIndex,
   }) {
-    final message = messages[index];
-    final r = reasoning[message.id];
-    final t = translations[message.id];
-    final chatScale = context.watch<SettingsProvider>().chatFontScale;
-    final assistant = context.watch<AssistantProvider>().currentAssistant;
+    final message = widget.messages[index];
+    final r = widget.reasoning[message.id];
+    final t = widget.translations[message.id];
+    final chatScale = settings.chatFontScale;
     final useAssistAvatar = assistant?.useAssistantAvatar == true;
     final useAssistName = assistant?.useAssistantName == true;
     final showDivider =
-        truncCollapsedIndex >= 0 && index == truncCollapsedIndex;
+        widget.truncCollapsedIndex >= 0 && index == widget.truncCollapsedIndex;
     final gid = (message.groupId ?? message.id);
-    final vers = (byGroup[gid] ?? const <ChatMessage>[]).toList()
+    final vers = (widget.byGroup[gid] ?? const <ChatMessage>[]).toList()
       ..sort((a, b) => a.version.compareTo(b.version));
     int selectedIdx =
-        versionSelections[gid] ?? (vers.isNotEmpty ? vers.length - 1 : 0);
+        widget.versionSelections[gid] ??
+        (vers.isNotEmpty ? vers.length - 1 : 0);
     final total = vers.length;
     if (selectedIdx < 0) selectedIdx = 0;
     if (total > 0 && selectedIdx > total - 1) selectedIdx = total - 1;
-    final latestAssistantIndex = _latestAssistantMessageIndex();
     final messageSuggestions =
-        !selecting &&
+        !widget.selecting &&
             index == latestAssistantIndex &&
             message.role == 'assistant' &&
             !message.isStreaming &&
-            onSuggestionTap != null
-        ? suggestions
+            widget.onSuggestionTap != null
+        ? widget.suggestions
         : const <String>[];
 
     // Check if this is a streaming message that should use ValueListenableBuilder
     final isStreaming =
         message.isStreaming &&
         message.role == 'assistant' &&
-        streamingContentNotifier != null &&
-        streamingContentNotifier!.hasNotifier(message.id);
+        widget.streamingContentNotifier != null &&
+        widget.streamingContentNotifier!.hasNotifier(message.id);
 
     final messageColumn = Column(
       key: ValueKey(message.id),
@@ -340,16 +460,16 @@ class MessageListView extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (selecting &&
+            if (widget.selecting &&
                 (message.role == 'user' || message.role == 'assistant'))
               Padding(
                 padding: const EdgeInsets.only(left: 10, right: 6),
                 child: IosCheckbox(
-                  value: selectedItems.contains(message.id),
+                  value: widget.selectedItems.contains(message.id),
                   size: 20,
                   hitTestSize: 28,
                   onChanged: (v) {
-                    onToggleSelection?.call(message.id, v);
+                    widget.onToggleSelection?.call(message.id, v);
                   },
                 ),
               ),
@@ -382,6 +502,7 @@ class MessageListView extends StatelessWidget {
                               total: total,
                               isProcessingFiles: isProcessingFiles,
                               suggestions: messageSuggestions,
+                              settings: settings,
                             )
                           : _buildChatMessageWidget(
                               context,
@@ -397,6 +518,7 @@ class MessageListView extends StatelessWidget {
                               total: total,
                               isProcessingFiles: isProcessingFiles,
                               suggestions: messageSuggestions,
+                              settings: settings,
                             ),
                     );
                   },
@@ -404,12 +526,12 @@ class MessageListView extends StatelessWidget {
 
                 final canSelect =
                     (message.role == 'user' || message.role == 'assistant');
-                if (selecting && canSelect) {
-                  final isSelected = selectedItems.contains(message.id);
+                if (widget.selecting && canSelect) {
+                  final isSelected = widget.selectedItems.contains(message.id);
                   content = GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () =>
-                        onToggleSelection?.call(message.id, !isSelected),
+                        widget.onToggleSelection?.call(message.id, !isSelected),
                     child: IgnorePointer(ignoring: true, child: content),
                   );
                 }
@@ -421,18 +543,19 @@ class MessageListView extends StatelessWidget {
         ),
         if (showDivider)
           Padding(
-            padding: dividerPadding,
+            padding: widget.dividerPadding,
             child: _buildContextDivider(context),
           ),
       ],
     );
 
     final isSpotlight =
-        spotlightMessageId != null && message.id == spotlightMessageId;
+        widget.spotlightMessageId != null &&
+        message.id == widget.spotlightMessageId;
     if (!isSpotlight) return messageColumn;
 
     return TweenAnimationBuilder<double>(
-      key: ValueKey('spotlight-$spotlightToken'),
+      key: ValueKey('spotlight-${widget.spotlightToken}'),
       tween: Tween<double>(begin: 1.0, end: 0.0),
       duration: const Duration(milliseconds: 1200),
       curve: Curves.easeOut,
@@ -460,14 +583,6 @@ class MessageListView extends StatelessWidget {
     );
   }
 
-  int _latestAssistantMessageIndex() {
-    for (var i = messages.length - 1; i >= 0; i--) {
-      final message = messages[i];
-      if (message.role == 'assistant' && !message.isStreaming) return i;
-    }
-    return -1;
-  }
-
   /// Build a streaming message widget that uses ValueListenableBuilder
   /// to avoid full page rebuilds during streaming.
   Widget _buildStreamingMessageWidget(
@@ -484,9 +599,10 @@ class MessageListView extends StatelessWidget {
     required int total,
     required bool isProcessingFiles,
     required List<String> suggestions,
+    required _MessageListSettingsSnapshot settings,
   }) {
     return ValueListenableBuilder<StreamingContentData>(
-      valueListenable: streamingContentNotifier!.getNotifier(message.id),
+      valueListenable: widget.streamingContentNotifier!.getNotifier(message.id),
       builder: (context, data, child) {
         // Use streaming content if available, otherwise fall back to message content
         final displayContent = data.content.isNotEmpty
@@ -542,6 +658,7 @@ class MessageListView extends StatelessWidget {
             total: total,
             isProcessingFiles: isProcessingFiles,
             suggestions: suggestions,
+            settings: settings,
           ),
         );
       },
@@ -563,16 +680,17 @@ class MessageListView extends StatelessWidget {
     required int total,
     required bool isProcessingFiles,
     required List<String> suggestions,
+    required _MessageListSettingsSnapshot settings,
   }) {
     return ChatMessageWidget(
       message: message,
       versionIndex: selectedIdx,
       versionCount: total > 0 ? total : 1,
       onPrevVersion: (selectedIdx > 0)
-          ? () => onVersionChange?.call(gid, selectedIdx - 1)
+          ? () => widget.onVersionChange?.call(gid, selectedIdx - 1)
           : null,
       onNextVersion: (selectedIdx < total - 1)
-          ? () => onVersionChange?.call(gid, selectedIdx + 1)
+          ? () => widget.onVersionChange?.call(gid, selectedIdx + 1)
           : null,
       modelIcon:
           (!useAssistAvatar &&
@@ -585,20 +703,19 @@ class MessageListView extends StatelessWidget {
               size: 30,
             )
           : null,
-      showModelIcon: useAssistAvatar
-          ? false
-          : context.watch<SettingsProvider>().showModelIcon,
+      showModelIcon: useAssistAvatar ? false : settings.showModelIcon,
       useAssistantAvatar: useAssistAvatar && message.role == 'assistant',
       useAssistantName: useAssistName && message.role == 'assistant',
       assistantName: (useAssistAvatar || useAssistName)
           ? (assistant?.name ?? 'Assistant')
           : null,
       assistantAvatar: useAssistAvatar ? (assistant?.avatar ?? '') : null,
-      showUserAvatar: context.watch<SettingsProvider>().showUserAvatar,
-      showTokenStats: context.watch<SettingsProvider>().showTokenStats,
+      showUserAvatar: settings.showUserAvatar,
+      showTokenStats: settings.showTokenStats,
       hideStreamingIndicator:
           isProcessingFiles ||
-          (isPinnedIndicatorActive && (message.id == pinnedStreamingMessageId)),
+          (widget.isPinnedIndicatorActive &&
+              (message.id == widget.pinnedStreamingMessageId)),
       reasoningText: (message.role == 'assistant') ? (r?.text ?? '') : null,
       reasoningExpanded: (message.role == 'assistant')
           ? (r?.expanded ?? false)
@@ -611,32 +728,32 @@ class MessageListView extends StatelessWidget {
       reasoningStartAt: (message.role == 'assistant') ? r?.startAt : null,
       reasoningFinishedAt: (message.role == 'assistant') ? r?.finishedAt : null,
       onToggleReasoning: (message.role == 'assistant' && r != null)
-          ? () => onToggleReasoning?.call(message.id)
+          ? () => widget.onToggleReasoning?.call(message.id)
           : null,
       translationExpanded: t?.expanded ?? true,
       onToggleTranslation:
           (message.translation != null &&
               message.translation!.isNotEmpty &&
               t != null)
-          ? () => onToggleTranslation?.call(message.id)
+          ? () => widget.onToggleTranslation?.call(message.id)
           : null,
       onRegenerate: message.role == 'assistant'
-          ? () => onRegenerateMessage?.call(message)
+          ? () => widget.onRegenerateMessage?.call(message)
           : null,
       onResend: message.role == 'user'
-          ? () => onResendMessage?.call(message)
+          ? () => widget.onResendMessage?.call(message)
           : null,
       onTranslate: message.role == 'assistant'
-          ? () => onTranslateMessage?.call(message)
+          ? () => widget.onTranslateMessage?.call(message)
           : null,
       onSpeak: message.role == 'assistant'
-          ? () => onSpeakMessage?.call(message)
+          ? () => widget.onSpeakMessage?.call(message)
           : null,
       onEdit: (message.role == 'user' || message.role == 'assistant')
-          ? () => onEditMessage?.call(message)
+          ? () => widget.onEditMessage?.call(message)
           : null,
       onDelete: message.role == 'user'
-          ? () => onDeleteMessage?.call(message, byGroup)
+          ? () => widget.onDeleteMessage?.call(message, widget.byGroup)
           : null,
       onMore: () async {
         final action = await showMessageMoreSheet(
@@ -645,30 +762,32 @@ class MessageListView extends StatelessWidget {
           canDeleteAllVersions: total > 1,
         );
         if (action == MessageMoreAction.deleteCurrentVersion) {
-          await onDeleteMessage?.call(message, byGroup);
+          await widget.onDeleteMessage?.call(message, widget.byGroup);
         } else if (action == MessageMoreAction.deleteAllVersions) {
-          await onDeleteAllVersions?.call(message, byGroup);
+          await widget.onDeleteAllVersions?.call(message, widget.byGroup);
         } else if (action == MessageMoreAction.edit) {
-          onEditMessage?.call(message);
+          widget.onEditMessage?.call(message);
         } else if (action == MessageMoreAction.fork) {
-          await onForkConversation?.call(message);
+          await widget.onForkConversation?.call(message);
         } else if (action == MessageMoreAction.share) {
-          onShareMessage?.call(index, messages);
+          widget.onShareMessage?.call(index, widget.messages);
         }
       },
-      toolParts: message.role == 'assistant' ? toolParts[message.id] : null,
+      toolParts: message.role == 'assistant'
+          ? widget.toolParts[message.id]
+          : null,
       contentSplitOffsets: message.role == 'assistant'
-          ? contentSplits[message.id]?.offsets
+          ? widget.contentSplits[message.id]?.offsets
           : null,
       reasoningCountAtSplit: message.role == 'assistant'
-          ? contentSplits[message.id]?.reasoningCounts
+          ? widget.contentSplits[message.id]?.reasoningCounts
           : null,
       toolCountAtSplit: message.role == 'assistant'
-          ? contentSplits[message.id]?.toolCounts
+          ? widget.contentSplits[message.id]?.toolCounts
           : null,
       reasoningSegments: message.role == 'assistant'
           ? (() {
-              final segments = reasoningSegments[message.id];
+              final segments = widget.reasoningSegments[message.id];
               if (segments == null || segments.isEmpty) return null;
               return segments
                   .asMap()
@@ -683,8 +802,10 @@ class MessageListView extends StatelessWidget {
                           entry.value.text.isNotEmpty,
                       startAt: entry.value.startAt,
                       finishedAt: entry.value.finishedAt,
-                      onToggle: () =>
-                          onToggleReasoningSegment?.call(message.id, entry.key),
+                      onToggle: () => widget.onToggleReasoningSegment?.call(
+                        message.id,
+                        entry.key,
+                      ),
                       toolStartIndex: entry.value.toolStartIndex,
                     ),
                   )
@@ -693,10 +814,11 @@ class MessageListView extends StatelessWidget {
           : null,
       isProcessingFiles: isProcessingFiles,
       suggestions: suggestions,
-      onSuggestionTap: onSuggestionTap,
-      onRecoveredAskUserAnswer: onRecoveredAskUserAnswer == null
+      onSuggestionTap: widget.onSuggestionTap,
+      onRecoveredAskUserAnswer: widget.onRecoveredAskUserAnswer == null
           ? null
-          : (part, result) => onRecoveredAskUserAnswer!(message, part, result),
+          : (part, result) =>
+                widget.onRecoveredAskUserAnswer!(message, part, result),
     );
   }
 }
