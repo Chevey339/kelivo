@@ -41,6 +41,8 @@ class ChatIndexedScrollControllers {
   final ScrollOffsetListener scrollOffsetListener;
 }
 
+enum ChatUserScrollIntentDirection { unknown, towardTop, towardBottom }
+
 class ChatScrollPositionTracker {
   ChatScrollPositionTracker({
     required ChatIndexedScrollControllers controllers,
@@ -67,12 +69,17 @@ class ChatScrollPositionTracker {
   StreamSubscription<double>? _offsetSubscription;
   Timer? _scrollIdleTimer;
   ChatVisibleRange _visibleRange = ChatVisibleRange.empty;
+  int? _visibleRangeItemCount;
   bool _isUserScrolling = false;
   bool _isProgrammaticScroll = false;
   double _lastUserScrollDelta = 0;
   int _jumpGeneration = 0;
 
   ChatVisibleRange get visibleRange => _visibleRange;
+  bool get hasCurrentVisibleRange =>
+      _visibleRangeItemCount == _itemCount() &&
+      _visibleRange.firstIndex >= 0 &&
+      _visibleRange.lastIndex >= 0;
   bool get isUserScrolling => _isUserScrolling;
   bool get isAttached => _controllers.itemScrollController.isAttached;
   int get firstVisibleIndex => _visibleRange.firstIndex;
@@ -87,6 +94,47 @@ class ChatScrollPositionTracker {
       if (position.index == index) return position.itemLeadingEdge;
     }
     return null;
+  }
+
+  ItemPosition? readingAnchorPosition() {
+    final count = _itemCount();
+    if (count <= 0) return null;
+    final positions =
+        _controllers.itemPositionsListener.itemPositions.value
+            .where(
+              (position) =>
+                  position.index >= 0 &&
+                  position.index < count &&
+                  position.itemTrailingEdge > 0 &&
+                  position.itemLeadingEdge < 1,
+            )
+            .toList(growable: false)
+          ..sort((a, b) => a.itemLeadingEdge.compareTo(b.itemLeadingEdge));
+    if (positions.isEmpty) return null;
+    return positions.firstWhere(
+      (position) => position.itemTrailingEdge > 0.04,
+      orElse: () => positions.first,
+    );
+  }
+
+  bool visibleContentFitsInViewport() {
+    final count = _itemCount();
+    if (count <= 0) return true;
+    if (!hasCurrentVisibleRange) return false;
+
+    ItemPosition? firstMessage;
+    ItemPosition? bottomAnchor;
+    for (final position
+        in _controllers.itemPositionsListener.itemPositions.value) {
+      if (position.index == 0) {
+        firstMessage = position;
+      } else if (position.index == count) {
+        bottomAnchor = position;
+      }
+    }
+    return firstMessage != null &&
+        bottomAnchor != null &&
+        bottomAnchor.itemTrailingEdge - firstMessage.itemLeadingEdge <= 1.02;
   }
 
   void _onPositionsChanged() {
@@ -112,7 +160,8 @@ class ChatScrollPositionTracker {
           )
         : _rangeFromPositions(visible, count, bottomAnchorIndex);
 
-    if (_visibleRange.firstIndex == next.firstIndex &&
+    if (_visibleRangeItemCount == count &&
+        _visibleRange.firstIndex == next.firstIndex &&
         _visibleRange.lastIndex == next.lastIndex &&
         _visibleRange.isAtTop == next.isAtTop &&
         _visibleRange.isAtBottom == next.isAtBottom) {
@@ -120,6 +169,7 @@ class ChatScrollPositionTracker {
     }
 
     _visibleRange = next;
+    _visibleRangeItemCount = count;
     _onChanged();
   }
 
@@ -159,8 +209,8 @@ class ChatScrollPositionTracker {
     _lastUserScrollDelta = delta;
     if (!_isUserScrolling) {
       _isUserScrolling = true;
-      _onChanged();
     }
+    _onChanged();
     _scrollIdleTimer?.cancel();
     _scrollIdleTimer = Timer(_scrollIdleDelay, () {
       if (!_isUserScrolling) return;

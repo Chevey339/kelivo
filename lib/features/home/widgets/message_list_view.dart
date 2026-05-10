@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -44,6 +45,8 @@ typedef OnRecoveredAskUserAnswer =
       ToolUIPart part,
       AskUserResult result,
     );
+typedef OnUserScrollIntent =
+    void Function(ChatUserScrollIntentDirection direction);
 typedef OnUserResizesMessageContent =
     void Function(ChatMessage message, int index);
 
@@ -186,7 +189,7 @@ class MessageListView extends StatefulWidget {
   final void Function(String messageId)? onToggleTranslation;
   final void Function(String messageId, int segmentIndex)?
   onToggleReasoningSegment;
-  final VoidCallback? onUserScrollIntent;
+  final OnUserScrollIntent? onUserScrollIntent;
   final OnUserResizesMessageContent? onUserResizesMessageContent;
   final void Function(ChatMessage message, int index)? onMessageVisible;
   final ValueChanged<double>? onBottomAnchorAlignmentChanged;
@@ -244,6 +247,7 @@ class _MessageListViewState extends State<MessageListView> {
   final List<(ChatMessage, int)> _pendingVisibleMessages =
       <(ChatMessage, int)>[];
   bool _visibleFlushScheduled = false;
+  bool _pointerScrollIntentSent = false;
 
   @override
   void didUpdateWidget(covariant MessageListView oldWidget) {
@@ -378,7 +382,37 @@ class _MessageListViewState extends State<MessageListView> {
             widget.onBottomAnchorAlignmentChanged?.call(bottomAnchorAlignment);
             final list = Listener(
               behavior: HitTestBehavior.translucent,
-              onPointerDown: (_) => widget.onUserScrollIntent?.call(),
+              onPointerDown: (_) {
+                _pointerScrollIntentSent = false;
+              },
+              onPointerMove: (event) {
+                if (_pointerScrollIntentSent) return;
+                _pointerScrollIntentSent = true;
+                widget.onUserScrollIntent?.call(
+                  event.delta.dy > 0
+                      ? ChatUserScrollIntentDirection.towardTop
+                      : ChatUserScrollIntentDirection.towardBottom,
+                );
+              },
+              onPointerUp: (_) {
+                _pointerScrollIntentSent = false;
+              },
+              onPointerCancel: (_) {
+                _pointerScrollIntentSent = false;
+              },
+              onPointerSignal: (event) {
+                if (event is PointerScrollEvent) {
+                  widget.onUserScrollIntent?.call(
+                    event.scrollDelta.dy > 0
+                        ? ChatUserScrollIntentDirection.towardBottom
+                        : ChatUserScrollIntentDirection.towardTop,
+                  );
+                  return;
+                }
+                widget.onUserScrollIntent?.call(
+                  ChatUserScrollIntentDirection.unknown,
+                );
+              },
               child: ScrollablePositionedList.builder(
                 itemScrollController:
                     widget.scrollControllers.itemScrollController,

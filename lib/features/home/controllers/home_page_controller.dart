@@ -415,8 +415,6 @@ class HomePageController extends ChangeNotifier {
       getShouldAutoStickToBottom: () => _shouldAutoStickToBottom(),
       getAutoScrollEnabled: () =>
           _context.read<SettingsProvider>().autoScrollEnabled,
-      getAutoScrollIdleSeconds: () =>
-          _context.read<SettingsProvider>().autoScrollIdleSeconds,
       getItemCount: () => _chatController.collapsedMessages.length,
       getBottomAnchorAlignment: () => _bottomAnchorAlignment,
     );

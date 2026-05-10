@@ -18,7 +18,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => itemCount,
         getBottomAnchorAlignment: () => 1,
       );
@@ -61,7 +60,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => itemCount,
         getBottomAnchorAlignment: () => 1,
       );
@@ -107,7 +105,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => messages.length,
         getBottomAnchorAlignment: () => 1,
       );
@@ -188,7 +185,6 @@ void main() {
         },
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => itemCount,
         getBottomAnchorAlignment: () => 1,
       );
@@ -228,7 +224,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => itemCount,
         getBottomAnchorAlignment: () => 1,
       );
@@ -277,7 +272,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 1,
         getItemCount: () => messageCount,
         getBottomAnchorAlignment: () => bottomAnchorAlignment,
       );
@@ -327,7 +321,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => messageCount,
         getBottomAnchorAlignment: () => bottomAnchorAlignment,
       );
@@ -371,6 +364,56 @@ void main() {
       chatScrollController.dispose();
     });
 
+    testWidgets('用户上滑离开底部后空闲状态会结束以允许阅读锚点维护', (tester) async {
+      const messageCount = 120;
+      const bottomAnchorHeight = 120.0;
+      final bottomAnchorAlignment = 1 - bottomAnchorHeight / _harnessHeight;
+      final scrollControllers = ChatIndexedScrollControllers();
+      late final ChatScrollController chatScrollController;
+      chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () {
+          if (chatScrollController.isUserScrolling) return false;
+          return chatScrollController.isNearBottom(48);
+        },
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => bottomAnchorAlignment,
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: messageCount,
+          initialAlignment: bottomAnchorAlignment,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(height: 56, child: Text('Message $index'));
+          },
+        ),
+      );
+      await tester.pump();
+
+      await tester.drag(
+        find.byType(ScrollablePositionedList),
+        const Offset(0, 360),
+      );
+      await tester.pump();
+      expect(chatScrollController.isUserScrolling, isTrue);
+
+      await tester.pump(const Duration(milliseconds: 240));
+
+      expect(chatScrollController.autoStickToBottom, isFalse);
+      expect(chatScrollController.isNearBottom(), isFalse);
+      expect(chatScrollController.isUserScrolling, isFalse);
+
+      chatScrollController.dispose();
+    });
+
     testWidgets('用户展开消息内容后内容变化不会重新强行贴底', (tester) async {
       const messageCount = 80;
       const bottomAnchorHeight = 120.0;
@@ -381,7 +424,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => messageCount,
         getBottomAnchorAlignment: () => bottomAnchorAlignment,
       );
@@ -423,7 +465,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 1,
         getItemCount: () => messageCount,
         getBottomAnchorAlignment: () => bottomAnchorAlignment,
       );
@@ -473,7 +514,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => messageCount,
         getBottomAnchorAlignment: () => bottomAnchorAlignment,
       );
@@ -523,7 +563,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => messageCount,
         getBottomAnchorAlignment: () => 1,
       );
@@ -577,7 +616,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => messageCount,
         getBottomAnchorAlignment: () => bottomAnchorAlignment,
       );
@@ -631,7 +669,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => messageCount,
         getBottomAnchorAlignment: () => bottomAnchorAlignment,
       );
@@ -670,7 +707,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 1,
         getItemCount: () => messageCount,
         getBottomAnchorAlignment: () => bottomAnchorAlignment,
       );
@@ -698,11 +734,17 @@ void main() {
       await tester.pump(const Duration(milliseconds: 240));
       expect(chatScrollController.autoStickToBottom, isFalse);
 
+      chatScrollController.handleUserScrollIntent(
+        ChatUserScrollIntentDirection.towardBottom,
+      );
       await tester.drag(
         find.byType(ScrollablePositionedList),
         const Offset(0, -360),
       );
       await tester.pump(const Duration(milliseconds: 240));
+      chatScrollController.handleUserScrollIntent(
+        ChatUserScrollIntentDirection.towardBottom,
+      );
       await tester.drag(
         find.byType(ScrollablePositionedList),
         const Offset(0, -360),
@@ -724,7 +766,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => messageCount,
         getBottomAnchorAlignment: () => 1 - bottomAnchorHeight / _harnessHeight,
       );
@@ -767,7 +808,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => messageCount,
         getBottomAnchorAlignment: () => bottomAnchorAlignment,
       );
@@ -823,7 +863,6 @@ void main() {
         onStateChanged: () {},
         getShouldAutoStickToBottom: () => true,
         getAutoScrollEnabled: () => true,
-        getAutoScrollIdleSeconds: () => 8,
         getItemCount: () => messageCount,
         getBottomAnchorAlignment: () => 1 - bottomAnchorHeight / _harnessHeight,
       );
@@ -852,6 +891,577 @@ void main() {
           .value
           .firstWhere((position) => position.index == 0);
       expect(firstMessage.itemLeadingEdge, 0);
+
+      chatScrollController.dispose();
+    });
+
+    testWidgets('用户在短内容顶部拖动时顶部重对齐不会重新打开贴底', (tester) async {
+      const messageCount = 1;
+      const bottomAnchorHeight = 120.0;
+      final scrollControllers = ChatIndexedScrollControllers();
+      final chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => 1 - bottomAnchorHeight / _harnessHeight,
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return const SizedBox(height: 56, child: Text('Message 0'));
+          },
+        ),
+      );
+      await tester.pump();
+
+      chatScrollController.handleUserScrollIntent(
+        ChatUserScrollIntentDirection.towardTop,
+      );
+      scrollControllers.itemScrollController.jumpTo(index: 0, alignment: 0.1);
+      await tester.pump();
+      await tester.pump();
+
+      expect(chatScrollController.autoStickToBottom, isFalse);
+
+      chatScrollController.dispose();
+    });
+
+    testWidgets('用户停在顶部附近后流式维护不会保留下拉空隙', (tester) async {
+      const messageCount = 80;
+      const bottomAnchorHeight = 120.0;
+      final scrollControllers = ChatIndexedScrollControllers();
+      late final ChatScrollController chatScrollController;
+      chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () {
+          if (chatScrollController.isUserScrolling) return false;
+          return chatScrollController.isNearBottom(48);
+        },
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => 1 - bottomAnchorHeight / _harnessHeight,
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: messageCount,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(height: 72, child: Text('Message $index'));
+          },
+        ),
+      );
+      await tester.pump();
+
+      chatScrollController.handleUserScrollIntent(
+        ChatUserScrollIntentDirection.towardTop,
+      );
+      scrollControllers.itemScrollController.jumpTo(index: 0, alignment: 0.12);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 240));
+
+      chatScrollController.autoScrollToBottomIfNeeded();
+      await tester.pump();
+      await tester.pump();
+
+      final firstMessage = _positionFor(scrollControllers, 0);
+      expect(firstMessage.itemLeadingEdge, closeTo(0, 0.02));
+      expect(chatScrollController.autoStickToBottom, isFalse);
+
+      chatScrollController.dispose();
+    });
+
+    testWidgets('首条消息内容变高先触发内容跟随后仍继续自动贴底', (tester) async {
+      const messageCount = 1;
+      const bottomAnchorHeight = 120.0;
+      final bottomAnchorAlignment = 1 - bottomAnchorHeight / _harnessHeight;
+      var messageHeight = 240.0;
+      final scrollControllers = ChatIndexedScrollControllers();
+      late final ChatScrollController chatScrollController;
+      chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () {
+          if (chatScrollController.isUserScrolling) return false;
+          if (!chatScrollController.hasEnoughContentToScroll(56.0)) {
+            return true;
+          }
+          return chatScrollController.isNearBottom(48);
+        },
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => bottomAnchorAlignment,
+      );
+
+      Widget buildHarness() {
+        return _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: messageCount,
+          initialAlignment: bottomAnchorAlignment,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(
+              height: messageHeight,
+              child: const Text('Message'),
+            );
+          },
+        );
+      }
+
+      await tester.pumpWidget(buildHarness());
+      await tester.pump();
+      expect(chatScrollController.isNearBottom(), isTrue);
+      expect(chatScrollController.autoStickToBottom, isTrue);
+
+      messageHeight = 900.0;
+      await tester.pumpWidget(buildHarness());
+      await tester.pump();
+
+      chatScrollController.followBottomAfterContentChange();
+      chatScrollController.autoScrollToBottomIfNeeded();
+      for (var i = 0; i < 8; i++) {
+        await tester.pump();
+      }
+
+      final anchor = _positionFor(scrollControllers, messageCount);
+      expect(anchor.itemTrailingEdge, closeTo(1, 0.02));
+      expect(chatScrollController.autoStickToBottom, isTrue);
+
+      chatScrollController.dispose();
+    });
+
+    testWidgets('流式 tick 早于本帧布局时仍会滚到新内容底部', (tester) async {
+      const messageCount = 1;
+      const bottomAnchorHeight = 120.0;
+      final bottomAnchorAlignment = 1 - bottomAnchorHeight / _harnessHeight;
+      var messageHeight = 240.0;
+      final scrollControllers = ChatIndexedScrollControllers();
+      final chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => bottomAnchorAlignment,
+      );
+
+      Widget buildHarness() {
+        return _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: messageCount,
+          initialAlignment: bottomAnchorAlignment,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(
+              height: messageHeight,
+              child: const Text('Message'),
+            );
+          },
+        );
+      }
+
+      await tester.pumpWidget(buildHarness());
+      await tester.pump();
+      expect(chatScrollController.autoStickToBottom, isTrue);
+
+      messageHeight = 900.0;
+      chatScrollController.autoScrollToBottomIfNeeded();
+      await tester.pumpWidget(buildHarness());
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+
+      final anchor = _positionFor(scrollControllers, messageCount);
+      expect(anchor.itemTrailingEdge, closeTo(1, 0.02));
+
+      chatScrollController.dispose();
+    });
+
+    testWidgets('首条流式从不满一屏跨到超出一屏时继续贴底', (tester) async {
+      const messageCount = 1;
+      const bottomAnchorHeight = 120.0;
+      final bottomAnchorAlignment = 1 - bottomAnchorHeight / _harnessHeight;
+      var messageHeight = 240.0;
+      final scrollControllers = ChatIndexedScrollControllers();
+      final chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => bottomAnchorAlignment,
+      );
+
+      Widget buildHarness() {
+        return _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: messageCount,
+          initialAlignment: bottomAnchorAlignment,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(
+              height: messageHeight,
+              child: const Text('Message'),
+            );
+          },
+        );
+      }
+
+      await tester.pumpWidget(buildHarness());
+      await tester.pump();
+      expect(chatScrollController.autoStickToBottom, isTrue);
+
+      messageHeight = 520.0;
+      chatScrollController.autoScrollToBottomIfNeeded();
+      await tester.pumpWidget(buildHarness());
+      await tester.pump();
+
+      messageHeight = 900.0;
+      chatScrollController.autoScrollToBottomIfNeeded();
+      await tester.pumpWidget(buildHarness());
+      for (var i = 0; i < 8; i++) {
+        await tester.pump();
+      }
+
+      final anchor = _positionFor(scrollControllers, messageCount);
+      expect(anchor.itemTrailingEdge, closeTo(1, 0.02));
+      expect(chatScrollController.autoStickToBottom, isTrue);
+
+      chatScrollController.dispose();
+    });
+
+    testWidgets('首个用户消息后的短流式回复保持顶部超出一屏后才贴底', (tester) async {
+      const messageCount = 2;
+      const bottomAnchorHeight = 120.0;
+      final bottomAnchorAlignment = 1 - bottomAnchorHeight / _harnessHeight;
+      var assistantHeight = 120.0;
+      final scrollControllers = ChatIndexedScrollControllers();
+      final chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => bottomAnchorAlignment,
+      );
+
+      Widget buildHarness() {
+        return _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: 0,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return const SizedBox(height: 96, child: Text('User message'));
+            }
+            if (index == 1) {
+              return SizedBox(
+                height: assistantHeight,
+                child: const Text('Assistant message'),
+              );
+            }
+            return const SizedBox(height: bottomAnchorHeight);
+          },
+        );
+      }
+
+      await tester.pumpWidget(buildHarness());
+      await tester.pump();
+      expect(
+        _positionFor(scrollControllers, 0).itemLeadingEdge,
+        closeTo(0, 0.02),
+      );
+
+      chatScrollController.autoScrollToBottomIfNeeded();
+      for (var i = 0; i < 4; i++) {
+        await tester.pump();
+      }
+
+      expect(
+        _positionFor(scrollControllers, 0).itemLeadingEdge,
+        closeTo(0, 0.02),
+      );
+
+      assistantHeight = 900.0;
+      chatScrollController.autoScrollToBottomIfNeeded();
+      await tester.pumpWidget(buildHarness());
+      for (var i = 0; i < 8; i++) {
+        await tester.pump();
+      }
+
+      final anchor = _positionFor(scrollControllers, messageCount);
+      expect(anchor.itemTrailingEdge, closeTo(1, 0.02));
+      expect(chatScrollController.autoStickToBottom, isTrue);
+
+      chatScrollController.dispose();
+    });
+
+    testWidgets('关闭自动贴底后内容变化不会自动滚到底部', (tester) async {
+      var messageCount = 0;
+      var messageHeight = 56.0;
+      const bottomAnchorHeight = 120.0;
+      final bottomAnchorAlignment = 1 - bottomAnchorHeight / _harnessHeight;
+      final scrollControllers = ChatIndexedScrollControllers();
+      final chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => false,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => bottomAnchorAlignment,
+      );
+
+      Widget buildHarness() {
+        return _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialAlignment: bottomAnchorAlignment,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(
+              height: messageHeight,
+              child: const Text('Message'),
+            );
+          },
+        );
+      }
+
+      await tester.pumpWidget(buildHarness());
+      await tester.pump();
+
+      messageCount = 1;
+      messageHeight = 900.0;
+      chatScrollController.followBottomAfterContentChange();
+      await tester.pumpWidget(buildHarness());
+      await tester.pump();
+      await tester.pump();
+
+      final message = _positionFor(scrollControllers, 0);
+      expect(message.itemLeadingEdge, closeTo(0, 0.02));
+      expect(chatScrollController.autoStickToBottom, isFalse);
+
+      chatScrollController.dispose();
+    });
+
+    testWidgets('真实拖动到底部后会恢复流式自动贴底', (tester) async {
+      const messageCount = 120;
+      const bottomAnchorHeight = 120.0;
+      final bottomAnchorAlignment = 1 - bottomAnchorHeight / _harnessHeight;
+      final scrollControllers = ChatIndexedScrollControllers();
+      late final ChatScrollController chatScrollController;
+      chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => bottomAnchorAlignment,
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: messageCount,
+          initialAlignment: bottomAnchorAlignment,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(height: 56, child: Text('Message $index'));
+          },
+        ),
+      );
+      await tester.pump();
+      expect(chatScrollController.autoStickToBottom, isTrue);
+
+      await tester.drag(
+        find.byType(ScrollablePositionedList),
+        const Offset(0, 360),
+      );
+      await tester.pump(const Duration(milliseconds: 240));
+      expect(chatScrollController.autoStickToBottom, isFalse);
+
+      for (var i = 0; i < 3; i++) {
+        chatScrollController.handleUserScrollIntent(
+          ChatUserScrollIntentDirection.towardBottom,
+        );
+        await tester.drag(
+          find.byType(ScrollablePositionedList),
+          const Offset(0, -360),
+        );
+        await tester.pump(const Duration(milliseconds: 240));
+      }
+
+      expect(chatScrollController.isNearBottom(), isTrue);
+      expect(chatScrollController.autoStickToBottom, isTrue);
+
+      chatScrollController.dispose();
+    });
+
+    testWidgets('点到底部后用户上滑会停止后续流式贴底', (tester) async {
+      const messageCount = 12;
+      const bottomAnchorHeight = 120.0;
+      final bottomAnchorAlignment = 1 - bottomAnchorHeight / _harnessHeight;
+      var lastMessageHeight = 120.0;
+      final scrollControllers = ChatIndexedScrollControllers();
+      final chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => bottomAnchorAlignment,
+      );
+
+      Widget buildHarness() {
+        return _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: 0,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            final height = index == messageCount - 1
+                ? lastMessageHeight
+                : 120.0;
+            return SizedBox(height: height, child: Text('Message $index'));
+          },
+        );
+      }
+
+      await tester.pumpWidget(buildHarness());
+      await tester.pump();
+
+      chatScrollController.forceScrollToBottom();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 280));
+      expect(chatScrollController.isNearBottom(), isTrue);
+
+      chatScrollController.handleUserScrollIntent();
+      await tester.drag(
+        find.byType(ScrollablePositionedList),
+        const Offset(0, 180),
+      );
+      await tester.pump(const Duration(milliseconds: 240));
+      expect(chatScrollController.autoStickToBottom, isFalse);
+
+      lastMessageHeight = 480.0;
+      await tester.pumpWidget(buildHarness());
+      await tester.pump();
+      chatScrollController.autoScrollToBottomIfNeeded();
+      chatScrollController.followBottomAfterContentChange();
+      await tester.pump();
+      await tester.pump();
+
+      expect(chatScrollController.autoStickToBottom, isFalse);
+      expect(chatScrollController.isNearBottom(), isFalse);
+
+      chatScrollController.dispose();
+    });
+
+    testWidgets('用户上滑阅读流式助手消息时新增内容不会持续推走当前阅读行', (tester) async {
+      const messageCount = 2;
+      const bottomAnchorHeight = 120.0;
+      final bottomAnchorAlignment = 1 - bottomAnchorHeight / _harnessHeight;
+      var streamingLineCount = 28;
+      final scrollControllers = ChatIndexedScrollControllers();
+      late final ChatScrollController chatScrollController;
+      chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () {
+          if (chatScrollController.isUserScrolling) return false;
+          if (!chatScrollController.hasEnoughContentToScroll(56.0)) {
+            return true;
+          }
+          return chatScrollController.isNearBottom(48);
+        },
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => bottomAnchorAlignment,
+      );
+
+      Widget buildHarness() {
+        return _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: messageCount,
+          initialAlignment: bottomAnchorAlignment,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return const SizedBox(height: 96, child: Text('User message'));
+            }
+            if (index == 1) {
+              return Column(
+                children: [
+                  for (var line = 0; line < streamingLineCount; line++)
+                    SizedBox(
+                      key: ValueKey('streaming-line-$line'),
+                      height: 40,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text('Streaming line $line'),
+                      ),
+                    ),
+                ],
+              );
+            }
+            return const SizedBox(height: bottomAnchorHeight);
+          },
+        );
+      }
+
+      await tester.pumpWidget(buildHarness());
+      await tester.pump();
+      expect(chatScrollController.isNearBottom(), isTrue);
+
+      await tester.drag(
+        find.byType(ScrollablePositionedList),
+        const Offset(0, 320),
+      );
+      await tester.pump(const Duration(milliseconds: 240));
+      expect(chatScrollController.autoStickToBottom, isFalse);
+
+      final anchorFinder = find.byKey(const ValueKey('streaming-line-16'));
+      expect(anchorFinder, findsOneWidget);
+      final beforeTop = tester.getTopLeft(anchorFinder).dy;
+
+      for (var step = 0; step < 4; step++) {
+        streamingLineCount += 8;
+        await tester.pumpWidget(buildHarness());
+        chatScrollController.autoScrollToBottomIfNeeded();
+        await tester.pump();
+        await tester.pump();
+      }
+
+      expect(tester.getTopLeft(anchorFinder).dy, closeTo(beforeTop, 2.0));
+      expect(chatScrollController.autoStickToBottom, isFalse);
 
       chatScrollController.dispose();
     });

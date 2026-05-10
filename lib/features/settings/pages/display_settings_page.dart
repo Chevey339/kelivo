@@ -299,31 +299,13 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                 onTap: () => _showChatFontSizeSheet(context),
               ),
               _iosDivider(context),
-              _iosNavRow(
+              _iosSwitchRow(
                 context,
                 icon: Lucide.ArrowDown,
-                label: l10n.displaySettingsPageAutoScrollIdleTitle,
-                detailBuilder: (ctx) {
-                  final sp = ctx.watch<SettingsProvider>();
-                  if (!sp.autoScrollEnabled) {
-                    return Text(
-                      l10n.displaySettingsPageAutoScrollDisabledLabel,
-                      style: TextStyle(
-                        color: cs.onSurface.withValues(alpha: 0.5),
-                        fontSize: 13,
-                      ),
-                    );
-                  }
-                  final seconds = sp.autoScrollIdleSeconds;
-                  return Text(
-                    '${seconds.round()}s',
-                    style: TextStyle(
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                      fontSize: 13,
-                    ),
-                  );
-                },
-                onTap: () => _showAutoScrollIdleSheet(context),
+                label: l10n.displaySettingsPageAutoScrollEnableTitle,
+                value: context.watch<SettingsProvider>().autoScrollEnabled,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setAutoScrollEnabled(v),
               ),
               _iosDivider(context),
               _iosNavRow(
@@ -767,161 +749,6 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                               16 *
                               context.watch<SettingsProvider>().chatFontScale,
                         ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _showAutoScrollIdleSheet(BuildContext context) async {
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: cs.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      isScrollControlled: false,
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-            child: Builder(
-              builder: (context) {
-                final theme = Theme.of(context);
-                final cs = theme.colorScheme;
-                final isDark = theme.brightness == Brightness.dark;
-                final sp = context.watch<SettingsProvider>();
-                final seconds = sp.autoScrollIdleSeconds;
-                final enabled = sp.autoScrollEnabled;
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          l10n.displaySettingsPageAutoScrollEnableTitle,
-                          style: TextStyle(fontSize: 15, color: cs.onSurface),
-                        ),
-                        const Spacer(),
-                        IosSwitch(
-                          value: enabled,
-                          onChanged: (v) => context
-                              .read<SettingsProvider>()
-                              .setAutoScrollEnabled(v),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Text(
-                          '2s',
-                          style: TextStyle(
-                            color: cs.onSurface.withValues(alpha: 0.7),
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: SfSliderTheme(
-                            data: SfSliderThemeData(
-                              activeTrackHeight: 8,
-                              inactiveTrackHeight: 8,
-                              overlayRadius: 14,
-                              activeTrackColor: cs.primary,
-                              inactiveTrackColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.25 : 0.20,
-                              ),
-                              tooltipBackgroundColor: cs.primary,
-                              tooltipTextStyle: TextStyle(
-                                color: cs.onPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              activeTickColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.45 : 0.35,
-                              ),
-                              inactiveTickColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.30 : 0.25,
-                              ),
-                              activeMinorTickColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.34 : 0.28,
-                              ),
-                              inactiveMinorTickColor: cs.onSurface.withValues(
-                                alpha: isDark ? 0.24 : 0.20,
-                              ),
-                            ),
-                            child: SfSlider(
-                              value: seconds.toDouble(),
-                              min: 2.0,
-                              max: 64.0,
-                              stepSize: 2.0,
-                              showTicks: true,
-                              showLabels: true,
-                              interval: 10.0,
-                              minorTicksPerInterval: 1,
-                              enableTooltip: true,
-                              shouldAlwaysShowTooltip: false,
-                              tooltipShape: const SfPaddleTooltipShape(),
-                              labelFormatterCallback: (value, text) =>
-                                  value.toInt().toString(),
-                              thumbIcon: Container(
-                                width: 20,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  color: cs.primary,
-                                  shape: BoxShape.circle,
-                                  boxShadow: isDark
-                                      ? []
-                                      : [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.08,
-                                            ),
-                                            blurRadius: 8,
-                                            offset: Offset(0, 2),
-                                          ),
-                                        ],
-                                ),
-                              ),
-                              onChanged: enabled
-                                  ? (v) => context
-                                        .read<SettingsProvider>()
-                                        .setAutoScrollIdleSeconds(
-                                          (v as double).round(),
-                                        )
-                                  : null,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          enabled
-                              ? '${seconds.round()}s'
-                              : l10n.displaySettingsPageAutoScrollDisabledLabel,
-                          style: TextStyle(
-                            color: cs.onSurface.withValues(
-                              alpha: enabled ? 1.0 : 0.5,
-                            ),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      l10n.displaySettingsPageAutoScrollIdleSubtitle,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
