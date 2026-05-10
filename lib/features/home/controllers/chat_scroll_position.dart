@@ -28,16 +28,20 @@ class ChatIndexedScrollControllers {
   ChatIndexedScrollControllers({
     ItemScrollController? itemScrollController,
     ItemPositionsListener? itemPositionsListener,
+    ScrollOffsetController? scrollOffsetController,
     ScrollOffsetListener? scrollOffsetListener,
   }) : itemScrollController = itemScrollController ?? ItemScrollController(),
        itemPositionsListener =
            itemPositionsListener ?? ItemPositionsListener.create(),
+       scrollOffsetController =
+           scrollOffsetController ?? ScrollOffsetController(),
        scrollOffsetListener =
            scrollOffsetListener ??
            ScrollOffsetListener.create(recordProgrammaticScrolls: false);
 
   final ItemScrollController itemScrollController;
   final ItemPositionsListener itemPositionsListener;
+  final ScrollOffsetController scrollOffsetController;
   final ScrollOffsetListener scrollOffsetListener;
 }
 
@@ -269,6 +273,27 @@ class ChatScrollPositionTracker {
         _isProgrammaticScroll = false;
       });
     }
+  }
+
+  Future<void> scrollByOffset(double offset) async {
+    if (!_controllers.itemScrollController.isAttached) return;
+    if (offset.abs() < 0.5) return;
+    if ((offset < 0 && isAtTop) || (offset > 0 && isAtBottom)) return;
+    _jumpGeneration++;
+    _isProgrammaticScroll = false;
+    _isUserScrolling = true;
+    _lastUserScrollDelta = offset;
+    _scrollIdleTimer?.cancel();
+    await _controllers.scrollOffsetController.animateScroll(
+      offset: offset,
+      duration: const Duration(milliseconds: 1),
+    );
+    _onChanged();
+    _scrollIdleTimer = Timer(_scrollIdleDelay, () {
+      if (!_isUserScrolling) return;
+      _isUserScrolling = false;
+      _onChanged();
+    });
   }
 
   void resetUserScrolling() {

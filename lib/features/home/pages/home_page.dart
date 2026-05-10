@@ -1232,6 +1232,10 @@ class _HomePageState extends State<HomePage>
                 }
               : null,
           bottomOffset: _controller.inputBarHeight + 12,
+          onScrollDragStart:
+              _controller.scrollCtrl.handleForwardedScrollDragStart,
+          onScrollDragUpdate:
+              _controller.scrollCtrl.handleForwardedScrollDragUpdate,
           onScrollToTop: _controller.scrollToTop,
           onPreviousMessage: _controller.jumpToPreviousQuestion,
           onNextMessage: _controller.jumpToNextQuestion,

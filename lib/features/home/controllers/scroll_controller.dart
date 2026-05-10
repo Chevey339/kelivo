@@ -521,6 +521,17 @@ class ChatScrollController {
     }
   }
 
+  void handleForwardedScrollDragStart([
+    ChatUserScrollIntentDirection direction =
+        ChatUserScrollIntentDirection.unknown,
+  ]) {
+    handleUserScrollIntent(direction);
+  }
+
+  Future<void> handleForwardedScrollDragUpdate(double delta) {
+    return _positionTracker.scrollByOffset(-delta);
+  }
+
   void _cancelPendingBottomScrollsForUser() {
     _autoStickSuspendedByUser = true;
     _bottomScrollGeneration++;

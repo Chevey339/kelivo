@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/features/home/controllers/chat_scroll_position.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
@@ -984,6 +986,54 @@ void main() {
       chatScrollController.dispose();
     });
 
+    testWidgets('用户停手后记录阅读锚点不会立即改变当前列表位置', (tester) async {
+      const messageCount = 80;
+      const bottomAnchorHeight = 120.0;
+      final scrollControllers = ChatIndexedScrollControllers();
+      late final ChatScrollController chatScrollController;
+      chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () {
+          if (chatScrollController.isUserScrolling) return false;
+          return chatScrollController.isNearBottom(48);
+        },
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => 1 - bottomAnchorHeight / _harnessHeight,
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: 30,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(height: 96, child: Text('Message $index'));
+          },
+        ),
+      );
+      await tester.pump();
+
+      await tester.drag(
+        find.byType(ScrollablePositionedList),
+        const Offset(0, -48),
+      );
+      await tester.pump();
+      final before = _positionFor(scrollControllers, 30).itemLeadingEdge;
+
+      await tester.pump(const Duration(milliseconds: 240));
+      await tester.pump();
+
+      final after = _positionFor(scrollControllers, 30).itemLeadingEdge;
+      expect(after, closeTo(before, 0.02));
+
+      chatScrollController.dispose();
+    });
+
     testWidgets('首条消息内容变高先触发内容跟随后仍继续自动贴底', (tester) async {
       const messageCount = 1;
       const bottomAnchorHeight = 120.0;
@@ -1385,6 +1435,231 @@ void main() {
       chatScrollController.dispose();
     });
 
+    testWidgets('转发的导航按钮拖动会滚动消息列表', (tester) async {
+      const messageCount = 80;
+      const bottomAnchorHeight = 120.0;
+      final scrollControllers = ChatIndexedScrollControllers();
+      final chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => 1 - bottomAnchorHeight / _harnessHeight,
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: 30,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(height: 96, child: Text('Message $index'));
+          },
+        ),
+      );
+      await tester.pump();
+
+      final before = _positionFor(scrollControllers, 30).itemLeadingEdge;
+      chatScrollController.handleForwardedScrollDragStart(
+        ChatUserScrollIntentDirection.towardBottom,
+      );
+      final scrollFuture = chatScrollController.handleForwardedScrollDragUpdate(
+        96,
+      );
+      await tester.pumpAndSettle();
+      await scrollFuture;
+
+      final after = _positionFor(scrollControllers, 30).itemLeadingEdge;
+      expect(after, greaterThan(before));
+      expect(chatScrollController.autoStickToBottom, isFalse);
+
+      await tester.pump(const Duration(milliseconds: 240));
+      chatScrollController.dispose();
+    });
+
+    testWidgets('导航动画被转发拖动接管后后续列表拖动仍会识别为用户滚动', (tester) async {
+      const messageCount = 120;
+      const bottomAnchorHeight = 120.0;
+      final scrollControllers = ChatIndexedScrollControllers();
+      final chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => 1 - bottomAnchorHeight / _harnessHeight,
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: 30,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(height: 96, child: Text('Message $index'));
+          },
+        ),
+      );
+      await tester.pump();
+
+      final jumpFuture = chatScrollController.scrollToMessageId(
+        targetId: 'message-36',
+        targetIndex: 36,
+      );
+      await tester.pump();
+
+      chatScrollController.handleForwardedScrollDragStart();
+      final forwardedScrollFuture = chatScrollController
+          .handleForwardedScrollDragUpdate(72);
+      await tester.pumpAndSettle();
+      await forwardedScrollFuture;
+      await jumpFuture;
+      await tester.pump(const Duration(milliseconds: 240));
+      expect(chatScrollController.isUserScrolling, isFalse);
+
+      await tester.drag(
+        find.byType(ScrollablePositionedList),
+        const Offset(0, -96),
+      );
+      await tester.pump();
+
+      expect(chatScrollController.isUserScrolling, isTrue);
+
+      chatScrollController.dispose();
+    });
+
+    testWidgets('转发拖动接管导航动画后不会残留程序化滚动状态', (tester) async {
+      const messageCount = 120;
+      final scrollControllers = ChatIndexedScrollControllers();
+      final tracker = ChatScrollPositionTracker(
+        controllers: scrollControllers,
+        itemCount: () => messageCount,
+        onChanged: () {},
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount,
+          initialScrollIndex: 30,
+          itemBuilder: (context, index) {
+            return SizedBox(height: 96, child: Text('Message $index'));
+          },
+        ),
+      );
+      await tester.pump();
+
+      final jumpFuture = tracker.scrollToIndex(
+        index: 36,
+        animate: true,
+        duration: const Duration(milliseconds: 250),
+      );
+      await tester.pump();
+      final forwardedScrollFuture = tracker.scrollByOffset(72);
+      await tester.pumpAndSettle();
+      await forwardedScrollFuture;
+      await jumpFuture;
+      await tester.pump(const Duration(milliseconds: 240));
+      expect(tracker.isUserScrolling, isFalse);
+
+      await tester.drag(
+        find.byType(ScrollablePositionedList),
+        const Offset(0, -96),
+      );
+      await tester.pump();
+
+      expect(tracker.isUserScrolling, isTrue);
+
+      tracker.dispose();
+    });
+
+    testWidgets('转发拖动在列表顶部不会产生越界下拉空隙', (tester) async {
+      const messageCount = 80;
+      final scrollControllers = ChatIndexedScrollControllers();
+      final tracker = ChatScrollPositionTracker(
+        controllers: scrollControllers,
+        itemCount: () => messageCount,
+        onChanged: () {},
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount,
+          physics: const BouncingScrollPhysics(),
+          itemBuilder: (context, index) {
+            return SizedBox(height: 96, child: Text('Message $index'));
+          },
+        ),
+      );
+      await tester.pump();
+      expect(tracker.isAtTop, isTrue);
+
+      final before = _positionFor(scrollControllers, 0).itemLeadingEdge;
+      unawaited(tracker.scrollByOffset(-48));
+      expect(tracker.isUserScrolling, isFalse);
+      await tester.pump();
+      await tester.pump();
+
+      final after = _positionFor(scrollControllers, 0).itemLeadingEdge;
+      expect(after, closeTo(before, 0.02));
+
+      tracker.dispose();
+    });
+
+    testWidgets('转发拖动在列表底部不会产生越界上拉空隙', (tester) async {
+      const messageCount = 80;
+      const bottomAnchorHeight = 120.0;
+      final scrollControllers = ChatIndexedScrollControllers();
+      final tracker = ChatScrollPositionTracker(
+        controllers: scrollControllers,
+        itemCount: () => messageCount,
+        onChanged: () {},
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: messageCount,
+          initialAlignment: 1 - bottomAnchorHeight / _harnessHeight,
+          physics: const BouncingScrollPhysics(),
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(height: 96, child: Text('Message $index'));
+          },
+        ),
+      );
+      await tester.pump();
+      expect(tracker.isAtBottom, isTrue);
+
+      final before = _positionFor(
+        scrollControllers,
+        messageCount,
+      ).itemTrailingEdge;
+      unawaited(tracker.scrollByOffset(48));
+      expect(tracker.isUserScrolling, isFalse);
+      await tester.pump();
+      await tester.pump();
+
+      final after = _positionFor(
+        scrollControllers,
+        messageCount,
+      ).itemTrailingEdge;
+      expect(after, closeTo(before, 0.02));
+
+      tracker.dispose();
+    });
+
     testWidgets('用户上滑阅读流式助手消息时新增内容不会持续推走当前阅读行', (tester) async {
       const messageCount = 2;
       const bottomAnchorHeight = 120.0;
@@ -1498,6 +1773,7 @@ class _IndexedScrollHarness extends StatelessWidget {
     required this.itemBuilder,
     this.initialScrollIndex = 0,
     this.initialAlignment = 0,
+    this.physics,
   });
 
   final ChatIndexedScrollControllers scrollControllers;
@@ -1505,6 +1781,7 @@ class _IndexedScrollHarness extends StatelessWidget {
   final IndexedWidgetBuilder itemBuilder;
   final int initialScrollIndex;
   final double initialAlignment;
+  final ScrollPhysics? physics;
 
   @override
   Widget build(BuildContext context) {
@@ -1514,9 +1791,11 @@ class _IndexedScrollHarness extends StatelessWidget {
         child: ScrollablePositionedList.builder(
           itemScrollController: scrollControllers.itemScrollController,
           itemPositionsListener: scrollControllers.itemPositionsListener,
+          scrollOffsetController: scrollControllers.scrollOffsetController,
           scrollOffsetListener: scrollControllers.scrollOffsetListener,
           initialScrollIndex: initialScrollIndex,
           initialAlignment: initialAlignment,
+          physics: physics,
           itemCount: itemCount,
           minCacheExtent: 0,
           addAutomaticKeepAlives: false,

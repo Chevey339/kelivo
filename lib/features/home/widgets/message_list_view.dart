@@ -418,6 +418,8 @@ class _MessageListViewState extends State<MessageListView> {
                     widget.scrollControllers.itemScrollController,
                 itemPositionsListener:
                     widget.scrollControllers.itemPositionsListener,
+                scrollOffsetController:
+                    widget.scrollControllers.scrollOffsetController,
                 scrollOffsetListener:
                     widget.scrollControllers.scrollOffsetListener,
                 initialScrollIndex: bottomAnchorIndex,
