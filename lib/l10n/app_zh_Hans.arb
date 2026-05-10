@@ -646,6 +646,8 @@
   "messageMoreSheetCreateBranch": "创建分支",
   "messageMoreSheetDelete": "删除本版本",
   "messageMoreSheetDeleteAllVersions": "删除全部版本",
+  "messageMoreSheetSwitchToUser": "切换为用户",
+  "messageMoreSheetSwitchToAssistant": "切换为模型",
   "reasoningBudgetSheetOff": "关闭",
   "reasoningBudgetSheetAuto": "自动",
   "reasoningBudgetSheetLight": "轻度推理",

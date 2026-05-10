@@ -1802,6 +1802,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageMoreSheetDeleteAllVersions => 'Delete All Versions';
 
   @override
+  String get messageMoreSheetSwitchToUser => 'Switch to User';
+
+  @override
+  String get messageMoreSheetSwitchToAssistant => 'Switch to Model';
+
+  @override
   String get reasoningBudgetSheetOff => 'Off';
 
   @override

@@ -721,6 +721,8 @@
   "messageMoreSheetCreateBranch": "Create Branch",
   "messageMoreSheetDelete": "Delete This Version",
   "messageMoreSheetDeleteAllVersions": "Delete All Versions",
+  "messageMoreSheetSwitchToUser": "Switch to User",
+  "messageMoreSheetSwitchToAssistant": "Switch to Model",
   "reasoningBudgetSheetOff": "Off",
   "reasoningBudgetSheetAuto": "Auto",
   "reasoningBudgetSheetLight": "Light Reasoning",

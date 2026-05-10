@@ -24,6 +24,8 @@ enum MessageMoreAction {
   deleteCurrentVersion,
   deleteAllVersions,
   share,
+  switchToUser,
+  switchToAssistant,
 }
 
 Future<MessageMoreAction?> showMessageMoreSheet(
@@ -107,6 +109,17 @@ Future<MessageMoreAction?> showMessageMoreSheet(
             selected = MessageMoreAction.edit;
           },
         ),
+      DesktopContextMenuItem(
+        icon: message.role == 'user' ? Lucide.Bot : Lucide.User,
+        label: message.role == 'user'
+            ? l10n.messageMoreSheetSwitchToAssistant
+            : l10n.messageMoreSheetSwitchToUser,
+        onTap: () {
+          selected = message.role == 'user'
+              ? MessageMoreAction.switchToAssistant
+              : MessageMoreAction.switchToUser;
+        },
+      ),
       DesktopContextMenuItem(
         icon: Lucide.Share,
         label: l10n.messageMoreSheetShare,
@@ -307,6 +320,21 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                           Navigator.of(context).pop(MessageMoreAction.edit);
                         },
                       ),
+                    _actionItem(
+                      icon: widget.message.role == 'user'
+                          ? Lucide.Bot
+                          : Lucide.User,
+                      label: widget.message.role == 'user'
+                          ? l10n.messageMoreSheetSwitchToAssistant
+                          : l10n.messageMoreSheetSwitchToUser,
+                      onTap: () {
+                        Navigator.of(context).pop(
+                          widget.message.role == 'user'
+                              ? MessageMoreAction.switchToAssistant
+                              : MessageMoreAction.switchToUser,
+                        );
+                      },
+                    ),
                     _actionItem(
                       icon: Lucide.Share,
                       label: l10n.messageMoreSheetShare,

@@ -190,12 +190,14 @@ class ChatController extends ChangeNotifier {
   /// Update a message by ID with optional new values.
   Future<void> updateMessage(
     String messageId, {
+    String? role,
     String? content,
     int? totalTokens,
     bool? isStreaming,
   }) async {
     await _chatService.updateMessage(
       messageId,
+      role: role,
       content: content,
       totalTokens: totalTokens,
       isStreaming: isStreaming,
@@ -205,6 +207,7 @@ class ChatController extends ChangeNotifier {
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
       _messages[index] = _messages[index].copyWith(
+        role: role ?? _messages[index].role,
         content: content ?? _messages[index].content,
         totalTokens: totalTokens ?? _messages[index].totalTokens,
         isStreaming: isStreaming ?? _messages[index].isStreaming,

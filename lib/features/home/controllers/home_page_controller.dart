@@ -836,6 +836,14 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
+  Future<void> switchMessageRole(ChatMessage message, String role) async {
+    if (role != 'user' && role != 'assistant') return;
+    if (message.role == role) return;
+
+    await _chatController.updateMessage(message.id, role: role);
+    notifyListeners();
+  }
+
   Future<void> editMessage(ChatMessage message) async {
     final ctx = _context;
     if (!ctx.mounted) return;

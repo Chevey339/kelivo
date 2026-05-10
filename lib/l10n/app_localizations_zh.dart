@@ -1755,6 +1755,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMoreSheetDeleteAllVersions => '删除全部版本';
 
   @override
+  String get messageMoreSheetSwitchToUser => '切换为用户';
+
+  @override
+  String get messageMoreSheetSwitchToAssistant => '切换为模型';
+
+  @override
   String get reasoningBudgetSheetOff => '关闭';
 
   @override
@@ -6604,6 +6610,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageMoreSheetDeleteAllVersions => '删除全部版本';
 
   @override
+  String get messageMoreSheetSwitchToUser => '切换为用户';
+
+  @override
+  String get messageMoreSheetSwitchToAssistant => '切换为模型';
+
+  @override
   String get reasoningBudgetSheetOff => '关闭';
 
   @override
@@ -11450,6 +11462,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageMoreSheetDeleteAllVersions => '刪除全部版本';
+
+  @override
+  String get messageMoreSheetSwitchToUser => '切換為使用者';
+
+  @override
+  String get messageMoreSheetSwitchToAssistant => '切換為模型';
 
   @override
   String get reasoningBudgetSheetOff => '關閉';

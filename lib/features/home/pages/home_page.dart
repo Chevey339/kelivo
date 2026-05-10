@@ -1061,6 +1061,8 @@ class _HomePageState extends State<HomePage>
         onShareMessage: (index, messages) =>
             _controller.shareMessage(index, messages),
         onSpeakMessage: (message) => _controller.speakMessage(message),
+        onSwitchMessageRole: (message, role) =>
+            _controller.switchMessageRole(message, role),
         onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),
         onRecoveredAskUserAnswer: (message, part, result) =>
             _controller.submitRecoveredAskUserAnswer(message, part, result),
