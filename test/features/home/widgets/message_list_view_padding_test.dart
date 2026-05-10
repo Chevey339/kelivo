@@ -109,6 +109,39 @@ void main() {
     isProcessingFiles.dispose();
   });
 
+  testWidgets('消息列表使用夹紧滚动物理避免边界弹性位移', (tester) async {
+    final scrollControllers = ChatIndexedScrollControllers();
+    final isProcessingFiles = ValueNotifier<bool>(false);
+
+    await tester.pumpWidget(
+      _harness(
+        MessageListView(
+          scrollControllers: scrollControllers,
+          messages: const [],
+          byGroup: const {},
+          versionSelections: const {},
+          reasoning: const {},
+          reasoningSegments: const {},
+          contentSplits: const {},
+          toolParts: const {},
+          translations: const {},
+          selecting: false,
+          selectedItems: const {},
+          dividerPadding: EdgeInsets.zero,
+          isProcessingFiles: isProcessingFiles,
+          bottomContentPadding: 144,
+        ),
+      ),
+    );
+
+    final list = tester.widget<ScrollablePositionedList>(
+      find.byType(ScrollablePositionedList),
+    );
+    expect(list.physics, isA<ClampingScrollPhysics>());
+
+    isProcessingFiles.dispose();
+  });
+
   testWidgets('超大对话初始打开只构建底部附近的消息', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
@@ -815,6 +848,80 @@ void main() {
 
     chatScrollController.dispose();
     streamingContentNotifier.dispose();
+    isProcessingFiles.dispose();
+  });
+
+  testWidgets('真实消息列表停手后记录阅读锚点不会无动画改动顶部位置', (tester) async {
+    tester.view.physicalSize = const Size(390, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final scrollControllers = ChatIndexedScrollControllers();
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    final messages = List<ChatMessage>.generate(
+      40,
+      (index) => ChatMessage(
+        id: 'message-$index',
+        role: index.isEven ? 'user' : 'assistant',
+        content: List.filled(3, 'Message $index').join('\n'),
+        conversationId: 'conversation-1',
+      ),
+    );
+
+    late final ChatScrollController chatScrollController;
+    chatScrollController = ChatScrollController(
+      indexedControllers: scrollControllers,
+      onStateChanged: () {},
+      getShouldAutoStickToBottom: () {
+        if (chatScrollController.isUserScrolling) return false;
+        return chatScrollController.isNearBottom(48);
+      },
+      getAutoScrollEnabled: () => true,
+      getItemCount: () => messages.length,
+      getBottomAnchorAlignment: () => 1,
+    );
+
+    await tester.pumpWidget(
+      _harness(
+        MessageListView(
+          scrollControllers: scrollControllers,
+          messages: messages,
+          byGroup: {
+            for (final message in messages) message.id: [message],
+          },
+          versionSelections: const {},
+          reasoning: const {},
+          reasoningSegments: const {},
+          contentSplits: const {},
+          toolParts: const {},
+          translations: const {},
+          selecting: false,
+          selectedItems: const {},
+          dividerPadding: EdgeInsets.zero,
+          isProcessingFiles: isProcessingFiles,
+          bottomContentPadding: 120,
+          onUserScrollIntent: chatScrollController.handleUserScrollIntent,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    scrollControllers.itemScrollController.jumpTo(index: 0, alignment: 0.02);
+    await tester.pump();
+    chatScrollController.handleUserScrollIntent(
+      ChatUserScrollIntentDirection.towardTop,
+    );
+    await tester.pump();
+    final before = _positionFor(scrollControllers, 0).itemLeadingEdge;
+
+    await tester.pump(const Duration(milliseconds: 240));
+    await tester.pump();
+
+    final after = _positionFor(scrollControllers, 0).itemLeadingEdge;
+    expect(after, closeTo(before, 0.02));
+
+    chatScrollController.dispose();
     isProcessingFiles.dispose();
   });
 

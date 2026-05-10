@@ -180,7 +180,7 @@ class ChatScrollController {
       if (!userScrolling && _isUserScrolling) {
         _isUserScrolling = false;
         if (_autoStickSuspendedByUser) {
-          _captureReadingAnchor();
+          _scheduleReadingAnchorCapture();
         }
       }
     } else if (shouldResumeSuspendedAutoStick) {
@@ -188,7 +188,7 @@ class ChatScrollController {
     } else if (!userScrolling && _isUserScrolling) {
       _isUserScrolling = false;
       if (_autoStickSuspendedByUser) {
-        _captureReadingAnchor();
+        _scheduleReadingAnchorCapture();
       }
     } else if (!userScrolling &&
         !_isUserScrolling &&
@@ -613,29 +613,17 @@ class ChatScrollController {
 
   void _captureReadingAnchor() {
     if (!hasClients) return;
+    // Capture after the drag settles; capturing must not move the list.
     final anchor = _positionTracker.readingAnchorPosition();
     if (anchor == null) return;
-    final alignment = _normalizeReadingAnchorAlignment(
+    _readingAnchorIndex = anchor.index;
+    _readingAnchorAlignment = _normalizedReadingAnchorAlignment(
       index: anchor.index,
       alignment: anchor.itemLeadingEdge,
     );
-    _readingAnchorIndex = anchor.index;
-    _readingAnchorAlignment = alignment;
-    final generation = _bottomScrollGeneration;
-    unawaited(
-      _positionTracker
-          .scrollToIndex(
-            index: anchor.index,
-            alignment: alignment,
-            animate: false,
-          )
-          .then((_) {
-            if (_disposed || generation != _bottomScrollGeneration) return;
-          }),
-    );
   }
 
-  double _normalizeReadingAnchorAlignment({
+  double _normalizedReadingAnchorAlignment({
     required int index,
     required double alignment,
   }) {
@@ -645,6 +633,7 @@ class ChatScrollController {
 
   void _maintainReadingAnchorIfSuspended() {
     if (!_autoStickSuspendedByUser) return;
+    if (_realignSuspendedTopGap()) return;
     if (_isUserScrolling || _positionTracker.isUserScrolling) return;
     if (_readingAnchorScheduled) return;
     final index = _readingAnchorIndex;
@@ -659,18 +648,33 @@ class ChatScrollController {
       _readingAnchorScheduled = false;
       if (_disposed || generation != _bottomScrollGeneration) return;
       if (!_autoStickSuspendedByUser || _autoStickToBottom) return;
-      final normalizedAlignment = _normalizeReadingAnchorAlignment(
-        index: index,
-        alignment: alignment,
-      );
       unawaited(
         _positionTracker.scrollToIndex(
           index: index,
-          alignment: normalizedAlignment,
+          alignment: alignment,
           animate: false,
         ),
       );
     });
+  }
+
+  bool _realignSuspendedTopGap() {
+    if (!_positionTracker.isAtTop) return false;
+    final firstMessageLeadingEdge = _positionTracker.leadingEdgeForIndex(0);
+    if (firstMessageLeadingEdge == null || firstMessageLeadingEdge <= 0.02) {
+      return false;
+    }
+    // Do not preserve artificial top whitespace as a reading anchor.
+    final generation = _bottomScrollGeneration;
+    unawaited(
+      _positionTracker
+          .scrollToIndex(index: 0, alignment: 0, animate: false)
+          .then((_) {
+            if (_disposed || generation != _bottomScrollGeneration) return;
+            _autoStickToBottom = false;
+          }),
+    );
+    return true;
   }
 
   /// Animate or jump to the bottom of the scroll view.

@@ -1034,6 +1034,61 @@ void main() {
       chatScrollController.dispose();
     });
 
+    testWidgets('用户真实拖动停手后记录阅读锚点不会触发无动画跳转', (tester) async {
+      const messageCount = 80;
+      const bottomAnchorHeight = 120.0;
+      final itemScrollController = _RecordingItemScrollController();
+      final scrollControllers = ChatIndexedScrollControllers(
+        itemScrollController: itemScrollController,
+      );
+      late final ChatScrollController chatScrollController;
+      chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () {
+          if (chatScrollController.isUserScrolling) return false;
+          return chatScrollController.isNearBottom(48);
+        },
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => 1 - bottomAnchorHeight / _harnessHeight,
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: 0,
+          initialAlignment: 0.12,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(height: 96, child: Text('Message $index'));
+          },
+        ),
+      );
+      await tester.pump();
+
+      expect(itemScrollController.jumpToCount, 0);
+      expect(itemScrollController.scrollToCount, 0);
+
+      await tester.drag(
+        find.byType(ScrollablePositionedList),
+        const Offset(0, -24),
+      );
+      await tester.pump();
+      expect(chatScrollController.isUserScrolling, isTrue);
+
+      await tester.pump(const Duration(milliseconds: 240));
+      await tester.pump();
+
+      expect(itemScrollController.jumpToCount, 0);
+      expect(itemScrollController.scrollToCount, 0);
+
+      chatScrollController.dispose();
+    });
+
     testWidgets('首条消息内容变高先触发内容跟随后仍继续自动贴底', (tester) async {
       const messageCount = 1;
       const bottomAnchorHeight = 120.0;
@@ -1764,6 +1819,35 @@ ItemPosition _positionFor(
   return scrollControllers.itemPositionsListener.itemPositions.value.firstWhere(
     (position) => position.index == index,
   );
+}
+
+class _RecordingItemScrollController extends ItemScrollController {
+  int jumpToCount = 0;
+  int scrollToCount = 0;
+
+  @override
+  void jumpTo({required int index, double alignment = 0}) {
+    jumpToCount++;
+    super.jumpTo(index: index, alignment: alignment);
+  }
+
+  @override
+  Future<void> scrollTo({
+    required int index,
+    double alignment = 0,
+    required Duration duration,
+    Curve curve = Curves.linear,
+    List<double> opacityAnimationWeights = const [40, 20, 40],
+  }) {
+    scrollToCount++;
+    return super.scrollTo(
+      index: index,
+      alignment: alignment,
+      duration: duration,
+      curve: curve,
+      opacityAnimationWeights: opacityAnimationWeights,
+    );
+  }
 }
 
 class _IndexedScrollHarness extends StatelessWidget {

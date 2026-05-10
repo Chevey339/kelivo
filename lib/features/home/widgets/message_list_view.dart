@@ -424,6 +424,7 @@ class _MessageListViewState extends State<MessageListView> {
                     widget.scrollControllers.scrollOffsetListener,
                 initialScrollIndex: bottomAnchorIndex,
                 initialAlignment: bottomAnchorAlignment,
+                physics: const ClampingScrollPhysics(),
                 padding: EdgeInsets.fromLTRB(
                   horizontalPad,
                   8,
