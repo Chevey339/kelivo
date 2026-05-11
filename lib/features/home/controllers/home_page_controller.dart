@@ -162,6 +162,10 @@ class HomePageController extends ChangeNotifier {
   String? _spotlightMessageId;
   int _spotlightToken = 0;
 
+  int _userStreamingFreezeDepth = 0;
+  int _codeBlockStreamingFreezeDepth = 0;
+  int _streamingContentScrollSuppressionFrames = 0;
+
   // Restored lazily as visible message widgets are built. This keeps opening
   // very large imported conversations from synchronously walking all messages.
   final Set<String> _restoredMessageUiStateIds = <String>{};
@@ -428,13 +432,71 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _handleUserScrollActiveChanged(bool active) {
-    if (!active) {
+    if (active) {
+      _userStreamingFreezeDepth = 1;
+      streamingContentNotifier.setUpdatesFrozen(true);
+      return;
+    }
+    _userStreamingFreezeDepth = 0;
+    _unfreezeStreamingContentIfNoOwners();
+  }
+
+  void handleCodeBlockInteractionStart() {
+    _codeBlockStreamingFreezeDepth++;
+    _scrollCtrl.handleCodeBlockInteractionStart();
+    streamingContentNotifier.setUpdatesFrozen(true);
+  }
+
+  void handleCodeBlockInteractionEnd() {
+    if (_codeBlockStreamingFreezeDepth <= 0) return;
+    _codeBlockStreamingFreezeDepth--;
+    _scrollCtrl.handleCodeBlockInteractionEnd();
+    if (_codeBlockStreamingFreezeDepth == 0) {
+      _suppressStreamingContentScrollForFrames(2);
+      _unfreezeStreamingContentIfNoOwners(reconcileScroll: false);
+    }
+  }
+
+  void _unfreezeStreamingContentIfNoOwners({bool reconcileScroll = true}) {
+    if (_userStreamingFreezeDepth > 0 || _codeBlockStreamingFreezeDepth > 0) {
+      return;
+    }
+    if (reconcileScroll) {
       _scrollCtrl.prepareForFrozenStreamingContentFlush();
     }
-    final flushed = streamingContentNotifier.setUpdatesFrozen(active);
-    if (!active && flushed) {
+    final flushed = streamingContentNotifier.setUpdatesFrozen(false);
+    if (flushed && reconcileScroll) {
       _scrollCtrl.handleFrozenStreamingContentFlushed();
     }
+  }
+
+  void _suppressStreamingContentScrollForFrames(int frames) {
+    if (frames <= _streamingContentScrollSuppressionFrames) return;
+    _streamingContentScrollSuppressionFrames = frames;
+    void clearAfterFrames(int remaining) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (remaining <= 1) {
+          if (_streamingContentScrollSuppressionFrames <= frames) {
+            _streamingContentScrollSuppressionFrames = 0;
+          }
+          return;
+        }
+        clearAfterFrames(remaining - 1);
+      });
+      WidgetsBinding.instance.ensureVisualUpdate();
+    }
+
+    clearAfterFrames(frames);
+  }
+
+  bool shouldSuppressStreamingContentScrollNow() {
+    return _streamingContentScrollSuppressionFrames > 0 ||
+        _codeBlockStreamingFreezeDepth > 0 ||
+        _scrollCtrl.isCodeBlockInteractionActive;
+  }
+
+  bool shouldSuppressStreamingContentScroll() {
+    return shouldSuppressStreamingContentScrollNow();
   }
 
   void _initializeProviders() {

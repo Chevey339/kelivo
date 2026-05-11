@@ -1074,12 +1074,16 @@ class _HomePageState extends State<HomePage>
         onUserScrollPointerDown:
             _controller.scrollCtrl.handleUserScrollPointerDown,
         onUserScrollPointerUp: _controller.scrollCtrl.handleUserScrollPointerUp,
+        onCodeBlockInteractionStart:
+            _controller.handleCodeBlockInteractionStart,
+        onCodeBlockInteractionEnd: _controller.handleCodeBlockInteractionEnd,
         onUserResizesMessageContent: (message, index) {
           _controller.scrollCtrl.suspendAutoStickForUserInteraction(
             anchorIndex: index,
           );
         },
         onStreamingMessageContentChanged: (_, __) {
+          if (_controller.shouldSuppressStreamingContentScrollNow()) return;
           _controller.scrollCtrl.autoScrollToBottomIfNeeded();
         },
         onMessageVisible: _controller.restoreVisibleMessageUiState,

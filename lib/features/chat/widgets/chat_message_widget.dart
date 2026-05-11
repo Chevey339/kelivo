@@ -637,6 +637,7 @@ class ChatMessageWidget extends StatefulWidget {
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAskUserAnswer;
   final VoidCallback? onUserResizesMessageContent;
+  final ValueChanged<int>? onCodeBlockPointerDown;
 
   const ChatMessageWidget({
     super.key,
@@ -680,6 +681,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.onSuggestionTap,
     this.onRecoveredAskUserAnswer,
     this.onUserResizesMessageContent,
+    this.onCodeBlockPointerDown,
   });
 
   @override
@@ -1309,6 +1311,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               ),
                               child: MarkdownWithCodeHighlight(
                                 text: visualText,
+                                onCodeBlockPointerDown:
+                                    widget.onCodeBlockPointerDown,
                                 onUserResizesContent:
                                     widget.onUserResizesMessageContent,
                                 baseStyle: TextStyle(
@@ -1787,6 +1791,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       assistantContent = MarkdownWithCodeHighlight(
         text: visualContent,
         onCitationTap: (id) => _handleCitationTap(id),
+        onCodeBlockPointerDown: widget.onCodeBlockPointerDown,
         onUserResizesContent: widget.onUserResizesMessageContent,
         baseStyle: TextStyle(fontSize: baseAssistant, height: 1.5),
       );
@@ -2183,6 +2188,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
                     onUserResizesMessageContent:
                         widget.onUserResizesMessageContent,
+                    onCodeBlockPointerDown: widget.onCodeBlockPointerDown,
                   ),
                 );
               }
@@ -2316,6 +2322,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                             text: translationText,
                                             onCitationTap: (id) =>
                                                 _handleCitationTap(id),
+                                            onCodeBlockPointerDown:
+                                                widget.onCodeBlockPointerDown,
                                             onUserResizesContent: widget
                                                 .onUserResizesMessageContent,
                                             baseStyle: TextStyle(
@@ -3461,12 +3469,14 @@ class _ChainOfThoughtCard extends StatefulWidget {
     required this.steps,
     this.onRecoveredAnswer,
     this.onUserResizesMessageContent,
+    this.onCodeBlockPointerDown,
   });
 
   final List<_TimelineStepData> steps;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
   final VoidCallback? onUserResizesMessageContent;
+  final ValueChanged<int>? onCodeBlockPointerDown;
 
   @override
   State<_ChainOfThoughtCard> createState() => _ChainOfThoughtCardState();
@@ -3567,6 +3577,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                   isLast: index == visibleSteps.length - 1,
                   onUserResizesMessageContent:
                       widget.onUserResizesMessageContent,
+                  onCodeBlockPointerDown: widget.onCodeBlockPointerDown,
                 );
               }
               return _ChainOfThoughtToolStep(
@@ -3689,12 +3700,14 @@ class _ChainOfThoughtReasoningStep extends StatefulWidget {
     required this.isFirst,
     required this.isLast,
     this.onUserResizesMessageContent,
+    this.onCodeBlockPointerDown,
   });
 
   final ReasoningSegment step;
   final bool isFirst;
   final bool isLast;
   final VoidCallback? onUserResizesMessageContent;
+  final ValueChanged<int>? onCodeBlockPointerDown;
 
   @override
   State<_ChainOfThoughtReasoningStep> createState() =>
@@ -3831,6 +3844,7 @@ class _ChainOfThoughtReasoningStepState
         return RepaintBoundary(
           child: MarkdownWithCodeHighlight(
             text: text.isNotEmpty ? text : '…',
+            onCodeBlockPointerDown: widget.onCodeBlockPointerDown,
             onUserResizesContent:
                 widget.step.onResizeContent ??
                 widget.onUserResizesMessageContent,

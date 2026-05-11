@@ -306,10 +306,20 @@ class ChatScrollPositionTracker {
   }
 
   void cancelProgrammaticScrollForUser() {
+    _cancelProgrammaticScroll(preserveCurrentAnchor: true);
+  }
+
+  void cancelProgrammaticScrollSilently({bool preserveCurrentAnchor = true}) {
+    _cancelProgrammaticScroll(preserveCurrentAnchor: preserveCurrentAnchor);
+    clearUserScrollingSilently();
+  }
+
+  void _cancelProgrammaticScroll({required bool preserveCurrentAnchor}) {
     if (!_isProgrammaticScroll) return;
     _jumpGeneration++;
     _isProgrammaticScroll = false;
     _scrollIdleTimer?.cancel();
+    if (!preserveCurrentAnchor) return;
     if (!_controllers.itemScrollController.isAttached) return;
     final anchor = readingAnchorPosition();
     if (anchor == null) return;
@@ -340,10 +350,14 @@ class ChatScrollPositionTracker {
     });
   }
 
-  void resetUserScrolling() {
+  void clearUserScrollingSilently() {
     _isUserScrolling = false;
     _lastUserScrollDelta = 0;
     _scrollIdleTimer?.cancel();
+  }
+
+  void resetUserScrolling() {
+    clearUserScrollingSilently();
     _onChanged();
   }
 

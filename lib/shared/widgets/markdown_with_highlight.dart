@@ -41,12 +41,14 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     required this.text,
     this.onCitationTap,
     this.baseStyle,
+    this.onCodeBlockPointerDown,
     this.onUserResizesContent,
   });
 
   final String text;
   final void Function(String id)? onCitationTap;
   final TextStyle? baseStyle; // optional override for base markdown text style
+  final ValueChanged<int>? onCodeBlockPointerDown;
   final VoidCallback? onUserResizesContent;
 
   // Tunable: list scaling compensation exponent.
@@ -106,7 +108,10 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     // so lines like "# comment" inside code fences are not parsed as headings.
     components.insert(
       0,
-      FencedCodeBlockMd(onUserResizesContent: onUserResizesContent),
+      FencedCodeBlockMd(
+        onCodeBlockPointerDown: onCodeBlockPointerDown,
+        onUserResizesContent: onUserResizesContent,
+      ),
     );
     components.insert(
       0,
@@ -400,6 +405,7 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
         return _CollapsibleCodeBlock(
           language: lang,
           code: code,
+          onPointerDown: onCodeBlockPointerDown,
           onUserResizesContent: onUserResizesContent,
         );
       },
@@ -934,11 +940,13 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
 class _CollapsibleCodeBlock extends StatefulWidget {
   final String language;
   final String code;
+  final ValueChanged<int>? onPointerDown;
   final VoidCallback? onUserResizesContent;
 
   const _CollapsibleCodeBlock({
     required this.language,
     required this.code,
+    this.onPointerDown,
     this.onUserResizesContent,
   });
 
@@ -1172,10 +1180,15 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                   curve: Curves.easeOutCubic,
                   alignment: Alignment.topLeft,
                   clipBehavior: Clip.hardEdge,
-                  child: buildCodeView(
-                    isCollapsed
-                        ? _collapsedHighlightedCode(settings)
-                        : _trimTrailingNewlines(widget.code),
+                  child: Listener(
+                    behavior: HitTestBehavior.translucent,
+                    onPointerDown: (event) =>
+                        widget.onPointerDown?.call(event.pointer),
+                    child: buildCodeView(
+                      isCollapsed
+                          ? _collapsedHighlightedCode(settings)
+                          : _trimTrailingNewlines(widget.code),
+                    ),
                   ),
                 ),
                 if (_shouldShowFoldControl(settings)) ...[
@@ -2701,8 +2714,9 @@ class SoftHrLine extends BlockMd {
 
 // Robust fenced code block that takes precedence over other blocks
 class FencedCodeBlockMd extends BlockMd {
-  FencedCodeBlockMd({this.onUserResizesContent});
+  FencedCodeBlockMd({this.onCodeBlockPointerDown, this.onUserResizesContent});
 
+  final ValueChanged<int>? onCodeBlockPointerDown;
   final VoidCallback? onUserResizesContent;
 
   @override
@@ -2729,6 +2743,7 @@ class FencedCodeBlockMd extends BlockMd {
     return _CollapsibleCodeBlock(
       language: lang,
       code: code,
+      onPointerDown: onCodeBlockPointerDown,
       onUserResizesContent: onUserResizesContent,
     );
   }
@@ -3622,14 +3637,42 @@ class _SelectableHighlightViewState extends State<SelectableHighlightView> {
 
   @override
   Widget build(BuildContext context) {
-    return SelectableText.rich(
-      TextSpan(
-        style: widget.textStyle,
-        children: _codeTextSpans.isEmpty
-            ? [TextSpan(text: widget.source)]
-            : _codeTextSpans,
+    return _SelectionEnsureVisibleBoundary(
+      child: SelectableText.rich(
+        TextSpan(
+          style: widget.textStyle,
+          children: _codeTextSpans.isEmpty
+              ? [TextSpan(text: widget.source)]
+              : _codeTextSpans,
+        ),
       ),
     );
+  }
+}
+
+/// Prevents Flutter's selectable text caret reveal from bubbling out of a code
+/// block and moving the outer chat list while users select finished output.
+class _SelectionEnsureVisibleBoundary extends SingleChildRenderObjectWidget {
+  const _SelectionEnsureVisibleBoundary({required super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return _RenderSelectionEnsureVisibleBoundary();
+  }
+}
+
+class _RenderSelectionEnsureVisibleBoundary extends RenderProxyBox {
+  @override
+  void showOnScreen({
+    RenderObject? descendant,
+    Rect? rect,
+    Duration duration = Duration.zero,
+    Curve curve = Curves.ease,
+  }) {
+    // Intentionally absorb descendant showOnScreen requests from SelectableText.
+    // EditableText calls this during drag/long-press selection to keep the caret
+    // visible; in a chat message, forwarding it reaches the parent
+    // ScrollablePositionedList and causes an unwanted downward jump.
   }
 }
 

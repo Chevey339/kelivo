@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -129,6 +131,8 @@ class MessageListView extends StatefulWidget {
     this.onUserScrollIntent,
     this.onUserScrollPointerDown,
     this.onUserScrollPointerUp,
+    this.onCodeBlockInteractionStart,
+    this.onCodeBlockInteractionEnd,
     this.onUserResizesMessageContent,
     this.onStreamingMessageContentChanged,
     this.onMessageVisible,
@@ -198,6 +202,8 @@ class MessageListView extends StatefulWidget {
   final OnUserScrollIntent? onUserScrollIntent;
   final VoidCallback? onUserScrollPointerDown;
   final VoidCallback? onUserScrollPointerUp;
+  final VoidCallback? onCodeBlockInteractionStart;
+  final VoidCallback? onCodeBlockInteractionEnd;
   final OnUserResizesMessageContent? onUserResizesMessageContent;
   final OnStreamingMessageContentChanged? onStreamingMessageContentChanged;
   final void Function(ChatMessage message, int index)? onMessageVisible;
@@ -266,6 +272,9 @@ class _MessageListViewState extends State<MessageListView> {
       <String, StreamingContentData>{};
   final Map<String, _MessageItemCacheEntry> _messageItemCache =
       <String, _MessageItemCacheEntry>{};
+  final Set<int> _codeBlockPointerIds = <int>{};
+  Timer? _codeBlockUnlockTimer;
+  bool _codeBlockUnlockPending = false;
   bool _visibleFlushScheduled = false;
   bool _pointerScrollIntentSent = false;
   double _pointerScrollIntentDx = 0;
@@ -299,10 +308,50 @@ class _MessageListViewState extends State<MessageListView> {
 
   @override
   void dispose() {
+    final wasCodeBlockInteractionActive = _isCodeBlockInteractionActive;
+    _codeBlockUnlockTimer?.cancel();
+    if (wasCodeBlockInteractionActive) {
+      widget.onCodeBlockInteractionEnd?.call();
+    }
+    _codeBlockPointerIds.clear();
     _pendingVisibleMessages.clear();
     _lastStreamingContentData.clear();
     _messageItemCache.clear();
     super.dispose();
+  }
+
+  bool get _isCodeBlockInteractionActive =>
+      _codeBlockPointerIds.isNotEmpty || _codeBlockUnlockPending;
+
+  void _handleCodeBlockPointerDown(int pointer) {
+    final wasActive = _isCodeBlockInteractionActive;
+    _codeBlockUnlockTimer?.cancel();
+    _codeBlockUnlockTimer = null;
+    if (_codeBlockUnlockPending) {
+      _codeBlockUnlockPending = false;
+      if (mounted) setState(() {});
+    }
+    if (_codeBlockPointerIds.add(pointer)) {
+      if (!wasActive) {
+        widget.onCodeBlockInteractionStart?.call();
+      }
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _handleCodeBlockPointerFinished(int pointer) {
+    if (!_codeBlockPointerIds.remove(pointer)) return;
+    if (_codeBlockPointerIds.isNotEmpty) return;
+    _codeBlockUnlockPending = true;
+    if (mounted) setState(() {});
+    _codeBlockUnlockTimer?.cancel();
+    _codeBlockUnlockTimer = Timer(const Duration(milliseconds: 400), () {
+      _codeBlockUnlockTimer = null;
+      if (!_codeBlockUnlockPending) return;
+      _codeBlockUnlockPending = false;
+      widget.onCodeBlockInteractionEnd?.call();
+      if (mounted) setState(() {});
+    });
   }
 
   void _scheduleVisibleMessage(ChatMessage message, int index) {
@@ -413,13 +462,16 @@ class _MessageListViewState extends State<MessageListView> {
             widget.onBottomAnchorAlignmentChanged?.call(bottomAnchorAlignment);
             final list = Listener(
               behavior: HitTestBehavior.translucent,
-              onPointerDown: (_) {
+              onPointerDown: (event) {
                 _pointerScrollIntentSent = false;
                 _pointerScrollIntentDx = 0;
                 _pointerScrollIntentDy = 0;
-                widget.onUserScrollPointerDown?.call();
+                if (_codeBlockPointerIds.contains(event.pointer)) {
+                  return;
+                }
               },
               onPointerMove: (event) {
+                if (_codeBlockPointerIds.contains(event.pointer)) return;
                 if (_pointerScrollIntentSent) return;
                 _pointerScrollIntentDx += event.delta.dx;
                 _pointerScrollIntentDy += event.delta.dy;
@@ -429,25 +481,35 @@ class _MessageListViewState extends State<MessageListView> {
                   return;
                 }
                 _pointerScrollIntentSent = true;
+                widget.onUserScrollPointerDown?.call();
                 widget.onUserScrollIntent?.call(
                   _pointerScrollIntentDy > 0
                       ? ChatUserScrollIntentDirection.towardTop
                       : ChatUserScrollIntentDirection.towardBottom,
                 );
               },
-              onPointerUp: (_) {
+              onPointerUp: (event) {
+                _handleCodeBlockPointerFinished(event.pointer);
+                final sentScrollIntent = _pointerScrollIntentSent;
                 _pointerScrollIntentSent = false;
                 _pointerScrollIntentDx = 0;
                 _pointerScrollIntentDy = 0;
-                widget.onUserScrollPointerUp?.call();
+                if (sentScrollIntent) {
+                  widget.onUserScrollPointerUp?.call();
+                }
               },
-              onPointerCancel: (_) {
+              onPointerCancel: (event) {
+                _handleCodeBlockPointerFinished(event.pointer);
+                final sentScrollIntent = _pointerScrollIntentSent;
                 _pointerScrollIntentSent = false;
                 _pointerScrollIntentDx = 0;
                 _pointerScrollIntentDy = 0;
-                widget.onUserScrollPointerUp?.call();
+                if (sentScrollIntent) {
+                  widget.onUserScrollPointerUp?.call();
+                }
               },
               onPointerSignal: (event) {
+                if (_isCodeBlockInteractionActive) return;
                 if (event is PointerScrollEvent) {
                   final absDx = event.scrollDelta.dx.abs();
                   final absDy = event.scrollDelta.dy.abs();
@@ -464,6 +526,13 @@ class _MessageListViewState extends State<MessageListView> {
                 );
               },
               child: ScrollablePositionedList.builder(
+                physics: _isCodeBlockInteractionActive
+                    ? const NeverScrollableScrollPhysics()
+                    : defaultTargetPlatform == TargetPlatform.iOS
+                    ? const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
+                      )
+                    : const ClampingScrollPhysics(),
                 itemScrollController:
                     widget.scrollControllers.itemScrollController,
                 itemPositionsListener:
@@ -474,11 +543,6 @@ class _MessageListViewState extends State<MessageListView> {
                     widget.scrollControllers.scrollOffsetListener,
                 initialScrollIndex: bottomAnchorIndex,
                 initialAlignment: bottomAnchorAlignment,
-                physics: defaultTargetPlatform == TargetPlatform.iOS
-                    ? const BouncingScrollPhysics(
-                        parent: AlwaysScrollableScrollPhysics(),
-                      )
-                    : const ClampingScrollPhysics(),
                 padding: EdgeInsets.fromLTRB(
                   horizontalPad,
                   8,
@@ -794,6 +858,8 @@ class _MessageListViewState extends State<MessageListView> {
         widget.onToggleReasoning != null,
         widget.onToggleTranslation != null,
         widget.onToggleReasoningSegment != null,
+        widget.onCodeBlockInteractionStart != null,
+        widget.onCodeBlockInteractionEnd != null,
         widget.onUserResizesMessageContent != null,
       ),
     );
@@ -1160,6 +1226,7 @@ class _MessageListViewState extends State<MessageListView> {
                 widget.onRecoveredAskUserAnswer!(message, part, result),
       onUserResizesMessageContent: () =>
           widget.onUserResizesMessageContent?.call(message, index),
+      onCodeBlockPointerDown: _handleCodeBlockPointerDown,
     );
   }
 }

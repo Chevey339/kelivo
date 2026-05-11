@@ -106,6 +106,7 @@ class ChatScrollController {
   bool _autoStickBottomMaintenancePendingAlignFittingContentToTop = true;
   bool _disposed = false;
   bool _userPointerDown = false;
+  int _codeBlockInteractionDepth = 0;
   bool _readingAnchorCaptureScheduled = false;
   bool _readingAnchorScheduled = false;
   int? _readingAnchorIndex;
@@ -170,6 +171,12 @@ class ChatScrollController {
   }
 
   void _onScrollPositionChanged() {
+    if (_isCodeBlockInteractionActive) {
+      _positionTracker.clearUserScrollingSilently();
+      _cancelPendingBottomScrollMotion();
+      return;
+    }
+
     var needsNotify = false;
     final userScrolling = _positionTracker.isUserScrolling;
     if (userScrolling) {
@@ -343,6 +350,7 @@ class ChatScrollController {
     Duration duration = const Duration(milliseconds: 250),
     Curve curve = Curves.easeOutCubic,
   }) {
+    if (_isCodeBlockInteractionActive) return;
     if (!_bottomScrollScheduled) {
       _bottomScrollGeneration++;
     }
@@ -370,6 +378,7 @@ class ChatScrollController {
     final generation = _bottomScrollGeneration;
     void flush({int layoutWaitFrames = 2}) {
       if (_disposed) return;
+      if (_isCodeBlockInteractionActive) return;
       if (generation != _bottomScrollGeneration) return;
       if (_pendingBottomScrollRequiresAutoStick &&
           layoutWaitFrames > 0 &&
@@ -395,6 +404,7 @@ class ChatScrollController {
       _pendingBottomScrollForceAnimation = false;
       _pendingBottomScrollDuration = const Duration(milliseconds: 250);
       _pendingBottomScrollCurve = Curves.easeOutCubic;
+      if (_isCodeBlockInteractionActive) return;
       if (shouldRequireAutoStick && !_autoStickToBottom) return;
       final contentFits =
           shouldAlignFittingContentToTop &&
@@ -440,6 +450,7 @@ class ChatScrollController {
     required bool alignFittingContentToTop,
   }) {
     if (_disposed || generation != _bottomScrollGeneration) return;
+    if (_isCodeBlockInteractionActive) return;
     if (!_autoStickToBottom) return;
     if (_userPointerDown ||
         _isUserScrolling ||
@@ -550,7 +561,8 @@ class ChatScrollController {
     scrollToBottom(animate: animate);
     final generation = _bottomScrollGeneration;
     Future.delayed(postSwitchDelay, () {
-      if (_disposed || generation != _bottomScrollGeneration) return;
+      if (_disposed || _isCodeBlockInteractionActive) return;
+      if (generation != _bottomScrollGeneration) return;
       scrollToBottom(animate: animate);
     });
   }
@@ -560,7 +572,8 @@ class ChatScrollController {
     scrollToBottom(animate: animate);
     final generation = _bottomScrollGeneration;
     Future.delayed(const Duration(milliseconds: 120), () {
-      if (_disposed || generation != _bottomScrollGeneration) return;
+      if (_disposed || _isCodeBlockInteractionActive) return;
+      if (generation != _bottomScrollGeneration) return;
       scrollToBottom(animate: animate);
     });
   }
@@ -569,6 +582,7 @@ class ChatScrollController {
   void autoScrollToBottomIfNeeded() {
     final enabled = _getAutoScrollEnabled();
     if (!enabled) return;
+    if (_isCodeBlockInteractionActive) return;
     if (_userPointerDown) return;
     if (!_autoStickToBottom) {
       _maintainReadingAnchorIfSuspended();
@@ -590,6 +604,7 @@ class ChatScrollController {
   /// Keep the list pinned after messages are inserted while the user is still
   /// at the bottom. This covers empty/new conversations before streaming ticks.
   void followBottomAfterContentChange() {
+    if (_isCodeBlockInteractionActive) return;
     if (!_getAutoScrollEnabled()) {
       _autoStickToBottom = false;
       return;
@@ -618,6 +633,7 @@ class ChatScrollController {
     int? anchorIndex,
     double? anchorAlignment,
   }) {
+    if (_isCodeBlockInteractionActive) return;
     handleUserScrollIntent();
     final generation = _bottomScrollGeneration;
     if (anchorIndex != null && hasClients) {
@@ -645,6 +661,7 @@ class ChatScrollController {
     ChatUserScrollIntentDirection direction =
         ChatUserScrollIntentDirection.unknown,
   ]) {
+    if (_isCodeBlockInteractionActive) return;
     revealNavButtons();
     _cancelPendingBottomScrollsForUser();
     _positionTracker.cancelProgrammaticScrollForUser();
@@ -663,13 +680,36 @@ class ChatScrollController {
     }
   }
 
+  bool get _isCodeBlockInteractionActive => _codeBlockInteractionDepth > 0;
+
+  bool get isCodeBlockInteractionActive => _isCodeBlockInteractionActive;
+
+  void handleCodeBlockInteractionStart() {
+    _codeBlockInteractionDepth++;
+    _userPointerDown = false;
+    _setUserScrolling(false);
+    _positionTracker.cancelProgrammaticScrollSilently();
+    _positionTracker.clearUserScrollingSilently();
+    _cancelPendingBottomScrollMotion();
+  }
+
+  void handleCodeBlockInteractionEnd() {
+    if (_codeBlockInteractionDepth <= 0) return;
+    _codeBlockInteractionDepth--;
+    if (!_isCodeBlockInteractionActive) {
+      _positionTracker.clearUserScrollingSilently();
+    }
+  }
+
   void handleUserScrollPointerDown() {
+    if (_isCodeBlockInteractionActive) return;
     _userPointerDown = true;
     _positionTracker.cancelProgrammaticScrollForUser();
     _cancelPendingBottomScrollMotion();
   }
 
   void handleUserScrollPointerUp() {
+    if (_isCodeBlockInteractionActive) return;
     _userPointerDown = false;
     if (_isUserScrolling && !_positionTracker.isUserScrolling) {
       _scheduleUserScrollIntentIdle();
@@ -727,10 +767,11 @@ class ChatScrollController {
     required double alignment,
     required int generation,
   }) {
+    if (_isCodeBlockInteractionActive) return;
     _cancelAnchorMaintenanceTimers();
 
     void maintain() {
-      if (_disposed) return;
+      if (_disposed || _isCodeBlockInteractionActive) return;
       if (generation != _bottomScrollGeneration) return;
       if (!hasClients) return;
       unawaited(
@@ -765,10 +806,11 @@ class ChatScrollController {
   }
 
   void _scheduleUserScrollIntentIdle() {
+    if (_isCodeBlockInteractionActive) return;
     _userScrollIntentIdleTimer?.cancel();
     _userScrollIntentIdleTimer = Timer(_userScrollIntentIdleDelay, () {
       _userScrollIntentIdleTimer = null;
-      if (_disposed) return;
+      if (_disposed || _isCodeBlockInteractionActive) return;
       if (_userPointerDown) {
         _scheduleUserScrollIntentIdle();
         return;
@@ -783,6 +825,7 @@ class ChatScrollController {
   }
 
   void _finishUserScrollIdleWhenReady() {
+    if (_isCodeBlockInteractionActive) return;
     if (_userPointerDown || _positionTracker.isUserScrolling) {
       _scheduleUserScrollIntentIdle();
       return;
@@ -791,6 +834,7 @@ class ChatScrollController {
   }
 
   void _finishUserScrollIdle() {
+    if (_isCodeBlockInteractionActive) return;
     _setUserScrolling(false);
     if (_shouldResumeBottomAfterUserScrollIdle()) {
       _resumeAutoStickToBottom();
@@ -833,6 +877,7 @@ class ChatScrollController {
   }
 
   void _scheduleReadingAnchorCapture() {
+    if (_isCodeBlockInteractionActive) return;
     if (_readingAnchorCaptureScheduled) return;
     final generation = _bottomScrollGeneration;
     _readingAnchorCaptureScheduled = true;
@@ -845,6 +890,7 @@ class ChatScrollController {
   }
 
   void _captureReadingAnchor() {
+    if (_isCodeBlockInteractionActive) return;
     if (!hasClients) return;
     // Capture after the drag settles; capturing must not move the list.
     final anchor = _positionTracker.readingAnchorPosition();
@@ -865,6 +911,7 @@ class ChatScrollController {
   }
 
   void _maintainReadingAnchorIfSuspended() {
+    if (_isCodeBlockInteractionActive) return;
     if (!_autoStickSuspendedByUser) return;
     if (_realignSuspendedTopGap()) return;
     if (_isUserScrolling || _positionTracker.isUserScrolling) return;
@@ -892,6 +939,7 @@ class ChatScrollController {
   }
 
   void _restoreReadingAnchorIfSuspended() {
+    if (_isCodeBlockInteractionActive) return;
     if (!_autoStickSuspendedByUser) return;
     if (_realignSuspendedTopGap()) return;
     if (_isUserScrolling || _positionTracker.isUserScrolling) return;
@@ -911,6 +959,7 @@ class ChatScrollController {
   }
 
   bool _realignSuspendedTopGap() {
+    if (_isCodeBlockInteractionActive) return false;
     if (!_positionTracker.isAtTop) return false;
     final firstMessageLeadingEdge = _positionTracker.leadingEdgeForIndex(0);
     if (firstMessageLeadingEdge == null || firstMessageLeadingEdge <= 0.02) {
@@ -932,6 +981,7 @@ class ChatScrollController {
   /// Capture the current reading anchor before frozen streaming content is
   /// displayed, so a height change can be reconciled without a visible bounce.
   void prepareForFrozenStreamingContentFlush() {
+    if (_isCodeBlockInteractionActive) return;
     if (_shouldResumeBottomAfterUserScrollIdle()) {
       _resumeAutoStickToBottom();
       return;
@@ -943,6 +993,7 @@ class ChatScrollController {
 
   /// Reconcile scroll position after frozen streaming UI content is displayed.
   void handleFrozenStreamingContentFlushed() {
+    if (_isCodeBlockInteractionActive) return;
     if (_shouldResumeBottomAfterUserScrollIdle()) {
       _resumeAutoStickToBottom();
     }
@@ -965,14 +1016,20 @@ class ChatScrollController {
     Duration duration = const Duration(milliseconds: 250),
     Curve curve = Curves.easeOutCubic,
   }) async {
+    if (_isCodeBlockInteractionActive) return;
     final target = _getItemCount();
     if (target < 0) return;
     if (alignFittingContentToTop && !_hasOverflowingContent()) {
+      if (_isCodeBlockInteractionActive) return;
       await _positionTracker.scrollToIndex(
         index: 0,
         alignment: 0,
         animate: false,
       );
+      if (_isCodeBlockInteractionActive) {
+        _cancelPendingBottomScrollMotion();
+        return;
+      }
       if (generation != _bottomScrollGeneration) return;
       _updateJumpToBottomVisibility(false);
       _autoStickToBottom = true;
@@ -981,6 +1038,7 @@ class ChatScrollController {
     final useAnimation =
         animate &&
         (forceAnimation || _positionTracker.shouldAnimateToIndex(target));
+    if (_isCodeBlockInteractionActive) return;
     await _positionTracker.scrollToIndex(
       index: target,
       alignment: _getBottomAnchorAlignment(),
@@ -988,6 +1046,10 @@ class ChatScrollController {
       duration: duration,
       curve: curve,
     );
+    if (_isCodeBlockInteractionActive) {
+      _cancelPendingBottomScrollMotion();
+      return;
+    }
     if (generation != _bottomScrollGeneration) return;
     _updateJumpToBottomVisibility(false);
     _autoStickToBottom = true;
