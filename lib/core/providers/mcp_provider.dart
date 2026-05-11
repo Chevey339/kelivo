@@ -49,6 +49,7 @@ class McpToolConfig {
   final List<McpParamSpec> params;
   // Raw JSON schema for parameters, if provided by the server
   final Map<String, dynamic>? schema;
+
   /// Whether this tool requires user approval before execution.
   final bool needsApproval;
 
@@ -255,6 +256,7 @@ class McpProvider extends ChangeNotifier {
   final Map<String, Timer> _heartbeats = <String, Timer>{};
   Duration _requestTimeout = const Duration(seconds: 30);
   String? _cachedSystemPath;
+  Future<String?>? _systemPathFuture;
 
   McpProvider() {
     _load();
@@ -712,8 +714,10 @@ class McpProvider extends ChangeNotifier {
     if (idx < 0) return;
     final server = _servers[idx];
     final tools = server.tools
-        .map((t) =>
-            t.name == toolName ? t.copyWith(needsApproval: needsApproval) : t)
+        .map(
+          (t) =>
+              t.name == toolName ? t.copyWith(needsApproval: needsApproval) : t,
+        )
         .toList();
     _servers[idx] = server.copyWith(tools: tools);
     await _persist();
@@ -1392,17 +1396,54 @@ class McpProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<String?> _getSystemPath() async {
-    if (_cachedSystemPath != null) return _cachedSystemPath;
-    if (!Platform.isMacOS) return null;
-    try {
-      final result = await Process.run('launchctl', ['getenv', 'PATH']);
-      if (result.exitCode == 0) {
-        _cachedSystemPath = (result.stdout as String).trim();
-        return _cachedSystemPath;
+  Future<String?> _getSystemPath() {
+    final cachedFuture = _systemPathFuture;
+    if (cachedFuture != null) return cachedFuture;
+
+    final systemPathFuture = () async {
+      if (_cachedSystemPath != null) return _cachedSystemPath;
+      // macOS: use launchctl to get system PATH
+      if (Platform.isMacOS) {
+        try {
+          final result = await Process.run('launchctl', ['getenv', 'PATH']);
+          if (result.exitCode == 0) {
+            _cachedSystemPath = (result.stdout as String).trim();
+            return _cachedSystemPath;
+          }
+        } catch (_) {}
       }
-    } catch (_) {}
-    return null;
+      // Windows: get user PATH from registry if not in current environment
+      if (Platform.isWindows) {
+        try {
+          // Try to get PATH from the user environment via PowerShell
+          final result = await Process.run('powershell', [
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            r'[Environment]::GetEnvironmentVariable("PATH", "User")',
+          ]);
+          if (result.exitCode == 0) {
+            final userPath = (result.stdout as String).trim();
+            if (userPath.isNotEmpty) {
+              // Merge with current PATH
+              final currentPath = Platform.environment['PATH'] ?? '';
+              if (currentPath.isNotEmpty && userPath.isNotEmpty) {
+                _cachedSystemPath = '$currentPath;$userPath';
+              } else {
+                _cachedSystemPath = currentPath.isNotEmpty
+                    ? currentPath
+                    : userPath;
+              }
+              return _cachedSystemPath;
+            }
+          }
+        } catch (_) {}
+      }
+      return null;
+    }();
+
+    _systemPathFuture = systemPathFuture;
+    return systemPathFuture;
   }
 
   Future<Map<String, String>> _resolveEnvironmentWithPath(
@@ -1423,14 +1464,24 @@ class McpProvider extends ChangeNotifier {
     Map<String, String> environment,
   ) async {
     try {
-      final whichCmd = Platform.isWindows ? 'where' : 'which';
-      final result = await Process.run(
-        whichCmd,
-        [command],
-        environment: environment,
-        runInShell: true,
-      );
-      return result.exitCode == 0;
+      if (Platform.isWindows) {
+        final whereResult = await Process.run(
+          'where',
+          [command],
+          environment: environment,
+          runInShell: true,
+        );
+        return whereResult.exitCode == 0;
+      } else {
+        final whichCmd = 'which';
+        final result = await Process.run(
+          whichCmd,
+          [command],
+          environment: environment,
+          runInShell: true,
+        );
+        return result.exitCode == 0;
+      }
     } catch (_) {
       return false;
     }
