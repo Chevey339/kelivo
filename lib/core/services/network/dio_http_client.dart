@@ -9,6 +9,8 @@ import 'package:socks5_proxy/socks_client.dart' as socks;
 
 import 'request_logger.dart';
 
+const int _maxLoggedResponseBodyBytes = 1024 * 1024;
+
 Future<InternetAddress?> _resolveProxyAddress(String host) async {
   final parsed = InternetAddress.tryParse(host);
   if (parsed != null) return parsed;
@@ -168,10 +170,12 @@ class DioHttpClient extends http.BaseClient {
     reqHeaders.putIfAbsent('User-Agent', () => 'Kelivo');
 
     if (RequestLogger.enabled) {
-      RequestLogger.logLine('[REQ $reqId] $method $uri');
+      RequestLogger.logLine(
+        '[REQ $reqId] $method ${RequestLogger.sanitizeUrlForLogging(uri)}',
+      );
       if (reqHeaders.isNotEmpty) {
         RequestLogger.logLine(
-          '[REQ $reqId] headers=${RequestLogger.encodeObject(reqHeaders)}',
+          '[REQ $reqId] headers=${RequestLogger.encodeObject(reqHeaders, redactSecrets: true)}',
         );
       }
       if (bodyBytes.isNotEmpty) {
@@ -180,7 +184,7 @@ class DioHttpClient extends http.BaseClient {
             ? decoded
             : 'base64:${base64Encode(bodyBytes)}';
         RequestLogger.logLine(
-          '[REQ $reqId] body=${RequestLogger.escape(bodyText)}',
+          '[REQ $reqId] body=${RequestLogger.escape(RequestLogger.sanitizeBodyForLogging(bodyText))}',
         );
       }
     }
@@ -211,7 +215,7 @@ class DioHttpClient extends http.BaseClient {
         RequestLogger.logLine('[RES $reqId] status=$statusCode');
         if (headers.isNotEmpty) {
           RequestLogger.logLine(
-            '[RES $reqId] headers=${RequestLogger.encodeObject(headers)}',
+            '[RES $reqId] headers=${RequestLogger.encodeObject(headers, redactSecrets: true)}',
           );
         }
       }
@@ -221,29 +225,80 @@ class DioHttpClient extends http.BaseClient {
           ? body.contentLength
           : null;
       final controller = StreamController<List<int>>(sync: true);
+      var responseLogBytes = 0;
+      var responseLogPending = '';
+      var responseLogTruncated = false;
+      var responseLogFinished = false;
+
+      void writeResponseLogText(String text) {
+        if (text.isEmpty) return;
+        RequestLogger.logLine(
+          '[RES $reqId] chunk=${RequestLogger.escape(RequestLogger.sanitizeBodyForLogging(text))}',
+        );
+      }
+
+      void flushCompleteResponseLogLines() {
+        final end = responseLogPending.lastIndexOf('\n');
+        if (end < 0) return;
+        final text = responseLogPending.substring(0, end + 1);
+        responseLogPending = responseLogPending.substring(end + 1);
+        writeResponseLogText(text);
+      }
+
+      void captureResponseLogChunk(List<int> chunk) {
+        if (!RequestLogger.enabled || !RequestLogger.saveOutput) return;
+        final remaining = _maxLoggedResponseBodyBytes - responseLogBytes;
+        if (remaining <= 0) {
+          responseLogTruncated = true;
+          return;
+        }
+        final bytes = remaining >= chunk.length
+            ? chunk
+            : chunk.sublist(0, remaining);
+        responseLogBytes += bytes.length;
+        if (bytes.length < chunk.length) {
+          responseLogTruncated = true;
+        }
+        final s = RequestLogger.safeDecodeUtf8(bytes);
+        if (s.isEmpty) return;
+        responseLogPending += s;
+        flushCompleteResponseLogLines();
+      }
+
+      void finishResponseLogBody() {
+        if (responseLogFinished ||
+            !RequestLogger.enabled ||
+            !RequestLogger.saveOutput) {
+          return;
+        }
+        responseLogFinished = true;
+        writeResponseLogText(responseLogPending);
+        responseLogPending = '';
+        if (responseLogTruncated) {
+          writeResponseLogText(
+            '[response log truncated after $_maxLoggedResponseBodyBytes bytes]',
+          );
+        }
+      }
+
       controller.onListen = () {
         body.stream.listen(
           (chunk) {
             controller.add(chunk);
-            if (RequestLogger.enabled && RequestLogger.saveOutput) {
-              final s = RequestLogger.safeDecodeUtf8(chunk);
-              if (s.isNotEmpty) {
-                RequestLogger.logLine(
-                  '[RES $reqId] chunk=${RequestLogger.escape(s)}',
-                );
-              }
-            }
+            captureResponseLogChunk(chunk);
           },
           onError: (e, st) {
+            finishResponseLogBody();
             if (RequestLogger.enabled) {
               RequestLogger.logLine(
-                '[RES $reqId] error=${RequestLogger.escape(e.toString())}',
+                '[RES $reqId] error=${RequestLogger.escape(RequestLogger.sanitizeBodyForLogging(e.toString()))}',
               );
             }
             controller.addError(e, st);
             controller.close();
           },
           onDone: () {
+            finishResponseLogBody();
             if (RequestLogger.enabled) {
               RequestLogger.logLine('[RES $reqId] done');
             }
@@ -277,14 +332,14 @@ class DioHttpClient extends http.BaseClient {
     } on DioException catch (e) {
       if (RequestLogger.enabled) {
         RequestLogger.logLine(
-          '[RES $reqId] dio_error=${RequestLogger.escape(e.toString())}',
+          '[RES $reqId] dio_error=${RequestLogger.escape(RequestLogger.sanitizeBodyForLogging(e.toString()))}',
         );
       }
       throw http.ClientException(e.toString(), uri);
     } catch (e) {
       if (RequestLogger.enabled) {
         RequestLogger.logLine(
-          '[RES $reqId] error=${RequestLogger.escape(e.toString())}',
+          '[RES $reqId] error=${RequestLogger.escape(RequestLogger.sanitizeBodyForLogging(e.toString()))}',
         );
       }
       throw http.ClientException(e.toString(), uri);
