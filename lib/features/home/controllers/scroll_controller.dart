@@ -63,7 +63,11 @@ class ChatScrollController {
 
   /// Timer for auto-hiding navigation buttons.
   Timer? _navButtonsHideTimer;
+  Timer? _userScrollIntentIdleTimer;
   static const int _navButtonsHideDelayMs = 2000;
+  static const Duration _userScrollIntentIdleDelay = Duration(
+    milliseconds: 180,
+  );
 
   /// Whether the user is actively scrolling.
   bool _isUserScrolling = false;
@@ -87,11 +91,17 @@ class ChatScrollController {
   bool _pendingBottomScrollAnimation = false;
   bool _pendingBottomScrollRequiresAutoStick = false;
   bool _pendingBottomScrollAlignFittingContentToTop = true;
+  bool _pendingBottomScrollMaintainFittingContentForGrowth = false;
+  bool _pendingBottomScrollForceAnimation = false;
   Duration _pendingBottomScrollDuration = const Duration(milliseconds: 250);
   Curve _pendingBottomScrollCurve = Curves.easeOutCubic;
   int _bottomScrollGeneration = 0;
   final List<Timer> _anchorMaintenanceTimers = <Timer>[];
+  bool _autoStickBottomMaintenanceActive = false;
+  bool _autoStickBottomMaintenancePending = false;
+  bool _autoStickBottomMaintenancePendingAlignFittingContentToTop = true;
   bool _disposed = false;
+  bool _userPointerDown = false;
   bool _readingAnchorCaptureScheduled = false;
   bool _readingAnchorScheduled = false;
   int? _readingAnchorIndex;
@@ -103,6 +113,8 @@ class ChatScrollController {
 
   /// Tolerance for "near bottom" detection.
   static const double _autoScrollSnapTolerance = 56.0;
+  static const Duration _userSettleScrollDuration = Duration(milliseconds: 520);
+  static const Curve _userSettleScrollCurve = Curves.easeInOutCubic;
 
   // ============================================================================
   // Public Getters
@@ -124,6 +136,9 @@ class ChatScrollController {
   bool isNearBottom([double tolerance = _autoScrollSnapTolerance]) {
     return _positionTracker.isAtBottom;
   }
+
+  bool get _isInBottomResumeZone =>
+      _positionTracker.isAtBottom || _positionTracker.isNearLiveTail();
 
   /// Check if the scroll view has enough content to scroll.
   ///
@@ -169,6 +184,10 @@ class ChatScrollController {
     _realignFittingContentToTop();
 
     final atBottom = _positionTracker.isAtBottom;
+    final shouldResumeInBottomZone =
+        _isInBottomResumeZone &&
+        (_hasUserScrollIntentTowardBottom ||
+            _positionTracker.lastUserScrollWasTowardBottom);
     final shouldResumeSuspendedAutoStick =
         _autoStickSuspendedByUser &&
         (_getAutoScrollEnabled() || _autoStickToBottom) &&
@@ -177,24 +196,26 @@ class ChatScrollController {
             (!userScrolling &&
                 _hasUserScrollMovementSinceIntent &&
                 _positionTracker.lastUserScrollWasTowardBottom));
-    if (!atBottom) {
+    if (!atBottom &&
+        shouldResumeSuspendedAutoStick &&
+        shouldResumeInBottomZone) {
+      _resumeAutoStickToBottom(keepUserScrolling: userScrolling);
+    } else if (!atBottom) {
       if (userScrolling || _isUserScrolling || _autoStickSuspendedByUser) {
-        _autoStickToBottom = false;
-        _hasLeftBottomSinceUserIntent = true;
+        final keepRecoveredAutoStick =
+            _autoStickToBottom && !_autoStickSuspendedByUser && !userScrolling;
+        if (!keepRecoveredAutoStick) {
+          _autoStickToBottom = false;
+          _hasLeftBottomSinceUserIntent = true;
+        }
       }
       if (!userScrolling && _isUserScrolling) {
-        _setUserScrolling(false);
-        if (_autoStickSuspendedByUser) {
-          _scheduleReadingAnchorCapture();
-        }
+        _finishUserScrollIdleWhenReady();
       }
     } else if (shouldResumeSuspendedAutoStick) {
       _resumeAutoStickToBottom();
     } else if (!userScrolling && _isUserScrolling) {
-      _setUserScrolling(false);
-      if (_autoStickSuspendedByUser) {
-        _scheduleReadingAnchorCapture();
-      }
+      _finishUserScrollIdleWhenReady();
     } else if (!userScrolling &&
         !_isUserScrolling &&
         !_autoStickSuspendedByUser &&
@@ -292,7 +313,15 @@ class ChatScrollController {
     _hasUserScrollIntentTowardBottom = false;
     _autoStickToBottom = true;
     _clearReadingAnchor();
-    _scheduleScrollToBottom(animate: animate);
+    _scheduleScrollToBottom(
+      animate: animate,
+      forceAnimation: animate,
+      alignFittingContentToTop: !animate,
+      duration: animate
+          ? _userSettleScrollDuration
+          : const Duration(milliseconds: 250),
+      curve: _userSettleScrollCurve,
+    );
   }
 
   void _scheduleScrollToBottom({
@@ -300,6 +329,8 @@ class ChatScrollController {
     bool deferUntilNextFrame = false,
     bool requireAutoStick = false,
     bool alignFittingContentToTop = true,
+    bool maintainFittingContentForGrowth = false,
+    bool forceAnimation = false,
     Duration duration = const Duration(milliseconds: 250),
     Curve curve = Curves.easeOutCubic,
   }) {
@@ -307,6 +338,9 @@ class ChatScrollController {
       _bottomScrollGeneration++;
     }
     _pendingBottomScrollAnimation = _pendingBottomScrollAnimation || animate;
+    _pendingBottomScrollForceAnimation = _bottomScrollScheduled
+        ? _pendingBottomScrollForceAnimation || forceAnimation
+        : forceAnimation;
     _pendingBottomScrollRequiresAutoStick = _bottomScrollScheduled
         ? _pendingBottomScrollRequiresAutoStick && requireAutoStick
         : requireAutoStick;
@@ -314,6 +348,10 @@ class ChatScrollController {
         ? _pendingBottomScrollAlignFittingContentToTop &&
               alignFittingContentToTop
         : alignFittingContentToTop;
+    _pendingBottomScrollMaintainFittingContentForGrowth = _bottomScrollScheduled
+        ? _pendingBottomScrollMaintainFittingContentForGrowth ||
+              maintainFittingContentForGrowth
+        : maintainFittingContentForGrowth;
     if (!_bottomScrollScheduled || duration > _pendingBottomScrollDuration) {
       _pendingBottomScrollDuration = duration;
       _pendingBottomScrollCurve = curve;
@@ -336,24 +374,36 @@ class ChatScrollController {
       final shouldRequireAutoStick = _pendingBottomScrollRequiresAutoStick;
       final shouldAlignFittingContentToTop =
           _pendingBottomScrollAlignFittingContentToTop;
+      final shouldMaintainFittingContentForGrowth =
+          _pendingBottomScrollMaintainFittingContentForGrowth;
+      final shouldForceAnimation = _pendingBottomScrollForceAnimation;
       final scrollDuration = _pendingBottomScrollDuration;
       final scrollCurve = _pendingBottomScrollCurve;
       _pendingBottomScrollAnimation = false;
       _pendingBottomScrollRequiresAutoStick = false;
       _pendingBottomScrollAlignFittingContentToTop = true;
+      _pendingBottomScrollMaintainFittingContentForGrowth = false;
+      _pendingBottomScrollForceAnimation = false;
       _pendingBottomScrollDuration = const Duration(milliseconds: 250);
       _pendingBottomScrollCurve = Curves.easeOutCubic;
       if (shouldRequireAutoStick && !_autoStickToBottom) return;
+      final contentFits =
+          shouldAlignFittingContentToTop &&
+          _positionTracker.hasCurrentVisibleRange &&
+          _positionTracker.visibleContentFitsInViewport();
       unawaited(
         _animateToBottom(
           animate: shouldAnimate,
           generation: generation,
           alignFittingContentToTop: shouldAlignFittingContentToTop,
+          forceAnimation: shouldForceAnimation,
           duration: scrollDuration,
           curve: scrollCurve,
         ),
       );
-      if (shouldRequireAutoStick) {
+      if (shouldRequireAutoStick &&
+          (shouldMaintainFittingContentForGrowth ||
+              (shouldAlignFittingContentToTop && !contentFits))) {
         _maintainAutoStickBottomAfterLayout(
           generation,
           alignFittingContentToTop: shouldAlignFittingContentToTop,
@@ -382,6 +432,11 @@ class ChatScrollController {
   }) {
     if (_disposed || generation != _bottomScrollGeneration) return;
     if (!_autoStickToBottom) return;
+    if (_userPointerDown ||
+        _isUserScrolling ||
+        _positionTracker.isUserScrolling) {
+      return;
+    }
     unawaited(
       _animateToBottom(
         animate: false,
@@ -395,7 +450,17 @@ class ChatScrollController {
     int generation, {
     required bool alignFittingContentToTop,
   }) {
+    if (_autoStickBottomMaintenanceActive) {
+      _autoStickBottomMaintenancePending = true;
+      _autoStickBottomMaintenancePendingAlignFittingContentToTop =
+          _autoStickBottomMaintenancePendingAlignFittingContentToTop &&
+          alignFittingContentToTop;
+      return;
+    }
     _cancelAnchorMaintenanceTimers();
+    _autoStickBottomMaintenanceActive = true;
+    _autoStickBottomMaintenancePendingAlignFittingContentToTop =
+        alignFittingContentToTop;
 
     void maintain() {
       _maintainAutoStickBottom(
@@ -421,6 +486,30 @@ class ChatScrollController {
     ]) {
       _anchorMaintenanceTimers.add(Timer(delay, maintain));
     }
+    _anchorMaintenanceTimers.add(
+      Timer(const Duration(milliseconds: 380), () {
+        if (_disposed) return;
+        _autoStickBottomMaintenanceActive = false;
+        final pendingAlignFittingContentToTop =
+            _autoStickBottomMaintenancePendingAlignFittingContentToTop;
+        if (_autoStickBottomMaintenancePending &&
+            _autoStickToBottom &&
+            _getAutoScrollEnabled()) {
+          _autoStickBottomMaintenancePending = false;
+          _autoStickBottomMaintenancePendingAlignFittingContentToTop = true;
+          _scheduleScrollToBottom(
+            animate: false,
+            deferUntilNextFrame: true,
+            requireAutoStick: true,
+            alignFittingContentToTop: pendingAlignFittingContentToTop,
+            maintainFittingContentForGrowth: pendingAlignFittingContentToTop,
+          );
+        } else {
+          _autoStickBottomMaintenancePending = false;
+          _autoStickBottomMaintenancePendingAlignFittingContentToTop = true;
+        }
+      }),
+    );
   }
 
   /// Force scroll to bottom (used when user explicitly clicks the button).
@@ -434,7 +523,7 @@ class ChatScrollController {
     _clearReadingAnchor();
     _positionTracker.resetUserScrolling();
     revealNavButtons();
-    scrollToBottom();
+    scrollToBottom(animate: true);
   }
 
   /// Force scroll after rebuilds when switching topics/conversations.
@@ -469,14 +558,21 @@ class ChatScrollController {
   void autoScrollToBottomIfNeeded() {
     final enabled = _getAutoScrollEnabled();
     if (!enabled) return;
+    if (_userPointerDown) return;
     if (!_autoStickToBottom) {
       _maintainReadingAnchorIfSuspended();
+      return;
+    }
+    if (_isUserScrolling || _positionTracker.isUserScrolling) return;
+    if (_autoStickBottomMaintenanceActive) {
+      _autoStickBottomMaintenancePending = true;
       return;
     }
     _scheduleScrollToBottom(
       animate: false,
       deferUntilNextFrame: true,
       requireAutoStick: true,
+      maintainFittingContentForGrowth: true,
     );
   }
 
@@ -540,15 +636,30 @@ class ChatScrollController {
   ]) {
     revealNavButtons();
     _cancelPendingBottomScrollsForUser();
+    _positionTracker.cancelProgrammaticScrollForUser();
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom =
         direction == ChatUserScrollIntentDirection.towardBottom;
     _setUserScrolling(true);
+    _scheduleUserScrollIntentIdle();
     _autoStickToBottom = false;
     _lastJumpUserMessageId = null;
-    if (_hasUserScrollIntentTowardBottom && _positionTracker.isAtBottom) {
-      _resumeAutoStickToBottom();
+    if (_hasUserScrollIntentTowardBottom && _isInBottomResumeZone) {
+      _resumeAutoStickToBottom(keepUserScrolling: true);
+    }
+  }
+
+  void handleUserScrollPointerDown() {
+    _userPointerDown = true;
+    _positionTracker.cancelProgrammaticScrollForUser();
+    _cancelPendingBottomScrollMotion();
+  }
+
+  void handleUserScrollPointerUp() {
+    _userPointerDown = false;
+    if (_isUserScrolling && !_positionTracker.isUserScrolling) {
+      _scheduleUserScrollIntentIdle();
     }
   }
 
@@ -563,22 +674,30 @@ class ChatScrollController {
     return _positionTracker.scrollByOffset(-delta);
   }
 
-  void _cancelPendingBottomScrollsForUser() {
-    _autoStickSuspendedByUser = true;
+  void _cancelPendingBottomScrollMotion() {
     _bottomScrollGeneration++;
     _bottomScrollScheduled = false;
     _pendingBottomScrollAnimation = false;
     _pendingBottomScrollRequiresAutoStick = true;
     _pendingBottomScrollAlignFittingContentToTop = true;
+    _pendingBottomScrollMaintainFittingContentForGrowth = false;
+    _pendingBottomScrollForceAnimation = false;
     _pendingBottomScrollDuration = const Duration(milliseconds: 250);
     _pendingBottomScrollCurve = Curves.easeOutCubic;
     _cancelAnchorMaintenanceTimers();
+  }
+
+  void _cancelPendingBottomScrollsForUser() {
+    _autoStickSuspendedByUser = true;
+    _cancelPendingBottomScrollMotion();
     _readingAnchorIndex = null;
     _readingAnchorAlignment = null;
   }
 
-  void _resumeAutoStickToBottom() {
-    _setUserScrolling(false);
+  void _resumeAutoStickToBottom({bool keepUserScrolling = false}) {
+    if (!keepUserScrolling) {
+      _setUserScrolling(false);
+    }
     _autoStickSuspendedByUser = false;
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
@@ -622,8 +741,56 @@ class ChatScrollController {
       timer.cancel();
     }
     _anchorMaintenanceTimers.clear();
+    _autoStickBottomMaintenanceActive = false;
+    _autoStickBottomMaintenancePending = false;
+    _autoStickBottomMaintenancePendingAlignFittingContentToTop = true;
     _readingAnchorCaptureScheduled = false;
     _readingAnchorScheduled = false;
+  }
+
+  void _scheduleUserScrollIntentIdle() {
+    _userScrollIntentIdleTimer?.cancel();
+    _userScrollIntentIdleTimer = Timer(_userScrollIntentIdleDelay, () {
+      _userScrollIntentIdleTimer = null;
+      if (_disposed) return;
+      if (_userPointerDown) {
+        _scheduleUserScrollIntentIdle();
+        return;
+      }
+      if (_positionTracker.isUserScrolling) {
+        _scheduleUserScrollIntentIdle();
+        return;
+      }
+      if (!_isUserScrolling) return;
+      _finishUserScrollIdle();
+    });
+  }
+
+  void _finishUserScrollIdleWhenReady() {
+    if (_userPointerDown || _positionTracker.isUserScrolling) {
+      _scheduleUserScrollIntentIdle();
+      return;
+    }
+    _finishUserScrollIdle();
+  }
+
+  void _finishUserScrollIdle() {
+    _setUserScrolling(false);
+    if (_autoStickToBottom && _getAutoScrollEnabled()) {
+      _scheduleScrollToBottom(
+        animate: true,
+        deferUntilNextFrame: true,
+        requireAutoStick: true,
+        alignFittingContentToTop: false,
+        forceAnimation: true,
+        duration: _userSettleScrollDuration,
+        curve: _userSettleScrollCurve,
+      );
+      return;
+    }
+    if (_autoStickSuspendedByUser) {
+      _scheduleReadingAnchorCapture();
+    }
   }
 
   void _clearReadingAnchor() {
@@ -745,8 +912,10 @@ class ChatScrollController {
         deferUntilNextFrame: true,
         requireAutoStick: true,
         alignFittingContentToTop: false,
-        duration: const Duration(milliseconds: 480),
-        curve: Curves.easeInOutCubic,
+        forceAnimation: true,
+        maintainFittingContentForGrowth: false,
+        duration: _userSettleScrollDuration,
+        curve: _userSettleScrollCurve,
       );
       return;
     }
@@ -761,6 +930,7 @@ class ChatScrollController {
     bool animate = true,
     required int generation,
     bool alignFittingContentToTop = true,
+    bool forceAnimation = false,
     Duration duration = const Duration(milliseconds: 250),
     Curve curve = Curves.easeOutCubic,
   }) async {
@@ -778,7 +948,8 @@ class ChatScrollController {
       return;
     }
     final useAnimation =
-        animate && _positionTracker.shouldAnimateToIndex(target);
+        animate &&
+        (forceAnimation || _positionTracker.shouldAnimateToIndex(target));
     await _positionTracker.scrollToIndex(
       index: target,
       alignment: _getBottomAnchorAlignment(),
@@ -983,6 +1154,10 @@ class ChatScrollController {
 
   void _setUserScrolling(bool value) {
     if (_isUserScrolling == value) return;
+    if (!value) {
+      _userScrollIntentIdleTimer?.cancel();
+      _userScrollIntentIdleTimer = null;
+    }
     _isUserScrolling = value;
     _onUserScrollActiveChanged?.call(value);
   }
@@ -996,6 +1171,7 @@ class ChatScrollController {
     _disposed = true;
     _positionTracker.dispose();
     _navButtonsHideTimer?.cancel();
+    _userScrollIntentIdleTimer?.cancel();
     _cancelAnchorMaintenanceTimers();
   }
 }

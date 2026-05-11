@@ -1071,6 +1071,9 @@ class _HomePageState extends State<HomePage>
           _controller.toggleReasoningSegment(messageId, segmentIndex);
         },
         onUserScrollIntent: _controller.scrollCtrl.handleUserScrollIntent,
+        onUserScrollPointerDown:
+            _controller.scrollCtrl.handleUserScrollPointerDown,
+        onUserScrollPointerUp: _controller.scrollCtrl.handleUserScrollPointerUp,
         onUserResizesMessageContent: (message, index) {
           _controller.scrollCtrl.suspendAutoStickForUserInteraction(
             anchorIndex: index,
@@ -1191,8 +1194,9 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildScrollButtons() {
-    return Builder(
-      builder: (context) {
+    return AnimatedBuilder(
+      animation: _controller.scrollUiState,
+      builder: (context, _) {
         final settings = context.watch<SettingsProvider>();
         if (_controller.selecting) return const SizedBox.shrink();
         if (_controller.messages.isEmpty) {

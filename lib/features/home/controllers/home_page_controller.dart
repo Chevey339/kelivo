@@ -108,6 +108,7 @@ class HomePageController extends ChangeNotifier {
   late scroll_ctrl.ChatScrollController _scrollCtrl;
   final ChatIndexedScrollControllers _chatScrollControllers =
       ChatIndexedScrollControllers();
+  final ChangeNotifier _scrollUiState = ChangeNotifier();
 
   McpProvider? _mcpProvider;
   StreamSubscription<ChatAction>? _chatActionSub;
@@ -186,6 +187,7 @@ class HomePageController extends ChangeNotifier {
   ChatInputBarController get mediaController => _mediaController;
   ChatIndexedScrollControllers get chatScrollControllers =>
       _chatScrollControllers;
+  Listenable get scrollUiState => _scrollUiState;
   Animation<double> get convoFade => _convoFade;
   AnimationController get convoFadeController => _convoFadeController;
 
@@ -258,7 +260,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _notifyUiStateChanged() {
-    super.notifyListeners();
+    _scrollUiState.notifyListeners();
   }
 
   // ============================================================================
@@ -1750,6 +1752,7 @@ class HomePageController extends ChangeNotifier {
     _convoFadeController.dispose();
     _mcpProvider?.removeListener(_onMcpChanged);
     _scrollCtrl.dispose();
+    _scrollUiState.dispose();
     try {
       _chatActionSub?.cancel();
     } catch (_) {}

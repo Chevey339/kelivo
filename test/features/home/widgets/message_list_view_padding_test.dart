@@ -5,6 +5,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/controllers/chat_scroll_position.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
@@ -12,6 +13,7 @@ import 'package:Kelivo/features/home/controllers/streaming_content_notifier.dart
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -109,35 +111,44 @@ void main() {
     isProcessingFiles.dispose();
   });
 
-  testWidgets('消息列表使用夹紧滚动物理避免边界弹性位移', (tester) async {
+  testWidgets('iOS 消息列表使用原生弹性滚动物理', (tester) async {
     final scrollControllers = ChatIndexedScrollControllers();
     final isProcessingFiles = ValueNotifier<bool>(false);
 
-    await tester.pumpWidget(
-      _harness(
-        MessageListView(
-          scrollControllers: scrollControllers,
-          messages: const [],
-          byGroup: const {},
-          versionSelections: const {},
-          reasoning: const {},
-          reasoningSegments: const {},
-          contentSplits: const {},
-          toolParts: const {},
-          translations: const {},
-          selecting: false,
-          selectedItems: const {},
-          dividerPadding: EdgeInsets.zero,
-          isProcessingFiles: isProcessingFiles,
-          bottomContentPadding: 144,
+    try {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      await tester.pumpWidget(
+        _harness(
+          MessageListView(
+            scrollControllers: scrollControllers,
+            messages: const [],
+            byGroup: const {},
+            versionSelections: const {},
+            reasoning: const {},
+            reasoningSegments: const {},
+            contentSplits: const {},
+            toolParts: const {},
+            translations: const {},
+            selecting: false,
+            selectedItems: const {},
+            dividerPadding: EdgeInsets.zero,
+            isProcessingFiles: isProcessingFiles,
+            bottomContentPadding: 144,
+          ),
         ),
-      ),
-    );
+      );
 
-    final list = tester.widget<ScrollablePositionedList>(
-      find.byType(ScrollablePositionedList),
-    );
-    expect(list.physics, isA<ClampingScrollPhysics>());
+      final list = tester.widget<ScrollablePositionedList>(
+        find.byType(ScrollablePositionedList),
+      );
+      expect(list.physics, isA<BouncingScrollPhysics>());
+      expect(
+        (list.physics! as BouncingScrollPhysics).parent,
+        isA<AlwaysScrollableScrollPhysics>(),
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
 
     isProcessingFiles.dispose();
   });
@@ -261,6 +272,149 @@ void main() {
     isProcessingFiles.dispose();
   });
 
+  testWidgets('相同消息列表重建时复用已构建消息子树', (tester) async {
+    final scrollControllers = ChatIndexedScrollControllers();
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    var rebuildTick = 0;
+    final messages = <ChatMessage>[
+      ChatMessage(
+        id: 'assistant-mermaid',
+        role: 'assistant',
+        content: '```dart\nfinal value = 1;\n```',
+        conversationId: 'conversation-1',
+      ),
+    ];
+
+    Widget buildList() {
+      return _harness(
+        StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              children: [
+                TextButton(
+                  onPressed: () => setState(() {
+                    rebuildTick++;
+                  }),
+                  child: Text('rebuild $rebuildTick'),
+                ),
+                Expanded(
+                  child: MessageListView(
+                    scrollControllers: scrollControllers,
+                    messages: messages,
+                    byGroup: {
+                      for (final message in messages) message.id: [message],
+                    },
+                    versionSelections: const {},
+                    reasoning: const {},
+                    reasoningSegments: const {},
+                    contentSplits: const {},
+                    toolParts: const {},
+                    translations: const {},
+                    selecting: false,
+                    selectedItems: const {},
+                    dividerPadding: EdgeInsets.zero,
+                    isProcessingFiles: isProcessingFiles,
+                    bottomContentPadding: 120,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+
+    await tester.pumpWidget(buildList());
+    await tester.pump();
+
+    final before = tester.widget<ChatMessageWidget>(
+      find.byType(ChatMessageWidget).first,
+    );
+
+    await tester.tap(find.byType(TextButton));
+    await tester.pump();
+
+    final after = tester.widget<ChatMessageWidget>(
+      find.byType(ChatMessageWidget).first,
+    );
+
+    expect(identical(after, before), isTrue);
+
+    isProcessingFiles.dispose();
+  });
+
+  testWidgets('消息内容变化时重建消息子树', (tester) async {
+    final scrollControllers = ChatIndexedScrollControllers();
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    var content = '```dart\nfinal value = 1;\n```';
+
+    Widget buildList() {
+      return _harness(
+        StatefulBuilder(
+          builder: (context, setState) {
+            final messages = <ChatMessage>[
+              ChatMessage(
+                id: 'assistant-code',
+                role: 'assistant',
+                content: content,
+                conversationId: 'conversation-1',
+              ),
+            ];
+            return Column(
+              children: [
+                TextButton(
+                  onPressed: () => setState(() {
+                    content = '```dart\nfinal value = 2;\n```';
+                  }),
+                  child: const Text('update content'),
+                ),
+                Expanded(
+                  child: MessageListView(
+                    scrollControllers: scrollControllers,
+                    messages: messages,
+                    byGroup: {
+                      for (final message in messages) message.id: [message],
+                    },
+                    versionSelections: const {},
+                    reasoning: const {},
+                    reasoningSegments: const {},
+                    contentSplits: const {},
+                    toolParts: const {},
+                    translations: const {},
+                    selecting: false,
+                    selectedItems: const {},
+                    dividerPadding: EdgeInsets.zero,
+                    isProcessingFiles: isProcessingFiles,
+                    bottomContentPadding: 120,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+
+    await tester.pumpWidget(buildList());
+    await tester.pump();
+
+    final before = tester.widget<ChatMessageWidget>(
+      find.byType(ChatMessageWidget).first,
+    );
+
+    await tester.tap(find.byType(TextButton));
+    await tester.pump();
+
+    final after = tester.widget<ChatMessageWidget>(
+      find.byType(ChatMessageWidget).first,
+    );
+
+    expect(identical(after, before), isFalse);
+    expect(after.message.content, contains('value = 2'));
+
+    isProcessingFiles.dispose();
+  });
+
   testWidgets('消息列表拖动时只通知一次用户滚动意图', (tester) async {
     final scrollControllers = ChatIndexedScrollControllers();
     final isProcessingFiles = ValueNotifier<bool>(false);
@@ -313,6 +467,59 @@ void main() {
 
     expect(userScrollIntentCount, 1);
     expect(lastIntentDirection, ChatUserScrollIntentDirection.towardTop);
+
+    isProcessingFiles.dispose();
+  });
+
+  testWidgets('消息列表水平滑动不会触发用户滚动意图', (tester) async {
+    final scrollControllers = ChatIndexedScrollControllers();
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    var userScrollIntentCount = 0;
+    final messages = List<ChatMessage>.generate(
+      80,
+      (index) => ChatMessage(
+        id: 'message-$index',
+        role: index.isEven ? 'user' : 'assistant',
+        content: 'Message $index',
+        conversationId: 'conversation-1',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _harness(
+        MessageListView(
+          scrollControllers: scrollControllers,
+          messages: messages,
+          byGroup: {
+            for (final message in messages) message.id: [message],
+          },
+          versionSelections: const {},
+          reasoning: const {},
+          reasoningSegments: const {},
+          contentSplits: const {},
+          toolParts: const {},
+          translations: const {},
+          selecting: false,
+          selectedItems: const {},
+          dividerPadding: EdgeInsets.zero,
+          isProcessingFiles: isProcessingFiles,
+          onUserScrollIntent: (_) {
+            userScrollIntentCount++;
+          },
+        ),
+      ),
+    );
+
+    await tester.pump();
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(ScrollablePositionedList)),
+    );
+    await gesture.moveBy(const Offset(28, 1));
+    await gesture.moveBy(const Offset(28, 1));
+    await gesture.up();
+    await tester.pump();
+
+    expect(userScrollIntentCount, 0);
 
     isProcessingFiles.dispose();
   });

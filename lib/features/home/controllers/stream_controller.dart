@@ -12,6 +12,30 @@ import 'streaming_content_notifier.dart';
 
 export 'streaming_content_notifier.dart';
 
+class _PendingStreamUpdate {
+  const _PendingStreamUpdate({
+    required this.content,
+    required this.totalTokens,
+    this.contentSplitOffsets,
+    this.reasoningCountAtSplit,
+    this.toolCountAtSplit,
+    this.promptTokens,
+    this.completionTokens,
+    this.cachedTokens,
+    this.durationMs,
+  });
+
+  final String content;
+  final int totalTokens;
+  final List<int>? contentSplitOffsets;
+  final List<int>? reasoningCountAtSplit;
+  final List<int>? toolCountAtSplit;
+  final int? promptTokens;
+  final int? completionTokens;
+  final int? cachedTokens;
+  final int? durationMs;
+}
+
 /// Controller for managing streaming message generation.
 ///
 /// This controller handles:
@@ -120,7 +144,8 @@ class StreamController {
   final Map<String, Timer?> _streamThrottleTimers = <String, Timer?>{};
 
   /// Pending content to be applied on next throttle tick.
-  final Map<String, String> _pendingStreamContent = <String, String>{};
+  final Map<String, _PendingStreamUpdate> _pendingStreamUpdates =
+      <String, _PendingStreamUpdate>{};
 
   /// Delay before sanitizing inline base64 images.
   static const Duration _inlineImageSanitizeDelay = Duration(milliseconds: 120);
@@ -467,7 +492,17 @@ class StreamController {
     int? cachedTokens,
     int? durationMs,
   }) {
-    _pendingStreamContent[messageId] = content;
+    _pendingStreamUpdates[messageId] = _PendingStreamUpdate(
+      content: content,
+      totalTokens: totalTokens,
+      contentSplitOffsets: contentSplitOffsets,
+      reasoningCountAtSplit: reasoningCountAtSplit,
+      toolCountAtSplit: toolCountAtSplit,
+      promptTokens: promptTokens,
+      completionTokens: completionTokens,
+      cachedTokens: cachedTokens,
+      durationMs: durationMs,
+    );
 
     // Ensure notifier exists for this message
     streamingContentNotifier.getNotifier(messageId);
@@ -475,23 +510,23 @@ class StreamController {
     _streamThrottleTimers[messageId] ??= Timer.periodic(
       _streamThrottleInterval,
       (_) {
-        final pending = _pendingStreamContent[messageId];
+        final pending = _pendingStreamUpdates.remove(messageId);
         if (pending != null && getCurrentConversationId() == conversationId) {
           // Use lightweight notifier instead of full page rebuild
           streamingContentNotifier.updateContent(
             messageId,
-            pending,
-            totalTokens,
-            contentSplitOffsets: contentSplitOffsets,
-            reasoningCountAtSplit: reasoningCountAtSplit,
-            toolCountAtSplit: toolCountAtSplit,
-            promptTokens: promptTokens,
-            completionTokens: completionTokens,
-            cachedTokens: cachedTokens,
-            durationMs: durationMs,
+            pending.content,
+            pending.totalTokens,
+            contentSplitOffsets: pending.contentSplitOffsets,
+            reasoningCountAtSplit: pending.reasoningCountAtSplit,
+            toolCountAtSplit: pending.toolCountAtSplit,
+            promptTokens: pending.promptTokens,
+            completionTokens: pending.completionTokens,
+            cachedTokens: pending.cachedTokens,
+            durationMs: pending.durationMs,
           );
           // Also update the message list data (without triggering rebuild)
-          updateMessageInList(messageId, pending, totalTokens);
+          updateMessageInList(messageId, pending.content, pending.totalTokens);
           onStreamTick?.call();
         }
       },
@@ -500,18 +535,29 @@ class StreamController {
 
   /// Get pending stream content for a message.
   String? getPendingStreamContent(String messageId) =>
-      _pendingStreamContent[messageId];
+      _pendingStreamUpdates[messageId]?.content;
 
   /// Set pending stream content (used by inline image sanitizer).
   void setPendingStreamContent(String messageId, String content) {
-    _pendingStreamContent[messageId] = content;
+    final previous = _pendingStreamUpdates[messageId];
+    _pendingStreamUpdates[messageId] = _PendingStreamUpdate(
+      content: content,
+      totalTokens: previous?.totalTokens ?? 0,
+      contentSplitOffsets: previous?.contentSplitOffsets,
+      reasoningCountAtSplit: previous?.reasoningCountAtSplit,
+      toolCountAtSplit: previous?.toolCountAtSplit,
+      promptTokens: previous?.promptTokens,
+      completionTokens: previous?.completionTokens,
+      cachedTokens: previous?.cachedTokens,
+      durationMs: previous?.durationMs,
+    );
   }
 
   /// Clean up stream throttle timers for a message.
   void _cleanupStreamTimers(String messageId) {
     _streamThrottleTimers[messageId]?.cancel();
     _streamThrottleTimers.remove(messageId);
-    _pendingStreamContent.remove(messageId);
+    _pendingStreamUpdates.remove(messageId);
     _inlineImageSanitizeTimers[messageId]?.cancel();
     _inlineImageSanitizeTimers.remove(messageId);
     _inlineImageSanitizing.remove(messageId);
@@ -538,7 +584,7 @@ class StreamController {
       timer?.cancel();
     }
     _streamThrottleTimers.clear();
-    _pendingStreamContent.clear();
+    _pendingStreamUpdates.clear();
     for (final timer in _inlineImageSanitizeTimers.values) {
       timer?.cancel();
     }
@@ -586,7 +632,7 @@ class StreamController {
           if (sanitized == current) return;
 
           // Keep throttled UI updates in sync
-          _pendingStreamContent[messageId] = sanitized;
+          setPendingStreamContent(messageId, sanitized);
           await onSanitized(messageId, sanitized);
         } catch (_) {
           // Swallow errors to avoid crashing streaming UI

@@ -261,4 +261,59 @@ void main() {
       expect(controller.toolParts[message.id]!.single.loading, isTrue);
     },
   );
+
+  test('stream throttle consumes each pending content once', () async {
+    const conversationId = 'conversation-1';
+    final controller = StreamController(
+      chatService: ChatService(),
+      onStateChanged: () {},
+      getSettingsProvider: () => SettingsProvider(),
+      getCurrentConversationId: () => conversationId,
+    );
+    addTearDown(controller.dispose);
+
+    final valueListenable = controller.streamingContentNotifier.getNotifier(
+      'assistant-1',
+    );
+    var notifyCount = 0;
+    valueListenable.addListener(() {
+      notifyCount++;
+    });
+    final applied = <String>[];
+
+    controller.scheduleThrottledUpdate(
+      'assistant-1',
+      conversationId,
+      'first chunk',
+      updateMessageInList: (messageId, content, totalTokens) {
+        applied.add(content);
+      },
+      totalTokens: 1,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 75));
+    expect(notifyCount, 1);
+    expect(applied, const <String>['first chunk']);
+    expect(valueListenable.value.content, 'first chunk');
+
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    expect(notifyCount, 1);
+    expect(applied, const <String>['first chunk']);
+
+    controller.scheduleThrottledUpdate(
+      'assistant-1',
+      conversationId,
+      'second chunk',
+      updateMessageInList: (messageId, content, totalTokens) {
+        applied.add(content);
+      },
+      totalTokens: 2,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 75));
+    expect(notifyCount, 2);
+    expect(applied, const <String>['first chunk', 'second chunk']);
+    expect(valueListenable.value.content, 'second chunk');
+    expect(valueListenable.value.totalTokens, 2);
+  });
 }

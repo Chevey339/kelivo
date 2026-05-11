@@ -92,6 +92,35 @@ class ChatScrollPositionTracker {
   bool get isAtBottom => _visibleRange.isAtBottom;
   bool get lastUserScrollWasTowardBottom => _lastUserScrollDelta > 0;
 
+  bool get isBottomAnchorVisible {
+    final bottomAnchorIndex = _itemCount();
+    for (final position
+        in _controllers.itemPositionsListener.itemPositions.value) {
+      if (position.index != bottomAnchorIndex) continue;
+      return position.itemTrailingEdge > 0 && position.itemLeadingEdge < 1;
+    }
+    return false;
+  }
+
+  bool isNearLiveTail({double trailingEdgeTolerance = 0.35}) {
+    final count = _itemCount();
+    if (count <= 0) return isBottomAnchorVisible;
+    var lastMessageNearTail = false;
+    for (final position
+        in _controllers.itemPositionsListener.itemPositions.value) {
+      if (position.index == count) {
+        return position.itemTrailingEdge > 0 && position.itemLeadingEdge < 1;
+      }
+      if (position.index == count - 1 &&
+          position.itemTrailingEdge > 0 &&
+          position.itemLeadingEdge < 1 &&
+          position.itemTrailingEdge <= 1 + trailingEdgeTolerance) {
+        lastMessageNearTail = true;
+      }
+    }
+    return lastMessageNearTail;
+  }
+
   double? leadingEdgeForIndex(int index) {
     for (final position
         in _controllers.itemPositionsListener.itemPositions.value) {
@@ -274,6 +303,20 @@ class ChatScrollPositionTracker {
         _isProgrammaticScroll = false;
       });
     }
+  }
+
+  void cancelProgrammaticScrollForUser() {
+    if (!_isProgrammaticScroll) return;
+    _jumpGeneration++;
+    _isProgrammaticScroll = false;
+    _scrollIdleTimer?.cancel();
+    if (!_controllers.itemScrollController.isAttached) return;
+    final anchor = readingAnchorPosition();
+    if (anchor == null) return;
+    _controllers.itemScrollController.jumpTo(
+      index: anchor.index.clamp(0, _itemCount()),
+      alignment: anchor.itemLeadingEdge,
+    );
   }
 
   Future<void> scrollByOffset(double offset) async {

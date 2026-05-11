@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -126,6 +127,8 @@ class MessageListView extends StatefulWidget {
     this.onToggleTranslation,
     this.onToggleReasoningSegment,
     this.onUserScrollIntent,
+    this.onUserScrollPointerDown,
+    this.onUserScrollPointerUp,
     this.onUserResizesMessageContent,
     this.onStreamingMessageContentChanged,
     this.onMessageVisible,
@@ -193,6 +196,8 @@ class MessageListView extends StatefulWidget {
   final void Function(String messageId, int segmentIndex)?
   onToggleReasoningSegment;
   final OnUserScrollIntent? onUserScrollIntent;
+  final VoidCallback? onUserScrollPointerDown;
+  final VoidCallback? onUserScrollPointerUp;
   final OnUserResizesMessageContent? onUserResizesMessageContent;
   final OnStreamingMessageContentChanged? onStreamingMessageContentChanged;
   final void Function(ChatMessage message, int index)? onMessageVisible;
@@ -246,14 +251,27 @@ class _MessageListSettingsSnapshot {
       Object.hash(chatFontScale, showModelIcon, showUserAvatar, showTokenStats);
 }
 
+class _MessageItemCacheEntry {
+  const _MessageItemCacheEntry({required this.signature, required this.widget});
+
+  final Object signature;
+  final Widget widget;
+}
+
 class _MessageListViewState extends State<MessageListView> {
   final Set<String> _reportedVisibleMessageIds = <String>{};
   final List<(ChatMessage, int)> _pendingVisibleMessages =
       <(ChatMessage, int)>[];
   final Map<String, StreamingContentData> _lastStreamingContentData =
       <String, StreamingContentData>{};
+  final Map<String, _MessageItemCacheEntry> _messageItemCache =
+      <String, _MessageItemCacheEntry>{};
   bool _visibleFlushScheduled = false;
   bool _pointerScrollIntentSent = false;
+  double _pointerScrollIntentDx = 0;
+  double _pointerScrollIntentDy = 0;
+
+  static const double _pointerScrollIntentThreshold = 4.0;
 
   @override
   void didUpdateWidget(covariant MessageListView oldWidget) {
@@ -271,6 +289,7 @@ class _MessageListViewState extends State<MessageListView> {
       _lastStreamingContentData.removeWhere(
         (id, _) => !currentIds.contains(id),
       );
+      _messageItemCache.removeWhere((id, _) => !currentIds.contains(id));
     }
   }
 
@@ -282,6 +301,7 @@ class _MessageListViewState extends State<MessageListView> {
   void dispose() {
     _pendingVisibleMessages.clear();
     _lastStreamingContentData.clear();
+    _messageItemCache.clear();
     super.dispose();
   }
 
@@ -395,24 +415,43 @@ class _MessageListViewState extends State<MessageListView> {
               behavior: HitTestBehavior.translucent,
               onPointerDown: (_) {
                 _pointerScrollIntentSent = false;
+                _pointerScrollIntentDx = 0;
+                _pointerScrollIntentDy = 0;
+                widget.onUserScrollPointerDown?.call();
               },
               onPointerMove: (event) {
                 if (_pointerScrollIntentSent) return;
+                _pointerScrollIntentDx += event.delta.dx;
+                _pointerScrollIntentDy += event.delta.dy;
+                final absDx = _pointerScrollIntentDx.abs();
+                final absDy = _pointerScrollIntentDy.abs();
+                if (absDy < _pointerScrollIntentThreshold || absDy < absDx) {
+                  return;
+                }
                 _pointerScrollIntentSent = true;
                 widget.onUserScrollIntent?.call(
-                  event.delta.dy > 0
+                  _pointerScrollIntentDy > 0
                       ? ChatUserScrollIntentDirection.towardTop
                       : ChatUserScrollIntentDirection.towardBottom,
                 );
               },
               onPointerUp: (_) {
                 _pointerScrollIntentSent = false;
+                _pointerScrollIntentDx = 0;
+                _pointerScrollIntentDy = 0;
+                widget.onUserScrollPointerUp?.call();
               },
               onPointerCancel: (_) {
                 _pointerScrollIntentSent = false;
+                _pointerScrollIntentDx = 0;
+                _pointerScrollIntentDy = 0;
+                widget.onUserScrollPointerUp?.call();
               },
               onPointerSignal: (event) {
                 if (event is PointerScrollEvent) {
+                  final absDx = event.scrollDelta.dx.abs();
+                  final absDy = event.scrollDelta.dy.abs();
+                  if (absDy < 0.5 || absDy < absDx) return;
                   widget.onUserScrollIntent?.call(
                     event.scrollDelta.dy > 0
                         ? ChatUserScrollIntentDirection.towardBottom
@@ -435,7 +474,11 @@ class _MessageListViewState extends State<MessageListView> {
                     widget.scrollControllers.scrollOffsetListener,
                 initialScrollIndex: bottomAnchorIndex,
                 initialAlignment: bottomAnchorAlignment,
-                physics: const ClampingScrollPhysics(),
+                physics: defaultTargetPlatform == TargetPlatform.iOS
+                    ? const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
+                      )
+                    : const ClampingScrollPhysics(),
                 padding: EdgeInsets.fromLTRB(
                   horizontalPad,
                   8,
@@ -524,6 +567,27 @@ class _MessageListViewState extends State<MessageListView> {
         message.role == 'assistant' &&
         widget.streamingContentNotifier != null &&
         widget.streamingContentNotifier!.hasNotifier(message.id);
+    final signature = _messageItemSignature(
+      message: message,
+      index: index,
+      isStreaming: isStreaming,
+      reasoning: r,
+      translation: t,
+      settings: settings,
+      assistant: assistant,
+      useAssistAvatar: useAssistAvatar,
+      useAssistName: useAssistName,
+      gid: gid,
+      selectedIdx: selectedIdx,
+      total: total,
+      isProcessingFiles: isProcessingFiles,
+      suggestions: messageSuggestions,
+      showDivider: showDivider,
+    );
+    final cached = _messageItemCache[message.id];
+    if (cached != null && cached.signature == signature) {
+      return cached.widget;
+    }
 
     final messageColumn = Column(
       key: ValueKey(message.id),
@@ -624,34 +688,211 @@ class _MessageListViewState extends State<MessageListView> {
     final isSpotlight =
         widget.spotlightMessageId != null &&
         message.id == widget.spotlightMessageId;
-    if (!isSpotlight) return messageColumn;
-
-    return TweenAnimationBuilder<double>(
-      key: ValueKey('spotlight-${widget.spotlightToken}'),
-      tween: Tween<double>(begin: 1.0, end: 0.0),
-      duration: const Duration(milliseconds: 1200),
-      curve: Curves.easeOut,
-      builder: (context, opacity, child) {
-        return Stack(
-          children: [
-            child!,
-            if (opacity > 0.0)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(
-                        0xFFFFA726,
-                      ).withValues(alpha: opacity * 0.30),
-                      borderRadius: BorderRadius.circular(4),
+    final built = !isSpotlight
+        ? messageColumn
+        : TweenAnimationBuilder<double>(
+            key: ValueKey('spotlight-${widget.spotlightToken}'),
+            tween: Tween<double>(begin: 1.0, end: 0.0),
+            duration: const Duration(milliseconds: 1200),
+            curve: Curves.easeOut,
+            builder: (context, opacity, child) {
+              return Stack(
+                children: [
+                  child!,
+                  if (opacity > 0.0)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFFFA726,
+                            ).withValues(alpha: opacity * 0.30),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
-      child: messageColumn,
+                ],
+              );
+            },
+            child: messageColumn,
+          );
+    _messageItemCache[message.id] = _MessageItemCacheEntry(
+      signature: signature,
+      widget: built,
+    );
+    return built;
+  }
+
+  Object _messageItemSignature({
+    required ChatMessage message,
+    required int index,
+    required bool isStreaming,
+    required stream_ctrl.ReasoningData? reasoning,
+    required TranslationUiState? translation,
+    required _MessageListSettingsSnapshot settings,
+    required Assistant? assistant,
+    required bool useAssistAvatar,
+    required bool useAssistName,
+    required String gid,
+    required int selectedIdx,
+    required int total,
+    required bool isProcessingFiles,
+    required List<String> suggestions,
+    required bool showDivider,
+  }) {
+    return (
+      message: _messageSignature(message, isStreaming: isStreaming),
+      index: index,
+      streamingNotifier: isStreaming ? widget.streamingContentNotifier : null,
+      selecting: widget.selecting,
+      selected: widget.selectedItems.contains(message.id),
+      settings: settings,
+      assistantId: assistant?.id,
+      assistantName: assistant?.name,
+      assistantAvatar: assistant?.avatar,
+      useAssistAvatar: useAssistAvatar,
+      useAssistName: useAssistName,
+      gid: gid,
+      selectedIdx: selectedIdx,
+      total: total,
+      isProcessingFiles: isProcessingFiles,
+      pinnedStreamingIndicator:
+          widget.isPinnedIndicatorActive &&
+          widget.pinnedStreamingMessageId == message.id,
+      suggestions: Object.hashAll(suggestions),
+      reasoning: isStreaming ? null : _reasoningSignature(reasoning),
+      reasoningSegments: isStreaming
+          ? 0
+          : _reasoningSegmentsSignature(widget.reasoningSegments[message.id]),
+      translation: (translation?.expanded, translation != null),
+      contentSplits: isStreaming
+          ? 0
+          : _contentSplitSignature(widget.contentSplits[message.id]),
+      toolParts: isStreaming
+          ? 0
+          : _toolPartsSignature(widget.toolParts[message.id]),
+      showDivider: showDivider,
+      dividerPadding: showDivider ? widget.dividerPadding : null,
+      spotlightToken: widget.spotlightMessageId == message.id
+          ? widget.spotlightToken
+          : 0,
+      callbackShape: (
+        widget.onVersionChange != null,
+        widget.onRegenerateMessage != null,
+        widget.onResendMessage != null,
+        widget.onTranslateMessage != null,
+        widget.onEditMessage != null,
+        widget.onDeleteMessage != null,
+        widget.onDeleteAllVersions != null,
+        widget.onForkConversation != null,
+        widget.onShareMessage != null,
+        widget.onSpeakMessage != null,
+        widget.onSuggestionTap != null,
+        widget.onRecoveredAskUserAnswer != null,
+        widget.onToggleSelection != null,
+        widget.onToggleReasoning != null,
+        widget.onToggleTranslation != null,
+        widget.onToggleReasoningSegment != null,
+        widget.onUserResizesMessageContent != null,
+      ),
+    );
+  }
+
+  Object _messageSignature(ChatMessage message, {required bool isStreaming}) {
+    if (isStreaming) {
+      return (
+        message.id,
+        message.role,
+        message.conversationId,
+        message.isStreaming,
+        message.modelId,
+        message.providerId,
+        message.groupId,
+        message.version,
+      );
+    }
+    return (
+      message.id,
+      message.role,
+      message.content,
+      message.timestamp,
+      message.modelId,
+      message.providerId,
+      message.totalTokens,
+      message.conversationId,
+      message.isStreaming,
+      message.reasoningText,
+      message.reasoningStartAt,
+      message.reasoningFinishedAt,
+      message.translation,
+      message.reasoningSegmentsJson,
+      message.groupId,
+      message.version,
+      message.promptTokens,
+      message.completionTokens,
+      message.cachedTokens,
+      message.durationMs,
+    );
+  }
+
+  Object? _reasoningSignature(stream_ctrl.ReasoningData? reasoning) {
+    if (reasoning == null) return null;
+    return (
+      reasoning.text,
+      reasoning.startAt,
+      reasoning.finishedAt,
+      reasoning.expanded,
+    );
+  }
+
+  int _reasoningSegmentsSignature(
+    List<stream_ctrl.ReasoningSegmentData>? segments,
+  ) {
+    if (segments == null || segments.isEmpty) return 0;
+    return Object.hashAll(
+      segments.map(
+        (segment) => (
+          segment.text,
+          segment.startAt,
+          segment.finishedAt,
+          segment.expanded,
+          segment.toolStartIndex,
+        ),
+      ),
+    );
+  }
+
+  int _contentSplitSignature(stream_ctrl.ContentSplitData? contentSplit) {
+    if (contentSplit == null) return 0;
+    return Object.hash(
+      Object.hashAll(contentSplit.offsets),
+      Object.hashAll(contentSplit.reasoningCounts),
+      Object.hashAll(contentSplit.toolCounts),
+    );
+  }
+
+  int _toolPartsSignature(List<ToolUIPart>? parts) {
+    if (parts == null || parts.isEmpty) return 0;
+    return Object.hashAll(
+      parts.map(
+        (part) => (
+          part.id,
+          part.toolName,
+          _mapSignature(part.arguments),
+          part.content,
+          part.loading,
+        ),
+      ),
+    );
+  }
+
+  int _mapSignature(Map<String, dynamic> map) {
+    if (map.isEmpty) return 0;
+    final entries = map.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return Object.hashAll(
+      entries.map((entry) => (entry.key, entry.value.toString())),
     );
   }
 

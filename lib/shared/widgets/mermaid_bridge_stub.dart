@@ -47,6 +47,7 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
   String? _tempFilePath;
   Completer<String?>? _exportCompleter;
   Timer? _heightDebounce;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -107,7 +108,9 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
           _exportCompleter!.complete(b64?.isNotEmpty == true ? b64 : null);
         }
       }
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      debugPrint('Failed to load Mermaid Windows view: $error\n$stackTrace');
+    }
   }
 
   @override
@@ -119,8 +122,6 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
         oldWidget.dark != widget.dark ||
         themeChanged) {
       _loadHtml();
-    } else {
-      _postHeight();
     }
   }
 
@@ -140,6 +141,9 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
 
   Future<void> _loadHtml() async {
     try {
+      final generation = ++_loadGeneration;
+      final themeSig = _themeVarsSignature(widget.themeVars);
+      _lastThemeVarsSig = themeSig;
       final mermaidJs = await rootBundle.loadString('assets/mermaid.min.js');
       final html = _buildWindowsHtml(
         widget.code,
@@ -152,16 +156,14 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
         '${dir.path}/mermaid_${DateTime.now().millisecondsSinceEpoch}.html',
       );
       await file.writeAsString(html, flush: true);
+      if (!mounted || generation != _loadGeneration) return;
       _tempFilePath = file.path;
       await _controller.loadUrl(Uri.file(file.path).toString());
-      _lastThemeVarsSig = _themeVarsSignature(widget.themeVars);
-    } catch (_) {}
-  }
-
-  void _postHeight() {
-    try {
-      _controller.executeScript('postHeight();');
-    } catch (_) {}
+      if (!mounted || generation != _loadGeneration) return;
+      _lastThemeVarsSig = themeSig;
+    } catch (error, stackTrace) {
+      debugPrint('Failed to load Mermaid WebView: $error\n$stackTrace');
+    }
   }
 
   String _themeVarsSignature(Map<String, String>? vars) {
@@ -448,6 +450,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
   Completer<String?>? _exportCompleter;
   String? _lastThemeVarsSig;
   Timer? _heightDebounce;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -499,9 +502,6 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
     final darkChanged = oldWidget.dark != widget.dark;
     if (codeChanged || darkChanged || themeChanged) {
       _loadHtml();
-    } else {
-      // No content change; still re-measure to keep height in sync after rebuilds
-      _safePostHeight();
     }
   }
 
@@ -520,17 +520,24 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
   }
 
   Future<void> _loadHtml() async {
-    // Load mermaid script from assets and inline it to avoid external requests.
-    final mermaidJs = await rootBundle.loadString('assets/mermaid.min.js');
-    final html = _buildHtml(
-      widget.code,
-      widget.dark,
-      mermaidJs,
-      widget.themeVars,
-    );
-    await _controller.loadHtmlString(html);
-    // Store latest theme signature for change detection
-    _lastThemeVarsSig = _themeVarsSignature(widget.themeVars);
+    try {
+      final generation = ++_loadGeneration;
+      final themeSig = _themeVarsSignature(widget.themeVars);
+      _lastThemeVarsSig = themeSig;
+      // Load mermaid script from assets and inline it to avoid external requests.
+      final mermaidJs = await rootBundle.loadString('assets/mermaid.min.js');
+      final html = _buildHtml(
+        widget.code,
+        widget.dark,
+        mermaidJs,
+        widget.themeVars,
+      );
+      if (!mounted || generation != _loadGeneration) return;
+      await _controller.loadHtmlString(html);
+      if (!mounted || generation != _loadGeneration) return;
+      // Store latest theme signature for change detection
+      _lastThemeVarsSig = themeSig;
+    } catch (_) {}
   }
 
   String _buildHtml(
@@ -634,12 +641,6 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
   </body>
 </html>
   ''';
-  }
-
-  void _safePostHeight() {
-    try {
-      _controller.runJavaScript('postHeight();');
-    } catch (_) {}
   }
 
   String _themeVarsSignature(Map<String, String>? vars) {
