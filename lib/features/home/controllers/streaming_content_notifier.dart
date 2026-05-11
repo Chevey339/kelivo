@@ -17,6 +17,15 @@ class StreamingContentNotifier {
   final Map<String, ValueNotifier<StreamingContentData>> _notifiers =
       <String, ValueNotifier<StreamingContentData>>{};
 
+  final Map<String, StreamingContentData> _pendingFrozenUpdates =
+      <String, StreamingContentData>{};
+  final Set<String> _deferredRemovals = <String>{};
+
+  bool _updatesFrozen = false;
+
+  /// Whether streaming UI updates are currently being held back.
+  bool get updatesFrozen => _updatesFrozen;
+
   /// Get or create a notifier for a message.
   ValueNotifier<StreamingContentData> getNotifier(String messageId) {
     return _notifiers.putIfAbsent(
@@ -29,6 +38,21 @@ class StreamingContentNotifier {
 
   /// Check if a notifier exists for a message.
   bool hasNotifier(String messageId) => _notifiers.containsKey(messageId);
+
+  /// Check if a frozen update is waiting to be displayed.
+  bool hasPendingFrozenUpdate(String messageId) =>
+      _pendingFrozenUpdates.containsKey(messageId);
+
+  /// Freeze or resume streaming UI updates.
+  ///
+  /// While frozen, update calls keep only the latest display snapshot per
+  /// message and do not notify listeners. Resuming applies each snapshot once.
+  bool setUpdatesFrozen(bool frozen) {
+    if (_updatesFrozen == frozen) return false;
+    _updatesFrozen = frozen;
+    if (frozen) return false;
+    return _flushFrozenUpdates();
+  }
 
   /// Update content for a streaming message.
   /// This will only notify the specific widget listening to this message's notifier.
@@ -44,27 +68,20 @@ class StreamingContentNotifier {
     int? cachedTokens,
     int? durationMs,
   }) {
-    final notifier = _notifiers[messageId];
-    if (notifier != null) {
-      final current = notifier.value;
-      notifier.value = StreamingContentData(
+    _updateData(
+      messageId,
+      (current) => current.copyWith(
         content: content,
         totalTokens: totalTokens,
-        reasoningText: current.reasoningText,
-        reasoningStartAt: current.reasoningStartAt,
-        reasoningFinishedAt: current.reasoningFinishedAt,
-        contentSplitOffsets: contentSplitOffsets ?? current.contentSplitOffsets,
-        reasoningCountAtSplit:
-            reasoningCountAtSplit ?? current.reasoningCountAtSplit,
-        toolCountAtSplit: toolCountAtSplit ?? current.toolCountAtSplit,
-        toolPartsVersion: current.toolPartsVersion,
-        uiVersion: current.uiVersion,
-        promptTokens: promptTokens ?? current.promptTokens,
-        completionTokens: completionTokens ?? current.completionTokens,
-        cachedTokens: cachedTokens ?? current.cachedTokens,
-        durationMs: durationMs ?? current.durationMs,
-      );
-    }
+        contentSplitOffsets: contentSplitOffsets,
+        reasoningCountAtSplit: reasoningCountAtSplit,
+        toolCountAtSplit: toolCountAtSplit,
+        promptTokens: promptTokens,
+        completionTokens: completionTokens,
+        cachedTokens: cachedTokens,
+        durationMs: durationMs,
+      ),
+    );
   }
 
   /// Update reasoning content for a streaming message.
@@ -77,27 +94,17 @@ class StreamingContentNotifier {
     List<int>? reasoningCountAtSplit,
     List<int>? toolCountAtSplit,
   }) {
-    final notifier = _notifiers[messageId];
-    if (notifier != null) {
-      final current = notifier.value;
-      notifier.value = StreamingContentData(
-        content: current.content,
-        totalTokens: current.totalTokens,
-        reasoningText: reasoningText ?? current.reasoningText,
-        reasoningStartAt: reasoningStartAt ?? current.reasoningStartAt,
-        reasoningFinishedAt: reasoningFinishedAt ?? current.reasoningFinishedAt,
-        contentSplitOffsets: contentSplitOffsets ?? current.contentSplitOffsets,
-        reasoningCountAtSplit:
-            reasoningCountAtSplit ?? current.reasoningCountAtSplit,
-        toolCountAtSplit: toolCountAtSplit ?? current.toolCountAtSplit,
-        toolPartsVersion: current.toolPartsVersion,
-        uiVersion: current.uiVersion,
-        promptTokens: current.promptTokens,
-        completionTokens: current.completionTokens,
-        cachedTokens: current.cachedTokens,
-        durationMs: current.durationMs,
-      );
-    }
+    _updateData(
+      messageId,
+      (current) => current.copyWith(
+        reasoningText: reasoningText,
+        reasoningStartAt: reasoningStartAt,
+        reasoningFinishedAt: reasoningFinishedAt,
+        contentSplitOffsets: contentSplitOffsets,
+        reasoningCountAtSplit: reasoningCountAtSplit,
+        toolCountAtSplit: toolCountAtSplit,
+      ),
+    );
   }
 
   /// Notify that tool parts have been updated.
@@ -108,53 +115,34 @@ class StreamingContentNotifier {
     List<int>? reasoningCountAtSplit,
     List<int>? toolCountAtSplit,
   }) {
-    final notifier = _notifiers[messageId];
-    if (notifier != null) {
-      final current = notifier.value;
-      notifier.value = StreamingContentData(
-        content: current.content,
-        totalTokens: current.totalTokens,
-        reasoningText: current.reasoningText,
-        reasoningStartAt: current.reasoningStartAt,
-        reasoningFinishedAt: current.reasoningFinishedAt,
-        contentSplitOffsets: contentSplitOffsets ?? current.contentSplitOffsets,
-        reasoningCountAtSplit:
-            reasoningCountAtSplit ?? current.reasoningCountAtSplit,
-        toolCountAtSplit: toolCountAtSplit ?? current.toolCountAtSplit,
+    _updateData(
+      messageId,
+      (current) => current.copyWith(
+        contentSplitOffsets: contentSplitOffsets,
+        reasoningCountAtSplit: reasoningCountAtSplit,
+        toolCountAtSplit: toolCountAtSplit,
         toolPartsVersion: current.toolPartsVersion + 1,
-        uiVersion: current.uiVersion,
-        promptTokens: current.promptTokens,
-        completionTokens: current.completionTokens,
-        cachedTokens: current.cachedTokens,
-        durationMs: current.durationMs,
-      );
-    }
+      ),
+    );
   }
 
   /// Force a rebuild of the streaming message widget.
   /// Used when external state like reasoning expanded changes.
   void forceRebuild(String messageId) {
-    final notifier = _notifiers[messageId];
-    if (notifier != null) {
-      final current = notifier.value;
-      notifier.value = StreamingContentData(
-        content: current.content,
-        totalTokens: current.totalTokens,
-        reasoningText: current.reasoningText,
-        reasoningStartAt: current.reasoningStartAt,
-        reasoningFinishedAt: current.reasoningFinishedAt,
-        toolPartsVersion: current.toolPartsVersion,
-        uiVersion: current.uiVersion + 1,
-        promptTokens: current.promptTokens,
-        completionTokens: current.completionTokens,
-        cachedTokens: current.cachedTokens,
-        durationMs: current.durationMs,
-      );
-    }
+    _updateData(
+      messageId,
+      (current) => current.copyWith(uiVersion: current.uiVersion + 1),
+    );
   }
 
   /// Remove notifier when streaming is complete.
   void removeNotifier(String messageId) {
+    if (_updatesFrozen && _pendingFrozenUpdates.containsKey(messageId)) {
+      _deferredRemovals.add(messageId);
+      return;
+    }
+    _pendingFrozenUpdates.remove(messageId);
+    _deferredRemovals.remove(messageId);
     final notifier = _notifiers.remove(messageId);
     notifier?.dispose();
   }
@@ -165,11 +153,49 @@ class StreamingContentNotifier {
       notifier.dispose();
     }
     _notifiers.clear();
+    _pendingFrozenUpdates.clear();
+    _deferredRemovals.clear();
+    _updatesFrozen = false;
   }
 
   /// Dispose all resources.
   void dispose() {
     clear();
+  }
+
+  void _updateData(
+    String messageId,
+    StreamingContentData Function(StreamingContentData current) update,
+  ) {
+    final notifier = _notifiers[messageId];
+    if (notifier == null) return;
+    final current = _pendingFrozenUpdates[messageId] ?? notifier.value;
+    final next = update(current);
+    if (_updatesFrozen) {
+      _pendingFrozenUpdates[messageId] = next;
+      return;
+    }
+    notifier.value = next;
+  }
+
+  bool _flushFrozenUpdates() {
+    if (_pendingFrozenUpdates.isEmpty) return false;
+    final pending = Map<String, StreamingContentData>.of(_pendingFrozenUpdates);
+    _pendingFrozenUpdates.clear();
+    var flushed = false;
+    for (final entry in pending.entries) {
+      final notifier = _notifiers[entry.key];
+      if (notifier == null) continue;
+      notifier.value = entry.value;
+      flushed = true;
+    }
+    for (final messageId in pending.keys) {
+      if (_deferredRemovals.remove(messageId)) {
+        final notifier = _notifiers.remove(messageId);
+        notifier?.dispose();
+      }
+    }
+    return flushed;
   }
 }
 
@@ -213,6 +239,41 @@ class StreamingContentData {
   final int? completionTokens;
   final int? cachedTokens;
   final int? durationMs;
+
+  StreamingContentData copyWith({
+    String? content,
+    int? totalTokens,
+    String? reasoningText,
+    DateTime? reasoningStartAt,
+    DateTime? reasoningFinishedAt,
+    List<int>? contentSplitOffsets,
+    List<int>? reasoningCountAtSplit,
+    List<int>? toolCountAtSplit,
+    int? toolPartsVersion,
+    int? uiVersion,
+    int? promptTokens,
+    int? completionTokens,
+    int? cachedTokens,
+    int? durationMs,
+  }) {
+    return StreamingContentData(
+      content: content ?? this.content,
+      totalTokens: totalTokens ?? this.totalTokens,
+      reasoningText: reasoningText ?? this.reasoningText,
+      reasoningStartAt: reasoningStartAt ?? this.reasoningStartAt,
+      reasoningFinishedAt: reasoningFinishedAt ?? this.reasoningFinishedAt,
+      contentSplitOffsets: contentSplitOffsets ?? this.contentSplitOffsets,
+      reasoningCountAtSplit:
+          reasoningCountAtSplit ?? this.reasoningCountAtSplit,
+      toolCountAtSplit: toolCountAtSplit ?? this.toolCountAtSplit,
+      toolPartsVersion: toolPartsVersion ?? this.toolPartsVersion,
+      uiVersion: uiVersion ?? this.uiVersion,
+      promptTokens: promptTokens ?? this.promptTokens,
+      completionTokens: completionTokens ?? this.completionTokens,
+      cachedTokens: cachedTokens ?? this.cachedTokens,
+      durationMs: durationMs ?? this.durationMs,
+    );
+  }
 
   @override
   bool operator ==(Object other) =>

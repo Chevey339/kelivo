@@ -242,6 +242,7 @@ class ChatScrollPositionTracker {
     double alignment = 0,
     bool animate = true,
     Duration duration = const Duration(milliseconds: 250),
+    Curve curve = Curves.easeOutCubic,
   }) async {
     final count = _itemCount();
     if (!_controllers.itemScrollController.isAttached) return;
@@ -265,7 +266,7 @@ class ChatScrollPositionTracker {
         index: target,
         alignment: alignment,
         duration: duration,
-        curve: Curves.easeOutCubic,
+        curve: curve,
       );
     } finally {
       WidgetsBinding.instance.addPostFrameCallback((_) {

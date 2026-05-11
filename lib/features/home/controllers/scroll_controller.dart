@@ -23,12 +23,14 @@ class ChatScrollController {
     required bool Function() getAutoScrollEnabled,
     required int Function() getItemCount,
     required double Function() getBottomAnchorAlignment,
+    ValueChanged<bool>? onUserScrollActiveChanged,
   }) : _indexedControllers = indexedControllers,
        _onStateChanged = onStateChanged,
        _getShouldAutoStickToBottom = getShouldAutoStickToBottom,
        _getAutoScrollEnabled = getAutoScrollEnabled,
        _getItemCount = getItemCount,
-       _getBottomAnchorAlignment = getBottomAnchorAlignment {
+       _getBottomAnchorAlignment = getBottomAnchorAlignment,
+       _onUserScrollActiveChanged = onUserScrollActiveChanged {
     _positionTracker = ChatScrollPositionTracker(
       controllers: indexedControllers,
       itemCount: getItemCount,
@@ -43,6 +45,7 @@ class ChatScrollController {
   final bool Function() _getAutoScrollEnabled;
   final int Function() _getItemCount;
   final double Function() _getBottomAnchorAlignment;
+  final ValueChanged<bool>? _onUserScrollActiveChanged;
 
   late final ChatScrollPositionTracker _positionTracker;
 
@@ -84,6 +87,8 @@ class ChatScrollController {
   bool _pendingBottomScrollAnimation = false;
   bool _pendingBottomScrollRequiresAutoStick = false;
   bool _pendingBottomScrollAlignFittingContentToTop = true;
+  Duration _pendingBottomScrollDuration = const Duration(milliseconds: 250);
+  Curve _pendingBottomScrollCurve = Curves.easeOutCubic;
   int _bottomScrollGeneration = 0;
   final List<Timer> _anchorMaintenanceTimers = <Timer>[];
   bool _disposed = false;
@@ -151,7 +156,7 @@ class ChatScrollController {
     if (userScrolling) {
       _cancelPendingBottomScrollsForUser();
       _hasUserScrollMovementSinceIntent = true;
-      _isUserScrolling = true;
+      _setUserScrolling(true);
       _autoStickToBottom = false;
       _lastJumpUserMessageId = null;
       if (!_showNavButtons) {
@@ -178,7 +183,7 @@ class ChatScrollController {
         _hasLeftBottomSinceUserIntent = true;
       }
       if (!userScrolling && _isUserScrolling) {
-        _isUserScrolling = false;
+        _setUserScrolling(false);
         if (_autoStickSuspendedByUser) {
           _scheduleReadingAnchorCapture();
         }
@@ -186,7 +191,7 @@ class ChatScrollController {
     } else if (shouldResumeSuspendedAutoStick) {
       _resumeAutoStickToBottom();
     } else if (!userScrolling && _isUserScrolling) {
-      _isUserScrolling = false;
+      _setUserScrolling(false);
       if (_autoStickSuspendedByUser) {
         _scheduleReadingAnchorCapture();
       }
@@ -295,6 +300,8 @@ class ChatScrollController {
     bool deferUntilNextFrame = false,
     bool requireAutoStick = false,
     bool alignFittingContentToTop = true,
+    Duration duration = const Duration(milliseconds: 250),
+    Curve curve = Curves.easeOutCubic,
   }) {
     if (!_bottomScrollScheduled) {
       _bottomScrollGeneration++;
@@ -307,6 +314,10 @@ class ChatScrollController {
         ? _pendingBottomScrollAlignFittingContentToTop &&
               alignFittingContentToTop
         : alignFittingContentToTop;
+    if (!_bottomScrollScheduled || duration > _pendingBottomScrollDuration) {
+      _pendingBottomScrollDuration = duration;
+      _pendingBottomScrollCurve = curve;
+    }
     if (_bottomScrollScheduled) return;
     _bottomScrollScheduled = true;
     final generation = _bottomScrollGeneration;
@@ -325,15 +336,21 @@ class ChatScrollController {
       final shouldRequireAutoStick = _pendingBottomScrollRequiresAutoStick;
       final shouldAlignFittingContentToTop =
           _pendingBottomScrollAlignFittingContentToTop;
+      final scrollDuration = _pendingBottomScrollDuration;
+      final scrollCurve = _pendingBottomScrollCurve;
       _pendingBottomScrollAnimation = false;
       _pendingBottomScrollRequiresAutoStick = false;
       _pendingBottomScrollAlignFittingContentToTop = true;
+      _pendingBottomScrollDuration = const Duration(milliseconds: 250);
+      _pendingBottomScrollCurve = Curves.easeOutCubic;
       if (shouldRequireAutoStick && !_autoStickToBottom) return;
       unawaited(
         _animateToBottom(
           animate: shouldAnimate,
           generation: generation,
           alignFittingContentToTop: shouldAlignFittingContentToTop,
+          duration: scrollDuration,
+          curve: scrollCurve,
         ),
       );
       if (shouldRequireAutoStick) {
@@ -378,18 +395,32 @@ class ChatScrollController {
     int generation, {
     required bool alignFittingContentToTop,
   }) {
+    _cancelAnchorMaintenanceTimers();
+
+    void maintain() {
+      _maintainAutoStickBottom(
+        generation,
+        alignFittingContentToTop: alignFittingContentToTop,
+      );
+    }
+
     void maintainAfterFrames(int remainingFrames) {
       if (remainingFrames <= 0) return;
       _runAfterNextFrame(() {
-        _maintainAutoStickBottom(
-          generation,
-          alignFittingContentToTop: alignFittingContentToTop,
-        );
+        maintain();
         maintainAfterFrames(remainingFrames - 1);
       });
     }
 
     maintainAfterFrames(5);
+    for (final delay in const <Duration>[
+      Duration(milliseconds: 80),
+      Duration(milliseconds: 160),
+      Duration(milliseconds: 260),
+      Duration(milliseconds: 340),
+    ]) {
+      _anchorMaintenanceTimers.add(Timer(delay, maintain));
+    }
   }
 
   /// Force scroll to bottom (used when user explicitly clicks the button).
@@ -398,7 +429,7 @@ class ChatScrollController {
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom = false;
-    _isUserScrolling = false;
+    _setUserScrolling(false);
     _lastJumpUserMessageId = null;
     _clearReadingAnchor();
     _positionTracker.resetUserScrolling();
@@ -415,7 +446,7 @@ class ChatScrollController {
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom = false;
-    _isUserScrolling = false;
+    _setUserScrolling(false);
     scrollToBottom(animate: animate);
     final generation = _bottomScrollGeneration;
     Future.delayed(postSwitchDelay, () {
@@ -513,7 +544,7 @@ class ChatScrollController {
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom =
         direction == ChatUserScrollIntentDirection.towardBottom;
-    _isUserScrolling = true;
+    _setUserScrolling(true);
     _autoStickToBottom = false;
     _lastJumpUserMessageId = null;
     if (_hasUserScrollIntentTowardBottom && _positionTracker.isAtBottom) {
@@ -539,13 +570,15 @@ class ChatScrollController {
     _pendingBottomScrollAnimation = false;
     _pendingBottomScrollRequiresAutoStick = true;
     _pendingBottomScrollAlignFittingContentToTop = true;
+    _pendingBottomScrollDuration = const Duration(milliseconds: 250);
+    _pendingBottomScrollCurve = Curves.easeOutCubic;
     _cancelAnchorMaintenanceTimers();
     _readingAnchorIndex = null;
     _readingAnchorAlignment = null;
   }
 
   void _resumeAutoStickToBottom() {
-    _isUserScrolling = false;
+    _setUserScrolling(false);
     _autoStickSuspendedByUser = false;
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
@@ -658,6 +691,25 @@ class ChatScrollController {
     });
   }
 
+  void _restoreReadingAnchorIfSuspended() {
+    if (!_autoStickSuspendedByUser) return;
+    if (_realignSuspendedTopGap()) return;
+    if (_isUserScrolling || _positionTracker.isUserScrolling) return;
+    final index = _readingAnchorIndex;
+    final alignment = _readingAnchorAlignment;
+    if (index == null || alignment == null) {
+      _scheduleReadingAnchorCapture();
+      return;
+    }
+    unawaited(
+      _positionTracker.scrollToIndex(
+        index: index,
+        alignment: alignment,
+        animate: false,
+      ),
+    );
+  }
+
   bool _realignSuspendedTopGap() {
     if (!_positionTracker.isAtTop) return false;
     final firstMessageLeadingEdge = _positionTracker.leadingEdgeForIndex(0);
@@ -677,6 +729,30 @@ class ChatScrollController {
     return true;
   }
 
+  /// Capture the current reading anchor before frozen streaming content is
+  /// displayed, so a height change can be reconciled without a visible bounce.
+  void prepareForFrozenStreamingContentFlush() {
+    if (!_autoStickSuspendedByUser || _autoStickToBottom) return;
+    if (_isUserScrolling || _positionTracker.isUserScrolling) return;
+    _captureReadingAnchor();
+  }
+
+  /// Reconcile scroll position after frozen streaming UI content is displayed.
+  void handleFrozenStreamingContentFlushed() {
+    if (_autoStickToBottom && _getAutoScrollEnabled()) {
+      _scheduleScrollToBottom(
+        animate: true,
+        deferUntilNextFrame: true,
+        requireAutoStick: true,
+        alignFittingContentToTop: false,
+        duration: const Duration(milliseconds: 480),
+        curve: Curves.easeInOutCubic,
+      );
+      return;
+    }
+    _restoreReadingAnchorIfSuspended();
+  }
+
   /// Animate or jump to the bottom of the scroll view.
   ///
   /// Used for explicit scroll-to-bottom requests (user-triggered button,
@@ -685,6 +761,8 @@ class ChatScrollController {
     bool animate = true,
     required int generation,
     bool alignFittingContentToTop = true,
+    Duration duration = const Duration(milliseconds: 250),
+    Curve curve = Curves.easeOutCubic,
   }) async {
     final target = _getItemCount();
     if (target < 0) return;
@@ -705,7 +783,8 @@ class ChatScrollController {
       index: target,
       alignment: _getBottomAnchorAlignment(),
       animate: useAnimation,
-      duration: const Duration(milliseconds: 250),
+      duration: duration,
+      curve: curve,
     );
     if (generation != _bottomScrollGeneration) return;
     _updateJumpToBottomVisibility(false);
@@ -894,12 +973,18 @@ class ChatScrollController {
 
   /// Reset user scrolling state (e.g., when force scrolling).
   void resetUserScrolling() {
-    _isUserScrolling = false;
+    _setUserScrolling(false);
     _autoStickSuspendedByUser = false;
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom = false;
     _positionTracker.resetUserScrolling();
+  }
+
+  void _setUserScrolling(bool value) {
+    if (_isUserScrolling == value) return;
+    _isUserScrolling = value;
+    _onUserScrollActiveChanged?.call(value);
   }
 
   // ============================================================================

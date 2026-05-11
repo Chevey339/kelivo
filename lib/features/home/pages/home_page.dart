@@ -1076,6 +1076,9 @@ class _HomePageState extends State<HomePage>
             anchorIndex: index,
           );
         },
+        onStreamingMessageContentChanged: (_, __) {
+          _controller.scrollCtrl.autoScrollToBottomIfNeeded();
+        },
         onMessageVisible: _controller.restoreVisibleMessageUiState,
         onBottomAnchorAlignmentChanged: _controller.updateBottomAnchorAlignment,
       ),

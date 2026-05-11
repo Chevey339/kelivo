@@ -49,6 +49,8 @@ typedef OnUserScrollIntent =
     void Function(ChatUserScrollIntentDirection direction);
 typedef OnUserResizesMessageContent =
     void Function(ChatMessage message, int index);
+typedef OnStreamingMessageContentChanged =
+    void Function(ChatMessage message, int index);
 
 /// Data class for reasoning UI state
 class ReasoningUiState {
@@ -125,6 +127,7 @@ class MessageListView extends StatefulWidget {
     this.onToggleReasoningSegment,
     this.onUserScrollIntent,
     this.onUserResizesMessageContent,
+    this.onStreamingMessageContentChanged,
     this.onMessageVisible,
     this.onBottomAnchorAlignmentChanged,
     this.buildPinnedStreamingIndicator,
@@ -191,6 +194,7 @@ class MessageListView extends StatefulWidget {
   onToggleReasoningSegment;
   final OnUserScrollIntent? onUserScrollIntent;
   final OnUserResizesMessageContent? onUserResizesMessageContent;
+  final OnStreamingMessageContentChanged? onStreamingMessageContentChanged;
   final void Function(ChatMessage message, int index)? onMessageVisible;
   final ValueChanged<double>? onBottomAnchorAlignmentChanged;
   final Widget Function()? buildPinnedStreamingIndicator;
@@ -246,6 +250,8 @@ class _MessageListViewState extends State<MessageListView> {
   final Set<String> _reportedVisibleMessageIds = <String>{};
   final List<(ChatMessage, int)> _pendingVisibleMessages =
       <(ChatMessage, int)>[];
+  final Map<String, StreamingContentData> _lastStreamingContentData =
+      <String, StreamingContentData>{};
   bool _visibleFlushScheduled = false;
   bool _pointerScrollIntentSent = false;
 
@@ -257,10 +263,14 @@ class _MessageListViewState extends State<MessageListView> {
           _conversationIdFor(widget.messages)) {
         _reportedVisibleMessageIds.clear();
         _pendingVisibleMessages.clear();
+        _lastStreamingContentData.clear();
         return;
       }
       final currentIds = widget.messages.map((message) => message.id).toSet();
       _reportedVisibleMessageIds.removeWhere((id) => !currentIds.contains(id));
+      _lastStreamingContentData.removeWhere(
+        (id, _) => !currentIds.contains(id),
+      );
     }
   }
 
@@ -271,6 +281,7 @@ class _MessageListViewState extends State<MessageListView> {
   @override
   void dispose() {
     _pendingVisibleMessages.clear();
+    _lastStreamingContentData.clear();
     super.dispose();
   }
 
@@ -510,7 +521,6 @@ class _MessageListViewState extends State<MessageListView> {
 
     // Check if this is a streaming message that should use ValueListenableBuilder
     final isStreaming =
-        message.isStreaming &&
         message.role == 'assistant' &&
         widget.streamingContentNotifier != null &&
         widget.streamingContentNotifier!.hasNotifier(message.id);
@@ -702,6 +712,14 @@ class _MessageListViewState extends State<MessageListView> {
               ..finishedAt = data.reasoningFinishedAt
               ..expanded = false;
           }
+        }
+
+        if (_lastStreamingContentData[message.id] != data) {
+          _lastStreamingContentData[message.id] = data;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            widget.onStreamingMessageContentChanged?.call(message, index);
+          });
         }
 
         // Wrap in RepaintBoundary to isolate repaints from affecting other widgets

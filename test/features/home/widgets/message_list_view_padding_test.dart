@@ -373,6 +373,9 @@ void main() {
             bottomAnchorAlignment = value;
           },
           onUserScrollIntent: chatScrollController.handleUserScrollIntent,
+          onStreamingMessageContentChanged: (_, __) {
+            chatScrollController.autoScrollToBottomIfNeeded();
+          },
         ),
       ),
     );
@@ -454,6 +457,9 @@ void main() {
             bottomAnchorAlignment = value;
           },
           onUserScrollIntent: chatScrollController.handleUserScrollIntent,
+          onStreamingMessageContentChanged: (_, __) {
+            chatScrollController.autoScrollToBottomIfNeeded();
+          },
         ),
       ),
     );
@@ -489,9 +495,12 @@ void main() {
       80,
     );
     chatScrollController.autoScrollToBottomIfNeeded();
-    for (var i = 0; i < 8; i++) {
-      await tester.pump();
-    }
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    await tester.pump(const Duration(milliseconds: 120));
+    await tester.pump(const Duration(milliseconds: 160));
+    await tester.pump(const Duration(milliseconds: 260));
+    await tester.pump();
 
     final bottomAnchor = _positionFor(scrollControllers, messages.length);
     expect(bottomAnchor.itemTrailingEdge, closeTo(1, 0.03));
@@ -561,6 +570,9 @@ void main() {
             bottomAnchorAlignment = value;
           },
           onUserScrollIntent: chatScrollController.handleUserScrollIntent,
+          onStreamingMessageContentChanged: (_, __) {
+            chatScrollController.autoScrollToBottomIfNeeded();
+          },
         ),
       ),
     );
@@ -573,9 +585,10 @@ void main() {
       80,
     );
     chatScrollController.autoScrollToBottomIfNeeded();
-    for (var i = 0; i < 8; i++) {
-      await tester.pump();
-    }
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    await tester.pump(const Duration(milliseconds: 120));
+    await tester.pump(const Duration(milliseconds: 160));
 
     final bottomAnchor = _positionFor(scrollControllers, messages.length);
     expect(bottomAnchor.itemTrailingEdge, closeTo(1, 0.03));

@@ -417,7 +417,18 @@ class HomePageController extends ChangeNotifier {
           _context.read<SettingsProvider>().autoScrollEnabled,
       getItemCount: () => _chatController.collapsedMessages.length,
       getBottomAnchorAlignment: () => _bottomAnchorAlignment,
+      onUserScrollActiveChanged: _handleUserScrollActiveChanged,
     );
+  }
+
+  void _handleUserScrollActiveChanged(bool active) {
+    if (!active) {
+      _scrollCtrl.prepareForFrozenStreamingContentFlush();
+    }
+    final flushed = streamingContentNotifier.setUpdatesFrozen(active);
+    if (!active && flushed) {
+      _scrollCtrl.handleFrozenStreamingContentFlushed();
+    }
   }
 
   void _initializeProviders() {
