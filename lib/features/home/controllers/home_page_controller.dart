@@ -419,6 +419,10 @@ class HomePageController extends ChangeNotifier {
           _context.read<SettingsProvider>().autoScrollEnabled,
       getItemCount: () => _chatController.collapsedMessages.length,
       getBottomAnchorAlignment: () => _bottomAnchorAlignment,
+      getAnimationsDisabled: () {
+        final mediaQuery = MediaQuery.maybeOf(_context);
+        return mediaQuery?.disableAnimations ?? false;
+      },
       onUserScrollActiveChanged: _handleUserScrollActiveChanged,
     );
   }

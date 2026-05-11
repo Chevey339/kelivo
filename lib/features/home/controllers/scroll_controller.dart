@@ -23,6 +23,7 @@ class ChatScrollController {
     required bool Function() getAutoScrollEnabled,
     required int Function() getItemCount,
     required double Function() getBottomAnchorAlignment,
+    bool Function()? getAnimationsDisabled,
     ValueChanged<bool>? onUserScrollActiveChanged,
   }) : _indexedControllers = indexedControllers,
        _onStateChanged = onStateChanged,
@@ -30,6 +31,7 @@ class ChatScrollController {
        _getAutoScrollEnabled = getAutoScrollEnabled,
        _getItemCount = getItemCount,
        _getBottomAnchorAlignment = getBottomAnchorAlignment,
+       _getAnimationsDisabled = getAnimationsDisabled ?? (() => false),
        _onUserScrollActiveChanged = onUserScrollActiveChanged {
     _positionTracker = ChatScrollPositionTracker(
       controllers: indexedControllers,
@@ -45,6 +47,7 @@ class ChatScrollController {
   final bool Function() _getAutoScrollEnabled;
   final int Function() _getItemCount;
   final double Function() _getBottomAnchorAlignment;
+  final bool Function() _getAnimationsDisabled;
   final ValueChanged<bool>? _onUserScrollActiveChanged;
 
   late final ChatScrollPositionTracker _positionTracker;
@@ -84,6 +87,7 @@ class ChatScrollController {
   bool _hasUserScrollMovementSinceIntent = false;
   bool _hasLeftBottomSinceUserIntent = false;
   bool _hasUserScrollIntentTowardBottom = false;
+  bool _pendingBottomResumeAfterUserScroll = false;
 
   /// Coalesces repeated bottom scroll requests during streaming into one
   /// jump per frame.
@@ -171,6 +175,9 @@ class ChatScrollController {
     if (userScrolling) {
       _cancelPendingBottomScrollsForUser();
       _hasUserScrollMovementSinceIntent = true;
+      if (_positionTracker.lastUserScrollWasTowardBottom) {
+        _pendingBottomResumeAfterUserScroll = true;
+      }
       _setUserScrolling(true);
       _autoStickToBottom = false;
       _lastJumpUserMessageId = null;
@@ -311,13 +318,15 @@ class ChatScrollController {
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom = false;
+    _pendingBottomResumeAfterUserScroll = false;
     _autoStickToBottom = true;
     _clearReadingAnchor();
+    final shouldAnimate = animate && !_getAnimationsDisabled();
     _scheduleScrollToBottom(
-      animate: animate,
-      forceAnimation: animate,
-      alignFittingContentToTop: !animate,
-      duration: animate
+      animate: shouldAnimate,
+      forceAnimation: shouldAnimate,
+      alignFittingContentToTop: !shouldAnimate,
+      duration: shouldAnimate
           ? _userSettleScrollDuration
           : const Duration(milliseconds: 250),
       curve: _userSettleScrollCurve,
@@ -518,6 +527,7 @@ class ChatScrollController {
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom = false;
+    _pendingBottomResumeAfterUserScroll = false;
     _setUserScrolling(false);
     _lastJumpUserMessageId = null;
     _clearReadingAnchor();
@@ -535,6 +545,7 @@ class ChatScrollController {
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom = false;
+    _pendingBottomResumeAfterUserScroll = false;
     _setUserScrolling(false);
     scrollToBottom(animate: animate);
     final generation = _bottomScrollGeneration;
@@ -641,6 +652,8 @@ class ChatScrollController {
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom =
         direction == ChatUserScrollIntentDirection.towardBottom;
+    _pendingBottomResumeAfterUserScroll =
+        _pendingBottomResumeAfterUserScroll || _hasUserScrollIntentTowardBottom;
     _setUserScrolling(true);
     _scheduleUserScrollIntentIdle();
     _autoStickToBottom = false;
@@ -702,6 +715,9 @@ class ChatScrollController {
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom = false;
+    if (!keepUserScrolling) {
+      _pendingBottomResumeAfterUserScroll = false;
+    }
     _autoStickToBottom = true;
     _clearReadingAnchor();
   }
@@ -776,21 +792,38 @@ class ChatScrollController {
 
   void _finishUserScrollIdle() {
     _setUserScrolling(false);
+    if (_shouldResumeBottomAfterUserScrollIdle()) {
+      _resumeAutoStickToBottom();
+    }
     if (_autoStickToBottom && _getAutoScrollEnabled()) {
-      _scheduleScrollToBottom(
-        animate: true,
-        deferUntilNextFrame: true,
-        requireAutoStick: true,
-        alignFittingContentToTop: false,
-        forceAnimation: true,
-        duration: _userSettleScrollDuration,
-        curve: _userSettleScrollCurve,
-      );
+      _scheduleUserSettleScrollToBottom();
       return;
     }
     if (_autoStickSuspendedByUser) {
       _scheduleReadingAnchorCapture();
     }
+  }
+
+  bool _shouldResumeBottomAfterUserScrollIdle() {
+    if (!_autoStickSuspendedByUser) return false;
+    if (!_getAutoScrollEnabled() && !_autoStickToBottom) return false;
+    if (!_isInBottomResumeZone) return false;
+    return _pendingBottomResumeAfterUserScroll ||
+        _hasUserScrollIntentTowardBottom ||
+        _positionTracker.lastUserScrollWasTowardBottom;
+  }
+
+  void _scheduleUserSettleScrollToBottom() {
+    final animationsDisabled = _getAnimationsDisabled();
+    _scheduleScrollToBottom(
+      animate: !animationsDisabled,
+      deferUntilNextFrame: true,
+      requireAutoStick: true,
+      alignFittingContentToTop: false,
+      forceAnimation: !animationsDisabled,
+      duration: animationsDisabled ? Duration.zero : _userSettleScrollDuration,
+      curve: _userSettleScrollCurve,
+    );
   }
 
   void _clearReadingAnchor() {
@@ -899,6 +932,10 @@ class ChatScrollController {
   /// Capture the current reading anchor before frozen streaming content is
   /// displayed, so a height change can be reconciled without a visible bounce.
   void prepareForFrozenStreamingContentFlush() {
+    if (_shouldResumeBottomAfterUserScrollIdle()) {
+      _resumeAutoStickToBottom();
+      return;
+    }
     if (!_autoStickSuspendedByUser || _autoStickToBottom) return;
     if (_isUserScrolling || _positionTracker.isUserScrolling) return;
     _captureReadingAnchor();
@@ -906,17 +943,11 @@ class ChatScrollController {
 
   /// Reconcile scroll position after frozen streaming UI content is displayed.
   void handleFrozenStreamingContentFlushed() {
+    if (_shouldResumeBottomAfterUserScrollIdle()) {
+      _resumeAutoStickToBottom();
+    }
     if (_autoStickToBottom && _getAutoScrollEnabled()) {
-      _scheduleScrollToBottom(
-        animate: true,
-        deferUntilNextFrame: true,
-        requireAutoStick: true,
-        alignFittingContentToTop: false,
-        forceAnimation: true,
-        maintainFittingContentForGrowth: false,
-        duration: _userSettleScrollDuration,
-        curve: _userSettleScrollCurve,
-      );
+      _scheduleUserSettleScrollToBottom();
       return;
     }
     _restoreReadingAnchorIfSuspended();
@@ -1149,6 +1180,7 @@ class ChatScrollController {
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom = false;
+    _pendingBottomResumeAfterUserScroll = false;
     _positionTracker.resetUserScrolling();
   }
 
