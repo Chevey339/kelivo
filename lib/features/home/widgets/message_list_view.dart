@@ -277,6 +277,7 @@ class _MessageListViewState extends State<MessageListView> {
   bool _codeBlockUnlockPending = false;
   bool _visibleFlushScheduled = false;
   bool _pointerScrollIntentSent = false;
+  bool _pointerScrollPointerDownSent = false;
   double _pointerScrollIntentDx = 0;
   double _pointerScrollIntentDy = 0;
 
@@ -464,11 +465,14 @@ class _MessageListViewState extends State<MessageListView> {
               behavior: HitTestBehavior.translucent,
               onPointerDown: (event) {
                 _pointerScrollIntentSent = false;
+                _pointerScrollPointerDownSent = false;
                 _pointerScrollIntentDx = 0;
                 _pointerScrollIntentDy = 0;
                 if (_codeBlockPointerIds.contains(event.pointer)) {
                   return;
                 }
+                _pointerScrollPointerDownSent = true;
+                widget.onUserScrollPointerDown?.call();
               },
               onPointerMove: (event) {
                 if (_codeBlockPointerIds.contains(event.pointer)) return;
@@ -481,7 +485,10 @@ class _MessageListViewState extends State<MessageListView> {
                   return;
                 }
                 _pointerScrollIntentSent = true;
-                widget.onUserScrollPointerDown?.call();
+                if (!_pointerScrollPointerDownSent) {
+                  _pointerScrollPointerDownSent = true;
+                  widget.onUserScrollPointerDown?.call();
+                }
                 widget.onUserScrollIntent?.call(
                   _pointerScrollIntentDy > 0
                       ? ChatUserScrollIntentDirection.towardTop
@@ -490,21 +497,23 @@ class _MessageListViewState extends State<MessageListView> {
               },
               onPointerUp: (event) {
                 _handleCodeBlockPointerFinished(event.pointer);
-                final sentScrollIntent = _pointerScrollIntentSent;
+                final sentPointerDown = _pointerScrollPointerDownSent;
                 _pointerScrollIntentSent = false;
+                _pointerScrollPointerDownSent = false;
                 _pointerScrollIntentDx = 0;
                 _pointerScrollIntentDy = 0;
-                if (sentScrollIntent) {
+                if (sentPointerDown) {
                   widget.onUserScrollPointerUp?.call();
                 }
               },
               onPointerCancel: (event) {
                 _handleCodeBlockPointerFinished(event.pointer);
-                final sentScrollIntent = _pointerScrollIntentSent;
+                final sentPointerDown = _pointerScrollPointerDownSent;
                 _pointerScrollIntentSent = false;
+                _pointerScrollPointerDownSent = false;
                 _pointerScrollIntentDx = 0;
                 _pointerScrollIntentDy = 0;
-                if (sentScrollIntent) {
+                if (sentPointerDown) {
                   widget.onUserScrollPointerUp?.call();
                 }
               },

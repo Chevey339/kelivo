@@ -272,6 +272,71 @@ void main() {
     isProcessingFiles.dispose();
   });
 
+  testWidgets('消息列表指针按下立即通知控制器暂停程序化滚动', (tester) async {
+    final scrollControllers = ChatIndexedScrollControllers();
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    var pointerDownCount = 0;
+    var pointerUpCount = 0;
+    var userScrollIntentCount = 0;
+    final messages = List<ChatMessage>.generate(
+      24,
+      (index) => ChatMessage(
+        id: 'message-$index',
+        role: index.isEven ? 'user' : 'assistant',
+        content: 'Message $index',
+        conversationId: 'conversation-1',
+      ),
+    );
+
+    await tester.pumpWidget(
+      _harness(
+        MessageListView(
+          scrollControllers: scrollControllers,
+          messages: messages,
+          byGroup: {
+            for (final message in messages) message.id: [message],
+          },
+          versionSelections: const {},
+          reasoning: const {},
+          reasoningSegments: const {},
+          contentSplits: const {},
+          toolParts: const {},
+          translations: const {},
+          selecting: false,
+          selectedItems: const {},
+          dividerPadding: EdgeInsets.zero,
+          isProcessingFiles: isProcessingFiles,
+          onUserScrollPointerDown: () {
+            pointerDownCount++;
+          },
+          onUserScrollPointerUp: () {
+            pointerUpCount++;
+          },
+          onUserScrollIntent: (_) {
+            userScrollIntentCount++;
+          },
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(ScrollablePositionedList)),
+    );
+    await tester.pump();
+
+    expect(pointerDownCount, 1);
+    expect(userScrollIntentCount, 0);
+
+    await gesture.up();
+    await tester.pump();
+
+    expect(pointerUpCount, 1);
+
+    isProcessingFiles.dispose();
+  });
+
   testWidgets('相同消息列表重建时复用已构建消息子树', (tester) async {
     final scrollControllers = ChatIndexedScrollControllers();
     final isProcessingFiles = ValueNotifier<bool>(false);

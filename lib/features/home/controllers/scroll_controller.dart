@@ -150,15 +150,12 @@ class ChatScrollController {
     return _positionTracker.isAtBottom;
   }
 
-  bool get _isInBottomResumeZone =>
-      _positionTracker.isAtBottom || _positionTracker.isNearLiveTail();
-
   bool get shouldLiftContentForKeyboardInset =>
       _autoStickToBottom &&
       !_autoStickSuspendedByUser &&
       !_isUserScrolling &&
       !_positionTracker.isUserScrolling &&
-      _isInBottomResumeZone;
+      _positionTracker.isAtBottom;
 
   /// Check if the scroll view has enough content to scroll.
   ///
@@ -223,11 +220,6 @@ class ChatScrollController {
     final atBottom = _positionTracker.isAtBottom;
     final allowsBottomResume =
         !_hasUserScrollIntentTowardTop || _hasUserScrollIntentTowardBottom;
-    final shouldResumeInBottomZone =
-        allowsBottomResume &&
-        _isInBottomResumeZone &&
-        (_hasUserScrollIntentTowardBottom ||
-            _positionTracker.lastUserScrollWasTowardBottom);
     final shouldResumeSuspendedAutoStick =
         _autoStickSuspendedByUser &&
         allowsBottomResume &&
@@ -237,11 +229,7 @@ class ChatScrollController {
             (!userScrolling &&
                 _hasUserScrollMovementSinceIntent &&
                 _positionTracker.lastUserScrollWasTowardBottom));
-    if (!atBottom &&
-        shouldResumeSuspendedAutoStick &&
-        shouldResumeInBottomZone) {
-      _resumeAutoStickToBottom(keepUserScrolling: userScrolling);
-    } else if (!atBottom) {
+    if (!atBottom) {
       if (userScrolling || _isUserScrolling || _autoStickSuspendedByUser) {
         final keepRecoveredAutoStick =
             _autoStickToBottom && !_autoStickSuspendedByUser && !userScrolling;
@@ -698,7 +686,7 @@ class ChatScrollController {
   ]) {
     if (_isCodeBlockInteractionActive) return;
     _beginUserReadingIntent(direction);
-    if (_hasUserScrollIntentTowardBottom && _isInBottomResumeZone) {
+    if (_hasUserScrollIntentTowardBottom && _positionTracker.isAtBottom) {
       _resumeAutoStickToBottom(keepUserScrolling: true);
     }
   }
@@ -975,7 +963,7 @@ class ChatScrollController {
   bool _shouldResumeBottomAfterUserScrollIdle() {
     if (!_autoStickSuspendedByUser) return false;
     if (!_getAutoScrollEnabled() && !_autoStickToBottom) return false;
-    if (!_isInBottomResumeZone) return false;
+    if (!_positionTracker.isAtBottom) return false;
     if (_hasUserScrollIntentTowardTop && !_hasUserScrollIntentTowardBottom) {
       return false;
     }
