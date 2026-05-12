@@ -124,6 +124,10 @@ class ChatScrollController {
   static const double _autoScrollSnapTolerance = 56.0;
   static const Duration _userSettleScrollDuration = Duration(milliseconds: 520);
   static const Curve _userSettleScrollCurve = Curves.easeInOutCubic;
+  static const Duration _explicitNavigationScrollDuration = Duration(
+    milliseconds: 380,
+  );
+  static const Curve _explicitNavigationScrollCurve = Curves.easeInOutCubic;
 
   // ============================================================================
   // Public Getters
@@ -1217,18 +1221,15 @@ class ChatScrollController {
       ChatUserScrollIntentDirection.towardTop,
     );
     if (navigationGeneration == null) return;
-    final useAnimation = animate && _positionTracker.shouldAnimateToIndex(0);
     unawaited(
-      _positionTracker
-          .scrollToIndex(
-            index: 0,
-            alignment: 0,
-            animate: useAnimation,
-            duration: const Duration(milliseconds: 220),
-          )
-          .whenComplete(
-            () => _finishExplicitNavigationIntent(navigationGeneration),
-          ),
+      _scrollToExplicitNavigationTarget(
+        index: 0,
+        alignment: 0,
+        animate: animate,
+        navigationGeneration: navigationGeneration,
+      ).whenComplete(
+        () => _finishExplicitNavigationIntent(navigationGeneration),
+      ),
     );
   }
 
@@ -1268,10 +1269,10 @@ class ChatScrollController {
     if (navigationGeneration == null) return;
     if (target < 0) {
       try {
-        await _positionTracker.scrollToIndex(
+        await _scrollToExplicitNavigationTarget(
           index: 0,
           alignment: 0,
-          animate: false,
+          navigationGeneration: navigationGeneration,
         );
         if (_isCurrentExplicitNavigation(navigationGeneration)) {
           _lastJumpUserMessageId = null;
@@ -1283,11 +1284,10 @@ class ChatScrollController {
     }
 
     try {
-      await _positionTracker.scrollToIndex(
+      await _scrollToExplicitNavigationTarget(
         index: target,
         alignment: 0.08,
-        animate: _positionTracker.shouldAnimateToIndex(target),
-        duration: const Duration(milliseconds: 200),
+        navigationGeneration: navigationGeneration,
       );
       if (_isCurrentExplicitNavigation(navigationGeneration)) {
         _lastJumpUserMessageId = messages[target].id;
@@ -1338,11 +1338,10 @@ class ChatScrollController {
     );
     if (navigationGeneration == null) return;
     try {
-      await _positionTracker.scrollToIndex(
+      await _scrollToExplicitNavigationTarget(
         index: target,
         alignment: 0.08,
-        animate: _positionTracker.shouldAnimateToIndex(target),
-        duration: const Duration(milliseconds: 200),
+        navigationGeneration: navigationGeneration,
       );
       if (_isCurrentExplicitNavigation(navigationGeneration)) {
         _lastJumpUserMessageId = messages[target].id;
@@ -1368,11 +1367,10 @@ class ChatScrollController {
     );
     if (navigationGeneration == null) return;
     try {
-      await _positionTracker.scrollToIndex(
+      await _scrollToExplicitNavigationTarget(
         index: targetIndex,
         alignment: 0.1,
-        animate: _positionTracker.shouldAnimateToIndex(targetIndex),
-        duration: const Duration(milliseconds: 250),
+        navigationGeneration: navigationGeneration,
       );
       if (_isCurrentExplicitNavigation(navigationGeneration)) {
         _lastJumpUserMessageId = targetId;
@@ -1380,6 +1378,24 @@ class ChatScrollController {
     } finally {
       _finishExplicitNavigationIntent(navigationGeneration);
     }
+  }
+
+  Future<void> _scrollToExplicitNavigationTarget({
+    required int index,
+    required double alignment,
+    required int navigationGeneration,
+    bool animate = true,
+  }) {
+    if (!_isCurrentExplicitNavigation(navigationGeneration)) {
+      return Future<void>.value();
+    }
+    return _positionTracker.scrollToIndex(
+      index: index,
+      alignment: alignment,
+      animate: animate && !_getAnimationsDisabled(),
+      duration: _explicitNavigationScrollDuration,
+      curve: _explicitNavigationScrollCurve,
+    );
   }
 
   // ============================================================================

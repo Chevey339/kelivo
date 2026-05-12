@@ -11,9 +11,12 @@ const _harnessHeight = 600.0;
 
 void main() {
   group('ChatScrollController indexed navigation', () {
-    testWidgets('超远距离跳到底部不会动画构建中间消息', (tester) async {
+    testWidgets('超远距离迷你地图跳转使用动画但不构建中间消息', (tester) async {
       var itemCount = 5000;
-      final scrollControllers = ChatIndexedScrollControllers();
+      final itemScrollController = _RecordingItemScrollController();
+      final scrollControllers = ChatIndexedScrollControllers(
+        itemScrollController: itemScrollController,
+      );
       final builtIndexes = <int>{};
       final chatScrollController = ChatScrollController(
         indexedControllers: scrollControllers,
@@ -37,12 +40,17 @@ void main() {
       await tester.pump();
 
       builtIndexes.clear();
-      await chatScrollController.scrollToMessageId(
+      final jumpFuture = chatScrollController.scrollToMessageId(
         targetId: 'message-4999',
         targetIndex: itemCount - 1,
       );
       await tester.pump();
+      await tester.pumpAndSettle();
+      await jumpFuture;
+      await tester.pump();
 
+      expect(itemScrollController.scrollTargets, contains(itemCount - 1));
+      expect(itemScrollController.jumpTargets, isEmpty);
       expect(builtIndexes, isNotEmpty);
       expect(
         builtIndexes.any((index) => index >= 4980 && index < itemCount),
@@ -50,6 +58,115 @@ void main() {
       );
       expect(builtIndexes.any((index) => index > 200 && index < 4800), isFalse);
       expect(builtIndexes.length, lessThan(120));
+
+      chatScrollController.dispose();
+    });
+
+    testWidgets('远距离跳到顶部使用平滑动画而不是直接跳转', (tester) async {
+      const messageCount = 300;
+      final itemScrollController = _RecordingItemScrollController();
+      final scrollControllers = ChatIndexedScrollControllers(
+        itemScrollController: itemScrollController,
+      );
+      final chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => 1,
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          initialScrollIndex: messageCount,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: 120);
+            }
+            return SizedBox(height: 56, child: Text('Message $index'));
+          },
+        ),
+      );
+      await tester.pump();
+
+      chatScrollController.scrollToTop();
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(itemScrollController.scrollTargets, contains(0));
+      expect(itemScrollController.jumpTargets, isEmpty);
+      expect(
+        itemScrollController.lastScrollDuration,
+        greaterThanOrEqualTo(const Duration(milliseconds: 360)),
+      );
+
+      chatScrollController.dispose();
+    });
+
+    testWidgets('远距离上一条和下一条问题导航使用平滑动画', (tester) async {
+      const messageCount = 220;
+      final messages = List<ChatMessage>.generate(
+        messageCount,
+        (index) => ChatMessage(
+          id: 'message-$index',
+          role: index == 20 || index == 180 ? 'user' : 'assistant',
+          content: 'Message $index',
+          conversationId: 'conversation-1',
+        ),
+      );
+      final itemScrollController = _RecordingItemScrollController();
+      final scrollControllers = ChatIndexedScrollControllers(
+        itemScrollController: itemScrollController,
+      );
+      final chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messages.length,
+        getBottomAnchorAlignment: () => 1,
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messages.length + 1,
+          initialScrollIndex: 120,
+          itemBuilder: (context, index) {
+            if (index == messages.length) {
+              return const SizedBox(height: 120);
+            }
+            return SizedBox(height: 56, child: Text(messages[index].id));
+          },
+        ),
+      );
+      await tester.pump();
+
+      final previousFuture = chatScrollController.jumpToPreviousQuestion(
+        messages: messages,
+        indexOfId: (id) => messages.indexWhere((message) => message.id == id),
+      );
+      await tester.pump();
+      await tester.pumpAndSettle();
+      await previousFuture;
+
+      expect(itemScrollController.scrollTargets, contains(20));
+      expect(itemScrollController.jumpTargets, isEmpty);
+
+      itemScrollController.scrollTargets.clear();
+      final nextFuture = chatScrollController.jumpToNextQuestion(
+        messages: messages,
+        indexOfId: (id) => messages.indexWhere((message) => message.id == id),
+      );
+      await tester.pump();
+      await tester.pumpAndSettle();
+      await nextFuture;
+
+      expect(itemScrollController.scrollTargets, contains(180));
+      expect(itemScrollController.jumpTargets, isEmpty);
 
       chatScrollController.dispose();
     });
@@ -79,10 +196,13 @@ void main() {
 
       expect(chatScrollController.showNavButtons, isFalse);
 
-      await chatScrollController.scrollToMessageId(
+      final jumpFuture = chatScrollController.scrollToMessageId(
         targetId: 'message-4500',
         targetIndex: 4500,
       );
+      await tester.pump();
+      await tester.pumpAndSettle();
+      await jumpFuture;
       await tester.pump();
 
       expect(chatScrollController.showNavButtons, isTrue);
@@ -135,7 +255,7 @@ void main() {
         indexOfId: (id) => messages.indexWhere((message) => message.id == id),
       );
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 240));
+      await tester.pumpAndSettle();
       await previousFuture;
       await tester.pump();
 
@@ -158,7 +278,7 @@ void main() {
         indexOfId: (id) => messages.indexWhere((message) => message.id == id),
       );
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 240));
+      await tester.pumpAndSettle();
       await nextFuture;
       await tester.pump();
 
@@ -364,7 +484,7 @@ void main() {
       expect(chatScrollController.autoStickToBottom, isFalse);
 
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 240));
+      await tester.pumpAndSettle();
       await previousFuture;
       await tester.pump();
 
@@ -415,7 +535,7 @@ void main() {
       expect(chatScrollController.autoStickToBottom, isFalse);
 
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 280));
+      await tester.pumpAndSettle();
       await jumpFuture;
       await tester.pump();
 
@@ -572,7 +692,7 @@ void main() {
         targetIndex: 30,
       );
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 280));
+      await tester.pumpAndSettle();
       await jumpFuture;
       await tester.pumpAndSettle();
 
