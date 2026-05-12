@@ -433,6 +433,16 @@ class _HomePageState extends State<HomePage>
   }
 
   @override
+  void didChangeMetrics() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _controller.handleViewInsetsBottomChanged(
+        MediaQuery.viewInsetsOf(context).bottom,
+      );
+    });
+  }
+
+  @override
   void didPushNext() {
     _controller.onDidPushNext();
   }
@@ -631,9 +641,16 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildMobileBody(BuildContext context, ColorScheme cs) {
     final bottomContentPadding = _controller.inputBarHeight + 16;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final contentBottomInset =
+        _controller.scrollCtrl.shouldLiftContentForKeyboardInset
+        ? keyboardInset
+        : 0.0;
 
     return ChatInputOverlayLayout(
       topInset: kToolbarHeight + MediaQuery.paddingOf(context).top,
+      contentBottomInset: contentBottomInset,
+      bottomOverlayInset: keyboardInset,
       background: _buildChatBackground(context, cs),
       content: Builder(
         builder: (context) {
@@ -801,9 +818,16 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildTabletBody(BuildContext context, ColorScheme cs) {
     final bottomContentPadding = _controller.inputBarHeight + 16;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final contentBottomInset =
+        _controller.scrollCtrl.shouldLiftContentForKeyboardInset
+        ? keyboardInset
+        : 0.0;
 
     return ChatInputOverlayLayout(
       topInset: kToolbarHeight + MediaQuery.paddingOf(context).top,
+      contentBottomInset: contentBottomInset,
+      bottomOverlayInset: keyboardInset,
       content: FadeTransition(
         opacity: _controller.convoFade,
         child:
@@ -1242,7 +1266,10 @@ class _HomePageState extends State<HomePage>
                   setState(() => _scrollNavHovering = hovering);
                 }
               : null,
-          bottomOffset: _controller.inputBarHeight + 12,
+          bottomOffset:
+              _controller.inputBarHeight +
+              12 +
+              MediaQuery.viewInsetsOf(context).bottom,
           onScrollDragStart:
               _controller.scrollCtrl.handleForwardedScrollDragStart,
           onScrollDragUpdate:

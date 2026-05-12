@@ -524,6 +524,68 @@ void main() {
     isProcessingFiles.dispose();
   });
 
+  testWidgets('代码块交互时消息列表仍保持可滚动', (tester) async {
+    final scrollControllers = ChatIndexedScrollControllers();
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    final codeLines = List<String>.generate(40, (index) => 'code-line-$index');
+    final messages = <ChatMessage>[
+      ChatMessage(
+        id: 'assistant-code',
+        role: 'assistant',
+        content:
+            '''
+```dart
+${codeLines.join('\n')}
+```
+''',
+        conversationId: 'conversation-1',
+      ),
+    ];
+
+    await tester.pumpWidget(
+      _harness(
+        MessageListView(
+          scrollControllers: scrollControllers,
+          messages: messages,
+          byGroup: {
+            for (final message in messages) message.id: [message],
+          },
+          versionSelections: const {},
+          reasoning: const {},
+          reasoningSegments: const {},
+          contentSplits: const {},
+          toolParts: const {},
+          translations: const {},
+          selecting: false,
+          selectedItems: const {},
+          dividerPadding: EdgeInsets.zero,
+          isProcessingFiles: isProcessingFiles,
+          bottomContentPadding: 120,
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    final codeBlockFinder = find.byType(SelectableText);
+    expect(codeBlockFinder, findsOneWidget);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(codeBlockFinder),
+    );
+    await tester.pump();
+
+    final list = tester.widget<ScrollablePositionedList>(
+      find.byType(ScrollablePositionedList),
+    );
+    expect(list.physics, isNot(isA<NeverScrollableScrollPhysics>()));
+
+    await gesture.up();
+    await tester.pump();
+
+    isProcessingFiles.dispose();
+  });
+
   testWidgets('真实消息列表拖动会停止控制器后续流式贴底', (tester) async {
     tester.view.physicalSize = const Size(390, 700);
     tester.view.devicePixelRatio = 1.0;

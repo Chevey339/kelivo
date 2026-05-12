@@ -509,7 +509,6 @@ class _MessageListViewState extends State<MessageListView> {
                 }
               },
               onPointerSignal: (event) {
-                if (_isCodeBlockInteractionActive) return;
                 if (event is PointerScrollEvent) {
                   final absDx = event.scrollDelta.dx.abs();
                   final absDy = event.scrollDelta.dy.abs();
@@ -526,9 +525,7 @@ class _MessageListViewState extends State<MessageListView> {
                 );
               },
               child: ScrollablePositionedList.builder(
-                physics: _isCodeBlockInteractionActive
-                    ? const NeverScrollableScrollPhysics()
-                    : defaultTargetPlatform == TargetPlatform.iOS
+                physics: defaultTargetPlatform == TargetPlatform.iOS
                     ? const BouncingScrollPhysics(
                         parent: AlwaysScrollableScrollPhysics(),
                       )

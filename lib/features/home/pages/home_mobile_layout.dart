@@ -111,7 +111,7 @@ class HomeMobileScaffold extends StatelessWidget {
       ),
       child: Scaffold(
         key: scaffoldKey,
-        resizeToAvoidBottomInset: true,
+        resizeToAvoidBottomInset: false,
         extendBodyBehindAppBar: true,
         appBar: appBarOverride ?? _buildAppBar(context, cs),
         body: body,

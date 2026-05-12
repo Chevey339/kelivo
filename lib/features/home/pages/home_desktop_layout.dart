@@ -143,7 +143,7 @@ class HomeDesktopScaffold extends StatelessWidget {
               Expanded(
                 child: Scaffold(
                   key: scaffoldKey,
-                  resizeToAvoidBottomInset: true,
+                  resizeToAvoidBottomInset: false,
                   extendBodyBehindAppBar: true,
                   backgroundColor: Colors.transparent,
                   appBar:

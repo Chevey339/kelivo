@@ -174,6 +174,7 @@ class HomePageController extends ChangeNotifier {
   // Input bar measurement
   double _inputBarHeight = 72;
   double _bottomAnchorAlignment = 1.0;
+  double _lastViewInsetsBottom = 0;
 
   // Animation tuning
   static const Duration _postSwitchScrollDelay = Duration(milliseconds: 220);
@@ -1512,6 +1513,16 @@ class HomePageController extends ChangeNotifier {
         notifyListeners();
       }
     } catch (_) {}
+  }
+
+  void handleViewInsetsBottomChanged(double bottomInset) {
+    if ((_lastViewInsetsBottom - bottomInset).abs() <= 1.0) return;
+    final previous = _lastViewInsetsBottom;
+    _lastViewInsetsBottom = bottomInset;
+    if (bottomInset > previous &&
+        _scrollCtrl.shouldLiftContentForKeyboardInset) {
+      _scrollCtrl.followBottomAfterContentChange();
+    }
   }
 
   // ============================================================================

@@ -83,10 +83,12 @@ class ChatScrollController {
   /// Blocks implicit bottom sticking while the user is reading/editing away
   /// from the live tail. Explicit bottom navigation clears this.
   bool _autoStickSuspendedByUser = false;
+  bool _autoStickSuspendedByExplicitNavigation = false;
 
   bool _hasUserScrollMovementSinceIntent = false;
   bool _hasLeftBottomSinceUserIntent = false;
   bool _hasUserScrollIntentTowardBottom = false;
+  bool _hasUserScrollIntentTowardTop = false;
   bool _pendingBottomResumeAfterUserScroll = false;
 
   /// Coalesces repeated bottom scroll requests during streaming into one
@@ -111,6 +113,8 @@ class ChatScrollController {
   bool _readingAnchorScheduled = false;
   int? _readingAnchorIndex;
   double? _readingAnchorAlignment;
+  bool _explicitNavigationActive = false;
+  int _explicitNavigationGeneration = 0;
 
   /// Anchor for chained "jump to previous question" navigation.
   String? _lastJumpUserMessageId;
@@ -145,6 +149,13 @@ class ChatScrollController {
   bool get _isInBottomResumeZone =>
       _positionTracker.isAtBottom || _positionTracker.isNearLiveTail();
 
+  bool get shouldLiftContentForKeyboardInset =>
+      _autoStickToBottom &&
+      !_autoStickSuspendedByUser &&
+      !_isUserScrolling &&
+      !_positionTracker.isUserScrolling &&
+      _isInBottomResumeZone;
+
   /// Check if the scroll view has enough content to scroll.
   ///
   /// [minExtent] - Minimum scroll extent to consider scrollable (default: 56.0).
@@ -171,10 +182,16 @@ class ChatScrollController {
   }
 
   void _onScrollPositionChanged() {
-    if (_isCodeBlockInteractionActive) {
-      _positionTracker.clearUserScrollingSilently();
+    final codeBlockInteractionActive = _isCodeBlockInteractionActive;
+    if (codeBlockInteractionActive) {
       _cancelPendingBottomScrollMotion();
-      return;
+      if (!_positionTracker.isUserScrolling) {
+        _positionTracker.clearUserScrollingSilently();
+        if (_isUserScrolling) {
+          _setUserScrolling(false);
+        }
+        return;
+      }
     }
 
     var needsNotify = false;
@@ -183,7 +200,9 @@ class ChatScrollController {
       _cancelPendingBottomScrollsForUser();
       _hasUserScrollMovementSinceIntent = true;
       if (_positionTracker.lastUserScrollWasTowardBottom) {
-        _pendingBottomResumeAfterUserScroll = true;
+        if (!_hasUserScrollIntentTowardTop) {
+          _pendingBottomResumeAfterUserScroll = true;
+        }
       }
       _setUserScrolling(true);
       _autoStickToBottom = false;
@@ -198,12 +217,16 @@ class ChatScrollController {
     _realignFittingContentToTop();
 
     final atBottom = _positionTracker.isAtBottom;
+    final allowsBottomResume =
+        !_hasUserScrollIntentTowardTop || _hasUserScrollIntentTowardBottom;
     final shouldResumeInBottomZone =
+        allowsBottomResume &&
         _isInBottomResumeZone &&
         (_hasUserScrollIntentTowardBottom ||
             _positionTracker.lastUserScrollWasTowardBottom);
     final shouldResumeSuspendedAutoStick =
         _autoStickSuspendedByUser &&
+        allowsBottomResume &&
         (_getAutoScrollEnabled() || _autoStickToBottom) &&
         (_hasLeftBottomSinceUserIntent ||
             _hasUserScrollIntentTowardBottom ||
@@ -237,6 +260,7 @@ class ChatScrollController {
       _autoStickSuspendedByUser = false;
       _hasUserScrollMovementSinceIntent = false;
       _hasLeftBottomSinceUserIntent = false;
+      _hasUserScrollIntentTowardTop = false;
       _autoStickToBottom = true;
       _clearReadingAnchor();
     }
@@ -321,10 +345,13 @@ class ChatScrollController {
   ///
   /// [animate] - Whether to animate the scroll (default: true).
   void scrollToBottom({bool animate = true}) {
+    _cancelExplicitNavigationIntent();
     _autoStickSuspendedByUser = false;
+    _autoStickSuspendedByExplicitNavigation = false;
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom = false;
+    _hasUserScrollIntentTowardTop = false;
     _pendingBottomResumeAfterUserScroll = false;
     _autoStickToBottom = true;
     _clearReadingAnchor();
@@ -535,9 +562,11 @@ class ChatScrollController {
   /// Force scroll to bottom (used when user explicitly clicks the button).
   void forceScrollToBottom() {
     _autoStickSuspendedByUser = false;
+    _autoStickSuspendedByExplicitNavigation = false;
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom = false;
+    _hasUserScrollIntentTowardTop = false;
     _pendingBottomResumeAfterUserScroll = false;
     _setUserScrolling(false);
     _lastJumpUserMessageId = null;
@@ -553,9 +582,11 @@ class ChatScrollController {
     Duration postSwitchDelay = const Duration(milliseconds: 220),
   }) {
     _autoStickSuspendedByUser = false;
+    _autoStickSuspendedByExplicitNavigation = false;
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom = false;
+    _hasUserScrollIntentTowardTop = false;
     _pendingBottomResumeAfterUserScroll = false;
     _setUserScrolling(false);
     scrollToBottom(animate: animate);
@@ -662,21 +693,48 @@ class ChatScrollController {
         ChatUserScrollIntentDirection.unknown,
   ]) {
     if (_isCodeBlockInteractionActive) return;
+    _beginUserReadingIntent(direction);
+    if (_hasUserScrollIntentTowardBottom && _isInBottomResumeZone) {
+      _resumeAutoStickToBottom(keepUserScrolling: true);
+    }
+  }
+
+  void _beginUserReadingIntent(
+    ChatUserScrollIntentDirection direction, {
+    bool clearLastJumpUserMessageId = true,
+  }) {
+    if (_isCodeBlockInteractionActive) return;
+    final preserveCurrentAnchor =
+        !(_explicitNavigationActive || _autoStickSuspendedByExplicitNavigation);
+    _cancelExplicitNavigationIntent();
     revealNavButtons();
     _cancelPendingBottomScrollsForUser();
-    _positionTracker.cancelProgrammaticScrollForUser();
+    _autoStickSuspendedByExplicitNavigation = false;
+    if (preserveCurrentAnchor) {
+      _positionTracker.cancelProgrammaticScrollForUser();
+    } else {
+      _positionTracker.cancelProgrammaticScrollSilently(
+        preserveCurrentAnchor: false,
+      );
+    }
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
+    final intentTowardTop =
+        direction == ChatUserScrollIntentDirection.towardTop;
     _hasUserScrollIntentTowardBottom =
         direction == ChatUserScrollIntentDirection.towardBottom;
-    _pendingBottomResumeAfterUserScroll =
-        _pendingBottomResumeAfterUserScroll || _hasUserScrollIntentTowardBottom;
+    if (_hasUserScrollIntentTowardBottom) {
+      _hasUserScrollIntentTowardTop = false;
+      _pendingBottomResumeAfterUserScroll = true;
+    } else if (intentTowardTop) {
+      _hasUserScrollIntentTowardTop = true;
+      _pendingBottomResumeAfterUserScroll = false;
+    }
     _setUserScrolling(true);
     _scheduleUserScrollIntentIdle();
     _autoStickToBottom = false;
-    _lastJumpUserMessageId = null;
-    if (_hasUserScrollIntentTowardBottom && _isInBottomResumeZone) {
-      _resumeAutoStickToBottom(keepUserScrolling: true);
+    if (clearLastJumpUserMessageId) {
+      _lastJumpUserMessageId = null;
     }
   }
 
@@ -686,6 +744,7 @@ class ChatScrollController {
 
   void handleCodeBlockInteractionStart() {
     _codeBlockInteractionDepth++;
+    _cancelExplicitNavigationIntent();
     _userPointerDown = false;
     _setUserScrolling(false);
     _positionTracker.cancelProgrammaticScrollSilently();
@@ -698,13 +757,25 @@ class ChatScrollController {
     _codeBlockInteractionDepth--;
     if (!_isCodeBlockInteractionActive) {
       _positionTracker.clearUserScrollingSilently();
+      if (_isUserScrolling && !_positionTracker.isUserScrolling) {
+        _setUserScrolling(false);
+      }
     }
   }
 
   void handleUserScrollPointerDown() {
     if (_isCodeBlockInteractionActive) return;
+    final preserveCurrentAnchor =
+        !(_explicitNavigationActive || _autoStickSuspendedByExplicitNavigation);
+    _cancelExplicitNavigationIntent();
     _userPointerDown = true;
-    _positionTracker.cancelProgrammaticScrollForUser();
+    if (preserveCurrentAnchor) {
+      _positionTracker.cancelProgrammaticScrollForUser();
+    } else {
+      _positionTracker.cancelProgrammaticScrollSilently(
+        preserveCurrentAnchor: false,
+      );
+    }
     _cancelPendingBottomScrollMotion();
   }
 
@@ -752,9 +823,11 @@ class ChatScrollController {
       _setUserScrolling(false);
     }
     _autoStickSuspendedByUser = false;
+    _autoStickSuspendedByExplicitNavigation = false;
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom = false;
+    _hasUserScrollIntentTowardTop = false;
     if (!keepUserScrolling) {
       _pendingBottomResumeAfterUserScroll = false;
     }
@@ -805,6 +878,53 @@ class ChatScrollController {
     _readingAnchorScheduled = false;
   }
 
+  int? _beginExplicitNavigationIntent(
+    ChatUserScrollIntentDirection direction, {
+    bool clearLastJumpUserMessageId = true,
+  }) {
+    if (_isCodeBlockInteractionActive) return null;
+    final generation = ++_explicitNavigationGeneration;
+    _explicitNavigationActive = true;
+    _userScrollIntentIdleTimer?.cancel();
+    _userScrollIntentIdleTimer = null;
+    revealNavButtons();
+    _cancelPendingBottomScrollsForUser();
+    _autoStickSuspendedByExplicitNavigation = true;
+    _positionTracker.clearUserScrollingSilently();
+    _hasUserScrollMovementSinceIntent = false;
+    _hasLeftBottomSinceUserIntent = false;
+    _hasUserScrollIntentTowardBottom = false;
+    _hasUserScrollIntentTowardTop =
+        direction == ChatUserScrollIntentDirection.towardTop;
+    _pendingBottomResumeAfterUserScroll = false;
+    _autoStickToBottom = false;
+    if (_isUserScrolling) {
+      _setUserScrolling(false);
+    }
+    if (clearLastJumpUserMessageId) {
+      _lastJumpUserMessageId = null;
+    }
+    return generation;
+  }
+
+  bool _isCurrentExplicitNavigation(int generation) {
+    return _explicitNavigationActive &&
+        generation == _explicitNavigationGeneration;
+  }
+
+  void _finishExplicitNavigationIntent(int generation) {
+    if (!_isCurrentExplicitNavigation(generation)) return;
+    _explicitNavigationActive = false;
+  }
+
+  void _cancelExplicitNavigationIntent() {
+    if (_explicitNavigationActive) {
+      _explicitNavigationActive = false;
+      _explicitNavigationGeneration++;
+    }
+    _autoStickSuspendedByExplicitNavigation = false;
+  }
+
   void _scheduleUserScrollIntentIdle() {
     if (_isCodeBlockInteractionActive) return;
     _userScrollIntentIdleTimer?.cancel();
@@ -852,6 +972,9 @@ class ChatScrollController {
     if (!_autoStickSuspendedByUser) return false;
     if (!_getAutoScrollEnabled() && !_autoStickToBottom) return false;
     if (!_isInBottomResumeZone) return false;
+    if (_hasUserScrollIntentTowardTop && !_hasUserScrollIntentTowardBottom) {
+      return false;
+    }
     return _pendingBottomResumeAfterUserScroll ||
         _hasUserScrollIntentTowardBottom ||
         _positionTracker.lastUserScrollWasTowardBottom;
@@ -912,6 +1035,9 @@ class ChatScrollController {
 
   void _maintainReadingAnchorIfSuspended() {
     if (_isCodeBlockInteractionActive) return;
+    if (_explicitNavigationActive || _autoStickSuspendedByExplicitNavigation) {
+      return;
+    }
     if (!_autoStickSuspendedByUser) return;
     if (_realignSuspendedTopGap()) return;
     if (_isUserScrolling || _positionTracker.isUserScrolling) return;
@@ -940,6 +1066,9 @@ class ChatScrollController {
 
   void _restoreReadingAnchorIfSuspended() {
     if (_isCodeBlockInteractionActive) return;
+    if (_explicitNavigationActive || _autoStickSuspendedByExplicitNavigation) {
+      return;
+    }
     if (!_autoStickSuspendedByUser) return;
     if (_realignSuspendedTopGap()) return;
     if (_isUserScrolling || _positionTracker.isUserScrolling) return;
@@ -982,6 +1111,9 @@ class ChatScrollController {
   /// displayed, so a height change can be reconciled without a visible bounce.
   void prepareForFrozenStreamingContentFlush() {
     if (_isCodeBlockInteractionActive) return;
+    if (_explicitNavigationActive || _autoStickSuspendedByExplicitNavigation) {
+      return;
+    }
     if (_shouldResumeBottomAfterUserScrollIdle()) {
       _resumeAutoStickToBottom();
       return;
@@ -994,6 +1126,9 @@ class ChatScrollController {
   /// Reconcile scroll position after frozen streaming UI content is displayed.
   void handleFrozenStreamingContentFlushed() {
     if (_isCodeBlockInteractionActive) return;
+    if (_explicitNavigationActive || _autoStickSuspendedByExplicitNavigation) {
+      return;
+    }
     if (_shouldResumeBottomAfterUserScrollIdle()) {
       _resumeAutoStickToBottom();
     }
@@ -1078,17 +1213,22 @@ class ChatScrollController {
   /// Scroll to the top of the list.
   void scrollToTop({bool animate = true}) {
     if (!hasClients) return;
-    _cancelPendingBottomScrollsForUser();
-    _lastJumpUserMessageId = null;
-    revealNavButtons();
+    final navigationGeneration = _beginExplicitNavigationIntent(
+      ChatUserScrollIntentDirection.towardTop,
+    );
+    if (navigationGeneration == null) return;
     final useAnimation = animate && _positionTracker.shouldAnimateToIndex(0);
     unawaited(
-      _positionTracker.scrollToIndex(
-        index: 0,
-        alignment: 0,
-        animate: useAnimation,
-        duration: const Duration(milliseconds: 220),
-      ),
+      _positionTracker
+          .scrollToIndex(
+            index: 0,
+            alignment: 0,
+            animate: useAnimation,
+            duration: const Duration(milliseconds: 220),
+          )
+          .whenComplete(
+            () => _finishExplicitNavigationIntent(navigationGeneration),
+          ),
     );
   }
 
@@ -1101,9 +1241,6 @@ class ChatScrollController {
   }) async {
     if (!hasClients) return;
     if (messages.isEmpty) return;
-
-    revealNavButtons();
-    _cancelPendingBottomScrollsForUser();
 
     // Determine anchor index
     int anchor;
@@ -1124,23 +1261,40 @@ class ChatScrollController {
         break;
       }
     }
+    final navigationGeneration = _beginExplicitNavigationIntent(
+      ChatUserScrollIntentDirection.towardTop,
+      clearLastJumpUserMessageId: false,
+    );
+    if (navigationGeneration == null) return;
     if (target < 0) {
-      await _positionTracker.scrollToIndex(
-        index: 0,
-        alignment: 0,
-        animate: false,
-      );
-      _lastJumpUserMessageId = null;
+      try {
+        await _positionTracker.scrollToIndex(
+          index: 0,
+          alignment: 0,
+          animate: false,
+        );
+        if (_isCurrentExplicitNavigation(navigationGeneration)) {
+          _lastJumpUserMessageId = null;
+        }
+      } finally {
+        _finishExplicitNavigationIntent(navigationGeneration);
+      }
       return;
     }
 
-    await _positionTracker.scrollToIndex(
-      index: target,
-      alignment: 0.08,
-      animate: _positionTracker.shouldAnimateToIndex(target),
-      duration: const Duration(milliseconds: 200),
-    );
-    _lastJumpUserMessageId = messages[target].id;
+    try {
+      await _positionTracker.scrollToIndex(
+        index: target,
+        alignment: 0.08,
+        animate: _positionTracker.shouldAnimateToIndex(target),
+        duration: const Duration(milliseconds: 200),
+      );
+      if (_isCurrentExplicitNavigation(navigationGeneration)) {
+        _lastJumpUserMessageId = messages[target].id;
+      }
+    } finally {
+      _finishExplicitNavigationIntent(navigationGeneration);
+    }
   }
 
   /// Jump to the next user message (question) below the current viewport.
@@ -1152,9 +1306,6 @@ class ChatScrollController {
   }) async {
     if (!hasClients) return;
     if (messages.isEmpty) return;
-
-    revealNavButtons();
-    _cancelPendingBottomScrollsForUser();
 
     // Determine anchor index
     int anchor;
@@ -1181,13 +1332,24 @@ class ChatScrollController {
       return;
     }
 
-    await _positionTracker.scrollToIndex(
-      index: target,
-      alignment: 0.08,
-      animate: _positionTracker.shouldAnimateToIndex(target),
-      duration: const Duration(milliseconds: 200),
+    final navigationGeneration = _beginExplicitNavigationIntent(
+      ChatUserScrollIntentDirection.unknown,
+      clearLastJumpUserMessageId: false,
     );
-    _lastJumpUserMessageId = messages[target].id;
+    if (navigationGeneration == null) return;
+    try {
+      await _positionTracker.scrollToIndex(
+        index: target,
+        alignment: 0.08,
+        animate: _positionTracker.shouldAnimateToIndex(target),
+        duration: const Duration(milliseconds: 200),
+      );
+      if (_isCurrentExplicitNavigation(navigationGeneration)) {
+        _lastJumpUserMessageId = messages[target].id;
+      }
+    } finally {
+      _finishExplicitNavigationIntent(navigationGeneration);
+    }
   }
 
   /// Scroll to a specific message by index (from mini map or search).
@@ -1201,15 +1363,23 @@ class ChatScrollController {
     if (!hasClients) return;
     if (targetIndex < 0) return;
 
-    revealNavButtons();
-    _cancelPendingBottomScrollsForUser();
-    await _positionTracker.scrollToIndex(
-      index: targetIndex,
-      alignment: 0.1,
-      animate: _positionTracker.shouldAnimateToIndex(targetIndex),
-      duration: const Duration(milliseconds: 250),
+    final navigationGeneration = _beginExplicitNavigationIntent(
+      ChatUserScrollIntentDirection.unknown,
     );
-    _lastJumpUserMessageId = targetId;
+    if (navigationGeneration == null) return;
+    try {
+      await _positionTracker.scrollToIndex(
+        index: targetIndex,
+        alignment: 0.1,
+        animate: _positionTracker.shouldAnimateToIndex(targetIndex),
+        duration: const Duration(milliseconds: 250),
+      );
+      if (_isCurrentExplicitNavigation(navigationGeneration)) {
+        _lastJumpUserMessageId = targetId;
+      }
+    } finally {
+      _finishExplicitNavigationIntent(navigationGeneration);
+    }
   }
 
   // ============================================================================
@@ -1237,11 +1407,14 @@ class ChatScrollController {
 
   /// Reset user scrolling state (e.g., when force scrolling).
   void resetUserScrolling() {
+    _cancelExplicitNavigationIntent();
     _setUserScrolling(false);
     _autoStickSuspendedByUser = false;
+    _autoStickSuspendedByExplicitNavigation = false;
     _hasUserScrollMovementSinceIntent = false;
     _hasLeftBottomSinceUserIntent = false;
     _hasUserScrollIntentTowardBottom = false;
+    _hasUserScrollIntentTowardTop = false;
     _pendingBottomResumeAfterUserScroll = false;
     _positionTracker.resetUserScrolling();
   }
