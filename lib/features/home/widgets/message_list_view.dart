@@ -460,6 +460,7 @@ class _MessageListViewState extends State<MessageListView> {
                   viewportHeight: constraints.maxHeight,
                   bottomPadding: bottomPadding,
                 );
+            final initialAlignsToTop = widget.messages.length <= 2;
             widget.onBottomAnchorAlignmentChanged?.call(bottomAnchorAlignment);
             final list = Listener(
               behavior: HitTestBehavior.translucent,
@@ -547,8 +548,10 @@ class _MessageListViewState extends State<MessageListView> {
                     widget.scrollControllers.scrollOffsetController,
                 scrollOffsetListener:
                     widget.scrollControllers.scrollOffsetListener,
-                initialScrollIndex: bottomAnchorIndex,
-                initialAlignment: bottomAnchorAlignment,
+                initialScrollIndex: initialAlignsToTop ? 0 : bottomAnchorIndex,
+                initialAlignment: initialAlignsToTop
+                    ? 0
+                    : bottomAnchorAlignment,
                 padding: EdgeInsets.fromLTRB(
                   horizontalPad,
                   8,

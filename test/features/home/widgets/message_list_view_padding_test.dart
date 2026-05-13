@@ -216,6 +216,63 @@ void main() {
     isProcessingFiles.dispose();
   });
 
+  testWidgets('短对话初始打开直接顶对齐避免先显示在底部', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final scrollControllers = ChatIndexedScrollControllers();
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    final messages = <ChatMessage>[
+      ChatMessage(
+        id: 'user-1',
+        role: 'user',
+        content: 'Short user message',
+        conversationId: 'conversation-1',
+      ),
+      ChatMessage(
+        id: 'assistant-1',
+        role: 'assistant',
+        content: 'Short assistant message',
+        conversationId: 'conversation-1',
+      ),
+    ];
+
+    await tester.pumpWidget(
+      _harness(
+        MessageListView(
+          scrollControllers: scrollControllers,
+          messages: messages,
+          byGroup: {
+            for (final message in messages) message.id: [message],
+          },
+          versionSelections: const {},
+          reasoning: const {},
+          reasoningSegments: const {},
+          contentSplits: const {},
+          toolParts: const {},
+          translations: const {},
+          selecting: false,
+          selectedItems: const {},
+          dividerPadding: EdgeInsets.zero,
+          isProcessingFiles: isProcessingFiles,
+          bottomContentPadding: 144,
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    final list = tester.widget<ScrollablePositionedList>(
+      find.byType(ScrollablePositionedList),
+    );
+    expect(list.initialScrollIndex, 0);
+    expect(list.initialAlignment, 0);
+
+    isProcessingFiles.dispose();
+  });
+
   testWidgets('消息列表接收滚轮事件时通知用户滚动意图', (tester) async {
     final scrollControllers = ChatIndexedScrollControllers();
     final isProcessingFiles = ValueNotifier<bool>(false);

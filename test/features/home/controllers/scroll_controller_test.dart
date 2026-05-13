@@ -2021,6 +2021,48 @@ void main() {
       chatScrollController.dispose();
     });
 
+    testWidgets('内容不满一屏时动画滚到底部仍保持第一条消息在顶部', (tester) async {
+      const messageCount = 1;
+      const bottomAnchorHeight = 120.0;
+      final itemScrollController = _RecordingItemScrollController();
+      final scrollControllers = ChatIndexedScrollControllers(
+        itemScrollController: itemScrollController,
+      );
+      final chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => 1 - bottomAnchorHeight / _harnessHeight,
+      );
+
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          itemCount: messageCount + 1,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(height: 56, child: Text('Message $index'));
+          },
+        ),
+      );
+      await tester.pump();
+
+      chatScrollController.scrollToBottom();
+      await tester.pump();
+      await tester.pump();
+
+      final firstMessage = _positionFor(scrollControllers, 0);
+      expect(firstMessage.itemLeadingEdge, closeTo(0, 0.02));
+      expect(itemScrollController.scrollTargets, isEmpty);
+      expect(itemScrollController.jumpTargets, everyElement(0));
+
+      chatScrollController.dispose();
+    });
+
     testWidgets('用户在短内容顶部拖动时顶部重对齐不会重新打开贴底', (tester) async {
       const messageCount = 1;
       const bottomAnchorHeight = 120.0;

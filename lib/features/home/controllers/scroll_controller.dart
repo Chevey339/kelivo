@@ -351,7 +351,7 @@ class ChatScrollController {
     _scheduleScrollToBottom(
       animate: shouldAnimate,
       forceAnimation: shouldAnimate,
-      alignFittingContentToTop: !shouldAnimate,
+      alignFittingContentToTop: true,
       duration: shouldAnimate
           ? _userSettleScrollDuration
           : const Duration(milliseconds: 250),
@@ -399,10 +399,12 @@ class ChatScrollController {
       if (_disposed) return;
       if (_isCodeBlockInteractionActive) return;
       if (generation != _bottomScrollGeneration) return;
-      if (_pendingBottomScrollRequiresAutoStick &&
-          layoutWaitFrames > 0 &&
-          (!_positionTracker.hasCurrentVisibleRange ||
-              _pendingBottomScrollAlignFittingContentToTop)) {
+      final shouldWaitForLayout = _pendingBottomScrollAlignFittingContentToTop
+          ? (_pendingBottomScrollRequiresAutoStick ||
+                !_positionTracker.hasCurrentVisibleRange)
+          : (_pendingBottomScrollRequiresAutoStick &&
+                !_positionTracker.hasCurrentVisibleRange);
+      if (layoutWaitFrames > 0 && shouldWaitForLayout) {
         _runAfterNextFrame(() => flush(layoutWaitFrames: layoutWaitFrames - 1));
         return;
       }
