@@ -106,6 +106,7 @@ class ChatScrollController {
   bool _autoStickBottomMaintenanceActive = false;
   bool _autoStickBottomMaintenancePending = false;
   bool _autoStickBottomMaintenancePendingAlignFittingContentToTop = true;
+  bool _keyboardContentLiftActive = false;
   bool _disposed = false;
   bool _userPointerDown = false;
   int _codeBlockInteractionDepth = 0;
@@ -150,12 +151,36 @@ class ChatScrollController {
     return _positionTracker.isAtBottom;
   }
 
-  bool get shouldLiftContentForKeyboardInset =>
+  bool get _canMaintainKeyboardContentLift =>
       _autoStickToBottom &&
       !_autoStickSuspendedByUser &&
+      !_autoStickSuspendedByExplicitNavigation &&
       !_isUserScrolling &&
-      !_positionTracker.isUserScrolling &&
-      _positionTracker.isAtBottom;
+      !_positionTracker.isUserScrolling;
+
+  bool get shouldLiftContentForKeyboardInset =>
+      _canMaintainKeyboardContentLift && _positionTracker.isAtBottom;
+
+  bool get isKeyboardContentLiftActive =>
+      _keyboardContentLiftActive && _canMaintainKeyboardContentLift;
+
+  double contentBottomInsetForKeyboard(double keyboardInset) {
+    final effectiveInset = keyboardInset.clamp(0.0, double.infinity).toDouble();
+    if (effectiveInset <= 1.0) {
+      _keyboardContentLiftActive = false;
+      return 0;
+    }
+    if (_keyboardContentLiftActive) {
+      if (_canMaintainKeyboardContentLift) {
+        return effectiveInset;
+      }
+      _keyboardContentLiftActive = false;
+      return 0;
+    }
+    if (!shouldLiftContentForKeyboardInset) return 0;
+    _keyboardContentLiftActive = true;
+    return effectiveInset;
+  }
 
   /// Check if the scroll view has enough content to scroll.
   ///
@@ -652,6 +677,22 @@ class ChatScrollController {
     );
   }
 
+  void followBottomAfterKeyboardInsetChange() {
+    if (_isCodeBlockInteractionActive) return;
+    if (!_getAutoScrollEnabled()) {
+      _autoStickToBottom = false;
+      _keyboardContentLiftActive = false;
+      return;
+    }
+    if (!isKeyboardContentLiftActive) return;
+    _autoStickToBottom = true;
+    _scheduleScrollToBottom(
+      animate: false,
+      deferUntilNextFrame: true,
+      requireAutoStick: true,
+    );
+  }
+
   /// Temporarily disables automatic bottom following for user-triggered UI
   /// expansion/collapse that can resize message content.
   void suspendAutoStickForUserInteraction({
@@ -806,6 +847,7 @@ class ChatScrollController {
   }
 
   void _cancelPendingBottomScrollsForUser() {
+    _keyboardContentLiftActive = false;
     _autoStickSuspendedByUser = true;
     _cancelPendingBottomScrollMotion();
     _readingAnchorIndex = null;

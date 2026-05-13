@@ -642,10 +642,8 @@ class _HomePageState extends State<HomePage>
   Widget _buildMobileBody(BuildContext context, ColorScheme cs) {
     final bottomContentPadding = _controller.inputBarHeight + 16;
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    final contentBottomInset =
-        _controller.scrollCtrl.shouldLiftContentForKeyboardInset
-        ? keyboardInset
-        : 0.0;
+    final contentBottomInset = _controller.scrollCtrl
+        .contentBottomInsetForKeyboard(keyboardInset);
 
     return ChatInputOverlayLayout(
       topInset: kToolbarHeight + MediaQuery.paddingOf(context).top,
@@ -819,10 +817,8 @@ class _HomePageState extends State<HomePage>
   Widget _buildTabletBody(BuildContext context, ColorScheme cs) {
     final bottomContentPadding = _controller.inputBarHeight + 16;
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    final contentBottomInset =
-        _controller.scrollCtrl.shouldLiftContentForKeyboardInset
-        ? keyboardInset
-        : 0.0;
+    final contentBottomInset = _controller.scrollCtrl
+        .contentBottomInsetForKeyboard(keyboardInset);
 
     return ChatInputOverlayLayout(
       topInset: kToolbarHeight + MediaQuery.paddingOf(context).top,

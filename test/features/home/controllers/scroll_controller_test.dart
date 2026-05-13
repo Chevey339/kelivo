@@ -1772,6 +1772,59 @@ void main() {
       chatScrollController.dispose();
     });
 
+    testWidgets('键盘弹出缩短视口后保持内容顶起资格直到用户滚动', (tester) async {
+      const messageCount = 12;
+      const bottomAnchorHeight = 120.0;
+      final bottomAnchorAlignment = 1 - bottomAnchorHeight / _harnessHeight;
+      final scrollControllers = ChatIndexedScrollControllers();
+      final chatScrollController = ChatScrollController(
+        indexedControllers: scrollControllers,
+        onStateChanged: () {},
+        getShouldAutoStickToBottom: () => true,
+        getAutoScrollEnabled: () => true,
+        getItemCount: () => messageCount,
+        getBottomAnchorAlignment: () => bottomAnchorAlignment,
+      );
+
+      Widget buildHarness({required double height}) {
+        return _IndexedScrollHarness(
+          scrollControllers: scrollControllers,
+          height: height,
+          itemCount: messageCount + 1,
+          initialScrollIndex: messageCount,
+          initialAlignment: bottomAnchorAlignment,
+          itemBuilder: (context, index) {
+            if (index == messageCount) {
+              return const SizedBox(height: bottomAnchorHeight);
+            }
+            return SizedBox(height: 96, child: Text('Message $index'));
+          },
+        );
+      }
+
+      await tester.pumpWidget(buildHarness(height: _harnessHeight));
+      await tester.pump();
+
+      expect(chatScrollController.shouldLiftContentForKeyboardInset, isTrue);
+      expect(chatScrollController.contentBottomInsetForKeyboard(160), 160);
+      expect(chatScrollController.isKeyboardContentLiftActive, isTrue);
+
+      await tester.pumpWidget(buildHarness(height: _harnessHeight - 160));
+      await tester.pump();
+
+      expect(chatScrollController.contentBottomInsetForKeyboard(220), 220);
+      expect(chatScrollController.isKeyboardContentLiftActive, isTrue);
+
+      chatScrollController.handleUserScrollIntent(
+        ChatUserScrollIntentDirection.towardTop,
+      );
+
+      expect(chatScrollController.contentBottomInsetForKeyboard(220), 0);
+      expect(chatScrollController.isKeyboardContentLiftActive, isFalse);
+
+      chatScrollController.dispose();
+    });
+
     testWidgets('滚到底部时底部锚点完整可见', (tester) async {
       const messageCount = 40;
       const bottomAnchorHeight = 120.0;
@@ -3637,12 +3690,14 @@ class _IndexedScrollHarness extends StatelessWidget {
     required this.scrollControllers,
     required this.itemCount,
     required this.itemBuilder,
+    this.height = _harnessHeight,
     this.initialScrollIndex = 0,
     this.initialAlignment = 0,
     this.physics,
   });
 
   final ChatIndexedScrollControllers scrollControllers;
+  final double height;
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
   final int initialScrollIndex;
@@ -3653,7 +3708,7 @@ class _IndexedScrollHarness extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: SizedBox(
-        height: _harnessHeight,
+        height: height,
         child: ScrollablePositionedList.builder(
           itemScrollController: scrollControllers.itemScrollController,
           itemPositionsListener: scrollControllers.itemPositionsListener,

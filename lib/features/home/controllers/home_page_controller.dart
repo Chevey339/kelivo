@@ -1519,9 +1519,8 @@ class HomePageController extends ChangeNotifier {
     if ((_lastViewInsetsBottom - bottomInset).abs() <= 1.0) return;
     final previous = _lastViewInsetsBottom;
     _lastViewInsetsBottom = bottomInset;
-    if (bottomInset > previous &&
-        _scrollCtrl.shouldLiftContentForKeyboardInset) {
-      _scrollCtrl.followBottomAfterContentChange();
+    if (bottomInset > previous && _scrollCtrl.isKeyboardContentLiftActive) {
+      _scrollCtrl.followBottomAfterKeyboardInsetChange();
     }
   }
 
