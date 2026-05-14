@@ -45,11 +45,15 @@ class AssistantSettingsPage extends StatelessWidget {
               size: 22,
               onTap: () async {
                 final assistantProvider = context.read<AssistantProvider>();
+                final insertAtTop = context
+                    .read<SettingsProvider>()
+                    .insertNewAssistantAtTop;
                 final name = await _showAddAssistantSheet(context);
                 if (!context.mounted || name == null) return;
                 final id = await assistantProvider.addAssistant(
                   name: name.trim(),
                   context: context,
+                  insertAtTop: insertAtTop,
                 );
                 if (!context.mounted) return;
                 await Navigator.of(context).push(
@@ -208,9 +212,13 @@ class _AssistantCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             onPressed: (_) async {
               final assistantProvider = context.read<AssistantProvider>();
+              final insertAtTop = context
+                  .read<SettingsProvider>()
+                  .insertNewAssistantAtTop;
               final newId = await assistantProvider.duplicateAssistant(
                 item.id,
                 l10n: l10n,
+                insertAtTop: insertAtTop,
               );
               if (!context.mounted) return;
               if (newId != null) {

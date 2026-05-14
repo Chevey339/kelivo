@@ -3497,6 +3497,18 @@ abstract class AppLocalizations {
   /// **'Delete All Versions'**
   String get messageMoreSheetDeleteAllVersions;
 
+  /// No description provided for @messageMoreSheetSwitchToUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to User'**
+  String get messageMoreSheetSwitchToUser;
+
+  /// No description provided for @messageMoreSheetSwitchToAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Model'**
+  String get messageMoreSheetSwitchToAssistant;
+
   /// No description provided for @reasoningBudgetSheetOff.
   ///
   /// In en, this message translates to:
@@ -6889,6 +6901,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Don\'t collapse assistant list when closing sidebar'**
   String get displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle;
+
+  /// No description provided for @displaySettingsPageInsertNewAssistantAtTopTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Place new and copied assistants at top'**
+  String get displaySettingsPageInsertNewAssistantAtTopTitle;
 
   /// No description provided for @displaySettingsPageShowUpdatesTitle.
   ///
