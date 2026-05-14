@@ -6902,6 +6902,12 @@ abstract class AppLocalizations {
   /// **'Don\'t collapse assistant list when closing sidebar'**
   String get displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle;
 
+  /// No description provided for @displaySettingsPageInsertNewAssistantAtTopTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Place new and copied assistants at top'**
+  String get displaySettingsPageInsertNewAssistantAtTopTitle;
+
   /// No description provided for @displaySettingsPageShowUpdatesTitle.
   ///
   /// In en, this message translates to:

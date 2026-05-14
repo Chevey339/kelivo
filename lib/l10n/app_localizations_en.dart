@@ -3692,6 +3692,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Don\'t collapse assistant list when closing sidebar';
 
   @override
+  String get displaySettingsPageInsertNewAssistantAtTopTitle =>
+      'Place new and copied assistants at top';
+
+  @override
   String get displaySettingsPageShowUpdatesTitle => 'Show Updates';
 
   @override

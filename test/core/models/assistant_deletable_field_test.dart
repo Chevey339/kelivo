@@ -69,4 +69,72 @@ void main() {
       },
     );
   });
+
+  group('Assistant insertion order', () {
+    test('adds new assistant at bottom by default', () async {
+      final provider = await _createProviderWithLoadedAssistants(const [
+        {'id': 'assistant-1', 'name': 'Assistant 1'},
+        {'id': 'assistant-2', 'name': 'Assistant 2'},
+      ]);
+
+      final newId = await provider.addAssistant(name: 'Assistant 3');
+
+      expect(provider.assistants.map((a) => a.id), [
+        'assistant-1',
+        'assistant-2',
+        newId,
+      ]);
+    });
+
+    test('adds new assistant at top when requested', () async {
+      final provider = await _createProviderWithLoadedAssistants(const [
+        {'id': 'assistant-1', 'name': 'Assistant 1'},
+        {'id': 'assistant-2', 'name': 'Assistant 2'},
+      ]);
+
+      final newId = await provider.addAssistant(
+        name: 'Assistant 3',
+        insertAtTop: true,
+      );
+
+      expect(provider.assistants.map((a) => a.id), [
+        newId,
+        'assistant-1',
+        'assistant-2',
+      ]);
+    });
+
+    test('duplicates assistant below source by default', () async {
+      final provider = await _createProviderWithLoadedAssistants(const [
+        {'id': 'assistant-1', 'name': 'Assistant 1'},
+        {'id': 'assistant-2', 'name': 'Assistant 2'},
+      ]);
+
+      final newId = await provider.duplicateAssistant('assistant-2');
+
+      expect(provider.assistants.map((a) => a.id), [
+        'assistant-1',
+        'assistant-2',
+        newId,
+      ]);
+    });
+
+    test('duplicates assistant at top when requested', () async {
+      final provider = await _createProviderWithLoadedAssistants(const [
+        {'id': 'assistant-1', 'name': 'Assistant 1'},
+        {'id': 'assistant-2', 'name': 'Assistant 2'},
+      ]);
+
+      final newId = await provider.duplicateAssistant(
+        'assistant-2',
+        insertAtTop: true,
+      );
+
+      expect(provider.assistants.map((a) => a.id), [
+        newId,
+        'assistant-1',
+        'assistant-2',
+      ]);
+    });
+  });
 }

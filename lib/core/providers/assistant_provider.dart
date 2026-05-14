@@ -215,7 +215,11 @@ class AssistantProvider extends ChangeNotifier {
     ];
   }
 
-  Future<String> addAssistant({String? name, dynamic context}) async {
+  Future<String> addAssistant({
+    String? name,
+    dynamic context,
+    bool insertAtTop = false,
+  }) async {
     final a = Assistant(
       id: const Uuid().v4(),
       name:
@@ -226,7 +230,11 @@ class AssistantProvider extends ChangeNotifier {
       temperature: 0.6,
       topP: null,
     );
-    _assistants.add(a);
+    if (insertAtTop) {
+      _assistants.insert(0, a);
+    } else {
+      _assistants.add(a);
+    }
     await _persist();
     notifyListeners();
     return a.id;
@@ -235,6 +243,7 @@ class AssistantProvider extends ChangeNotifier {
   Future<String?> duplicateAssistant(
     String id, {
     AppLocalizations? l10n,
+    bool insertAtTop = false,
   }) async {
     final idx = _assistants.indexWhere((a) => a.id == id);
     if (idx == -1) return null;
@@ -284,7 +293,11 @@ class AssistantProvider extends ChangeNotifier {
           .toList(),
     );
 
-    _assistants.insert(idx + 1, copy);
+    if (insertAtTop) {
+      _assistants.insert(0, copy);
+    } else {
+      _assistants.insert(idx + 1, copy);
+    }
     await _persist();
     notifyListeners();
     return copy.id;

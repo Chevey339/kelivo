@@ -149,6 +149,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_keep_sidebar_open_on_topic_tap_v1';
   static const String _displayKeepAssistantListExpandedOnSidebarCloseKey =
       'display_keep_assistant_list_expanded_on_sidebar_close_v1';
+  static const String _displayInsertNewAssistantAtTopKey =
+      'display_insert_new_assistant_at_top_v1';
   static const String _displayNewChatOnAssistantSwitchKey =
       'display_new_chat_on_assistant_switch_v1';
   static const String _displayNewChatOnLaunchKey =
@@ -836,6 +838,8 @@ class SettingsProvider extends ChangeNotifier {
     _keepAssistantListExpandedOnSidebarClose =
         prefs.getBool(_displayKeepAssistantListExpandedOnSidebarCloseKey) ??
         false;
+    _insertNewAssistantAtTop =
+        prefs.getBool(_displayInsertNewAssistantAtTopKey) ?? false;
     _requestLogEnabled = prefs.getBool(_requestLogEnabledKey) ?? false;
     await RequestLogger.setEnabled(_requestLogEnabled);
     _flutterLogEnabled = prefs.getBool(_flutterLogEnabledKey) ?? false;
@@ -3480,6 +3484,17 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_displayKeepAssistantListExpandedOnSidebarCloseKey, v);
   }
 
+  // Display: insert newly created or copied assistants at the top.
+  bool _insertNewAssistantAtTop = false;
+  bool get insertNewAssistantAtTop => _insertNewAssistantAtTop;
+  Future<void> setInsertNewAssistantAtTop(bool v) async {
+    if (_insertNewAssistantAtTop == v) return;
+    _insertNewAssistantAtTop = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayInsertNewAssistantAtTopKey, v);
+  }
+
   // Network: request logging (debug)
   bool _requestLogEnabled = false;
   bool get requestLogEnabled => _requestLogEnabled;
@@ -3688,6 +3703,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._keepSidebarOpenOnTopicTap = _keepSidebarOpenOnTopicTap;
     copy._keepAssistantListExpandedOnSidebarClose =
         _keepAssistantListExpandedOnSidebarClose;
+    copy._insertNewAssistantAtTop = _insertNewAssistantAtTop;
     copy._requestLogEnabled = _requestLogEnabled;
     copy._flutterLogEnabled = _flutterLogEnabled;
     copy._logSaveOutput = _logSaveOutput;

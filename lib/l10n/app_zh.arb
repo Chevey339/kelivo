@@ -1210,6 +1210,7 @@
   "displaySettingsPageKeepSidebarOpenOnAssistantTapTitle": "点选助手时不自动关闭侧边栏",
   "displaySettingsPageKeepSidebarOpenOnTopicTapTitle": "点选话题时不自动关闭侧边栏",
   "displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle": "关闭侧边栏时不折叠助手列表",
+  "displaySettingsPageInsertNewAssistantAtTopTitle": "新建和复制助手放到顶部",
   "displaySettingsPageShowUpdatesTitle": "显示更新",
   "displaySettingsPageShowUpdatesSubtitle": "显示应用更新通知",
   "displaySettingsPageMessageNavButtonsTitle": "消息导航按钮",

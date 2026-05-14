@@ -1553,6 +1553,7 @@
   "displaySettingsPageKeepSidebarOpenOnAssistantTapTitle": "Keep sidebar open when selecting assistant",
   "displaySettingsPageKeepSidebarOpenOnTopicTapTitle": "Keep sidebar open when selecting topic",
   "displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle": "Don't collapse assistant list when closing sidebar",
+  "displaySettingsPageInsertNewAssistantAtTopTitle": "Place new and copied assistants at top",
   "displaySettingsPageShowUpdatesTitle": "Show Updates",
   "displaySettingsPageShowUpdatesSubtitle": "Show app update notifications",
   "displaySettingsPageMessageNavButtonsTitle": "Message Navigation Buttons",

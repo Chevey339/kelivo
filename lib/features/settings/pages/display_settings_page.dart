@@ -1911,6 +1911,16 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.ArrowUp,
+                label: l10n.displaySettingsPageInsertNewAssistantAtTopTitle,
+                value: sp.insertNewAssistantAtTop,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setInsertNewAssistantAtTop(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.Shuffle,
                 label: l10n.displaySettingsPageNewChatOnAssistantSwitchTitle,
                 value: sp.newChatOnAssistantSwitch,

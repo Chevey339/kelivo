@@ -3560,6 +3560,9 @@ class AppLocalizationsZh extends AppLocalizations {
       '关闭侧边栏时不折叠助手列表';
 
   @override
+  String get displaySettingsPageInsertNewAssistantAtTopTitle => '新建和复制助手放到顶部';
+
+  @override
   String get displaySettingsPageShowUpdatesTitle => '显示更新';
 
   @override
@@ -8415,6 +8418,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '关闭侧边栏时不折叠助手列表';
 
   @override
+  String get displaySettingsPageInsertNewAssistantAtTopTitle => '新建和复制助手放到顶部';
+
+  @override
   String get displaySettingsPageShowUpdatesTitle => '显示更新';
 
   @override
@@ -13266,6 +13272,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle =>
       '關閉側邊欄時不折疊助手列表';
+
+  @override
+  String get displaySettingsPageInsertNewAssistantAtTopTitle => '新建和複製助手放到頂部';
 
   @override
   String get displaySettingsPageShowUpdatesTitle => '顯示更新';

@@ -129,12 +129,16 @@ class _AddAssistantButtonState extends State<_AddAssistantButton> {
       child: GestureDetector(
         onTap: () async {
           final assistantProvider = context.read<AssistantProvider>();
+          final insertAtTop = context
+              .read<SettingsProvider>()
+              .insertNewAssistantAtTop;
           final name = await _showAddAssistantDesktopDialog(context);
           if (name == null || name.trim().isEmpty) return;
           if (!context.mounted) return;
           await assistantProvider.addAssistant(
             name: name.trim(),
             context: context,
+            insertAtTop: insertAtTop,
           );
         },
         child: Container(
@@ -596,11 +600,15 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                             onCopy: () async {
                               final assistantProvider = context
                                   .read<AssistantProvider>();
+                              final insertAtTop = context
+                                  .read<SettingsProvider>()
+                                  .insertNewAssistantAtTop;
                               final l10n = AppLocalizations.of(context)!;
                               final newId = await assistantProvider
                                   .duplicateAssistant(
                                     widget.item.id,
                                     l10n: l10n,
+                                    insertAtTop: insertAtTop,
                                   );
                               if (!context.mounted) return;
                               if (newId != null) {
