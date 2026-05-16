@@ -12,6 +12,10 @@ class ChatService extends ChangeNotifier {
   static const String _messagesBoxName = 'messages';
   static const String _toolEventsBoxName = 'tool_events_v1';
   static const String _activeStreamingKey = '_active_streaming_ids';
+  static const int defaultInitialMessageMin = 2;
+  static const int defaultInitialMessageMax = 240;
+  static const int defaultInitialTextBudget = 20000;
+  static const int defaultHistoryPageSize = 20;
 
   late Box<Conversation> _conversationsBox;
   late Box<ChatMessage> _messagesBox;
@@ -81,6 +85,17 @@ class ChatService extends ChangeNotifier {
     return _conversationsBox.get(id) ?? _draftConversations[id];
   }
 
+  Conversation? _conversationForMessages(String conversationId) {
+    if (!_initialized) return _draftConversations[conversationId];
+    return _conversationsBox.get(conversationId) ??
+        _draftConversations[conversationId];
+  }
+
+  int getMessageCount(String conversationId) {
+    final conversation = _conversationForMessages(conversationId);
+    return conversation?.messageIds.length ?? 0;
+  }
+
   List<ChatMessage> getMessages(String conversationId) {
     if (!_initialized) return [];
 
@@ -104,6 +119,79 @@ class ChatService extends ChangeNotifier {
     // Cache the result
     _messagesCache[conversationId] = messages;
     return messages;
+  }
+
+  List<ChatMessage> getMessagesRange(
+    String conversationId, {
+    required int start,
+    required int limit,
+  }) {
+    if (!_initialized || limit <= 0) return const <ChatMessage>[];
+
+    final conversation = _conversationForMessages(conversationId);
+    if (conversation == null || conversation.messageIds.isEmpty) {
+      return const <ChatMessage>[];
+    }
+
+    final ids = conversation.messageIds;
+    final safeStart = start.clamp(0, ids.length).toInt();
+    final end = (safeStart + limit).clamp(safeStart, ids.length).toInt();
+    if (safeStart >= end) return const <ChatMessage>[];
+
+    final messages = <ChatMessage>[];
+    for (var i = safeStart; i < end; i++) {
+      final message = _messagesBox.get(ids[i]);
+      if (message != null) messages.add(message);
+    }
+    return messages;
+  }
+
+  List<ChatMessage> getRecentMessages(
+    String conversationId, {
+    int minMessages = defaultInitialMessageMin,
+    int textBudget = defaultInitialTextBudget,
+    int maxMessages = defaultInitialMessageMax,
+  }) {
+    if (!_initialized) return const <ChatMessage>[];
+
+    final conversation = _conversationForMessages(conversationId);
+    if (conversation == null || conversation.messageIds.isEmpty) {
+      return const <ChatMessage>[];
+    }
+
+    final ids = conversation.messageIds;
+    final minCount = minMessages.clamp(1, ids.length).toInt();
+    final maxCount = maxMessages < minCount ? minCount : maxMessages;
+    final budget = textBudget <= 0 ? defaultInitialTextBudget : textBudget;
+
+    var start = ids.length;
+    var loaded = 0;
+    var weight = 0;
+    while (start > 0 && loaded < maxCount) {
+      start--;
+      final message = _messagesBox.get(ids[start]);
+      if (message == null) continue;
+      loaded++;
+      weight += _estimateInitialLoadWeight(message);
+      if (loaded >= minCount && weight >= budget) break;
+    }
+
+    if (loaded.isOdd && start > 0 && loaded < maxCount) {
+      start--;
+    }
+
+    return getMessagesRange(
+      conversationId,
+      start: start,
+      limit: ids.length - start,
+    );
+  }
+
+  int _estimateInitialLoadWeight(ChatMessage message) {
+    final len = message.content.length;
+    if (message.role == 'user') return len < 200 ? 200 : len;
+    if (message.role == 'assistant') return (len * 0.8).round();
+    return len;
   }
 
   Future<Conversation> createConversation({

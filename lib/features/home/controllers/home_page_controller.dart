@@ -1448,7 +1448,15 @@ class HomePageController extends ChangeNotifier {
         postSwitchDelay: _postSwitchScrollDelay,
       );
 
+  bool loadMoreBefore() => _viewModel.loadMoreBefore();
+
   Future<void> scrollToMessageId(String targetId) async {
+    if (_chatController.indexOfCollapsedMessageId(targetId) < 0) {
+      _viewModel.loadUntilMessageVisible(targetId);
+      try {
+        await WidgetsBinding.instance.endOfFrame;
+      } catch (_) {}
+    }
     final index = _chatController.indexOfCollapsedMessageId(targetId);
     if (index < 0) return;
     await _scrollCtrl.scrollToMessageId(targetId: targetId, targetIndex: index);

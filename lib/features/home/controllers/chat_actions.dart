@@ -236,7 +236,9 @@ class ChatActions {
         .buildApiMessages(
           messages: messages,
           versionSelections: _versionSelections,
-          currentConversation: conversation,
+          currentConversation: chatController.conversationForLoadedWindow(
+            conversation,
+          ),
         );
     return messageGenerationService.apiMessagesContainAudioAttachments(
       apiMessages,
@@ -410,7 +412,9 @@ class ChatActions {
           .prepareApiMessagesWithInjections(
             messages: _messages,
             versionSelections: _versionSelections,
-            currentConversation: conversation,
+            currentConversation: chatController.conversationForLoadedWindow(
+              conversation,
+            ),
             settings: settings,
             assistant: assistant,
             assistantId: assistantId,
@@ -594,7 +598,9 @@ class ChatActions {
         .prepareApiMessagesWithInjections(
           messages: regenerationMessages,
           versionSelections: _versionSelections,
-          currentConversation: conversation,
+          currentConversation: chatController.conversationForLoadedWindow(
+            conversation,
+          ),
           settings: settings,
           assistant: assistant,
           assistantId: assistantId,
@@ -685,7 +691,9 @@ class ChatActions {
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
             versionSelections: _versionSelections,
-            currentConversation: conversation,
+            currentConversation: chatController.conversationForLoadedWindow(
+              conversation,
+            ),
             settings: settings,
             assistant: assistant,
             assistantId: assistant?.id,

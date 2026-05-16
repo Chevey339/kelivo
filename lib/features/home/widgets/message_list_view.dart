@@ -117,6 +117,8 @@ class MessageListView extends StatelessWidget {
     this.onToggleTranslation,
     this.onToggleReasoningSegment,
     this.buildPinnedStreamingIndicator,
+    this.hasMoreBefore = false,
+    this.onLoadMoreBefore,
   });
 
   final ScrollController scrollController;
@@ -179,6 +181,8 @@ class MessageListView extends StatelessWidget {
   final void Function(String messageId, int segmentIndex)?
   onToggleReasoningSegment;
   final Widget Function()? buildPinnedStreamingIndicator;
+  final bool hasMoreBefore;
+  final bool Function()? onLoadMoreBefore;
 
   /// Build the context divider widget shown at truncate position.
   Widget _buildContextDivider(BuildContext context) {
@@ -253,9 +257,14 @@ class MessageListView extends StatelessWidget {
               child: list,
             );
 
+            final historyList = NotificationListener<ScrollNotification>(
+              onNotification: _handleScrollNotification,
+              child: observedList,
+            );
+
             return Stack(
               children: [
-                observedList,
+                historyList,
                 if (isPinnedIndicatorActive &&
                     buildPinnedStreamingIndicator != null)
                   buildPinnedStreamingIndicator!(),
@@ -265,6 +274,29 @@ class MessageListView extends StatelessWidget {
         );
       },
     );
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (!hasMoreBefore || onLoadMoreBefore == null) return false;
+    if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification.metrics.pixels > 96) return false;
+
+    final before = notification.metrics.maxScrollExtent;
+    final loaded = onLoadMoreBefore!();
+    if (!loaded) return false;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!scrollController.hasClients) return;
+      final after = scrollController.position.maxScrollExtent;
+      final delta = after - before;
+      if (delta <= 0) return;
+      final target = (scrollController.offset + delta).clamp(
+        scrollController.position.minScrollExtent,
+        scrollController.position.maxScrollExtent,
+      );
+      scrollController.jumpTo(target);
+    });
+    return false;
   }
 
   Widget _buildMessageItem(

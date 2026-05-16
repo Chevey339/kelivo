@@ -189,6 +189,7 @@ class HomeViewModel extends ChangeNotifier {
 
   void _onMessagesChanged() {
     _chatController.invalidateCache();
+    _chatController.refreshLoadedMessageCount();
     notifyListeners();
   }
 
@@ -809,6 +810,22 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool loadMoreBefore() {
+    final loaded = _chatController.loadMoreBefore();
+    if (!loaded) return false;
+    _restoreMessageUiState();
+    notifyListeners();
+    return true;
+  }
+
+  bool loadUntilMessageVisible(String messageId) {
+    final loaded = _chatController.loadUntilMessageVisible(messageId);
+    if (!loaded) return false;
+    _restoreMessageUiState();
+    notifyListeners();
+    return true;
+  }
+
   /// Set selected version for a message group.
   Future<void> setSelectedVersion(String groupId, int version) async {
     final cid = currentConversation?.id;
@@ -892,7 +909,7 @@ class HomeViewModel extends ChangeNotifier {
     // Use collapsed view for counting
     final collapsed = collapseVersions(messages);
     // Map raw truncate index to collapsed start index
-    final int tRaw = currentConversation?.truncateIndex ?? -1;
+    final int tRaw = _chatController.loadedWindowTruncateIndex();
     int startCollapsed = 0;
     if (tRaw > 0) {
       final seen = <String>{};
@@ -1170,7 +1187,9 @@ class HomeViewModel extends ChangeNotifier {
         providerKey: provKey,
         modelId: mdlId,
         messages: msgs,
-        truncateIndex: convo.truncateIndex,
+        truncateIndex: currentConversation?.id == conversationId
+            ? _chatController.loadedWindowTruncateIndex()
+            : convo.truncateIndex,
         locale: locale,
         thinkingBudget: budget,
       );

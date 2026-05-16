@@ -991,7 +991,7 @@ class _HomePageState extends State<HomePage>
 
   /// Map persisted truncateIndex (raw message count) to collapsed index.
   int _computeTruncCollapsedIndex() {
-    final int truncRaw = _controller.currentConversation?.truncateIndex ?? -1;
+    final int truncRaw = _controller.chatController.loadedWindowTruncateIndex();
     if (truncRaw <= 0) return -1;
     final rawMessages = _controller.messages;
     final seen = <String>{};
@@ -1041,6 +1041,8 @@ class _HomePageState extends State<HomePage>
         streamingContentNotifier: _controller.streamingContentNotifier,
         spotlightMessageId: _controller.spotlightMessageId,
         spotlightToken: _controller.spotlightToken,
+        hasMoreBefore: _controller.chatController.hasMoreBefore,
+        onLoadMoreBefore: _controller.loadMoreBefore,
         onVersionChange: (groupId, version) async {
           await _controller.setSelectedVersion(groupId, version);
         },

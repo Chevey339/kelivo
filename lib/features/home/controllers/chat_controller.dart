@@ -30,6 +30,16 @@ class ChatController extends ChangeNotifier {
   List<ChatMessage> _messages = [];
   List<ChatMessage> get messages => _messages;
 
+  /// Index in the persisted conversation where [_messages] starts.
+  int _loadedStartIndex = 0;
+  int get loadedStartIndex => _loadedStartIndex;
+
+  /// Total persisted message count for the current conversation.
+  int _totalMessageCount = 0;
+  int get totalMessageCount => _totalMessageCount;
+
+  bool get hasMoreBefore => _loadedStartIndex > 0;
+
   /// Selected version per message group (groupId -> selected version index).
   Map<String, int> _versionSelections = <String, int>{};
   Map<String, int> get versionSelections => _versionSelections;
@@ -71,10 +81,12 @@ class ChatController extends ChangeNotifier {
   void setCurrentConversation(Conversation? conversation) {
     _currentConversation = conversation;
     if (conversation != null) {
-      _messages = List.of(_chatService.getMessages(conversation.id));
+      _loadInitialMessageWindow(conversation.id);
       _loadVersionSelections();
     } else {
       _messages = [];
+      _loadedStartIndex = 0;
+      _totalMessageCount = 0;
       _versionSelections = <String, int>{};
     }
     notifyListeners();
@@ -117,7 +129,9 @@ class ChatController extends ChangeNotifier {
     );
     _currentConversation = conversation;
     _messages = [];
-    _versionSelections.clear();
+    _loadedStartIndex = 0;
+    _totalMessageCount = 0;
+    _versionSelections = <String, int>{};
     notifyListeners();
     return conversation;
   }
@@ -130,7 +144,7 @@ class ChatController extends ChangeNotifier {
     final convo = _chatService.getConversation(id);
     if (convo != null) {
       _currentConversation = convo;
-      _messages = List.of(_chatService.getMessages(id));
+      _loadInitialMessageWindow(id);
       _loadVersionSelections();
       notifyListeners();
     }
@@ -140,8 +154,92 @@ class ChatController extends ChangeNotifier {
   void clearCurrentConversation() {
     _currentConversation = null;
     _messages = [];
+    _loadedStartIndex = 0;
+    _totalMessageCount = 0;
     _versionSelections.clear();
     notifyListeners();
+  }
+
+  void _loadInitialMessageWindow(String conversationId) {
+    _totalMessageCount = _chatService.getMessageCount(conversationId);
+    _messages = List.of(_chatService.getRecentMessages(conversationId));
+    _loadedStartIndex = (_totalMessageCount - _messages.length)
+        .clamp(0, _totalMessageCount)
+        .toInt();
+  }
+
+  void refreshLoadedMessageCount() {
+    final conversation = _currentConversation;
+    if (conversation == null) {
+      _totalMessageCount = 0;
+      _loadedStartIndex = 0;
+      return;
+    }
+    _totalMessageCount = _chatService.getMessageCount(conversation.id);
+    _loadedStartIndex = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
+  }
+
+  bool loadMoreBefore({int limit = ChatService.defaultHistoryPageSize}) {
+    final conversation = _currentConversation;
+    if (conversation == null || _loadedStartIndex <= 0 || limit <= 0) {
+      return false;
+    }
+
+    final newStart = (_loadedStartIndex - limit)
+        .clamp(0, _loadedStartIndex)
+        .toInt();
+    final older = _chatService.getMessagesRange(
+      conversation.id,
+      start: newStart,
+      limit: _loadedStartIndex - newStart,
+    );
+    if (older.isEmpty) {
+      _loadedStartIndex = 0;
+      return false;
+    }
+
+    _messages = <ChatMessage>[...older, ..._messages];
+    _loadedStartIndex = newStart;
+    notifyListeners();
+    return true;
+  }
+
+  bool loadUntilMessageVisible(
+    String messageId, {
+    int pageSize = ChatService.defaultHistoryPageSize,
+    int maxPages = 256,
+  }) {
+    if (_messages.any((message) => message.id == messageId)) return true;
+
+    var loadedAny = false;
+    var pages = 0;
+    while (hasMoreBefore && pages < maxPages) {
+      final loaded = loadMoreBefore(limit: pageSize);
+      loadedAny = loadedAny || loaded;
+      if (!loaded) break;
+      if (_messages.any((message) => message.id == messageId)) {
+        return true;
+      }
+      pages++;
+    }
+    return loadedAny && _messages.any((message) => message.id == messageId);
+  }
+
+  int loadedWindowTruncateIndex() {
+    final raw = _currentConversation?.truncateIndex ?? -1;
+    if (raw < 0) return -1;
+    if (raw <= _loadedStartIndex) return -1;
+
+    final loadedEnd = _loadedStartIndex + _messages.length;
+    if (raw >= loadedEnd) return _messages.length;
+    return raw - _loadedStartIndex;
+  }
+
+  Conversation conversationForLoadedWindow(Conversation conversation) {
+    if (_currentConversation?.id != conversation.id) return conversation;
+    final localTruncateIndex = loadedWindowTruncateIndex();
+    if (localTruncateIndex == conversation.truncateIndex) return conversation;
+    return conversation.copyWith(truncateIndex: localTruncateIndex);
   }
 
   // ============================================================================
@@ -174,6 +272,7 @@ class ChatController extends ChangeNotifier {
     );
 
     _messages.add(message);
+    _totalMessageCount += 1;
     notifyListeners();
     return message;
   }
@@ -217,6 +316,7 @@ class ChatController extends ChangeNotifier {
   void removeMessagesAfter(int index) {
     if (index < _messages.length - 1) {
       _messages = _messages.sublist(0, index + 1);
+      _totalMessageCount = _loadedStartIndex + _messages.length;
       notifyListeners();
     }
   }
@@ -224,13 +324,41 @@ class ChatController extends ChangeNotifier {
   /// Remove specific message IDs from the list.
   void removeMessageIds(List<String> ids) {
     _messages.removeWhere((m) => ids.contains(m.id));
+    _totalMessageCount = (_totalMessageCount - ids.length)
+        .clamp(0, 1 << 31)
+        .toInt();
+    _loadedStartIndex = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
     notifyListeners();
   }
 
   /// Reload messages from storage.
   void reloadMessages() {
     if (_currentConversation == null) return;
-    _messages = List.of(_chatService.getMessages(_currentConversation!.id));
+    final conversationId = _currentConversation!.id;
+    _totalMessageCount = _chatService.getMessageCount(conversationId);
+    if (_totalMessageCount == 0) {
+      _messages = [];
+      _loadedStartIndex = 0;
+      notifyListeners();
+      return;
+    }
+
+    final visibleCount = _messages.isEmpty
+        ? ChatService.defaultInitialMessageMin
+        : _messages.length;
+    final start = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
+    final maxStart = (_totalMessageCount - visibleCount)
+        .clamp(0, _totalMessageCount)
+        .toInt();
+    final safeStart = start > maxStart ? maxStart : start;
+    _messages = List.of(
+      _chatService.getMessagesRange(
+        conversationId,
+        start: safeStart,
+        limit: _totalMessageCount - safeStart,
+      ),
+    );
+    _loadedStartIndex = safeStart;
     notifyListeners();
   }
 
