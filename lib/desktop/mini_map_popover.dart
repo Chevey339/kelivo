@@ -244,7 +244,7 @@ class _GlassPanel extends StatelessWidget {
   }
 }
 
-class _MiniMapList extends StatelessWidget {
+class _MiniMapList extends StatefulWidget {
   const _MiniMapList({
     required this.messages,
     required this.onTapMessage,
@@ -257,6 +257,27 @@ class _MiniMapList extends StatelessWidget {
   final bool selecting;
   final Set<String>? selectedMessageIds;
   final Listenable? selectionListenable;
+
+  @override
+  State<_MiniMapList> createState() => _MiniMapListState();
+}
+
+class _MiniMapListState extends State<_MiniMapList> {
+  late List<_QaPair> _pairs;
+
+  @override
+  void initState() {
+    super.initState();
+    _pairs = _buildPairs(widget.messages);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MiniMapList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.messages, widget.messages)) {
+      _pairs = _buildPairs(widget.messages);
+    }
+  }
 
   String _oneLine(String s) {
     var t = s
@@ -314,15 +335,15 @@ class _MiniMapList extends StatelessWidget {
             itemBuilder: (context, index) {
               final p = pairs[index];
               final userSelected =
-                  selecting &&
-                  selectedMessageIds != null &&
+                  widget.selecting &&
+                  widget.selectedMessageIds != null &&
                   p.user != null &&
-                  selectedMessageIds!.contains(p.user!.id);
+                  widget.selectedMessageIds!.contains(p.user!.id);
               final assistantSelected =
-                  selecting &&
-                  selectedMessageIds != null &&
+                  widget.selecting &&
+                  widget.selectedMessageIds != null &&
                   p.assistant != null &&
-                  selectedMessageIds!.contains(p.assistant!.id);
+                  widget.selectedMessageIds!.contains(p.assistant!.id);
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
@@ -332,7 +353,7 @@ class _MiniMapList extends StatelessWidget {
                   userSelected: userSelected,
                   assistantSelected: assistantSelected,
                   toOneLine: _oneLine,
-                  onTapMessage: onTapMessage,
+                  onTapMessage: widget.onTapMessage,
                 ),
               );
             },
@@ -341,14 +362,13 @@ class _MiniMapList extends StatelessWidget {
       );
     }
 
-    if (selecting && selectionListenable != null) {
+    if (widget.selecting && widget.selectionListenable != null) {
       return AnimatedBuilder(
-        animation: selectionListenable!,
-        builder: (context, child) => buildList(_buildPairs(messages)),
+        animation: widget.selectionListenable!,
+        builder: (context, child) => buildList(_pairs),
       );
     }
 
-    final pairs = _buildPairs(messages);
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: ConstrainedBox(
@@ -357,9 +377,9 @@ class _MiniMapList extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
           primary: false,
           shrinkWrap: true,
-          itemCount: pairs.length,
+          itemCount: _pairs.length,
           itemBuilder: (context, index) {
-            final p = pairs[index];
+            final p = _pairs[index];
             return Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: _MiniMapRow(
@@ -368,7 +388,7 @@ class _MiniMapList extends StatelessWidget {
                 userSelected: false,
                 assistantSelected: false,
                 toOneLine: _oneLine,
-                onTapMessage: onTapMessage,
+                onTapMessage: widget.onTapMessage,
               ),
             );
           },

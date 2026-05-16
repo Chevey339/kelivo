@@ -353,6 +353,13 @@ class ChatActions {
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
 
+    if (chatController.hasMoreAfter) {
+      final loaded = chatController.loadEndWindow();
+      if (loaded) {
+        viewModel.restoreMessageUiState();
+      }
+    }
+
     if (_hasUnsupportedAudioAttachments(
       messages: _messages,
       conversation: conversation,

@@ -23,6 +23,11 @@ class _FakeLazyChatService extends ChatService {
   int getMessageCount(String conversationId) => _messages.length;
 
   @override
+  int getMessageIndex(String conversationId, String messageId) {
+    return _messages.indexWhere((message) => message.id == messageId);
+  }
+
+  @override
   List<ChatMessage> getRecentMessages(
     String conversationId, {
     int minMessages = 20,
@@ -141,6 +146,30 @@ void main() {
       },
     );
 
+    test('loading older history keeps the visible window bounded', () {
+      messages = List<ChatMessage>.generate(5000, _message);
+      conversation = Conversation(
+        id: 'conversation-1',
+        title: 'Very long chat',
+        messageIds: messages.map((message) => message.id).toList(),
+      );
+      chatService = _FakeLazyChatService(messages);
+      controller.dispose();
+      controller = ChatController(chatService: chatService);
+      controller.setCurrentConversation(conversation);
+
+      for (var i = 0; i < 30; i++) {
+        expect(controller.loadMoreBefore(), isTrue);
+      }
+
+      expect(controller.messages.length, ChatService.defaultLoadedWindowMax);
+      expect(controller.messages.first.id, 'message-4380');
+      expect(controller.messages.last.id, 'message-4739');
+      expect(controller.loadedStartIndex, 4380);
+      expect(controller.hasMoreBefore, isTrue);
+      expect(controller.hasMoreAfter, isTrue);
+    });
+
     test('loading older history stops at the beginning', () {
       controller.setCurrentConversation(conversation);
 
@@ -164,6 +193,84 @@ void main() {
       expect(controller.loadedStartIndex, 0);
       expect(controller.hasMoreBefore, isFalse);
     });
+
+    test('direct navigation loads a bounded target window', () {
+      messages = List<ChatMessage>.generate(5000, _message);
+      conversation = Conversation(
+        id: 'conversation-1',
+        title: 'Very long chat',
+        messageIds: messages.map((message) => message.id).toList(),
+      );
+      chatService = _FakeLazyChatService(messages);
+      controller.dispose();
+      controller = ChatController(chatService: chatService);
+      controller.setCurrentConversation(conversation);
+
+      final visible = controller.loadUntilMessageVisible('message-2500');
+
+      expect(visible, isTrue);
+      expect(chatService.rangeLoadCalls, 1);
+      expect(controller.messages.length, ChatService.defaultLoadedWindowMax);
+      expect(controller.messages.first.id, 'message-2480');
+      expect(controller.messages.last.id, 'message-2839');
+      expect(
+        controller.messages.any((message) => message.id == 'message-2500'),
+        isTrue,
+      );
+      expect(controller.loadedStartIndex, 2480);
+      expect(controller.hasMoreBefore, isTrue);
+      expect(controller.hasMoreAfter, isTrue);
+    });
+
+    test('loading newer history moves the bounded window forward', () {
+      messages = List<ChatMessage>.generate(5000, _message);
+      conversation = Conversation(
+        id: 'conversation-1',
+        title: 'Very long chat',
+        messageIds: messages.map((message) => message.id).toList(),
+      );
+      chatService = _FakeLazyChatService(messages);
+      controller.dispose();
+      controller = ChatController(chatService: chatService);
+      controller.setCurrentConversation(conversation);
+      controller.loadUntilMessageVisible('message-2500');
+
+      final loaded = controller.loadMoreAfter();
+
+      expect(loaded, isTrue);
+      expect(controller.messages.length, ChatService.defaultLoadedWindowMax);
+      expect(controller.messages.first.id, 'message-2500');
+      expect(controller.messages.last.id, 'message-2859');
+      expect(controller.loadedStartIndex, 2500);
+      expect(controller.hasMoreBefore, isTrue);
+      expect(controller.hasMoreAfter, isTrue);
+    });
+
+    test(
+      'mini map source includes all messages without expanding chat window',
+      () {
+        messages = List<ChatMessage>.generate(5000, _message);
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Very long chat',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        controller.setCurrentConversation(conversation);
+
+        final miniMapMessages = controller
+            .allCollapsedMessagesForCurrentConversation();
+
+        expect(miniMapMessages.length, 5000);
+        expect(miniMapMessages.first.id, 'message-0');
+        expect(miniMapMessages.last.id, 'message-4999');
+        expect(controller.messages.length, 20);
+        expect(controller.loadedStartIndex, 4980);
+        expect(chatService.fullLoadCalls, 0);
+      },
+    );
 
     test('maps persisted truncate index into the loaded tail window', () {
       final truncatedConversation = conversation.copyWith(truncateIndex: 90);

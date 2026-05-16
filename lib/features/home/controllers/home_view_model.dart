@@ -818,6 +818,14 @@ class HomeViewModel extends ChangeNotifier {
     return true;
   }
 
+  bool loadMoreAfter() {
+    final loaded = _chatController.loadMoreAfter();
+    if (!loaded) return false;
+    _restoreMessageUiState();
+    notifyListeners();
+    return true;
+  }
+
   bool loadUntilMessageVisible(String messageId) {
     final loaded = _chatController.loadUntilMessageVisible(messageId);
     if (!loaded) return false;

@@ -1023,7 +1023,8 @@ class HomePageController extends ChangeNotifier {
   }
 
   void selectAll() {
-    final collapsed = _chatController.collapsedMessages;
+    final collapsed = _chatController
+        .allCollapsedMessagesForCurrentConversation();
     for (final m in collapsed) {
       if (m.role == 'user' || m.role == 'assistant') {
         _selectedItems.add(m.id);
@@ -1033,7 +1034,8 @@ class HomePageController extends ChangeNotifier {
   }
 
   void toggleSelectAll() {
-    final collapsed = _chatController.collapsedMessages;
+    final collapsed = _chatController
+        .allCollapsedMessagesForCurrentConversation();
     final selectable = collapsed
         .where((m) => m.role == 'user' || m.role == 'assistant')
         .toList();
@@ -1053,7 +1055,8 @@ class HomePageController extends ChangeNotifier {
   }
 
   void invertSelection() {
-    final collapsed = _chatController.collapsedMessages;
+    final collapsed = _chatController
+        .allCollapsedMessagesForCurrentConversation();
     for (final m in collapsed) {
       if (m.role != 'user' && m.role != 'assistant') continue;
       if (_selectedItems.contains(m.id)) {
@@ -1080,10 +1083,15 @@ class HomePageController extends ChangeNotifier {
   List<ChatMessage> _selectedCollapsedMessages() {
     final convo = currentConversation;
     if (convo == null) return const <ChatMessage>[];
+    final storedMessages = _chatService.getMessagesRange(
+      convo.id,
+      start: 0,
+      limit: _chatService.getMessageCount(convo.id),
+    );
     return ChatController.selectedCollapsedMessagesForExport(
-      collapsedMessages: _chatController.collapsedMessages,
+      collapsedMessages: _chatController.collapseVersions(storedMessages),
       selectedIds: _selectedItems,
-      storedMessages: _chatService.getMessages(convo.id),
+      storedMessages: storedMessages,
     );
   }
 
@@ -1441,7 +1449,6 @@ class HomePageController extends ChangeNotifier {
 
   void scrollToBottom({bool animate = true}) =>
       _scrollToBottom(animate: animate);
-  void forceScrollToBottom() => _scrollCtrl.forceScrollToBottom();
   void forceScrollToBottomSoon({bool animate = true}) =>
       _scrollCtrl.forceScrollToBottomSoon(
         animate: animate,
@@ -1450,9 +1457,17 @@ class HomePageController extends ChangeNotifier {
 
   bool loadMoreBefore() => _viewModel.loadMoreBefore();
 
+  bool loadMoreAfter() => _viewModel.loadMoreAfter();
+
+  List<ChatMessage> allCollapsedMessagesForCurrentConversation() =>
+      _chatController.allCollapsedMessagesForCurrentConversation();
+
   Future<void> scrollToMessageId(String targetId) async {
     if (_chatController.indexOfCollapsedMessageId(targetId) < 0) {
-      _viewModel.loadUntilMessageVisible(targetId);
+      final loaded = _viewModel.loadUntilMessageVisible(targetId);
+      if (loaded) {
+        _scrollCtrl.clearObserverCache();
+      }
       try {
         await WidgetsBinding.instance.endOfFrame;
       } catch (_) {}
@@ -1477,7 +1492,25 @@ class HomePageController extends ChangeNotifier {
   }
 
   void scrollToTop({bool animate = true}) {
+    if (_chatController.hasMoreBefore) {
+      final loaded = _chatController.loadStartWindow();
+      if (loaded) {
+        _viewModel.restoreMessageUiState();
+        _scrollCtrl.clearObserverCache();
+      }
+    }
     _scrollCtrl.scrollToTop(animate: animate);
+  }
+
+  void forceScrollToBottom({bool animate = true}) {
+    if (_chatController.hasMoreAfter) {
+      final loaded = _chatController.loadEndWindow();
+      if (loaded) {
+        _viewModel.restoreMessageUiState();
+        _scrollCtrl.clearObserverCache();
+      }
+    }
+    _scrollToBottom(animate: animate);
   }
 
   // ============================================================================

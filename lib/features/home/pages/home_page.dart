@@ -584,23 +584,7 @@ class _HomePageState extends State<HomePage>
       onNewConversation: () async {
         await _controller.createNewConversationAnimated();
       },
-      onOpenMiniMap: () async {
-        final collapsed = _controller.collapseVersions(_controller.messages);
-        String? selectedId;
-        if (PlatformUtils.isDesktop) {
-          selectedId = await showDesktopMiniMapPopover(
-            context,
-            anchorKey: _inputBarKey,
-            messages: collapsed,
-          );
-        } else {
-          selectedId = await showMiniMapSheet(context, collapsed);
-        }
-        if (!mounted) return;
-        if (selectedId != null && selectedId.isNotEmpty) {
-          await _controller.scrollToMessageId(selectedId);
-        }
-      },
+      onOpenMiniMap: _openMiniMap,
       onCreateNewConversation: () async {
         await _controller.createNewConversationAnimated();
         if (mounted) {
@@ -771,7 +755,7 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _openSelectionMiniMap() async {
-    final collapsed = _controller.collapseVersions(_controller.messages);
+    final collapsed = _controller.allCollapsedMessagesForCurrentConversation();
     if (collapsed.isEmpty) return;
 
     if (PlatformUtils.isDesktop &&
@@ -1043,6 +1027,8 @@ class _HomePageState extends State<HomePage>
         spotlightToken: _controller.spotlightToken,
         hasMoreBefore: _controller.chatController.hasMoreBefore,
         onLoadMoreBefore: _controller.loadMoreBefore,
+        hasMoreAfter: _controller.chatController.hasMoreAfter,
+        onLoadMoreAfter: _controller.loadMoreAfter,
         onVersionChange: (groupId, version) async {
           await _controller.setSelectedVersion(groupId, version);
         },
@@ -1160,22 +1146,7 @@ class _HomePageState extends State<HomePage>
         final sp = context.read<SettingsProvider>();
         await sp.setOcrEnabled(!sp.ocrEnabled);
       },
-      onOpenMiniMap: () async {
-        final collapsed = _controller.collapseVersions(_controller.messages);
-        String? selectedId;
-        if (PlatformUtils.isDesktop) {
-          selectedId = await showDesktopMiniMapPopover(
-            context,
-            anchorKey: _inputBarKey,
-            messages: collapsed,
-          );
-        } else {
-          selectedId = await showMiniMapSheet(context, collapsed);
-        }
-        if (selectedId != null && selectedId.isNotEmpty) {
-          await _controller.scrollToMessageId(selectedId);
-        }
-      },
+      onOpenMiniMap: _openMiniMap,
       onPickCamera: _controller.onPickCamera,
       onPickPhotos: _controller.onPickPhotos,
       onUploadFiles: _controller.onPickFiles,
@@ -1239,6 +1210,26 @@ class _HomePageState extends State<HomePage>
         );
       },
     );
+  }
+
+  Future<void> _openMiniMap() async {
+    final collapsed = _controller.allCollapsedMessagesForCurrentConversation();
+    if (collapsed.isEmpty) return;
+
+    String? selectedId;
+    if (PlatformUtils.isDesktop) {
+      selectedId = await showDesktopMiniMapPopover(
+        context,
+        anchorKey: _inputBarKey,
+        messages: collapsed,
+      );
+    } else {
+      selectedId = await showMiniMapSheet(context, collapsed);
+    }
+    if (!mounted) return;
+    if (selectedId != null && selectedId.isNotEmpty) {
+      await _controller.scrollToMessageId(selectedId);
+    }
   }
 
   Widget _wrapWithDropTarget(Widget child) {

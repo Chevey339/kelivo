@@ -16,6 +16,7 @@ class ChatService extends ChangeNotifier {
   static const int defaultInitialMessageMax = 240;
   static const int defaultInitialTextBudget = 20000;
   static const int defaultHistoryPageSize = 20;
+  static const int defaultLoadedWindowMax = 360;
 
   late Box<Conversation> _conversationsBox;
   late Box<ChatMessage> _messagesBox;
@@ -94,6 +95,12 @@ class ChatService extends ChangeNotifier {
   int getMessageCount(String conversationId) {
     final conversation = _conversationForMessages(conversationId);
     return conversation?.messageIds.length ?? 0;
+  }
+
+  int getMessageIndex(String conversationId, String messageId) {
+    final conversation = _conversationForMessages(conversationId);
+    if (conversation == null) return -1;
+    return conversation.messageIds.indexOf(messageId);
   }
 
   List<ChatMessage> getMessages(String conversationId) {
