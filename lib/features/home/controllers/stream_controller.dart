@@ -113,14 +113,20 @@ class StreamController {
   // Throttle State
   // ============================================================================
 
-  /// Throttle interval for streaming UI updates.
-  static const Duration _streamThrottleInterval = Duration(milliseconds: 60);
+  /// UI output interval for streaming content.
+  static const Duration _streamThrottleInterval = Duration(milliseconds: 50);
+  static const int _streamSmoothMinCount = 2;
+  static const int _streamSmoothBaseCount = 40;
+  static const int _streamSmoothMaxCount = 240;
+  static const double _streamSmoothPickRate = 0.1;
+  static const int _streamSmoothMoveAverageLength = 10;
 
   /// Throttle timers per message ID.
   final Map<String, Timer?> _streamThrottleTimers = <String, Timer?>{};
 
-  /// Pending content to be applied on next throttle tick.
-  final Map<String, String> _pendingStreamContent = <String, String>{};
+  /// Per-message smooth output state.
+  final Map<String, _StreamSmoothState> _streamSmoothStates =
+      <String, _StreamSmoothState>{};
 
   /// Delay before sanitizing inline base64 images.
   static const Duration _inlineImageSanitizeDelay = Duration(milliseconds: 120);
@@ -467,51 +473,102 @@ class StreamController {
     int? cachedTokens,
     int? durationMs,
   }) {
-    _pendingStreamContent[messageId] = content;
+    final state = _streamSmoothStates.putIfAbsent(
+      messageId,
+      _StreamSmoothState.new,
+    );
+    state
+      ..conversationId = conversationId
+      ..targetContent = content
+      ..totalTokens = totalTokens
+      ..contentSplitOffsets = contentSplitOffsets
+      ..reasoningCountAtSplit = reasoningCountAtSplit
+      ..toolCountAtSplit = toolCountAtSplit
+      ..promptTokens = promptTokens
+      ..completionTokens = completionTokens
+      ..cachedTokens = cachedTokens
+      ..durationMs = durationMs
+      ..updateMessageInList = updateMessageInList;
 
     // Ensure notifier exists for this message
     streamingContentNotifier.getNotifier(messageId);
 
     _streamThrottleTimers[messageId] ??= Timer.periodic(
       _streamThrottleInterval,
-      (_) {
-        final pending = _pendingStreamContent[messageId];
-        if (pending != null && getCurrentConversationId() == conversationId) {
-          // Use lightweight notifier instead of full page rebuild
-          streamingContentNotifier.updateContent(
-            messageId,
-            pending,
-            totalTokens,
-            contentSplitOffsets: contentSplitOffsets,
-            reasoningCountAtSplit: reasoningCountAtSplit,
-            toolCountAtSplit: toolCountAtSplit,
-            promptTokens: promptTokens,
-            completionTokens: completionTokens,
-            cachedTokens: cachedTokens,
-            durationMs: durationMs,
-          );
-          // Also update the message list data (without triggering rebuild)
-          updateMessageInList(messageId, pending, totalTokens);
-          onStreamTick?.call();
-        }
-      },
+      (_) => _flushSmoothStreamTick(messageId),
     );
+  }
+
+  void _flushSmoothStreamTick(String messageId) {
+    final state = _streamSmoothStates[messageId];
+    if (state == null) return;
+    if (getCurrentConversationId() != state.conversationId) return;
+
+    final nextContent = state.takeNextContentSlice(
+      minCount: _streamSmoothMinCount,
+      baseCount: _streamSmoothBaseCount,
+      maxCount: _streamSmoothMaxCount,
+      pickRate: _streamSmoothPickRate,
+      moveAverageLength: _streamSmoothMoveAverageLength,
+    );
+    if (nextContent == null) return;
+
+    _publishSmoothStreamContent(messageId, state, nextContent);
+  }
+
+  void _publishSmoothStreamContent(
+    String messageId,
+    _StreamSmoothState state,
+    String content,
+  ) {
+    streamingContentNotifier.updateContent(
+      messageId,
+      content,
+      state.totalTokens,
+      contentSplitOffsets: state.contentSplitOffsets,
+      reasoningCountAtSplit: state.reasoningCountAtSplit,
+      toolCountAtSplit: state.toolCountAtSplit,
+      promptTokens: state.promptTokens,
+      completionTokens: state.completionTokens,
+      cachedTokens: state.cachedTokens,
+      durationMs: state.durationMs,
+    );
+    state.updateMessageInList?.call(messageId, content, state.totalTokens);
+    onStreamTick?.call();
+  }
+
+  String? _flushPendingStreamUpdate(String messageId) {
+    final state = _streamSmoothStates[messageId];
+    if (state == null) return null;
+    final content = state.flushTargetContent();
+    if (content == null) return state.visibleContent;
+    if (getCurrentConversationId() == state.conversationId) {
+      _publishSmoothStreamContent(messageId, state, content);
+    } else {
+      state.updateMessageInList?.call(messageId, content, state.totalTokens);
+    }
+    return content;
   }
 
   /// Get pending stream content for a message.
   String? getPendingStreamContent(String messageId) =>
-      _pendingStreamContent[messageId];
+      _streamSmoothStates[messageId]?.targetContent;
 
   /// Set pending stream content (used by inline image sanitizer).
   void setPendingStreamContent(String messageId, String content) {
-    _pendingStreamContent[messageId] = content;
+    final state = _streamSmoothStates.putIfAbsent(
+      messageId,
+      _StreamSmoothState.new,
+    );
+    state.targetContent = content;
   }
 
   /// Clean up stream throttle timers for a message.
   void _cleanupStreamTimers(String messageId) {
+    _flushPendingStreamUpdate(messageId);
     _streamThrottleTimers[messageId]?.cancel();
     _streamThrottleTimers.remove(messageId);
-    _pendingStreamContent.remove(messageId);
+    _streamSmoothStates.remove(messageId);
     _inlineImageSanitizeTimers[messageId]?.cancel();
     _inlineImageSanitizeTimers.remove(messageId);
     _inlineImageSanitizing.remove(messageId);
@@ -538,7 +595,7 @@ class StreamController {
       timer?.cancel();
     }
     _streamThrottleTimers.clear();
-    _pendingStreamContent.clear();
+    _streamSmoothStates.clear();
     for (final timer in _inlineImageSanitizeTimers.values) {
       timer?.cancel();
     }
@@ -585,8 +642,8 @@ class StreamController {
               await MarkdownMediaSanitizer.replaceInlineBase64Images(current);
           if (sanitized == current) return;
 
-          // Keep throttled UI updates in sync
-          _pendingStreamContent[messageId] = sanitized;
+          // Keep throttled UI updates in sync.
+          setPendingStreamContent(messageId, sanitized);
           await onSanitized(messageId, sanitized);
         } catch (_) {
           // Swallow errors to avoid crashing streaming UI
@@ -1265,6 +1322,109 @@ class ContentSplitData {
   final List<int> offsets;
   final List<int> reasoningCounts;
   final List<int> toolCounts;
+}
+
+class _StreamSmoothState {
+  String conversationId = '';
+  String targetContent = '';
+  String visibleContent = '';
+  int totalTokens = 0;
+  List<int>? contentSplitOffsets;
+  List<int>? reasoningCountAtSplit;
+  List<int>? toolCountAtSplit;
+  int? promptTokens;
+  int? completionTokens;
+  int? cachedTokens;
+  int? durationMs;
+  void Function(String messageId, String content, int totalTokens)?
+  updateMessageInList;
+  final List<int> _recentPickCounts = <int>[];
+
+  String? takeNextContentSlice({
+    required int minCount,
+    required int baseCount,
+    required int maxCount,
+    required double pickRate,
+    required int moveAverageLength,
+  }) {
+    if (targetContent == visibleContent) return null;
+    if (!targetContent.startsWith(visibleContent)) {
+      visibleContent = targetContent;
+      _recentPickCounts.clear();
+      return visibleContent;
+    }
+
+    final backlog = targetContent.length - visibleContent.length;
+    if (backlog <= 0) return null;
+    final pickCount = _nextPickCount(
+      backlog: backlog,
+      minCount: minCount,
+      baseCount: baseCount,
+      maxCount: maxCount,
+      pickRate: pickRate,
+      moveAverageLength: moveAverageLength,
+    );
+    final nextLength = math.min(
+      targetContent.length,
+      visibleContent.length + pickCount,
+    );
+    visibleContent = targetContent.substring(0, nextLength);
+    return visibleContent;
+  }
+
+  String? flushTargetContent() {
+    if (targetContent == visibleContent) return null;
+    visibleContent = targetContent;
+    _recentPickCounts.clear();
+    return visibleContent;
+  }
+
+  int _nextPickCount({
+    required int backlog,
+    required int minCount,
+    required int baseCount,
+    required int maxCount,
+    required double pickRate,
+    required int moveAverageLength,
+  }) {
+    final rawPick = _rawPickCount(
+      backlog: backlog,
+      minCount: minCount,
+      baseCount: baseCount,
+      maxCount: maxCount,
+      pickRate: pickRate,
+    );
+    _recentPickCounts.add(rawPick);
+    if (_recentPickCounts.length > moveAverageLength) {
+      _recentPickCounts.removeAt(0);
+    }
+
+    final average =
+        _recentPickCounts.reduce((a, b) => a + b) / _recentPickCounts.length;
+    return average.round().clamp(minCount, backlog).toInt();
+  }
+
+  int _rawPickCount({
+    required int backlog,
+    required int minCount,
+    required int baseCount,
+    required int maxCount,
+    required double pickRate,
+  }) {
+    if (backlog <= minCount) return backlog;
+
+    double effectivePickRate;
+    if (backlog < baseCount) {
+      effectivePickRate = pickRate * backlog / baseCount;
+    } else if (backlog >= maxCount) {
+      effectivePickRate = math.max((backlog - baseCount) / backlog, pickRate);
+    } else {
+      final t = (backlog - baseCount) / (maxCount - baseCount);
+      effectivePickRate = pickRate + (0.5 - pickRate) * t;
+    }
+
+    return math.max(minCount, (backlog * effectivePickRate).round());
+  }
 }
 
 // ============================================================================

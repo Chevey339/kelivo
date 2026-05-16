@@ -784,19 +784,24 @@ class ChatActions {
     if (streaming != null) {
       // Mark streaming as ended to allow UI rebuilds again
       streamController.markStreamingEnded(streaming.id);
-
-      await chatService.updateMessage(
-        streaming.id,
-        content: streaming.content,
-        isStreaming: false,
-        totalTokens: streaming.totalTokens,
-      );
+      streamController.cleanupTimers(streaming.id);
 
       final idx = _messages.indexWhere((m) => m.id == streaming!.id);
+      final latestStreaming = idx == -1 ? streaming : _messages[idx];
+
+      await chatService.updateMessage(
+        latestStreaming.id,
+        content: latestStreaming.content,
+        isStreaming: false,
+        totalTokens: latestStreaming.totalTokens,
+      );
+
       if (idx != -1) {
-        _messages[idx] = _messages[idx].copyWith(isStreaming: false);
+        _messages[idx] = latestStreaming.copyWith(isStreaming: false);
         onMessagesChanged?.call();
       }
+
+      streamController.removeStreamingNotifier(streaming.id);
       _setConversationLoading(cid, false);
 
       // Use unified reasoning completion method
@@ -821,7 +826,7 @@ class ChatActions {
       // If streaming output included inline base64 images, sanitize them even on manual cancel
       onScheduleImageSanitize?.call(
         streaming.id,
-        streaming.content,
+        latestStreaming.content,
         immediate: true,
       );
     } else {

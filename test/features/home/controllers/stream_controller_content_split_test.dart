@@ -261,4 +261,202 @@ void main() {
       expect(controller.toolParts[message.id]!.single.loading, isTrue);
     },
   );
+
+  testWidgets('stream UI output is buffered until the smooth ticker fires', (
+    tester,
+  ) async {
+    final settings = SettingsProvider();
+    final updates = <String>[];
+    var listUpdateCount = 0;
+    var tickCount = 0;
+    final smoothController = StreamController(
+      chatService: ChatService(),
+      onStateChanged: () {},
+      getSettingsProvider: () => settings,
+      getCurrentConversationId: () => 'conversation-1',
+      onStreamTick: () => tickCount++,
+    );
+
+    smoothController.markStreamingStarted('assistant-message');
+    smoothController.streamingContentNotifier
+        .getNotifier('assistant-message')
+        .addListener(() {
+          updates.add(
+            smoothController.streamingContentNotifier
+                .getNotifier('assistant-message')
+                .value
+                .content,
+          );
+        });
+
+    smoothController.scheduleThrottledUpdate(
+      'assistant-message',
+      'conversation-1',
+      'abcdefghijklmnopqrstuvwxyz',
+      totalTokens: 26,
+      updateMessageInList: (_, __, ___) => listUpdateCount++,
+    );
+
+    expect(updates, isEmpty);
+    expect(listUpdateCount, 0);
+
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(updates, hasLength(1));
+    expect(updates.single, isNot('abcdefghijklmnopqrstuvwxyz'));
+    expect(updates.single.length, greaterThanOrEqualTo(2));
+    expect(listUpdateCount, 1);
+    expect(tickCount, 1);
+    smoothController.dispose();
+  });
+
+  testWidgets('stream UI output adapts pick count to large backlog', (
+    tester,
+  ) async {
+    final settings = SettingsProvider();
+    final smoothController = StreamController(
+      chatService: ChatService(),
+      onStateChanged: () {},
+      getSettingsProvider: () => settings,
+      getCurrentConversationId: () => 'conversation-1',
+    );
+
+    final contents = <String>[];
+    smoothController.markStreamingStarted('assistant-message');
+    smoothController.streamingContentNotifier
+        .getNotifier('assistant-message')
+        .addListener(() {
+          contents.add(
+            smoothController.streamingContentNotifier
+                .getNotifier('assistant-message')
+                .value
+                .content,
+          );
+        });
+
+    smoothController.scheduleThrottledUpdate(
+      'assistant-message',
+      'conversation-1',
+      'a' * 320,
+      totalTokens: 320,
+      updateMessageInList: (_, __, ___) {},
+    );
+
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(contents, hasLength(1));
+    expect(contents.single.length, greaterThan(40));
+    expect(contents.single.length, lessThan(320));
+    smoothController.dispose();
+  });
+
+  testWidgets('stream UI output does not repeat an unchanged full frame', (
+    tester,
+  ) async {
+    final settings = SettingsProvider();
+    final smoothController = StreamController(
+      chatService: ChatService(),
+      onStateChanged: () {},
+      getSettingsProvider: () => settings,
+      getCurrentConversationId: () => 'conversation-1',
+    );
+
+    final contents = <String>[];
+    smoothController.markStreamingStarted('assistant-message');
+    smoothController.streamingContentNotifier
+        .getNotifier('assistant-message')
+        .addListener(() {
+          contents.add(
+            smoothController.streamingContentNotifier
+                .getNotifier('assistant-message')
+                .value
+                .content,
+          );
+        });
+
+    smoothController.scheduleThrottledUpdate(
+      'assistant-message',
+      'conversation-1',
+      'ok',
+      totalTokens: 2,
+      updateMessageInList: (_, __, ___) {},
+    );
+
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(contents, const ['ok']);
+    smoothController.dispose();
+  });
+
+  testWidgets('cleanup flushes final stream content immediately', (
+    tester,
+  ) async {
+    final settings = SettingsProvider();
+    final smoothController = StreamController(
+      chatService: ChatService(),
+      onStateChanged: () {},
+      getSettingsProvider: () => settings,
+      getCurrentConversationId: () => 'conversation-1',
+    );
+
+    String? latestContent;
+    int latestTokens = 0;
+    var listUpdateCount = 0;
+
+    smoothController.markStreamingStarted('assistant-message');
+    smoothController.streamingContentNotifier
+        .getNotifier('assistant-message')
+        .addListener(() {
+          final data = smoothController.streamingContentNotifier
+              .getNotifier('assistant-message')
+              .value;
+          latestContent = data.content;
+          latestTokens = data.totalTokens;
+        });
+
+    smoothController.scheduleThrottledUpdate(
+      'assistant-message',
+      'conversation-1',
+      'final answer',
+      totalTokens: 11,
+      updateMessageInList: (_, __, ___) => listUpdateCount++,
+    );
+
+    smoothController.cleanupTimers('assistant-message');
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(latestContent, 'final answer');
+    expect(latestTokens, 11);
+    expect(listUpdateCount, 1);
+    smoothController.dispose();
+  });
+
+  testWidgets('cleanup flushes pending content into the list callback', (
+    tester,
+  ) async {
+    final settings = SettingsProvider();
+    final smoothController = StreamController(
+      chatService: ChatService(),
+      onStateChanged: () {},
+      getSettingsProvider: () => settings,
+      getCurrentConversationId: () => 'conversation-1',
+    );
+
+    String listContent = '';
+    smoothController.markStreamingStarted('assistant-message');
+    smoothController.scheduleThrottledUpdate(
+      'assistant-message',
+      'conversation-1',
+      'visible after cancel',
+      totalTokens: 18,
+      updateMessageInList: (_, content, ___) => listContent = content,
+    );
+
+    smoothController.cleanupTimers('assistant-message');
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(listContent, 'visible after cancel');
+    smoothController.dispose();
+  });
 }
