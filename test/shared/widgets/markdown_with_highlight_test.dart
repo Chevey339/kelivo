@@ -1,4 +1,5 @@
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
@@ -36,9 +37,83 @@ const _transparentPngDataUrl =
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwAD'
     'hgGAWjR9awAAAABJRU5ErkJggg==';
 
+const _transparentPngBytes = <int>[
+  0x89,
+  0x50,
+  0x4E,
+  0x47,
+  0x0D,
+  0x0A,
+  0x1A,
+  0x0A,
+  0x00,
+  0x00,
+  0x00,
+  0x0D,
+  0x49,
+  0x48,
+  0x44,
+  0x52,
+  0x00,
+  0x00,
+  0x00,
+  0x01,
+  0x00,
+  0x00,
+  0x00,
+  0x01,
+  0x08,
+  0x06,
+  0x00,
+  0x00,
+  0x00,
+  0x1F,
+  0x15,
+  0xC4,
+  0x89,
+  0x00,
+  0x00,
+  0x00,
+  0x0D,
+  0x49,
+  0x44,
+  0x41,
+  0x54,
+  0x78,
+  0xDA,
+  0x63,
+  0x64,
+  0xFE,
+  0xCF,
+  0x50,
+  0x0F,
+  0x00,
+  0x03,
+  0x86,
+  0x01,
+  0x80,
+  0x5A,
+  0x34,
+  0x7D,
+  0x6B,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x49,
+  0x45,
+  0x4E,
+  0x44,
+  0xAE,
+  0x42,
+  0x60,
+  0x82,
+];
+
 Widget _markdownHarness(
   String text, {
   double? width,
+  bool streaming = false,
   Map<String, Object>? preferences,
 }) {
   SharedPreferences.setMockInitialValues(preferences ?? {});
@@ -49,12 +124,15 @@ Widget _markdownHarness(
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: width == null
-            ? MarkdownWithCodeHighlight(text: text)
+            ? MarkdownWithCodeHighlight(text: text, streaming: streaming)
             : Align(
                 alignment: Alignment.topLeft,
                 child: SizedBox(
                   width: width,
-                  child: MarkdownWithCodeHighlight(text: text),
+                  child: MarkdownWithCodeHighlight(
+                    text: text,
+                    streaming: streaming,
+                  ),
                 ),
               ),
       ),
@@ -76,7 +154,7 @@ Widget _streamingMarkdownHarness(
         body: ValueListenableBuilder<String>(
           valueListenable: text,
           builder: (context, value, _) =>
-              MarkdownWithCodeHighlight(text: value),
+              MarkdownWithCodeHighlight(text: value, streaming: true),
         ),
       ),
     ),
@@ -278,6 +356,226 @@ void main() {
   });
 
   testWidgets(
+    'MarkdownWithCodeHighlight does not add a bottom fade while streaming',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          'This answer is still arriving without a message-local fade mask.',
+          streaming: true,
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('streaming-markdown-tail-fade')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets('MarkdownWithCodeHighlight debounces long streaming reparses', (
+    tester,
+  ) async {
+    final baseLines = List<String>.filled(
+      260,
+      'streaming markdown keeps a rich rendered frame',
+    ).join('\n');
+    final text = ValueNotifier<String>('$baseLines\nold-tail');
+
+    await tester.pumpWidget(_streamingMarkdownHarness(text));
+    await tester.pump();
+
+    expect(find.textContaining('old-tail'), findsOneWidget);
+
+    text.value = '$baseLines\nnew-tail';
+    await tester.pump(const Duration(milliseconds: 20));
+
+    expect(find.textContaining('old-tail'), findsOneWidget);
+    expect(find.textContaining('new-tail'), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 180));
+
+    expect(find.textContaining('new-tail'), findsOneWidget);
+  });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps refreshing during continuous long streams',
+    (tester) async {
+      final baseLines = List<String>.filled(
+        260,
+        'continuous streaming markdown keeps rendered frames moving',
+      ).join('\n');
+      final text = ValueNotifier<String>('$baseLines\nframe-0');
+
+      await tester.pumpWidget(_streamingMarkdownHarness(text));
+      await tester.pump();
+
+      text.value = '$baseLines\nframe-1';
+      await tester.pump(const Duration(milliseconds: 50));
+      text.value = '$baseLines\nframe-2';
+      await tester.pump(const Duration(milliseconds: 50));
+      text.value = '$baseLines\nframe-3';
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 40));
+
+      expect(find.textContaining('frame-3'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight caps rendered rows for streaming long tables',
+    (tester) async {
+      final rows = List<String>.generate(40, (i) => '| row$i | value$i |');
+      await tester.pumpWidget(
+        _markdownHarness(
+          '''
+| Name | Value |
+| - | - |
+${rows.join('\n')}
+''',
+          width: 360,
+          streaming: true,
+        ),
+      );
+      await tester.pump();
+
+      final body = find.byKey(const ValueKey('markdown-table-body'));
+      final plainText = tester
+          .widgetList<RichText>(
+            find.descendant(of: body, matching: find.byType(RichText)),
+          )
+          .map((widget) => widget.text.toPlainText())
+          .join('\n');
+
+      expect(plainText, contains('row0'));
+      expect(plainText, contains('row29'));
+      expect(plainText, isNot(contains('row30')));
+      expect(plainText, isNot(contains('row39')));
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps an unfinished streaming table row in table layout',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          '''
+| 水果 | 颜色 | 价格 |
+| - | - | - |
+| 苹果 | 红色 | ¥9.9 |
+| 葡萄 🍇 | 紫色 | ¥12.8
+''',
+          width: 360,
+          streaming: true,
+        ),
+      );
+      await tester.pump();
+
+      final body = find.byKey(const ValueKey('markdown-table-body'));
+      expect(body, findsOneWidget);
+      final tableText = tester
+          .widgetList<RichText>(
+            find.descendant(of: body, matching: find.byType(RichText)),
+          )
+          .map((widget) => widget.text.toPlainText())
+          .join('\n');
+      final allText = tester
+          .widgetList<RichText>(find.byType(RichText))
+          .map((widget) => widget.text.toPlainText())
+          .join('\n');
+
+      expect(tableText, contains('葡萄 🍇'));
+      expect(tableText, contains('¥12.8'));
+      expect(allText, isNot(contains('| 葡萄 🍇 | 紫色 | ¥12.8')));
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps a just-started streaming table row in table layout',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          '''
+| 水果 | 颜色 | 价格 |
+| - | - | - |
+| 葡萄 🍇''',
+          width: 360,
+          streaming: true,
+        ),
+      );
+      await tester.pump();
+
+      final body = find.byKey(const ValueKey('markdown-table-body'));
+      expect(body, findsOneWidget);
+      final tableText = tester
+          .widgetList<RichText>(
+            find.descendant(of: body, matching: find.byType(RichText)),
+          )
+          .map((widget) => widget.text.toPlainText())
+          .join('\n');
+      final allText = tester
+          .widgetList<RichText>(find.byType(RichText))
+          .map((widget) => widget.text.toPlainText())
+          .join('\n');
+
+      expect(tableText, contains('葡萄 🍇'));
+      expect(allText, isNot(contains('| 葡萄 🍇')));
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight shows cached Mermaid bitmap while streaming',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      const code = 'graph TD\nA-->B';
+      MermaidImageCache.put(code, Uint8List.fromList(_transparentPngBytes));
+
+      await tester.pumpWidget(
+        _markdownHarness('''
+```mermaid
+$code
+''', streaming: true),
+      );
+      await tester.pump();
+
+      expect(find.byType(Image), findsOneWidget);
+      expect(find.textContaining('graph TD'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps Mermaid bitmap visible while streaming code grows',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      const firstCode = 'graph TD\nA-->B';
+      MermaidImageCache.put(
+        firstCode,
+        Uint8List.fromList(_transparentPngBytes),
+      );
+      final text = ValueNotifier<String>('''
+```mermaid
+$firstCode
+''');
+
+      await tester.pumpWidget(_streamingMarkdownHarness(text));
+      await tester.pump();
+
+      expect(find.byType(Image), findsOneWidget);
+
+      text.value =
+          '''
+```mermaid
+$firstCode
+B-->C
+''';
+      await tester.pump();
+
+      expect(find.byType(Image), findsOneWidget);
+      expect(find.textContaining('graph TD'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps table body clipped inside shell',
     (tester) async {
       await tester.pumpWidget(
@@ -447,6 +745,19 @@ $$
   );
 
   testWidgets(
+    'MarkdownWithCodeHighlight keeps unfinished streaming dollar math in math layout',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'公式正在输出：$E = mc', streaming: true),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining(r'$E = mc'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps table pipes from widening dollar math',
     (tester) async {
       await tester.pumpWidget(
@@ -562,6 +873,57 @@ final price = "$12";
 
     expect(identical(before, after), isTrue);
   });
+
+  testWidgets(
+    'SelectableHighlightView skips synchronous highlighting on demand',
+    (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SelectableHighlightView(
+              'final value = 1;',
+              language: 'dart',
+              theme: {},
+              enableHighlight: false,
+            ),
+          ),
+        ),
+      );
+
+      final richText = tester.widget<SelectableText>(
+        find.byType(SelectableText),
+      );
+      final root = richText.textSpan!;
+      final children = root.children ?? const <InlineSpan>[];
+
+      expect(children, hasLength(1));
+      expect((children.single as TextSpan).text, 'final value = 1;');
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight highlights unclosed code fences after streaming stops',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('''
+```dart
+final value = 1;
+'''),
+      );
+      await tester.pump();
+
+      final richText = tester.widget<SelectableText>(
+        find.descendant(
+          of: find.byType(SelectableHighlightView),
+          matching: find.byType(SelectableText),
+        ),
+      );
+      final root = richText.textSpan!;
+      final children = root.children ?? const <InlineSpan>[];
+
+      expect(children.length, greaterThan(1));
+    },
+  );
 
   testWidgets('MarkdownWithCodeHighlight renders code block actions', (
     tester,

@@ -1785,6 +1785,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         text: visualContent,
         onCitationTap: (id) => _handleCitationTap(id),
         baseStyle: TextStyle(fontSize: baseAssistant, height: 1.5),
+        streaming: widget.message.isStreaming,
       );
     } else {
       assistantContent = Text(
@@ -1812,7 +1813,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
     return RepaintBoundary(
       child: SelectionArea(
-        key: ValueKey('assistant_${widget.message.id}_$visualContent'),
+        key: ValueKey('assistant_${widget.message.id}'),
         child: DefaultTextStyle.merge(
           style: TextStyle(fontSize: baseAssistant, height: 1.5),
           child: assistantContent,
@@ -3807,6 +3808,7 @@ class _ChainOfThoughtReasoningStepState
           child: MarkdownWithCodeHighlight(
             text: text.isNotEmpty ? text : '…',
             baseStyle: const TextStyle(fontSize: 12.5, height: 1.32),
+            streaming: widget.step.loading,
           ),
         );
       }
@@ -6049,6 +6051,7 @@ class _ReasoningSectionState extends State<_ReasoningSection>
           child: MarkdownWithCodeHighlight(
             text: text.isNotEmpty ? text : '…',
             baseStyle: baseStyle,
+            streaming: isLoading,
           ),
         );
       }
