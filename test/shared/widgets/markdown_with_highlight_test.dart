@@ -31,6 +31,11 @@ List<WidgetSpan> _widgetSpansFromRichText(WidgetTester tester) {
   return spans;
 }
 
+const _transparentPngDataUrl =
+    'data:image/png;base64,'
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwAD'
+    'hgGAWjR9awAAAABJRU5ErkJggg==';
+
 Widget _markdownHarness(
   String text, {
   double? width,
@@ -113,6 +118,44 @@ void main() {
       '"Bob, Jr.","said ""hello""",',
     );
   });
+
+  testWidgets('MarkdownWithCodeHighlight applies markdown image dimensions', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness('![42x24]($_transparentPngDataUrl)', width: 160),
+    );
+    await tester.pump();
+
+    final image = tester.widget<Image>(find.byType(Image));
+    expect(image.width, 42.0);
+    expect(image.height, 24.0);
+  });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps undimensioned images full width',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('![]($_transparentPngDataUrl)', width: 160),
+      );
+      await tester.pump();
+
+      final image = tester.widget<Image>(find.byType(Image));
+      expect(image.width, 160.0);
+      expect(image.height, isNull);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight shows broken image for invalid source',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness('![42x24](missing-image.png)'));
+      await tester.pump();
+
+      expect(find.byIcon(Icons.broken_image), findsOneWidget);
+      expect(find.byType(Image), findsNothing);
+    },
+  );
 
   testWidgets('MarkdownWithCodeHighlight renders mobile table export action', (
     tester,
