@@ -315,6 +315,28 @@ class ChatController extends ChangeNotifier {
     );
   }
 
+  List<ChatMessage> allMessagesForCurrentConversationContext() {
+    final conversation = _currentConversation;
+    if (conversation == null) return const <ChatMessage>[];
+    return messagesForCompleteHistoryContext(conversation);
+  }
+
+  List<ChatMessage> messagesForCompleteHistoryContext(
+    Conversation conversation,
+  ) {
+    return _chatService.getMessagesRange(
+      conversation.id,
+      start: 0,
+      limit: _chatService.getMessageCount(conversation.id),
+    );
+  }
+
+  Conversation conversationForCompleteHistoryContext(
+    Conversation conversation,
+  ) {
+    return _chatService.getConversation(conversation.id) ?? conversation;
+  }
+
   List<ChatMessage> _trimWindowEnd(List<ChatMessage> messages) {
     if (messages.length <= ChatService.defaultLoadedWindowMax) return messages;
     return messages.sublist(0, ChatService.defaultLoadedWindowMax);

@@ -1,0 +1,9 @@
+# This directory contains regression tests for specific bugs.
+#
+# Naming convention: issue_<number>_<brief_description>_test.dart
+# Example: issue_42_nested_bold_italic_test.dart
+#
+# Each test file should include:
+# - A comment with link to the GitHub issue
+# - Original bug description
+# - Test that reproduces the bug (should pass after fix)

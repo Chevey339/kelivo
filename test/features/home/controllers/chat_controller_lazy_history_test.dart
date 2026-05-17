@@ -286,6 +286,25 @@ void main() {
     });
 
     test(
+      'model context source keeps complete history and persisted truncate index',
+      () {
+        final truncatedConversation = conversation.copyWith(truncateIndex: 30);
+        controller.setCurrentConversation(truncatedConversation);
+
+        final contextMessages = controller
+            .allMessagesForCurrentConversationContext();
+        final contextConversation = controller
+            .conversationForCompleteHistoryContext(truncatedConversation);
+
+        expect(contextMessages, messages);
+        expect(contextConversation.truncateIndex, 30);
+        expect(controller.messages, messages.sublist(80));
+        expect(controller.loadedStartIndex, 80);
+        expect(chatService.fullLoadCalls, 0);
+      },
+    );
+
+    test(
       'creating a draft conversation clears the loaded history window',
       () async {
         controller.setCurrentConversation(conversation);

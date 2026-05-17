@@ -142,6 +142,36 @@ class ChatActions {
     return messageGenerationService.isReasoningEnabled(budget);
   }
 
+  Conversation _conversationForMessageContext(
+    Conversation conversation,
+    List<ChatMessage> messages, {
+    int? maxRawTruncateIndex,
+  }) {
+    final completeConversation = chatController
+        .conversationForCompleteHistoryContext(conversation);
+    return conversationForMessageContext(
+      conversation: completeConversation,
+      messages: messages,
+      maxRawTruncateIndex: maxRawTruncateIndex,
+    );
+  }
+
+  @visibleForTesting
+  static Conversation conversationForMessageContext({
+    required Conversation conversation,
+    required List<ChatMessage> messages,
+    int? maxRawTruncateIndex,
+  }) {
+    final rawTruncateIndex = conversation.truncateIndex;
+    if (maxRawTruncateIndex != null && rawTruncateIndex > maxRawTruncateIndex) {
+      return conversation.copyWith(truncateIndex: -1);
+    }
+    if (rawTruncateIndex < 0 || rawTruncateIndex <= messages.length) {
+      return conversation;
+    }
+    return conversation.copyWith(truncateIndex: -1);
+  }
+
   @visibleForTesting
   static StreamSubscription<T> listenSequentiallyToStream<T>({
     required Stream<T> stream,
@@ -218,6 +248,7 @@ class ChatActions {
     required String providerKey,
     required String modelId,
     ChatInputData? pendingInput,
+    int? maxRawTruncateIndex,
   }) {
     if (_supportsAudioAttachmentsForProvider(
       settings,
@@ -236,8 +267,10 @@ class ChatActions {
         .buildApiMessages(
           messages: messages,
           versionSelections: _versionSelections,
-          currentConversation: chatController.conversationForLoadedWindow(
+          currentConversation: _conversationForMessageContext(
             conversation,
+            messages,
+            maxRawTruncateIndex: maxRawTruncateIndex,
           ),
         );
     return messageGenerationService.apiMessagesContainAudioAttachments(
@@ -360,13 +393,16 @@ class ChatActions {
       }
     }
 
+    final existingContextMessages = chatController
+        .messagesForCompleteHistoryContext(conversation);
     if (_hasUnsupportedAudioAttachments(
-      messages: _messages,
+      messages: existingContextMessages,
       conversation: conversation,
       settings: settings,
       providerKey: providerKey,
       modelId: modelId,
       pendingInput: input,
+      maxRawTruncateIndex: null,
     )) {
       return ChatActionResult.error('audio_attachment_unsupported');
     }
@@ -415,12 +451,15 @@ class ChatActions {
     messageGenerationService.onFileProcessingFinished =
         onFileProcessingFinished;
     try {
+      final apiContextMessages = chatController
+          .messagesForCompleteHistoryContext(conversation);
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
-            messages: _messages,
+            messages: apiContextMessages,
             versionSelections: _versionSelections,
-            currentConversation: chatController.conversationForLoadedWindow(
+            currentConversation: _conversationForMessageContext(
               conversation,
+              apiContextMessages,
             ),
             settings: settings,
             assistant: assistant,
@@ -498,7 +537,10 @@ class ChatActions {
 
     await cancelStreaming(conversation);
 
-    final idx = _messages.indexWhere((m) => m.id == message.id);
+    final completeMessages = chatController.messagesForCompleteHistoryContext(
+      conversation,
+    );
+    final idx = completeMessages.indexWhere((m) => m.id == message.id);
     if (idx < 0) {
       return ChatActionResult.error('message_not_found');
     }
@@ -506,7 +548,7 @@ class ChatActions {
     // Calculate versioning using service
     final versioning = messageGenerationService.calculateRegenerationVersioning(
       message: message,
-      messages: _messages,
+      messages: completeMessages,
       assistantAsNewReply: assistantAsNewReply,
     );
     if (versioning.lastKeep < 0) {
@@ -527,7 +569,7 @@ class ChatActions {
     final modelId = modelConfig.modelId!;
 
     final projectedMessages = ChatActions.projectMessagesForRegenerationContext(
-      messages: _messages,
+      messages: completeMessages,
       lastKeep: versioning.lastKeep,
       targetGroupId: versioning.targetGroupId,
     );
@@ -537,13 +579,14 @@ class ChatActions {
       settings: settings,
       providerKey: providerKey,
       modelId: modelId,
+      maxRawTruncateIndex: versioning.lastKeep,
     )) {
       return ChatActionResult.error('audio_attachment_unsupported');
     }
 
     if (settings.regenerateDeleteTrailingMessages) {
       final removeIds = await messageGenerationService.removeTrailingMessages(
-        messages: _messages,
+        messages: completeMessages,
         lastKeep: versioning.lastKeep,
         targetGroupId: versioning.targetGroupId,
       );
@@ -577,7 +620,7 @@ class ChatActions {
     );
 
     final regenerationMessages = ChatActions.buildRegenerationMessages(
-      messages: _messages,
+      messages: completeMessages,
       lastKeep: versioning.lastKeep,
       targetGroupId: versioning.targetGroupId,
       assistantPlaceholder: assistantMessage,
@@ -605,8 +648,10 @@ class ChatActions {
         .prepareApiMessagesWithInjections(
           messages: regenerationMessages,
           versionSelections: _versionSelections,
-          currentConversation: chatController.conversationForLoadedWindow(
+          currentConversation: _conversationForMessageContext(
             conversation,
+            regenerationMessages,
+            maxRawTruncateIndex: versioning.lastKeep,
           ),
           settings: settings,
           assistant: assistant,
@@ -663,8 +708,19 @@ class ChatActions {
       askUserService = contextProvider.read<AskUserInteractionService>();
     } catch (_) {}
 
-    final idx = _messages.indexWhere((candidate) => candidate.id == message.id);
-    if (idx < 0 || message.role != 'assistant') {
+    final visibleIndex = _messages.indexWhere(
+      (candidate) => candidate.id == message.id,
+    );
+    if (visibleIndex < 0 || message.role != 'assistant') {
+      return ChatActionResult.error('message_not_found');
+    }
+    final completeMessages = chatController.messagesForCompleteHistoryContext(
+      conversation,
+    );
+    final contextIndex = completeMessages.indexWhere(
+      (candidate) => candidate.id == message.id,
+    );
+    if (contextIndex < 0) {
       return ChatActionResult.error('message_not_found');
     }
 
@@ -678,8 +734,10 @@ class ChatActions {
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
 
-    final streamingMessage = _messages[idx].copyWith(isStreaming: true);
-    _messages[idx] = streamingMessage;
+    final streamingMessage = _messages[visibleIndex].copyWith(
+      isStreaming: true,
+    );
+    _messages[visibleIndex] = streamingMessage;
     await chatService.updateMessage(streamingMessage.id, isStreaming: true);
     onMessagesChanged?.call();
     _setConversationLoading(conversation.id, true);
@@ -692,14 +750,15 @@ class ChatActions {
         );
 
     try {
-      final apiContextMessages = List<ChatMessage>.of(_messages);
-      apiContextMessages[idx] = streamingMessage.copyWith(content: '');
+      final apiContextMessages = List<ChatMessage>.of(completeMessages);
+      apiContextMessages[contextIndex] = streamingMessage.copyWith(content: '');
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
             versionSelections: _versionSelections,
-            currentConversation: chatController.conversationForLoadedWindow(
+            currentConversation: _conversationForMessageContext(
               conversation,
+              apiContextMessages,
             ),
             settings: settings,
             assistant: assistant,
@@ -736,7 +795,7 @@ class ChatActions {
       return ChatActionResult.success(streamingMessage);
     } catch (e) {
       streamController.markStreamingEnded(streamingMessage.id);
-      _messages[idx] = streamingMessage.copyWith(isStreaming: false);
+      _messages[visibleIndex] = streamingMessage.copyWith(isStreaming: false);
       await chatService.updateMessage(streamingMessage.id, isStreaming: false);
       _setConversationLoading(conversation.id, false);
       return ChatActionResult.error(e.toString());
