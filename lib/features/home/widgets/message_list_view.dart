@@ -1,4 +1,9 @@
+import 'dart:async';
+
+import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollview_observer/scrollview_observer.dart';
 
@@ -193,8 +198,22 @@ class MessageListView extends StatefulWidget {
 }
 
 class _MessageListViewState extends State<MessageListView> {
+  static const double _streamingUpdateDeferBottomTolerance = 24.0;
+
   bool _historyLoadScheduled = false;
+  final ValueNotifier<bool> _deferStreamingMessageUpdates = ValueNotifier<bool>(
+    false,
+  );
   DateTime? _lastHistoryLoadAt;
+  Timer? _scrollIdleTimer;
+  bool _pointerScrollActivityCheckScheduled = false;
+
+  @override
+  void dispose() {
+    _scrollIdleTimer?.cancel();
+    _deferStreamingMessageUpdates.dispose();
+    super.dispose();
+  }
 
   /// Build the context divider widget shown at truncate position.
   Widget _buildContextDivider(BuildContext context) {
@@ -275,9 +294,18 @@ class _MessageListViewState extends State<MessageListView> {
               child: observedList,
             );
 
+            final userScrollAwareList = Listener(
+              onPointerSignal: (event) {
+                if (event is PointerScrollEvent) {
+                  _schedulePointerScrollActivityCheck();
+                }
+              },
+              child: historyList,
+            );
+
             return Stack(
               children: [
-                historyList,
+                userScrollAwareList,
                 if (widget.isPinnedIndicatorActive &&
                     widget.buildPinnedStreamingIndicator != null)
                   widget.buildPinnedStreamingIndicator!(),
@@ -291,6 +319,35 @@ class _MessageListViewState extends State<MessageListView> {
 
   bool _handleScrollNotification(ScrollNotification notification) {
     if (notification.metrics.axis != Axis.vertical) return false;
+    if (notification is ScrollUpdateNotification) {
+      if (notification.dragDetails != null) {
+        _handleUserScrollActivity(notification.metrics);
+      }
+      if (_deferStreamingMessageUpdates.value) {
+        _scheduleStreamingUpdateResume();
+      }
+    } else if (notification is OverscrollNotification) {
+      if (notification.dragDetails != null) {
+        _handleUserScrollActivity(notification.metrics);
+      }
+      if (_deferStreamingMessageUpdates.value) {
+        _scheduleStreamingUpdateResume();
+      }
+    } else if (notification is ScrollStartNotification &&
+        notification.dragDetails != null) {
+      _handleUserScrollActivity(notification.metrics);
+    }
+    if (notification is UserScrollNotification) {
+      final shouldDefer = notification.direction != ScrollDirection.idle;
+      if (shouldDefer) {
+        _handleUserScrollActivity(notification.metrics);
+      } else {
+        _scheduleStreamingUpdateResume();
+      }
+    }
+    if (notification is ScrollEndNotification) {
+      _scheduleStreamingUpdateResume();
+    }
     if (_historyLoadScheduled) return false;
     final now = DateTime.now();
     final last = _lastHistoryLoadAt;
@@ -319,6 +376,56 @@ class _MessageListViewState extends State<MessageListView> {
       );
     }
     return false;
+  }
+
+  void _schedulePointerScrollActivityCheck() {
+    if (_pointerScrollActivityCheckScheduled) return;
+    _pointerScrollActivityCheckScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pointerScrollActivityCheckScheduled = false;
+      if (!mounted) return;
+      _handleUserScrollActivity();
+    });
+  }
+
+  void _handleUserScrollActivity([ScrollMetrics? metrics]) {
+    if (_isWithinStreamingAutoFollowBand(metrics)) {
+      _resumeStreamingMessageUpdates();
+      return;
+    }
+    _setDeferStreamingMessageUpdates(true);
+    _scheduleStreamingUpdateResume();
+  }
+
+  bool _isWithinStreamingAutoFollowBand([ScrollMetrics? metrics]) {
+    if (metrics != null) {
+      return metrics.maxScrollExtent - metrics.pixels <=
+          _streamingUpdateDeferBottomTolerance;
+    }
+    if (!widget.scrollController.hasClients) return true;
+    final position = widget.scrollController.position;
+    return position.maxScrollExtent - position.pixels <=
+        _streamingUpdateDeferBottomTolerance;
+  }
+
+  void _setDeferStreamingMessageUpdates(bool value) {
+    if (_deferStreamingMessageUpdates.value == value) return;
+    _deferStreamingMessageUpdates.value = value;
+  }
+
+  void _scheduleStreamingUpdateResume() {
+    _scrollIdleTimer?.cancel();
+    _scrollIdleTimer = Timer(
+      const Duration(milliseconds: 160),
+      _resumeStreamingMessageUpdates,
+    );
+  }
+
+  void _resumeStreamingMessageUpdates() {
+    _scrollIdleTimer?.cancel();
+    _scrollIdleTimer = null;
+    if (!mounted || !_deferStreamingMessageUpdates.value) return;
+    _deferStreamingMessageUpdates.value = false;
   }
 
   void _scheduleHistoryLoad({
@@ -549,9 +656,10 @@ class _MessageListViewState extends State<MessageListView> {
     required bool isProcessingFiles,
     required List<String> suggestions,
   }) {
-    return ValueListenableBuilder<StreamingContentData>(
-      valueListenable: widget.streamingContentNotifier!.getNotifier(message.id),
-      builder: (context, data, child) {
+    return _StreamingMessageDataGate(
+      notifier: widget.streamingContentNotifier!.getNotifier(message.id),
+      deferUpdates: _deferStreamingMessageUpdates,
+      builder: (context, data, deferUpdates) {
         // Use streaming content if available, otherwise fall back to message content
         final displayContent = data.content.isNotEmpty
             ? data.content
@@ -606,6 +714,7 @@ class _MessageListViewState extends State<MessageListView> {
             total: total,
             isProcessingFiles: isProcessingFiles,
             suggestions: suggestions,
+            enableStreamingTextMotion: !deferUpdates,
           ),
         );
       },
@@ -627,9 +736,11 @@ class _MessageListViewState extends State<MessageListView> {
     required int total,
     required bool isProcessingFiles,
     required List<String> suggestions,
+    bool enableStreamingTextMotion = true,
   }) {
     return ChatMessageWidget(
       message: message,
+      enableStreamingTextMotion: enableStreamingTextMotion,
       versionIndex: selectedIdx,
       versionCount: total > 0 ? total : 1,
       onPrevVersion: (selectedIdx > 0)
@@ -769,4 +880,108 @@ class _MessageListViewState extends State<MessageListView> {
                 widget.onRecoveredAskUserAnswer!(message, part, result),
     );
   }
+}
+
+class _StreamingMessageDataGate extends StatefulWidget {
+  const _StreamingMessageDataGate({
+    required this.notifier,
+    required this.deferUpdates,
+    required this.builder,
+  });
+
+  final ValueNotifier<StreamingContentData> notifier;
+  final ValueListenable<bool> deferUpdates;
+  final Widget Function(
+    BuildContext context,
+    StreamingContentData data,
+    bool deferUpdates,
+  )
+  builder;
+
+  @override
+  State<_StreamingMessageDataGate> createState() =>
+      _StreamingMessageDataGateState();
+}
+
+class _StreamingMessageDataGateState extends State<_StreamingMessageDataGate> {
+  late StreamingContentData _visibleData;
+  late bool _deferUpdates;
+  bool _hasDeferredUpdate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _visibleData = widget.notifier.value;
+    _deferUpdates = widget.deferUpdates.value;
+    widget.notifier.addListener(_handleNotifierChanged);
+    widget.deferUpdates.addListener(_handleDeferUpdatesChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _StreamingMessageDataGate oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.notifier != widget.notifier) {
+      oldWidget.notifier.removeListener(_handleNotifierChanged);
+      _visibleData = widget.notifier.value;
+      _hasDeferredUpdate = false;
+      widget.notifier.addListener(_handleNotifierChanged);
+    }
+
+    if (oldWidget.deferUpdates != widget.deferUpdates) {
+      oldWidget.deferUpdates.removeListener(_handleDeferUpdatesChanged);
+      _deferUpdates = widget.deferUpdates.value;
+      widget.deferUpdates.addListener(_handleDeferUpdatesChanged);
+    }
+  }
+
+  void _handleNotifierChanged() {
+    if (_deferUpdates) {
+      _hasDeferredUpdate = true;
+      return;
+    }
+    if (_visibleData == widget.notifier.value) return;
+    setState(() {
+      _visibleData = widget.notifier.value;
+      _hasDeferredUpdate = false;
+    });
+  }
+
+  void _handleDeferUpdatesChanged() {
+    final next = widget.deferUpdates.value;
+    if (_deferUpdates == next) return;
+    if (!next) {
+      _deferUpdates = next;
+      final hadDeferredUpdate = _hasDeferredUpdate;
+      _applyLatestDeferredData();
+      if (!hadDeferredUpdate && _visibleData == widget.notifier.value) {
+        setState(() {});
+      }
+      return;
+    }
+    setState(() => _deferUpdates = next);
+  }
+
+  void _applyLatestDeferredData({bool notify = true}) {
+    if (!_hasDeferredUpdate && _visibleData == widget.notifier.value) return;
+    if (!notify) {
+      _visibleData = widget.notifier.value;
+      _hasDeferredUpdate = false;
+      return;
+    }
+    setState(() {
+      _visibleData = widget.notifier.value;
+      _hasDeferredUpdate = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    widget.notifier.removeListener(_handleNotifierChanged);
+    widget.deferUpdates.removeListener(_handleDeferUpdatesChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      widget.builder(context, _visibleData, _deferUpdates);
 }

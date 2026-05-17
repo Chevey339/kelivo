@@ -632,6 +632,7 @@ class ChatMessageWidget extends StatefulWidget {
   final bool hideStreamingIndicator;
   // Whether files are currently being processed
   final bool isProcessingFiles;
+  final bool enableStreamingTextMotion;
   final List<String> suggestions;
   final ValueChanged<String>? onSuggestionTap;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
@@ -675,6 +676,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.toolCountAtSplit,
     this.hideStreamingIndicator = false,
     this.isProcessingFiles = false,
+    this.enableStreamingTextMotion = true,
     this.suggestions = const <String>[],
     this.onSuggestionTap,
     this.onRecoveredAskUserAnswer,
@@ -1802,6 +1804,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     assistantContent = _StreamingAssistantMessageMotion(
       enabled:
           widget.message.isStreaming &&
+          widget.enableStreamingTextMotion &&
           !reduceMotion &&
           visualContent.isNotEmpty,
       child: assistantContent,
@@ -3328,6 +3331,7 @@ class _StreamingAssistantMessageMotion extends StatelessWidget {
     if (!enabled) return child;
 
     return AnimatedSize(
+      key: const ValueKey('streaming-assistant-message-motion'),
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
       alignment: Alignment.topLeft,
