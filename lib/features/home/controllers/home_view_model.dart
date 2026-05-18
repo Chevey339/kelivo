@@ -1212,9 +1212,7 @@ class HomeViewModel extends ChangeNotifier {
         providerKey: provKey,
         modelId: mdlId,
         messages: msgs,
-        truncateIndex: currentConversation?.id == conversationId
-            ? _chatController.loadedWindowTruncateIndex()
-            : convo.truncateIndex,
+        truncateIndex: convo.truncateIndex,
         locale: locale,
         thinkingBudget: budget,
       );

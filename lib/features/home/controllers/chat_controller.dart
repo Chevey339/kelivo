@@ -405,6 +405,42 @@ class ChatController extends ChangeNotifier {
     return message;
   }
 
+  /// Add an already-persisted tail message to the loaded window.
+  ///
+  /// ChatService appends new message versions and streaming placeholders to the
+  /// persisted conversation before callers update UI state. This method keeps
+  /// [_messages] as a real contiguous persisted range instead of mixing a tail
+  /// message into an older loaded window.
+  bool appendPersistedTailMessage(ChatMessage message) {
+    final conversation = _currentConversation;
+    if (conversation == null || message.conversationId != conversation.id) {
+      return false;
+    }
+
+    final wasAtTail =
+        _loadedStartIndex + _messages.length >= _totalMessageCount;
+    _totalMessageCount = _chatService.getMessageCount(conversation.id);
+
+    if (!wasAtTail) {
+      return loadEndWindow();
+    }
+
+    final existingIndex = _messages.indexWhere((m) => m.id == message.id);
+    if (existingIndex >= 0) {
+      _messages[existingIndex] = message;
+    } else {
+      _messages.add(message);
+    }
+
+    final overflow = _messages.length - ChatService.defaultLoadedWindowMax;
+    if (overflow > 0) {
+      _messages = _messages.sublist(overflow);
+      _loadedStartIndex += overflow;
+    }
+    notifyListeners();
+    return false;
+  }
+
   /// Update a message in the list.
   void updateMessageInList(String messageId, ChatMessage updatedMessage) {
     final index = _messages.indexWhere((m) => m.id == messageId);

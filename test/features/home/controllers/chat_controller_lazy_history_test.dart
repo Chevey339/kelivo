@@ -57,6 +57,11 @@ class _FakeLazyChatService extends ChatService {
   Map<String, int> getVersionSelections(String conversationId) =>
       const <String, int>{};
 
+  ChatMessage appendPersistedMessage(ChatMessage message) {
+    _messages.add(message);
+    return message;
+  }
+
   @override
   Future<Conversation> createDraftConversation({
     String? title,
@@ -244,6 +249,57 @@ void main() {
       expect(controller.loadedStartIndex, 2500);
       expect(controller.hasMoreBefore, isTrue);
       expect(controller.hasMoreAfter, isTrue);
+    });
+
+    test(
+      'appending a persisted tail message from a middle window loads the tail',
+      () {
+        messages = List<ChatMessage>.generate(5000, _message);
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Very long chat',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        controller.setCurrentConversation(conversation);
+        controller.loadUntilMessageVisible('message-2500');
+
+        final appended = chatService.appendPersistedMessage(_message(5000));
+        controller.appendPersistedTailMessage(appended);
+
+        expect(controller.messages.length, ChatService.defaultLoadedWindowMax);
+        expect(controller.messages.first.id, 'message-4641');
+        expect(controller.messages.last.id, 'message-5000');
+        expect(controller.loadedStartIndex, 4641);
+        expect(controller.totalMessageCount, 5001);
+        expect(controller.hasMoreAfter, isFalse);
+      },
+    );
+
+    test('appending a persisted tail message trims a full tail window', () {
+      messages = List<ChatMessage>.generate(5000, _message);
+      conversation = Conversation(
+        id: 'conversation-1',
+        title: 'Very long chat',
+        messageIds: messages.map((message) => message.id).toList(),
+      );
+      chatService = _FakeLazyChatService(messages);
+      controller.dispose();
+      controller = ChatController(chatService: chatService);
+      controller.setCurrentConversation(conversation);
+      controller.loadEndWindow();
+
+      final appended = chatService.appendPersistedMessage(_message(5000));
+      controller.appendPersistedTailMessage(appended);
+
+      expect(controller.messages.length, ChatService.defaultLoadedWindowMax);
+      expect(controller.messages.first.id, 'message-4641');
+      expect(controller.messages.last.id, 'message-5000');
+      expect(controller.loadedStartIndex, 4641);
+      expect(controller.totalMessageCount, 5001);
+      expect(controller.hasMoreAfter, isFalse);
     });
 
     test(

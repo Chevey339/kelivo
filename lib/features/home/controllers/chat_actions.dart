@@ -413,7 +413,9 @@ class ChatActions {
       input: input,
       assistant: assistant,
     );
-    _messages.add(userMessage);
+    if (chatController.appendPersistedTailMessage(userMessage)) {
+      viewModel.restoreMessageUiState();
+    }
     onMessagesChanged?.call();
 
     _setConversationLoading(conversation.id, true);
@@ -430,7 +432,9 @@ class ChatActions {
     // so that MessageListView can detect it's streaming on first render
     streamController.markStreamingStarted(assistantMessage.id);
 
-    _messages.add(assistantMessage);
+    if (chatController.appendPersistedTailMessage(assistantMessage)) {
+      viewModel.restoreMessageUiState();
+    }
     onMessagesChanged?.call();
 
     // Reset tool parts and initialize reasoning
@@ -591,7 +595,8 @@ class ChatActions {
         targetGroupId: versioning.targetGroupId,
       );
       if (removeIds.isNotEmpty) {
-        _messages.removeWhere((message) => removeIds.contains(message.id));
+        chatController.reloadMessages();
+        viewModel.restoreMessageUiState();
         onMessagesChanged?.call();
       }
     }
@@ -626,7 +631,9 @@ class ChatActions {
       assistantPlaceholder: assistantMessage,
     );
 
-    _messages.add(assistantMessage);
+    if (chatController.appendPersistedTailMessage(assistantMessage)) {
+      viewModel.restoreMessageUiState();
+    }
     onMessagesChanged?.call();
 
     _setConversationLoading(conversation.id, true);

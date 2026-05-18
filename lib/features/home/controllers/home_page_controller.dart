@@ -859,7 +859,9 @@ class HomePageController extends ChangeNotifier {
     );
     if (newMsg == null) return;
 
-    messages.add(newMsg);
+    if (_chatController.appendPersistedTailMessage(newMsg)) {
+      _viewModel.restoreMessageUiState();
+    }
     final gid = (newMsg.groupId ?? newMsg.id);
     versionSelections[gid] = newMsg.version;
     notifyListeners();
