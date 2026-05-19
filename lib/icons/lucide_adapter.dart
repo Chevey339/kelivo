@@ -9,6 +9,8 @@ class Lucide {
   static const IconData Menu = lucide.LucideIcons.menu;
   static const IconData MessageCirclePlus =
       lucide.LucideIcons.messageCirclePlus;
+  static const IconData MessageCircleDashed =
+      lucide.LucideIcons.messageCircleDashed;
   static const IconData Box = lucide.LucideIcons.box;
   static const IconData Globe = lucide.LucideIcons.earth;
   static const IconData Earth = lucide.LucideIcons.earth;
@@ -72,6 +74,7 @@ class Lucide {
   static const IconData Check = lucide.LucideIcons.check;
   static const IconData Trash2 = lucide.LucideIcons.trash2;
   static const IconData HeartOff = lucide.LucideIcons.heartOff;
+  static const IconData HatGlasses = lucide.LucideIcons.hatGlasses;
   static const IconData MessageCircle = lucide.LucideIcons.messageCircle;
   static const IconData NotebookTabs = lucide.LucideIcons.notebookTabs;
   static const IconData Vibrate = lucide.LucideIcons.vibrate;

@@ -8,6 +8,12 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
 
 class ChatService extends ChangeNotifier {
+  static const int defaultInitialMessageMin = 20;
+  static const int defaultInitialMessageMax = 240;
+  static const int defaultInitialTextBudget = 20000;
+  static const int defaultHistoryPageSize = 20;
+  static const int defaultLoadedWindowMax = 360;
+
   static const String _conversationsBoxName = 'conversations';
   static const String _messagesBoxName = 'messages';
   static const String _toolEventsBoxName = 'tool_events_v1';
@@ -22,6 +28,10 @@ class ChatService extends ChangeNotifier {
   String? _currentConversationId;
   final Map<String, List<ChatMessage>> _messagesCache = {};
   final Map<String, Conversation> _draftConversations = {};
+  final Set<String> _temporaryConversationIds = <String>{};
+  final Map<String, List<Map<String, dynamic>>> _temporaryToolEvents =
+      <String, List<Map<String, dynamic>>>{};
+  final Map<String, String> _temporaryGeminiThoughtSigs = <String, String>{};
 
   // Localized default title for new conversations; set by UI on startup.
   String _defaultConversationTitle = 'New Chat';
@@ -34,6 +44,10 @@ class ChatService extends ChangeNotifier {
   bool get initialized => _initialized;
 
   String? get currentConversationId => _currentConversationId;
+
+  bool isTemporaryConversation(String? id) {
+    return id != null && _temporaryConversationIds.contains(id);
+  }
 
   Future<void> init() async {
     if (_initialized) return;
@@ -81,6 +95,38 @@ class ChatService extends ChangeNotifier {
     return _conversationsBox.get(id) ?? _draftConversations[id];
   }
 
+  Conversation? _conversationForMessages(String conversationId) {
+    if (!_initialized) return _draftConversations[conversationId];
+    return _conversationsBox.get(conversationId) ??
+        _draftConversations[conversationId];
+  }
+
+  int getMessageCount(String conversationId) {
+    final conversation = _conversationForMessages(conversationId);
+    return conversation?.messageIds.length ?? 0;
+  }
+
+  int getMessageIndex(String conversationId, String messageId) {
+    final conversation = _conversationForMessages(conversationId);
+    if (conversation == null) return -1;
+    return conversation.messageIds.indexOf(messageId);
+  }
+
+  ChatMessage? _messageForConversation(
+    String conversationId,
+    String messageId,
+  ) {
+    if (_temporaryConversationIds.contains(conversationId)) {
+      final messages = _messagesCache[conversationId];
+      if (messages == null) return null;
+      for (final message in messages) {
+        if (message.id == messageId) return message;
+      }
+      return null;
+    }
+    return _messagesBox.get(messageId);
+  }
+
   List<ChatMessage> getMessages(String conversationId) {
     if (!_initialized) return [];
 
@@ -90,12 +136,14 @@ class ChatService extends ChangeNotifier {
     }
 
     // Load from storage
-    final conversation = _conversationsBox.get(conversationId);
+    final conversation =
+        _conversationsBox.get(conversationId) ??
+        _draftConversations[conversationId];
     if (conversation == null) return [];
 
     final messages = <ChatMessage>[];
     for (final messageId in conversation.messageIds) {
-      final message = _messagesBox.get(messageId);
+      final message = _messageForConversation(conversationId, messageId);
       if (message != null) {
         messages.add(message);
       }
@@ -106,11 +154,85 @@ class ChatService extends ChangeNotifier {
     return messages;
   }
 
+  List<ChatMessage> getMessagesRange(
+    String conversationId, {
+    required int start,
+    required int limit,
+  }) {
+    if (!_initialized || limit <= 0) return const <ChatMessage>[];
+
+    final conversation = _conversationForMessages(conversationId);
+    if (conversation == null || conversation.messageIds.isEmpty) {
+      return const <ChatMessage>[];
+    }
+
+    final ids = conversation.messageIds;
+    final safeStart = start.clamp(0, ids.length).toInt();
+    final end = (safeStart + limit).clamp(safeStart, ids.length).toInt();
+    if (safeStart >= end) return const <ChatMessage>[];
+
+    final messages = <ChatMessage>[];
+    for (var i = safeStart; i < end; i++) {
+      final message = _messageForConversation(conversationId, ids[i]);
+      if (message != null) messages.add(message);
+    }
+    return messages;
+  }
+
+  List<ChatMessage> getRecentMessages(
+    String conversationId, {
+    int minMessages = defaultInitialMessageMin,
+    int textBudget = defaultInitialTextBudget,
+    int maxMessages = defaultInitialMessageMax,
+  }) {
+    if (!_initialized) return const <ChatMessage>[];
+
+    final conversation = _conversationForMessages(conversationId);
+    if (conversation == null || conversation.messageIds.isEmpty) {
+      return const <ChatMessage>[];
+    }
+
+    final ids = conversation.messageIds;
+    final minCount = minMessages.clamp(1, ids.length).toInt();
+    final maxCount = maxMessages < minCount ? minCount : maxMessages;
+    final budget = textBudget <= 0 ? defaultInitialTextBudget : textBudget;
+
+    var start = ids.length;
+    var loaded = 0;
+    var weight = 0;
+    while (start > 0 && loaded < maxCount) {
+      start--;
+      final message = _messageForConversation(conversationId, ids[start]);
+      if (message == null) continue;
+      loaded++;
+      weight += _estimateInitialLoadWeight(message);
+      if (loaded >= minCount && weight >= budget) break;
+    }
+
+    if (loaded.isOdd && start > 0 && loaded < maxCount) {
+      start--;
+    }
+
+    return getMessagesRange(
+      conversationId,
+      start: start,
+      limit: ids.length - start,
+    );
+  }
+
+  int _estimateInitialLoadWeight(ChatMessage message) {
+    final len = message.content.length;
+    if (message.role == 'user') return len < 200 ? 200 : len;
+    if (message.role == 'assistant') return (len * 0.8).round();
+    return len;
+  }
+
   Future<Conversation> createConversation({
     String? title,
     String? assistantId,
   }) async {
     if (!_initialized) await init();
+    _discardTemporaryConversation(_currentConversationId);
 
     final conversation = Conversation(
       title: title ?? _defaultConversationTitle,
@@ -127,16 +249,36 @@ class ChatService extends ChangeNotifier {
   Future<Conversation> createDraftConversation({
     String? title,
     String? assistantId,
+    bool temporary = false,
   }) async {
     if (!_initialized) await init();
+    _discardTemporaryConversation(_currentConversationId);
     final conversation = Conversation(
       title: title ?? _defaultConversationTitle,
       assistantId: assistantId,
     );
     _draftConversations[conversation.id] = conversation;
+    if (temporary) {
+      _temporaryConversationIds.add(conversation.id);
+      _messagesCache[conversation.id] = <ChatMessage>[];
+    }
     _currentConversationId = conversation.id;
     notifyListeners();
     return conversation;
+  }
+
+  void _discardTemporaryConversation(String? id) {
+    if (id == null || !_temporaryConversationIds.remove(id)) return;
+    final messages = _messagesCache[id] ?? const <ChatMessage>[];
+    for (final message in messages) {
+      _temporaryToolEvents.remove(message.id);
+      _temporaryGeminiThoughtSigs.remove(message.id);
+    }
+    _draftConversations.remove(id);
+    _messagesCache.remove(id);
+    if (_currentConversationId == id) {
+      _currentConversationId = null;
+    }
   }
 
   Future<void> deleteConversation(String id) async {
@@ -145,6 +287,13 @@ class ChatService extends ChangeNotifier {
     // If it's a draft and never persisted, just drop it.
     if (_draftConversations.containsKey(id)) {
       _draftConversations.remove(id);
+      _temporaryConversationIds.remove(id);
+      final messages = _messagesCache[id] ?? const <ChatMessage>[];
+      for (final message in messages) {
+        _temporaryToolEvents.remove(message.id);
+        _temporaryGeminiThoughtSigs.remove(message.id);
+      }
+      _messagesCache.remove(id);
       if (_currentConversationId == id) {
         _currentConversationId = null;
       }
@@ -642,11 +791,16 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) await init();
 
     var conversation = _conversationsBox.get(conversationId);
+    final temporary = _temporaryConversationIds.contains(conversationId);
     // If conversation doesn't exist yet, persist draft (if any)
     if (conversation == null) {
-      final draft = _draftConversations.remove(conversationId);
+      final draft = temporary
+          ? _draftConversations[conversationId]
+          : _draftConversations.remove(conversationId);
       if (draft != null) {
-        await _conversationsBox.put(draft.id, draft);
+        if (!temporary) {
+          await _conversationsBox.put(draft.id, draft);
+        }
         conversation = draft;
       } else {
         // Create a new one on the fly as a fallback
@@ -673,16 +827,22 @@ class ChatService extends ChangeNotifier {
       version: version,
     );
 
-    await _messagesBox.put(message.id, message);
+    if (!temporary) {
+      await _messagesBox.put(message.id, message);
+    }
 
     // Track streaming state for crash-recovery cleanup
-    if (isStreaming) {
+    if (isStreaming && !temporary) {
       _trackStreamingId(message.id);
     }
 
     conversation.messageIds.add(message.id);
     conversation.updatedAt = DateTime.now();
-    await conversation.save();
+    if (temporary) {
+      _messagesCache.putIfAbsent(conversationId, () => <ChatMessage>[]);
+    } else {
+      await conversation.save();
+    }
 
     // Update cache
     if (_messagesCache.containsKey(conversationId)) {
@@ -711,7 +871,8 @@ class ChatService extends ChangeNotifier {
   }) async {
     if (!_initialized) return;
 
-    final message = _messagesBox.get(messageId);
+    final message =
+        _messagesBox.get(messageId) ?? _cachedTemporaryMessage(messageId);
     if (message == null) return;
 
     final updatedMessage = message.copyWith(
@@ -730,6 +891,12 @@ class ChatService extends ChangeNotifier {
       cachedTokens: cachedTokens ?? message.cachedTokens,
       durationMs: durationMs ?? message.durationMs,
     );
+
+    if (isTemporaryConversation(message.conversationId)) {
+      _replaceCachedMessage(updatedMessage);
+      notifyListeners();
+      return;
+    }
 
     await _messagesBox.put(messageId, updatedMessage);
 
@@ -772,7 +939,8 @@ class ChatService extends ChangeNotifier {
   }) async {
     if (!_initialized) return;
 
-    final message = _messagesBox.get(messageId);
+    final message =
+        _messagesBox.get(messageId) ?? _cachedTemporaryMessage(messageId);
     if (message == null) return;
 
     final updatedMessage = message.copyWith(
@@ -791,6 +959,11 @@ class ChatService extends ChangeNotifier {
       cachedTokens: cachedTokens ?? message.cachedTokens,
       durationMs: durationMs ?? message.durationMs,
     );
+
+    if (isTemporaryConversation(message.conversationId)) {
+      _replaceCachedMessage(updatedMessage);
+      return;
+    }
 
     await _messagesBox.put(messageId, updatedMessage);
 
@@ -811,9 +984,38 @@ class ChatService extends ChangeNotifier {
     // NOTE: Do NOT call notifyListeners() here to avoid UI rebuilds during streaming
   }
 
+  ChatMessage? _cachedTemporaryMessage(String messageId) {
+    for (final entry in _messagesCache.entries) {
+      if (!_temporaryConversationIds.contains(entry.key)) continue;
+      for (final message in entry.value) {
+        if (message.id == messageId) return message;
+      }
+    }
+    return null;
+  }
+
+  bool _isTemporaryMessageId(String messageId) {
+    return _cachedTemporaryMessage(messageId) != null;
+  }
+
+  void _replaceCachedMessage(ChatMessage updatedMessage) {
+    final messages = _messagesCache[updatedMessage.conversationId];
+    if (messages == null) return;
+    final index = messages.indexWhere((m) => m.id == updatedMessage.id);
+    if (index >= 0) {
+      messages[index] = updatedMessage;
+    }
+  }
+
   // Tool events persistence (per assistant message)
   List<Map<String, dynamic>> getToolEvents(String assistantMessageId) {
     if (!_initialized) return const <Map<String, dynamic>>[];
+    if (_isTemporaryMessageId(assistantMessageId)) {
+      return List<Map<String, dynamic>>.from(
+        _temporaryToolEvents[assistantMessageId] ??
+            const <Map<String, dynamic>>[],
+      );
+    }
     final v = _toolEventsBox.get(assistantMessageId);
     if (v is List) {
       return v
@@ -829,6 +1031,12 @@ class ChatService extends ChangeNotifier {
     List<Map<String, dynamic>> events,
   ) async {
     if (!_initialized) await init();
+    if (_isTemporaryMessageId(assistantMessageId)) {
+      _temporaryToolEvents[assistantMessageId] =
+          List<Map<String, dynamic>>.from(events);
+      notifyListeners();
+      return;
+    }
     await _toolEventsBox.put(assistantMessageId, events);
     notifyListeners();
   }
@@ -886,6 +1094,10 @@ class ChatService extends ChangeNotifier {
   // Gemini thought signature persistence (per assistant message)
   String? getGeminiThoughtSignature(String assistantMessageId) {
     if (!_initialized) return null;
+    if (_isTemporaryMessageId(assistantMessageId)) {
+      final v = _temporaryGeminiThoughtSigs[assistantMessageId];
+      return (v != null && v.trim().isNotEmpty) ? v : null;
+    }
     final v = _toolEventsBox.get(_sigKey(assistantMessageId));
     if (v is String && v.trim().isNotEmpty) return v;
     return null;
@@ -896,12 +1108,21 @@ class ChatService extends ChangeNotifier {
     String signature,
   ) async {
     if (!_initialized) await init();
+    if (_isTemporaryMessageId(assistantMessageId)) {
+      _temporaryGeminiThoughtSigs[assistantMessageId] = signature;
+      notifyListeners();
+      return;
+    }
     await _toolEventsBox.put(_sigKey(assistantMessageId), signature);
     notifyListeners();
   }
 
   Future<void> removeGeminiThoughtSignature(String assistantMessageId) async {
     if (!_initialized) await init();
+    if (_isTemporaryMessageId(assistantMessageId)) {
+      _temporaryGeminiThoughtSigs.remove(assistantMessageId);
+      return;
+    }
     try {
       await _toolEventsBox.delete(_sigKey(assistantMessageId));
     } catch (_) {}
@@ -1101,8 +1322,20 @@ class ChatService extends ChangeNotifier {
   Future<void> deleteMessage(String messageId) async {
     if (!_initialized) return;
 
-    final message = _messagesBox.get(messageId);
+    final message =
+        _messagesBox.get(messageId) ?? _cachedTemporaryMessage(messageId);
     if (message == null) return;
+
+    if (isTemporaryConversation(message.conversationId)) {
+      final conversation = _draftConversations[message.conversationId];
+      conversation?.messageIds.remove(messageId);
+      final messages = _messagesCache[message.conversationId];
+      messages?.removeWhere((m) => m.id == messageId);
+      _temporaryToolEvents.remove(messageId);
+      _temporaryGeminiThoughtSigs.remove(messageId);
+      notifyListeners();
+      return;
+    }
 
     final conversation = _conversationsBox.get(message.conversationId);
     if (conversation != null) {
@@ -1173,6 +1406,9 @@ class ChatService extends ChangeNotifier {
   }
 
   void setCurrentConversation(String? id) {
+    if (id != _currentConversationId) {
+      _discardTemporaryConversation(_currentConversationId);
+    }
     _currentConversationId = id;
     notifyListeners();
   }
@@ -1185,6 +1421,9 @@ class ChatService extends ChangeNotifier {
     await _toolEventsBox.clear();
     _messagesCache.clear();
     _draftConversations.clear();
+    _temporaryConversationIds.clear();
+    _temporaryToolEvents.clear();
+    _temporaryGeminiThoughtSigs.clear();
     _currentConversationId = null;
     // Remove uploads directory completely
     try {

@@ -207,6 +207,10 @@ class HomePageController extends ChangeNotifier {
   // Delegate to ChatController
   Conversation? get currentConversation => _chatController.currentConversation;
   List<ChatMessage> get messages => _chatController.messages;
+  bool get isTemporaryConversation =>
+      _chatService.isTemporaryConversation(currentConversation?.id);
+  bool get canToggleTemporaryConversation =>
+      currentConversation != null && messages.isEmpty;
   Map<String, int> get versionSelections => _chatController.versionSelections;
   Set<String> get loadingConversationIds =>
       _chatController.loadingConversationIds;
@@ -701,6 +705,11 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> toggleTemporaryConversation() async {
+    await _viewModel.toggleTemporaryConversation();
+    notifyListeners();
+  }
+
   // ============================================================================
   // Public Methods - Conversation Management
   // ============================================================================
@@ -867,7 +876,9 @@ class HomePageController extends ChangeNotifier {
     );
     if (newMsg == null) return;
 
-    messages.add(newMsg);
+    if (_chatController.appendPersistedTailMessage(newMsg)) {
+      _viewModel.restoreMessageUiState();
+    }
     final gid = (newMsg.groupId ?? newMsg.id);
     versionSelections[gid] = newMsg.version;
     notifyListeners();
@@ -1449,14 +1460,37 @@ class HomePageController extends ChangeNotifier {
 
   void scrollToBottom({bool animate = true}) =>
       _scrollToBottom(animate: animate);
-  void forceScrollToBottom() => _scrollCtrl.forceScrollToBottom();
+
+  void forceScrollToBottom({bool animate = true}) {
+    if (_chatController.hasMoreAfter) {
+      final loaded = _chatController.loadEndWindow();
+      if (loaded) _restoreMessageUiState();
+    }
+    if (animate) {
+      _scrollCtrl.forceScrollToBottom();
+    } else {
+      _scrollCtrl.scrollToBottom(animate: false);
+    }
+  }
+
   void forceScrollToBottomSoon({bool animate = true}) =>
       _scrollCtrl.forceScrollToBottomSoon(
         animate: animate,
         postSwitchDelay: _postSwitchScrollDelay,
       );
 
+  bool loadMoreBefore() => _viewModel.loadMoreBefore();
+
+  bool loadMoreAfter() => _viewModel.loadMoreAfter();
+
   Future<void> scrollToMessageId(String targetId) async {
+    if (_chatController.indexOfCollapsedMessageId(targetId) < 0) {
+      final loaded = _viewModel.loadUntilMessageVisible(targetId);
+      if (loaded) {
+        _restoreMessageUiState();
+        notifyListeners();
+      }
+    }
     final index = _chatController.indexOfCollapsedMessageId(targetId);
     if (index < 0) return;
     await _scrollCtrl.scrollToMessageId(targetId: targetId, targetIndex: index);
@@ -1477,6 +1511,13 @@ class HomePageController extends ChangeNotifier {
   }
 
   void scrollToTop({bool animate = true}) {
+    if (_chatController.hasMoreBefore) {
+      final loaded = _chatController.loadStartWindow();
+      if (loaded) {
+        _restoreMessageUiState();
+        notifyListeners();
+      }
+    }
     _scrollCtrl.scrollToTop(animate: animate);
   }
 

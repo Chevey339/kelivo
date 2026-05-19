@@ -120,6 +120,10 @@ class MessageListView extends StatelessWidget {
     this.onToggleTranslation,
     this.onToggleReasoningSegment,
     this.buildPinnedStreamingIndicator,
+    this.hasMoreBefore = false,
+    this.onLoadMoreBefore,
+    this.hasMoreAfter = false,
+    this.onLoadMoreAfter,
   });
 
   final ScrollController scrollController;
@@ -183,6 +187,10 @@ class MessageListView extends StatelessWidget {
   final void Function(String messageId, int segmentIndex)?
   onToggleReasoningSegment;
   final Widget Function()? buildPinnedStreamingIndicator;
+  final bool hasMoreBefore;
+  final bool Function()? onLoadMoreBefore;
+  final bool hasMoreAfter;
+  final bool Function()? onLoadMoreAfter;
 
   /// Build the context divider widget shown at truncate position.
   Widget _buildContextDivider(BuildContext context) {
@@ -257,9 +265,47 @@ class MessageListView extends StatelessWidget {
               child: list,
             );
 
+            final historyList = NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification.metrics.axis != Axis.vertical) return false;
+                final isNearTop = notification.metrics.pixels <= 96;
+                final isNearBottom =
+                    notification.metrics.maxScrollExtent -
+                        notification.metrics.pixels <=
+                    96;
+                if (isNearTop && hasMoreBefore && onLoadMoreBefore != null) {
+                  final beforeExtent = notification.metrics.maxScrollExtent;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    final loaded = onLoadMoreBefore!();
+                    if (!loaded || !scrollController.hasClients) return;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!scrollController.hasClients) return;
+                      final afterExtent =
+                          scrollController.position.maxScrollExtent;
+                      final delta = afterExtent - beforeExtent;
+                      if (delta <= 0) return;
+                      final target = (scrollController.offset + delta).clamp(
+                        scrollController.position.minScrollExtent,
+                        scrollController.position.maxScrollExtent,
+                      );
+                      scrollController.jumpTo(target);
+                    });
+                  });
+                } else if (isNearBottom &&
+                    hasMoreAfter &&
+                    onLoadMoreAfter != null) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    onLoadMoreAfter!();
+                  });
+                }
+                return false;
+              },
+              child: observedList,
+            );
+
             return Stack(
               children: [
-                observedList,
+                historyList,
                 if (isPinnedIndicatorActive &&
                     buildPinnedStreamingIndicator != null)
                   buildPinnedStreamingIndicator!(),

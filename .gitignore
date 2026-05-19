@@ -45,6 +45,11 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Android release signing secrets
+/android/key.properties
+/android/app/*.jks
+/android/app/*.keystore
+
 pubspec.lock
 /linux/flutter/generated_plugin_registrant.cc
 /windows/flutter/generated_plugin_registrant.cc
@@ -64,3 +69,4 @@ internationalization.md
 /.agents/
 /skills-lock.json
 installer.iss
+/参考文件/

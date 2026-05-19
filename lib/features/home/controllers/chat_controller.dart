@@ -30,6 +30,18 @@ class ChatController extends ChangeNotifier {
   List<ChatMessage> _messages = [];
   List<ChatMessage> get messages => _messages;
 
+  /// Index in the persisted conversation where [_messages] starts.
+  int _loadedStartIndex = 0;
+  int get loadedStartIndex => _loadedStartIndex;
+
+  /// Total persisted message count for the current conversation.
+  int _totalMessageCount = 0;
+  int get totalMessageCount => _totalMessageCount;
+
+  bool get hasMoreBefore => _loadedStartIndex > 0;
+  bool get hasMoreAfter =>
+      _loadedStartIndex + _messages.length < _totalMessageCount;
+
   /// Selected version per message group (groupId -> selected version index).
   Map<String, int> _versionSelections = <String, int>{};
   Map<String, int> get versionSelections => _versionSelections;
@@ -71,10 +83,12 @@ class ChatController extends ChangeNotifier {
   void setCurrentConversation(Conversation? conversation) {
     _currentConversation = conversation;
     if (conversation != null) {
-      _messages = List.of(_chatService.getMessages(conversation.id));
+      _loadInitialMessageWindow(conversation.id);
       _loadVersionSelections();
     } else {
       _messages = [];
+      _loadedStartIndex = 0;
+      _totalMessageCount = 0;
       _versionSelections = <String, int>{};
     }
     notifyListeners();
@@ -117,6 +131,8 @@ class ChatController extends ChangeNotifier {
     );
     _currentConversation = conversation;
     _messages = [];
+    _loadedStartIndex = 0;
+    _totalMessageCount = 0;
     _versionSelections.clear();
     notifyListeners();
     return conversation;
@@ -130,7 +146,7 @@ class ChatController extends ChangeNotifier {
     final convo = _chatService.getConversation(id);
     if (convo != null) {
       _currentConversation = convo;
-      _messages = List.of(_chatService.getMessages(id));
+      _loadInitialMessageWindow(id);
       _loadVersionSelections();
       notifyListeners();
     }
@@ -140,8 +156,209 @@ class ChatController extends ChangeNotifier {
   void clearCurrentConversation() {
     _currentConversation = null;
     _messages = [];
+    _loadedStartIndex = 0;
+    _totalMessageCount = 0;
     _versionSelections.clear();
     notifyListeners();
+  }
+
+  void _loadInitialMessageWindow(String conversationId) {
+    _totalMessageCount = _chatService.getMessageCount(conversationId);
+    _messages = List.of(_chatService.getRecentMessages(conversationId));
+    _loadedStartIndex = (_totalMessageCount - _messages.length)
+        .clamp(0, _totalMessageCount)
+        .toInt();
+  }
+
+  void refreshLoadedMessageCount() {
+    final conversation = _currentConversation;
+    if (conversation == null) {
+      _totalMessageCount = 0;
+      _loadedStartIndex = 0;
+      return;
+    }
+    _totalMessageCount = _chatService.getMessageCount(conversation.id);
+    _loadedStartIndex = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
+  }
+
+  bool loadMoreBefore({int limit = ChatService.defaultHistoryPageSize}) {
+    final conversation = _currentConversation;
+    if (conversation == null || _loadedStartIndex <= 0 || limit <= 0) {
+      return false;
+    }
+
+    final newStart = (_loadedStartIndex - limit)
+        .clamp(0, _loadedStartIndex)
+        .toInt();
+    final older = _chatService.getMessagesRange(
+      conversation.id,
+      start: newStart,
+      limit: _loadedStartIndex - newStart,
+    );
+    if (older.isEmpty) {
+      _loadedStartIndex = 0;
+      return false;
+    }
+
+    final merged = <ChatMessage>[...older, ..._messages];
+    _messages = _trimWindowEnd(merged);
+    _loadedStartIndex = newStart;
+    notifyListeners();
+    return true;
+  }
+
+  bool loadMoreAfter({int limit = ChatService.defaultHistoryPageSize}) {
+    final conversation = _currentConversation;
+    if (conversation == null || !hasMoreAfter || limit <= 0) {
+      return false;
+    }
+
+    final currentEnd = _loadedStartIndex + _messages.length;
+    final newer = _chatService.getMessagesRange(
+      conversation.id,
+      start: currentEnd,
+      limit: limit,
+    );
+    if (newer.isEmpty) return false;
+
+    final merged = <ChatMessage>[..._messages, ...newer];
+    final overflow = merged.length - ChatService.defaultLoadedWindowMax;
+    if (overflow > 0) {
+      _messages = merged.sublist(overflow);
+      _loadedStartIndex += overflow;
+    } else {
+      _messages = merged;
+    }
+    notifyListeners();
+    return true;
+  }
+
+  bool loadStartWindow() {
+    return _loadWindow(start: 0, limit: ChatService.defaultLoadedWindowMax);
+  }
+
+  bool loadEndWindow() {
+    final conversation = _currentConversation;
+    if (conversation == null) return false;
+    _totalMessageCount = _chatService.getMessageCount(conversation.id);
+    if (_totalMessageCount == 0) return false;
+
+    final start = (_totalMessageCount - ChatService.defaultLoadedWindowMax)
+        .clamp(0, _totalMessageCount)
+        .toInt();
+    return _loadWindow(start: start, limit: ChatService.defaultLoadedWindowMax);
+  }
+
+  bool loadUntilMessageVisible(
+    String messageId, {
+    int pageSize = ChatService.defaultHistoryPageSize,
+    int maxPages = 256,
+  }) {
+    if (_messages.any((message) => message.id == messageId)) return true;
+
+    final loaded = loadWindowAroundMessage(messageId, leadingContext: pageSize);
+    return loaded && _messages.any((message) => message.id == messageId);
+  }
+
+  bool loadWindowAroundMessage(
+    String messageId, {
+    int leadingContext = ChatService.defaultHistoryPageSize,
+  }) {
+    final conversation = _currentConversation;
+    if (conversation == null) return false;
+
+    final targetIndex = _chatService.getMessageIndex(
+      conversation.id,
+      messageId,
+    );
+    if (targetIndex < 0) return false;
+
+    _totalMessageCount = _chatService.getMessageCount(conversation.id);
+    if (_totalMessageCount == 0) return false;
+
+    final safeLeading = leadingContext
+        .clamp(0, ChatService.defaultLoadedWindowMax - 1)
+        .toInt();
+    final maxStart = (_totalMessageCount - ChatService.defaultLoadedWindowMax)
+        .clamp(0, _totalMessageCount)
+        .toInt();
+    final start = (targetIndex - safeLeading).clamp(0, maxStart).toInt();
+    return _loadWindow(start: start, limit: ChatService.defaultLoadedWindowMax);
+  }
+
+  int loadedWindowTruncateIndex() {
+    final raw = _currentConversation?.truncateIndex ?? -1;
+    if (raw < 0) return -1;
+    if (raw <= _loadedStartIndex) return -1;
+
+    final loadedEnd = _loadedStartIndex + _messages.length;
+    if (raw >= loadedEnd) return _messages.length;
+    return raw - _loadedStartIndex;
+  }
+
+  Conversation conversationForLoadedWindow(Conversation conversation) {
+    if (_currentConversation?.id != conversation.id) return conversation;
+    final localTruncateIndex = loadedWindowTruncateIndex();
+    if (localTruncateIndex == conversation.truncateIndex) return conversation;
+    return conversation.copyWith(truncateIndex: localTruncateIndex);
+  }
+
+  List<ChatMessage> allCollapsedMessagesForCurrentConversation() {
+    final conversation = _currentConversation;
+    if (conversation == null) return const <ChatMessage>[];
+    return collapseVersions(
+      _chatService.getMessagesRange(
+        conversation.id,
+        start: 0,
+        limit: _chatService.getMessageCount(conversation.id),
+      ),
+    );
+  }
+
+  List<ChatMessage> allMessagesForCurrentConversationContext() {
+    final conversation = _currentConversation;
+    if (conversation == null) return const <ChatMessage>[];
+    return messagesForCompleteHistoryContext(conversation);
+  }
+
+  List<ChatMessage> messagesForCompleteHistoryContext(
+    Conversation conversation,
+  ) {
+    return _chatService.getMessagesRange(
+      conversation.id,
+      start: 0,
+      limit: _chatService.getMessageCount(conversation.id),
+    );
+  }
+
+  Conversation conversationForCompleteHistoryContext(
+    Conversation conversation,
+  ) {
+    return _chatService.getConversation(conversation.id) ?? conversation;
+  }
+
+  List<ChatMessage> _trimWindowEnd(List<ChatMessage> messages) {
+    if (messages.length <= ChatService.defaultLoadedWindowMax) return messages;
+    return messages.sublist(0, ChatService.defaultLoadedWindowMax);
+  }
+
+  bool _loadWindow({required int start, required int limit}) {
+    final conversation = _currentConversation;
+    if (conversation == null || limit <= 0) return false;
+
+    _totalMessageCount = _chatService.getMessageCount(conversation.id);
+    final safeStart = start.clamp(0, _totalMessageCount).toInt();
+    final range = _chatService.getMessagesRange(
+      conversation.id,
+      start: safeStart,
+      limit: limit,
+    );
+    if (range.isEmpty) return false;
+
+    _messages = List.of(range);
+    _loadedStartIndex = safeStart;
+    notifyListeners();
+    return true;
   }
 
   // ============================================================================
@@ -162,6 +379,10 @@ class ChatController extends ChangeNotifier {
       throw StateError('No current conversation');
     }
 
+    if (hasMoreAfter) {
+      loadEndWindow();
+    }
+
     final message = await _chatService.addMessage(
       conversationId: _currentConversation!.id,
       role: role,
@@ -174,8 +395,50 @@ class ChatController extends ChangeNotifier {
     );
 
     _messages.add(message);
+    _totalMessageCount += 1;
+    final overflow = _messages.length - ChatService.defaultLoadedWindowMax;
+    if (overflow > 0) {
+      _messages = _messages.sublist(overflow);
+      _loadedStartIndex += overflow;
+    }
     notifyListeners();
     return message;
+  }
+
+  /// Add an already-persisted tail message to the loaded window.
+  ///
+  /// ChatService appends new message versions and streaming placeholders to the
+  /// persisted conversation before callers update UI state. This method keeps
+  /// [_messages] as a real contiguous persisted range instead of mixing a tail
+  /// message into an older loaded window.
+  bool appendPersistedTailMessage(ChatMessage message) {
+    final conversation = _currentConversation;
+    if (conversation == null || message.conversationId != conversation.id) {
+      return false;
+    }
+
+    final wasAtTail =
+        _loadedStartIndex + _messages.length >= _totalMessageCount;
+    _totalMessageCount = _chatService.getMessageCount(conversation.id);
+
+    if (!wasAtTail) {
+      return loadEndWindow();
+    }
+
+    final existingIndex = _messages.indexWhere((m) => m.id == message.id);
+    if (existingIndex >= 0) {
+      _messages[existingIndex] = message;
+    } else {
+      _messages.add(message);
+    }
+
+    final overflow = _messages.length - ChatService.defaultLoadedWindowMax;
+    if (overflow > 0) {
+      _messages = _messages.sublist(overflow);
+      _loadedStartIndex += overflow;
+    }
+    notifyListeners();
+    return false;
   }
 
   /// Update a message in the list.
@@ -220,6 +483,7 @@ class ChatController extends ChangeNotifier {
   void removeMessagesAfter(int index) {
     if (index < _messages.length - 1) {
       _messages = _messages.sublist(0, index + 1);
+      _totalMessageCount = _loadedStartIndex + _messages.length;
       notifyListeners();
     }
   }
@@ -227,13 +491,41 @@ class ChatController extends ChangeNotifier {
   /// Remove specific message IDs from the list.
   void removeMessageIds(List<String> ids) {
     _messages.removeWhere((m) => ids.contains(m.id));
+    _totalMessageCount = (_totalMessageCount - ids.length)
+        .clamp(0, 1 << 31)
+        .toInt();
+    _loadedStartIndex = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
     notifyListeners();
   }
 
   /// Reload messages from storage.
   void reloadMessages() {
     if (_currentConversation == null) return;
-    _messages = List.of(_chatService.getMessages(_currentConversation!.id));
+    final conversationId = _currentConversation!.id;
+    _totalMessageCount = _chatService.getMessageCount(conversationId);
+    if (_totalMessageCount == 0) {
+      _messages = [];
+      _loadedStartIndex = 0;
+      notifyListeners();
+      return;
+    }
+
+    final visibleCount = _messages.isEmpty
+        ? ChatService.defaultInitialMessageMin
+        : _messages.length.clamp(1, ChatService.defaultLoadedWindowMax).toInt();
+    final start = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
+    final maxStart = (_totalMessageCount - visibleCount)
+        .clamp(0, _totalMessageCount)
+        .toInt();
+    final safeStart = start > maxStart ? maxStart : start;
+    _messages = List.of(
+      _chatService.getMessagesRange(
+        conversationId,
+        start: safeStart,
+        limit: visibleCount,
+      ),
+    );
+    _loadedStartIndex = safeStart;
     notifyListeners();
   }
 

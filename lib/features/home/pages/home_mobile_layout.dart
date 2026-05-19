@@ -47,6 +47,9 @@ class HomeMobileScaffold extends StatelessWidget {
     required this.onEnterGlobalSearch,
     required this.onExitGlobalSearch,
     required this.onOpenGlobalSearchResult,
+    required this.onToggleTemporaryConversation,
+    required this.canToggleTemporaryConversation,
+    required this.temporaryConversationEnabled,
     this.appBarOverride,
     required this.body,
   });
@@ -72,6 +75,9 @@ class HomeMobileScaffold extends StatelessWidget {
   final VoidCallback onExitGlobalSearch;
   final Future<void> Function(String conversationId, String messageId)
   onOpenGlobalSearchResult;
+  final Future<void> Function() onToggleTemporaryConversation;
+  final bool canToggleTemporaryConversation;
+  final bool temporaryConversationEnabled;
   final PreferredSizeWidget? appBarOverride;
   final Widget body;
 
@@ -260,9 +266,27 @@ class HomeMobileScaffold extends StatelessWidget {
           size: 22,
           minSize: 44,
           onTap: () async {
-            await onCreateNewConversation();
+            if (canToggleTemporaryConversation) {
+              await onToggleTemporaryConversation();
+            } else {
+              await onCreateNewConversation();
+            }
           },
-          icon: Lucide.MessageCirclePlus,
+          semanticLabel: canToggleTemporaryConversation
+              ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
+              : AppLocalizations.of(context)!.titleForLocale,
+          icon: canToggleTemporaryConversation && !temporaryConversationEnabled
+              ? Lucide.MessageCircleDashed
+              : Lucide.MessageCirclePlus,
+          builder:
+              canToggleTemporaryConversation && temporaryConversationEnabled
+              ? (color) => SvgPicture.asset(
+                  'assets/icons/temporary_chat_checked.svg',
+                  width: 22,
+                  height: 22,
+                  colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                )
+              : null,
         ),
         const SizedBox(width: 4),
       ],

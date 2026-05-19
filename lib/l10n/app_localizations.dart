@@ -5504,6 +5504,18 @@ abstract class AppLocalizations {
   /// **'Adds header APP-Code requests to get a 10% discount. Only affects AIhubmix.'**
   String get providerDetailPageAihubmixAppCodeHelp;
 
+  /// No description provided for @providerDetailPageClaudePromptCachingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Claude Prompt Caching'**
+  String get providerDetailPageClaudePromptCachingTitle;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Adds cache_control to the system prompt for Claude requests through Anthropic or OpenRouter.'**
+  String get providerDetailPageClaudePromptCachingHelp;
+
   /// No description provided for @providerDetailPageBalanceTitle.
   ///
   /// In en, this message translates to:
@@ -7789,6 +7801,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New Chat'**
   String get titleForLocale;
+
+  /// No description provided for @temporaryChatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary Chat'**
+  String get temporaryChatTitle;
+
+  /// No description provided for @temporaryChatEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary chats do not appear in history and will be deleted completely after you leave.'**
+  String get temporaryChatEmptyMessage;
+
+  /// No description provided for @temporaryChatToggleTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle temporary chat'**
+  String get temporaryChatToggleTooltip;
 
   /// No description provided for @quickPhraseBackTooltip.
   ///

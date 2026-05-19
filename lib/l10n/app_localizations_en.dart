@@ -2931,6 +2931,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Adds header APP-Code requests to get a 10% discount. Only affects AIhubmix.';
 
   @override
+  String get providerDetailPageClaudePromptCachingTitle =>
+      'Claude Prompt Caching';
+
+  @override
+  String get providerDetailPageClaudePromptCachingHelp =>
+      'Adds cache_control to the system prompt for Claude requests through Anthropic or OpenRouter.';
+
+  @override
   String get providerDetailPageBalanceTitle => 'Account Balance';
 
   @override
@@ -4183,6 +4191,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get titleForLocale => 'New Chat';
+
+  @override
+  String get temporaryChatTitle => 'Temporary Chat';
+
+  @override
+  String get temporaryChatEmptyMessage =>
+      'Temporary chats do not appear in history and will be deleted completely after you leave.';
+
+  @override
+  String get temporaryChatToggleTooltip => 'Toggle temporary chat';
 
   @override
   String get quickPhraseBackTooltip => 'Back';

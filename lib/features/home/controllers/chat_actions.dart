@@ -351,9 +351,18 @@ class ChatActions {
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
 
+    if (chatController.hasMoreAfter) {
+      final loaded = chatController.loadEndWindow();
+      if (loaded) viewModel.restoreMessageUiState();
+    }
+
+    final existingContextMessages = chatController
+        .messagesForCompleteHistoryContext(conversation);
     if (_hasUnsupportedAudioAttachments(
-      messages: _messages,
-      conversation: conversation,
+      messages: existingContextMessages,
+      conversation: chatController.conversationForCompleteHistoryContext(
+        conversation,
+      ),
       settings: settings,
       providerKey: providerKey,
       modelId: modelId,
@@ -368,7 +377,9 @@ class ChatActions {
       input: input,
       assistant: assistant,
     );
-    _messages.add(userMessage);
+    if (chatController.appendPersistedTailMessage(userMessage)) {
+      viewModel.restoreMessageUiState();
+    }
     onMessagesChanged?.call();
 
     _setConversationLoading(conversation.id, true);
@@ -385,7 +396,9 @@ class ChatActions {
     // so that MessageListView can detect it's streaming on first render
     streamController.markStreamingStarted(assistantMessage.id);
 
-    _messages.add(assistantMessage);
+    if (chatController.appendPersistedTailMessage(assistantMessage)) {
+      viewModel.restoreMessageUiState();
+    }
     onMessagesChanged?.call();
 
     // Reset tool parts and initialize reasoning
@@ -406,11 +419,14 @@ class ChatActions {
     messageGenerationService.onFileProcessingFinished =
         onFileProcessingFinished;
     try {
+      final apiContextMessages = chatController
+          .messagesForCompleteHistoryContext(conversation);
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
-            messages: _messages,
+            messages: apiContextMessages,
             versionSelections: _versionSelections,
-            currentConversation: conversation,
+            currentConversation: chatController
+                .conversationForCompleteHistoryContext(conversation),
             settings: settings,
             assistant: assistant,
             assistantId: assistantId,
@@ -515,8 +531,11 @@ class ChatActions {
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
 
+    final completeMessages = chatController.messagesForCompleteHistoryContext(
+      conversation,
+    );
     final projectedMessages = ChatActions.projectMessagesForRegenerationContext(
-      messages: _messages,
+      messages: completeMessages,
       lastKeep: versioning.lastKeep,
       targetGroupId: versioning.targetGroupId,
     );
@@ -566,13 +585,15 @@ class ChatActions {
     );
 
     final regenerationMessages = ChatActions.buildRegenerationMessages(
-      messages: _messages,
+      messages: completeMessages,
       lastKeep: versioning.lastKeep,
       targetGroupId: versioning.targetGroupId,
       assistantPlaceholder: assistantMessage,
     );
 
-    _messages.add(assistantMessage);
+    if (chatController.appendPersistedTailMessage(assistantMessage)) {
+      viewModel.restoreMessageUiState();
+    }
     onMessagesChanged?.call();
 
     _setConversationLoading(conversation.id, true);
@@ -679,13 +700,22 @@ class ChatActions {
         );
 
     try {
-      final apiContextMessages = List<ChatMessage>.of(_messages);
-      apiContextMessages[idx] = streamingMessage.copyWith(content: '');
+      final apiContextMessages = chatController
+          .messagesForCompleteHistoryContext(conversation);
+      final apiContextIndex = apiContextMessages.indexWhere(
+        (candidate) => candidate.id == message.id,
+      );
+      if (apiContextIndex >= 0) {
+        apiContextMessages[apiContextIndex] = streamingMessage.copyWith(
+          content: '',
+        );
+      }
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
             versionSelections: _versionSelections,
-            currentConversation: conversation,
+            currentConversation: chatController
+                .conversationForCompleteHistoryContext(conversation),
             settings: settings,
             assistant: assistant,
             assistantId: assistant?.id,

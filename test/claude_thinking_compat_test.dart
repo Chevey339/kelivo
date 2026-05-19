@@ -10,6 +10,7 @@ import 'package:Kelivo/core/services/api/chat_api_service.dart';
 ProviderConfig _claudeConfig(
   String baseUrl, {
   Map<String, dynamic> modelOverrides = const <String, dynamic>{},
+  bool claudePromptCachingEnabled = false,
 }) {
   return ProviderConfig(
     id: 'ClaudeCompatTest',
@@ -19,6 +20,7 @@ ProviderConfig _claudeConfig(
     baseUrl: baseUrl,
     providerType: ProviderKind.claude,
     modelOverrides: modelOverrides,
+    claudePromptCachingEnabled: claudePromptCachingEnabled,
   );
 }
 
@@ -57,6 +59,7 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
   int? thinkingBudget,
   double? temperature,
   double? topP,
+  bool claudePromptCachingEnabled = false,
 }) async {
   late Map<String, dynamic> requestBody;
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -82,7 +85,10 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
   });
 
   final chunks = await ChatApiService.sendMessageStream(
-    config: _claudeConfig('http://${server.address.address}:${server.port}'),
+    config: _claudeConfig(
+      'http://${server.address.address}:${server.port}',
+      claudePromptCachingEnabled: claudePromptCachingEnabled,
+    ),
     modelId: modelId,
     messages: const [
       {'role': 'user', 'content': 'hello'},
@@ -296,6 +302,23 @@ void main() {
         (body['thinking'] as Map<String, dynamic>).containsKey('budget_tokens'),
         isFalse,
       );
+    });
+
+    test('Claude prompt caching opt-in adds ephemeral cache control', () async {
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-sonnet-4-6',
+        claudePromptCachingEnabled: true,
+      );
+
+      expect(body['cache_control'], {'type': 'ephemeral'});
+    });
+
+    test('Claude prompt caching stays absent when disabled', () async {
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-sonnet-4-6',
+      );
+
+      expect(body.containsKey('cache_control'), isFalse);
     });
 
     test('Claude built-in search support list includes Opus 4.7', () {

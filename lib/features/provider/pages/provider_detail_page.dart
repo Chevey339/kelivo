@@ -75,6 +75,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   String? _currentDetectingModel;
   final Set<String> _pendingModels = {};
   bool _aihubmixAppCodeEnabled = false;
+  bool _claudePromptCachingEnabled = false;
 
   @override
   void initState() {
@@ -100,6 +101,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     _saJsonCtrl.text = _cfg.serviceAccountJson ?? '';
     _multiKeyEnabled = _cfg.multiKeyEnabled ?? false;
     _aihubmixAppCodeEnabled = _cfg.aihubmixAppCodeEnabled ?? false;
+    _claudePromptCachingEnabled = _cfg.claudePromptCachingEnabled ?? false;
   }
 
   @override
@@ -794,6 +796,21 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   value: _aihubmixAppCodeEnabled,
                   onChanged: (v) {
                     setState(() => _aihubmixAppCodeEnabled = v);
+                    _save();
+                  },
+                ),
+              ),
+            if (_supportsClaudePromptCaching)
+              _iosRowWithHelp(
+                context,
+                label: l10n.providerDetailPageClaudePromptCachingTitle,
+                helpText: l10n.providerDetailPageClaudePromptCachingHelp,
+                trailing: IosSwitch(
+                  value: _claudePromptCachingEnabled,
+                  semanticLabel:
+                      l10n.providerDetailPageClaudePromptCachingTitle,
+                  onChanged: (v) {
+                    setState(() => _claudePromptCachingEnabled = v);
                     _save();
                   },
                 ),
@@ -1832,6 +1849,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     return keyLower.contains('aihubmix') || baseLower.contains('aihubmix.com');
   }
 
+  bool get _supportsClaudePromptCaching {
+    return _kind == ProviderKind.claude ||
+        widget.keyName.toLowerCase().contains('openrouter') ||
+        _baseCtrl.text.toLowerCase().contains('openrouter.ai');
+  }
+
   Widget _providerKindRow(BuildContext context) {
     String labelFor(ProviderKind k) {
       switch (k) {
@@ -2070,6 +2093,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           : old.serviceAccountJson,
       multiKeyEnabled: _multiKeyEnabled,
       aihubmixAppCodeEnabled: _aihubmixAppCodeEnabled,
+      claudePromptCachingEnabled: _supportsClaudePromptCaching
+          ? _claudePromptCachingEnabled
+          : false,
       // preserve models and modelOverrides and proxy fields implicitly via copyWith
     );
     await settings.setProviderConfig(widget.keyName, updated);

@@ -3993,6 +3993,8 @@ class ProviderConfig {
   final bool? balanceEnabled;
   final String? balanceApiPath;
   final String? balanceResultPath;
+  // Anthropic/OpenRouter Claude prompt caching for stable system prompts.
+  final bool? claudePromptCachingEnabled;
 
   static String resolveProxyType(String? value) {
     switch (value?.trim().toLowerCase()) {
@@ -4034,6 +4036,7 @@ class ProviderConfig {
     this.balanceEnabled,
     this.balanceApiPath,
     this.balanceResultPath,
+    this.claudePromptCachingEnabled = false,
   });
 
   // Sentinel for copyWith nullability control (allow explicit null set)
@@ -4069,6 +4072,7 @@ class ProviderConfig {
     bool? balanceEnabled,
     String? balanceApiPath,
     String? balanceResultPath,
+    bool? claudePromptCachingEnabled,
   }) => ProviderConfig(
     id: id ?? this.id,
     enabled: enabled ?? this.enabled,
@@ -4104,6 +4108,8 @@ class ProviderConfig {
     balanceEnabled: balanceEnabled ?? this.balanceEnabled,
     balanceApiPath: balanceApiPath ?? this.balanceApiPath,
     balanceResultPath: balanceResultPath ?? this.balanceResultPath,
+    claudePromptCachingEnabled:
+        claudePromptCachingEnabled ?? this.claudePromptCachingEnabled,
   );
 
   Map<String, dynamic> toJson() => {
@@ -4136,6 +4142,7 @@ class ProviderConfig {
     'balanceEnabled': balanceEnabled,
     'balanceApiPath': balanceApiPath,
     'balanceResultPath': balanceResultPath,
+    'claudePromptCachingEnabled': claudePromptCachingEnabled,
   };
 
   factory ProviderConfig.fromJson(Map<String, dynamic> json) => ProviderConfig(
@@ -4184,6 +4191,8 @@ class ProviderConfig {
     balanceEnabled: json['balanceEnabled'] as bool?,
     balanceApiPath: json['balanceApiPath'] as String?,
     balanceResultPath: json['balanceResultPath'] as String?,
+    claudePromptCachingEnabled:
+        json['claudePromptCachingEnabled'] as bool? ?? false,
   );
 
   static ProviderKind classify(String key, {ProviderKind? explicitType}) {
@@ -4297,6 +4306,7 @@ class ProviderConfig {
           balanceEnabled: false,
           balanceApiPath: '/credits',
           balanceResultPath: 'data.total_usage',
+          claudePromptCachingEnabled: false,
         );
       case ProviderKind.openai:
         // Special-case KelivoIN default models and overrides
