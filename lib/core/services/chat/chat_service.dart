@@ -111,6 +111,21 @@ class ChatService extends ChangeNotifier {
     return conversation.messageIds.indexOf(messageId);
   }
 
+  ChatMessage? _messageForConversation(
+    String conversationId,
+    String messageId,
+  ) {
+    if (_temporaryConversationIds.contains(conversationId)) {
+      final messages = _messagesCache[conversationId];
+      if (messages == null) return null;
+      for (final message in messages) {
+        if (message.id == messageId) return message;
+      }
+      return null;
+    }
+    return _messagesBox.get(messageId);
+  }
+
   List<ChatMessage> getMessages(String conversationId) {
     if (!_initialized) return [];
 
@@ -127,7 +142,7 @@ class ChatService extends ChangeNotifier {
 
     final messages = <ChatMessage>[];
     for (final messageId in conversation.messageIds) {
-      final message = _messagesBox.get(messageId);
+      final message = _messageForConversation(conversationId, messageId);
       if (message != null) {
         messages.add(message);
       }
@@ -157,7 +172,7 @@ class ChatService extends ChangeNotifier {
 
     final messages = <ChatMessage>[];
     for (var i = safeStart; i < end; i++) {
-      final message = _messagesBox.get(ids[i]);
+      final message = _messageForConversation(conversationId, ids[i]);
       if (message != null) messages.add(message);
     }
     return messages;
@@ -186,7 +201,7 @@ class ChatService extends ChangeNotifier {
     var weight = 0;
     while (start > 0 && loaded < maxCount) {
       start--;
-      final message = _messagesBox.get(ids[start]);
+      final message = _messageForConversation(conversationId, ids[start]);
       if (message == null) continue;
       loaded++;
       weight += _estimateInitialLoadWeight(message);

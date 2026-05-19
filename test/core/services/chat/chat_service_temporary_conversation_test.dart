@@ -84,6 +84,47 @@ void main() {
     );
 
     test(
+      'temporary conversation supports range and recent message reads',
+      () async {
+        final service = ChatService();
+        await service.init();
+
+        final conversation = await service.createDraftConversation(
+          title: 'Temporary Chat',
+          temporary: true,
+        );
+        for (var i = 0; i < 5; i++) {
+          await service.addMessage(
+            conversationId: conversation.id,
+            role: i.isEven ? 'user' : 'assistant',
+            content: 'temporary message $i',
+          );
+        }
+
+        final range = service.getMessagesRange(
+          conversation.id,
+          start: 1,
+          limit: 3,
+        );
+        final recent = service.getRecentMessages(
+          conversation.id,
+          minMessages: 2,
+          maxMessages: 2,
+        );
+
+        expect(range.map((message) => message.content), [
+          'temporary message 1',
+          'temporary message 2',
+          'temporary message 3',
+        ]);
+        expect(recent.map((message) => message.content), [
+          'temporary message 3',
+          'temporary message 4',
+        ]);
+      },
+    );
+
+    test(
       'temporary conversation is discarded when current conversation changes',
       () async {
         final service = ChatService();
