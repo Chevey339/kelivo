@@ -2363,6 +2363,12 @@ abstract class AppLocalizations {
   /// **'Export CSV'**
   String get markdownTableExportCsvTooltip;
 
+  /// No description provided for @markdownTableSaveImageTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to Gallery'**
+  String get markdownTableSaveImageTooltip;
+
   /// No description provided for @markdownTableDefaultFileNameStem.
   ///
   /// In en, this message translates to:
@@ -2374,6 +2380,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'CSV copied. Long press Copy to copy as image.'**
   String get markdownTableCopiedCsvSnackbar;
+
+  /// No description provided for @markdownTableCopiedMarkdownSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Table copied.'**
+  String get markdownTableCopiedMarkdownSnackbar;
 
   /// No description provided for @codeBlockCollapsedLines.
   ///

@@ -4,6 +4,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -140,6 +141,11 @@ Widget _markdownHarness(
   );
 }
 
+void _overrideMarkdownTablePlatform(TargetPlatform platform) {
+  markdownTableTargetPlatformOverride = platform;
+  addTearDown(() => markdownTableTargetPlatformOverride = null);
+}
+
 Widget _streamingMarkdownHarness(
   ValueListenable<String> text, {
   double? width,
@@ -193,6 +199,8 @@ Widget _settingsHarness({
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('markdown table CSV export escapes boundary cell values', () {
     final csv = markdownTableRowsToCsvForTesting([
       ['Name', 'Note', 'Multiline'],
@@ -205,6 +213,22 @@ void main() {
       'Name,Note,Multiline\r\n'
       'Alice,plain,"first\nsecond"\r\n'
       '"Bob, Jr.","said ""hello""",',
+    );
+  });
+
+  test('markdown table markdown copy keeps pipe table syntax', () {
+    final markdown = markdownTableRowsToMarkdownForTesting([
+      ['Name', 'Note', 'Multiline'],
+      ['Alice', 'plain', 'first\nsecond'],
+      ['Bob | Jr.', 'said "hello"', ''],
+    ]);
+
+    expect(
+      markdown,
+      '| Name | Note | Multiline |\n'
+      '| --- | --- | --- |\n'
+      '| Alice | plain | first<br>second |\n'
+      '| Bob \\| Jr. | said "hello" |  |',
     );
   });
 
@@ -249,6 +273,7 @@ void main() {
   testWidgets('MarkdownWithCodeHighlight renders mobile table export action', (
     tester,
   ) async {
+    _overrideMarkdownTablePlatform(TargetPlatform.android);
     await tester.pumpWidget(
       _markdownHarness('''
 | Name | Value |
@@ -261,7 +286,7 @@ void main() {
     expect(find.text('Table'), findsOneWidget);
     expect(find.byTooltip('Copy'), findsOneWidget);
     expect(find.byTooltip('Export CSV'), findsOneWidget);
-    expect(find.byTooltip('Export as Image'), findsOneWidget);
+    expect(find.byTooltip('Save to Gallery'), findsOneWidget);
     final tableBlock = find.byKey(const ValueKey('markdown-table-block'));
     final plainText = tester
         .widgetList<RichText>(
@@ -276,6 +301,7 @@ void main() {
   testWidgets('MarkdownWithCodeHighlight keeps table actions out of body', (
     tester,
   ) async {
+    _overrideMarkdownTablePlatform(TargetPlatform.android);
     await tester.pumpWidget(
       _markdownHarness('''
 | Name | Value |
@@ -301,9 +327,82 @@ void main() {
     );
   });
 
+  testWidgets('MarkdownWithCodeHighlight copies markdown table syntax', (
+    tester,
+  ) async {
+    _overrideMarkdownTablePlatform(TargetPlatform.android);
+    String? clipboardText;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'Clipboard.setData') {
+            final data = Map<String, dynamic>.from(call.arguments as Map);
+            clipboardText = data['text'] as String?;
+          }
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    await tester.pumpWidget(
+      _markdownHarness('''
+| Name | Value |
+| - | - |
+| Alpha | Beta |
+''', width: 360),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Copy'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 4));
+
+    expect(
+      clipboardText,
+      '| Name | Value |\n'
+      '| --- | --- |\n'
+      '| Alpha | Beta |',
+    );
+  });
+
+  testWidgets('MarkdownWithCodeHighlight centers padded table cells', (
+    tester,
+  ) async {
+    _overrideMarkdownTablePlatform(TargetPlatform.android);
+    await tester.pumpWidget(
+      _markdownHarness('''
+| 项目 | 状态 |
+| :---: | :---: |
+| 单字 |   中   |
+''', width: 360),
+    );
+    await tester.pump();
+
+    final body = find.byKey(const ValueKey('markdown-table-body'));
+    expect(body, findsOneWidget);
+    final bodyRect = tester.getRect(body);
+    final expectedSecondColumnCenter = bodyRect.left + bodyRect.width * 0.75;
+    final centeredCellText = find.descendant(
+      of: body,
+      matching: find.byWidgetPredicate(
+        (widget) => widget is RichText && widget.text.toPlainText() == '中',
+        description: 'centered table cell text',
+      ),
+    );
+    expect(centeredCellText, findsOneWidget);
+
+    expect(
+      (tester.getCenter(centeredCellText).dx - expectedSecondColumnCenter)
+          .abs(),
+      lessThan(1.0),
+    );
+  });
+
   testWidgets('MarkdownWithCodeHighlight does not scroll narrow table', (
     tester,
   ) async {
+    _overrideMarkdownTablePlatform(TargetPlatform.android);
     await tester.pumpWidget(
       _markdownHarness('''
 | Name | Value |
@@ -331,9 +430,81 @@ void main() {
     );
   });
 
+  testWidgets(
+    'MarkdownWithCodeHighlight does not scroll three-column narrow table',
+    (tester) async {
+      _overrideMarkdownTablePlatform(TargetPlatform.android);
+      await tester.pumpWidget(
+        _markdownHarness('''
+| Name | Value | Note |
+| - | - | - |
+| A | B | C |
+''', width: 320),
+      );
+      await tester.pump();
+
+      final tableBlock = find.byKey(const ValueKey('markdown-table-block'));
+      expect(tableBlock, findsOneWidget);
+      expect(
+        find.descendant(
+          of: tableBlock,
+          matching: find.byKey(
+            const ValueKey('markdown-table-horizontal-scroll'),
+          ),
+        ),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight saves table image on image action tap',
+    (tester) async {
+      _overrideMarkdownTablePlatform(TargetPlatform.android);
+      var savedToGallery = false;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('image_gallery_saver_plus'),
+            (call) async {
+              if (call.method == 'saveImageToGallery') {
+                savedToGallery = true;
+                return <String, Object>{'isSuccess': true};
+              }
+              return null;
+            },
+          );
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              const MethodChannel('image_gallery_saver_plus'),
+              null,
+            );
+      });
+
+      await tester.pumpWidget(
+        _markdownHarness('''
+| Name | Value |
+| - | - |
+| Alpha | 42 |
+''', width: 360),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Save to Gallery'));
+      await tester.pump();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pump(const Duration(seconds: 4));
+
+      expect(savedToGallery, isTrue);
+    },
+  );
+
   testWidgets('MarkdownWithCodeHighlight scrolls only overflowing table', (
     tester,
   ) async {
+    _overrideMarkdownTablePlatform(TargetPlatform.android);
     await tester.pumpWidget(
       _markdownHarness('''
 | Very long header | Another very long header | Third very long header | Fourth very long header |

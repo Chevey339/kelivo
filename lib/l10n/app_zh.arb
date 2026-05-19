@@ -338,8 +338,10 @@
   "codeBlockDefaultFileNameStem": "代码",
   "markdownTableLabel": "表格",
   "markdownTableExportCsvTooltip": "导出 CSV",
+  "markdownTableSaveImageTooltip": "保存到相册",
   "markdownTableDefaultFileNameStem": "表格",
   "markdownTableCopiedCsvSnackbar": "已复制 CSV，长按复制可复制为图片",
+  "markdownTableCopiedMarkdownSnackbar": "已复制表格",
   "codeBlockCollapsedLines": "… 已折叠 {n} 行",
   "@codeBlockCollapsedLines": {
     "placeholders": {

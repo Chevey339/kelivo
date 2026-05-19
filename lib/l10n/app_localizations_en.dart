@@ -1211,11 +1211,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get markdownTableExportCsvTooltip => 'Export CSV';
 
   @override
+  String get markdownTableSaveImageTooltip => 'Save to Gallery';
+
+  @override
   String get markdownTableDefaultFileNameStem => 'table';
 
   @override
   String get markdownTableCopiedCsvSnackbar =>
       'CSV copied. Long press Copy to copy as image.';
+
+  @override
+  String get markdownTableCopiedMarkdownSnackbar => 'Table copied.';
 
   @override
   String codeBlockCollapsedLines(int n) {

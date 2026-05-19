@@ -1861,6 +1861,13 @@ bool _isHtml(String? lang) {
 String markdownTableRowsToCsvForTesting(List<List<String>> rows) =>
     _rowsToCsv(rows);
 
+@visibleForTesting
+String markdownTableRowsToMarkdownForTesting(List<List<String>> rows) =>
+    _rowsToMarkdown(rows);
+
+@visibleForTesting
+TargetPlatform? markdownTableTargetPlatformOverride;
+
 class _MarkdownTableBlock extends StatelessWidget {
   _MarkdownTableBlock({
     required this.rows,
@@ -1893,8 +1900,7 @@ class _MarkdownTableBlock extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final bool isDesktopPlatform =
-            Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+        final bool isDesktopPlatform = _markdownTableTargetPlatformIsDesktop();
         final bool useCompactTable =
             !isDesktopPlatform || constraints.maxWidth < 520;
 
@@ -1908,7 +1914,9 @@ class _MarkdownTableBlock extends StatelessWidget {
             ? constraints.maxWidth
             : MediaQuery.sizeOf(context).width;
         final shouldScrollHorizontally =
-            useCompactTable && columnWidth * rows.columnCount > viewportWidth;
+            useCompactTable &&
+            rows.columnCount >= 4 &&
+            columnWidth * rows.columnCount > viewportWidth;
         final table = _buildTable(
           context,
           borderColor: borderColor,
@@ -1960,11 +1968,16 @@ class _MarkdownTableBlock extends StatelessWidget {
                   backgroundColor: headerBg,
                   copyLabel: l10n.shareProviderSheetCopyButton,
                   exportLabel: l10n.markdownTableExportCsvTooltip,
-                  exportImageLabel: l10n.messageExportSheetExportImage,
-                  onCopy: () => _copyCsv(context),
+                  imageActionLabel: isDesktopPlatform
+                      ? l10n.messageExportSheetExportImage
+                      : l10n.markdownTableSaveImageTooltip,
+                  onCopy: () => _copyMarkdown(context),
                   onCopyImage: () => _copyImage(context),
                   onExport: () => _exportCsv(context),
                   onExportImage: () => _exportImage(context),
+                  onImageAction: () => isDesktopPlatform
+                      ? _exportImage(context)
+                      : _saveImageToGallery(context),
                 ),
                 GestureDetector(
                   key: const ValueKey('markdown-table-body'),
@@ -2092,13 +2105,13 @@ class _MarkdownTableBlock extends StatelessWidget {
     return ((safeMax - 16) / visibleColumns).clamp(112.0, 178.0).toDouble();
   }
 
-  Future<void> _copyCsv(BuildContext context) async {
+  Future<void> _copyMarkdown(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
-    await Clipboard.setData(ClipboardData(text: rows.toCsv()));
+    await Clipboard.setData(ClipboardData(text: rows.toMarkdown()));
     if (!context.mounted) return;
     showAppSnackBar(
       context,
-      message: l10n.markdownTableCopiedCsvSnackbar,
+      message: l10n.markdownTableCopiedMarkdownSnackbar,
       type: NotificationType.success,
     );
   }
@@ -2185,6 +2198,44 @@ class _MarkdownTableBlock extends StatelessWidget {
         type: NotificationType.error,
       );
     }
+  }
+
+  Future<void> _saveImageToGallery(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final bytes = await _captureTablePngBytes();
+      if (bytes == null) throw 'render error';
+      final ok = await _savePngBytesToGallery(bytes);
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: ok
+            ? l10n.imagePreviewSheetSaveSuccess
+            : l10n.imagePreviewSheetSaveFailed('unknown'),
+        type: ok ? NotificationType.success : NotificationType.error,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.imagePreviewSheetSaveFailed('$e'),
+        type: NotificationType.error,
+      );
+    }
+  }
+
+  Future<bool> _savePngBytesToGallery(Uint8List bytes) async {
+    final result = await ImageGallerySaverPlus.saveImage(
+      bytes,
+      quality: 100,
+      name: 'kelivo-table-${DateTime.now().millisecondsSinceEpoch}',
+    );
+    if (result is Map) {
+      final isSuccess = result['isSuccess'] == true || result['isSuccess'] == 1;
+      final filePath = result['filePath'] ?? result['file_path'];
+      return isSuccess || (filePath is String && filePath.isNotEmpty);
+    }
+    return false;
   }
 
   Future<void> _copyImage(BuildContext context) async {
@@ -2309,7 +2360,7 @@ class _MarkdownTableCell extends StatelessWidget {
       fontFamily: appFontFamily ?? style.fontFamily,
     );
     final innerCfg = config.copyWith(style: baseStyle);
-    final displayText = _softBreakTableCellText(data.text);
+    final displayText = _softBreakTableCellText(data.text.trim());
     final spans = MarkdownComponent.generate(
       context,
       displayText,
@@ -2367,22 +2418,24 @@ class _MarkdownTableToolbar extends StatelessWidget {
     required this.backgroundColor,
     required this.copyLabel,
     required this.exportLabel,
-    required this.exportImageLabel,
+    required this.imageActionLabel,
     required this.onCopy,
     required this.onCopyImage,
     required this.onExport,
     required this.onExportImage,
+    required this.onImageAction,
   });
 
   final String label;
   final Color backgroundColor;
   final String copyLabel;
   final String exportLabel;
-  final String exportImageLabel;
+  final String imageActionLabel;
   final VoidCallback onCopy;
   final VoidCallback onCopyImage;
   final VoidCallback onExport;
   final VoidCallback onExportImage;
+  final VoidCallback onImageAction;
 
   @override
   Widget build(BuildContext context) {
@@ -2430,11 +2483,12 @@ class _MarkdownTableToolbar extends StatelessWidget {
             ),
           ),
           Tooltip(
-            message: exportImageLabel,
+            message: imageActionLabel,
             child: IosIconButton(
               icon: Lucide.ImageDown,
-              semanticLabel: exportImageLabel,
-              onTap: onExportImage,
+              semanticLabel: imageActionLabel,
+              onTap: onImageAction,
+              onLongPress: onExportImage,
               size: 15,
               minSize: 32,
               padding: const EdgeInsets.all(7),
@@ -2509,6 +2563,10 @@ class _MarkdownTableData {
   String toCsv() => _rowsToCsv(
     rows.map((row) => row.cells.map((c) => c.text).toList()).toList(),
   );
+
+  String toMarkdown() => _rowsToMarkdown(
+    rows.map((row) => row.cells.map((c) => c.text).toList()).toList(),
+  );
 }
 
 class _MarkdownTableRowData {
@@ -2526,6 +2584,54 @@ class _MarkdownTableCellData {
 
 String _rowsToCsv(List<List<String>> rows) {
   return rows.map((row) => row.map(_csvCell).join(',')).join('\r\n');
+}
+
+bool _markdownTableTargetPlatformIsDesktop() {
+  final override = markdownTableTargetPlatformOverride;
+  if (override != null) {
+    return override == TargetPlatform.macOS ||
+        override == TargetPlatform.windows ||
+        override == TargetPlatform.linux;
+  }
+  return Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+}
+
+String _rowsToMarkdown(List<List<String>> rows) {
+  if (rows.isEmpty) return '';
+  final columnCount = rows.fold<int>(
+    0,
+    (count, row) => math.max(count, row.length),
+  );
+  if (columnCount == 0) return '';
+
+  final normalizedRows = rows
+      .map(
+        (row) => List<String>.generate(
+          columnCount,
+          (index) => index < row.length ? _markdownTableCell(row[index]) : '',
+          growable: false,
+        ),
+      )
+      .toList(growable: false);
+  final buffer = StringBuffer();
+  buffer.writeln(_markdownTableLine(normalizedRows.first));
+  buffer.writeln(_markdownTableLine(List.filled(columnCount, '---')));
+  for (final row in normalizedRows.skip(1)) {
+    buffer.writeln(_markdownTableLine(row));
+  }
+  return buffer.toString().trimRight();
+}
+
+String _markdownTableLine(List<String> cells) => '| ${cells.join(' | ')} |';
+
+String _markdownTableCell(String value) {
+  return value
+      .trim()
+      .replaceAll('\\', r'\\')
+      .replaceAll('|', r'\|')
+      .replaceAll('\r\n', '<br>')
+      .replaceAll('\n', '<br>')
+      .replaceAll('\r', '<br>');
 }
 
 String _csvCell(String value) {
