@@ -66,6 +66,7 @@ class _FakeLazyChatService extends ChatService {
   Future<Conversation> createDraftConversation({
     String? title,
     String? assistantId,
+    bool temporary = false,
   }) async {
     return Conversation(title: title ?? 'Draft', assistantId: assistantId);
   }
