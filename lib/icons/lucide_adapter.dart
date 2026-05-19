@@ -9,6 +9,9 @@ class Lucide {
   static const IconData Menu = lucide.LucideIcons.menu;
   static const IconData MessageCirclePlus =
       lucide.LucideIcons.messageCirclePlus;
+  static const IconData MessageCircleDashed =
+      lucide.LucideIcons.messageCircleDashed;
+  static const IconData HatGlasses = lucide.LucideIcons.hatGlasses;
   static const IconData Box = lucide.LucideIcons.box;
   static const IconData Globe = lucide.LucideIcons.earth;
   static const IconData Earth = lucide.LucideIcons.earth;

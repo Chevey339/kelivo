@@ -242,6 +242,12 @@ class HomePageController extends ChangeNotifier {
 
   ValueNotifier<bool> get isProcessingFiles => _viewModel.isProcessingFiles;
 
+  bool get isTemporaryConversation =>
+      _chatService.isTemporaryConversation(currentConversation?.id);
+
+  bool get canToggleTemporaryConversation =>
+      currentConversation != null && messages.isEmpty;
+
   @override
   void notifyListeners() {
     if (_chatControllerReady) {
@@ -600,6 +606,10 @@ class HomePageController extends ChangeNotifier {
     final text = suggestion.trim();
     if (text.isEmpty) return;
     await sendMessage(ChatInputData(text: text));
+  }
+
+  Future<void> toggleTemporaryConversation() async {
+    await _viewModel.toggleTemporaryConversation();
   }
 
   void cancelQueuedMessage() {
