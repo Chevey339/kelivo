@@ -978,6 +978,8 @@
   "providerDetailPageResponseApiTitle": "Response API (/responses)",
   "providerDetailPageAihubmixAppCodeLabel": "应用 Code（享 10% 优惠）",
   "providerDetailPageAihubmixAppCodeHelp": "为请求附加 APP-Code，可享 10% 优惠，仅对 AIhubmix 生效。",
+  "providerDetailPageClaudePromptCachingTitle": "Claude Prompt Caching",
+  "providerDetailPageClaudePromptCachingHelp": "通过 Claude 官方或 OpenRouter 调用 Claude 时，为 System Prompt 附加 cache_control。",
   "providerDetailPageBalanceTitle": "账户余额",
   "providerDetailPageBalanceInfo": "获取账户余额",
   "providerDetailPageBalanceApiPathLabel": "余额 API 路径",

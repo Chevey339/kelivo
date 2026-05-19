@@ -11,6 +11,7 @@ ProviderConfig _openRouterConfig({
   required String modelId,
   bool searchEnabled = true,
   bool useResponseApi = false,
+  bool claudePromptCachingEnabled = false,
 }) {
   return ProviderConfig(
     id: 'OpenRouter',
@@ -20,6 +21,7 @@ ProviderConfig _openRouterConfig({
     baseUrl: 'http://openrouter.ai/api/v1',
     providerType: ProviderKind.openai,
     useResponseApi: useResponseApi,
+    claudePromptCachingEnabled: claudePromptCachingEnabled,
     modelOverrides: <String, dynamic>{
       if (searchEnabled)
         modelId: <String, dynamic>{
@@ -188,5 +190,133 @@ void main() {
         expect(receivedBody!.containsKey('plugins'), isFalse);
       },
     );
+
+    test(
+      'Claude prompt caching adds OpenRouter top-level cache control',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        Map<String, dynamic>? receivedBody;
+        server.listen((request) async {
+          receivedBody =
+              jsonDecode(await utf8.decoder.bind(request).join())
+                  as Map<String, dynamic>;
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {'role': 'assistant', 'content': 'ok'},
+                  'finish_reason': 'stop',
+                },
+              ],
+              'usage': {
+                'prompt_tokens': 1,
+                'completion_tokens': 1,
+                'total_tokens': 2,
+              },
+            }),
+          );
+          await request.response.close();
+        });
+
+        await HttpOverrides.runZoned(
+          () async {
+            final chunks = await ChatApiService.sendMessageStream(
+              config: _openRouterConfig(
+                modelId: 'anthropic/claude-sonnet-4.5',
+                searchEnabled: false,
+                claudePromptCachingEnabled: true,
+              ),
+              modelId: 'anthropic/claude-sonnet-4.5',
+              messages: const <Map<String, dynamic>>[
+                {
+                  'role': 'system',
+                  'content': 'Stable persona and long context.',
+                },
+                {'role': 'user', 'content': 'hello'},
+              ],
+              stream: false,
+            ).toList();
+
+            expect(chunks.last.isDone, isTrue);
+          },
+          createHttpClient: (context) {
+            return _ProxyHttpOverrides(server.port).createHttpClient(context);
+          },
+        );
+
+        expect(receivedBody, isNotNull);
+        final messages = (receivedBody!['messages'] as List).cast<Map>();
+        expect(messages.first['role'], 'system');
+        expect(messages.first['content'], 'Stable persona and long context.');
+        expect(receivedBody!['cache_control'], {'type': 'ephemeral'});
+      },
+    );
+
+    test('Claude prompt caching skips non-Claude OpenRouter models', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      Map<String, dynamic>? receivedBody;
+      server.listen((request) async {
+        receivedBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {'role': 'assistant', 'content': 'ok'},
+                'finish_reason': 'stop',
+              },
+            ],
+            'usage': {
+              'prompt_tokens': 1,
+              'completion_tokens': 1,
+              'total_tokens': 2,
+            },
+          }),
+        );
+        await request.response.close();
+      });
+
+      await HttpOverrides.runZoned(
+        () async {
+          final chunks = await ChatApiService.sendMessageStream(
+            config: _openRouterConfig(
+              modelId: 'deepseek/deepseek-chat',
+              searchEnabled: false,
+              claudePromptCachingEnabled: true,
+            ),
+            modelId: 'deepseek/deepseek-chat',
+            messages: const <Map<String, dynamic>>[
+              {'role': 'system', 'content': 'Stable persona and long context.'},
+              {'role': 'user', 'content': 'hello'},
+            ],
+            stream: false,
+          ).toList();
+
+          expect(chunks.last.isDone, isTrue);
+        },
+        createHttpClient: (context) {
+          return _ProxyHttpOverrides(server.port).createHttpClient(context);
+        },
+      );
+
+      expect(receivedBody, isNotNull);
+      final messages = (receivedBody!['messages'] as List).cast<Map>();
+      expect(messages.first['role'], 'system');
+      expect(messages.first['content'], 'Stable persona and long context.');
+      expect(receivedBody!.containsKey('cache_control'), isFalse);
+    });
   });
 }

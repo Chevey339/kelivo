@@ -10,6 +10,7 @@ import 'package:Kelivo/core/services/api/chat_api_service.dart';
 ProviderConfig _claudeConfig(
   String baseUrl, {
   Map<String, dynamic> modelOverrides = const <String, dynamic>{},
+  bool claudePromptCachingEnabled = false,
 }) {
   return ProviderConfig(
     id: 'ClaudeCompatTest',
@@ -19,6 +20,7 @@ ProviderConfig _claudeConfig(
     baseUrl: baseUrl,
     providerType: ProviderKind.claude,
     modelOverrides: modelOverrides,
+    claudePromptCachingEnabled: claudePromptCachingEnabled,
   );
 }
 
@@ -57,6 +59,10 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
   int? thinkingBudget,
   double? temperature,
   double? topP,
+  bool claudePromptCachingEnabled = false,
+  List<Map<String, dynamic>> messages = const [
+    {'role': 'user', 'content': 'hello'},
+  ],
 }) async {
   late Map<String, dynamic> requestBody;
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -82,11 +88,12 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
   });
 
   final chunks = await ChatApiService.sendMessageStream(
-    config: _claudeConfig('http://${server.address.address}:${server.port}'),
+    config: _claudeConfig(
+      'http://${server.address.address}:${server.port}',
+      claudePromptCachingEnabled: claudePromptCachingEnabled,
+    ),
     modelId: modelId,
-    messages: const [
-      {'role': 'user', 'content': 'hello'},
-    ],
+    messages: messages,
     thinkingBudget: thinkingBudget,
     temperature: temperature,
     topP: topP,
@@ -199,6 +206,40 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
 
 void main() {
   group('Claude thinking compatibility', () {
+    test(
+      'prompt caching adds official Claude top-level cache control',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-sonnet-4-6',
+          claudePromptCachingEnabled: true,
+          messages: const [
+            {'role': 'system', 'content': 'Stable persona and long context.'},
+            {'role': 'user', 'content': 'hello'},
+          ],
+        );
+
+        expect(body['system'], 'Stable persona and long context.');
+        expect(body['cache_control'], {'type': 'ephemeral'});
+        expect((body['messages'] as List).cast<Map>().single['role'], 'user');
+      },
+    );
+
+    test(
+      'prompt caching disabled omits official Claude cache control',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-sonnet-4-6',
+          messages: const [
+            {'role': 'system', 'content': 'Stable persona and long context.'},
+            {'role': 'user', 'content': 'hello'},
+          ],
+        );
+
+        expect(body['system'], 'Stable persona and long context.');
+        expect(body.containsKey('cache_control'), isFalse);
+      },
+    );
+
     test(
       'Opus 4.7 uses adaptive thinking with effort and strips sampling',
       () async {

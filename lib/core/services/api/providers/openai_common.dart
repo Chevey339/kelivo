@@ -252,6 +252,29 @@ bool _shouldIncludeStreamingUsageOptions(
   return !host.contains('mistral.ai') && !host.contains('openrouter');
 }
 
+bool _isClaudeModelId(String modelId) {
+  final normalized = modelId.trim().toLowerCase();
+  return normalized.contains('claude') || normalized.contains('anthropic/');
+}
+
+bool _shouldCacheClaudeSystemPrompt(
+  ProviderConfig config,
+  String upstreamModelId,
+) {
+  return config.claudePromptCachingEnabled == true &&
+      BuiltInToolsHelper.isOpenRouterProvider(config) &&
+      _isClaudeModelId(upstreamModelId);
+}
+
+void _applyOpenRouterClaudePromptCaching(
+  Map<String, dynamic> body, {
+  required ProviderConfig config,
+  required String upstreamModelId,
+}) {
+  if (!_shouldCacheClaudeSystemPrompt(config, upstreamModelId)) return;
+  body['cache_control'] = {'type': 'ephemeral'};
+}
+
 void _maybeAddStreamingUsageOptions(
   Map<String, dynamic> body, {
   required bool stream,
@@ -1186,6 +1209,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     body,
     config: config,
     modelId: modelId,
+    upstreamModelId: upstreamModelId,
+  );
+  _applyOpenRouterClaudePromptCaching(
+    body,
+    config: config,
     upstreamModelId: upstreamModelId,
   );
 

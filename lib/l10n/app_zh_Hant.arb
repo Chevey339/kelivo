@@ -932,6 +932,8 @@
   "providerDetailPageResponseApiTitle": "Response API (/responses)",
   "providerDetailPageAihubmixAppCodeLabel": "應用 Code（享 10% 優惠）",
   "providerDetailPageAihubmixAppCodeHelp": "為請求附加 APP-Code，可享 10% 優惠，僅對 AIhubmix 生效。",
+  "providerDetailPageClaudePromptCachingTitle": "Claude Prompt Caching",
+  "providerDetailPageClaudePromptCachingHelp": "透過 Claude 官方或 OpenRouter 呼叫 Claude 時，為 System Prompt 附加 cache_control。",
   "providerDetailPageBalanceTitle": "帳戶餘額",
   "providerDetailPageBalanceInfo": "取得帳戶餘額",
   "providerDetailPageBalanceApiPathLabel": "餘額 API 路徑",

@@ -2832,6 +2832,14 @@ class AppLocalizationsZh extends AppLocalizations {
       '为请求附加 APP-Code，可享 10% 优惠，仅对 AIhubmix 生效。';
 
   @override
+  String get providerDetailPageClaudePromptCachingTitle =>
+      'Claude Prompt Caching';
+
+  @override
+  String get providerDetailPageClaudePromptCachingHelp =>
+      '通过 Claude 官方或 OpenRouter 调用 Claude 时，为 System Prompt 附加 cache_control。';
+
+  @override
   String get providerDetailPageBalanceTitle => '账户余额';
 
   @override
@@ -7687,6 +7695,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '为请求附加 APP-Code，可享 10% 优惠，仅对 AIhubmix 生效。';
 
   @override
+  String get providerDetailPageClaudePromptCachingTitle =>
+      'Claude Prompt Caching';
+
+  @override
+  String get providerDetailPageClaudePromptCachingHelp =>
+      '通过 Claude 官方或 OpenRouter 调用 Claude 时，为 System Prompt 附加 cache_control。';
+
+  @override
   String get providerDetailPageBalanceTitle => '账户余额';
 
   @override
@@ -12539,6 +12555,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get providerDetailPageAihubmixAppCodeHelp =>
       '為請求附加 APP-Code，可享 10% 優惠，僅對 AIhubmix 生效。';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTitle =>
+      'Claude Prompt Caching';
+
+  @override
+  String get providerDetailPageClaudePromptCachingHelp =>
+      '透過 Claude 官方或 OpenRouter 呼叫 Claude 時，為 System Prompt 附加 cache_control。';
 
   @override
   String get providerDetailPageBalanceTitle => '帳戶餘額';

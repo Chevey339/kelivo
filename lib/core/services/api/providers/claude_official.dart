@@ -273,6 +273,8 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       'messages': convo,
       'stream': stream,
       if (systemPrompt.isNotEmpty) 'system': systemPrompt,
+      if (config.claudePromptCachingEnabled == true)
+        'cache_control': {'type': 'ephemeral'},
       if (!omitSamplingParams &&
           !_isClaudeReasoningEnabled(thinkingBudget) &&
           temperature != null)

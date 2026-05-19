@@ -5504,6 +5504,18 @@ abstract class AppLocalizations {
   /// **'Adds header APP-Code requests to get a 10% discount. Only affects AIhubmix.'**
   String get providerDetailPageAihubmixAppCodeHelp;
 
+  /// No description provided for @providerDetailPageClaudePromptCachingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Claude Prompt Caching'**
+  String get providerDetailPageClaudePromptCachingTitle;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Adds cache_control to the system prompt for Claude requests through Anthropic or OpenRouter.'**
+  String get providerDetailPageClaudePromptCachingHelp;
+
   /// No description provided for @providerDetailPageBalanceTitle.
   ///
   /// In en, this message translates to:
