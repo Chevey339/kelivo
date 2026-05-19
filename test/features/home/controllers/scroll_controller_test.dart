@@ -1,6 +1,7 @@
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:scrollview_observer/scrollview_observer.dart';
 
 void main() {
   group('ChatScrollController streaming auto-follow', () {
@@ -82,6 +83,86 @@ void main() {
       scrollController.dispose();
     });
   });
+
+  group('ChatScrollController message navigation', () {
+    testWidgets('上一条消息在没有观察回调时仍以当前可见项为锚点', (tester) async {
+      final messages = <_NavMessage>[
+        for (var i = 0; i < 40; i++)
+          _NavMessage(
+            id: 'message-$i',
+            role: i % 5 == 0 ? 'user' : 'assistant',
+          ),
+      ];
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => false,
+        getAutoScrollIdleSeconds: () => 8,
+      );
+
+      await tester.pumpWidget(
+        _ObservedScrollHarness(
+          scrollController: scrollController,
+          observerController: chatScrollController.observerController,
+          messages: messages,
+        ),
+      );
+      scrollController.jumpTo(900);
+      await tester.pump();
+
+      final navigation = chatScrollController.jumpToPreviousQuestion(
+        messages: messages,
+        indexOfId: (id) => messages.indexWhere((message) => message.id == id),
+      );
+      await tester.pumpAndSettle();
+      await navigation;
+
+      expect(chatScrollController.lastJumpUserMessageId, 'message-15');
+
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
+
+    testWidgets('下一条消息在没有观察回调时仍以当前可见项为锚点', (tester) async {
+      final messages = <_NavMessage>[
+        for (var i = 0; i < 40; i++)
+          _NavMessage(
+            id: 'message-$i',
+            role: i % 5 == 0 ? 'user' : 'assistant',
+          ),
+      ];
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => false,
+        getAutoScrollIdleSeconds: () => 8,
+      );
+
+      await tester.pumpWidget(
+        _ObservedScrollHarness(
+          scrollController: scrollController,
+          observerController: chatScrollController.observerController,
+          messages: messages,
+        ),
+      );
+      scrollController.jumpTo(900);
+      await tester.pump();
+
+      final navigation = chatScrollController.jumpToNextQuestion(
+        messages: messages,
+        indexOfId: (id) => messages.indexWhere((message) => message.id == id),
+      );
+      await tester.pumpAndSettle();
+      await navigation;
+
+      expect(chatScrollController.lastJumpUserMessageId, 'message-15');
+
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
+  });
 }
 
 class _ScrollHarness extends StatelessWidget {
@@ -108,4 +189,46 @@ class _ScrollHarness extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ObservedScrollHarness extends StatelessWidget {
+  const _ObservedScrollHarness({
+    required this.scrollController,
+    required this.observerController,
+    required this.messages,
+  });
+
+  final ScrollController scrollController;
+  final ListObserverController observerController;
+  final List<_NavMessage> messages;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: SizedBox(
+        height: 600,
+        child: ListViewObserver(
+          controller: observerController,
+          child: ListView.builder(
+            controller: scrollController,
+            itemCount: messages.length,
+            itemBuilder: (context, index) {
+              final message = messages[index];
+              return SizedBox(
+                height: 80,
+                child: Text('${message.role} ${message.id}'),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavMessage {
+  const _NavMessage({required this.id, required this.role});
+
+  final String id;
+  final String role;
 }
