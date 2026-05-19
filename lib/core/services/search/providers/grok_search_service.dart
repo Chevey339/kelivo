@@ -45,7 +45,12 @@ class GrokSearchService extends SearchService<GrokOptions> {
           {'type': 'x_search'},
         ],
         'store': false,
+        'stream': false,
       };
+      final reasoningEffort = serviceOptions.resolvedReasoningEffort;
+      if (reasoningEffort.isNotEmpty) {
+        body['reasoning'] = {'effort': reasoningEffort};
+      }
 
       final response = await _client
           .post(
@@ -76,24 +81,18 @@ class GrokSearchService extends SearchService<GrokOptions> {
         orElse: () => const <String, dynamic>{},
       );
 
-      final seenUrls = <String>{};
-      final annotations =
-          (textContent['annotations'] as List?) ?? const <dynamic>[];
       final items = <SearchResultItem>[];
-      for (final annotation in annotations.cast<Object?>().whereType<Map>()) {
-        if (annotation['type'] != 'url_citation') continue;
-        final url = annotation['url']?.toString().trim() ?? '';
-        if (url.isEmpty || !seenUrls.add(url)) continue;
-        items.add(
-          SearchResultItem(
-            title: annotation['title']?.toString().trim().isNotEmpty == true
-                ? annotation['title'].toString()
-                : url,
-            url: url,
-            text: '',
-          ),
+      _addCitationItems(
+        items: items,
+        citations: data['citations'],
+        maxItems: commonOptions.resultSize,
+      );
+      if (items.length < commonOptions.resultSize) {
+        _addCitationItems(
+          items: items,
+          citations: textContent['annotations'],
+          maxItems: commonOptions.resultSize,
         );
-        if (items.length >= commonOptions.resultSize) break;
       }
 
       return SearchResult(
@@ -103,5 +102,40 @@ class GrokSearchService extends SearchService<GrokOptions> {
     } catch (e) {
       throw Exception('Grok search failed: $e');
     }
+  }
+
+  static void _addCitationItems({
+    required List<SearchResultItem> items,
+    required Object? citations,
+    required int maxItems,
+  }) {
+    final seenUrls = items.map((item) => item.url).toSet();
+    final citationList = (citations as List?) ?? const <dynamic>[];
+    for (final citation in citationList) {
+      final item = _citationItem(citation);
+      if (item == null || !seenUrls.add(item.url)) continue;
+      items.add(item);
+      if (items.length >= maxItems) return;
+    }
+  }
+
+  static SearchResultItem? _citationItem(Object? citation) {
+    if (citation is String) {
+      final url = citation.trim();
+      if (url.isEmpty) return null;
+      return SearchResultItem(title: url, url: url, text: '');
+    }
+
+    if (citation is! Map || citation['type'] != 'url_citation') {
+      return null;
+    }
+    final url = citation['url']?.toString().trim() ?? '';
+    if (url.isEmpty) return null;
+    final title = citation['title']?.toString().trim();
+    return SearchResultItem(
+      title: title?.isNotEmpty == true ? title! : url,
+      url: url,
+      text: '',
+    );
   }
 }

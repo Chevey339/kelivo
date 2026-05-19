@@ -100,6 +100,7 @@ void main() {
           {'type': 'x_search'},
         ],
         'store': false,
+        'stream': false,
       });
       expect(result.answer, 'Kelivo is a Flutter chat client.');
       expect(result.items, hasLength(1));
@@ -107,6 +108,124 @@ void main() {
       expect(result.items.single.url, 'https://example.com/a');
       expect(result.items.single.text, isEmpty);
     });
+
+    test('keeps explicitly configured model unchanged', () async {
+      http.Request? captured;
+      final service = GrokSearchService(
+        client: MockClient((request) async {
+          captured = request;
+          return http.Response(
+            jsonEncode({
+              'output': [
+                {
+                  'type': 'message',
+                  'role': 'assistant',
+                  'content': [
+                    {'type': 'output_text', 'text': 'ok'},
+                  ],
+                },
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+
+      await service.search(
+        query: 'kelivo',
+        commonOptions: const SearchCommonOptions(timeout: 1000),
+        serviceOptions: GrokOptions(
+          id: 'grok-1',
+          apiKey: 'xai-test',
+          model: 'grok-4-1-fast-non-reasoning',
+        ),
+      );
+
+      final body = jsonDecode(captured!.body) as Map<String, dynamic>;
+      expect(body['model'], 'grok-4-1-fast-non-reasoning');
+      expect(body.containsKey('reasoning'), isFalse);
+    });
+
+    test('uses current default model with non-reasoning effort', () async {
+      http.Request? captured;
+      final service = GrokSearchService(
+        client: MockClient((request) async {
+          captured = request;
+          return http.Response(
+            jsonEncode({
+              'output': [
+                {
+                  'type': 'message',
+                  'role': 'assistant',
+                  'content': [
+                    {'type': 'output_text', 'text': 'ok'},
+                  ],
+                },
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+
+      await service.search(
+        query: 'kelivo',
+        commonOptions: const SearchCommonOptions(timeout: 1000),
+        serviceOptions: GrokOptions(id: 'grok-1', apiKey: 'xai-test'),
+      );
+
+      final body = jsonDecode(captured!.body) as Map<String, dynamic>;
+      expect(body['model'], 'grok-4.3');
+      expect(body['reasoning'], {'effort': 'none'});
+    });
+
+    test(
+      'parses top-level citations when inline annotations are absent',
+      () async {
+        final service = GrokSearchService(
+          client: MockClient(
+            (_) async => http.Response(
+              jsonEncode({
+                'citations': [
+                  'https://example.com/a',
+                  'https://example.com/a',
+                  'https://example.com/b',
+                ],
+                'output': [
+                  {'type': 'web_search_call', 'status': 'completed'},
+                  {
+                    'type': 'message',
+                    'role': 'assistant',
+                    'content': [
+                      {
+                        'type': 'output_text',
+                        'text': 'Kelivo is a Flutter chat client.',
+                      },
+                    ],
+                  },
+                ],
+              }),
+              200,
+            ),
+          ),
+        );
+
+        final result = await service.search(
+          query: 'kelivo',
+          commonOptions: const SearchCommonOptions(
+            resultSize: 1,
+            timeout: 1000,
+          ),
+          serviceOptions: GrokOptions(id: 'grok-1', apiKey: 'xai-test'),
+        );
+
+        expect(result.answer, 'Kelivo is a Flutter chat client.');
+        expect(result.items, hasLength(1));
+        expect(result.items.single.title, 'https://example.com/a');
+        expect(result.items.single.url, 'https://example.com/a');
+        expect(result.items.single.text, isEmpty);
+      },
+    );
 
     test('throws before request when API key is empty', () async {
       var called = false;
