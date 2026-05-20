@@ -389,6 +389,46 @@ void main() {
     smoothController.dispose();
   });
 
+  testWidgets('stream UI output handles a one-character final backlog', (
+    tester,
+  ) async {
+    final settings = SettingsProvider();
+    final smoothController = StreamController(
+      chatService: ChatService(),
+      onStateChanged: () {},
+      getSettingsProvider: () => settings,
+      getCurrentConversationId: () => 'conversation-1',
+    );
+
+    final contents = <String>[];
+    smoothController.markStreamingStarted('assistant-message');
+    smoothController.streamingContentNotifier
+        .getNotifier('assistant-message')
+        .addListener(() {
+          contents.add(
+            smoothController.streamingContentNotifier
+                .getNotifier('assistant-message')
+                .value
+                .content,
+          );
+        });
+
+    smoothController.scheduleThrottledUpdate(
+      'assistant-message',
+      'conversation-1',
+      'abc',
+      totalTokens: 3,
+      updateMessageInList: (_, __, ___) {},
+    );
+
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(tester.takeException(), isNull);
+    expect(contents, const ['ab', 'abc']);
+    smoothController.dispose();
+  });
+
   testWidgets('cleanup flushes final stream content immediately', (
     tester,
   ) async {

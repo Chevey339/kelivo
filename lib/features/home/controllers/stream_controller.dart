@@ -1387,6 +1387,8 @@ class _StreamSmoothState {
     required double pickRate,
     required int moveAverageLength,
   }) {
+    if (backlog <= minCount) return backlog;
+
     final rawPick = _rawPickCount(
       backlog: backlog,
       minCount: minCount,
