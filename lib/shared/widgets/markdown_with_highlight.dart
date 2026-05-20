@@ -3015,7 +3015,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => _openMermaidImageViewer(context, displayBytes),
-            child: Image.memory(displayBytes, fit: BoxFit.contain),
+            child: Image(image: MemoryImage(displayBytes), fit: BoxFit.contain),
           ),
         ),
       );
@@ -3320,9 +3320,11 @@ class _MermaidBlockState extends State<_MermaidBlock> {
 
   void _openMermaidImageViewer(BuildContext context, Uint8List bytes) {
     final src = 'data:image/png;base64,${base64Encode(bytes)}';
+    final provider = MemoryImage(bytes);
     Navigator.of(context).push(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => ImageViewerPage(images: [src]),
+        pageBuilder: (_, __, ___) =>
+            ImageViewerPage(images: [src], imageProviders: {src: provider}),
         transitionDuration: const Duration(milliseconds: 300),
         reverseTransitionDuration: const Duration(milliseconds: 240),
         transitionsBuilder: (context, anim, sec, child) {
@@ -3483,15 +3485,19 @@ class _MermaidTabButtonState extends State<_MermaidTabButton> {
               color: bg,
               borderRadius: BorderRadius.circular(6),
             ),
-            child: Text(
-              widget.label,
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.35,
-                fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
-                color: widget.selected
-                    ? widget.colors.textPrimary
-                    : widget.colors.textSecondary,
+            child: SelectionContainer.disabled(
+              child: Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: widget.selected
+                      ? FontWeight.w600
+                      : FontWeight.w500,
+                  color: widget.selected
+                      ? widget.colors.textPrimary
+                      : widget.colors.textSecondary,
+                ),
               ),
             ),
           ),

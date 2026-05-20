@@ -22,10 +22,12 @@ class ImageViewerPage extends StatefulWidget {
     super.key,
     required this.images,
     this.initialIndex = 0,
+    this.imageProviders = const <String, ImageProvider>{},
   });
 
   final List<String> images; // local paths, http urls, or data urls
   final int initialIndex;
+  final Map<String, ImageProvider> imageProviders;
 
   @override
   State<ImageViewerPage> createState() => _ImageViewerPageState();
@@ -53,6 +55,8 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   final GlobalKey _copyBtnKey = GlobalKey();
 
   final Map<String, _SampledImage> _samples = <String, _SampledImage>{};
+  final Map<String, ImageProvider> _imageProviderCache =
+      <String, ImageProvider>{};
 
   bool get _isDesktop =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
@@ -85,6 +89,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       vsync: this,
       duration: const Duration(milliseconds: 230),
     );
+    _imageProviderCache.addAll(widget.imageProviders);
 
     // prepare sample for initial image
     _prepareSampleForIndex(_index);
@@ -135,6 +140,15 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   }
 
   ImageProvider _providerFor(String src) {
+    final cached = _imageProviderCache[src];
+    if (cached != null) return cached;
+
+    final provider = _createProviderFor(src);
+    _imageProviderCache[src] = provider;
+    return provider;
+  }
+
+  ImageProvider _createProviderFor(String src) {
     if (src.startsWith('http://') || src.startsWith('https://')) {
       return NetworkImage(src);
     }
@@ -673,6 +687,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
                   final img = Image(
                     image: _providerFor(src),
                     fit: BoxFit.contain,
+                    gaplessPlayback: true,
                     errorBuilder: (_, __, ___) => const Icon(
                       Icons.broken_image,
                       color: Colors.white70,

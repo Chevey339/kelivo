@@ -1252,6 +1252,36 @@ $code
     },
   );
 
+  testWidgets('MarkdownWithCodeHighlight disables selection for Mermaid tabs', (
+    tester,
+  ) async {
+    addTearDown(MermaidImageCache.clear);
+    const code = 'graph TD\nA-->B';
+    MermaidImageCache.put(code, Uint8List.fromList(_transparentPngBytes));
+
+    await tester.pumpWidget(
+      _markdownHarness('''
+```mermaid
+$code
+```'''),
+    );
+    await tester.pump();
+
+    for (final label in ['Image', 'Code']) {
+      final selectionContainers = find.ancestor(
+        of: find.text(label),
+        matching: find.byType(SelectionContainer),
+      );
+
+      expect(
+        tester
+            .widgetList<SelectionContainer>(selectionContainers)
+            .any((widget) => widget.delegate == null),
+        isTrue,
+      );
+    }
+  });
+
   testWidgets(
     'MarkdownWithCodeHighlight opens Mermaid image from preview tap',
     (tester) async {
