@@ -39,6 +39,7 @@ import 'package:Kelivo/desktop/html_preview_dialog.dart';
 // Inline math is parsed on the UI thread. Bound the lookahead window so a long
 // line with many unmatched openers cannot trigger repeated whole-line scans.
 const int _maxInlineMathBodyLength = 512;
+const String _codeDollarMask = '___CODE_DOLLAR_MASK___';
 
 /// gpt_markdown with custom code block highlight and inline code styling.
 class MarkdownWithCodeHighlight extends StatefulWidget {
@@ -427,7 +428,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       // Inline `code` styling via highlightBuilder in gpt_markdown
       highlightBuilder: (ctx, inline, style) {
         // Unmask dollar signs that were protected during preprocessing
-        String unmasked = inline.replaceAll('___CODE_DOLLAR_MASK___', r'$');
+        String unmasked = inline.replaceAll(_codeDollarMask, r'$');
         String softened = _softBreakInline(unmasked);
         final bool isDarkCtx = Theme.of(ctx).brightness == Brightness.dark;
         final csCtx = Theme.of(ctx).colorScheme;
@@ -632,7 +633,7 @@ String _preprocessFences(
     if (isInlineCode) {
       codeContent = codeContent.replaceAllMapped(
         RegExp(r'\$'),
-        (m) => '___CODE_DOLLAR_MASK___',
+        (m) => _codeDollarMask,
       );
     }
 
@@ -770,7 +771,7 @@ String _preprocessFences(
 
   // STEP 3: UNMASKING - Restore code blocks
   // Replace all mask placeholders with their original content
-  // NOTE: We do NOT restore ___CODE_DOLLAR_MASK___ here because we want LaTeX components
+  // NOTE: We do NOT restore _codeDollarMask here because we want LaTeX components
   // to never see dollar signs inside code. The unmask will happen later in highlightBuilder.
   out = out.replaceAllMapped(RegExp(r'__CODE_MASK_\d+__'), (match) {
     final key = match.group(0)!;
@@ -2365,7 +2366,8 @@ class _MarkdownTableCell extends StatelessWidget {
       fontFamily: appFontFamily ?? style.fontFamily,
     );
     final innerCfg = config.copyWith(style: baseStyle);
-    final displayText = _softBreakTableCellText(data.text.trim());
+    final cellText = data.text.trim().replaceAll(_codeDollarMask, r'$');
+    final displayText = _softBreakTableCellText(cellText);
     final spans = MarkdownComponent.generate(
       context,
       displayText,

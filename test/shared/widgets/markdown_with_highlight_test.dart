@@ -288,12 +288,20 @@ void main() {
     expect(find.byTooltip('Export CSV'), findsOneWidget);
     expect(find.byTooltip('Save to Gallery'), findsOneWidget);
     final tableBlock = find.byKey(const ValueKey('markdown-table-block'));
-    final plainText = tester
+    final richTextPlainText = tester
         .widgetList<RichText>(
           find.descendant(of: tableBlock, matching: find.byType(RichText)),
         )
-        .map((widget) => widget.text.toPlainText())
-        .join('\n');
+        .map((widget) => widget.text.toPlainText());
+    final selectablePlainText = tester
+        .widgetList<SelectableText>(
+          find.descendant(
+            of: tableBlock,
+            matching: find.byType(SelectableText),
+          ),
+        )
+        .map((widget) => widget.textSpan?.toPlainText() ?? widget.data ?? '');
+    final plainText = [...richTextPlainText, ...selectablePlainText].join('\n');
     expect(plainText, contains('Name'));
     expect(plainText, contains('42'));
   });
@@ -1194,6 +1202,45 @@ B-->C
       isTrue,
     );
   });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps dollar signs inside table code',
+    (tester) async {
+      _overrideMarkdownTablePlatform(TargetPlatform.android);
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+| 对比点 | 行内 `$...$` | 行间 `$$...$$` |
+|--------|-------------|---------------|
+| 是否换行 | 不换行 | 换行 |
+''', width: 360),
+      );
+      await tester.pump();
+
+      final tableBlock = find.byKey(const ValueKey('markdown-table-block'));
+      expect(tableBlock, findsOneWidget);
+      final richTextPlainText = tester
+          .widgetList<RichText>(
+            find.descendant(of: tableBlock, matching: find.byType(RichText)),
+          )
+          .map((widget) => widget.text.toPlainText());
+      final selectablePlainText = tester
+          .widgetList<SelectableText>(
+            find.descendant(
+              of: tableBlock,
+              matching: find.byType(SelectableText),
+            ),
+          )
+          .map((widget) => widget.textSpan?.toPlainText() ?? widget.data ?? '');
+      final plainText = [
+        ...richTextPlainText,
+        ...selectablePlainText,
+      ].join('\n');
+
+      expect(plainText, contains(r'$...$'));
+      expect(plainText, contains(r'$$...$$'));
+      expect(plainText, isNot(contains('___CODE_DOLLAR_MASK___')));
+    },
+  );
 
   testWidgets(
     'MarkdownWithCodeHighlight uses flutter_math_fork for inline and block math',
