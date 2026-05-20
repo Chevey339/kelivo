@@ -36,6 +36,10 @@ import 'package:flutter_math_fork/flutter_math.dart';
 import '../../core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/html_preview_dialog.dart';
 
+// Inline math is parsed on the UI thread. Bound the lookahead window so a long
+// line with many unmatched openers cannot trigger repeated whole-line scans.
+const int _maxInlineMathBodyLength = 512;
+
 /// gpt_markdown with custom code block highlight and inline code styling.
 class MarkdownWithCodeHighlight extends StatefulWidget {
   const MarkdownWithCodeHighlight({
@@ -989,7 +993,6 @@ int _findLastOpenStreamingDollar(String line) {
     if (!_canOpenDollarMath(line, i)) continue;
     final close = _findClosingDollarMath(line, i + 1);
     if (close == -1) return i;
-    i = close;
   }
   return -1;
 }
@@ -1043,7 +1046,8 @@ String _replaceInlineDollarMath(String input) {
 }
 
 int _findClosingDollarMath(String input, int start) {
-  for (var i = start; i < input.length; i++) {
+  final end = math.min(input.length, start + _maxInlineMathBodyLength + 1);
+  for (var i = start; i < end; i++) {
     final ch = input.codeUnitAt(i);
     if (ch == 0x0A) return -1;
     if (ch == 0x5C) {
@@ -1062,6 +1066,7 @@ int _findClosingDollarMath(String input, int start) {
 
 bool _isValidDollarMathBody(String body) {
   if (body.isEmpty) return false;
+  if (body.length > _maxInlineMathBodyLength) return false;
   if (_isWhitespaceCodeUnit(body.codeUnitAt(0))) return false;
   if (_isWhitespaceCodeUnit(body.codeUnitAt(body.length - 1))) return false;
   return !_containsUnescapedPipe(body);
@@ -3446,8 +3451,13 @@ class LatexBlockScrollableMd extends BlockMd {
 class InlineLatexScrollableMd extends InlineMd {
   @override
   // Match single-dollar $...$ or \(...\) inline math (avoid $$ block)
-  RegExp get exp =>
-      RegExp(r"(?:(?<!\$)\$([^\$\n]+?)\$(?!\$)|\\\(([^\n]+?)\\\))");
+  RegExp get exp => RegExp(
+    r"(?:(?<!\$)\$([^\$\n]{1,"
+    "$_maxInlineMathBodyLength"
+    r"})\$(?!\$)|\\\(([^\n]{1,"
+    "$_maxInlineMathBodyLength"
+    r"}?)\\\))",
+  );
 
   @override
   InlineSpan span(BuildContext context, String text, GptMarkdownConfig config) {
@@ -3474,7 +3484,9 @@ class InlineLatexScrollableMd extends InlineMd {
 class InlineLatexDollarScrollableMd extends InlineMd {
   @override
   RegExp get exp => RegExp(
-    r"(^|[ \t\r\n(])(?<!\\)(?<!\$)\$((?:\\.|[^\$\\\n|])+?)\$(?!\$)(?![A-Za-z0-9])",
+    r"(^|[ \t\r\n(])(?<!\\)(?<!\$)\$((?:\\.|[^\$\\\n|]){1,"
+    "$_maxInlineMathBodyLength"
+    r"})\$(?!\$)(?![A-Za-z0-9])",
   );
 
   @override
@@ -3511,7 +3523,11 @@ class InlineLatexDollarScrollableMd extends InlineMd {
 /// Inline LaTeX for parenthesis delimiters only: `\(...\)`
 class InlineLatexParenScrollableMd extends InlineMd {
   @override
-  RegExp get exp => RegExp(r"(?:\\\(([^\n]+?)\\\))");
+  RegExp get exp => RegExp(
+    r"(?:\\\(([^\n]{1,"
+    "$_maxInlineMathBodyLength"
+    r"}?)\\\))",
+  );
 
   @override
   InlineSpan span(BuildContext context, String text, GptMarkdownConfig config) {

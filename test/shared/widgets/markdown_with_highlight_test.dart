@@ -1329,6 +1329,65 @@ $$
   );
 
   testWidgets(
+    'MarkdownWithCodeHighlight does not stall on closed streaming inline dollar math',
+    (tester) async {
+      final stopwatch = Stopwatch()..start();
+
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+**举例对比：**
+
+- 行内：$\sum_{i=1}^{n} i$
+''', streaming: true),
+      );
+      await tester.pump();
+
+      stopwatch.stop();
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 3)));
+      expect(_findMathWidget(), findsOneWidget);
+    },
+    timeout: const Timeout(Duration(seconds: 10)),
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight does not stall on many unmatched inline dollar math openers',
+    (tester) async {
+      final text = List<String>.filled(
+        2200,
+        r' prose $unfinished_math_expression',
+      ).join();
+      final stopwatch = Stopwatch()..start();
+
+      await tester.pumpWidget(_markdownHarness(text));
+      await tester.pump();
+
+      stopwatch.stop();
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 3)));
+      expect(_findMathWidget(), findsNothing);
+    },
+    timeout: const Timeout(Duration(seconds: 10)),
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight does not stall on many unmatched inline paren math openers',
+    (tester) async {
+      final text = List<String>.filled(
+        2200,
+        r' prose \(unfinished_math_expression',
+      ).join();
+      final stopwatch = Stopwatch()..start();
+
+      await tester.pumpWidget(_markdownHarness(text));
+      await tester.pump();
+
+      stopwatch.stop();
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 3)));
+      expect(_findMathWidget(), findsNothing);
+    },
+    timeout: const Timeout(Duration(seconds: 10)),
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps table pipes from widening dollar math',
     (tester) async {
       await tester.pumpWidget(
