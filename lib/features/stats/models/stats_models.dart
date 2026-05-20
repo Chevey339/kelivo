@@ -31,14 +31,14 @@ class StatsDateRange {
     final end = StatsDateRange.normalizeDate(now);
     return StatsDateRange._(
       preset: StatsDateRangePreset.last30Days,
-      start: end.subtract(const Duration(days: 29)),
+      start: StatsDateRange.addCalendarDays(end, -29),
       end: end,
     );
   }
 
   factory StatsDateRange.previousMonth(DateTime now) {
     final monthStart = DateTime(now.year, now.month);
-    final previousMonthEnd = monthStart.subtract(const Duration(days: 1));
+    final previousMonthEnd = StatsDateRange.addCalendarDays(monthStart, -1);
     return StatsDateRange._(
       preset: StatsDateRangePreset.previousMonth,
       start: DateTime(previousMonthEnd.year, previousMonthEnd.month),
@@ -53,8 +53,9 @@ class StatsDateRange {
   factory StatsDateRange.previousQuarter(DateTime now) {
     final currentQuarterStartMonth = ((now.month - 1) ~/ 3) * 3 + 1;
     final currentQuarterStart = DateTime(now.year, currentQuarterStartMonth);
-    final previousQuarterEnd = currentQuarterStart.subtract(
-      const Duration(days: 1),
+    final previousQuarterEnd = StatsDateRange.addCalendarDays(
+      currentQuarterStart,
+      -1,
     );
     final previousQuarterStartMonth =
         ((previousQuarterEnd.month - 1) ~/ 3) * 3 + 1;
@@ -84,6 +85,10 @@ class StatsDateRange {
 
   static DateTime normalizeDate(DateTime value) {
     return DateTime(value.year, value.month, value.day);
+  }
+
+  static DateTime addCalendarDays(DateTime value, int days) {
+    return DateTime(value.year, value.month, value.day + days);
   }
 
   bool contains(DateTime value) {

@@ -199,7 +199,7 @@ class _StatsPageState extends State<StatsPage> {
   Future<void> _pickCustomRange() async {
     final now = DateTime.now();
     final end = StatsDateRange.normalizeDate(now);
-    final start = end.subtract(const Duration(days: 29));
+    final start = StatsDateRange.addCalendarDays(end, -29);
     final initialRange = DateTimeRange(
       start: _range.start ?? start,
       end: _range.end ?? end,
@@ -756,7 +756,7 @@ class _StatsDatePickerPanelState extends State<_StatsDatePickerPanel> {
     final formatter = DateFormat.E(locale);
     return [
       for (var i = 0; i < 7; i++)
-        formatter.format(weekStart.add(Duration(days: i))),
+        formatter.format(StatsDateRange.addCalendarDays(weekStart, i)),
     ];
   }
 }
@@ -781,8 +781,9 @@ class _MonthGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final monthStart = DateTime(visibleMonth.year, visibleMonth.month);
-    final gridStart = monthStart.subtract(
-      Duration(days: monthStart.weekday - DateTime.monday),
+    final gridStart = StatsDateRange.addCalendarDays(
+      monthStart,
+      DateTime.monday - monthStart.weekday,
     );
     return GridView.builder(
       shrinkWrap: true,
@@ -794,7 +795,7 @@ class _MonthGrid extends StatelessWidget {
       ),
       itemCount: 42,
       itemBuilder: (context, index) {
-        final date = gridStart.add(Duration(days: index));
+        final date = StatsDateRange.addCalendarDays(gridStart, index);
         return _DateCell(
           date: date,
           inVisibleMonth: date.month == visibleMonth.month,
