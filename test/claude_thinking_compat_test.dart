@@ -524,6 +524,98 @@ void main() {
       expect(toolResultContent.single['tool_use_id'], 'toolu_1');
     });
 
+    test(
+      'history tool replay uses complete Claude assistant tool blocks',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-sonnet-4-6',
+          messages: const [
+            {'role': 'user', 'content': '查两个信息'},
+            {
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': [
+                {
+                  'id': 'toolu_1',
+                  'type': 'function',
+                  'function': {
+                    'name': 'lookup',
+                    'arguments': '{"query":"Kelivo"}',
+                  },
+                  'metadata': {
+                    'anthropic': {
+                      'assistant_blocks': [
+                        {
+                          'type': 'tool_use',
+                          'id': 'toolu_1',
+                          'name': 'lookup',
+                          'input': {'query': 'Kelivo'},
+                        },
+                      ],
+                    },
+                  },
+                },
+                {
+                  'id': 'toolu_2',
+                  'type': 'function',
+                  'function': {
+                    'name': 'lookup',
+                    'arguments': '{"query":"Claude"}',
+                  },
+                  'metadata': {
+                    'anthropic': {
+                      'assistant_blocks': [
+                        {
+                          'type': 'tool_use',
+                          'id': 'toolu_1',
+                          'name': 'lookup',
+                          'input': {'query': 'Kelivo'},
+                        },
+                        {
+                          'type': 'tool_use',
+                          'id': 'toolu_2',
+                          'name': 'lookup',
+                          'input': {'query': 'Claude'},
+                        },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'toolu_1',
+              'name': 'lookup',
+              'content': '{"result":"Kelivo ok"}',
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'toolu_2',
+              'name': 'lookup',
+              'content': '{"result":"Claude ok"}',
+            },
+            {'role': 'user', 'content': '继续总结'},
+          ],
+        );
+
+        final messages = (body['messages'] as List).cast<Map>();
+        final assistantContent = (messages[1]['content'] as List).cast<Map>();
+        final toolResultContent = (messages[2]['content'] as List).cast<Map>();
+        final toolUseIds = assistantContent
+            .where((block) => block['type'] == 'tool_use')
+            .map((block) => block['id'])
+            .toList();
+        final toolResultIds = toolResultContent
+            .where((block) => block['type'] == 'tool_result')
+            .map((block) => block['tool_use_id'])
+            .toList();
+
+        expect(toolUseIds, ['toolu_1', 'toolu_2']);
+        expect(toolResultIds, ['toolu_1', 'toolu_2']);
+      },
+    );
+
     test('live tool continuation keeps initial user image blocks', () async {
       final dir = await Directory.systemTemp.createTemp(
         'kelivo_claude_tool_img_',

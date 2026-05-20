@@ -57,9 +57,42 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     pendingToolResults.clear();
   }
 
+  Map<String, dynamic>? toolUseBlockFromToolCall(Map tc) {
+    final id = (tc['id'] ?? '').toString();
+    final fn = tc['function'];
+    if (id.isEmpty || fn is! Map) return null;
+    Map<String, dynamic> input = const <String, dynamic>{};
+    try {
+      input = (jsonDecode((fn['arguments'] ?? '{}').toString()) as Map)
+          .cast<String, dynamic>();
+    } catch (_) {}
+    return {
+      'type': 'tool_use',
+      'id': id,
+      'name': (fn['name'] ?? '').toString(),
+      'input': input,
+    };
+  }
+
+  Set<String> toolUseIdsInBlocks(List<Map<String, dynamic>> blocks) {
+    return blocks
+        .where((block) => block['type'] == 'tool_use')
+        .map((block) => (block['id'] ?? '').toString())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+  }
+
   List<Map<String, dynamic>>? anthropicBlocksFromToolCallMetadata(
     List toolCalls,
   ) {
+    final expectedIds = toolCalls
+        .whereType<Map>()
+        .map((tc) => (tc['id'] ?? '').toString())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    List<Map<String, dynamic>>? bestBlocks;
+    var bestMatchCount = -1;
+
     for (final tc in toolCalls) {
       if (tc is! Map) continue;
       final meta = tc['metadata'];
@@ -68,12 +101,38 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       if (anthropic is! Map) continue;
       final blocks = anthropic['assistant_blocks'];
       if (blocks is! List || blocks.isEmpty) continue;
-      return blocks
+      final candidate = blocks
           .whereType<Map>()
           .map((e) => e.cast<String, dynamic>())
           .toList();
+      final matchCount = toolUseIdsInBlocks(
+        candidate,
+      ).where(expectedIds.contains).length;
+      if (matchCount > bestMatchCount ||
+          (matchCount == bestMatchCount &&
+              candidate.length > (bestBlocks?.length ?? 0))) {
+        bestBlocks = candidate;
+        bestMatchCount = matchCount;
+      }
     }
-    return null;
+    if (bestBlocks == null) return null;
+    if (expectedIds.isEmpty) return bestBlocks;
+
+    final presentIds = toolUseIdsInBlocks(bestBlocks);
+    if (presentIds.containsAll(expectedIds)) return bestBlocks;
+
+    final completed = <Map<String, dynamic>>[
+      for (final block in bestBlocks) Map<String, dynamic>.from(block),
+    ];
+    for (final tc in toolCalls.whereType<Map>()) {
+      final block = toolUseBlockFromToolCall(tc);
+      if (block == null) continue;
+      final id = (block['id'] ?? '').toString();
+      if (presentIds.contains(id)) continue;
+      completed.add(block);
+      presentIds.add(id);
+    }
+    return completed;
   }
 
   for (int i = 0; i < nonSystemMessages.length; i++) {
@@ -105,20 +164,8 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         }
         for (final tc in toolCalls) {
           if (tc is! Map) continue;
-          final id = (tc['id'] ?? '').toString();
-          final fn = tc['function'];
-          if (id.isEmpty || fn is! Map) continue;
-          Map<String, dynamic> input = const <String, dynamic>{};
-          try {
-            input = (jsonDecode((fn['arguments'] ?? '{}').toString()) as Map)
-                .cast<String, dynamic>();
-          } catch (_) {}
-          blocks.add({
-            'type': 'tool_use',
-            'id': id,
-            'name': (fn['name'] ?? '').toString(),
-            'input': input,
-          });
+          final block = toolUseBlockFromToolCall(tc);
+          if (block != null) blocks.add(block);
         }
       }
       if (blocks.isNotEmpty) {
