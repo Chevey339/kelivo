@@ -1048,6 +1048,10 @@ String _replaceInlineDollarMath(String input) {
 
 int _findClosingDollarMath(String input, int start) {
   final end = math.min(input.length, start + _maxInlineMathBodyLength + 1);
+  final allowUnescapedPipes = !_isDollarMathOnMarkdownTableRow(
+    input,
+    start - 1,
+  );
   for (var i = start; i < end; i++) {
     final ch = input.codeUnitAt(i);
     if (ch == 0x0A) return -1;
@@ -1058,19 +1062,31 @@ int _findClosingDollarMath(String input, int start) {
     if (ch != 0x24 || _isDoubleDollar(input, i)) continue;
 
     final body = input.substring(start, i);
-    if (_isValidDollarMathBody(body) && _canCloseDollarMath(input, i)) {
+    if (_isValidDollarMathBody(
+          body,
+          allowUnescapedPipes: allowUnescapedPipes,
+        ) &&
+        _canCloseDollarMath(input, i)) {
       return i;
     }
   }
   return -1;
 }
 
-bool _isValidDollarMathBody(String body) {
+bool _isValidDollarMathBody(String body, {bool allowUnescapedPipes = false}) {
   if (body.isEmpty) return false;
   if (body.length > _maxInlineMathBodyLength) return false;
   if (_isWhitespaceCodeUnit(body.codeUnitAt(0))) return false;
   if (_isWhitespaceCodeUnit(body.codeUnitAt(body.length - 1))) return false;
-  return !_containsUnescapedPipe(body);
+  return allowUnescapedPipes || !_containsUnescapedPipe(body);
+}
+
+bool _isDollarMathOnMarkdownTableRow(String input, int dollarIndex) {
+  final lineStart = input.lastIndexOf('\n', dollarIndex);
+  final lineEnd = input.indexOf('\n', dollarIndex);
+  final start = lineStart == -1 ? 0 : lineStart + 1;
+  final end = lineEnd == -1 ? input.length : lineEnd;
+  return _looksLikeTableRowStart(input.substring(start, end));
 }
 
 bool _containsUnescapedPipe(String input) {

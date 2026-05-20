@@ -1317,6 +1317,25 @@ B-->C
   );
 
   testWidgets(
+    'MarkdownWithCodeHighlight renders list dollar math with literal pipes',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+- 向量点积：$\mathbf{a} \cdot \mathbf{b} = |\mathbf{a}||\mathbf{b}|\cos\theta$
+- 矢量叉乘：$\mathbf{a} \times \mathbf{b} = |\mathbf{a}||\mathbf{b}|\sin\theta \, \hat{n}$
+- Bayes 公式：$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$
+- 向量模长：$|\mathbf{v}| = \sqrt{v_x^2 + v_y^2 + v_z^2}$
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNWidgets(4));
+      expect(find.textContaining(r'$\mathbf{a} \cdot'), findsNothing);
+      expect(find.textContaining(r'$P(A|B)'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight follows GitHub-like dollar math boundaries',
     (tester) async {
       await tester.pumpWidget(
