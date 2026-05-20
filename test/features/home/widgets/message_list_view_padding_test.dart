@@ -4,6 +4,8 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
+import 'package:Kelivo/features/home/controllers/stream_controller.dart'
+    as stream_ctrl;
 import 'package:Kelivo/features/home/controllers/streaming_content_notifier.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
@@ -95,6 +97,163 @@ void main() {
 
     scrollController.dispose();
     isProcessingFiles.dispose();
+  });
+
+  testWidgets('流式思考更新缺少起始时间时保留已有计时起点', (tester) async {
+    final scrollController = ScrollController();
+    final observerController = ListObserverController(
+      controller: scrollController,
+    );
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    final streamingNotifier = StreamingContentNotifier();
+    const messageId = 'reasoning-streaming-message';
+    final startAt = DateTime.now().subtract(const Duration(seconds: 7));
+    final reasoning = <String, stream_ctrl.ReasoningData>{
+      messageId: stream_ctrl.ReasoningData()
+        ..text = 'initial thinking'
+        ..startAt = startAt
+        ..expanded = false,
+    };
+    final messages = <ChatMessage>[
+      ChatMessage(
+        id: messageId,
+        role: 'assistant',
+        content: '',
+        conversationId: 'conversation-1',
+        isStreaming: true,
+      ),
+    ];
+    streamingNotifier.getNotifier(messageId);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: SettingsProvider()),
+          ChangeNotifierProvider.value(value: AssistantProvider()),
+          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(value: AskUserInteractionService()),
+          ChangeNotifierProvider.value(value: ToolApprovalService()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: MessageListView(
+              scrollController: scrollController,
+              observerController: observerController,
+              messages: messages,
+              byGroup: const {},
+              versionSelections: const {},
+              reasoning: reasoning,
+              reasoningSegments: const {},
+              contentSplits: const {},
+              toolParts: const {},
+              translations: const {},
+              selecting: false,
+              selectedItems: const {},
+              dividerPadding: EdgeInsets.zero,
+              isProcessingFiles: isProcessingFiles,
+              bottomContentPadding: 16,
+              streamingContentNotifier: streamingNotifier,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    streamingNotifier.updateReasoning(
+      messageId,
+      reasoningText: 'updated thinking',
+    );
+    await tester.pump();
+
+    expect(reasoning[messageId]!.startAt, startAt);
+
+    scrollController.dispose();
+    isProcessingFiles.dispose();
+    streamingNotifier.dispose();
+  });
+
+  testWidgets('思考卡内部滚动不暂停流式正文更新', (tester) async {
+    final scrollController = ScrollController();
+    final observerController = ListObserverController(
+      controller: scrollController,
+    );
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    final streamingNotifier = StreamingContentNotifier();
+    const messageId = 'nested-reasoning-scroll-message';
+    final reasoningText = List.filled(40, 'reasoning line').join('\n');
+    final messages = <ChatMessage>[
+      ChatMessage(
+        id: messageId,
+        role: 'assistant',
+        content: 'initial nested answer',
+        conversationId: 'conversation-1',
+        isStreaming: true,
+      ),
+    ];
+    final reasoning = <String, stream_ctrl.ReasoningData>{
+      messageId: stream_ctrl.ReasoningData()
+        ..text = reasoningText
+        ..startAt = DateTime.now().subtract(const Duration(seconds: 3))
+        ..expanded = false,
+    };
+    streamingNotifier.getNotifier(messageId);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: SettingsProvider()),
+          ChangeNotifierProvider.value(value: AssistantProvider()),
+          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(value: AskUserInteractionService()),
+          ChangeNotifierProvider.value(value: ToolApprovalService()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: MessageListView(
+              scrollController: scrollController,
+              observerController: observerController,
+              messages: messages,
+              byGroup: const {},
+              versionSelections: const {},
+              reasoning: reasoning,
+              reasoningSegments: const {},
+              contentSplits: const {},
+              toolParts: const {},
+              translations: const {},
+              selecting: false,
+              selectedItems: const {},
+              dividerPadding: EdgeInsets.zero,
+              isProcessingFiles: isProcessingFiles,
+              bottomContentPadding: 16,
+              streamingContentNotifier: streamingNotifier,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump(const Duration(milliseconds: 320));
+
+    final innerScroll = find.byType(SingleChildScrollView).first;
+    await tester.drag(innerScroll, const Offset(0, 40));
+    await tester.pump();
+
+    streamingNotifier.updateContent(
+      messageId,
+      'updated after nested reasoning scroll',
+      3,
+    );
+    await tester.pump();
+
+    expect(find.text('updated after nested reasoning scroll'), findsOneWidget);
+
+    scrollController.dispose();
+    isProcessingFiles.dispose();
+    streamingNotifier.dispose();
   });
 
   testWidgets('用户拖动离开底部时暂停应用流式内容更新', (tester) async {
