@@ -1720,6 +1720,42 @@ String _mermaidCacheKey(
   return '${isDark ? 'dark' : 'light'}|$themeSig|$code';
 }
 
+enum MermaidBitmapRenderStatus { success, failed, unsupported }
+
+class MermaidBitmapRenderResult {
+  const MermaidBitmapRenderResult._(this.status, [this.bytes]);
+
+  factory MermaidBitmapRenderResult.success(Uint8List bytes) {
+    return MermaidBitmapRenderResult._(
+      MermaidBitmapRenderStatus.success,
+      bytes,
+    );
+  }
+
+  factory MermaidBitmapRenderResult.failed() {
+    return const MermaidBitmapRenderResult._(MermaidBitmapRenderStatus.failed);
+  }
+
+  factory MermaidBitmapRenderResult.unsupported() {
+    return const MermaidBitmapRenderResult._(
+      MermaidBitmapRenderStatus.unsupported,
+    );
+  }
+
+  final MermaidBitmapRenderStatus status;
+  final Uint8List? bytes;
+}
+
+typedef MermaidBitmapRenderOverride =
+    Future<MermaidBitmapRenderResult> Function(
+      String code,
+      bool isDark,
+      Map<String, String> themeVars,
+    );
+
+@visibleForTesting
+MermaidBitmapRenderOverride? debugMermaidBitmapRenderOverride;
+
 class _CodeBlockIconAction extends StatelessWidget {
   const _CodeBlockIconAction({
     required this.icon,
@@ -2691,6 +2727,9 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   String? _lastRenderedKey;
   Uint8List? _lastRenderedBytes;
   Timer? _streamingRenderDebounce;
+  bool _bitmapRenderingUnsupported = false;
+  bool _suppressBitmapLoading = false;
+  final Set<String> _failedBitmapRenderKeys = <String>{};
 
   @override
   Widget build(BuildContext context) {
@@ -2767,8 +2806,15 @@ class _MermaidBlockState extends State<_MermaidBlock> {
         themedCachedBytes ?? legacyCachedBytes ?? prefixCachedBytes;
     final displayBytes =
         cachedBytes ?? (widget.streaming ? _lastRenderedBytes : null);
+    final renderFailedForCurrentCode = _failedBitmapRenderKeys.contains(
+      cacheKey,
+    );
     final hasRenderableCode = widget.code.trim().isNotEmpty;
-    if (!exporting && hasRenderableCode && themedCachedBytes == null) {
+    if (!exporting &&
+        hasRenderableCode &&
+        themedCachedBytes == null &&
+        !_bitmapRenderingUnsupported &&
+        !renderFailedForCurrentCode) {
       _scheduleBitmapRender(
         isDark: isDark,
         themeVars: themeVars,
@@ -2996,14 +3042,17 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                       children: [
                         if (mermaidView != null) ...[
                           SizedBox(width: double.infinity, child: mermaidView),
-                        ] else if (widget.streaming ||
-                            _renderQueued ||
-                            _renderingBitmap) ...[
+                        ] else if (!_suppressBitmapLoading &&
+                            !_bitmapRenderingUnsupported &&
+                            !renderFailedForCurrentCode &&
+                            (widget.streaming ||
+                                _renderQueued ||
+                                _renderingBitmap)) ...[
                           const SizedBox(height: 8),
                           const LinearProgressIndicator(minHeight: 2),
                           const SizedBox(height: 8),
                         ] else ...[
-                          // Fallback: show raw code and a preview button (opens browser)
+                          // Fallback: show raw code when bitmap rendering is unavailable.
                           () {
                             final bool isDesktop =
                                 Platform.isMacOS ||
@@ -3076,26 +3125,6 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                               ),
                             );
                           }(),
-                          if (!ExportCaptureScope.of(context)) ...[
-                            const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton.icon(
-                                onPressed: () => _openMermaidPreviewInBrowser(
-                                  context,
-                                  widget.code,
-                                  Theme.of(context).brightness ==
-                                      Brightness.dark,
-                                ),
-                                icon: Icon(Lucide.Eye, size: 16),
-                                label: Text(
-                                  AppLocalizations.of(
-                                    context,
-                                  )!.mermaidPreviewOpen,
-                                ),
-                              ),
-                            ),
-                          ],
                         ],
                       ],
                     ),
@@ -3118,6 +3147,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.code != widget.code ||
         oldWidget.streaming != widget.streaming) {
+      _suppressBitmapLoading = false;
       if (!widget.streaming || oldWidget.streaming != widget.streaming) {
         _streamingRenderDebounce?.cancel();
         _renderQueued = false;
@@ -3129,6 +3159,9 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     if (widget.code.trim().isEmpty) {
       _lastRenderedKey = null;
       _lastRenderedBytes = null;
+      _suppressBitmapLoading = false;
+      _bitmapRenderingUnsupported = false;
+      _failedBitmapRenderKeys.clear();
     }
   }
 
@@ -3162,8 +3195,65 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     final code = widget.code;
     final cacheKey = _mermaidCacheKey(code, isDark, themeVars);
     if (MermaidImageCache.get(cacheKey) != null) return;
-    final overlay = Overlay.maybeOf(context);
-    if (overlay == null) return;
+    final renderOverride = debugMermaidBitmapRenderOverride;
+    final overlay = renderOverride == null ? Overlay.maybeOf(context) : null;
+    if (renderOverride == null && overlay == null) {
+      _markBitmapRenderingUnsupported(cacheKey);
+      return;
+    }
+    setState(() {
+      _renderKey = cacheKey;
+      _renderingBitmap = true;
+    });
+
+    MermaidBitmapRenderResult result = MermaidBitmapRenderResult.failed();
+    try {
+      result = renderOverride == null
+          ? await _renderMermaidBitmapWithOverlay(
+              overlay!,
+              code,
+              isDark,
+              themeVars,
+            )
+          : await renderOverride(code, isDark, themeVars);
+      if (!mounted || _renderKey != cacheKey) return;
+      final bytes = result.bytes;
+      if (result.status == MermaidBitmapRenderStatus.success &&
+          bytes != null &&
+          bytes.isNotEmpty) {
+        MermaidImageCache.put(cacheKey, bytes);
+        _failedBitmapRenderKeys.remove(cacheKey);
+      }
+    } catch (e, st) {
+      debugPrint('Mermaid bitmap render failed: $e\n$st');
+    } finally {
+      if (mounted && _renderKey == cacheKey) {
+        _removeRenderOverlay();
+        setState(() {
+          if (result.status == MermaidBitmapRenderStatus.success &&
+              result.bytes != null &&
+              result.bytes!.isNotEmpty) {
+            _lastRenderedKey = cacheKey;
+            _lastRenderedBytes = result.bytes;
+          } else if (result.status == MermaidBitmapRenderStatus.unsupported) {
+            _bitmapRenderingUnsupported = true;
+            _suppressBitmapLoading = true;
+          } else {
+            _failedBitmapRenderKeys.add(cacheKey);
+            _suppressBitmapLoading = true;
+          }
+          _renderingBitmap = false;
+        });
+      }
+    }
+  }
+
+  Future<MermaidBitmapRenderResult> _renderMermaidBitmapWithOverlay(
+    OverlayState overlay,
+    String code,
+    bool isDark,
+    Map<String, String> themeVars,
+  ) async {
     _removeRenderOverlay();
     final renderKey = GlobalKey();
     final handle = createMermaidView(
@@ -3172,11 +3262,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
       themeVars: themeVars,
       viewKey: renderKey,
     );
-    if (!mounted || handle == null) return;
-    setState(() {
-      _renderKey = cacheKey;
-      _renderingBitmap = true;
-    });
+    if (handle == null) return MermaidBitmapRenderResult.unsupported();
 
     _renderOverlayEntry = OverlayEntry(
       builder: (context) => Positioned(
@@ -3190,28 +3276,21 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     );
     overlay.insert(_renderOverlayEntry!);
 
-    Uint8List? renderedBytes;
-    try {
-      final bytes = await _captureMermaidBytes(handle);
-      if (!mounted || _renderKey != cacheKey) return;
-      if (bytes != null && bytes.isNotEmpty) {
-        MermaidImageCache.put(cacheKey, bytes);
-        renderedBytes = bytes;
+    return _captureMermaidBitmap(handle);
+  }
+
+  void _markBitmapRenderingUnsupported(String cacheKey) {
+    if (!mounted) return;
+    _streamingRenderDebounce?.cancel();
+    _removeRenderOverlay();
+    setState(() {
+      if (_renderKey == null || _renderKey == cacheKey) {
+        _renderKey = null;
+        _renderQueued = false;
+        _renderingBitmap = false;
       }
-    } catch (e, st) {
-      debugPrint('Mermaid bitmap render failed: $e\n$st');
-    } finally {
-      if (mounted && _renderKey == cacheKey) {
-        _removeRenderOverlay();
-        setState(() {
-          if (renderedBytes != null) {
-            _lastRenderedKey = cacheKey;
-            _lastRenderedBytes = renderedBytes;
-          }
-          _renderingBitmap = false;
-        });
-      }
-    }
+      _bitmapRenderingUnsupported = true;
+    });
   }
 
   Uint8List? _findCachedStreamingMermaidPrefix(
@@ -3237,9 +3316,11 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     return null;
   }
 
-  Future<Uint8List?> _captureMermaidBytes(MermaidViewHandle handle) async {
+  Future<MermaidBitmapRenderResult> _captureMermaidBitmap(
+    MermaidViewHandle handle,
+  ) async {
     final exportBytes = handle.exportPngBytes;
-    if (exportBytes == null) return null;
+    if (exportBytes == null) return MermaidBitmapRenderResult.unsupported();
     await WidgetsBinding.instance.endOfFrame;
     await Future<void>.delayed(const Duration(milliseconds: 120));
     for (var i = 0; i < 4; i++) {
@@ -3248,13 +3329,18 @@ class _MermaidBlockState extends State<_MermaidBlock> {
           const Duration(milliseconds: 900),
           onTimeout: () => null,
         );
-        if (bytes != null && bytes.isNotEmpty) return bytes;
-      } catch (_) {
+        if (bytes != null && bytes.isNotEmpty) {
+          return MermaidBitmapRenderResult.success(bytes);
+        }
+      } catch (e) {
+        if (e is UnsupportedError) {
+          return MermaidBitmapRenderResult.unsupported();
+        }
         // Mermaid/WebView can report readiness before pixel capture is available.
       }
       await Future<void>.delayed(const Duration(milliseconds: 120));
     }
-    return null;
+    return MermaidBitmapRenderResult.failed();
   }
 
   Future<bool> _exportMermaidPng(BuildContext context, String cacheKey) async {
@@ -3304,64 +3390,6 @@ class _MermaidBlockState extends State<_MermaidBlock> {
       }
     } catch (_) {}
     return false;
-  }
-
-  Future<void> _openMermaidPreviewInBrowser(
-    BuildContext context,
-    String code,
-    bool dark,
-  ) async {
-    final htmlStr = _buildMermaidHtml(code, dark);
-    final l10n = AppLocalizations.of(context)!;
-    final uri = Uri.dataFromString(
-      htmlStr,
-      mimeType: 'text/html',
-      encoding: utf8,
-    );
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {
-      if (!context.mounted) return;
-      showAppSnackBar(
-        context,
-        message: l10n.mermaidPreviewOpenFailed,
-        type: NotificationType.error,
-      );
-    }
-  }
-
-  String _buildMermaidHtml(String code, bool dark) {
-    final bg = dark ? '#111111' : '#ffffff';
-    final fg = dark ? '#eaeaea' : '#222222';
-    final escaped = code
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;');
-    return '''
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=5.0">
-    <title>Mermaid Preview</title>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-    <style>
-      body{ margin:0; padding:12px; background:$bg; color:$fg; }
-      .wrap{ max-width: 1000px; margin: 0 auto; }
-      .mermaid{ text-align:center; }
-    </style>
-  </head>
-  <body>
-    <div class="wrap">
-      <div class="mermaid">$escaped</div>
-    </div>
-    <script>
-      mermaid.initialize({ startOnLoad:false, theme: '${dark ? 'dark' : 'default'}', securityLevel:'loose' });
-      mermaid.run({ querySelector: '.mermaid' });
-    </script>
-  </body>
-</html>
-''';
   }
 }
 

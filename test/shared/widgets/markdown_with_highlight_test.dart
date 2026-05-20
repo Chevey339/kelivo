@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -110,6 +112,89 @@ const _transparentPngBytes = <int>[
   0x60,
   0x82,
 ];
+
+const _secondPngBytes = <int>[
+  0x89,
+  0x50,
+  0x4E,
+  0x47,
+  0x0D,
+  0x0A,
+  0x1A,
+  0x0A,
+  0x00,
+  0x00,
+  0x00,
+  0x0D,
+  0x49,
+  0x48,
+  0x44,
+  0x52,
+  0x00,
+  0x00,
+  0x00,
+  0x01,
+  0x00,
+  0x00,
+  0x00,
+  0x01,
+  0x08,
+  0x06,
+  0x00,
+  0x00,
+  0x00,
+  0x1F,
+  0x15,
+  0xC4,
+  0x89,
+  0x00,
+  0x00,
+  0x00,
+  0x0D,
+  0x49,
+  0x44,
+  0x41,
+  0x54,
+  0x78,
+  0xDA,
+  0x63,
+  0xFC,
+  0xCF,
+  0xC0,
+  0xF0,
+  0x9F,
+  0x81,
+  0x81,
+  0x01,
+  0x00,
+  0x07,
+  0x18,
+  0x02,
+  0x03,
+  0x51,
+  0xBA,
+  0xC4,
+  0xDD,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x49,
+  0x45,
+  0x4E,
+  0x44,
+  0xAE,
+  0x42,
+  0x60,
+  0x82,
+];
+
+List<int> _displayedImageBytes(WidgetTester tester) {
+  final image = tester.widget<Image>(find.byType(Image));
+  final provider = image.image;
+  expect(provider, isA<MemoryImage>());
+  return (provider as MemoryImage).bytes;
+}
 
 Widget _markdownHarness(
   String text, {
@@ -1151,6 +1236,128 @@ B-->C
 
       expect(find.byType(Image), findsOneWidget);
       expect(find.textContaining('graph TD'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps previous Mermaid bitmap visible until streaming render succeeds',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      addTearDown(() => debugMermaidBitmapRenderOverride = null);
+      const firstCode = 'graph TD\nA-->B';
+      MermaidImageCache.put(
+        firstCode,
+        Uint8List.fromList(_transparentPngBytes),
+      );
+      final renderStarted = Completer<void>();
+      final renderCanFinish = Completer<void>();
+      debugMermaidBitmapRenderOverride = (code, isDark, themeVars) async {
+        if (!renderStarted.isCompleted) renderStarted.complete();
+        await renderCanFinish.future;
+        return MermaidBitmapRenderResult.success(
+          Uint8List.fromList(_secondPngBytes),
+        );
+      };
+      final text = ValueNotifier<String>('''
+```mermaid
+$firstCode
+''');
+
+      await tester.pumpWidget(_streamingMarkdownHarness(text));
+      await tester.pump();
+      expect(_displayedImageBytes(tester), _transparentPngBytes);
+
+      text.value =
+          '''
+```mermaid
+$firstCode
+B-->C
+''';
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await renderStarted.future;
+
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(_displayedImageBytes(tester), _transparentPngBytes);
+
+      renderCanFinish.complete();
+      await tester.pump();
+      await tester.pump();
+
+      expect(_displayedImageBytes(tester), _secondPngBytes);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps previous Mermaid bitmap when streaming render fails',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      addTearDown(() => debugMermaidBitmapRenderOverride = null);
+      const firstCode = 'graph TD\nA-->B';
+      MermaidImageCache.put(
+        firstCode,
+        Uint8List.fromList(_transparentPngBytes),
+      );
+      debugMermaidBitmapRenderOverride = (code, isDark, themeVars) async {
+        return MermaidBitmapRenderResult.failed();
+      };
+      final text = ValueNotifier<String>('''
+```mermaid
+$firstCode
+''');
+
+      await tester.pumpWidget(_streamingMarkdownHarness(text));
+      await tester.pump();
+      expect(_displayedImageBytes(tester), _transparentPngBytes);
+
+      text.value =
+          '''
+```mermaid
+$firstCode
+B-->
+''';
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
+
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(_displayedImageBytes(tester), _transparentPngBytes);
+
+      text.value = String.fromCharCodes(text.value.codeUnits);
+      await tester.pump();
+
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(_displayedImageBytes(tester), _transparentPngBytes);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight shows Mermaid code when bitmap rendering is unsupported',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      addTearDown(() => debugMermaidBitmapRenderOverride = null);
+      MermaidImageCache.clear();
+      debugMermaidBitmapRenderOverride = (code, isDark, themeVars) async {
+        return MermaidBitmapRenderResult.unsupported();
+      };
+
+      await tester.pumpWidget(
+        _markdownHarness('''
+```mermaid
+graph TD
+A-->B
+''', streaming: true),
+      );
+      await tester.pump();
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
+
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byType(Image), findsNothing);
+      expect(find.textContaining('graph TD'), findsOneWidget);
+      expect(find.text('Open Preview'), findsNothing);
     },
   );
 
