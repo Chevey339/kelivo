@@ -2287,6 +2287,10 @@ class _DesktopProviderDetailPaneState
                 );
                 final aihubmixAppCodeEnabled =
                     cfgNow.aihubmixAppCodeEnabled ?? false;
+                final supportsClaudePromptCaching =
+                    _supportsClaudePromptCaching(cfgNow, kindNow);
+                final claudePromptCachingEnabled =
+                    cfgNow.claudePromptCachingEnabled ?? false;
                 final groupsNow = spWatch.providerGroups;
                 final groupValue =
                     spWatch.groupIdForProvider(widget.providerKey) ??
@@ -2832,72 +2836,98 @@ class _DesktopProviderDetailPaneState
                                       row(
                                         l10n.providerDetailPageBalanceTitle,
                                         Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
                                           children: [
-                                            Expanded(
-                                              child: ProviderBalanceBadge(
-                                                providerKey: widget.providerKey,
-                                                displayName: widget.displayName,
-                                                color: cs.primary,
+                                            Flexible(
+                                              child: Align(
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                child: ConstrainedBox(
+                                                  constraints:
+                                                      const BoxConstraints(
+                                                        minWidth: 72,
+                                                        maxWidth: 120,
+                                                      ),
+                                                  child: ProviderBalanceBadge(
+                                                    providerKey:
+                                                        widget.providerKey,
+                                                    displayName:
+                                                        widget.displayName,
+                                                    color: cs.primary,
+                                                  ),
+                                                ),
                                               ),
                                             ),
-                                            const SizedBox(width: 8),
-                                            _DeskIosButton(
-                                              label: l10n
-                                                  .providerDetailPageBalanceResetDefaultsButton,
-                                              filled: false,
-                                              dense: true,
-                                              onTap: () async {
-                                                _syncControllerText(
-                                                  _balanceApiPathCtrl,
-                                                  balanceDefaults
-                                                          .balanceApiPath ??
-                                                      '',
-                                                );
-                                                _syncControllerText(
-                                                  _balanceResultPathCtrl,
-                                                  balanceDefaults
-                                                          .balanceResultPath ??
-                                                      '',
-                                                );
-                                                final old = spWatch
-                                                    .getProviderConfig(
-                                                      widget.providerKey,
-                                                      defaultName:
-                                                          widget.displayName,
-                                                    );
-                                                await spWatch.setProviderConfig(
-                                                  widget.providerKey,
-                                                  old.copyWith(
-                                                    balanceEnabled:
-                                                        balanceDefaults
-                                                            .balanceEnabled ??
-                                                        false,
-                                                    balanceApiPath:
-                                                        _balanceApiPathCtrl.text
-                                                            .trim(),
-                                                    balanceResultPath:
-                                                        _balanceResultPathCtrl
-                                                            .text
-                                                            .trim(),
-                                                  ),
-                                                );
-                                                ProviderBalanceBadge.clearCacheFor(
-                                                  widget.providerKey,
-                                                );
-                                                if (mounted) setState(() {});
-                                              },
+                                            const SizedBox(width: 6),
+                                            Tooltip(
+                                              message: l10n
+                                                  .providerDetailPageBalanceResetDefaultsTooltip,
+                                              child: _IconBtn(
+                                                icon: lucide.Lucide.RotateCcw,
+                                                color: cs.onSurface.withValues(
+                                                  alpha: 0.78,
+                                                ),
+                                                onTap: () async {
+                                                  _syncControllerText(
+                                                    _balanceApiPathCtrl,
+                                                    balanceDefaults
+                                                            .balanceApiPath ??
+                                                        '',
+                                                  );
+                                                  _syncControllerText(
+                                                    _balanceResultPathCtrl,
+                                                    balanceDefaults
+                                                            .balanceResultPath ??
+                                                        '',
+                                                  );
+                                                  final old = spWatch
+                                                      .getProviderConfig(
+                                                        widget.providerKey,
+                                                        defaultName:
+                                                            widget.displayName,
+                                                      );
+                                                  await spWatch.setProviderConfig(
+                                                    widget.providerKey,
+                                                    old.copyWith(
+                                                      balanceEnabled:
+                                                          balanceDefaults
+                                                              .balanceEnabled ??
+                                                          false,
+                                                      balanceApiPath:
+                                                          _balanceApiPathCtrl
+                                                              .text
+                                                              .trim(),
+                                                      balanceResultPath:
+                                                          _balanceResultPathCtrl
+                                                              .text
+                                                              .trim(),
+                                                    ),
+                                                  );
+                                                  ProviderBalanceBadge.clearCacheFor(
+                                                    widget.providerKey,
+                                                  );
+                                                  if (mounted) setState(() {});
+                                                },
+                                              ),
                                             ),
-                                            const SizedBox(width: 8),
-                                            _DeskIosButton(
-                                              label: _balanceLoading
+                                            const SizedBox(width: 4),
+                                            Tooltip(
+                                              message: _balanceLoading
                                                   ? l10n.providerDetailPageBalanceQuerying
                                                   : l10n.providerDetailPageBalanceQueryButton,
-                                              filled: false,
-                                              dense: true,
-                                              onTap: () =>
-                                                  _queryProviderBalance(
-                                                    context,
-                                                  ),
+                                              child: _IconBtn(
+                                                icon: _balanceLoading
+                                                    ? lucide.Lucide.Loader
+                                                    : lucide
+                                                          .Lucide
+                                                          .RefreshCcwDot,
+                                                color: cs.primary,
+                                                onTap: () =>
+                                                    _queryProviderBalance(
+                                                      context,
+                                                    ),
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -2949,6 +2979,46 @@ class _DesktopProviderDetailPaneState
                                   ],
                                 ),
                               ),
+                            if (supportsClaudePromptCaching) ...[
+                              const SizedBox(height: 4),
+                              row(
+                                l10n.providerDetailPageClaudePromptCachingTitle,
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Tooltip(
+                                      message: l10n
+                                          .providerDetailPageClaudePromptCachingHelp,
+                                      child: Icon(
+                                        Icons.help_outline,
+                                        size: 16,
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IosSwitch(
+                                      value: claudePromptCachingEnabled,
+                                      semanticLabel: l10n
+                                          .providerDetailPageClaudePromptCachingTitle,
+                                      onChanged: (v) async {
+                                        final old = spWatch.getProviderConfig(
+                                          widget.providerKey,
+                                          defaultName: widget.displayName,
+                                        );
+                                        await spWatch.setProviderConfig(
+                                          widget.providerKey,
+                                          old.copyWith(
+                                            claudePromptCachingEnabled: v,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 4),
                             // 5) Network proxy inline
                             row(
@@ -3311,6 +3381,17 @@ class _DesktopProviderDetailPaneState
     final base = cfg.baseUrl.toLowerCase();
     final key = cfg.id.toLowerCase();
     return key.contains('aihubmix') || base.contains('aihubmix.com');
+  }
+
+  bool _isOpenRouter(ProviderConfig cfg) {
+    final base = cfg.baseUrl.toLowerCase();
+    final key = cfg.id.toLowerCase();
+    return key.contains('openrouter') || base.contains('openrouter');
+  }
+
+  bool _supportsClaudePromptCaching(ProviderConfig cfg, ProviderKind kind) {
+    return kind == ProviderKind.claude ||
+        (kind == ProviderKind.openai && _isOpenRouter(cfg));
   }
 
   Future<void> _showMultiKeyDialog(BuildContext context) async {

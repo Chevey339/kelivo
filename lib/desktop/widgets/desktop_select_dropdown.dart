@@ -187,24 +187,33 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
             child: Stack(
               alignment: Alignment.centerLeft,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: widget.maxLabelWidth,
-                      ),
-                      child: Text(
-                        label,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: cs.onSurface.withValues(alpha: 0.88),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final availableWidth = constraints.hasBoundedWidth
+                        ? constraints.maxWidth
+                        : widget.maxLabelWidth + 24;
+                    final labelMaxWidth = (availableWidth - 24)
+                        .clamp(0.0, widget.maxLabelWidth)
+                        .toDouble();
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: labelMaxWidth),
+                          child: Text(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: cs.onSurface.withValues(alpha: 0.88),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                  ],
+                        const SizedBox(width: 24),
+                      ],
+                    );
+                  },
                 ),
                 Positioned.fill(
                   child: Align(
