@@ -6,6 +6,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,6 +34,15 @@ List<WidgetSpan> _widgetSpansFromRichText(WidgetTester tester) {
     spans.addAll(_collectWidgetSpans(richText.text));
   }
   return spans;
+}
+
+RenderParagraph _paragraphContaining(String text) {
+  return find
+      .byType(RichText)
+      .evaluate()
+      .map((element) => element.renderObject)
+      .whereType<RenderParagraph>()
+      .firstWhere((paragraph) => paragraph.text.toPlainText().contains(text));
 }
 
 const _transparentPngDataUrl =
@@ -1461,7 +1471,7 @@ A-->B
     },
   );
 
-  testWidgets('MarkdownWithCodeHighlight vertically centers inline math', (
+  testWidgets('MarkdownWithCodeHighlight baseline-aligns inline math', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -1482,7 +1492,8 @@ A-->B
         .toList();
 
     expect(mathSpans, hasLength(1));
-    expect(mathSpans.single.alignment, PlaceholderAlignment.middle);
+    expect(mathSpans.single.alignment, PlaceholderAlignment.baseline);
+    expect(mathSpans.single.baseline, TextBaseline.alphabetic);
     expect(
       find.ancestor(
         of: _findMathWidget(),
@@ -1491,6 +1502,39 @@ A-->B
       findsNothing,
     );
   });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight expands line height for tall inline math',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'相对论动量公式：$p = \frac{mv}{\sqrt{1 - \frac{v^2}{c^2}}}$',
+        ),
+      );
+      await tester.pump();
+
+      final mathSpans = _widgetSpansFromRichText(tester)
+          .where(
+            (span) => find
+                .descendant(
+                  of: find.byWidget(span.child),
+                  matching: _findMathWidget(),
+                )
+                .evaluate()
+                .isNotEmpty,
+          )
+          .toList();
+
+      expect(mathSpans, hasLength(1));
+      expect(mathSpans.single.alignment, PlaceholderAlignment.baseline);
+      expect(mathSpans.single.baseline, TextBaseline.alphabetic);
+
+      final paragraph = _paragraphContaining('相对论动量公式');
+      final mathBox = tester.renderObject<RenderBox>(_findMathWidget());
+      expect(mathBox.size.height, greaterThan(30));
+      expect(paragraph.size.height, greaterThanOrEqualTo(mathBox.size.height));
+    },
+  );
 
   testWidgets('MarkdownWithCodeHighlight keeps dollar math switch scoped', (
     tester,

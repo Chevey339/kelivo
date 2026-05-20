@@ -1021,6 +1021,20 @@ Widget _renderMath(String tex, {TextStyle? style, bool displayMode = false}) {
   }
 }
 
+TextStyle _inlineMathTextStyle(TextStyle? style) {
+  final base = style ?? const TextStyle();
+  final baseSize = base.fontSize ?? 15.5;
+  return base.copyWith(fontSize: baseSize * 1.2);
+}
+
+WidgetSpan _inlineMathSpan(Widget math) {
+  return WidgetSpan(
+    alignment: PlaceholderAlignment.baseline,
+    baseline: TextBaseline.alphabetic,
+    child: SelectionContainer.disabled(child: math),
+  );
+}
+
 String _replaceInlineDollarMath(String input) {
   final buf = StringBuffer();
   var i = 0;
@@ -3511,18 +3525,8 @@ class InlineLatexScrollableMd extends InlineMd {
     if (m == null) return TextSpan(text: text, style: config.style);
     final body = ((m.group(1) ?? m.group(2) ?? '')).trim();
     if (body.isEmpty) return TextSpan(text: text, style: config.style);
-    final math = _renderMath(
-      body,
-      style: () {
-        final base = (config.style ?? const TextStyle());
-        final baseSize = base.fontSize ?? 15.5;
-        return base.copyWith(fontSize: baseSize * 1.2);
-      }(),
-    );
-    return WidgetSpan(
-      alignment: PlaceholderAlignment.middle,
-      child: SelectionContainer.disabled(child: math),
-    );
+    final math = _renderMath(body, style: _inlineMathTextStyle(config.style));
+    return _inlineMathSpan(math);
   }
 }
 
@@ -3545,22 +3549,12 @@ class InlineLatexDollarScrollableMd extends InlineMd {
     if (!_isValidDollarMathBody(m.group(2) ?? '')) {
       return TextSpan(text: text, style: config.style);
     }
-    final math = _renderMath(
-      body,
-      style: () {
-        final base = (config.style ?? const TextStyle());
-        final baseSize = base.fontSize ?? 15.5;
-        return base.copyWith(fontSize: baseSize * 1.2);
-      }(),
-    );
+    final math = _renderMath(body, style: _inlineMathTextStyle(config.style));
     return TextSpan(
       style: config.style,
       children: [
         if (prefix.isNotEmpty) TextSpan(text: prefix, style: config.style),
-        WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: SelectionContainer.disabled(child: math),
-        ),
+        _inlineMathSpan(math),
       ],
     );
   }
@@ -3581,18 +3575,8 @@ class InlineLatexParenScrollableMd extends InlineMd {
     if (m == null) return TextSpan(text: text, style: config.style);
     final body = (m.group(1) ?? '').trim();
     if (body.isEmpty) return TextSpan(text: text, style: config.style);
-    final math = _renderMath(
-      body,
-      style: () {
-        final base = (config.style ?? const TextStyle());
-        final baseSize = base.fontSize ?? 15.5;
-        return base.copyWith(fontSize: baseSize * 1.2);
-      }(),
-    );
-    return WidgetSpan(
-      alignment: PlaceholderAlignment.middle,
-      child: SelectionContainer.disabled(child: math),
-    );
+    final math = _renderMath(body, style: _inlineMathTextStyle(config.style));
+    return _inlineMathSpan(math);
   }
 }
 
