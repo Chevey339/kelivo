@@ -1125,6 +1125,7 @@ bool _isDollarMathOpeningBoundary(int codeUnit) {
   if (codeUnit == 0x28) return true; // (
   if (codeUnit == 0x3A) return true; // :
   if (codeUnit == 0xFF1A) return true; // full-width colon
+  if (codeUnit == 0xFF0C) return true; // full-width comma
   return false;
 }
 

@@ -1633,6 +1633,22 @@ $$
   );
 
   testWidgets(
+    'MarkdownWithCodeHighlight renders dollar math after Chinese punctuation',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'热力学第一定律本质上就是能量守恒定律：$\Delta U = Q - W$。其中 $Q$ 是系统吸收的热量，$W$ 是系统对外做的功，$\Delta U$ 是内能的变化。对于理想气体，其内能只与温度有关，即 $\Delta U = nC_v\Delta T$，其中 $n$ 为物质的量，$C_v$ 为定容摩尔热容。',
+        ),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNWidgets(7));
+      expect(find.textContaining(r'$\Delta U$'), findsNothing);
+      expect(find.textContaining(r'$C_v$'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps unfinished streaming dollar math in math layout',
     (tester) async {
       await tester.pumpWidget(
