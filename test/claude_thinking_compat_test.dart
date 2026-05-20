@@ -10,6 +10,7 @@ import 'package:Kelivo/core/services/api/chat_api_service.dart';
 ProviderConfig _claudeConfig(
   String baseUrl, {
   Map<String, dynamic> modelOverrides = const <String, dynamic>{},
+  bool claudePromptCachingEnabled = false,
 }) {
   return ProviderConfig(
     id: 'ClaudeCompatTest',
@@ -19,6 +20,7 @@ ProviderConfig _claudeConfig(
     baseUrl: baseUrl,
     providerType: ProviderKind.claude,
     modelOverrides: modelOverrides,
+    claudePromptCachingEnabled: claudePromptCachingEnabled,
   );
 }
 
@@ -57,6 +59,10 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
   int? thinkingBudget,
   double? temperature,
   double? topP,
+  bool claudePromptCachingEnabled = false,
+  List<Map<String, dynamic>> messages = const [
+    {'role': 'user', 'content': 'hello'},
+  ],
 }) async {
   late Map<String, dynamic> requestBody;
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -82,11 +88,12 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
   });
 
   final chunks = await ChatApiService.sendMessageStream(
-    config: _claudeConfig('http://${server.address.address}:${server.port}'),
+    config: _claudeConfig(
+      'http://${server.address.address}:${server.port}',
+      claudePromptCachingEnabled: claudePromptCachingEnabled,
+    ),
     modelId: modelId,
-    messages: const [
-      {'role': 'user', 'content': 'hello'},
-    ],
+    messages: messages,
     thinkingBudget: thinkingBudget,
     temperature: temperature,
     topP: topP,
@@ -199,6 +206,40 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
 
 void main() {
   group('Claude thinking compatibility', () {
+    test(
+      'prompt caching adds official Claude top-level cache control',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-sonnet-4-6',
+          claudePromptCachingEnabled: true,
+          messages: const [
+            {'role': 'system', 'content': 'Stable persona and long context.'},
+            {'role': 'user', 'content': 'hello'},
+          ],
+        );
+
+        expect(body['system'], 'Stable persona and long context.');
+        expect(body['cache_control'], {'type': 'ephemeral'});
+        expect((body['messages'] as List).cast<Map>().single['role'], 'user');
+      },
+    );
+
+    test(
+      'prompt caching disabled omits official Claude cache control',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-sonnet-4-6',
+          messages: const [
+            {'role': 'system', 'content': 'Stable persona and long context.'},
+            {'role': 'user', 'content': 'hello'},
+          ],
+        );
+
+        expect(body['system'], 'Stable persona and long context.');
+        expect(body.containsKey('cache_control'), isFalse);
+      },
+    );
+
     test(
       'Opus 4.7 uses adaptive thinking with effort and strips sampling',
       () async {
@@ -482,6 +523,98 @@ void main() {
       expect(toolResultContent.single['type'], 'tool_result');
       expect(toolResultContent.single['tool_use_id'], 'toolu_1');
     });
+
+    test(
+      'history tool replay uses complete Claude assistant tool blocks',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-sonnet-4-6',
+          messages: const [
+            {'role': 'user', 'content': '查两个信息'},
+            {
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': [
+                {
+                  'id': 'toolu_1',
+                  'type': 'function',
+                  'function': {
+                    'name': 'lookup',
+                    'arguments': '{"query":"Kelivo"}',
+                  },
+                  'metadata': {
+                    'anthropic': {
+                      'assistant_blocks': [
+                        {
+                          'type': 'tool_use',
+                          'id': 'toolu_1',
+                          'name': 'lookup',
+                          'input': {'query': 'Kelivo'},
+                        },
+                      ],
+                    },
+                  },
+                },
+                {
+                  'id': 'toolu_2',
+                  'type': 'function',
+                  'function': {
+                    'name': 'lookup',
+                    'arguments': '{"query":"Claude"}',
+                  },
+                  'metadata': {
+                    'anthropic': {
+                      'assistant_blocks': [
+                        {
+                          'type': 'tool_use',
+                          'id': 'toolu_1',
+                          'name': 'lookup',
+                          'input': {'query': 'Kelivo'},
+                        },
+                        {
+                          'type': 'tool_use',
+                          'id': 'toolu_2',
+                          'name': 'lookup',
+                          'input': {'query': 'Claude'},
+                        },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'toolu_1',
+              'name': 'lookup',
+              'content': '{"result":"Kelivo ok"}',
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'toolu_2',
+              'name': 'lookup',
+              'content': '{"result":"Claude ok"}',
+            },
+            {'role': 'user', 'content': '继续总结'},
+          ],
+        );
+
+        final messages = (body['messages'] as List).cast<Map>();
+        final assistantContent = (messages[1]['content'] as List).cast<Map>();
+        final toolResultContent = (messages[2]['content'] as List).cast<Map>();
+        final toolUseIds = assistantContent
+            .where((block) => block['type'] == 'tool_use')
+            .map((block) => block['id'])
+            .toList();
+        final toolResultIds = toolResultContent
+            .where((block) => block['type'] == 'tool_result')
+            .map((block) => block['tool_use_id'])
+            .toList();
+
+        expect(toolUseIds, ['toolu_1', 'toolu_2']);
+        expect(toolResultIds, ['toolu_1', 'toolu_2']);
+      },
+    );
 
     test('live tool continuation keeps initial user image blocks', () async {
       final dir = await Directory.systemTemp.createTemp(

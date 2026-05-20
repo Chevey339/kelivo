@@ -253,6 +253,113 @@ void main() {
       },
     );
 
+    test('keeps heatmap and trend dates aligned across DST boundaries', () {
+      final dstNow = DateTime(2026, 3, 10, 12);
+      final dstDay = DateTime(2026, 3, 8, 9);
+      final conversations = [
+        conversation(
+          'dst',
+          title: 'DST topic',
+          createdAt: dstDay,
+          messageIds: ['dst-message'],
+        ),
+      ];
+      final messagesByConversation = {
+        'dst': [
+          message(
+            'dst-message',
+            conversationId: 'dst',
+            timestamp: dstDay,
+            providerId: 'openai',
+            promptTokens: 3,
+            completionTokens: 5,
+          ),
+        ],
+      };
+
+      final snapshot = StatsAggregationService.buildSnapshot(
+        now: dstNow,
+        range: StatsDateRange.last30Days(dstNow),
+        conversations: conversations,
+        messagesByConversation: messagesByConversation,
+        launchCount: 1,
+        unknownProviderLabel: 'Unknown provider',
+        unknownTopicLabel: 'Untitled topic',
+        providerNames: const {'openai': 'OpenAI'},
+      );
+
+      expect(snapshot.range.start, DateTime(2026, 2, 9));
+      expect(snapshot.heatmap.length, 365);
+      expect(
+        snapshot.heatmap.map((day) => day.date),
+        contains(DateTime(2026, 3, 8)),
+      );
+      expect(
+        snapshot.heatmap.where(
+          (day) => day.date.hour != 0 || day.date.minute != 0,
+        ),
+        isEmpty,
+      );
+      expect(
+        snapshot.heatmap
+            .singleWhere((day) => day.date == DateTime(2026, 3, 8))
+            .count,
+        1,
+      );
+
+      final trendDay = snapshot.trend.singleWhere(
+        (day) => day.date == DateTime(2026, 3, 8),
+      );
+      expect(trendDay.providerTokens['OpenAI']!.inputTokens, 3);
+      expect(trendDay.providerTokens['OpenAI']!.outputTokens, 5);
+    });
+
+    test('keeps all-time trend dates aligned across DST boundaries', () {
+      final dstNow = DateTime(2026, 3, 10, 12);
+      final dstDay = DateTime(2026, 3, 8, 9);
+      final conversations = [
+        conversation(
+          'dst',
+          title: 'DST topic',
+          createdAt: dstDay,
+          messageIds: ['dst-message'],
+        ),
+      ];
+      final messagesByConversation = {
+        'dst': [
+          message(
+            'dst-message',
+            conversationId: 'dst',
+            timestamp: dstDay,
+            providerId: 'openai',
+            promptTokens: 3,
+          ),
+        ],
+      };
+
+      final snapshot = StatsAggregationService.buildSnapshot(
+        now: dstNow,
+        range: StatsDateRange.allTime(dstNow),
+        conversations: conversations,
+        messagesByConversation: messagesByConversation,
+        launchCount: 1,
+        unknownProviderLabel: 'Unknown provider',
+        unknownTopicLabel: 'Untitled topic',
+        providerNames: const {'openai': 'OpenAI'},
+      );
+
+      final trendDay = snapshot.trend.singleWhere(
+        (day) => day.date == DateTime(2026, 3, 8),
+      );
+      expect(trendDay.providerTokens['OpenAI']!.inputTokens, 3);
+      expect(
+        snapshot.trend.where(
+          (day) => day.date.hour != 0 || day.date.minute != 0,
+        ),
+        isEmpty,
+      );
+    });
+
     test('excludes conversations for assistants that no longer exist', () {
       final conversations = [
         conversation(

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/features/home/services/chat_suggestion_service.dart';
 
 void main() {
@@ -46,4 +47,48 @@ void main() {
       ]);
     });
   });
+
+  group('ChatSuggestionService.buildContent', () {
+    test('全量历史使用持久化截断点排除清上下文之前的消息', () {
+      final messages = List.generate(
+        100,
+        (index) => _suggestionMessage(index, 'message $index'),
+      );
+
+      final content = ChatSuggestionService.buildContent(
+        messages,
+        truncateIndex: 90,
+        maxMessages: 100,
+      );
+
+      expect(content, isNot(contains('message 89')));
+      expect(content, contains('message 90'));
+      expect(content, contains('message 99'));
+    });
+
+    test('局部窗口索引不能用于全量历史的清上下文边界', () {
+      final messages = List.generate(
+        100,
+        (index) => _suggestionMessage(index, 'message $index'),
+      );
+
+      final content = ChatSuggestionService.buildContent(
+        messages,
+        truncateIndex: 10,
+        maxMessages: 100,
+      );
+
+      expect(content, contains('message 89'));
+      expect(content, contains('message 99'));
+    });
+  });
+}
+
+ChatMessage _suggestionMessage(int index, String content) {
+  return ChatMessage(
+    id: 'message-$index',
+    role: index.isEven ? 'user' : 'assistant',
+    content: content,
+    conversationId: 'conversation-1',
+  );
 }

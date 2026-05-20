@@ -10,6 +10,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
@@ -44,6 +45,39 @@ String buildCompressContextContent(
     ),
     CompressContextLimitMode.unlimited => joined,
   };
+}
+
+String buildConversationTextForCompression(List<ChatMessage> messages) {
+  return messages
+      .where((m) => m.content.trim().isNotEmpty)
+      .map(
+        (m) => '${m.role == "assistant" ? "Assistant" : "User"}: ${m.content}',
+      )
+      .join('\n\n');
+}
+
+List<ChatMessage> selectForkConversationMessages({
+  required List<ChatMessage> messages,
+  required ChatMessage targetMessage,
+}) {
+  final Map<String, int> groupFirstIndex = <String, int>{};
+  final List<String> groupOrder = <String>[];
+  for (int i = 0; i < messages.length; i++) {
+    final gid0 = (messages[i].groupId ?? messages[i].id);
+    if (!groupFirstIndex.containsKey(gid0)) {
+      groupFirstIndex[gid0] = i;
+      groupOrder.add(gid0);
+    }
+  }
+  final targetGroup = (targetMessage.groupId ?? targetMessage.id);
+  final targetOrderIndex = groupOrder.indexOf(targetGroup);
+  if (targetOrderIndex < 0) return const <ChatMessage>[];
+
+  final includeGroups = groupOrder.take(targetOrderIndex + 1).toSet();
+  return [
+    for (final m in messages)
+      if (includeGroups.contains(m.groupId ?? m.id)) m,
+  ];
 }
 
 /// ViewModel for the home page, combining actions + services.
@@ -189,6 +223,7 @@ class HomeViewModel extends ChangeNotifier {
 
   void _onMessagesChanged() {
     _chatController.invalidateCache();
+    _chatController.refreshLoadedMessageCount();
     notifyListeners();
   }
 
@@ -646,28 +681,45 @@ class HomeViewModel extends ChangeNotifier {
     onScrollToBottom?.call();
   }
 
+  Future<void> toggleTemporaryConversation() async {
+    final convo = currentConversation;
+    if (convo == null || messages.isNotEmpty) return;
+
+    await _chatActions.flushConversationProgress(currentConversation);
+    if (!_contextProvider.mounted) return;
+
+    isProcessingFiles.value = false;
+
+    if (_chatService.isTemporaryConversation(convo.id)) {
+      await createNewConversation();
+      return;
+    }
+
+    final ap = _contextProvider.read<AssistantProvider>();
+    final conversation = await _chatService.createDraftConversation(
+      title: AppLocalizations.of(_contextProvider)!.temporaryChatTitle,
+      assistantId: ap.currentAssistantId,
+      temporary: true,
+    );
+
+    _chatController.setCurrentConversation(conversation);
+    _streamController.clearAllState();
+    notifyListeners();
+    onScrollToBottom?.call();
+  }
+
   /// Fork conversation at a specific message.
   Future<void> forkConversation(ChatMessage message) async {
-    // Determine included groups up to the message's group (inclusive)
-    final Map<String, int> groupFirstIndex = <String, int>{};
-    final List<String> groupOrder = <String>[];
-    for (int i = 0; i < messages.length; i++) {
-      final gid0 = (messages[i].groupId ?? messages[i].id);
-      if (!groupFirstIndex.containsKey(gid0)) {
-        groupFirstIndex[gid0] = i;
-        groupOrder.add(gid0);
-      }
-    }
-    final targetGroup = (message.groupId ?? message.id);
-    final targetOrderIndex = groupOrder.indexOf(targetGroup);
-    if (targetOrderIndex < 0) return;
+    final allMessages = _chatController
+        .allMessagesForCurrentConversationContext();
+    final selected = selectForkConversationMessages(
+      messages: allMessages,
+      targetMessage: message,
+    );
+    if (selected.isEmpty) return;
 
-    final includeGroups = groupOrder.take(targetOrderIndex + 1).toSet();
-    final selected = [
-      for (final m in messages)
-        if (includeGroups.contains(m.groupId ?? m.id)) m,
-    ];
     // Filter version selections to included groups
+    final includeGroups = selected.map((m) => m.groupId ?? m.id).toSet();
     final sel = <String, int>{};
     for (final gid in includeGroups) {
       final v = versionSelections[gid];
@@ -715,18 +767,12 @@ class HomeViewModel extends ChangeNotifier {
     if (convo == null) return 'no_conversation';
 
     // Get messages and collapse to selected versions
-    final allMsgs = _chatController.messages;
+    final allMsgs = _chatController.allMessagesForCurrentConversationContext();
     final collapsed = collapseVersions(allMsgs);
     if (collapsed.isEmpty) return 'no_messages';
 
     // Build conversation text for compression
-    final joined = collapsed
-        .where((m) => m.content.trim().isNotEmpty)
-        .map(
-          (m) =>
-              '${m.role == "assistant" ? "Assistant" : "User"}: ${m.content}',
-        )
-        .join('\n\n');
+    final joined = buildConversationTextForCompression(collapsed);
     if (joined.trim().isEmpty) return 'no_messages';
 
     final content = buildCompressContextContent(joined, options);
@@ -807,6 +853,30 @@ class HomeViewModel extends ChangeNotifier {
   void reloadMessages() {
     _chatController.reloadMessages();
     notifyListeners();
+  }
+
+  bool loadMoreBefore() {
+    final loaded = _chatController.loadMoreBefore();
+    if (!loaded) return false;
+    _restoreMessageUiState();
+    notifyListeners();
+    return true;
+  }
+
+  bool loadMoreAfter() {
+    final loaded = _chatController.loadMoreAfter();
+    if (!loaded) return false;
+    _restoreMessageUiState();
+    notifyListeners();
+    return true;
+  }
+
+  bool loadUntilMessageVisible(String messageId) {
+    final loaded = _chatController.loadUntilMessageVisible(messageId);
+    if (!loaded) return false;
+    _restoreMessageUiState();
+    notifyListeners();
+    return true;
   }
 
   /// Set selected version for a message group.
@@ -892,7 +962,7 @@ class HomeViewModel extends ChangeNotifier {
     // Use collapsed view for counting
     final collapsed = collapseVersions(messages);
     // Map raw truncate index to collapsed start index
-    final int tRaw = currentConversation?.truncateIndex ?? -1;
+    final int tRaw = _chatController.loadedWindowTruncateIndex();
     int startCollapsed = 0;
     if (tRaw > 0) {
       final seen = <String>{};

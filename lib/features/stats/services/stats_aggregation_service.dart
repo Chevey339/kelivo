@@ -112,10 +112,10 @@ class StatsAggregationService {
   ) {
     final today = StatsDateRange.normalizeDate(now);
     if (range.isAllTime) {
-      return (start: today.subtract(const Duration(days: 29)), end: today);
+      return (start: StatsDateRange.addCalendarDays(today, -29), end: today);
     }
     return (
-      start: range.start ?? today.subtract(const Duration(days: 29)),
+      start: range.start ?? StatsDateRange.addCalendarDays(today, -29),
       end: range.end ?? today,
     );
   }
@@ -125,12 +125,12 @@ class StatsAggregationService {
     Map<DateTime, int> counts,
   ) {
     final today = StatsDateRange.normalizeDate(now);
-    final start = today.subtract(const Duration(days: 364));
+    final start = StatsDateRange.addCalendarDays(today, -364);
     final days = <StatsHeatmapDay>[];
     for (
       var date = start;
       !date.isAfter(today);
-      date = date.add(const Duration(days: 1))
+      date = StatsDateRange.addCalendarDays(date, 1)
     ) {
       days.add(StatsHeatmapDay(date: date, count: counts[date] ?? 0));
     }
@@ -148,7 +148,7 @@ class StatsAggregationService {
     for (
       var date = trendRange.start;
       !date.isAfter(trendRange.end);
-      date = date.add(const Duration(days: 1))
+      date = StatsDateRange.addCalendarDays(date, 1)
     ) {
       buckets[date] = <String, StatsTokenBucket>{};
     }

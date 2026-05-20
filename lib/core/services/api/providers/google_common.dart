@@ -48,6 +48,22 @@ bool _isGemma4Model(String modelId) {
   ).hasMatch(modelId);
 }
 
+bool _isGemini35FlashModel(String modelId) {
+  return modelId.contains(
+    RegExp(r'gemini-3\.5-flash([._:@/-]|$)', caseSensitive: false),
+  );
+}
+
+bool _isGemini3TextModel(String modelId) {
+  return modelId.contains(
+    RegExp(r'gemini-3(?:\.\d+)?-(?!pro-image)', caseSensitive: false),
+  );
+}
+
+bool _shouldOmitGeminiSamplingParams(String modelId) {
+  return _isGemini3TextModel(modelId);
+}
+
 Map<String, dynamic> _googleThinkingConfig(
   String upstreamModelId,
   int? budget,
@@ -74,6 +90,7 @@ Map<String, dynamic> _googleThinkingConfig(
   final isGemini3Flash = upstreamModelId.contains(
     RegExp(r'gemini-3-flash(-preview)?', caseSensitive: false),
   );
+  final isGemini35Flash = _isGemini35FlashModel(upstreamModelId);
   if (isGemini3ProImage) {
     return {
       'includeThoughts': true,
@@ -103,9 +120,9 @@ Map<String, dynamic> _googleThinkingConfig(
     }
     return {'includeThoughts': true, 'thinkingLevel': level};
   }
-  // Gemini 3 Flash: supports 'minimal', 'low', 'medium', 'high'
-  if (isGemini3Flash) {
-    String level = 'high';
+  // Gemini 3 Flash and 3.5 Flash: supports 'minimal', 'low', 'medium', 'high'
+  if (isGemini3Flash || isGemini35Flash) {
+    String level = isGemini35Flash ? 'medium' : 'high';
     if (off) {
       level = 'minimal';
     } else if (budget != null && budget > 0) {
@@ -114,6 +131,8 @@ Map<String, dynamic> _googleThinkingConfig(
         level = 'low';
       } else if (budget < 24000) {
         level = 'medium';
+      } else {
+        level = 'high';
       }
     }
     return {'includeThoughts': true, 'thinkingLevel': level};
@@ -180,7 +199,9 @@ Map<String, dynamic> _googleFunctionResponsePartFromToolMessage(
   final google = _googleToolMetadata(message);
   final rawPart = google?['part'];
   final id = rawPart is Map ? rawPart['id']?.toString() : null;
-  if (id != null && id.isNotEmpty) part['id'] = id;
+  if (id != null && id.isNotEmpty) {
+    (part['functionResponse'] as Map<String, dynamic>)['id'] = id;
+  }
   return part;
 }
 
@@ -204,6 +225,11 @@ Map<String, dynamic> _googleApiPart(Map part) {
   final out = Map<String, dynamic>.from(part);
   out.remove('id');
   return out;
+}
+
+int? _defaultGeminiMaxOutputTokens(String upstreamModelId) {
+  if (_isGemini35FlashModel(upstreamModelId)) return 65536;
+  return null;
 }
 
 Stream<ChatStreamChunk> _sendGoogleStream(
@@ -468,8 +494,13 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     final thinkingConfig = isReasoning
         ? _googleThinkingConfig(upstreamModelId, thinkingBudget)
         : const <String, dynamic>{};
+    final defaultMaxOutputTokens = _defaultGeminiMaxOutputTokens(
+      upstreamModelId,
+    );
+    final omitSamplingParams = _shouldOmitGeminiSamplingParams(upstreamModelId);
     final generationConfig = <String, dynamic>{
-      if (maxTokens != null) 'maxOutputTokens': maxTokens,
+      if (maxTokens ?? defaultMaxOutputTokens case final resolvedMaxTokens?)
+        'maxOutputTokens': resolvedMaxTokens,
       if (thinkingConfig.isNotEmpty) 'thinkingConfig': thinkingConfig,
     };
 
@@ -481,8 +512,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
             {'text': systemPrompt},
           ],
         },
-      if (temperature != null) 'temperature': temperature,
-      if (topP != null) 'topP': topP,
+      if (!omitSamplingParams && temperature != null)
+        'temperature': temperature,
+      if (!omitSamplingParams && topP != null) 'topP': topP,
       if (generationConfig.isNotEmpty) 'generationConfig': generationConfig,
       if (toolsArr.isNotEmpty) 'tools': toolsArr,
       if (geminiToolConfig != null) 'toolConfig': geminiToolConfig,
@@ -577,8 +609,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
             'functionResponse': {
               'name': name,
               'response': {'result': res},
+              if (fc.containsKey('id')) 'id': fc['id'],
             },
-            if (fc.containsKey('id')) 'id': fc['id'],
           };
           responseParts.add(frPart);
         }
@@ -909,10 +941,16 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   }
 
   while (true) {
+    final defaultMaxOutputTokens = _defaultGeminiMaxOutputTokens(
+      upstreamModelId,
+    );
+    final omitSamplingParams = _shouldOmitGeminiSamplingParams(upstreamModelId);
     final gen = <String, dynamic>{
-      if (temperature != null) 'temperature': temperature,
-      if (topP != null) 'topP': topP,
-      if (maxTokens != null) 'maxOutputTokens': maxTokens,
+      if (!omitSamplingParams && temperature != null)
+        'temperature': temperature,
+      if (!omitSamplingParams && topP != null) 'topP': topP,
+      if (maxTokens ?? defaultMaxOutputTokens case final resolvedMaxTokens?)
+        'maxOutputTokens': resolvedMaxTokens,
       // Enable IMAGE+TEXT output modalities when model is configured to output images
       if (wantsImageOutput) 'responseModalities': ['TEXT', 'IMAGE'],
       if (isReasoning)
@@ -1523,8 +1561,11 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           responseObj = {'result': resText};
         }
         responseParts.add({
-          'functionResponse': {'name': name, 'response': responseObj},
-          if (apiId != null) 'id': apiId,
+          'functionResponse': {
+            'name': name,
+            'response': responseObj,
+            if (apiId != null) 'id': apiId,
+          },
         });
       }
       convo.add({'role': 'user', 'parts': responseParts});

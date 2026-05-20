@@ -56,6 +56,13 @@ class ModelRegistry {
         RegExp(r'(^|[-_/])embed(?:dings?)?([-.]|$)').hasMatch(id);
   }
 
+  static bool _isGemini35Flash(String id) {
+    return RegExp(
+      r'(^|[/:_-])gemini-3\.5-flash([._:@/-]|$)',
+      caseSensitive: false,
+    ).hasMatch(id);
+  }
+
   static ModelInfo infer(ModelInfo base) {
     final id = base.id.toLowerCase();
     final inMods = <Modality>[...base.input];
@@ -84,6 +91,17 @@ class ModelRegistry {
       ab.removeWhere(
         (x) => x == ModelAbility.tool || x == ModelAbility.reasoning,
       );
+      return base.copyWith(input: inMods, output: outMods, abilities: ab);
+    }
+    if (_isGemini35Flash(id)) {
+      if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
+      outMods
+        ..clear()
+        ..add(Modality.text);
+      if (!ab.contains(ModelAbility.tool)) ab.add(ModelAbility.tool);
+      if (!ab.contains(ModelAbility.reasoning)) {
+        ab.add(ModelAbility.reasoning);
+      }
       return base.copyWith(input: inMods, output: outMods, abilities: ab);
     }
     if (vision.hasMatch(id)) {

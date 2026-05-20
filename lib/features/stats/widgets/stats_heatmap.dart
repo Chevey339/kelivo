@@ -215,20 +215,28 @@ class _StatsHeatmapState extends State<StatsHeatmap> {
     final byDate = {for (final day in days) _dateOnly(day.date): day};
     final first = _dateOnly(days.first.date);
     final last = _dateOnly(days.last.date);
-    final start = first.subtract(Duration(days: first.weekday % 7));
+    final start = DateTime(
+      first.year,
+      first.month,
+      first.day - (first.weekday % 7),
+    );
     final weeks = <List<StatsHeatmapDay>>[];
     for (
       var weekStart = start;
       !weekStart.isAfter(last);
-      weekStart = weekStart.add(const Duration(days: 7))
+      weekStart = DateTime(weekStart.year, weekStart.month, weekStart.day + 7)
     ) {
-      final weekEnd = weekStart.add(const Duration(days: 6));
+      final weekEnd = DateTime(
+        weekStart.year,
+        weekStart.month,
+        weekStart.day + 6,
+      );
       final visibleEnd = weekEnd.isAfter(last) ? last : weekEnd;
       weeks.add([
         for (
           var date = weekStart;
           !date.isAfter(visibleEnd);
-          date = date.add(const Duration(days: 1))
+          date = DateTime(date.year, date.month, date.day + 1)
         )
           _dayForDate(byDate, date),
       ]);

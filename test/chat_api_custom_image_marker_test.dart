@@ -227,6 +227,57 @@ void main() {
         expect(content.last['image_url'], 'data:image/png;base64,AQIDBA==');
       },
     );
+
+    test(
+      'Responses tool continuation keeps streamed function call before output',
+      () async {
+        final requestBodies =
+            await _sendResponsesToolCallAndCaptureRequestBodies(
+              completedOutput: const <Map<String, dynamic>>[],
+              (baseUrl) {
+                return ChatApiService.sendMessageStream(
+                  config: _openAiResponsesConfig(baseUrl),
+                  modelId: 'gpt-5.5',
+                  messages: const [
+                    {'role': 'user', 'content': 'hi'},
+                  ],
+                  tools: const [
+                    {
+                      'type': 'function',
+                      'function': {
+                        'name': 'lookup',
+                        'description': 'Lookup test data',
+                        'parameters': {
+                          'type': 'object',
+                          'properties': <String, dynamic>{},
+                        },
+                      },
+                    },
+                  ],
+                  onToolCall: (_, __, {toolCallId}) async => '{"result":"ok"}',
+                ).toList();
+              },
+            );
+
+        expect(requestBodies, hasLength(2));
+        final followUpInput = (requestBodies[1]['input'] as List)
+            .map((e) => (e as Map).cast<String, dynamic>())
+            .toList(growable: false);
+        final functionCallIndex = followUpInput.indexWhere(
+          (item) =>
+              item['type'] == 'function_call' && item['call_id'] == 'call_1',
+        );
+        final outputIndex = followUpInput.indexWhere(
+          (item) =>
+              item['type'] == 'function_call_output' &&
+              item['call_id'] == 'call_1',
+        );
+
+        expect(functionCallIndex, isNonNegative);
+        expect(outputIndex, isNonNegative);
+        expect(functionCallIndex, lessThan(outputIndex));
+      },
+    );
   });
 }
 
@@ -358,8 +409,16 @@ Future<List<Map<String, dynamic>>> _sendToolCallAndCaptureRequestBodies(
 
 Future<List<Map<String, dynamic>>>
 _sendResponsesToolCallAndCaptureRequestBodies(
-  Future<List<dynamic>> Function(String baseUrl) sendRequest,
-) async {
+  Future<List<dynamic>> Function(String baseUrl) sendRequest, {
+  List<Map<String, dynamic>> completedOutput = const [
+    {
+      'type': 'function_call',
+      'call_id': 'call_1',
+      'name': 'lookup',
+      'arguments': '{}',
+    },
+  ],
+}) async {
   final requestBodies = <Map<String, dynamic>>[];
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   final baseUrl = 'http://${server.address.address}:${server.port}/v1';
@@ -396,9 +455,7 @@ _sendResponsesToolCallAndCaptureRequestBodies(
           'data: ${jsonEncode({
             'type': 'response.completed',
             'response': {
-              'output': [
-                {'type': 'function_call', 'call_id': 'call_1', 'name': 'lookup', 'arguments': '{}'},
-              ],
+              'output': completedOutput,
               'usage': {'input_tokens': 1, 'output_tokens': 1},
             },
           })}\n\n',

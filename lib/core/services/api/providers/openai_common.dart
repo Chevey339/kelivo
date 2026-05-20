@@ -252,6 +252,29 @@ bool _shouldIncludeStreamingUsageOptions(
   return !host.contains('mistral.ai') && !host.contains('openrouter');
 }
 
+bool _isClaudeModelId(String modelId) {
+  final normalized = modelId.trim().toLowerCase();
+  return normalized.contains('claude') || normalized.contains('anthropic/');
+}
+
+bool _shouldCacheClaudeSystemPrompt(
+  ProviderConfig config,
+  String upstreamModelId,
+) {
+  return config.claudePromptCachingEnabled == true &&
+      BuiltInToolsHelper.isOpenRouterProvider(config) &&
+      _isClaudeModelId(upstreamModelId);
+}
+
+void _applyOpenRouterClaudePromptCaching(
+  Map<String, dynamic> body, {
+  required ProviderConfig config,
+  required String upstreamModelId,
+}) {
+  if (!_shouldCacheClaudeSystemPrompt(config, upstreamModelId)) return;
+  body['cache_control'] = {'type': 'ephemeral'};
+}
+
 void _maybeAddStreamingUsageOptions(
   Map<String, dynamic> body, {
   required bool stream,
@@ -1186,6 +1209,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     body,
     config: config,
     modelId: modelId,
+    upstreamModelId: upstreamModelId,
+  );
+  _applyOpenRouterClaudePromptCaching(
+    body,
+    config: config,
     upstreamModelId: upstreamModelId,
   );
 
@@ -2361,6 +2389,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   toolCalls: callInfos,
                 );
               }
+              final responseOutputItems = _withResponsesFunctionCallItems(
+                lastResponseOutputItems,
+                callInfos,
+              );
               final resultsInfo = <ToolResultInfo>[];
               final followUpOutputs = <Map<String, dynamic>>[];
               for (final m in msgs) {
@@ -2396,8 +2428,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               List<Map<String, dynamic>> currentInput = <Map<String, dynamic>>[
                 ...responsesInitialInput,
               ];
-              if (lastResponseOutputItems.isNotEmpty) {
-                currentInput.addAll(lastResponseOutputItems);
+              if (responseOutputItems.isNotEmpty) {
+                currentInput.addAll(responseOutputItems);
               }
               currentInput.addAll(followUpOutputs);
 
@@ -2647,6 +2679,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     toolCalls: callInfos2,
                   );
                 }
+                final responseOutputItems2 = _withResponsesFunctionCallItems(
+                  outItems2,
+                  callInfos2,
+                );
                 final resultsInfo2 = <ToolResultInfo>[];
                 final followUpOutputs2 = <Map<String, dynamic>>[];
                 for (final m in msgs2) {
@@ -2678,7 +2714,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   );
                 }
                 // Extend current input with this round's model output and our outputs
-                if (outItems2.isNotEmpty) currentInput.addAll(outItems2);
+                if (responseOutputItems2.isNotEmpty) {
+                  currentInput.addAll(responseOutputItems2);
+                }
                 currentInput.addAll(followUpOutputs2);
               }
 

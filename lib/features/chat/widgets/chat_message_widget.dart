@@ -632,6 +632,7 @@ class ChatMessageWidget extends StatefulWidget {
   final bool hideStreamingIndicator;
   // Whether files are currently being processed
   final bool isProcessingFiles;
+  final bool enableStreamingTextMotion;
   final List<String> suggestions;
   final ValueChanged<String>? onSuggestionTap;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
@@ -675,6 +676,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.toolCountAtSplit,
     this.hideStreamingIndicator = false,
     this.isProcessingFiles = false,
+    this.enableStreamingTextMotion = true,
     this.suggestions = const <String>[],
     this.onSuggestionTap,
     this.onRecoveredAskUserAnswer,
@@ -1783,6 +1785,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         text: visualContent,
         onCitationTap: (id) => _handleCitationTap(id),
         baseStyle: TextStyle(fontSize: baseAssistant, height: 1.5),
+        streaming: widget.message.isStreaming,
       );
     } else {
       assistantContent = Text(
@@ -1802,6 +1805,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     assistantContent = _StreamingAssistantMessageMotion(
       enabled:
           widget.message.isStreaming &&
+          widget.enableStreamingTextMotion &&
           !reduceMotion &&
           visualContent.isNotEmpty,
       child: assistantContent,
@@ -1809,7 +1813,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
     return RepaintBoundary(
       child: SelectionArea(
-        key: ValueKey('assistant_${widget.message.id}_$visualContent'),
+        key: ValueKey('assistant_${widget.message.id}'),
         child: DefaultTextStyle.merge(
           style: TextStyle(fontSize: baseAssistant, height: 1.5),
           child: assistantContent,
@@ -3328,6 +3332,7 @@ class _StreamingAssistantMessageMotion extends StatelessWidget {
     if (!enabled) return child;
 
     return AnimatedSize(
+      key: const ValueKey('streaming-assistant-message-motion'),
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
       alignment: Alignment.topLeft,
@@ -3803,6 +3808,7 @@ class _ChainOfThoughtReasoningStepState
           child: MarkdownWithCodeHighlight(
             text: text.isNotEmpty ? text : '…',
             baseStyle: const TextStyle(fontSize: 12.5, height: 1.32),
+            streaming: widget.step.loading,
           ),
         );
       }
@@ -6045,6 +6051,7 @@ class _ReasoningSectionState extends State<_ReasoningSection>
           child: MarkdownWithCodeHighlight(
             text: text.isNotEmpty ? text : '…',
             baseStyle: baseStyle,
+            streaming: isLoading,
           ),
         );
       }

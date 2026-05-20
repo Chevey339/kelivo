@@ -93,6 +93,10 @@ class S3BackupClient {
     return parts.isEmpty ? key : parts.last;
   }
 
+  static String _keyFromItem(BackupFileItem item) {
+    return item.href.pathSegments.join('/');
+  }
+
   static DateTime? _parseDateTime(String raw) {
     final s = raw.trim();
     if (s.isEmpty) return null;
@@ -499,7 +503,7 @@ class S3BackupClient {
         'items': items
             .map(
               (item) => {
-                'key': item.href.pathSegments.join('/'),
+                'key': _keyFromItem(item),
                 'displayName': item.displayName,
                 'size': item.size,
                 'lastModified': item.lastModified?.toUtc().toIso8601String(),
@@ -554,55 +558,77 @@ class S3BackupClient {
 
   Future<List<BackupFileItem>> _listBucketObjects(S3Config cfg) async {
     final prefix = _normalizePrefix(cfg.prefix);
-    final res = await _sendSignedBucketListRequest(
-      cfg,
-      query: {
-        'list-type': '2',
-        if (prefix.isNotEmpty) 'prefix': prefix,
-        'max-keys': '1000',
-      },
-    );
-    if (res.statusCode != 200) {
-      throw Exception('S3 list failed: ${_extractErrorMessage(res)}');
-    }
-
-    final doc = XmlDocument.parse(res.body);
     final items = <BackupFileItem>[];
-    for (final c in doc.findAllElements('Contents', namespace: '*')) {
-      final key = c.getElement('Key', namespace: '*')?.innerText ?? '';
-      if (key.trim().isEmpty) continue;
-      final sizeStr = c.getElement('Size', namespace: '*')?.innerText ?? '0';
-      final mtimeStr =
-          c.getElement('LastModified', namespace: '*')?.innerText ?? '';
-      final size = int.tryParse(sizeStr.trim()) ?? 0;
-      final mtime = _parseDateTime(mtimeStr);
-      final name = _displayNameFromKey(key);
-      if (!name.toLowerCase().endsWith('.zip')) continue;
+    String? continuationToken;
 
-      items.add(
-        BackupFileItem(
-          href: Uri(
-            scheme: 's3',
-            host: cfg.bucket.trim(),
-            pathSegments: key.split('/').where((s) => s.isNotEmpty).toList(),
-          ),
-          displayName: name,
-          size: size,
-          lastModified: mtime,
-        ),
+    do {
+      final res = await _sendSignedBucketListRequest(
+        cfg,
+        query: {
+          'list-type': '2',
+          if (prefix.isNotEmpty) 'prefix': prefix,
+          'max-keys': '1000',
+          if (continuationToken != null)
+            'continuation-token': continuationToken,
+        },
       );
-    }
+      if (res.statusCode != 200) {
+        throw Exception('S3 list failed: ${_extractErrorMessage(res)}');
+      }
+
+      final doc = XmlDocument.parse(res.body);
+      for (final c in doc.findAllElements('Contents', namespace: '*')) {
+        final key = c.getElement('Key', namespace: '*')?.innerText ?? '';
+        if (key.trim().isEmpty) continue;
+        final sizeStr = c.getElement('Size', namespace: '*')?.innerText ?? '0';
+        final mtimeStr =
+            c.getElement('LastModified', namespace: '*')?.innerText ?? '';
+        final size = int.tryParse(sizeStr.trim()) ?? 0;
+        final mtime = _parseDateTime(mtimeStr);
+        final name = _displayNameFromKey(key);
+        if (!name.toLowerCase().endsWith('.zip')) continue;
+
+        items.add(
+          BackupFileItem(
+            href: Uri(
+              scheme: 's3',
+              host: cfg.bucket.trim(),
+              pathSegments: key.split('/').where((s) => s.isNotEmpty).toList(),
+            ),
+            displayName: name,
+            size: size,
+            lastModified: mtime,
+          ),
+        );
+      }
+
+      final isTruncated =
+          doc
+              .findAllElements('IsTruncated', namespace: '*')
+              .map((e) => e.innerText.trim().toLowerCase())
+              .firstWhere((s) => s.isNotEmpty, orElse: () => 'false') ==
+          'true';
+      final nextToken = doc
+          .findAllElements('NextContinuationToken', namespace: '*')
+          .map((e) => e.innerText.trim())
+          .firstWhere((s) => s.isNotEmpty, orElse: () => '');
+      continuationToken = isTruncated && nextToken.isNotEmpty
+          ? nextToken
+          : null;
+    } while (continuationToken != null);
+
     return items;
   }
 
   static List<BackupFileItem> _mergeBackupItems(
     List<BackupFileItem> manifestItems,
-    List<BackupFileItem> bucketItems,
-  ) {
+    List<BackupFileItem> bucketItems, {
+    bool bucketIsAuthoritative = false,
+  }) {
     final merged = <String, BackupFileItem>{};
 
     void upsert(BackupFileItem item) {
-      final key = item.href.pathSegments.join('/');
+      final key = _keyFromItem(item);
       final current = merged[key];
       if (current == null) {
         merged[key] = item;
@@ -625,8 +651,10 @@ class S3BackupClient {
       }
     }
 
-    for (final item in manifestItems) {
-      upsert(item);
+    if (!bucketIsAuthoritative) {
+      for (final item in manifestItems) {
+        upsert(item);
+      }
     }
     for (final item in bucketItems) {
       upsert(item);
@@ -639,6 +667,39 @@ class S3BackupClient {
       ),
     );
     return items;
+  }
+
+  static bool _sameInstant(DateTime? a, DateTime? b) {
+    if (a == null || b == null) return a == b;
+    return a.isAtSameMomentAs(b);
+  }
+
+  static bool _sameBackupItem(BackupFileItem a, BackupFileItem b) {
+    return _keyFromItem(a) == _keyFromItem(b) &&
+        a.displayName == b.displayName &&
+        a.size == b.size &&
+        _sameInstant(a.lastModified, b.lastModified);
+  }
+
+  static bool _sameBackupItems(List<BackupFileItem> a, List<BackupFileItem> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i += 1) {
+      if (!_sameBackupItem(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  Future<void> _writeManifestIfChanged(
+    S3Config cfg, {
+    required bool manifestExists,
+    required List<BackupFileItem> currentManifestItems,
+    required List<BackupFileItem> reconciledItems,
+  }) async {
+    if (!manifestExists ||
+        _sameBackupItems(currentManifestItems, reconciledItems)) {
+      return;
+    }
+    await _writeManifest(cfg, reconciledItems);
   }
 
   static void _validateConfigBasics(S3Config cfg) {
@@ -766,22 +827,43 @@ class S3BackupClient {
   Future<List<BackupFileItem>> listObjects(S3Config cfg) async {
     _validateConfigBasics(cfg);
     List<BackupFileItem> manifestItems = const [];
+    var manifestExists = false;
     Object? manifestError;
     try {
-      manifestItems = await _readManifest(cfg) ?? const [];
+      final manifest = await _readManifest(cfg);
+      if (manifest != null) {
+        manifestItems = manifest;
+        manifestExists = true;
+      }
     } catch (e) {
       manifestError = e;
     }
 
     List<BackupFileItem> bucketItems = const [];
     Object? bucketError;
+    var bucketListSucceeded = false;
     try {
       bucketItems = await _listBucketObjects(cfg);
+      bucketListSucceeded = true;
     } catch (e) {
       bucketError = e;
     }
 
-    final merged = _mergeBackupItems(manifestItems, bucketItems);
+    final merged = _mergeBackupItems(
+      manifestItems,
+      bucketItems,
+      bucketIsAuthoritative: bucketListSucceeded,
+    );
+    if (bucketListSucceeded) {
+      await _writeManifestIfChanged(
+        cfg,
+        manifestExists: manifestExists,
+        currentManifestItems: manifestItems,
+        reconciledItems: merged,
+      );
+      if (merged.isNotEmpty || manifestError == null) return merged;
+      throw manifestError;
+    }
     if (merged.isNotEmpty) return merged;
     if (manifestError != null) throw manifestError;
     if (bucketError != null) throw bucketError;

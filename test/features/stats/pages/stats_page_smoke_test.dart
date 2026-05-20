@@ -161,10 +161,13 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final latest = DateTime(2026, 5, 3);
-    final earliest = latest.subtract(const Duration(days: 179));
+    final earliest = DateTime(latest.year, latest.month, latest.day - 179);
     final days = [
       for (var i = 179; i >= 0; i--)
-        StatsHeatmapDay(date: latest.subtract(Duration(days: i)), count: 1),
+        StatsHeatmapDay(
+          date: DateTime(latest.year, latest.month, latest.day - i),
+          count: 1,
+        ),
     ];
 
     await tester.pumpWidget(

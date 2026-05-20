@@ -524,7 +524,8 @@ class SerperOptions extends SearchServiceOptions {
 
 class GrokOptions extends SearchServiceOptions {
   static const String defaultUrl = 'https://api.x.ai/v1/responses';
-  static const String defaultModel = 'grok-4-1-fast-non-reasoning';
+  static const String defaultModel = 'grok-4.3';
+  static const String defaultReasoningEffort = 'none';
   static const String defaultSystemPrompt =
       "You are a helpful search assistant. Search the web to find accurate and up-to-date information for the user's query. Provide a comprehensive answer with citations.";
 
@@ -549,6 +550,14 @@ class GrokOptions extends SearchServiceOptions {
   String get resolvedModel {
     final trimmed = model.trim();
     return trimmed.isEmpty ? defaultModel : trimmed;
+  }
+
+  String get resolvedReasoningEffort {
+    final trimmed = model.trim();
+    if (trimmed.isEmpty || trimmed == defaultModel) {
+      return defaultReasoningEffort;
+    }
+    return '';
   }
 
   String get resolvedSystemPrompt {

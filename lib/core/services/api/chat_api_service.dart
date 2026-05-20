@@ -680,6 +680,11 @@ class ChatApiService {
           modelId: modelId,
           upstreamModelId: upstreamModelId,
         );
+        _applyOpenRouterClaudePromptCaching(
+          body,
+          config: config,
+          upstreamModelId: upstreamModelId,
+        );
         _applyCompatibleResponsesReasoning(
           body,
           config: config,

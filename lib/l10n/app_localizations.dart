@@ -2363,6 +2363,12 @@ abstract class AppLocalizations {
   /// **'Export CSV'**
   String get markdownTableExportCsvTooltip;
 
+  /// No description provided for @markdownTableSaveImageTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to Gallery'**
+  String get markdownTableSaveImageTooltip;
+
   /// No description provided for @markdownTableDefaultFileNameStem.
   ///
   /// In en, this message translates to:
@@ -2374,6 +2380,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'CSV copied. Long press Copy to copy as image.'**
   String get markdownTableCopiedCsvSnackbar;
+
+  /// No description provided for @markdownTableCopiedMarkdownSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Table copied.'**
+  String get markdownTableCopiedMarkdownSnackbar;
 
   /// No description provided for @codeBlockCollapsedLines.
   ///
@@ -5492,6 +5504,18 @@ abstract class AppLocalizations {
   /// **'Adds header APP-Code requests to get a 10% discount. Only affects AIhubmix.'**
   String get providerDetailPageAihubmixAppCodeHelp;
 
+  /// No description provided for @providerDetailPageClaudePromptCachingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Claude Prompt Caching'**
+  String get providerDetailPageClaudePromptCachingTitle;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Adds cache_control to the system prompt for Claude requests through Anthropic or OpenRouter.'**
+  String get providerDetailPageClaudePromptCachingHelp;
+
   /// No description provided for @providerDetailPageBalanceTitle.
   ///
   /// In en, this message translates to:
@@ -7771,6 +7795,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New Chat'**
   String get titleForLocale;
+
+  /// No description provided for @temporaryChatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary Chat'**
+  String get temporaryChatTitle;
+
+  /// No description provided for @temporaryChatEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary chats do not appear in history and will be deleted completely after you leave.'**
+  String get temporaryChatEmptyMessage;
+
+  /// No description provided for @temporaryChatToggleTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle temporary chat'**
+  String get temporaryChatToggleTooltip;
 
   /// No description provided for @quickPhraseBackTooltip.
   ///

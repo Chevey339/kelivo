@@ -1179,10 +1179,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get markdownTableExportCsvTooltip => '导出 CSV';
 
   @override
+  String get markdownTableSaveImageTooltip => '保存到相册';
+
+  @override
   String get markdownTableDefaultFileNameStem => '表格';
 
   @override
   String get markdownTableCopiedCsvSnackbar => '已复制 CSV，长按复制可复制为图片';
+
+  @override
+  String get markdownTableCopiedMarkdownSnackbar => '已复制表格';
 
   @override
   String codeBlockCollapsedLines(int n) {
@@ -2826,6 +2832,14 @@ class AppLocalizationsZh extends AppLocalizations {
       '为请求附加 APP-Code，可享 10% 优惠，仅对 AIhubmix 生效。';
 
   @override
+  String get providerDetailPageClaudePromptCachingTitle =>
+      'Claude Prompt Caching';
+
+  @override
+  String get providerDetailPageClaudePromptCachingHelp =>
+      '通过 Claude 官方或 OpenRouter 调用 Claude 时，为 System Prompt 附加 cache_control。';
+
+  @override
   String get providerDetailPageBalanceTitle => '账户余额';
 
   @override
@@ -4012,6 +4026,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get titleForLocale => '新对话';
+
+  @override
+  String get temporaryChatTitle => '临时对话';
+
+  @override
+  String get temporaryChatEmptyMessage => '临时对话不显示在历史记录，退出后将被完全删除';
+
+  @override
+  String get temporaryChatToggleTooltip => '切换临时对话';
 
   @override
   String get quickPhraseBackTooltip => '返回';
@@ -6028,10 +6051,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get markdownTableExportCsvTooltip => '导出 CSV';
 
   @override
+  String get markdownTableSaveImageTooltip => '保存到相册';
+
+  @override
   String get markdownTableDefaultFileNameStem => '表格';
 
   @override
   String get markdownTableCopiedCsvSnackbar => '已复制 CSV，长按复制可复制为图片';
+
+  @override
+  String get markdownTableCopiedMarkdownSnackbar => '已复制表格';
 
   @override
   String codeBlockCollapsedLines(int n) {
@@ -7675,6 +7704,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '为请求附加 APP-Code，可享 10% 优惠，仅对 AIhubmix 生效。';
 
   @override
+  String get providerDetailPageClaudePromptCachingTitle =>
+      'Claude Prompt Caching';
+
+  @override
+  String get providerDetailPageClaudePromptCachingHelp =>
+      '通过 Claude 官方或 OpenRouter 调用 Claude 时，为 System Prompt 附加 cache_control。';
+
+  @override
   String get providerDetailPageBalanceTitle => '账户余额';
 
   @override
@@ -8861,6 +8898,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get titleForLocale => '新对话';
+
+  @override
+  String get temporaryChatTitle => '临时对话';
+
+  @override
+  String get temporaryChatEmptyMessage => '临时对话不显示在历史记录，退出后将被完全删除';
+
+  @override
+  String get temporaryChatToggleTooltip => '切换临时对话';
 
   @override
   String get quickPhraseBackTooltip => '返回';
@@ -10877,10 +10923,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get markdownTableExportCsvTooltip => '匯出 CSV';
 
   @override
+  String get markdownTableSaveImageTooltip => '儲存到相簿';
+
+  @override
   String get markdownTableDefaultFileNameStem => '表格';
 
   @override
   String get markdownTableCopiedCsvSnackbar => '已複製 CSV，長按複製可複製為圖片';
+
+  @override
+  String get markdownTableCopiedMarkdownSnackbar => '已複製表格';
 
   @override
   String codeBlockCollapsedLines(int n) {
@@ -12523,6 +12575,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '為請求附加 APP-Code，可享 10% 優惠，僅對 AIhubmix 生效。';
 
   @override
+  String get providerDetailPageClaudePromptCachingTitle =>
+      'Claude Prompt Caching';
+
+  @override
+  String get providerDetailPageClaudePromptCachingHelp =>
+      '透過 Claude 官方或 OpenRouter 呼叫 Claude 時，為 System Prompt 附加 cache_control。';
+
+  @override
   String get providerDetailPageBalanceTitle => '帳戶餘額';
 
   @override
@@ -13709,6 +13769,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get titleForLocale => '新對話';
+
+  @override
+  String get temporaryChatTitle => '臨時對話';
+
+  @override
+  String get temporaryChatEmptyMessage => '臨時對話不會顯示在歷史記錄中，退出後將被完全刪除';
+
+  @override
+  String get temporaryChatToggleTooltip => '切換臨時對話';
 
   @override
   String get quickPhraseBackTooltip => '返回';
