@@ -940,6 +940,36 @@ abstract class AppLocalizations {
   /// **'Export failed'**
   String get mermaidExportFailed;
 
+  /// No description provided for @mermaidImageTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get mermaidImageTab;
+
+  /// No description provided for @mermaidCodeTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get mermaidCodeTab;
+
+  /// No description provided for @mermaidFullScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Full screen'**
+  String get mermaidFullScreen;
+
+  /// No description provided for @mermaidGeneratingImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating image'**
+  String get mermaidGeneratingImage;
+
+  /// No description provided for @mermaidGenerationFailedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation failed. Try asking another way.'**
+  String get mermaidGenerationFailedHint;
+
   /// No description provided for @mermaidPreviewOpen.
   ///
   /// In en, this message translates to:

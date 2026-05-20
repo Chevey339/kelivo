@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -1218,6 +1219,180 @@ $code
   );
 
   testWidgets(
+    'MarkdownWithCodeHighlight frames cached Mermaid image in preview shell',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      const code = 'graph TD\nA-->B';
+      MermaidImageCache.put(code, Uint8List.fromList(_transparentPngBytes));
+
+      await tester.pumpWidget(
+        _markdownHarness('''
+```mermaid
+$code
+```'''),
+      );
+      await tester.pump();
+
+      expect(find.text('Image'), findsOneWidget);
+      expect(find.text('Code'), findsOneWidget);
+      expect(find.text('Copy'), findsNothing);
+      expect(find.text('Export PNG'), findsNothing);
+      expect(find.text('Full screen'), findsNothing);
+      expect(find.byTooltip('Copy'), findsOneWidget);
+      expect(find.byTooltip('Export PNG'), findsOneWidget);
+      expect(find.byTooltip('Full screen'), findsOneWidget);
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('mermaid-preview-body')))
+            .height,
+        406,
+      );
+      expect(find.byType(Image), findsOneWidget);
+      expect(find.textContaining('graph TD'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight opens Mermaid image from preview tap',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      const code = 'graph TD\nA-->B';
+      MermaidImageCache.put(code, Uint8List.fromList(_transparentPngBytes));
+
+      await tester.pumpWidget(
+        _markdownHarness('''
+```mermaid
+$code
+```'''),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byType(Image));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ImageViewerPage), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight pins Mermaid actions to trailing edge on wide layouts',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      const code = 'graph TD\nA-->B';
+      MermaidImageCache.put(code, Uint8List.fromList(_transparentPngBytes));
+
+      await tester.pumpWidget(
+        _markdownHarness('''
+```mermaid
+$code
+```''', width: 800),
+      );
+      await tester.pump();
+
+      final bodyRight = tester
+          .getTopRight(find.byKey(const ValueKey('mermaid-preview-body')))
+          .dx;
+      final fullScreenRight = tester
+          .getTopRight(find.byTooltip('Full screen'))
+          .dx;
+
+      expect(bodyRight - fullScreenRight, lessThanOrEqualTo(14));
+    },
+  );
+
+  testWidgets('MarkdownWithCodeHighlight toggles Mermaid image and code tabs', (
+    tester,
+  ) async {
+    addTearDown(MermaidImageCache.clear);
+    const code = 'graph TD\nA-->B';
+    MermaidImageCache.put(code, Uint8List.fromList(_transparentPngBytes));
+
+    await tester.pumpWidget(
+      _markdownHarness('''
+```mermaid
+$code
+```'''),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Code'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Image), findsNothing);
+    expect(find.textContaining('graph TD'), findsOneWidget);
+
+    await tester.tap(find.text('Image'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.textContaining('graph TD'), findsNothing);
+  });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight shows fixed Mermaid loading state while rendering',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      addTearDown(() => debugMermaidBitmapRenderOverride = null);
+      debugMermaidBitmapRenderOverride = (code, isDark, themeVars) {
+        return Completer<MermaidBitmapRenderResult>().future;
+      };
+
+      await tester.pumpWidget(
+        _markdownHarness('''
+```mermaid
+graph TD
+A-->B
+```'''),
+      );
+      await tester.pump(const Duration(milliseconds: 240));
+
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('mermaid-preview-body')))
+            .height,
+        406,
+      );
+      expect(find.text('Generating image'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byType(Image), findsNothing);
+      expect(find.textContaining('graph TD'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight shows Mermaid error preview after render failure',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      addTearDown(() => debugMermaidBitmapRenderOverride = null);
+      debugMermaidBitmapRenderOverride = (code, isDark, themeVars) async {
+        return MermaidBitmapRenderResult.failed();
+      };
+
+      await tester.pumpWidget(
+        _markdownHarness('''
+```mermaid
+graph TD
+A-->
+```'''),
+      );
+      await tester.pump(const Duration(milliseconds: 240));
+      await tester.pump();
+
+      expect(
+        find.text('Generation failed. Try asking another way.'),
+        findsOneWidget,
+      );
+      expect(find.byType(Image), findsNothing);
+      expect(find.textContaining('graph TD'), findsNothing);
+
+      await tester.tap(find.text('Code'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('graph TD'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps Mermaid bitmap visible while streaming code grows',
     (tester) async {
       addTearDown(MermaidImageCache.clear);
@@ -1359,12 +1534,12 @@ A-->B
 ''', streaming: true),
       );
       await tester.pump();
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.text('Generating image'), findsOneWidget);
 
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pump();
 
-      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.text('Generating image'), findsNothing);
       expect(find.byType(Image), findsNothing);
       expect(find.textContaining('graph TD'), findsOneWidget);
       expect(find.text('Open Preview'), findsNothing);

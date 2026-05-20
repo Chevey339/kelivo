@@ -456,6 +456,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mermaidExportFailed => 'Export failed';
 
   @override
+  String get mermaidImageTab => 'Image';
+
+  @override
+  String get mermaidCodeTab => 'Code';
+
+  @override
+  String get mermaidFullScreen => 'Full screen';
+
+  @override
+  String get mermaidGeneratingImage => 'Generating image';
+
+  @override
+  String get mermaidGenerationFailedHint =>
+      'Generation failed. Try asking another way.';
+
+  @override
   String get mermaidPreviewOpen => 'Open Preview';
 
   @override

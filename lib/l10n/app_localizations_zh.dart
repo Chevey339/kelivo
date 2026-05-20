@@ -453,6 +453,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mermaidExportFailed => '导出失败';
 
   @override
+  String get mermaidImageTab => '图片';
+
+  @override
+  String get mermaidCodeTab => '代码';
+
+  @override
+  String get mermaidFullScreen => '全屏';
+
+  @override
+  String get mermaidGeneratingImage => '图片生成中';
+
+  @override
+  String get mermaidGenerationFailedHint => '生成失败，换个方式问问吧';
+
+  @override
   String get mermaidPreviewOpen => '浏览器预览';
 
   @override
@@ -5325,6 +5340,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mermaidExportFailed => '导出失败';
 
   @override
+  String get mermaidImageTab => '图片';
+
+  @override
+  String get mermaidCodeTab => '代码';
+
+  @override
+  String get mermaidFullScreen => '全屏';
+
+  @override
+  String get mermaidGeneratingImage => '图片生成中';
+
+  @override
+  String get mermaidGenerationFailedHint => '生成失败，换个方式问问吧';
+
+  @override
   String get mermaidPreviewOpen => '浏览器预览';
 
   @override
@@ -10195,6 +10225,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mermaidExportFailed => '匯出失敗';
+
+  @override
+  String get mermaidImageTab => '圖片';
+
+  @override
+  String get mermaidCodeTab => '程式碼';
+
+  @override
+  String get mermaidFullScreen => '全螢幕';
+
+  @override
+  String get mermaidGeneratingImage => '圖片生成中';
+
+  @override
+  String get mermaidGenerationFailedHint => '生成失敗，換個方式問問吧';
 
   @override
   String get mermaidPreviewOpen => '瀏覽器預覽';

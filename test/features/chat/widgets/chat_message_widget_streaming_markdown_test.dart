@@ -91,8 +91,9 @@ A-->B''',
       );
       await tester.pump();
 
-      expect(find.text('mermaid'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.text('Image'), findsOneWidget);
+      expect(find.text('Code'), findsOneWidget);
+      expect(find.text('Generating image'), findsOneWidget);
       expect(_allRichTextPlainText(tester), isNot(contains('graph TD')));
     },
   );
