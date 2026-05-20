@@ -34,6 +34,37 @@ List<Map<String, dynamic>> _toResponsesToolsFormat(
   }).toList();
 }
 
+List<Map<String, dynamic>> _withResponsesFunctionCallItems(
+  List<Map<String, dynamic>> outputItems,
+  Iterable<ToolCallInfo> calls,
+) {
+  final replayItems = <Map<String, dynamic>>[
+    for (final item in outputItems) Map<String, dynamic>.from(item),
+  ];
+  final presentCallIds = replayItems
+      .where((item) => item['type'] == 'function_call')
+      .map((item) => (item['call_id'] ?? '').toString())
+      .where((callId) => callId.isNotEmpty)
+      .toSet();
+
+  for (final call in calls) {
+    if (call.id.isEmpty || presentCallIds.contains(call.id)) continue;
+    var argumentsJson = '{}';
+    try {
+      argumentsJson = jsonEncode(call.arguments);
+    } catch (_) {}
+    replayItems.add({
+      'type': 'function_call',
+      'call_id': call.id,
+      'name': call.name,
+      'arguments': argumentsJson,
+    });
+    presentCallIds.add(call.id);
+  }
+
+  return replayItems;
+}
+
 Stream<ChatStreamChunk> _sendOpenAIResponsesStream(
   http.Client client,
   ProviderConfig config,
