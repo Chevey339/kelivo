@@ -1974,6 +1974,7 @@ class _MarkdownTableBlock extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final bool isDesktopPlatform = _markdownTableTargetPlatformIsDesktop();
+        final bool isExporting = ExportCaptureScope.of(context);
         final bool useCompactTable =
             !isDesktopPlatform || constraints.maxWidth < 520;
 
@@ -1987,6 +1988,7 @@ class _MarkdownTableBlock extends StatelessWidget {
             ? constraints.maxWidth
             : MediaQuery.sizeOf(context).width;
         final shouldScrollHorizontally =
+            !isExporting &&
             useCompactTable &&
             rows.columnCount >= 4 &&
             columnWidth * rows.columnCount > viewportWidth;

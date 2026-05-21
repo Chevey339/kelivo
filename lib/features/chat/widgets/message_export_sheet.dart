@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as image_lib;
 import 'package:intl/intl.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
@@ -695,9 +697,9 @@ Future<File?> _renderAndSaveMessageImage(
     await preRenderMermaidCodesForExport(context, codes);
   } catch (_) {}
 
-  // Desktop uses larger width and lower pixel ratio for better proportions
   final bool isDesktop =
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+  final exportConfig = _exportImageRenderConfig(isDesktop: isDesktop);
 
   final content = ExportCaptureScope(
     enabled: true,
@@ -715,8 +717,8 @@ Future<File?> _renderAndSaveMessageImage(
   return _renderWidgetDirectly(
     context,
     content,
-    width: isDesktop ? 720 : 480,
-    pixelRatio: isDesktop ? 2.0 : 3.0,
+    width: exportConfig.width,
+    pixelRatio: exportConfig.pixelRatio,
   );
 }
 
@@ -739,9 +741,9 @@ Future<File?> _renderAndSaveChatImage(
     await preRenderMermaidCodesForExport(context, codes);
   } catch (_) {}
 
-  // Desktop uses larger width and lower pixel ratio for better proportions
   final bool isDesktop =
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+  final exportConfig = _exportImageRenderConfig(isDesktop: isDesktop);
 
   final content = ExportCaptureScope(
     enabled: true,
@@ -762,9 +764,32 @@ Future<File?> _renderAndSaveChatImage(
   return _renderWidgetDirectly(
     context,
     content,
-    width: isDesktop ? 720 : 480,
-    pixelRatio: isDesktop ? 2.0 : 3.0,
+    width: exportConfig.width,
+    pixelRatio: exportConfig.pixelRatio,
   );
+}
+
+const double _desktopExportLogicalWidth = 720.0;
+const double _mobileExportLogicalWidth = 480.0;
+const double _exportImagePixelRatio = 3.0;
+const int _exportImageBlankTrimPreservePaddingPhysical = 48;
+const int _exportImageBlankAlphaTolerance = 8;
+const int _exportImageBlankColorTolerance = 3;
+
+({double width, double pixelRatio}) _exportImageRenderConfig({
+  required bool isDesktop,
+}) {
+  return (
+    width: isDesktop ? _desktopExportLogicalWidth : _mobileExportLogicalWidth,
+    pixelRatio: _exportImagePixelRatio,
+  );
+}
+
+@visibleForTesting
+({double width, double pixelRatio}) exportImageRenderConfigForTesting({
+  required bool isDesktop,
+}) {
+  return _exportImageRenderConfig(isDesktop: isDesktop);
 }
 
 // New direct rendering approach without pagination
@@ -826,26 +851,10 @@ Future<File?> _renderWidgetDirectly(
             as RenderRepaintBoundary?;
     if (boundary == null) return null;
 
-    // Try to capture the image with retries
-    ui.Image? image;
-    for (int retry = 0; retry < 10; retry++) {
-      try {
-        image = await boundary.toImage(pixelRatio: pixelRatio);
-        break;
-      } catch (e) {
-        if (retry == 9) {
-          debugPrint('Failed to capture image after 10 retries: $e');
-          return null;
-        }
-        // Wait before retrying
-        await Future<void>.delayed(const Duration(milliseconds: 200));
-      }
-    }
-
-    if (image == null) return null;
-
-    // Convert to PNG
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    final data = await _captureBoundaryPngBytes(
+      boundary,
+      pixelRatio: pixelRatio,
+    );
     if (data == null) return null;
 
     // Save to file
@@ -853,12 +862,318 @@ Future<File?> _renderWidgetDirectly(
     final file = File(
       '${dir.path}/chat-export-${DateTime.now().millisecondsSinceEpoch}.png',
     );
-    await file.writeAsBytes(data.buffer.asUint8List());
+    await file.writeAsBytes(data);
 
     return file;
   } finally {
     entry.remove();
   }
+}
+
+const double _maxExportCaptureSlicePhysicalHeight = 4096.0;
+
+@visibleForTesting
+Future<Uint8List?> captureExportBoundaryPngBytesForTesting(
+  RenderRepaintBoundary boundary, {
+  required double pixelRatio,
+}) {
+  return _captureBoundaryPngBytes(boundary, pixelRatio: pixelRatio);
+}
+
+@visibleForTesting
+Uint8List stitchExportPngSlicesForTesting({
+  required int outputWidth,
+  required int outputHeight,
+  required List<({Uint8List bytes, int y})> slices,
+}) {
+  return _stitchExportPngSlices(
+    outputWidth: outputWidth,
+    outputHeight: outputHeight,
+    slices: slices,
+  );
+}
+
+Future<Uint8List?> _captureBoundaryPngBytes(
+  RenderRepaintBoundary boundary, {
+  required double pixelRatio,
+}) async {
+  if (boundary.size.isEmpty) return null;
+
+  final sliceLogicalHeight = _maxExportCaptureSlicePhysicalHeight / pixelRatio;
+  if (boundary.size.height <= sliceLogicalHeight) {
+    final image = await _captureBoundaryImageWithRetries(
+      boundary,
+      Rect.fromLTWH(0, 0, boundary.size.width, boundary.size.height),
+      pixelRatio: pixelRatio,
+    );
+    if (image == null) return null;
+    try {
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      final bytes = data?.buffer.asUint8List();
+      if (bytes == null) return null;
+      return _trimExportPngBlankPadding(
+        bytes,
+        preservePadding: _exportImageBlankTrimPreservePaddingPhysical,
+      );
+    } finally {
+      image.dispose();
+    }
+  }
+
+  final outputWidth = (boundary.size.width * pixelRatio).ceil();
+  final outputHeight = (boundary.size.height * pixelRatio).ceil();
+  final slices = <({Uint8List bytes, int y})>[];
+
+  double top = 0;
+  while (top < boundary.size.height) {
+    final height = (boundary.size.height - top).clamp(0.0, sliceLogicalHeight);
+    final slice = await _captureBoundaryImageWithRetries(
+      boundary,
+      Rect.fromLTWH(0, top, boundary.size.width, height),
+      pixelRatio: pixelRatio,
+    );
+    if (slice == null) return null;
+    try {
+      final data = await slice.toByteData(format: ui.ImageByteFormat.png);
+      if (data == null) return null;
+      slices.add((
+        bytes: data.buffer.asUint8List(),
+        y: (top * pixelRatio).round(),
+      ));
+    } finally {
+      slice.dispose();
+    }
+    top += height;
+  }
+
+  final stitched = _stitchExportPngSlicesImage(
+    outputWidth: outputWidth,
+    outputHeight: outputHeight,
+    slices: slices,
+  );
+  return _encodeTrimmedExportImage(
+    stitched,
+    preservePadding: _exportImageBlankTrimPreservePaddingPhysical,
+  );
+}
+
+Uint8List _stitchExportPngSlices({
+  required int outputWidth,
+  required int outputHeight,
+  required List<({Uint8List bytes, int y})> slices,
+}) {
+  return image_lib.encodePng(
+    _stitchExportPngSlicesImage(
+      outputWidth: outputWidth,
+      outputHeight: outputHeight,
+      slices: slices,
+    ),
+  );
+}
+
+image_lib.Image _stitchExportPngSlicesImage({
+  required int outputWidth,
+  required int outputHeight,
+  required List<({Uint8List bytes, int y})> slices,
+}) {
+  final stitched = image_lib.Image(
+    width: outputWidth,
+    height: outputHeight,
+    numChannels: 4,
+  )..clear(image_lib.ColorRgba8(0, 0, 0, 0));
+
+  for (final slice in slices) {
+    final decoded = image_lib.decodePng(slice.bytes);
+    if (decoded == null) continue;
+    final dstY = math.max(slice.y, 0);
+    final srcY = math.max(-slice.y, 0);
+    final copyHeight = math.min(decoded.height - srcY, outputHeight - dstY);
+    final copyWidth = math.min(decoded.width, outputWidth);
+    if (copyWidth <= 0 || copyHeight <= 0) continue;
+
+    for (var y = 0; y < copyHeight; y += 1) {
+      for (var x = 0; x < copyWidth; x += 1) {
+        stitched.setPixel(x, dstY + y, decoded.getPixel(x, srcY + y));
+      }
+    }
+  }
+
+  return stitched;
+}
+
+@visibleForTesting
+Uint8List trimExportPngBlankPaddingForTesting(
+  Uint8List bytes, {
+  required int preservePadding,
+}) {
+  return _trimExportPngBlankPadding(bytes, preservePadding: preservePadding);
+}
+
+Uint8List _trimExportPngBlankPadding(
+  Uint8List bytes, {
+  required int preservePadding,
+}) {
+  final decoded = image_lib.decodePng(bytes);
+  if (decoded == null || decoded.width <= 0 || decoded.height <= 0) {
+    return bytes;
+  }
+  return _encodeTrimmedExportImage(decoded, preservePadding: preservePadding);
+}
+
+Uint8List _encodeTrimmedExportImage(
+  image_lib.Image decoded, {
+  required int preservePadding,
+}) {
+  final trimmed = _trimExportImageBlankPadding(
+    decoded,
+    preservePadding: preservePadding,
+  );
+  return image_lib.encodePng(trimmed);
+}
+
+image_lib.Image _trimExportImageBlankPadding(
+  image_lib.Image decoded, {
+  required int preservePadding,
+}) {
+  final background = _exportImageBlankReferencePixel(decoded);
+  final width = decoded.width;
+  final height = decoded.height;
+
+  int? top;
+  for (var y = 0; y < height; y += 1) {
+    if (_exportImageRowHasContent(decoded, y, background)) {
+      top = y;
+      break;
+    }
+  }
+  if (top == null) return decoded;
+
+  var bottom = height - 1;
+  for (var y = height - 1; y >= top; y -= 1) {
+    if (_exportImageRowHasContent(decoded, y, background)) {
+      bottom = y;
+      break;
+    }
+  }
+
+  var left = 0;
+  for (var x = 0; x < width; x += 1) {
+    if (_exportImageColumnHasContent(decoded, x, top, bottom, background)) {
+      left = x;
+      break;
+    }
+  }
+
+  var right = width - 1;
+  for (var x = width - 1; x >= left; x -= 1) {
+    if (_exportImageColumnHasContent(decoded, x, top, bottom, background)) {
+      right = x;
+      break;
+    }
+  }
+
+  final padding = math.max(preservePadding, 0);
+  final cropLeft = math.max(left - padding, 0);
+  final cropTop = math.max(top - padding, 0);
+  final cropRight = math.min(right + padding, width - 1);
+  final cropBottom = math.min(bottom + padding, height - 1);
+
+  if (cropLeft == 0 &&
+      cropTop == 0 &&
+      cropRight == width - 1 &&
+      cropBottom == height - 1) {
+    return decoded;
+  }
+
+  return image_lib.copyCrop(
+    decoded,
+    x: cropLeft,
+    y: cropTop,
+    width: cropRight - cropLeft + 1,
+    height: cropBottom - cropTop + 1,
+  );
+}
+
+image_lib.Pixel _exportImageBlankReferencePixel(image_lib.Image image) {
+  final corners = [
+    image.getPixel(0, 0),
+    image.getPixel(image.width - 1, 0),
+    image.getPixel(0, image.height - 1),
+    image.getPixel(image.width - 1, image.height - 1),
+  ];
+  for (final pixel in corners) {
+    if (pixel.a <= _exportImageBlankAlphaTolerance) return pixel;
+  }
+  return corners.first;
+}
+
+bool _exportImageRowHasContent(
+  image_lib.Image image,
+  int y,
+  image_lib.Pixel background,
+) {
+  for (var x = 0; x < image.width; x += 1) {
+    if (!_exportImageIsBlankPixel(image.getPixel(x, y), background)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool _exportImageColumnHasContent(
+  image_lib.Image image,
+  int x,
+  int top,
+  int bottom,
+  image_lib.Pixel background,
+) {
+  for (var y = top; y <= bottom; y += 1) {
+    if (!_exportImageIsBlankPixel(image.getPixel(x, y), background)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool _exportImageIsBlankPixel(
+  image_lib.Pixel pixel,
+  image_lib.Pixel background,
+) {
+  if (pixel.a <= _exportImageBlankAlphaTolerance) return true;
+  if (background.a <= _exportImageBlankAlphaTolerance) return false;
+  return _exportImageChannelNear(pixel.r, background.r) &&
+      _exportImageChannelNear(pixel.g, background.g) &&
+      _exportImageChannelNear(pixel.b, background.b) &&
+      _exportImageChannelNear(pixel.a, background.a);
+}
+
+bool _exportImageChannelNear(num a, num b) {
+  return (a - b).abs() <= _exportImageBlankColorTolerance;
+}
+
+Future<ui.Image?> _captureBoundaryImageWithRetries(
+  RenderRepaintBoundary boundary,
+  Rect bounds, {
+  required double pixelRatio,
+}) async {
+  for (int retry = 0; retry < 10; retry++) {
+    try {
+      // RenderRepaintBoundary.toImage always captures the full boundary.
+      // Use its backing layer so overlong exports can be sampled in bounded
+      // slices and stitched without asking the GPU for one huge texture.
+      // ignore: invalid_use_of_protected_member
+      final layer = boundary.layer as OffsetLayer?;
+      if (layer == null) return null;
+      return await layer.toImage(bounds, pixelRatio: pixelRatio);
+    } catch (e) {
+      if (retry == 9) {
+        debugPrint('Failed to capture image after 10 retries: $e');
+        return null;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+  }
+  return null;
 }
 
 Future<void> showMessageExportSheet(

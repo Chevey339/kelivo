@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -400,6 +401,36 @@ void main() {
     final plainText = [...richTextPlainText, ...selectablePlainText].join('\n');
     expect(plainText, contains('Name'));
     expect(plainText, contains('42'));
+  });
+
+  testWidgets('MarkdownWithCodeHighlight expands compact tables for export', (
+    tester,
+  ) async {
+    _overrideMarkdownTablePlatform(TargetPlatform.android);
+    await tester.pumpWidget(
+      _settingsHarness(
+        onSettingsReady: (_) {},
+        child: const SizedBox(
+          width: 320,
+          child: ExportCaptureScope(
+            enabled: true,
+            child: MarkdownWithCodeHighlight(
+              text: '''
+| One | Two | Three | Four | Five |
+| - | - | - | - | - |
+| Alpha | Beta | Gamma | Delta | Epsilon |
+''',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('markdown-table-horizontal-scroll')),
+      findsNothing,
+    );
   });
 
   testWidgets('MarkdownWithCodeHighlight keeps table actions out of body', (
