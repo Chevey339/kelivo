@@ -119,6 +119,21 @@ void main() {
     },
   );
 
+  test('image preview can prepare tall display data asynchronously', () async {
+    final file = await _writePng(width: 144, height: 5000);
+
+    final display = await readPreviewDisplayAsyncForTesting(file);
+    final layout = previewImageDisplayLayoutForTesting(
+      file: file,
+      width: 360,
+      cachedDisplay: display,
+    );
+
+    expect(layout.height, 12500);
+    expect(layout.tileCount, 3);
+    expect(layout.providers, everyElement(isA<MemoryImage>()));
+  });
+
   test('image preview trims outer blank padding before sizing', () async {
     final file = await _writeBytes(
       _blankPaddedPng(

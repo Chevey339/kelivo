@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -65,7 +66,24 @@ class _ImagePreviewDesktopDialog extends StatefulWidget {
 class _ImagePreviewDesktopDialogState
     extends State<_ImagePreviewDesktopDialog> {
   bool _saving = false;
+  _ImagePreviewDisplay? _display;
+  bool _loadingDisplay = true;
   final ScrollController _scrollCtrl = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDisplay();
+  }
+
+  Future<void> _loadDisplay() async {
+    final display = await _readImagePreviewDisplayAsync(widget.file);
+    if (!mounted) return;
+    setState(() {
+      _display = display;
+      _loadingDisplay = false;
+    });
+  }
 
   Rect _shareAnchorRect(BuildContext context) {
     try {
@@ -335,9 +353,17 @@ class _ImagePreviewDesktopDialogState
                       child: Center(
                         child: LayoutBuilder(
                           builder: (context, constraints) {
+                            if (_loadingDisplay) {
+                              return const SizedBox(
+                                height: 360,
+                                child: Center(
+                                  child: CupertinoActivityIndicator(radius: 14),
+                                ),
+                              );
+                            }
                             return _ImagePreviewCard(
                               file: widget.file,
-                              display: _readImagePreviewDisplay(widget.file),
+                              display: _display,
                               maxWidth: constraints.maxWidth,
                             );
                           },
@@ -500,44 +526,110 @@ class _ImagePreviewTile {
   final ({int width, int height}) dimensions;
 }
 
+class _ImagePreviewDisplayPayload {
+  const _ImagePreviewDisplayPayload({
+    required this.dimensions,
+    required this.tiles,
+  });
+
+  final ({int width, int height}) dimensions;
+  final List<_ImagePreviewTilePayload> tiles;
+}
+
+class _ImagePreviewTilePayload {
+  const _ImagePreviewTilePayload({
+    required this.bytes,
+    required this.dimensions,
+    required this.useFile,
+  });
+
+  final Uint8List? bytes;
+  final ({int width, int height}) dimensions;
+  final bool useFile;
+}
+
 _ImagePreviewDisplay? _readImagePreviewDisplay(File file) {
   try {
-    final bytes = file.readAsBytesSync();
-    final decoded = image_lib.decodeImage(bytes);
-    if (decoded == null || decoded.width <= 0 || decoded.height <= 0) {
-      return null;
-    }
-    final trimmed = _trimPreviewBlankPadding(decoded);
-    final source = trimmed.image;
-    return _ImagePreviewDisplay(
-      dimensions: (width: source.width, height: source.height),
-      tiles: _previewImageTiles(
-        source,
-        file: file,
-        forceMemoryImage:
-            trimmed.changed || source.height > _previewMaxTileSourceHeight,
-      ),
+    return _previewDisplayFromPayload(
+      _readImagePreviewDisplayPayloadSync(file.path),
+      file,
     );
   } catch (_) {
     return null;
   }
 }
 
-List<_ImagePreviewTile> _previewImageTiles(
+Future<_ImagePreviewDisplay?> _readImagePreviewDisplayAsync(File file) async {
+  try {
+    final payload = await compute(
+      _readImagePreviewDisplayPayloadSync,
+      file.path,
+      debugLabel: 'image-preview-display-processing',
+    );
+    return _previewDisplayFromPayload(payload, file);
+  } catch (_) {
+    return null;
+  }
+}
+
+@visibleForTesting
+Future<Object?> readPreviewDisplayAsyncForTesting(File file) {
+  return _readImagePreviewDisplayAsync(file);
+}
+
+_ImagePreviewDisplayPayload? _readImagePreviewDisplayPayloadSync(String path) {
+  final bytes = File(path).readAsBytesSync();
+  final decoded = image_lib.decodeImage(bytes);
+  if (decoded == null || decoded.width <= 0 || decoded.height <= 0) {
+    return null;
+  }
+  final trimmed = _trimPreviewBlankPadding(decoded);
+  final source = trimmed.image;
+  return _ImagePreviewDisplayPayload(
+    dimensions: (width: source.width, height: source.height),
+    tiles: _previewImageTilePayloads(
+      source,
+      forceMemoryImage:
+          trimmed.changed || source.height > _previewMaxTileSourceHeight,
+    ),
+  );
+}
+
+_ImagePreviewDisplay? _previewDisplayFromPayload(
+  _ImagePreviewDisplayPayload? payload,
+  File file,
+) {
+  if (payload == null) return null;
+  return _ImagePreviewDisplay(
+    dimensions: payload.dimensions,
+    tiles: payload.tiles
+        .map(
+          (tile) => _ImagePreviewTile(
+            provider: tile.useFile
+                ? FileImage(file)
+                : MemoryImage(tile.bytes ?? Uint8List(0)),
+            dimensions: tile.dimensions,
+          ),
+        )
+        .toList(growable: false),
+  );
+}
+
+List<_ImagePreviewTilePayload> _previewImageTilePayloads(
   image_lib.Image image, {
-  required File file,
   required bool forceMemoryImage,
 }) {
   if (!forceMemoryImage) {
     return [
-      _ImagePreviewTile(
-        provider: FileImage(file),
+      _ImagePreviewTilePayload(
+        bytes: null,
         dimensions: (width: image.width, height: image.height),
+        useFile: true,
       ),
     ];
   }
 
-  final tiles = <_ImagePreviewTile>[];
+  final tiles = <_ImagePreviewTilePayload>[];
   var y = 0;
   while (y < image.height) {
     final tileHeight = (image.height - y) > _previewMaxTileSourceHeight
@@ -551,11 +643,10 @@ List<_ImagePreviewTile> _previewImageTiles(
       height: tileHeight,
     );
     tiles.add(
-      _ImagePreviewTile(
-        provider: MemoryImage(
-          Uint8List.fromList(image_lib.encodePng(tileImage)),
-        ),
+      _ImagePreviewTilePayload(
+        bytes: Uint8List.fromList(image_lib.encodePng(tileImage)),
         dimensions: (width: tileImage.width, height: tileImage.height),
+        useFile: false,
       ),
     );
     y += tileHeight;
@@ -862,13 +953,23 @@ class _DesktopIconButtonState extends State<_DesktopIconButton> {
 
 class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
   final DraggableScrollableController _ctrl = DraggableScrollableController();
-  late final _ImagePreviewDisplay? _display;
+  _ImagePreviewDisplay? _display;
+  bool _loadingDisplay = true;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _display = _readImagePreviewDisplay(widget.file);
+    _loadDisplay();
+  }
+
+  Future<void> _loadDisplay() async {
+    final display = await _readImagePreviewDisplayAsync(widget.file);
+    if (!mounted) return;
+    setState(() {
+      _display = display;
+      _loadingDisplay = false;
+    });
   }
 
   @override
@@ -999,11 +1100,24 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                _ImagePreviewCard(
-                                  file: widget.file,
-                                  display: _display,
-                                  maxWidth: constraints.maxWidth,
-                                ),
+                                if (_loadingDisplay)
+                                  SizedBox(
+                                    height: math.min(
+                                      constraints.maxWidth * 1.2,
+                                      420.0,
+                                    ),
+                                    child: const Center(
+                                      child: CupertinoActivityIndicator(
+                                        radius: 14,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  _ImagePreviewCard(
+                                    file: widget.file,
+                                    display: _display,
+                                    maxWidth: constraints.maxWidth,
+                                  ),
                                 const SizedBox(
                                   height: 80,
                                 ), // leave space for action bar overlap, outside the card

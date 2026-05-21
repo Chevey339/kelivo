@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as image_lib;
 import 'package:intl/intl.dart';
@@ -911,9 +911,11 @@ Future<Uint8List?> _captureBoundaryPngBytes(
       final data = await image.toByteData(format: ui.ImageByteFormat.png);
       final bytes = data?.buffer.asUint8List();
       if (bytes == null) return null;
-      return _trimExportPngBlankPadding(
-        bytes,
-        preservePadding: _exportImageBlankTrimPreservePaddingPhysical,
+      return _processCapturedExportPng(
+        _CapturedExportPngProcessingRequest.single(
+          singlePngBytes: bytes,
+          preservePadding: _exportImageBlankTrimPreservePaddingPhysical,
+        ),
       );
     } finally {
       image.dispose();
@@ -946,15 +948,108 @@ Future<Uint8List?> _captureBoundaryPngBytes(
     top += height;
   }
 
+  return _processCapturedExportPng(
+    _CapturedExportPngProcessingRequest.slices(
+      outputWidth: outputWidth,
+      outputHeight: outputHeight,
+      slices: slices
+          .map(
+            (slice) => _ExportPngSlicePayload(bytes: slice.bytes, y: slice.y),
+          )
+          .toList(growable: false),
+      preservePadding: _exportImageBlankTrimPreservePaddingPhysical,
+    ),
+  );
+}
+
+Future<Uint8List> _processCapturedExportPng(
+  _CapturedExportPngProcessingRequest request,
+) {
+  return compute(
+    _processCapturedExportPngSync,
+    request,
+    debugLabel: 'export-image-png-processing',
+  );
+}
+
+@visibleForTesting
+Future<Uint8List> processCapturedExportPngForTesting({
+  Uint8List? singlePngBytes,
+  int? outputWidth,
+  int? outputHeight,
+  List<({Uint8List bytes, int y})>? slices,
+  required int preservePadding,
+}) {
+  final request = singlePngBytes != null
+      ? _CapturedExportPngProcessingRequest.single(
+          singlePngBytes: singlePngBytes,
+          preservePadding: preservePadding,
+        )
+      : _CapturedExportPngProcessingRequest.slices(
+          outputWidth: outputWidth ?? 0,
+          outputHeight: outputHeight ?? 0,
+          slices: (slices ?? const <({Uint8List bytes, int y})>[])
+              .map(
+                (slice) =>
+                    _ExportPngSlicePayload(bytes: slice.bytes, y: slice.y),
+              )
+              .toList(growable: false),
+          preservePadding: preservePadding,
+        );
+  return _processCapturedExportPng(request);
+}
+
+Uint8List _processCapturedExportPngSync(
+  _CapturedExportPngProcessingRequest request,
+) {
+  final singlePngBytes = request.singlePngBytes;
+  if (singlePngBytes != null) {
+    return _trimExportPngBlankPadding(
+      singlePngBytes,
+      preservePadding: request.preservePadding,
+    );
+  }
+
   final stitched = _stitchExportPngSlicesImage(
-    outputWidth: outputWidth,
-    outputHeight: outputHeight,
-    slices: slices,
+    outputWidth: request.outputWidth,
+    outputHeight: request.outputHeight,
+    slices: request.slices
+        .map((slice) => (bytes: slice.bytes, y: slice.y))
+        .toList(growable: false),
   );
   return _encodeTrimmedExportImage(
     stitched,
-    preservePadding: _exportImageBlankTrimPreservePaddingPhysical,
+    preservePadding: request.preservePadding,
   );
+}
+
+class _CapturedExportPngProcessingRequest {
+  const _CapturedExportPngProcessingRequest.single({
+    required this.singlePngBytes,
+    required this.preservePadding,
+  }) : outputWidth = 0,
+       outputHeight = 0,
+       slices = const <_ExportPngSlicePayload>[];
+
+  const _CapturedExportPngProcessingRequest.slices({
+    required this.outputWidth,
+    required this.outputHeight,
+    required this.slices,
+    required this.preservePadding,
+  }) : singlePngBytes = null;
+
+  final Uint8List? singlePngBytes;
+  final int outputWidth;
+  final int outputHeight;
+  final List<_ExportPngSlicePayload> slices;
+  final int preservePadding;
+}
+
+class _ExportPngSlicePayload {
+  const _ExportPngSlicePayload({required this.bytes, required this.y});
+
+  final Uint8List bytes;
+  final int y;
 }
 
 Uint8List _stitchExportPngSlices({
@@ -2664,10 +2759,13 @@ Future<void> _runWithExportingOverlay(
     ),
   );
   try {
+    await WidgetsBinding.instance.endOfFrame;
     await task();
   } finally {
+    await Future<void>.delayed(Duration.zero);
     if (navigator.mounted) {
       await navigator.maybePop();
+      await Future<void>.delayed(Duration.zero);
     }
   }
 }

@@ -189,4 +189,78 @@ void main() {
     final contentPixel = image.getPixel(2, 2);
     expect(contentPixel.g, greaterThan(contentPixel.r));
   });
+
+  test(
+    'captured export png processing trims a single capture asynchronously',
+    () async {
+      final pngBytes = _blankPaddedPng(
+        width: 12,
+        height: 24,
+        background: image_lib.ColorRgba8(255, 255, 255, 255),
+        content: image_lib.ColorRgba8(0, 0, 255, 255),
+        contentLeft: 4,
+        contentTop: 9,
+        contentWidth: 3,
+        contentHeight: 4,
+      );
+
+      final trimmed = await processCapturedExportPngForTesting(
+        singlePngBytes: pngBytes,
+        preservePadding: 2,
+      );
+
+      final image = image_lib.decodePng(trimmed);
+      expect(image, isNotNull);
+      expect(image!.width, 7);
+      expect(image.height, 8);
+      final contentPixel = image.getPixel(3, 3);
+      expect(contentPixel.b, greaterThan(contentPixel.r));
+    },
+  );
+
+  test(
+    'captured export png processing stitches slices asynchronously',
+    () async {
+      final pngBytes = await processCapturedExportPngForTesting(
+        outputWidth: 8,
+        outputHeight: 14,
+        slices: [
+          (
+            bytes: _blankPaddedPng(
+              width: 8,
+              height: 8,
+              background: image_lib.ColorRgba8(0, 0, 0, 0),
+              content: image_lib.ColorRgba8(255, 0, 0, 255),
+              contentLeft: 2,
+              contentTop: 2,
+              contentWidth: 4,
+              contentHeight: 4,
+            ),
+            y: 0,
+          ),
+          (
+            bytes: _blankPaddedPng(
+              width: 8,
+              height: 6,
+              background: image_lib.ColorRgba8(0, 0, 0, 0),
+              content: image_lib.ColorRgba8(0, 255, 0, 255),
+              contentLeft: 2,
+              contentTop: 0,
+              contentWidth: 4,
+              contentHeight: 4,
+            ),
+            y: 8,
+          ),
+        ],
+        preservePadding: 0,
+      );
+
+      final image = image_lib.decodePng(pngBytes);
+      expect(image, isNotNull);
+      expect(image!.width, 4);
+      expect(image.height, 10);
+      expect(image.getPixel(2, 0).r, greaterThan(image.getPixel(2, 0).g));
+      expect(image.getPixel(2, 9).g, greaterThan(image.getPixel(2, 9).r));
+    },
+  );
 }
