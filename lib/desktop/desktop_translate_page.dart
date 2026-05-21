@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:re_editor/re_editor.dart';
 
 import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
@@ -11,10 +12,12 @@ import '../core/providers/settings_provider.dart';
 import '../core/providers/assistant_provider.dart';
 import '../core/services/api/chat_api_service.dart';
 import '../shared/widgets/snackbar.dart';
+import '../shared/widgets/plain_text_code_editor.dart';
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
 import '../features/settings/widgets/language_select_sheet.dart'
     show LanguageOption, supportedLanguages;
+import '../utils/re_editor_utils.dart';
 
 class DesktopTranslatePage extends StatefulWidget {
   const DesktopTranslatePage({super.key});
@@ -24,8 +27,8 @@ class DesktopTranslatePage extends StatefulWidget {
 }
 
 class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
-  final TextEditingController _source = TextEditingController();
-  final TextEditingController _output = TextEditingController();
+  final CodeLineEditingController _source = CodeLineEditingController();
+  final CodeLineEditingController _output = CodeLineEditingController();
 
   LanguageOption? _targetLang;
   String? _modelProviderKey;
@@ -33,6 +36,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
   StreamSubscription? _subscription;
   bool _translating = false;
+  int _translateRunId = 0;
 
   @override
   void initState() {
@@ -133,11 +137,15 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   }
 
   Future<void> _startTranslate() async {
+    if (_translating) return;
     final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
 
     final text = _source.text.trim();
     if (text.isEmpty) return;
+    await _subscription?.cancel();
+    _subscription = null;
+    if (!mounted) return;
 
     final providerKey = _modelProviderKey;
     final modelId = _modelId;
@@ -159,8 +167,24 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
     setState(() {
       _translating = true;
-      _output.text = '';
+      _output.value = const CodeLineEditingValue.empty();
     });
+
+    final runId = ++_translateRunId;
+    final buffer = StringBuffer();
+    Timer? flushTimer;
+    void flushNow() {
+      if (!mounted || runId != _translateRunId) return;
+      _setOutputText(buffer.toString());
+    }
+
+    void scheduleFlush() {
+      if (flushTimer?.isActive ?? false) return;
+      flushTimer = Timer(const Duration(milliseconds: 80), () {
+        flushTimer = null;
+        flushNow();
+      });
+    }
 
     try {
       final stream = ChatApiService.sendMessageStream(
@@ -174,19 +198,27 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
       _subscription = stream.listen(
         (chunk) {
           // live update; remove leading whitespace on first chunk to avoid top gap
+          if (runId != _translateRunId) return;
           final s = chunk.content;
-          if (_output.text.isEmpty) {
-            _output.text = s.replaceFirst(RegExp(r'^\s+'), '');
+          if (buffer.isEmpty) {
+            buffer.write(s.replaceFirst(RegExp(r'^\s+'), ''));
           } else {
-            _output.text += s;
+            buffer.write(s);
           }
+          scheduleFlush();
         },
         onDone: () {
-          if (!mounted) return;
+          if (!mounted || runId != _translateRunId) return;
+          flushTimer?.cancel();
+          flushNow();
+          _subscription = null;
           setState(() => _translating = false);
         },
         onError: (e) {
-          if (!mounted) return;
+          if (!mounted || runId != _translateRunId) return;
+          flushTimer?.cancel();
+          flushNow();
+          _subscription = null;
           setState(() => _translating = false);
           showAppSnackBar(
             context,
@@ -197,6 +229,8 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
         cancelOnError: true,
       );
     } catch (e) {
+      _subscription = null;
+      if (!mounted) return;
       setState(() => _translating = false);
       showAppSnackBar(
         context,
@@ -210,7 +244,13 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     try {
       await _subscription?.cancel();
     } catch (_) {}
+    _subscription = null;
+    _translateRunId++;
     if (mounted) setState(() => _translating = false);
+  }
+
+  void _setOutputText(String text) {
+    _output.setTextSafely(text);
   }
 
   @override
@@ -295,26 +335,23 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                 overlay: _PaneActionButton(
                                   icon: lucide.Lucide.Eraser,
                                   label: l10n.translatePageClearAll,
-                                  onTap: () {
-                                    _source.clear();
-                                    _output.clear();
+                                  onTap: () async {
+                                    if (_translating || _subscription != null) {
+                                      await _stopTranslate();
+                                    }
+                                    _source.value =
+                                        const CodeLineEditingValue.empty();
+                                    _output.value =
+                                        const CodeLineEditingValue.empty();
                                   },
                                 ),
-                                child: TextField(
+                                child: PlainTextCodeEditor(
                                   controller: _source,
-                                  keyboardType: TextInputType.multiline,
-                                  maxLines: null,
-                                  expands: true,
-                                  decoration: InputDecoration(
-                                    hintText: l10n.translatePageInputHint,
-                                    border: InputBorder.none,
-                                    isCollapsed: true,
-                                    contentPadding: const EdgeInsets.all(14),
-                                  ),
-                                  style: const TextStyle(
-                                    fontSize: 14.5,
-                                    height: 1.4,
-                                  ),
+                                  autofocus: false,
+                                  hint: l10n.translatePageInputHint,
+                                  padding: const EdgeInsets.all(14),
+                                  fontSize: 14.5,
+                                  fontHeight: 1.4,
                                 ),
                               ),
                             ),
@@ -337,22 +374,14 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
                                     );
                                   },
                                 ),
-                                child: TextField(
+                                child: PlainTextCodeEditor(
                                   controller: _output,
                                   readOnly: true,
-                                  keyboardType: TextInputType.multiline,
-                                  maxLines: null,
-                                  expands: true,
-                                  decoration: InputDecoration(
-                                    hintText: l10n.translatePageOutputHint,
-                                    border: InputBorder.none,
-                                    isCollapsed: true,
-                                    contentPadding: const EdgeInsets.all(14),
-                                  ),
-                                  style: const TextStyle(
-                                    fontSize: 14.5,
-                                    height: 1.4,
-                                  ),
+                                  autofocus: false,
+                                  hint: l10n.translatePageOutputHint,
+                                  padding: const EdgeInsets.all(14),
+                                  fontSize: 14.5,
+                                  fontHeight: 1.4,
                                 ),
                               ),
                             ),
@@ -473,8 +502,15 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
         );
       },
     );
-    Overlay.of(context).insert(_entry!);
-    setState(() => _open = true);
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) {
+      _entry = null;
+      return;
+    }
+    overlay.insert(_entry!);
+    if (mounted) {
+      setState(() => _open = true);
+    }
   }
 
   @override
@@ -882,6 +918,7 @@ class _TranslateButtonState extends State<_TranslateButton> {
                         colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
                       ),
                       const SizedBox(width: 6),
+                      // TODO: Replace hard-coded label with AppLocalizations (i18n).
                       Text(
                         l10n.chatMessageWidgetStopTooltip,
                         style: TextStyle(
@@ -898,6 +935,7 @@ class _TranslateButtonState extends State<_TranslateButton> {
                     children: [
                       Icon(lucide.Lucide.Languages, size: 16, color: fg),
                       const SizedBox(width: 6),
+                      // TODO: Replace hard-coded label with AppLocalizations (i18n).
                       Text(
                         l10n.chatMessageWidgetTranslateTooltip,
                         style: TextStyle(

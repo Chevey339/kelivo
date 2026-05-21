@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
+import 'package:re_editor/re_editor.dart';
 
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -14,6 +15,9 @@ import '../../../core/providers/instruction_injection_group_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/input_height_constraints.dart';
+import '../../../shared/widgets/plain_text_code_editor.dart';
+import '../../../utils/re_editor_utils.dart';
 
 class InstructionInjectionPage extends StatefulWidget {
   const InstructionInjectionPage({super.key});
@@ -131,6 +135,7 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
     }
     if (!mounted) return;
     if (result == null || result.files.isEmpty) return;
+    if (!mounted) return;
 
     final l10n = AppLocalizations.of(context)!;
     final provider = context.read<InstructionInjectionProvider>();
@@ -264,6 +269,7 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                     child: groupUi.isCollapsed(groupName)
                         ? const SizedBox.shrink()
                         : ReorderableListView.builder(
+                            padding: EdgeInsets.zero,
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: grouped[groupName]?.length ?? 0,
@@ -561,15 +567,57 @@ class InstructionInjectionEditSheet extends StatefulWidget {
 class _InstructionInjectionEditSheetState
     extends State<InstructionInjectionEditSheet> {
   late final TextEditingController _titleController;
+  late final CodeLineEditingController _promptController;
   late final TextEditingController _groupController;
-  late final TextEditingController _promptController;
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.item?.title ?? '');
     _groupController = TextEditingController(text: widget.item?.group ?? '');
-    _promptController = TextEditingController(text: widget.item?.prompt ?? '');
+    _promptController = CodeLineEditingController.fromText(
+      widget.item?.prompt ?? '',
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant InstructionInjectionEditSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldTitle = oldWidget.item?.title ?? '';
+    final newTitle = widget.item?.title ?? '';
+    if (oldTitle != newTitle && _titleController.text == oldTitle) {
+      _syncTitleText(newTitle);
+    }
+    final oldGroup = oldWidget.item?.group ?? '';
+    final newGroup = widget.item?.group ?? '';
+    if (oldGroup != newGroup && _groupController.text == oldGroup) {
+      _syncGroupText(newGroup);
+    }
+    final oldPrompt = oldWidget.item?.prompt ?? '';
+    final newPrompt = widget.item?.prompt ?? '';
+    if (oldPrompt != newPrompt && _promptController.text == oldPrompt) {
+      _syncPromptText(newPrompt);
+    }
+  }
+
+  void _syncTitleText(String text) {
+    _titleController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+      composing: TextRange.empty,
+    );
+  }
+
+  void _syncGroupText(String text) {
+    _groupController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+      composing: TextRange.empty,
+    );
+  }
+
+  void _syncPromptText(String text) {
+    _promptController.setTextSafely(text);
   }
 
   @override
@@ -678,33 +726,46 @@ class _InstructionInjectionEditSheetState
               ),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _promptController,
-              maxLines: 8,
-              decoration: InputDecoration(
-                labelText: l10n.instructionInjectionPromptLabel,
-                alignLabelWithHint: true,
-                filled: true,
-                fillColor: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: cs.outlineVariant.withValues(alpha: 0.4),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 12, bottom: 6),
+                  child: Text(
+                    l10n.instructionInjectionPromptLabel,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                    ),
                   ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: cs.outlineVariant.withValues(alpha: 0.4),
+                ConstrainedBox(
+                  constraints: buildInputMaxHeightConstraints(
+                    context: context,
+                    reservedHeight: 260,
+                    softCapFraction: 0.45,
+                    minHeight: 120,
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: PlainTextCodeEditor(
+                      controller: _promptController,
+                      autofocus: false,
+                      hint: l10n.instructionInjectionPromptLabel,
+                      padding: const EdgeInsets.all(12),
+                      fontSize: 14,
+                      fontHeight: 1.4,
+                    ),
                   ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: cs.primary.withValues(alpha: 0.5),
-                  ),
-                ),
-              ),
+              ],
             ),
             const SizedBox(height: 16),
             Row(
@@ -720,6 +781,7 @@ class _InstructionInjectionEditSheetState
                   child: _IosFilledButton(
                     label: l10n.quickPhraseSaveButton,
                     onTap: () {
+                      // TODO: Add immediate validation/UX feedback (e.g., disable Save or show error) when title or prompt is empty/invalid.
                       Navigator.of(context).pop({
                         'title': _titleController.text,
                         'group': _groupController.text,
