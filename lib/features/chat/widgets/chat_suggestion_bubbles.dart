@@ -49,7 +49,7 @@ class ChatSuggestionBubbles extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Text(
                 suggestion,
-                maxLines: 2,
+                maxLines: 4,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: textColor,
