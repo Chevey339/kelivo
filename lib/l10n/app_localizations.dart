@@ -7580,11 +7580,95 @@ abstract class AppLocalizations {
   /// **'Share Image'**
   String get imageViewerPageShareButton;
 
+  /// No description provided for @imageViewerPageCloseButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Close preview'**
+  String get imageViewerPageCloseButton;
+
   /// No description provided for @imageViewerPageSaveButton.
   ///
   /// In en, this message translates to:
   /// **'Save Image'**
   String get imageViewerPageSaveButton;
+
+  /// No description provided for @imageViewerPageCopyButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Image'**
+  String get imageViewerPageCopyButton;
+
+  /// No description provided for @imageViewerPagePreviousButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous Image'**
+  String get imageViewerPagePreviousButton;
+
+  /// No description provided for @imageViewerPageNextButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Next Image'**
+  String get imageViewerPageNextButton;
+
+  /// No description provided for @imageViewerPageZoomInButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom In'**
+  String get imageViewerPageZoomInButton;
+
+  /// No description provided for @imageViewerPageZoomOutButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom Out'**
+  String get imageViewerPageZoomOutButton;
+
+  /// No description provided for @imageViewerPageResetZoomButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Zoom'**
+  String get imageViewerPageResetZoomButton;
+
+  /// No description provided for @imageViewerPageFlipHorizontalButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip Horizontal'**
+  String get imageViewerPageFlipHorizontalButton;
+
+  /// No description provided for @imageViewerPageFlipVerticalButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Flip Vertical'**
+  String get imageViewerPageFlipVerticalButton;
+
+  /// No description provided for @imageViewerPageRotateLeftButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate Left'**
+  String get imageViewerPageRotateLeftButton;
+
+  /// No description provided for @imageViewerPageRotateRightButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate Right'**
+  String get imageViewerPageRotateRightButton;
+
+  /// No description provided for @imageViewerPageCounter.
+  ///
+  /// In en, this message translates to:
+  /// **'{index}/{total}'**
+  String imageViewerPageCounter(int index, int total);
+
+  /// No description provided for @imageViewerPageImageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Image {index} of {total}'**
+  String imageViewerPageImageLabel(int index, int total);
+
+  /// No description provided for @imageViewerPageImageLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to load image'**
+  String get imageViewerPageImageLoadFailed;
 
   /// No description provided for @imageViewerPageSaveSuccess.
   ///

@@ -113,6 +113,8 @@ class Lucide {
   static const IconData panelRight = lucide.LucideIcons.panelRight;
   static const IconData Square = lucide.LucideIcons.square;
   static const IconData Download = lucide.LucideIcons.download;
+  static const IconData ZoomIn = lucide.LucideIcons.zoomIn;
+  static const IconData ZoomOut = lucide.LucideIcons.zoomOut;
   static const IconData Paperclip = lucide.LucideIcons.paperclip;
   static const IconData ChevronUp = lucide.LucideIcons.chevronUp;
   static const IconData Map = lucide.LucideIcons.map;
@@ -146,6 +148,8 @@ class Lucide {
   static const IconData Calendar = lucide.LucideIcons.calendar;
   static const IconData ImageOff = lucide.LucideIcons.imageOff;
   static const IconData RotateCcw = lucide.LucideIcons.rotateCcw;
+  static const IconData FlipHorizontal2 = lucide.LucideIcons.flipHorizontal2;
+  static const IconData FlipVertical2 = lucide.LucideIcons.flipVertical2;
   static const IconData Loader = lucide.LucideIcons.loader;
   static const IconData Repeat = lucide.LucideIcons.repeat;
   static const IconData EthernetPort = lucide.LucideIcons.ethernetPort;

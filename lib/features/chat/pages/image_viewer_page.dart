@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -12,6 +14,7 @@ import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:super_clipboard/super_clipboard.dart';
+import '../../../icons/lucide_adapter.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/clipboard_images.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -39,27 +42,45 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   late int _index;
   late final AnimationController _restoreCtrl;
   late final List<TransformationController> _zoomCtrls;
+  late final List<_ImageDisplayTransform> _displayTransforms;
+  late final List<GlobalKey> _imageKeys;
   late final AnimationController _zoomCtrl;
   VoidCallback? _zoomTick;
+  final Map<String, Size> _imageNaturalSizes = <String, Size>{};
+  final Map<String, ImageStream> _imageSizeStreams = <String, ImageStream>{};
+  final Map<String, ImageStreamListener> _imageSizeListeners =
+      <String, ImageStreamListener>{};
 
   double _dragDy = 0.0; // current vertical drag offset
   double _bgOpacity = 1.0; // background dim opacity (0..1)
   bool _dragActive = false; // only when zoom ~ 1.0
   double _animFrom = 0.0; // for restore animation
   Offset? _lastDoubleTapPos; // focal point for double-tap zoom
+  Offset? _lastTapPos; // local tap point for desktop image/background split
   bool _saving = false; // saving to gallery state
+  bool _sharing = false; // sharing state
   bool _copying = false; // copying to clipboard state
+  bool _chromeVisible = true;
+  bool _currentImageZoomed = false;
+  late final FocusNode _focusNode;
   final GlobalKey _viewerKey = GlobalKey();
-  final GlobalKey _saveBtnKey = GlobalKey();
-  final GlobalKey _shareBtnKey = GlobalKey();
-  final GlobalKey _copyBtnKey = GlobalKey();
 
-  final Map<String, _SampledImage> _samples = <String, _SampledImage>{};
   final Map<String, ImageProvider> _imageProviderCache =
       <String, ImageProvider>{};
 
   bool get _isDesktop =>
-      Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+      defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.linux ||
+      defaultTargetPlatform == TargetPlatform.macOS;
+
+  bool get _hasImages => widget.images.isNotEmpty;
+  bool get _hasMultipleImages => widget.images.length > 1;
+  bool get _canGoPrevious => _index > 0;
+  bool get _canGoNext => _index < widget.images.length - 1;
+  TransformationController? get _currentZoomCtrl =>
+      _hasImages && _index >= 0 && _index < _zoomCtrls.length
+      ? _zoomCtrls[_index]
+      : null;
 
   @override
   void initState() {
@@ -69,9 +90,21 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       widget.images.isEmpty ? 0 : widget.images.length - 1,
     );
     _controller = PageController(initialPage: _index);
-    _zoomCtrls = List<TransformationController>.generate(
+    _zoomCtrls = List<TransformationController>.generate(widget.images.length, (
+      _,
+    ) {
+      final ctrl = TransformationController();
+      ctrl.addListener(_handleZoomChanged);
+      return ctrl;
+    }, growable: false);
+    _displayTransforms = List<_ImageDisplayTransform>.generate(
       widget.images.length,
-      (_) => TransformationController(),
+      (_) => const _ImageDisplayTransform(),
+      growable: false,
+    );
+    _imageKeys = List<GlobalKey>.generate(
+      widget.images.length,
+      (_) => GlobalKey(),
       growable: false,
     );
     _restoreCtrl =
@@ -89,20 +122,28 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       vsync: this,
       duration: const Duration(milliseconds: 230),
     );
+    _focusNode = FocusNode(debugLabel: 'ImageViewerPage');
     _imageProviderCache.addAll(widget.imageProviders);
-
-    // prepare sample for initial image
-    _prepareSampleForIndex(_index);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
   }
 
   @override
   void dispose() {
     _controller.dispose();
     for (final c in _zoomCtrls) {
+      c.removeListener(_handleZoomChanged);
       c.dispose();
     }
+    for (final entry in _imageSizeListeners.entries) {
+      _imageSizeStreams[entry.key]?.removeListener(entry.value);
+    }
+    _imageSizeListeners.clear();
+    _imageSizeStreams.clear();
     _restoreCtrl.dispose();
     _zoomCtrl.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -137,6 +178,311 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     };
     _zoomCtrl.addListener(_zoomTick!);
     _zoomCtrl.forward(from: 0);
+  }
+
+  void _toggleZoomAt(TransformationController ctrl, Offset focal) {
+    final current = ctrl.value;
+    final currentScale = current.getMaxScaleOnAxis();
+    if (currentScale > 1.01) {
+      _animateZoomTo(ctrl, toScale: 1.0, toTx: 0.0, toTy: 0.0);
+      return;
+    }
+
+    final focalPoint = MatrixUtils.transformPoint(
+      Matrix4.inverted(current),
+      focal,
+    );
+    const targetScale = 2.35;
+    final tx = focal.dx - targetScale * focalPoint.dx;
+    final ty = focal.dy - targetScale * focalPoint.dy;
+    _animateZoomTo(ctrl, toScale: targetScale, toTx: tx, toTy: ty);
+  }
+
+  void _toggleChrome() {
+    setState(() => _chromeVisible = !_chromeVisible);
+  }
+
+  void _updateCurrentDisplayTransform(
+    _ImageDisplayTransform Function(_ImageDisplayTransform current) update,
+  ) {
+    if (!_hasImages || _index < 0 || _index >= _displayTransforms.length) {
+      return;
+    }
+    setState(() {
+      _displayTransforms[_index] = update(_displayTransforms[_index]);
+    });
+  }
+
+  void _flipCurrentHorizontally() {
+    _updateCurrentDisplayTransform(
+      (current) => current.copyWith(flipX: !current.flipX),
+    );
+  }
+
+  void _flipCurrentVertically() {
+    _updateCurrentDisplayTransform(
+      (current) => current.copyWith(flipY: !current.flipY),
+    );
+  }
+
+  void _rotateCurrentLeft() {
+    _updateCurrentDisplayTransform(
+      (current) => current.copyWith(quarterTurns: current.quarterTurns - 1),
+    );
+  }
+
+  void _rotateCurrentRight() {
+    _updateCurrentDisplayTransform(
+      (current) => current.copyWith(quarterTurns: current.quarterTurns + 1),
+    );
+  }
+
+  bool _isZoomed(TransformationController ctrl) =>
+      ctrl.value.getMaxScaleOnAxis() > 1.01;
+
+  void _handleZoomChanged() {
+    final ctrl = _currentZoomCtrl;
+    if (ctrl == null) return;
+    final zoomed = _isZoomed(ctrl);
+    if (zoomed == _currentImageZoomed) return;
+    if (!mounted) {
+      _currentImageZoomed = zoomed;
+      return;
+    }
+    setState(() => _currentImageZoomed = zoomed);
+  }
+
+  void _markImageSizeChanged() {
+    if (!mounted) return;
+    switch (SchedulerBinding.instance.schedulerPhase) {
+      case SchedulerPhase.idle:
+      case SchedulerPhase.postFrameCallbacks:
+        setState(() {});
+        return;
+      case SchedulerPhase.transientCallbacks:
+      case SchedulerPhase.midFrameMicrotasks:
+      case SchedulerPhase.persistentCallbacks:
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() {});
+        });
+        return;
+    }
+  }
+
+  void _rememberImageNaturalSize(String src, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+    final current = _imageNaturalSizes[src];
+    if (current != null &&
+        current.width == size.width &&
+        current.height == size.height) {
+      return;
+    }
+    _imageNaturalSizes[src] = size;
+    _markImageSizeChanged();
+  }
+
+  void _ensureImageNaturalSize(String src, ImageProvider provider) {
+    if (_imageNaturalSizes.containsKey(src) ||
+        _imageSizeListeners.containsKey(src)) {
+      return;
+    }
+
+    final stream = provider.resolve(ImageConfiguration.empty);
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener(
+      (info, _) {
+        _rememberImageNaturalSize(
+          src,
+          Size(info.image.width.toDouble(), info.image.height.toDouble()),
+        );
+      },
+      onError: (_, _) {
+        stream.removeListener(listener);
+        _imageSizeStreams.remove(src);
+        _imageSizeListeners.remove(src);
+      },
+    );
+    _imageSizeStreams[src] = stream;
+    _imageSizeListeners[src] = listener;
+    stream.addListener(listener);
+  }
+
+  Rect _imageTapRect({
+    required int index,
+    required String src,
+    required Size pageSize,
+    required EdgeInsets padding,
+  }) {
+    Rect fitInto({
+      required Size outerSize,
+      required Offset outerTopLeft,
+      required Size sourceSize,
+    }) {
+      final transform = _displayTransforms[index];
+      final fittedSource = transform.quarterTurns.isOdd
+          ? Size(sourceSize.height, sourceSize.width)
+          : sourceSize;
+      final fitted = applyBoxFit(BoxFit.contain, fittedSource, outerSize);
+      final outputSize = fitted.destination;
+      return Rect.fromLTWH(
+        outerTopLeft.dx + (outerSize.width - outputSize.width) / 2,
+        outerTopLeft.dy + (outerSize.height - outputSize.height) / 2,
+        outputSize.width,
+        outputSize.height,
+      );
+    }
+
+    Rect centeredSquare(Size outerSize, Offset outerTopLeft) {
+      final side = math.min(outerSize.width, outerSize.height);
+      return Rect.fromLTWH(
+        outerTopLeft.dx + (outerSize.width - side) / 2,
+        outerTopLeft.dy + (outerSize.height - side) / 2,
+        side,
+        side,
+      );
+    }
+
+    final naturalSize = _imageNaturalSizes[src];
+    final imageContext = _imageKeys[index].currentContext;
+    final viewerContext = _viewerKey.currentContext;
+    final imageBox = imageContext?.findRenderObject();
+    final viewerBox = viewerContext?.findRenderObject();
+    if (imageBox is RenderBox &&
+        imageBox.hasSize &&
+        viewerBox is RenderBox &&
+        viewerBox.hasSize) {
+      final globalTopLeft = imageBox.localToGlobal(Offset.zero);
+      final localTopLeft = viewerBox.globalToLocal(globalTopLeft);
+      if (naturalSize != null) {
+        return fitInto(
+          outerSize: imageBox.size,
+          outerTopLeft: localTopLeft,
+          sourceSize: naturalSize,
+        );
+      }
+      return centeredSquare(imageBox.size, localTopLeft);
+    }
+
+    final contentSize = Size(
+      math.max(0.0, pageSize.width - padding.horizontal),
+      math.max(0.0, pageSize.height - padding.vertical),
+    );
+    final contentRect = padding.topLeft & contentSize;
+    if (naturalSize == null) {
+      return centeredSquare(contentSize, contentRect.topLeft);
+    }
+
+    return fitInto(
+      outerSize: contentSize,
+      outerTopLeft: contentRect.topLeft,
+      sourceSize: naturalSize,
+    );
+  }
+
+  void _handleImageTap({
+    required int index,
+    required String src,
+    required Size pageSize,
+    required EdgeInsets padding,
+  }) {
+    if (!_isDesktop) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+
+    final tapPos = _lastTapPos;
+    _lastTapPos = null;
+    if (tapPos != null &&
+        !_imageTapRect(
+          index: index,
+          src: src,
+          pageSize: pageSize,
+          padding: padding,
+        ).contains(tapPos)) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+
+    _toggleChrome();
+  }
+
+  void _resetDragState() {
+    _dragDy = 0.0;
+    _bgOpacity = 1.0;
+    _dragActive = false;
+  }
+
+  void _goToIndex(int target) {
+    if (!_hasImages) return;
+    final next = target < 0
+        ? 0
+        : target >= widget.images.length
+        ? widget.images.length - 1
+        : target;
+    if (next == _index) return;
+    _controller.animateToPage(
+      next,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _showPrevious() => _goToIndex(_index - 1);
+  void _showNext() => _goToIndex(_index + 1);
+
+  void _resetZoom() {
+    final ctrl = _currentZoomCtrl;
+    if (ctrl == null) return;
+    _animateZoomTo(ctrl, toScale: 1.0, toTx: 0.0, toTy: 0.0);
+  }
+
+  void _zoomBy(double factor) {
+    final ctrl = _currentZoomCtrl;
+    final viewerContext = _viewerKey.currentContext;
+    if (ctrl == null || viewerContext == null) return;
+    final size = viewerContext.size;
+    if (size == null) return;
+
+    final current = ctrl.value.clone();
+    final currentScale = current.getMaxScaleOnAxis();
+    final targetScale = (currentScale * factor).clamp(1.0, 5.0).toDouble();
+    final viewportCenter = size.center(Offset.zero);
+    final focalPoint = MatrixUtils.transformPoint(
+      Matrix4.inverted(current),
+      viewportCenter,
+    );
+    final tx = viewportCenter.dx - targetScale * focalPoint.dx;
+    final ty = viewportCenter.dy - targetScale * focalPoint.dy;
+    _animateZoomTo(ctrl, toScale: targetScale, toTx: tx, toTy: ty);
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    switch (event.logicalKey) {
+      case LogicalKeyboardKey.escape:
+        Navigator.of(context).maybePop();
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.arrowLeft:
+        _showPrevious();
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.arrowRight:
+        _showNext();
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.equal:
+      case LogicalKeyboardKey.add:
+      case LogicalKeyboardKey.numpadAdd:
+        _zoomBy(1.25);
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.minus:
+      case LogicalKeyboardKey.numpadSubtract:
+        _zoomBy(0.8);
+        return KeyEventResult.handled;
+      case LogicalKeyboardKey.digit0:
+      case LogicalKeyboardKey.numpad0:
+        _resetZoom();
+        return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   ImageProvider _providerFor(String src) {
@@ -306,6 +652,8 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   }
 
   Future<void> _shareCurrent() async {
+    if (_sharing) return;
+    setState(() => _sharing = true);
     final l10n = AppLocalizations.of(context)!;
     try {
       // iPad requires a non-zero popover source rect within overlay coordinates
@@ -421,6 +769,8 @@ class _ImageViewerPageState extends State<ImageViewerPage>
         message: l10n.imageViewerPageShareFailed(e.toString()),
         type: NotificationType.error,
       );
+    } finally {
+      if (mounted) setState(() => _sharing = false);
     }
   }
 
@@ -645,6 +995,14 @@ class _ImageViewerPageState extends State<ImageViewerPage>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final media = MediaQuery.of(context);
+    final size = media.size;
+    final compact = size.width < 700;
+    final topInset =
+        media.padding.top + (_isDesktop && Platform.isMacOS ? 22 : 0);
+    final chromeOpacity = _chromeVisible ? _bgOpacity.clamp(0.0, 1.0) : 0.0;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -656,124 +1014,187 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       ),
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        body: Stack(
-          children: [
-            // Dim background behind image; becomes transparent while dragging down
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withValues(alpha: _bgOpacity),
+        body: Focus(
+          focusNode: _focusNode,
+          autofocus: true,
+          onKeyEvent: _handleKeyEvent,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: _bgOpacity),
+                  ),
+                ),
+              ),
+              if (_hasImages) _buildPagedImageStage(context),
+              _buildTopBar(
+                context,
+                topInset: topInset,
+                opacity: chromeOpacity,
+                counterLabel: l10n.imageViewerPageCounter(
+                  _index + 1,
+                  widget.images.length,
+                ),
+              ),
+              if (_hasMultipleImages && !compact)
+                _buildDesktopPageArrows(context, opacity: chromeOpacity),
+              _buildActionChrome(
+                context,
+                compact: compact,
+                bottomInset: media.padding.bottom,
+                opacity: chromeOpacity,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPagedImageStage(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onVerticalDragStart: _currentImageZoomed
+          ? null
+          : _handleVerticalDragStart,
+      onVerticalDragUpdate: _currentImageZoomed
+          ? null
+          : _handleVerticalDragUpdate,
+      onVerticalDragEnd: _currentImageZoomed ? null : _handleVerticalDragEnd,
+      child: PageView.builder(
+        key: const ValueKey('image-viewer-page-view'),
+        controller: _controller,
+        physics: _currentImageZoomed
+            ? const NeverScrollableScrollPhysics()
+            : const PageScrollPhysics(),
+        itemCount: widget.images.length,
+        onPageChanged: (i) {
+          setState(() {
+            _index = i;
+            _chromeVisible = true;
+            _currentImageZoomed = _isZoomed(_zoomCtrls[i]);
+            _resetDragState();
+          });
+        },
+        itemBuilder: _buildImagePage,
+      ),
+    );
+  }
+
+  Widget _buildImagePage(BuildContext context, int i) {
+    final l10n = AppLocalizations.of(context)!;
+    final src = widget.images[i];
+    final provider = _providerFor(src);
+    _ensureImageNaturalSize(src, provider);
+    final image = Image(
+      key: _imageKeys[i],
+      image: provider,
+      fit: BoxFit.contain,
+      gaplessPlayback: true,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Center(
+          child: SizedBox(
+            width: 34,
+            height: 34,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.2,
+              value: loadingProgress.expectedTotalBytes == null
+                  ? null
+                  : loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Colors.white.withValues(alpha: 0.78),
               ),
             ),
-            // Drag-to-dismiss gesture layered over the PageView
-            GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onVerticalDragStart: _handleVerticalDragStart,
-              onVerticalDragUpdate: _handleVerticalDragUpdate,
-              onVerticalDragEnd: _handleVerticalDragEnd,
-              onTap: () => Navigator.of(context).maybePop(),
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: widget.images.length,
-                onPageChanged: (i) {
-                  setState(() {
-                    _index = i;
-                    _dragDy = 0.0;
-                    _bgOpacity = 1.0;
-                  });
-                  _prepareSampleForIndex(i);
-                },
-                itemBuilder: (context, i) {
-                  final src = widget.images[i];
-                  final img = Image(
-                    image: _providerFor(src),
-                    fit: BoxFit.contain,
-                    gaplessPlayback: true,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.broken_image,
-                      color: Colors.white70,
-                      size: 64,
-                    ),
-                  );
-                  // Only transform the current page while dragging
-                  final translateY = (i == _index) ? _dragDy : 0.0;
-                  final scale = (i == _index)
-                      ? (1.0 - math.min(_dragDy / 800.0, 0.15))
-                      : 1.0;
-                  return Container(
-                    alignment: Alignment.center,
-                    child: Transform.translate(
-                      offset: Offset(0, translateY),
-                      child: Transform.scale(
-                        scale: scale,
-                        child: Hero(
-                          tag: 'img:$src',
-                          child: SizedBox.expand(
-                            child: GestureDetector(
-                              onDoubleTapDown: (d) =>
-                                  _lastDoubleTapPos = d.localPosition,
-                              onDoubleTap: () {
-                                final ctrl = _zoomCtrls[i];
-                                final current = ctrl.value;
-                                final double currentScale = current
-                                    .getMaxScaleOnAxis();
-                                // Toggle zoom
-                                if (currentScale > 1.01) {
-                                  _animateZoomTo(
-                                    ctrl,
-                                    toScale: 1.0,
-                                    toTx: 0.0,
-                                    toTy: 0.0,
-                                  );
-                                } else {
-                                  final focal =
-                                      _lastDoubleTapPos ??
-                                      (context.size == null
-                                          ? const Offset(0, 0)
-                                          : Offset(
-                                              context.size!.width / 2,
-                                              context.size!.height / 2,
-                                            ));
-                                  // Convert focal from viewport to child coordinates
-                                  final inv = Matrix4.inverted(current);
-                                  final focalPoint = MatrixUtils.transformPoint(
-                                    inv,
-                                    focal,
-                                  );
-                                  final double targetScale = 2; // 放大倍率
-                                  final double tx =
-                                      focal.dx - targetScale * focalPoint.dx;
-                                  final double ty =
-                                      focal.dy - targetScale * focalPoint.dy;
-                                  _animateZoomTo(
-                                    ctrl,
-                                    toScale: targetScale,
-                                    toTx: tx,
-                                    toTy: ty,
-                                  );
-                                }
-                                _lastDoubleTapPos = null;
-                              },
-                              child: AnimatedBuilder(
-                                animation: _zoomCtrls[i],
-                                builder: (context, _) {
-                                  final scale = _zoomCtrls[i].value
-                                      .getMaxScaleOnAxis();
-                                  final canPan = scale > 1.01;
-                                  return InteractiveViewer(
-                                    key: i == _index ? _viewerKey : null,
-                                    transformationController: _zoomCtrls[i],
-                                    minScale: 1.0,
-                                    maxScale: 5,
-                                    panEnabled: canPan,
-                                    scaleEnabled: true,
-                                    clipBehavior: Clip.none,
-                                    boundaryMargin: canPan
-                                        ? const EdgeInsets.all(80)
-                                        : EdgeInsets.zero,
-                                    child: img,
-                                  );
-                                },
+          ),
+        );
+      },
+      errorBuilder: (_, __, ___) => Semantics(
+        image: true,
+        label: l10n.imageViewerPageImageLoadFailed,
+        child: Icon(
+          Lucide.ImageOff,
+          color: Colors.white.withValues(alpha: 0.72),
+          size: 64,
+        ),
+      ),
+    );
+    final translateY = (i == _index) ? _dragDy : 0.0;
+    final pageScale = (i == _index)
+        ? (1.0 - math.min(_dragDy / 800.0, 0.15))
+        : 1.0;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final pageSize = Size(constraints.maxWidth, constraints.maxHeight);
+        final compact = constraints.maxWidth < 700;
+        final padding = compact
+            ? const EdgeInsets.symmetric(vertical: 82)
+            : const EdgeInsets.fromLTRB(92, 82, 92, 106);
+
+        return Transform.translate(
+          offset: Offset(0, translateY),
+          child: Transform.scale(
+            scale: pageScale,
+            child: Hero(
+              tag: 'img:$src',
+              child: AnimatedBuilder(
+                animation: _zoomCtrls[i],
+                builder: (context, _) {
+                  final scale = _zoomCtrls[i].value.getMaxScaleOnAxis();
+                  final canPan = scale > 1.01;
+                  return InteractiveViewer(
+                    key: i == _index ? _viewerKey : null,
+                    transformationController: _zoomCtrls[i],
+                    minScale: 1.0,
+                    maxScale: 5.0,
+                    panEnabled: canPan,
+                    scaleEnabled: true,
+                    clipBehavior: compact ? Clip.hardEdge : Clip.none,
+                    boundaryMargin: compact
+                        ? EdgeInsets.zero
+                        : canPan
+                        ? const EdgeInsets.all(80)
+                        : EdgeInsets.zero,
+                    child: SizedBox.expand(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTapDown: (details) =>
+                            _lastTapPos = details.localPosition,
+                        onTapCancel: () => _lastTapPos = null,
+                        onDoubleTapDown: (details) =>
+                            _lastDoubleTapPos = details.localPosition,
+                        onTap: () => _handleImageTap(
+                          index: i,
+                          src: src,
+                          pageSize: pageSize,
+                          padding: padding,
+                        ),
+                        onDoubleTap: () {
+                          final focal =
+                              _lastDoubleTapPos ?? pageSize.center(Offset.zero);
+                          _toggleZoomAt(_zoomCtrls[i], focal);
+                          _lastDoubleTapPos = null;
+                          if (!_chromeVisible) {
+                            setState(() => _chromeVisible = true);
+                          }
+                        },
+                        child: Padding(
+                          padding: padding,
+                          child: Semantics(
+                            image: true,
+                            label: l10n.imageViewerPageImageLabel(
+                              i + 1,
+                              widget.images.length,
+                            ),
+                            child: _AnimatedImageDisplayTransform(
+                              transformKey: ValueKey(
+                                'image-viewer-display-transform-$i',
                               ),
+                              transform: _displayTransforms[i],
+                              child: image,
                             ),
                           ),
                         ),
@@ -783,139 +1204,85 @@ class _ImageViewerPageState extends State<ImageViewerPage>
                 },
               ),
             ),
-            // Top bar
-            SafeArea(
-              child: Padding(
-                padding: EdgeInsets.only(top: Platform.isMacOS ? 28.0 : 0.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.of(context).maybePop(),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: Text(
-                        '${_index + 1}/${widget.images.length}',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTopBar(
+    BuildContext context, {
+    required double topInset,
+    required double opacity,
+    required String counterLabel,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+    return Positioned(
+      left: 16,
+      right: 16,
+      top: topInset + 10,
+      child: IgnorePointer(
+        ignoring: opacity <= 0.01,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          opacity: opacity.toDouble(),
+          child: Row(
+            children: [
+              _GlassCircleButton(
+                label: l10n.imageViewerPageCloseButton,
+                icon: Lucide.X,
+                onTap: () => Navigator.of(context).maybePop(),
+              ),
+              const Spacer(),
+              if (_hasImages)
+                _GlassLabel(
+                  key: const ValueKey('image-viewer-counter'),
+                  label: counterLabel,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopPageArrows(
+    BuildContext context, {
+    required double opacity,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+    return IgnorePointer(
+      ignoring: opacity <= 0.01,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        opacity: opacity.toDouble(),
+        child: Stack(
+          children: [
+            Positioned(
+              left: 24,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: _GlassCircleButton(
+                  label: l10n.imageViewerPagePreviousButton,
+                  icon: Lucide.ChevronLeft,
+                  onTap: _canGoPrevious ? _showPrevious : null,
+                  size: 52,
                 ),
               ),
             ),
-            // Bottom action buttons (save + copy + share)
             Positioned(
-              left: 0,
-              right: 0,
+              right: 24,
+              top: 0,
               bottom: 0,
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-                  child: Center(
-                    child: AnimatedBuilder(
-                      animation: _zoomCtrls[_index],
-                      builder: (context, _) {
-                        final leftColor = _smartIconColorForKey(
-                          context,
-                          _saveBtnKey,
-                        );
-                        final rightColor = _smartIconColorForKey(
-                          context,
-                          _shareBtnKey,
-                        );
-                        final showCopy = _isDesktop;
-                        final Color? copyColor = showCopy
-                            ? _smartIconColorForKey(context, _copyBtnKey)
-                            : null;
-                        final children = <Widget>[
-                          _GlassCircleButton(
-                            key: _saveBtnKey,
-                            onTap: _saving ? null : _saveCurrent,
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              transitionBuilder: (child, anim) =>
-                                  FadeTransition(opacity: anim, child: child),
-                              child: _saving
-                                  ? SizedBox(
-                                      key: const ValueKey('saving'),
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.2,
-                                        valueColor: AlwaysStoppedAnimation(
-                                          leftColor,
-                                        ),
-                                      ),
-                                    )
-                                  : Icon(
-                                      Icons.download,
-                                      color: leftColor,
-                                      size: 20,
-                                      key: const ValueKey('ready'),
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                        ];
-                        if (showCopy) {
-                          children.addAll([
-                            _GlassCircleButton(
-                              key: _copyBtnKey,
-                              onTap: _copying ? null : _copyCurrent,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 200),
-                                transitionBuilder: (child, anim) =>
-                                    FadeTransition(opacity: anim, child: child),
-                                child: _copying
-                                    ? SizedBox(
-                                        key: const ValueKey('copying'),
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.2,
-                                          valueColor: AlwaysStoppedAnimation(
-                                            copyColor ??
-                                                _fallbackIconColor(context),
-                                          ),
-                                        ),
-                                      )
-                                    : Icon(
-                                        Icons.copy,
-                                        color:
-                                            copyColor ??
-                                            _fallbackIconColor(context),
-                                        size: 20,
-                                        key: const ValueKey('copy-ready'),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                          ]);
-                        }
-                        children.add(
-                          _GlassCircleButton(
-                            key: _shareBtnKey,
-                            onTap: _shareCurrent,
-                            child: Icon(
-                              Icons.share,
-                              color: rightColor,
-                              size: 20,
-                            ),
-                          ),
-                        );
-                        return Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: children,
-                        );
-                      },
-                    ),
-                  ),
+              child: Center(
+                child: _GlassCircleButton(
+                  label: l10n.imageViewerPageNextButton,
+                  icon: Lucide.ChevronRight,
+                  onTap: _canGoNext ? _showNext : null,
+                  size: 52,
                 ),
               ),
             ),
@@ -925,115 +1292,110 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     );
   }
 
-  // Dynamic icon color for glass buttons
-  Color _fallbackIconColor(BuildContext context) {
-    if (_bgOpacity >= 0.5) return Colors.white;
-    final brightness = Theme.of(context).brightness;
-    return brightness == Brightness.dark ? Colors.white : Colors.black;
-  }
+  Widget _buildActionChrome(
+    BuildContext context, {
+    required bool compact,
+    required double bottomInset,
+    required double opacity,
+  }) {
+    if (!_hasImages) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context)!;
+    final actions = <Widget>[
+      _GlassCircleButton(
+        label: l10n.imageViewerPageSaveButton,
+        icon: Lucide.Download,
+        loading: _saving,
+        onTap: _saving ? null : _saveCurrent,
+      ),
+      if (_isDesktop)
+        _GlassCircleButton(
+          label: l10n.imageViewerPageCopyButton,
+          icon: Lucide.Copy,
+          loading: _copying,
+          onTap: _copying ? null : _copyCurrent,
+        ),
+      _GlassCircleButton(
+        label: l10n.imageViewerPageShareButton,
+        icon: Lucide.Share2,
+        loading: _sharing,
+        onTap: _sharing ? null : _shareCurrent,
+      ),
+      const _GlassDivider(),
+      _GlassCircleButton(
+        label: l10n.imageViewerPageFlipHorizontalButton,
+        icon: Lucide.FlipHorizontal2,
+        onTap: _flipCurrentHorizontally,
+      ),
+      _GlassCircleButton(
+        label: l10n.imageViewerPageFlipVerticalButton,
+        icon: Lucide.FlipVertical2,
+        onTap: _flipCurrentVertically,
+      ),
+      _GlassCircleButton(
+        label: l10n.imageViewerPageRotateLeftButton,
+        icon: Lucide.RotateCcw,
+        onTap: _rotateCurrentLeft,
+      ),
+      _GlassCircleButton(
+        label: l10n.imageViewerPageRotateRightButton,
+        icon: Lucide.RotateCw,
+        onTap: _rotateCurrentRight,
+      ),
+      if (!compact) ...[
+        const _GlassDivider(),
+        _GlassCircleButton(
+          label: l10n.imageViewerPageZoomOutButton,
+          icon: Lucide.ZoomOut,
+          onTap: () => _zoomBy(0.8),
+        ),
+        _GlassCircleButton(
+          label: l10n.imageViewerPageResetZoomButton,
+          icon: Lucide.RotateCcw,
+          onTap: _resetZoom,
+        ),
+        _GlassCircleButton(
+          label: l10n.imageViewerPageZoomInButton,
+          icon: Lucide.ZoomIn,
+          onTap: () => _zoomBy(1.25),
+        ),
+      ],
+    ];
 
-  Color _smartIconColorForKey(BuildContext context, GlobalKey key) {
-    final src = (_index >= 0 && _index < widget.images.length)
-        ? widget.images[_index]
-        : null;
-    if (src == null) return _fallbackIconColor(context);
-    final sample = _samples[src];
-    final viewerCtx = _viewerKey.currentContext;
-    final btnCtx = key.currentContext;
-    if (sample == null || viewerCtx == null || btnCtx == null) {
-      return _fallbackIconColor(context);
-    }
-    final viewerBox = viewerCtx.findRenderObject();
-    final btnBox = btnCtx.findRenderObject();
-    if (viewerBox is! RenderBox || btnBox is! RenderBox || !viewerBox.hasSize) {
-      return _fallbackIconColor(context);
-    }
-
-    try {
-      final btnCenterGlobal = btnBox.localToGlobal(
-        btnBox.size.center(Offset.zero),
-      );
-      final viewerLocal = viewerBox.globalToLocal(btnCenterGlobal);
-
-      // Invert InteractiveViewer transform to get child-space point
-      final m = _zoomCtrls[_index].value;
-      final inv = Matrix4.inverted(m);
-      final childPt = MatrixUtils.transformPoint(inv, viewerLocal);
-
-      final childSize = viewerBox.size;
-      final imgSize = Size(sample.w.toDouble(), sample.h.toDouble());
-      final fitted = applyBoxFit(BoxFit.contain, imgSize, childSize);
-      final dest = Size(fitted.destination.width, fitted.destination.height);
-      final dx = (childSize.width - dest.width) / 2.0;
-      final dy = (childSize.height - dest.height) / 2.0;
-      final destRect = Rect.fromLTWH(dx, dy, dest.width, dest.height);
-      if (!destRect.contains(childPt)) {
-        return _fallbackIconColor(context);
-      }
-
-      final u = ((childPt.dx - destRect.left) / destRect.width).clamp(0.0, 1.0);
-      final v = ((childPt.dy - destRect.top) / destRect.height).clamp(0.0, 1.0);
-      final sx = (u * (sample.w - 1)).round();
-      final sy = (v * (sample.h - 1)).round();
-      final avgLum = sample.avgLuminance(sx, sy, radius: 4);
-      // Choose color: light bg -> black icon; dark bg -> white icon
-      return avgLum >= 0.58 ? Colors.black : Colors.white;
-    } catch (_) {
-      return _fallbackIconColor(context);
-    }
-  }
-
-  Future<void> _prepareSampleForIndex(int i) async {
-    if (i < 0 || i >= widget.images.length) return;
-    final src = widget.images[i];
-    if (_samples.containsKey(src)) return;
-    try {
-      Uint8List? bytes;
-      if (src.startsWith('data:')) {
-        final idx = src.indexOf('base64,');
-        if (idx != -1) {
-          bytes = base64Decode(src.substring(idx + 7));
-        }
-      } else if (src.startsWith('http://') || src.startsWith('https://')) {
-        final resp = await http.get(Uri.parse(src));
-        if (resp.statusCode >= 200 && resp.statusCode < 300) {
-          bytes = resp.bodyBytes;
-        }
-      } else {
-        final local = SandboxPathResolver.fix(src);
-        final f = File(local);
-        if (await f.exists()) {
-          bytes = await f.readAsBytes();
-        }
-      }
-      if (bytes == null) return;
-      // Downscale decode for sampling
-      const int targetW = 96;
-      final codec = await ui.instantiateImageCodec(bytes, targetWidth: targetW);
-      final frame = await codec.getNextFrame();
-      final img = frame.image;
-      final data = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
-      if (data == null) return;
-      final w = img.width;
-      final h = img.height;
-      final lum = Uint8List(w * h);
-      final bd = data.buffer.asUint8List();
-      for (int y = 0; y < h; y++) {
-        int row = y * w;
-        for (int x = 0; x < w; x++) {
-          final idx4 = (row + x) * 4;
-          final r = bd[idx4 + 0];
-          final g = bd[idx4 + 1];
-          final b = bd[idx4 + 2];
-          final yv = (0.299 * r + 0.587 * g + 0.114 * b).clamp(0, 255).toInt();
-          lum[row + x] = yv;
-        }
-      }
-      _samples[src] = _SampledImage(w, h, lum);
-      if (mounted) setState(() {});
-    } catch (_) {
-      // ignore sampling failures
-    }
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: math.max(bottomInset, 12) + (compact ? 10 : 18),
+      child: IgnorePointer(
+        ignoring: opacity <= 0.01,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          opacity: opacity.toDouble(),
+          child: Center(
+            child: _GlassPanel(
+              padding: EdgeInsets.all(compact ? 8 : 10),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: compact
+                    ? const BouncingScrollPhysics()
+                    : const NeverScrollableScrollPhysics(),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: actions
+                      .expand((child) sync* {
+                        if (child != actions.first) {
+                          yield SizedBox(width: compact ? 8 : 10);
+                        }
+                        yield child;
+                      })
+                      .toList(growable: false),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   // Desktop save: choose a location via file picker
@@ -1166,11 +1528,192 @@ class _CopyPayload {
   final String? sourcePath;
 }
 
-class _GlassCircleButton extends StatefulWidget {
-  const _GlassCircleButton({super.key, required this.child, this.onTap});
+class _ImageDisplayTransform {
+  const _ImageDisplayTransform({
+    this.flipX = false,
+    this.flipY = false,
+    this.quarterTurns = 0,
+  });
 
+  final bool flipX;
+  final bool flipY;
+  final int quarterTurns;
+
+  bool get isOddQuarterTurn => quarterTurns.isOdd;
+
+  _ImageDisplayTransform copyWith({
+    bool? flipX,
+    bool? flipY,
+    int? quarterTurns,
+  }) {
+    return _ImageDisplayTransform(
+      flipX: flipX ?? this.flipX,
+      flipY: flipY ?? this.flipY,
+      quarterTurns: quarterTurns ?? this.quarterTurns,
+    );
+  }
+
+  Matrix4 toMatrix() {
+    return toPoseNear(0).toMatrix();
+  }
+
+  _ImageDisplayPose toPoseNear(double angle) {
+    final baseAngle = (quarterTurns % 4) * math.pi / 2;
+    final nearestFullTurns = ((angle - baseAngle) / (math.pi * 2)).round();
+    return _ImageDisplayPose(
+      angle: baseAngle + nearestFullTurns * math.pi * 2,
+      scaleX: flipX ? -1.0 : 1.0,
+      scaleY: flipY ? -1.0 : 1.0,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is _ImageDisplayTransform &&
+        other.flipX == flipX &&
+        other.flipY == flipY &&
+        other.quarterTurns == quarterTurns;
+  }
+
+  @override
+  int get hashCode => Object.hash(flipX, flipY, quarterTurns);
+}
+
+class _ImageDisplayPose {
+  const _ImageDisplayPose({
+    required this.angle,
+    required this.scaleX,
+    required this.scaleY,
+  });
+
+  final double angle;
+  final double scaleX;
+  final double scaleY;
+
+  Matrix4 toMatrix() {
+    return Matrix4.identity()
+      ..rotateZ(angle)
+      ..scaleByDouble(scaleX, scaleY, 1.0, 1.0);
+  }
+}
+
+class _AnimatedImageDisplayTransform extends StatefulWidget {
+  const _AnimatedImageDisplayTransform({
+    required this.transformKey,
+    required this.transform,
+    required this.child,
+  });
+
+  final Key transformKey;
+  final _ImageDisplayTransform transform;
   final Widget child;
+
+  @override
+  State<_AnimatedImageDisplayTransform> createState() =>
+      _AnimatedImageDisplayTransformState();
+}
+
+class _AnimatedImageDisplayTransformState
+    extends State<_AnimatedImageDisplayTransform>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late Animation<double> _angle;
+  late Animation<double> _scaleX;
+  late Animation<double> _scaleY;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: 1,
+    );
+    final pose = widget.transform.toPoseNear(0);
+    _setAnimations(pose, pose);
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedImageDisplayTransform oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.transform == widget.transform) return;
+    final current = _currentPose;
+    final target = widget.transform.toPoseNear(current.angle);
+    _setAnimations(current, target);
+    _controller.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  _ImageDisplayPose get _currentPose {
+    return _ImageDisplayPose(
+      angle: _angle.value,
+      scaleX: _scaleX.value,
+      scaleY: _scaleY.value,
+    );
+  }
+
+  Animation<double> _animateDouble(double begin, double end) {
+    return Tween<double>(
+      begin: begin,
+      end: end,
+    ).chain(CurveTween(curve: Curves.easeOutCubic)).animate(_controller);
+  }
+
+  void _setAnimations(_ImageDisplayPose begin, _ImageDisplayPose end) {
+    _angle = _animateDouble(begin.angle, end.angle);
+    _scaleX = _animateDouble(begin.scaleX, end.scaleX);
+    _scaleY = _animateDouble(begin.scaleY, end.scaleY);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.maybeOf(context);
+    final reduceMotion =
+        (media?.disableAnimations ?? false) ||
+        (media?.accessibleNavigation ?? false);
+    if (reduceMotion) {
+      return Transform(
+        key: widget.transformKey,
+        alignment: Alignment.center,
+        transform: widget.transform.toPoseNear(_angle.value).toMatrix(),
+        child: widget.child,
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _controller,
+      child: widget.child,
+      builder: (context, child) {
+        return Transform(
+          key: widget.transformKey,
+          alignment: Alignment.center,
+          transform: _currentPose.toMatrix(),
+          child: child,
+        );
+      },
+    );
+  }
+}
+
+class _GlassCircleButton extends StatefulWidget {
+  const _GlassCircleButton({
+    required this.label,
+    required this.icon,
+    this.onTap,
+    this.loading = false,
+    this.size = 48,
+  });
+
+  final String label;
+  final IconData icon;
   final VoidCallback? onTap;
+  final bool loading;
+  final double size;
 
   @override
   State<_GlassCircleButton> createState() => _GlassCircleButtonState();
@@ -1178,6 +1721,7 @@ class _GlassCircleButton extends StatefulWidget {
 
 class _GlassCircleButtonState extends State<_GlassCircleButton> {
   bool _pressed = false;
+  bool _hovered = false;
 
   void _setPressed(bool v) {
     if (_pressed == v) return;
@@ -1188,35 +1732,80 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
   Widget build(BuildContext context) {
     final bool disabled = widget.onTap == null;
     final Color baseFill = Colors.white.withValues(
-      alpha: disabled ? 0.10 : 0.18,
+      alpha: disabled ? 0.09 : 0.16,
     );
-    final Color border = Colors.white.withValues(alpha: disabled ? 0.20 : 0.35);
-    final Color fill = _pressed
-        ? Colors.white.withValues(alpha: disabled ? 0.12 : 0.24)
-        : baseFill;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: widget.onTap,
-      onTapDown: (_) => _setPressed(true),
-      onTapUp: (_) => _setPressed(false),
-      onTapCancel: () => _setPressed(false),
-      child: AnimatedScale(
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.easeOutCubic,
-        scale: _pressed ? 0.94 : 1.0,
-        child: ClipOval(
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: fill,
-                shape: BoxShape.circle,
-                border: Border.all(color: border, width: 0.6),
+    final Color border = Colors.white.withValues(alpha: disabled ? 0.18 : 0.30);
+    final double overlay = disabled
+        ? 0
+        : _pressed
+        ? 0.10
+        : _hovered
+        ? 0.06
+        : 0;
+    final Color fill = Color.lerp(
+      baseFill,
+      Colors.white,
+      overlay,
+    )!.withValues(alpha: baseFill.a + overlay);
+    final content = widget.loading
+        ? SizedBox(
+            width: 19,
+            height: 19,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.1,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Colors.white.withValues(alpha: disabled ? 0.52 : 0.92),
               ),
-              child: Center(child: widget.child),
+            ),
+          )
+        : Icon(
+            widget.icon,
+            color: Colors.white.withValues(alpha: disabled ? 0.48 : 0.92),
+            size: 20,
+          );
+
+    return Tooltip(
+      message: widget.label,
+      child: Semantics(
+        button: true,
+        enabled: !disabled,
+        label: widget.label,
+        child: MouseRegion(
+          cursor: disabled ? MouseCursor.defer : SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) {
+            setState(() {
+              _hovered = false;
+              _pressed = false;
+            });
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onTap,
+            onTapDown: disabled ? null : (_) => _setPressed(true),
+            onTapUp: disabled ? null : (_) => _setPressed(false),
+            onTapCancel: disabled ? null : () => _setPressed(false),
+            child: AnimatedScale(
+              duration: const Duration(milliseconds: 100),
+              curve: Curves.easeOutCubic,
+              scale: _pressed ? 0.94 : 1.0,
+              child: ClipOval(
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    curve: Curves.easeOutCubic,
+                    width: widget.size,
+                    height: widget.size,
+                    decoration: BoxDecoration(
+                      color: fill,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: border, width: 0.7),
+                    ),
+                    child: Center(child: content),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -1225,28 +1814,65 @@ class _GlassCircleButtonState extends State<_GlassCircleButton> {
   }
 }
 
-class _SampledImage {
-  final int w;
-  final int h;
-  final Uint8List lum; // 0..255 luminance
-  _SampledImage(this.w, this.h, this.lum);
+class _GlassPanel extends StatelessWidget {
+  const _GlassPanel({required this.child, required this.padding});
 
-  double avgLuminance(int cx, int cy, {int radius = 3}) {
-    if (w == 0 || h == 0) return 0.0;
-    int x0 = (cx - radius).clamp(0, w - 1);
-    int x1 = (cx + radius).clamp(0, w - 1);
-    int y0 = (cy - radius).clamp(0, h - 1);
-    int y1 = (cy + radius).clamp(0, h - 1);
-    int sum = 0;
-    int count = 0;
-    for (int y = y0; y <= y1; y++) {
-      int row = y * w;
-      for (int x = x0; x <= x1; x++) {
-        sum += lum[row + x];
-        count++;
-      }
-    }
-    if (count == 0) return 0.0;
-    return (sum / count) / 255.0;
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(30),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.26),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.16),
+              width: 0.7,
+            ),
+          ),
+          child: Padding(padding: padding, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassLabel extends StatelessWidget {
+  const _GlassLabel({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassPanel(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.86),
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassDivider extends StatelessWidget {
+  const _GlassDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 1,
+      height: 24,
+      child: ColoredBox(color: Colors.white.withValues(alpha: 0.16)),
+    );
   }
 }

@@ -4064,7 +4064,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String get imageViewerPageShareButton => 'Share Image';
 
   @override
+  String get imageViewerPageCloseButton => 'Close preview';
+
+  @override
   String get imageViewerPageSaveButton => 'Save Image';
+
+  @override
+  String get imageViewerPageCopyButton => 'Copy Image';
+
+  @override
+  String get imageViewerPagePreviousButton => 'Previous Image';
+
+  @override
+  String get imageViewerPageNextButton => 'Next Image';
+
+  @override
+  String get imageViewerPageZoomInButton => 'Zoom In';
+
+  @override
+  String get imageViewerPageZoomOutButton => 'Zoom Out';
+
+  @override
+  String get imageViewerPageResetZoomButton => 'Reset Zoom';
+
+  @override
+  String get imageViewerPageFlipHorizontalButton => 'Flip Horizontal';
+
+  @override
+  String get imageViewerPageFlipVerticalButton => 'Flip Vertical';
+
+  @override
+  String get imageViewerPageRotateLeftButton => 'Rotate Left';
+
+  @override
+  String get imageViewerPageRotateRightButton => 'Rotate Right';
+
+  @override
+  String imageViewerPageCounter(int index, int total) {
+    return '$index/$total';
+  }
+
+  @override
+  String imageViewerPageImageLabel(int index, int total) {
+    return 'Image $index of $total';
+  }
+
+  @override
+  String get imageViewerPageImageLoadFailed => 'Unable to load image';
 
   @override
   String get imageViewerPageSaveSuccess => 'Saved to gallery';

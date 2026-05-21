@@ -3908,7 +3908,53 @@ class AppLocalizationsZh extends AppLocalizations {
   String get imageViewerPageShareButton => '分享图片';
 
   @override
+  String get imageViewerPageCloseButton => '关闭预览';
+
+  @override
   String get imageViewerPageSaveButton => '保存图片';
+
+  @override
+  String get imageViewerPageCopyButton => '复制图片';
+
+  @override
+  String get imageViewerPagePreviousButton => '上一张图片';
+
+  @override
+  String get imageViewerPageNextButton => '下一张图片';
+
+  @override
+  String get imageViewerPageZoomInButton => '放大';
+
+  @override
+  String get imageViewerPageZoomOutButton => '缩小';
+
+  @override
+  String get imageViewerPageResetZoomButton => '重置缩放';
+
+  @override
+  String get imageViewerPageFlipHorizontalButton => '左右镜像';
+
+  @override
+  String get imageViewerPageFlipVerticalButton => '上下镜像';
+
+  @override
+  String get imageViewerPageRotateLeftButton => '向左旋转';
+
+  @override
+  String get imageViewerPageRotateRightButton => '向右旋转';
+
+  @override
+  String imageViewerPageCounter(int index, int total) {
+    return '$index/$total';
+  }
+
+  @override
+  String imageViewerPageImageLabel(int index, int total) {
+    return '第 $index 张图片，共 $total 张';
+  }
+
+  @override
+  String get imageViewerPageImageLoadFailed => '无法加载图片';
 
   @override
   String get imageViewerPageSaveSuccess => '已保存到相册';
@@ -8795,7 +8841,53 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get imageViewerPageShareButton => '分享图片';
 
   @override
+  String get imageViewerPageCloseButton => '关闭预览';
+
+  @override
   String get imageViewerPageSaveButton => '保存图片';
+
+  @override
+  String get imageViewerPageCopyButton => '复制图片';
+
+  @override
+  String get imageViewerPagePreviousButton => '上一张图片';
+
+  @override
+  String get imageViewerPageNextButton => '下一张图片';
+
+  @override
+  String get imageViewerPageZoomInButton => '放大';
+
+  @override
+  String get imageViewerPageZoomOutButton => '缩小';
+
+  @override
+  String get imageViewerPageResetZoomButton => '重置缩放';
+
+  @override
+  String get imageViewerPageFlipHorizontalButton => '左右镜像';
+
+  @override
+  String get imageViewerPageFlipVerticalButton => '上下镜像';
+
+  @override
+  String get imageViewerPageRotateLeftButton => '向左旋转';
+
+  @override
+  String get imageViewerPageRotateRightButton => '向右旋转';
+
+  @override
+  String imageViewerPageCounter(int index, int total) {
+    return '$index/$total';
+  }
+
+  @override
+  String imageViewerPageImageLabel(int index, int total) {
+    return '第 $index 张图片，共 $total 张';
+  }
+
+  @override
+  String get imageViewerPageImageLoadFailed => '无法加载图片';
 
   @override
   String get imageViewerPageSaveSuccess => '已保存到相册';
@@ -13680,7 +13772,53 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get imageViewerPageShareButton => '分享圖片';
 
   @override
+  String get imageViewerPageCloseButton => '關閉預覽';
+
+  @override
   String get imageViewerPageSaveButton => '儲存圖片';
+
+  @override
+  String get imageViewerPageCopyButton => '複製圖片';
+
+  @override
+  String get imageViewerPagePreviousButton => '上一張圖片';
+
+  @override
+  String get imageViewerPageNextButton => '下一張圖片';
+
+  @override
+  String get imageViewerPageZoomInButton => '放大';
+
+  @override
+  String get imageViewerPageZoomOutButton => '縮小';
+
+  @override
+  String get imageViewerPageResetZoomButton => '重設縮放';
+
+  @override
+  String get imageViewerPageFlipHorizontalButton => '左右鏡像';
+
+  @override
+  String get imageViewerPageFlipVerticalButton => '上下鏡像';
+
+  @override
+  String get imageViewerPageRotateLeftButton => '向左旋轉';
+
+  @override
+  String get imageViewerPageRotateRightButton => '向右旋轉';
+
+  @override
+  String imageViewerPageCounter(int index, int total) {
+    return '$index/$total';
+  }
+
+  @override
+  String imageViewerPageImageLabel(int index, int total) {
+    return '第 $index 張圖片，共 $total 張';
+  }
+
+  @override
+  String get imageViewerPageImageLoadFailed => '無法載入圖片';
 
   @override
   String get imageViewerPageSaveSuccess => '已儲存到相簿';

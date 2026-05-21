@@ -1616,7 +1616,7 @@
   "desktopFontLoading": "Loading fonts…",
   "displaySettingsPageFontLocalFileLabel": "Local file",
   "displaySettingsPageFontResetLabel": "Reset font settings",
-  "displaySettingsPageOtherSettingsTitle": "Other",
+  "displaySettingsPageOtherSettingsTitle": "Other Settings",
   "themeSettingsPageDynamicColorSection": "Dynamic Color",
   "themeSettingsPageUseDynamicColorTitle": "System Dynamic Colors",
   "themeSettingsPageUseDynamicColorSubtitle": "Match system palette (Android 12+)",
@@ -1687,7 +1687,41 @@
     }
   },
   "imageViewerPageShareButton": "Share Image",
+  "imageViewerPageCloseButton": "Close preview",
   "imageViewerPageSaveButton": "Save Image",
+  "imageViewerPageCopyButton": "Copy Image",
+  "imageViewerPagePreviousButton": "Previous Image",
+  "imageViewerPageNextButton": "Next Image",
+  "imageViewerPageZoomInButton": "Zoom In",
+  "imageViewerPageZoomOutButton": "Zoom Out",
+  "imageViewerPageResetZoomButton": "Reset Zoom",
+  "imageViewerPageFlipHorizontalButton": "Flip Horizontal",
+  "imageViewerPageFlipVerticalButton": "Flip Vertical",
+  "imageViewerPageRotateLeftButton": "Rotate Left",
+  "imageViewerPageRotateRightButton": "Rotate Right",
+  "imageViewerPageCounter": "{index}/{total}",
+  "@imageViewerPageCounter": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageViewerPageImageLabel": "Image {index} of {total}",
+  "@imageViewerPageImageLabel": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageViewerPageImageLoadFailed": "Unable to load image",
   "imageViewerPageSaveSuccess": "Saved to gallery",
   "imageViewerPageSaveFailed": "Save failed: {error}",
   "@imageViewerPageSaveFailed": {
@@ -1735,7 +1769,7 @@
   "searchServicesDialogPageInvalid": "Page must be a positive integer.",
   "generationInterrupted": "Generation interrupted",
   "titleForLocale": "New Chat",
-    "temporaryChatTitle": "Temporary Chat",
+  "temporaryChatTitle": "Temporary Chat",
   "temporaryChatEmptyMessage": "Temporary chats do not appear in history and will be deleted completely after you leave.",
   "temporaryChatToggleTooltip": "Toggle temporary chat",
   "quickPhraseBackTooltip": "Back",
@@ -1822,14 +1856,15 @@
   "displaySettingsPageBehaviorStartupTitle": "Behavior & startup",
   "displaySettingsPageHapticsSettingsTitle": "Haptics",
   "assistantSettingsNoPromptPlaceholder": "No prompt yet",
-  "providersPageMultiSelectTooltip": "Multi-select"
-  ,
+  "providersPageMultiSelectTooltip": "Multi-select",
   "providersPageDeleteSelectedConfirmContent": "Delete selected providers? This cannot be undone.",
   "providersPageDeleteSelectedSnackbar": "Deleted selected providers",
   "providersPageExportSelectedTitle": "Export {count} providers",
   "@providersPageExportSelectedTitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "providersPageExportCopyButton": "Copy",
@@ -1869,7 +1904,9 @@
   "networkProxyTestFailed": "Test failed: {error}",
   "@networkProxyTestFailed": {
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "networkProxyNoUrl": "Please enter a URL",
@@ -1887,7 +1924,6 @@
   "providerDetailPageDetectSuccess": "Detection successful",
   "providerDetailPageDetectFailed": "Detection failed",
   "providerDetailPageDeleteAllModelsWarning": "This action cannot be undone.",
-  "displaySettingsPageOtherSettingsTitle": "Other Settings",
   "requestLogSettingTitle": "Request Logging",
   "requestLogSettingSubtitle": "When enabled, request/response details are written to logs/logs.txt (rotated daily).",
   "flutterLogSettingTitle": "Flutter Logging",
@@ -2048,44 +2084,60 @@
   "askUserCardQuestionCount": "Ask {count} questions",
   "@askUserCardQuestionCount": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "tokenDetailPromptTokens": "{count} tokens",
   "@tokenDetailPromptTokens": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "tokenDetailPromptTokensWithCache": "{count} tokens ({cached} cached)",
   "@tokenDetailPromptTokensWithCache": {
     "placeholders": {
-      "count": {"type": "int"},
-      "cached": {"type": "int"}
+      "count": {
+        "type": "int"
+      },
+      "cached": {
+        "type": "int"
+      }
     }
   },
   "tokenDetailCompletionTokens": "{count} tokens",
   "@tokenDetailCompletionTokens": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "tokenDetailSpeed": "{value} tok/s",
   "@tokenDetailSpeed": {
     "placeholders": {
-      "value": {"type": "String"}
+      "value": {
+        "type": "String"
+      }
     }
   },
   "tokenDetailDuration": "{value}s",
   "@tokenDetailDuration": {
     "placeholders": {
-      "value": {"type": "String"}
+      "value": {
+        "type": "String"
+      }
     }
   },
   "tokenDetailTotalTokens": "{count} tokens",
   "@tokenDetailTotalTokens": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "debugPageTitle": "Debug",
@@ -2103,45 +2155,61 @@
   "debugPageConversationCreated": "Created debug conversation with {count} messages.",
   "@debugPageConversationCreated": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "debugPageCreateConversationFailed": "Failed to create debug conversation: {error}",
   "@debugPageCreateConversationFailed": {
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "debugPageOversizedConversationTitle": "Oversized conversation test ({sizeMB} MB)",
   "@debugPageOversizedConversationTitle": {
     "placeholders": {
-      "sizeMB": {"type": "int"}
+      "sizeMB": {
+        "type": "int"
+      }
     }
   },
   "debugPageManyMessagesConversationTitle": "{count}-message conversation test",
   "@debugPageManyMessagesConversationTitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "debugPageDailyMixedMarkdownConversationTitle": "{count}-message daily mixed Markdown test",
   "@debugPageDailyMixedMarkdownConversationTitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "debugPageLongReasoningConversationTitle": "{count}-message long reasoning test",
   "@debugPageLongReasoningConversationTitle": {
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
   "debugPageOversizedConversationSeedText": "This is long debug text for reproducing slow rendering in oversized conversations. It includes repeated Markdown-like text, punctuation, CJK content, and plain words so chat rendering, storage, and scrolling can be profiled.",
   "debugPageManyMessagesSeedText": "{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.",
   "@debugPageManyMessagesSeedText": {
     "placeholders": {
-      "role": {"type": "String"},
-      "index": {"type": "int"}
+      "role": {
+        "type": "String"
+      },
+      "index": {
+        "type": "int"
+      }
     }
   }
 }

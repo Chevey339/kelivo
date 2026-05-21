@@ -278,7 +278,13 @@
   "providersPageDeleteSelectedConfirmContent": "確定要刪除選中的供應商嗎？此操作不可撤銷。",
   "providersPageDeleteSelectedSnackbar": "已刪除選中的供應商",
   "providersPageExportSelectedTitle": "匯出 {count} 個供應商",
-  "@providersPageExportSelectedTitle": {"placeholders": {"count": {"type": "int"}}},
+  "@providersPageExportSelectedTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "providersPageExportCopyButton": "複製",
   "providersPageExportShareButton": "分享",
   "providersPageExportCopiedSnackbar": "已複製匯出代碼",
@@ -1309,7 +1315,41 @@
   "imageViewerPageShareFailedOpenFile": "無法分享，已嘗試開啟檔案: {message}",
   "imageViewerPageShareFailed": "分享失敗: {error}",
   "imageViewerPageShareButton": "分享圖片",
+  "imageViewerPageCloseButton": "關閉預覽",
   "imageViewerPageSaveButton": "儲存圖片",
+  "imageViewerPageCopyButton": "複製圖片",
+  "imageViewerPagePreviousButton": "上一張圖片",
+  "imageViewerPageNextButton": "下一張圖片",
+  "imageViewerPageZoomInButton": "放大",
+  "imageViewerPageZoomOutButton": "縮小",
+  "imageViewerPageResetZoomButton": "重設縮放",
+  "imageViewerPageFlipHorizontalButton": "左右鏡像",
+  "imageViewerPageFlipVerticalButton": "上下鏡像",
+  "imageViewerPageRotateLeftButton": "向左旋轉",
+  "imageViewerPageRotateRightButton": "向右旋轉",
+  "imageViewerPageCounter": "{index}/{total}",
+  "@imageViewerPageCounter": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageViewerPageImageLabel": "第 {index} 張圖片，共 {total} 張",
+  "@imageViewerPageImageLabel": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "imageViewerPageImageLoadFailed": "無法載入圖片",
   "imageViewerPageSaveSuccess": "已儲存到相簿",
   "imageViewerPageSaveFailed": "儲存失敗: {error}",
   "@imageViewerPageSaveFailed": {
@@ -1534,7 +1574,11 @@
   "networkProxyTestSuccess": "連線成功",
   "networkProxyTestFailed": "測試失敗：{error}",
   "@networkProxyTestFailed": {
-    "placeholders": { "error": { "type": "String" } }
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   },
   "networkProxyNoUrl": "請輸入測試地址",
   "networkProxyPriorityNote": "同時啟用全域代理與供應商代理時，將優先使用供應商代理。",
@@ -1550,7 +1594,6 @@
   "providerDetailPageDetectSuccess": "檢測成功",
   "providerDetailPageDetectFailed": "檢測失敗",
   "providerDetailPageDeleteAllModelsWarning": "此操作不可撤回",
-  "displaySettingsPageOtherSettingsTitle": "其他設定",
   "requestLogSettingTitle": "請求日誌列印",
   "requestLogSettingSubtitle": "開啟後會將請求/回應詳細寫入 logs/logs.txt",
   "flutterLogSettingTitle": "Flutter日誌列印",
