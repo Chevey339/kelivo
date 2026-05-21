@@ -1236,6 +1236,7 @@
   "displaySettingsPageCollapseThinkingStepsTitle": "折叠思考步骤",
   "displaySettingsPageCollapseThinkingStepsSubtitle": "默认只显示最新步骤，展开后查看全部",
   "displaySettingsPageShowToolResultSummaryTitle": "显示工具结果摘要",
+  "displaySettingsPageInsertSuggestionOnlyTitle": "点击建议时仅填入输入框",
   "displaySettingsPageShowToolResultSummarySubtitle": "在工具步骤下方显示摘要文本",
   "displaySettingsPageRegenerateDeleteTrailingMessagesTitle": "重新生成时删除下面的消息",
   "displaySettingsPageShowRegenerateConfirmDialogTitle": "重新生成前弹出确认",

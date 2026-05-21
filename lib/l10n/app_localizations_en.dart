@@ -3669,6 +3669,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Show Tool Result Summary';
 
   @override
+  String get displaySettingsPageInsertSuggestionOnlyTitle =>
+      'Insert suggestions without sending';
+
+  @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
       'Display the summary text below tool steps';
 

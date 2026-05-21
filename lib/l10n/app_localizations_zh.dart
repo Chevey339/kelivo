@@ -3539,6 +3539,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageShowToolResultSummaryTitle => '显示工具结果摘要';
 
   @override
+  String get displaySettingsPageInsertSuggestionOnlyTitle => '点击建议时仅填入输入框';
+
+  @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
       '在工具步骤下方显示摘要文本';
 
@@ -8472,6 +8475,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageShowToolResultSummaryTitle => '显示工具结果摘要';
 
   @override
+  String get displaySettingsPageInsertSuggestionOnlyTitle => '点击建议时仅填入输入框';
+
+  @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
       '在工具步骤下方显示摘要文本';
 
@@ -13401,6 +13407,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageShowToolResultSummaryTitle => '顯示工具結果摘要';
+
+  @override
+  String get displaySettingsPageInsertSuggestionOnlyTitle => '點擊建議時僅填入輸入框';
 
   @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>

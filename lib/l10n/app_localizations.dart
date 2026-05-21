@@ -6872,6 +6872,12 @@ abstract class AppLocalizations {
   /// **'Show Tool Result Summary'**
   String get displaySettingsPageShowToolResultSummaryTitle;
 
+  /// No description provided for @displaySettingsPageInsertSuggestionOnlyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Insert suggestions without sending'**
+  String get displaySettingsPageInsertSuggestionOnlyTitle;
+
   /// No description provided for @displaySettingsPageShowToolResultSummarySubtitle.
   ///
   /// In en, this message translates to:

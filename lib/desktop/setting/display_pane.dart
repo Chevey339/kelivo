@@ -108,6 +108,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowShowToolResultSummary(),
                   _RowDivider(),
+                  _ToggleRowInsertSuggestionOnly(),
+                  _RowDivider(),
                   _ToggleRowRegenerateDeleteTrailingMessages(),
                   _RowDivider(),
                   _ToggleRowShowRegenerateConfirmDialog(),
@@ -2203,6 +2205,21 @@ class _ToggleRowShowToolResultSummary extends StatelessWidget {
       value: sp.showToolResultSummary,
       onChanged: (v) =>
           context.read<SettingsProvider>().setShowToolResultSummary(v),
+    );
+  }
+}
+
+class _ToggleRowInsertSuggestionOnly extends StatelessWidget {
+  const _ToggleRowInsertSuggestionOnly();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageInsertSuggestionOnlyTitle,
+      value: sp.insertSuggestionOnTapOnly,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setInsertSuggestionOnTapOnly(v),
     );
   }
 }

@@ -1541,6 +1541,7 @@
   "displaySettingsPageCollapseThinkingStepsTitle": "Collapse Thinking Steps",
   "displaySettingsPageCollapseThinkingStepsSubtitle": "Show only the latest steps until expanded",
   "displaySettingsPageShowToolResultSummaryTitle": "Show Tool Result Summary",
+  "displaySettingsPageInsertSuggestionOnlyTitle": "Insert suggestions without sending",
   "displaySettingsPageShowToolResultSummarySubtitle": "Display the summary text below tool steps",
   "displaySettingsPageRegenerateDeleteTrailingMessagesTitle": "Delete messages below when regenerating",
   "displaySettingsPageShowRegenerateConfirmDialogTitle": "Confirm before regenerating",

@@ -605,7 +605,25 @@ class HomePageController extends ChangeNotifier {
   Future<void> sendSuggestion(String suggestion) async {
     final text = suggestion.trim();
     if (text.isEmpty) return;
+    final settings = _context.read<SettingsProvider>();
+    if (settings.insertSuggestionOnTapOnly) {
+      _replaceInputWithSuggestion(text);
+      return;
+    }
     await sendMessage(ChatInputData(text: text));
+  }
+
+  void _replaceInputWithSuggestion(String text) {
+    _inputController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+      composing: TextRange.empty,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_context.mounted) return;
+      _inputFocus.requestFocus();
+    });
+    notifyListeners();
   }
 
   Future<void> toggleTemporaryConversation() async {
