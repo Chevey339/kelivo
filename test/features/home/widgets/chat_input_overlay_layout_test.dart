@@ -53,4 +53,63 @@ void main() {
 
     expect(tester.getTopLeft(find.byKey(overlayKey)).dy, 550);
   });
+
+  testWidgets('底部覆盖层后方有渐变遮罩隔开消息内容', (tester) async {
+    const fadeKey = Key('chat-input-overlay-bottom-fade');
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 600,
+            child: ChatInputOverlayLayout(
+              topInset: 100,
+              content: ColoredBox(color: Colors.blue),
+              bottomOverlay: SizedBox(width: 200, height: 50),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final fadeFinder = find.byKey(fadeKey);
+    expect(fadeFinder, findsOneWidget);
+    expect(tester.getBottomLeft(fadeFinder).dy, 600);
+
+    final decoration = tester.widget<DecoratedBox>(
+      find.descendant(of: fadeFinder, matching: find.byType(DecoratedBox)),
+    );
+    final boxDecoration = decoration.decoration as BoxDecoration;
+    final gradient = boxDecoration.gradient as LinearGradient;
+    expect(gradient.begin, Alignment.topCenter);
+    expect(gradient.end, Alignment.bottomCenter);
+    expect(gradient.colors.first.a, 0);
+    expect(gradient.colors[1].a, greaterThan(0.80));
+    expect(gradient.colors.last.a, greaterThan(0.95));
+  });
+
+  testWidgets('背景图模式下不渲染底部遮罩', (tester) async {
+    const fadeKey = Key('chat-input-overlay-bottom-fade');
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 600,
+            child: ChatInputOverlayLayout(
+              topInset: 100,
+              backgroundImageActive: true,
+              content: ColoredBox(color: Colors.blue),
+              bottomOverlay: SizedBox(width: 200, height: 50),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final fadeFinder = find.byKey(fadeKey);
+    expect(fadeFinder, findsNothing);
+  });
 }
