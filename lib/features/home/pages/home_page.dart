@@ -69,8 +69,12 @@ class HomePage extends StatefulWidget {
 }
 
 class _TemporaryConversationEmptyState extends StatelessWidget {
-  const _TemporaryConversationEmptyState({required this.bottomContentPadding});
+  const _TemporaryConversationEmptyState({
+    required this.topContentPadding,
+    required this.bottomContentPadding,
+  });
 
+  final double topContentPadding;
   final double bottomContentPadding;
 
   @override
@@ -80,7 +84,12 @@ class _TemporaryConversationEmptyState extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: EdgeInsets.fromLTRB(32, 24, 32, bottomContentPadding + 24),
+        padding: EdgeInsets.fromLTRB(
+          32,
+          topContentPadding + 24,
+          32,
+          bottomContentPadding + 24,
+        ),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Column(
@@ -672,11 +681,15 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildMobileBody(BuildContext context, ColorScheme cs) {
     final bottomContentPadding = _controller.inputBarHeight + 16;
+    final topContentPadding = _chatTopOverlayInset(context) + 8;
     final backgroundImageActive = _assistantBackgroundActive(context);
 
     return ChatInputOverlayLayout(
-      topInset: kToolbarHeight + MediaQuery.paddingOf(context).top,
+      topInset: _chatTopOverlayInset(context),
       background: backgroundImageActive
+          ? _buildChatBackground(context, cs)
+          : null,
+      topBackground: backgroundImageActive
           ? _buildChatBackground(context, cs)
           : null,
       backgroundImageActive: backgroundImageActive,
@@ -688,6 +701,7 @@ class _HomePageState extends State<HomePage>
             ),
             child: _buildMessageListView(
               context,
+              topContentPadding: topContentPadding,
               bottomContentPadding: bottomContentPadding,
               dividerPadding: const EdgeInsets.symmetric(
                 vertical: 10,
@@ -853,10 +867,14 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildTabletBody(BuildContext context, ColorScheme cs) {
     final bottomContentPadding = _controller.inputBarHeight + 16;
+    final topContentPadding = _chatTopOverlayInset(context) + 8;
     final backgroundImageActive = _assistantBackgroundActive(context);
 
     return ChatInputOverlayLayout(
-      topInset: kToolbarHeight + MediaQuery.paddingOf(context).top,
+      topInset: _chatTopOverlayInset(context),
+      topBackground: backgroundImageActive
+          ? _buildAssistantBackground(context)
+          : null,
       backgroundImageActive: backgroundImageActive,
       content: FadeTransition(
         opacity: _controller.convoFade,
@@ -867,6 +885,7 @@ class _HomePageState extends State<HomePage>
                   ),
                   child: _buildMessageListView(
                     context,
+                    topContentPadding: topContentPadding,
                     bottomContentPadding: bottomContentPadding,
                     dividerPadding: const EdgeInsets.symmetric(
                       vertical: 8,
@@ -1050,6 +1069,10 @@ class _HomePageState extends State<HomePage>
     }
   }
 
+  double _chatTopOverlayInset(BuildContext context) {
+    return kToolbarHeight + MediaQuery.paddingOf(context).top;
+  }
+
   /// Map persisted truncateIndex (raw message count) to collapsed index.
   int _computeTruncCollapsedIndex() {
     final int truncRaw = _controller.chatController.loadedWindowTruncateIndex();
@@ -1069,12 +1092,14 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildMessageListView(
     BuildContext context, {
+    required double topContentPadding,
     required double bottomContentPadding,
     required EdgeInsetsGeometry dividerPadding,
   }) {
     if (_controller.isTemporaryConversation &&
         _controller.chatController.collapsedMessages.isEmpty) {
       return _TemporaryConversationEmptyState(
+        topContentPadding: topContentPadding,
         bottomContentPadding: bottomContentPadding,
       );
     }
@@ -1104,6 +1129,7 @@ class _HomePageState extends State<HomePage>
             ? (_controller.currentConversation?.chatSuggestions ??
                   const <String>[])
             : const <String>[],
+        topContentPadding: topContentPadding,
         bottomContentPadding: bottomContentPadding,
         dividerPadding: dividerPadding,
         streamingContentNotifier: _controller.streamingContentNotifier,

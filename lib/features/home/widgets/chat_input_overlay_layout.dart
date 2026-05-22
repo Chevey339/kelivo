@@ -7,14 +7,18 @@ class ChatInputOverlayLayout extends StatelessWidget {
     required this.content,
     required this.bottomOverlay,
     this.background,
+    this.topBackground,
     this.foreground,
     this.backgroundImageActive = false,
   });
+
+  static const double _topOverlayTailHeight = 40;
 
   final double topInset;
   final Widget content;
   final Widget bottomOverlay;
   final Widget? background;
+  final Widget? topBackground;
   final Widget? foreground;
   final bool backgroundImageActive;
 
@@ -24,10 +28,29 @@ class ChatInputOverlayLayout extends StatelessWidget {
       children: [
         if (background != null) Positioned.fill(child: background!),
         Positioned.fill(
-          top: topInset,
           child: Stack(
             children: [
               Positioned.fill(child: content),
+              if (backgroundImageActive && topBackground != null)
+                Positioned.fill(
+                  child: ClipRect(
+                    clipper: _TopOverlayClipper(
+                      topInset + _topOverlayTailHeight,
+                    ),
+                    child: IgnorePointer(
+                      key: const Key('chat-input-overlay-top-background'),
+                      child: topBackground!,
+                    ),
+                  ),
+                )
+              else if (!backgroundImageActive)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  height: topInset + _topOverlayTailHeight,
+                  child: const _TopOverlayFade(),
+                ),
               if (!backgroundImageActive)
                 const Positioned(
                   left: 0,
@@ -49,6 +72,49 @@ class ChatInputOverlayLayout extends StatelessWidget {
         ),
         if (foreground != null) Positioned.fill(child: foreground!),
       ],
+    );
+  }
+}
+
+class _TopOverlayClipper extends CustomClipper<Rect> {
+  const _TopOverlayClipper(this.height);
+
+  final double height;
+
+  @override
+  Rect getClip(Size size) {
+    return Rect.fromLTWH(0, 0, size.width, height.clamp(0, size.height));
+  }
+
+  @override
+  bool shouldReclip(_TopOverlayClipper oldClipper) {
+    return height != oldClipper.height;
+  }
+}
+
+class _TopOverlayFade extends StatelessWidget {
+  const _TopOverlayFade();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final surface = theme.colorScheme.surface;
+    final gradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      stops: const [0.0, 0.38, 0.78, 1.0],
+      colors: [
+        surface.withValues(alpha: 1.0),
+        surface.withValues(alpha: isDark ? 0.96 : 0.99),
+        surface.withValues(alpha: isDark ? 0.64 : 0.88),
+        surface.withValues(alpha: 0),
+      ],
+    );
+
+    return IgnorePointer(
+      key: const Key('chat-input-overlay-top-fade'),
+      child: DecoratedBox(decoration: BoxDecoration(gradient: gradient)),
     );
   }
 }

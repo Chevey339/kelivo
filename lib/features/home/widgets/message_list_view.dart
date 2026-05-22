@@ -97,6 +97,7 @@ class MessageListView extends StatefulWidget {
     required this.selecting,
     required this.selectedItems,
     required this.dividerPadding,
+    this.topContentPadding = 8,
     this.bottomContentPadding = 16,
     this.pinnedStreamingMessageId,
     this.isPinnedIndicatorActive = false,
@@ -151,6 +152,7 @@ class MessageListView extends StatefulWidget {
   final bool selecting;
   final Set<String> selectedItems;
   final EdgeInsetsGeometry dividerPadding;
+  final double topContentPadding;
   final double bottomContentPadding;
   final String? pinnedStreamingMessageId;
   final bool isPinnedIndicatorActive;
@@ -265,7 +267,7 @@ class _MessageListViewState extends State<MessageListView> {
               controller: widget.scrollController,
               padding: EdgeInsets.fromLTRB(
                 horizontalPad,
-                8,
+                widget.topContentPadding,
                 horizontalPad,
                 widget.bottomContentPadding +
                     (widget.isPinnedIndicatorActive ? 12 : 0),
