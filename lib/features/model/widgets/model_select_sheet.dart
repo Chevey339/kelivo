@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -263,9 +265,18 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   final TextEditingController _search = TextEditingController();
   final DraggableScrollableController _sheetCtrl =
       DraggableScrollableController();
+  final ScrollController _providerTabsController = ScrollController();
+  final GlobalKey _providerTabsViewportKey = GlobalKey(
+    debugLabel: 'model-selector-provider-tabs-viewport',
+  );
+  final Map<String, GlobalKey> _providerTabKeys = <String, GlobalKey>{};
   static const double _initialSize = 0.8;
   static const double _maxSize = 0.8;
+  static const double _stickyProviderHeaderHeight = 38;
   String _lastQuery = '';
+  String? _activeProviderKey;
+  int _stickySwitchDirection = 1;
+  bool _activeProviderUpdateScheduled = false;
   // ScrollablePositionedList controllers
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener =
@@ -334,6 +345,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   @override
   void initState() {
     super.initState();
+    _itemPositionsListener.itemPositions.addListener(
+      _scheduleActiveProviderUpdate,
+    );
     // Delay loading to allow the sheet to open first
     Future.delayed(const Duration(milliseconds: 50), () {
       if (mounted) {
@@ -377,6 +391,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           _groups = result.groups;
           _orderedKeys = result.orderedKeys;
           _isLoading = false;
+          _activeProviderKey = null;
         });
         _scheduleAutoScrollToCurrent();
       }
@@ -438,6 +453,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       _groups = result.groups;
       _orderedKeys = result.orderedKeys;
       _isLoading = false;
+      _activeProviderKey = null;
     });
     _scheduleAutoScrollToCurrent();
   }
@@ -568,8 +584,12 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
   @override
   void dispose() {
+    _itemPositionsListener.itemPositions.removeListener(
+      _scheduleActiveProviderUpdate,
+    );
     _search.dispose();
     _sheetCtrl.dispose();
+    _providerTabsController.dispose();
     super.dispose();
   }
 
@@ -587,6 +607,108 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     final lowerQuery = query.toLowerCase();
     final lowerProviderName = providerName.toLowerCase();
     return lowerProviderName.contains(lowerQuery);
+  }
+
+  GlobalKey _providerTabKeyFor(String providerKey) {
+    return _providerTabKeys.putIfAbsent(
+      providerKey,
+      () => GlobalKey(debugLabel: 'model-selector-provider-tab-$providerKey'),
+    );
+  }
+
+  String? _providerKeyForRow(int index) {
+    if (index < 0 || index >= _rows.length) return null;
+    final row = _rows[index];
+    if (row is _HeaderRow) return row.providerKey;
+    if (row is _ModelRow && !row.showProviderLabel) return row.item.providerKey;
+    return null;
+  }
+
+  String? _activeProviderKeyFromVisibleRows() {
+    final positions =
+        _itemPositionsListener.itemPositions.value
+            .where((p) => p.itemTrailingEdge > 0 && p.itemLeadingEdge < 1)
+            .toList()
+          ..sort((a, b) => a.itemLeadingEdge.compareTo(b.itemLeadingEdge));
+    if (positions.isEmpty || _rows.isEmpty) return null;
+
+    final topIndex = positions.first.index;
+    final directKey = _providerKeyForRow(topIndex);
+    if (directKey != null) return directKey;
+
+    for (var i = topIndex - 1; i >= 0; i--) {
+      final key = _providerKeyForRow(i);
+      if (key != null) return key;
+    }
+    return null;
+  }
+
+  void _scheduleActiveProviderUpdate() {
+    if (!mounted || _activeProviderUpdateScheduled) return;
+    _activeProviderUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _activeProviderUpdateScheduled = false;
+      if (mounted) _syncActiveProviderFromVisibleRows();
+    });
+  }
+
+  void _syncActiveProviderFromVisibleRows() {
+    if (widget.limitProviderKey != null || _rows.isEmpty) return;
+    final nextKey = _activeProviderKeyFromVisibleRows();
+    if (nextKey == _activeProviderKey) return;
+    final previousKey = _activeProviderKey;
+    final previousIndex = previousKey == null
+        ? -1
+        : _orderedKeys.indexOf(previousKey);
+    final nextIndex = nextKey == null ? -1 : _orderedKeys.indexOf(nextKey);
+    setState(() {
+      if (previousIndex != -1 && nextIndex != -1) {
+        _stickySwitchDirection = nextIndex >= previousIndex ? 1 : -1;
+      }
+      _activeProviderKey = nextKey;
+    });
+    if (nextKey != null) _scrollProviderTabIntoView(nextKey);
+  }
+
+  void _scrollProviderTabIntoView(String providerKey) {
+    final tabContext = _providerTabKeys[providerKey]?.currentContext;
+    final viewportContext = _providerTabsViewportKey.currentContext;
+    if (!mounted ||
+        tabContext == null ||
+        viewportContext == null ||
+        !_providerTabsController.hasClients) {
+      return;
+    }
+
+    final tabBox = tabContext.findRenderObject();
+    final viewportBox = viewportContext.findRenderObject();
+    if (tabBox is! RenderBox || viewportBox is! RenderBox) return;
+
+    final tabLeft = tabBox.localToGlobal(Offset.zero).dx;
+    final tabRight = tabLeft + tabBox.size.width;
+    final viewportLeft = viewportBox.localToGlobal(Offset.zero).dx;
+    final viewportRight = viewportLeft + viewportBox.size.width;
+
+    var targetOffset = _providerTabsController.offset;
+    if (tabLeft < viewportLeft) {
+      targetOffset += tabLeft - viewportLeft;
+    } else if (tabRight > viewportRight) {
+      targetOffset += tabRight - viewportRight;
+    } else {
+      return;
+    }
+
+    targetOffset = targetOffset.clamp(
+      _providerTabsController.position.minScrollExtent,
+      _providerTabsController.position.maxScrollExtent,
+    );
+    unawaited(
+      _providerTabsController.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      ),
+    );
   }
 
   @override
@@ -809,7 +931,12 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         }
         if (favs.isNotEmpty) {
           _headerIndexMap['__fav__'] = _rows.length;
-          _rows.add(_HeaderRow(l10n.modelSelectSheetFavoritesSection));
+          _rows.add(
+            _HeaderRow(
+              l10n.modelSelectSheetFavoritesSection,
+              isFavorites: true,
+            ),
+          );
           for (final m in favs) {
             _favModelIndexMap['${m.providerKey}::${m.id}'] = _rows.length;
             _rows.add(_ModelRow(m, showProviderLabel: true));
@@ -838,7 +965,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       }
       if (items.isEmpty) continue;
       _headerIndexMap[pk] = _rows.length;
-      _rows.add(_HeaderRow(g.name));
+      _rows.add(_HeaderRow(g.name, providerKey: pk));
       for (final m in items) {
         _modelIndexMap['${m.providerKey}::${m.id}'] = _rows.length;
         _rows.add(_ModelRow(m));
@@ -847,28 +974,35 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
     if (_rows.isEmpty) return const SizedBox.shrink();
 
-    return ScrollablePositionedList.builder(
-      itemCount: _rows.length,
-      itemScrollController: _itemScrollController,
-      itemPositionsListener: _itemPositionsListener,
-      padding: const EdgeInsets.only(bottom: 12),
-      itemBuilder: (context, index) {
-        final row = _rows[index];
-        if (row is _HeaderRow) {
-          String? providerKey;
-          _headerIndexMap.forEach((k, v) {
-            if (v == index && k != '__fav__') providerKey = k;
-          });
-          return _sectionHeader(context, row.title, providerKey: providerKey);
-        } else if (row is _ModelRow) {
-          return _modelTile(
-            context,
-            row.item,
-            showProviderLabel: row.showProviderLabel,
-          );
-        }
-        return const SizedBox.shrink();
-      },
+    _scheduleActiveProviderUpdate();
+
+    return Stack(
+      children: [
+        ScrollablePositionedList.builder(
+          itemCount: _rows.length,
+          itemScrollController: _itemScrollController,
+          itemPositionsListener: _itemPositionsListener,
+          padding: const EdgeInsets.only(bottom: 12),
+          itemBuilder: (context, index) {
+            final row = _rows[index];
+            if (row is _HeaderRow) {
+              return _sectionHeader(
+                context,
+                row.title,
+                providerKey: row.providerKey,
+              );
+            } else if (row is _ModelRow) {
+              return _modelTile(
+                context,
+                row.item,
+                showProviderLabel: row.showProviderLabel,
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+        _stickyProviderHeader(context),
+      ],
     );
   }
 
@@ -883,6 +1017,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           selectedProviderKey = pk;
         }
       });
+      _providerTabKeys.removeWhere((key, _) => !_orderedKeys.contains(key));
       for (final k in _orderedKeys) {
         final g = _groups[k];
         if (g != null) {
@@ -904,8 +1039,94 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       // SafeArea already applies bottom inset; avoid doubling it here.
       padding: const EdgeInsets.only(left: 12, right: 12, top: 8, bottom: 10),
       child: SingleChildScrollView(
+        key: _providerTabsViewportKey,
+        controller: _providerTabsController,
         scrollDirection: Axis.horizontal,
         child: Row(children: providerTabs),
+      ),
+    );
+  }
+
+  Widget _stickyProviderHeader(BuildContext context) {
+    if (widget.limitProviderKey != null) return const SizedBox.shrink();
+    final providerKey = _activeProviderKey;
+    if (providerKey == null) return const SizedBox.shrink();
+    final group = _groups[providerKey];
+    if (group == null) return const SizedBox.shrink();
+
+    final cs = Theme.of(context).colorScheme;
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: DecoratedBox(
+        key: const ValueKey('model-selector-sticky-provider'),
+        decoration: BoxDecoration(color: cs.surface),
+        child: SizedBox(
+          height: _stickyProviderHeaderHeight,
+          child: ClipRect(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              reverseDuration: const Duration(milliseconds: 180),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeOutCubic,
+              layoutBuilder: (currentChild, previousChildren) {
+                return Stack(
+                  alignment: Alignment.centerLeft,
+                  children: [
+                    ...previousChildren,
+                    if (currentChild != null) currentChild,
+                  ],
+                );
+              },
+              transitionBuilder: (child, animation) {
+                final isIncoming =
+                    child.key == ValueKey('sticky-provider-$providerKey');
+                final dy = (isIncoming ? 0.65 : -0.65) * _stickySwitchDirection;
+                final offsetAnimation = Tween<Offset>(
+                  begin: Offset(0, dy),
+                  end: Offset.zero,
+                ).animate(animation);
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: offsetAnimation,
+                    child: child,
+                  ),
+                );
+              },
+              child: Padding(
+                key: ValueKey('sticky-provider-$providerKey'),
+                padding: const EdgeInsets.fromLTRB(16, 9, 16, 7),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        group.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface.withValues(alpha: 0.68),
+                        ),
+                      ),
+                    ),
+                    ProviderBalanceBadge(
+                      providerKey: providerKey,
+                      displayName: group.name,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      color: cs.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1065,8 +1286,10 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   }) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
+      key: _providerTabKeyFor(key),
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: _ProviderChip(
+        key: ValueKey('model-selector-provider-tab-$key'),
         avatar: ProviderAvatar(providerKey: key, displayName: name, size: 18),
         label: name,
         selected: selected,
@@ -1146,6 +1369,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
 class _ProviderChip extends StatefulWidget {
   const _ProviderChip({
+    super.key,
     required this.avatar,
     required this.label,
     required this.onTap,
@@ -1185,36 +1409,41 @@ class _ProviderChipState extends State<_ProviderChip> {
     final Color borderColor =
         widget.borderColor ?? cs.outlineVariant.withValues(alpha: 0.25);
     final Color labelColor = cs.onSurface;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTap: widget.onTap,
-      onLongPress: widget.onLongPress,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            widget.avatar,
-            const SizedBox(width: 6),
-            Text(
-              widget.label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: labelColor,
+    return Semantics(
+      label: widget.label,
+      button: true,
+      selected: isSelected,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderColor),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              widget.avatar,
+              const SizedBox(width: 6),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: labelColor,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1261,7 +1490,9 @@ abstract class _ListRow {}
 
 class _HeaderRow extends _ListRow {
   final String title;
-  _HeaderRow(this.title);
+  final String? providerKey;
+  final bool isFavorites;
+  _HeaderRow(this.title, {this.providerKey, this.isFavorites = false});
 }
 
 class _ModelRow extends _ListRow {
@@ -1547,7 +1778,12 @@ class _DesktopModelSelectDialogBodyState
         }
         if (favs.isNotEmpty) {
           _headerIndexMap['__fav__'] = _rows.length;
-          _rows.add(_HeaderRow(l10n.modelSelectSheetFavoritesSection));
+          _rows.add(
+            _HeaderRow(
+              l10n.modelSelectSheetFavoritesSection,
+              isFavorites: true,
+            ),
+          );
           for (final m in favs) {
             _favModelIndexMap['${m.providerKey}::${m.id}'] = _rows.length;
             _rows.add(_ModelRow(m, showProviderLabel: true));
@@ -1579,7 +1815,7 @@ class _DesktopModelSelectDialogBodyState
       // When limiting to a single provider, hide the provider header (and its settings button)
       if (widget.limitProviderKey == null) {
         _headerIndexMap[pk] = _rows.length;
-        _rows.add(_HeaderRow(g.name));
+        _rows.add(_HeaderRow(g.name, providerKey: pk));
       }
       for (final m in items) {
         _modelIndexMap['${m.providerKey}::${m.id}'] = _rows.length;
@@ -1731,16 +1967,10 @@ class _DesktopModelSelectDialogBodyState
       itemBuilder: (context, index) {
         final row = _rows[index];
         if (row is _HeaderRow) {
-          final isFav = _headerIndexMap['__fav__'] == index;
-          if (isFav) {
+          if (row.isFavorites) {
             return _favoritesHeader(context, row.title);
           }
-          // Find provider key by matching header index if needed
-          String? providerKey;
-          _headerIndexMap.forEach((k, v) {
-            if (v == index && k != '__fav__') providerKey = k;
-          });
-          return _providerHeader(context, providerKey, row.title);
+          return _providerHeader(context, row.providerKey, row.title);
         } else if (row is _ModelRow) {
           return _desktopModelTile(
             context,
