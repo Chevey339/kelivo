@@ -12,7 +12,7 @@ class ChatInputOverlayLayout extends StatelessWidget {
     this.backgroundImageActive = false,
   });
 
-  static const double _topOverlayTailHeight = 40;
+  static const double _topOverlayTailHeight = 28;
 
   final double topInset;
   final Widget content;
@@ -103,11 +103,11 @@ class _TopOverlayFade extends StatelessWidget {
     final gradient = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      stops: const [0.0, 0.38, 0.78, 1.0],
+      stops: const [0.0, 0.48, 0.78, 1.0],
       colors: [
         surface.withValues(alpha: 1.0),
         surface.withValues(alpha: isDark ? 0.96 : 0.99),
-        surface.withValues(alpha: isDark ? 0.64 : 0.88),
+        surface.withValues(alpha: isDark ? 0.74 : 0.88),
         surface.withValues(alpha: 0),
       ],
     );
