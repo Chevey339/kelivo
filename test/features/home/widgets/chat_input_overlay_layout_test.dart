@@ -111,7 +111,7 @@ void main() {
     final fadeFinder = find.byKey(fadeKey);
     expect(fadeFinder, findsOneWidget);
     expect(tester.getTopLeft(fadeFinder).dy, 0);
-    expect(tester.getBottomLeft(fadeFinder).dy, 140);
+    expect(tester.getBottomLeft(fadeFinder).dy, 128);
 
     final decoration = tester.widget<DecoratedBox>(
       find.descendant(of: fadeFinder, matching: find.byType(DecoratedBox)),
@@ -122,7 +122,7 @@ void main() {
     expect(gradient.end, Alignment.bottomCenter);
     expect(gradient.colors.first.a, 1);
     expect(gradient.colors[1].a, greaterThan(0.98));
-    expect(gradient.colors[2].a, inInclusiveRange(0.75, 0.80));
+    expect(gradient.colors[2].a, inInclusiveRange(0.85, 0.90));
     expect(gradient.colors.last.a, 0);
   });
 
@@ -157,5 +157,14 @@ void main() {
     expect(find.byKey(topFadeKey), findsNothing);
     expect(find.byKey(topBackgroundKey), findsOneWidget);
     expect(find.byKey(backgroundKey), findsOneWidget);
+
+    final clipRect = tester.widget<ClipRect>(
+      find.ancestor(
+        of: find.byKey(topBackgroundKey),
+        matching: find.byType(ClipRect),
+      ),
+    );
+    final clip = clipRect.clipper!.getClip(const Size(400, 600));
+    expect(clip.height, 100);
   });
 }

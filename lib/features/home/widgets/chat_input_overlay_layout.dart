@@ -34,9 +34,7 @@ class ChatInputOverlayLayout extends StatelessWidget {
               if (backgroundImageActive && topBackground != null)
                 Positioned.fill(
                   child: ClipRect(
-                    clipper: _TopOverlayClipper(
-                      topInset + _topOverlayTailHeight,
-                    ),
+                    clipper: _TopOverlayClipper(topInset),
                     child: IgnorePointer(
                       key: const Key('chat-input-overlay-top-background'),
                       child: topBackground!,
