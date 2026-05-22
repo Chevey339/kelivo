@@ -128,6 +128,7 @@ void main() {
 
   testWidgets('背景图模式下用背景覆盖顶部且不渲染纯色遮罩', (tester) async {
     const bottomFadeKey = Key('chat-input-overlay-bottom-fade');
+    const bottomBackgroundKey = Key('chat-input-overlay-bottom-background');
     const topFadeKey = Key('chat-input-overlay-top-fade');
     const topBackgroundKey = Key('chat-input-overlay-top-background');
     const backgroundKey = Key('background');
@@ -154,9 +155,10 @@ void main() {
     );
 
     expect(find.byKey(bottomFadeKey), findsNothing);
+    expect(find.byKey(bottomBackgroundKey), findsOneWidget);
     expect(find.byKey(topFadeKey), findsNothing);
     expect(find.byKey(topBackgroundKey), findsOneWidget);
-    expect(find.byKey(backgroundKey), findsOneWidget);
+    expect(find.byKey(backgroundKey), findsNWidgets(2));
 
     final clipRect = tester.widget<ClipRect>(
       find.ancestor(
@@ -165,6 +167,16 @@ void main() {
       ),
     );
     final clip = clipRect.clipper!.getClip(const Size(400, 600));
-    expect(clip.height, 100);
+    expect(clip.height, 128);
+
+    final bottomClipRect = tester.widget<ClipRect>(
+      find.ancestor(
+        of: find.byKey(bottomBackgroundKey),
+        matching: find.byType(ClipRect),
+      ),
+    );
+    final bottomClip = bottomClipRect.clipper!.getClip(const Size(400, 600));
+    expect(bottomClip.top, 420);
+    expect(bottomClip.height, 180);
   });
 }
