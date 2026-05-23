@@ -49,6 +49,32 @@ void main() {
       );
     });
 
+    test('defaults suggestion tap to auto-send', () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = SettingsProvider();
+
+      await _waitForSettingsLoad();
+
+      expect(settings.insertSuggestionOnTapOnly, isFalse);
+    });
+
+    test('loads and persists insert-only suggestion tap mode', () async {
+      SharedPreferences.setMockInitialValues({
+        'suggestion_insert_on_tap_only_v1': true,
+      });
+      final settings = SettingsProvider();
+
+      await _waitForSettingsLoad();
+
+      expect(settings.insertSuggestionOnTapOnly, isTrue);
+
+      await settings.setInsertSuggestionOnTapOnly(false);
+
+      expect(settings.insertSuggestionOnTapOnly, isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('suggestion_insert_on_tap_only_v1'), isFalse);
+    });
+
     test(
       'clears suggestion model when provider selection is cleared',
       () async {

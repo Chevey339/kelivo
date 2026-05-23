@@ -456,6 +456,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mermaidExportFailed => 'Export failed';
 
   @override
+  String get mermaidImageTab => 'Image';
+
+  @override
+  String get mermaidCodeTab => 'Code';
+
+  @override
+  String get mermaidFullScreen => 'Full screen';
+
+  @override
+  String get mermaidGeneratingImage => 'Generating image';
+
+  @override
+  String get mermaidGenerationFailedHint =>
+      'Generation failed. Try asking another way.';
+
+  @override
   String get mermaidPreviewOpen => 'Open Preview';
 
   @override
@@ -3653,6 +3669,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Show Tool Result Summary';
 
   @override
+  String get displaySettingsPageInsertSuggestionOnlyTitle =>
+      'Insert suggestions without sending';
+
+  @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
       'Display the summary text below tool steps';
 
@@ -4048,7 +4068,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String get imageViewerPageShareButton => 'Share Image';
 
   @override
+  String get imageViewerPageCloseButton => 'Close preview';
+
+  @override
   String get imageViewerPageSaveButton => 'Save Image';
+
+  @override
+  String get imageViewerPageCopyButton => 'Copy Image';
+
+  @override
+  String get imageViewerPagePreviousButton => 'Previous Image';
+
+  @override
+  String get imageViewerPageNextButton => 'Next Image';
+
+  @override
+  String get imageViewerPageZoomInButton => 'Zoom In';
+
+  @override
+  String get imageViewerPageZoomOutButton => 'Zoom Out';
+
+  @override
+  String get imageViewerPageResetZoomButton => 'Reset Zoom';
+
+  @override
+  String get imageViewerPageFlipHorizontalButton => 'Flip Horizontal';
+
+  @override
+  String get imageViewerPageFlipVerticalButton => 'Flip Vertical';
+
+  @override
+  String get imageViewerPageRotateLeftButton => 'Rotate Left';
+
+  @override
+  String get imageViewerPageRotateRightButton => 'Rotate Right';
+
+  @override
+  String imageViewerPageCounter(int index, int total) {
+    return '$index/$total';
+  }
+
+  @override
+  String imageViewerPageImageLabel(int index, int total) {
+    return 'Image $index of $total';
+  }
+
+  @override
+  String get imageViewerPageImageLoadFailed => 'Unable to load image';
 
   @override
   String get imageViewerPageSaveSuccess => 'Saved to gallery';

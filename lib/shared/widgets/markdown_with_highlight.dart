@@ -1021,6 +1021,20 @@ Widget _renderMath(String tex, {TextStyle? style, bool displayMode = false}) {
   }
 }
 
+TextStyle _inlineMathTextStyle(TextStyle? style) {
+  final base = style ?? const TextStyle();
+  final baseSize = base.fontSize ?? 15.5;
+  return base.copyWith(fontSize: baseSize * 1.2);
+}
+
+WidgetSpan _inlineMathSpan(Widget math) {
+  return WidgetSpan(
+    alignment: PlaceholderAlignment.baseline,
+    baseline: TextBaseline.alphabetic,
+    child: SelectionContainer.disabled(child: math),
+  );
+}
+
 String _replaceInlineDollarMath(String input) {
   final buf = StringBuffer();
   var i = 0;
@@ -1111,6 +1125,7 @@ bool _isDollarMathOpeningBoundary(int codeUnit) {
   if (codeUnit == 0x28) return true; // (
   if (codeUnit == 0x3A) return true; // :
   if (codeUnit == 0xFF1A) return true; // full-width colon
+  if (codeUnit == 0xFF0C) return true; // full-width comma
   return false;
 }
 
@@ -1959,6 +1974,7 @@ class _MarkdownTableBlock extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final bool isDesktopPlatform = _markdownTableTargetPlatformIsDesktop();
+        final bool isExporting = ExportCaptureScope.of(context);
         final bool useCompactTable =
             !isDesktopPlatform || constraints.maxWidth < 520;
 
@@ -1972,6 +1988,7 @@ class _MarkdownTableBlock extends StatelessWidget {
             ? constraints.maxWidth
             : MediaQuery.sizeOf(context).width;
         final shouldScrollHorizontally =
+            !isExporting &&
             useCompactTable &&
             rows.columnCount >= 4 &&
             columnWidth * rows.columnCount > viewportWidth;
@@ -2712,19 +2729,21 @@ class _MermaidBlock extends StatefulWidget {
   State<_MermaidBlock> createState() => _MermaidBlockState();
 }
 
+enum _MermaidTab { image, code }
+
 class _MermaidBlockState extends State<_MermaidBlock> {
   static const Duration _streamingBitmapRenderDelay = Duration(
     milliseconds: 360,
   );
   static const Duration _settledBitmapRenderDelay = Duration(milliseconds: 220);
+  static const double _previewHeight = 406;
 
-  bool _expanded = true;
+  _MermaidTab _selectedTab = _MermaidTab.image;
   late final ScrollController _vMermaidScrollController;
   OverlayEntry? _renderOverlayEntry;
   bool _renderQueued = false;
   bool _renderingBitmap = false;
   String? _renderKey;
-  String? _lastRenderedKey;
   Uint8List? _lastRenderedBytes;
   Timer? _streamingRenderDebounce;
   bool _bitmapRenderingUnsupported = false;
@@ -2735,16 +2754,9 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
-    // Use theme-tinted surfaces so headers follow the current theme color.
-    final Color bodyBg = Color.alphaBlend(
-      cs.primary.withValues(alpha: isDark ? 0.06 : 0.03),
-      cs.surface,
-    );
-    final Color headerBg = Color.alphaBlend(
-      cs.primary.withValues(alpha: isDark ? 0.16 : 0.10),
-      cs.surface,
-    );
+    final mermaidColors = _MermaidBlockColors.resolve(isDark);
 
     // Build theme variables mapping for Mermaid from Material ColorScheme
     String hex(Color c) {
@@ -2802,17 +2814,18 @@ class _MermaidBlockState extends State<_MermaidBlock> {
             themeVars: themeVars,
           )
         : null;
-    final cachedBytes =
-        themedCachedBytes ?? legacyCachedBytes ?? prefixCachedBytes;
+    final exactCachedBytes = themedCachedBytes ?? legacyCachedBytes;
+    final cachedBytes = exactCachedBytes ?? prefixCachedBytes;
     final displayBytes =
         cachedBytes ?? (widget.streaming ? _lastRenderedBytes : null);
+    final actionBytes = cachedBytes ?? displayBytes;
     final renderFailedForCurrentCode = _failedBitmapRenderKeys.contains(
       cacheKey,
     );
     final hasRenderableCode = widget.code.trim().isNotEmpty;
     if (!exporting &&
         hasRenderableCode &&
-        themedCachedBytes == null &&
+        exactCachedBytes == null &&
         !_bitmapRenderingUnsupported &&
         !renderFailedForCurrentCode) {
       _scheduleBitmapRender(
@@ -2823,315 +2836,250 @@ class _MermaidBlockState extends State<_MermaidBlock> {
             : _settledBitmapRenderDelay,
       );
     }
-    final Widget? mermaidView = () {
-      if (exporting || displayBytes != null) {
-        final bytes = displayBytes ?? MermaidImageCache.get(widget.code);
-        if (bytes != null && bytes.isNotEmpty) {
-          return Image.memory(
-            bytes,
-            key: ValueKey<String>(
-              displayBytes == themedCachedBytes ||
-                      displayBytes == legacyCachedBytes
-                  ? 'mermaid-bitmap-$cacheKey'
-                  : 'mermaid-bitmap-${_lastRenderedKey ?? 'streaming'}',
-            ),
-            fit: BoxFit.contain,
-          );
-        }
-        return null;
-      }
-      if (widget.streaming) return null;
-      return null;
-    }();
+    final hasImage = displayBytes != null && displayBytes.isNotEmpty;
+    final showLoading =
+        !hasImage &&
+        !_suppressBitmapLoading &&
+        !_bitmapRenderingUnsupported &&
+        !renderFailedForCurrentCode &&
+        (widget.streaming || _renderQueued || _renderingBitmap);
+    final showError =
+        !hasImage &&
+        !_bitmapRenderingUnsupported &&
+        renderFailedForCurrentCode &&
+        _selectedTab == _MermaidTab.image;
 
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: mermaidColors.body,
+        borderRadius: BorderRadius.circular(8),
+      ),
       clipBehavior: Clip.antiAlias,
       foregroundDecoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: mermaidColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header: left label (mermaid), right actions (copy label + export + chevron)
-          Material(
-            color: headerBg,
-            elevation: 0,
-            shadowColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-            child: InkWell(
-              onTap: () => setState(() => _expanded = !_expanded),
-              splashColor: Platform.isIOS ? Colors.transparent : null,
-              highlightColor: Platform.isIOS ? Colors.transparent : null,
-              hoverColor: Platform.isIOS ? Colors.transparent : null,
-              overlayColor: Platform.isIOS
-                  ? const WidgetStatePropertyAll(Colors.transparent)
-                  : null,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  border: Border(
-                    // Show divider only when expanded
-                    bottom: _expanded
-                        ? BorderSide(
-                            color: cs.outlineVariant.withValues(alpha: 0.28),
-                            width: 1.0,
-                          )
-                        : BorderSide.none,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 2),
-                    Text(
-                      'mermaid',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: cs.onSurface,
-                        height: 1.0,
-                      ),
+          Container(
+            decoration: BoxDecoration(
+              color: mermaidColors.header,
+              border: Border(
+                bottom: BorderSide(color: mermaidColors.border, width: 1),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                      start: 16,
+                      end: 10,
                     ),
-                    const Spacer(),
-                    if (!ExportCaptureScope.of(context)) ...[
-                      // Copy action
-                      InkWell(
-                        onTap: () async {
-                          final copiedMessage = AppLocalizations.of(
-                            context,
-                          )!.chatMessageWidgetCopiedToClipboard;
-                          await Clipboard.setData(
-                            ClipboardData(text: widget.code),
-                          );
-                          if (!context.mounted) return;
-                          showAppSnackBar(
-                            context,
-                            message: copiedMessage,
-                            type: NotificationType.success,
-                          );
-                        },
-                        splashColor: Platform.isIOS ? Colors.transparent : null,
-                        highlightColor: Platform.isIOS
-                            ? Colors.transparent
-                            : null,
-                        hoverColor: Platform.isIOS ? Colors.transparent : null,
-                        overlayColor: Platform.isIOS
-                            ? const WidgetStatePropertyAll(Colors.transparent)
-                            : null,
-                        borderRadius: BorderRadius.circular(6),
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: mermaidColors.tabTrack,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 6,
-                          ),
+                          padding: const EdgeInsets.all(2),
                           child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Lucide.Copy,
-                                size: 14,
-                                color: cs.onSurface.withValues(alpha: 0.6),
+                              _MermaidTabButton(
+                                label: l10n.mermaidImageTab,
+                                selected: _selectedTab == _MermaidTab.image,
+                                colors: mermaidColors,
+                                onTap: () {
+                                  setState(
+                                    () => _selectedTab = _MermaidTab.image,
+                                  );
+                                },
                               ),
-                              const SizedBox(width: 6),
-                              Text(
-                                AppLocalizations.of(
-                                  context,
-                                )!.shareProviderSheetCopyButton,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: cs.onSurface.withValues(alpha: 0.6),
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              _MermaidTabButton(
+                                label: l10n.mermaidCodeTab,
+                                selected: _selectedTab == _MermaidTab.code,
+                                colors: mermaidColors,
+                                onTap: () {
+                                  setState(
+                                    () => _selectedTab = _MermaidTab.code,
+                                  );
+                                },
                               ),
                             ],
                           ),
                         ),
                       ),
-                      if (cachedBytes != null) ...[
-                        const SizedBox(width: 6),
-                        InkWell(
-                          onTap: () async {
-                            final l10n = AppLocalizations.of(context)!;
-                            final ok = await _exportMermaidPng(
-                              context,
-                              themedCachedBytes != null
-                                  ? cacheKey
-                                  : widget.code,
-                            );
-                            if (!context.mounted) return;
-                            if (!ok) {
-                              showAppSnackBar(
-                                context,
-                                message: l10n.mermaidExportFailed,
-                                type: NotificationType.error,
-                              );
-                            } else if (Platform.isAndroid || Platform.isIOS) {
-                              showAppSnackBar(
-                                context,
-                                message: l10n.imageViewerPageSaveSuccess,
-                                type: NotificationType.success,
-                              );
-                            }
-                          },
-                          splashColor: Platform.isIOS
-                              ? Colors.transparent
-                              : null,
-                          highlightColor: Platform.isIOS
-                              ? Colors.transparent
-                              : null,
-                          hoverColor: Platform.isIOS
-                              ? Colors.transparent
-                              : null,
-                          overlayColor: Platform.isIOS
-                              ? const WidgetStatePropertyAll(Colors.transparent)
-                              : null,
-                          borderRadius: BorderRadius.circular(6),
-                          child: Padding(
-                            padding: const EdgeInsets.all(6),
-                            child: Icon(
-                              Lucide.Download,
-                              size: 14,
-                              color: cs.onSurface.withValues(alpha: 0.6),
-                            ),
-                          ),
+                    ),
+                  ),
+                ),
+                if (!exporting)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 10),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _MermaidTextAction(
+                          icon: Lucide.Copy,
+                          label: l10n.shareProviderSheetCopyButton,
+                          colors: mermaidColors,
+                          onTap: () => _copyMermaidCode(context),
+                        ),
+                        const SizedBox(width: 4),
+                        _MermaidTextAction(
+                          icon: Lucide.Download,
+                          label: l10n.mermaidExportPng,
+                          colors: mermaidColors,
+                          enabled:
+                              actionBytes != null && actionBytes.isNotEmpty,
+                          onTap: actionBytes == null || actionBytes.isEmpty
+                              ? null
+                              : () => _saveMermaidBytes(context, actionBytes),
+                        ),
+                        const SizedBox(width: 4),
+                        _MermaidTextAction(
+                          icon: Lucide.Maximize2,
+                          label: l10n.mermaidFullScreen,
+                          colors: mermaidColors,
+                          enabled:
+                              actionBytes != null && actionBytes.isNotEmpty,
+                          onTap: actionBytes == null || actionBytes.isEmpty
+                              ? null
+                              : () => _openMermaidImageViewer(
+                                  context,
+                                  actionBytes,
+                                ),
                         ),
                       ],
-                      const SizedBox(width: 6),
-                      AnimatedRotation(
-                        turns: _expanded ? 0.25 : 0.0,
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOutCubic,
-                        child: Icon(
-                          Lucide.ChevronRight,
-                          size: 16,
-                          color: cs.onSurface.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          SizedBox(
+            key: const ValueKey('mermaid-preview-body'),
+            width: double.infinity,
+            height: _previewHeight,
+            child: ColoredBox(
+              color: mermaidColors.body,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                layoutBuilder: (currentChild, previousChildren) {
+                  return currentChild ?? const SizedBox.shrink();
+                },
+                child: _buildMermaidBody(
+                  context: context,
+                  isDark: isDark,
+                  colors: mermaidColors,
+                  displayBytes: displayBytes,
+                  cacheKey: cacheKey,
+                  showLoading: showLoading,
+                  showError: showError,
                 ),
               ),
             ),
           ),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (child, anim) => FadeTransition(
-              opacity: anim,
-              child: SizeTransition(
-                sizeFactor: anim,
-                axisAlignment: -1.0,
-                child: child,
-              ),
-            ),
-            child: _expanded
-                ? Container(
-                    key: const ValueKey('mermaid-expanded'),
-                    width: double.infinity,
-                    color: bodyBg,
-                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (mermaidView != null) ...[
-                          SizedBox(width: double.infinity, child: mermaidView),
-                        ] else if (!_suppressBitmapLoading &&
-                            !_bitmapRenderingUnsupported &&
-                            !renderFailedForCurrentCode &&
-                            (widget.streaming ||
-                                _renderQueued ||
-                                _renderingBitmap)) ...[
-                          const SizedBox(height: 8),
-                          const LinearProgressIndicator(minHeight: 2),
-                          const SizedBox(height: 8),
-                        ] else ...[
-                          // Fallback: show raw code when bitmap rendering is unavailable.
-                          () {
-                            final bool isDesktop =
-                                Platform.isMacOS ||
-                                Platform.isWindows ||
-                                Platform.isLinux;
-                            if (!isDesktop) {
-                              return SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: SelectableHighlightView(
-                                  widget.code,
-                                  language: 'plaintext',
-                                  theme: _transparentBgTheme(
-                                    Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? atomOneDarkReasonableTheme
-                                        : githubTheme,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  textStyle: const TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontSize: 13,
-                                    height: 1.5,
-                                  ),
-                                ),
-                              );
-                            }
-                            final screenH = MediaQuery.of(context).size.height;
-                            final maxH = math.min(420.0, screenH * 0.55);
-                            return ConstrainedBox(
-                              constraints: BoxConstraints(maxHeight: maxH),
-                              child: ScrollConfiguration(
-                                behavior: ScrollConfiguration.of(context)
-                                    .copyWith(
-                                      dragDevices: {
-                                        ui.PointerDeviceKind.touch,
-                                        ui.PointerDeviceKind.mouse,
-                                        ui.PointerDeviceKind.stylus,
-                                        ui.PointerDeviceKind.unknown,
-                                      },
-                                    ),
-                                child: Scrollbar(
-                                  controller: _vMermaidScrollController,
-                                  thumbVisibility: true,
-                                  interactive: true,
-                                  notificationPredicate: (notif) =>
-                                      notif.metrics.axis == Axis.vertical,
-                                  child: SingleChildScrollView(
-                                    controller: _vMermaidScrollController,
-                                    child: SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: SelectableHighlightView(
-                                        widget.code,
-                                        language: 'plaintext',
-                                        theme: _transparentBgTheme(
-                                          Theme.of(context).brightness ==
-                                                  Brightness.dark
-                                              ? atomOneDarkReasonableTheme
-                                              : githubTheme,
-                                        ),
-                                        padding: EdgeInsets.zero,
-                                        textStyle: const TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 13,
-                                          height: 1.5,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }(),
-                        ],
-                      ],
-                    ),
-                  )
-                : const SizedBox.shrink(key: ValueKey('mermaid-collapsed')),
-          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMermaidBody({
+    required BuildContext context,
+    required bool isDark,
+    required _MermaidBlockColors colors,
+    required Uint8List? displayBytes,
+    required String cacheKey,
+    required bool showLoading,
+    required bool showError,
+  }) {
+    if (_selectedTab == _MermaidTab.code ||
+        _bitmapRenderingUnsupported ||
+        widget.code.trim().isEmpty) {
+      return _buildMermaidCodeView(context, isDark);
+    }
+
+    if (displayBytes != null && displayBytes.isNotEmpty) {
+      return Padding(
+        key: ValueKey<String>('mermaid-image-$cacheKey'),
+        padding: const EdgeInsets.all(8),
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _openMermaidImageViewer(context, displayBytes),
+            child: Image(image: MemoryImage(displayBytes), fit: BoxFit.contain),
+          ),
+        ),
+      );
+    }
+
+    if (showLoading) {
+      return _MermaidLoadingView(
+        key: const ValueKey('mermaid-loading-body'),
+        colors: colors,
+      );
+    }
+
+    if (showError) {
+      return _MermaidErrorView(
+        key: const ValueKey('mermaid-error-body'),
+        colors: colors,
+      );
+    }
+
+    return _buildMermaidCodeView(context, isDark);
+  }
+
+  Widget _buildMermaidCodeView(BuildContext context, bool isDark) {
+    final codeView = SelectableHighlightView(
+      widget.code,
+      language: 'plaintext',
+      theme: _transparentBgTheme(
+        isDark ? atomOneDarkReasonableTheme : githubTheme,
+      ),
+      padding: EdgeInsets.zero,
+      textStyle: const TextStyle(
+        fontFamily: 'monospace',
+        fontSize: 13,
+        height: 1.5,
+      ),
+    );
+
+    return Padding(
+      key: const ValueKey('mermaid-code-body'),
+      padding: const EdgeInsets.all(12),
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(
+          dragDevices: {
+            ui.PointerDeviceKind.touch,
+            ui.PointerDeviceKind.mouse,
+            ui.PointerDeviceKind.stylus,
+            ui.PointerDeviceKind.unknown,
+          },
+        ),
+        child: Scrollbar(
+          controller: _vMermaidScrollController,
+          thumbVisibility: true,
+          interactive: true,
+          notificationPredicate: (notif) => notif.metrics.axis == Axis.vertical,
+          child: SingleChildScrollView(
+            controller: _vMermaidScrollController,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: codeView,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -3157,7 +3105,6 @@ class _MermaidBlockState extends State<_MermaidBlock> {
       }
     }
     if (widget.code.trim().isEmpty) {
-      _lastRenderedKey = null;
       _lastRenderedBytes = null;
       _suppressBitmapLoading = false;
       _bitmapRenderingUnsupported = false;
@@ -3233,7 +3180,6 @@ class _MermaidBlockState extends State<_MermaidBlock> {
           if (result.status == MermaidBitmapRenderStatus.success &&
               result.bytes != null &&
               result.bytes!.isNotEmpty) {
-            _lastRenderedKey = cacheKey;
             _lastRenderedBytes = result.bytes;
           } else if (result.status == MermaidBitmapRenderStatus.unsupported) {
             _bitmapRenderingUnsupported = true;
@@ -3308,7 +3254,6 @@ class _MermaidBlockState extends State<_MermaidBlock> {
       final legacy = MermaidImageCache.get(candidate);
       final bytes = themed ?? legacy;
       if (bytes != null && bytes.isNotEmpty) {
-        _lastRenderedKey = _mermaidCacheKey(candidate, isDark, themeVars);
         _lastRenderedBytes = bytes;
         return bytes;
       }
@@ -3343,12 +3288,57 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     return MermaidBitmapRenderResult.failed();
   }
 
-  Future<bool> _exportMermaidPng(BuildContext context, String cacheKey) async {
-    final bytes = MermaidImageCache.get(cacheKey);
-    if (bytes != null && bytes.isNotEmpty) {
-      return _saveCachedMermaidPng(context, bytes);
+  Future<void> _copyMermaidCode(BuildContext context) async {
+    final copiedMessage = AppLocalizations.of(
+      context,
+    )!.chatMessageWidgetCopiedToClipboard;
+    await Clipboard.setData(ClipboardData(text: widget.code));
+    if (!context.mounted) return;
+    showAppSnackBar(
+      context,
+      message: copiedMessage,
+      type: NotificationType.success,
+    );
+  }
+
+  Future<void> _saveMermaidBytes(BuildContext context, Uint8List bytes) async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await _saveCachedMermaidPng(bytes);
+    if (!context.mounted) return;
+    if (!ok) {
+      showAppSnackBar(
+        context,
+        message: l10n.mermaidExportFailed,
+        type: NotificationType.error,
+      );
+    } else if (Platform.isAndroid || Platform.isIOS) {
+      showAppSnackBar(
+        context,
+        message: l10n.imageViewerPageSaveSuccess,
+        type: NotificationType.success,
+      );
     }
-    return false;
+  }
+
+  void _openMermaidImageViewer(BuildContext context, Uint8List bytes) {
+    final src = 'data:image/png;base64,${base64Encode(bytes)}';
+    final provider = MemoryImage(bytes);
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) =>
+            ImageViewerPage(images: [src], imageProviders: {src: provider}),
+        transitionDuration: const Duration(milliseconds: 300),
+        reverseTransitionDuration: const Duration(milliseconds: 240),
+        transitionsBuilder: (context, anim, sec, child) {
+          final curved = CurvedAnimation(
+            parent: anim,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return FadeTransition(opacity: curved, child: child);
+        },
+      ),
+    );
   }
 
   void _removeRenderOverlay() {
@@ -3358,10 +3348,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     _renderOverlayEntry = null;
   }
 
-  Future<bool> _saveCachedMermaidPng(
-    BuildContext context,
-    Uint8List bytes,
-  ) async {
+  Future<bool> _saveCachedMermaidPng(Uint8List bytes) async {
     try {
       final l10n = AppLocalizations.of(context)!;
       final suggested = 'mermaid_${DateTime.now().millisecondsSinceEpoch}.png';
@@ -3390,6 +3377,256 @@ class _MermaidBlockState extends State<_MermaidBlock> {
       }
     } catch (_) {}
     return false;
+  }
+}
+
+class _MermaidBlockColors {
+  const _MermaidBlockColors({
+    required this.body,
+    required this.header,
+    required this.border,
+    required this.tabTrack,
+    required this.tabSelected,
+    required this.textPrimary,
+    required this.textSecondary,
+    required this.textTertiary,
+  });
+
+  final Color body;
+  final Color header;
+  final Color border;
+  final Color tabTrack;
+  final Color tabSelected;
+  final Color textPrimary;
+  final Color textSecondary;
+  final Color textTertiary;
+
+  static _MermaidBlockColors resolve(bool isDark) {
+    if (isDark) {
+      return const _MermaidBlockColors(
+        body: Color(0xFF212121),
+        header: Color(0xFF303030),
+        border: Color(0xFF383838),
+        tabTrack: Color(0xF2212121),
+        tabSelected: Color(0xFF333333),
+        textPrimary: Color(0xFFE6E6E6),
+        textSecondary: Color(0xFFA0A0A0),
+        textTertiary: Color(0xFF707070),
+      );
+    }
+
+    return const _MermaidBlockColors(
+      body: Color(0xFFF8F8F8),
+      header: Color(0xFFEDEDED),
+      border: Color(0xFFE0E0E0),
+      tabTrack: Color(0xCCD9D9D9),
+      tabSelected: Color(0xFFFFFFFF),
+      textPrimary: Color(0xFF261208),
+      textSecondary: Color(0xFF46352B),
+      textTertiary: Color(0xFF5B4C43),
+    );
+  }
+}
+
+class _MermaidTabButton extends StatefulWidget {
+  const _MermaidTabButton({
+    required this.label,
+    required this.selected,
+    required this.colors,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final _MermaidBlockColors colors;
+  final VoidCallback onTap;
+
+  @override
+  State<_MermaidTabButton> createState() => _MermaidTabButtonState();
+}
+
+class _MermaidTabButtonState extends State<_MermaidTabButton> {
+  bool _pressed = false;
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseColor = widget.selected
+        ? widget.colors.tabSelected
+        : Colors.transparent;
+    final hoverColor = Color.alphaBlend(
+      widget.colors.textPrimary.withValues(alpha: _pressed ? 0.10 : 0.06),
+      baseColor,
+    );
+    final bg = widget.selected || _pressed || _hovered
+        ? hoverColor
+        : Colors.transparent;
+
+    return Semantics(
+      button: true,
+      selected: widget.selected,
+      label: widget.label,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() {
+          _hovered = false;
+          _pressed = false;
+        }),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapCancel: () => setState(() => _pressed = false),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: SelectionContainer.disabled(
+              child: Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: widget.selected
+                      ? FontWeight.w600
+                      : FontWeight.w500,
+                  color: widget.selected
+                      ? widget.colors.textPrimary
+                      : widget.colors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MermaidTextAction extends StatelessWidget {
+  const _MermaidTextAction({
+    required this.icon,
+    required this.label,
+    required this.colors,
+    this.onTap,
+    this.enabled = true,
+  });
+
+  final IconData icon;
+  final String label;
+  final _MermaidBlockColors colors;
+  final VoidCallback? onTap;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = enabled && onTap != null;
+    final color = colors.textSecondary.withValues(alpha: active ? 0.88 : 0.38);
+
+    return Tooltip(
+      message: label,
+      child: IosIconButton(
+        onTap: onTap,
+        enabled: active,
+        semanticLabel: label,
+        color: color,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        builder: (buttonColor) => Icon(icon, size: 14, color: buttonColor),
+      ),
+    );
+  }
+}
+
+class _MermaidLoadingView extends StatefulWidget {
+  const _MermaidLoadingView({super.key, required this.colors});
+
+  final _MermaidBlockColors colors;
+
+  @override
+  State<_MermaidLoadingView> createState() => _MermaidLoadingViewState();
+}
+
+class _MermaidLoadingViewState extends State<_MermaidLoadingView>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RotationTransition(
+            turns: _controller,
+            child: Icon(
+              Lucide.Loader,
+              size: 24,
+              color: widget.colors.textSecondary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            l10n.mermaidGeneratingImage,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.3,
+              color: widget.colors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MermaidErrorView extends StatelessWidget {
+  const _MermaidErrorView({super.key, required this.colors});
+
+  final _MermaidBlockColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Lucide.ImageOff, size: 48, color: colors.textTertiary),
+          const SizedBox(height: 8),
+          Text(
+            l10n.mermaidGenerationFailedHint,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.35,
+              color: colors.textTertiary,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -3511,18 +3748,8 @@ class InlineLatexScrollableMd extends InlineMd {
     if (m == null) return TextSpan(text: text, style: config.style);
     final body = ((m.group(1) ?? m.group(2) ?? '')).trim();
     if (body.isEmpty) return TextSpan(text: text, style: config.style);
-    final math = _renderMath(
-      body,
-      style: () {
-        final base = (config.style ?? const TextStyle());
-        final baseSize = base.fontSize ?? 15.5;
-        return base.copyWith(fontSize: baseSize * 1.2);
-      }(),
-    );
-    return WidgetSpan(
-      alignment: PlaceholderAlignment.middle,
-      child: SelectionContainer.disabled(child: math),
-    );
+    final math = _renderMath(body, style: _inlineMathTextStyle(config.style));
+    return _inlineMathSpan(math);
   }
 }
 
@@ -3545,22 +3772,12 @@ class InlineLatexDollarScrollableMd extends InlineMd {
     if (!_isValidDollarMathBody(m.group(2) ?? '')) {
       return TextSpan(text: text, style: config.style);
     }
-    final math = _renderMath(
-      body,
-      style: () {
-        final base = (config.style ?? const TextStyle());
-        final baseSize = base.fontSize ?? 15.5;
-        return base.copyWith(fontSize: baseSize * 1.2);
-      }(),
-    );
+    final math = _renderMath(body, style: _inlineMathTextStyle(config.style));
     return TextSpan(
       style: config.style,
       children: [
         if (prefix.isNotEmpty) TextSpan(text: prefix, style: config.style),
-        WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: SelectionContainer.disabled(child: math),
-        ),
+        _inlineMathSpan(math),
       ],
     );
   }
@@ -3581,18 +3798,8 @@ class InlineLatexParenScrollableMd extends InlineMd {
     if (m == null) return TextSpan(text: text, style: config.style);
     final body = (m.group(1) ?? '').trim();
     if (body.isEmpty) return TextSpan(text: text, style: config.style);
-    final math = _renderMath(
-      body,
-      style: () {
-        final base = (config.style ?? const TextStyle());
-        final baseSize = base.fontSize ?? 15.5;
-        return base.copyWith(fontSize: baseSize * 1.2);
-      }(),
-    );
-    return WidgetSpan(
-      alignment: PlaceholderAlignment.middle,
-      child: SelectionContainer.disabled(child: math),
-    );
+    final math = _renderMath(body, style: _inlineMathTextStyle(config.style));
+    return _inlineMathSpan(math);
   }
 }
 
@@ -3800,7 +4007,7 @@ class LabelValueLineMd extends InlineMd {
   }
 }
 
-// Modern, app-styled block quote with soft background and accent border
+// Minimal block quote with a neutral rounded leading line.
 class ModernBlockQuote extends InlineMd {
   @override
   bool get inline => false;
@@ -3827,8 +4034,7 @@ class ModernBlockQuote extends InlineMd {
     final data = _unmaskBlockquoteFenceMarkers(sb.toString().trim());
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = cs.primaryContainer.withValues(alpha: isDark ? 0.18 : 0.12);
-    final accent = cs.primary.withValues(alpha: isDark ? 0.90 : 0.80);
+    final lineColor = cs.outlineVariant.withValues(alpha: isDark ? 0.52 : 0.82);
     final innerComponents =
         (config.components ?? MarkdownComponent.globalComponents)
             .where((component) => component is! CodeBlockMd)
@@ -3849,14 +4055,30 @@ class ModernBlockQuote extends InlineMd {
       child: Container(
         key: const ValueKey('markdown-blockquote'),
         margin: const EdgeInsets.symmetric(vertical: 6),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border(left: BorderSide(color: accent, width: 3)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-          child: innerMarkdown,
+        child: Stack(
+          children: [
+            PositionedDirectional(
+              start: 0,
+              top: 2,
+              bottom: 2,
+              width: 3,
+              child: DecoratedBox(
+                key: const ValueKey('markdown-blockquote-line'),
+                decoration: BoxDecoration(
+                  color: lineColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsetsDirectional.only(
+                start: 13,
+                top: 2,
+                bottom: 2,
+              ),
+              child: innerMarkdown,
+            ),
+          ],
         ),
       ),
     );

@@ -91,6 +91,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _summaryPromptKey = 'summary_prompt_v1';
   static const String _suggestionModelKey = 'suggestion_model_v1';
   static const String _suggestionPromptKey = 'suggestion_prompt_v1';
+  static const String _suggestionInsertOnTapOnlyKey =
+      'suggestion_insert_on_tap_only_v1';
   static const String _compressModelKey = 'compress_model_v1';
   static const String _compressPromptKey = 'compress_prompt_v1';
   static const String _themePaletteKey = 'theme_palette_v1';
@@ -754,6 +756,8 @@ class SettingsProvider extends ChangeNotifier {
     _suggestionPrompt = (suggestionp == null || suggestionp.trim().isEmpty)
         ? defaultSuggestionPrompt
         : suggestionp;
+    _insertSuggestionOnTapOnly =
+        prefs.getBool(_suggestionInsertOnTapOnlyKey) ?? false;
     // load compress model
     final compressSel = prefs.getString(_compressModelKey);
     if (compressSel != null && compressSel.contains('::')) {
@@ -2674,6 +2678,8 @@ Rules:
 
   String _suggestionPrompt = defaultSuggestionPrompt;
   String get suggestionPrompt => _suggestionPrompt;
+  bool _insertSuggestionOnTapOnly = false;
+  bool get insertSuggestionOnTapOnly => _insertSuggestionOnTapOnly;
 
   Future<void> setSuggestionModel(String providerKey, String modelId) async {
     _suggestionModelProvider = providerKey;
@@ -2702,6 +2708,14 @@ Rules:
 
   Future<void> resetSuggestionPrompt() async =>
       setSuggestionPrompt(defaultSuggestionPrompt);
+
+  Future<void> setInsertSuggestionOnTapOnly(bool value) async {
+    if (_insertSuggestionOnTapOnly == value) return;
+    _insertSuggestionOnTapOnly = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_suggestionInsertOnTapOnlyKey, value);
+  }
 
   // Compress model and prompt
   String? _compressModelProvider;
@@ -3646,6 +3660,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._suggestionModelProvider = _suggestionModelProvider;
     copy._suggestionModelId = _suggestionModelId;
     copy._suggestionPrompt = _suggestionPrompt;
+    copy._insertSuggestionOnTapOnly = _insertSuggestionOnTapOnly;
     copy._compressModelProvider = _compressModelProvider;
     copy._compressModelId = _compressModelId;
     copy._compressPrompt = _compressPrompt;

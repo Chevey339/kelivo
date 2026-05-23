@@ -69,8 +69,12 @@ class HomePage extends StatefulWidget {
 }
 
 class _TemporaryConversationEmptyState extends StatelessWidget {
-  const _TemporaryConversationEmptyState({required this.bottomContentPadding});
+  const _TemporaryConversationEmptyState({
+    required this.topContentPadding,
+    required this.bottomContentPadding,
+  });
 
+  final double topContentPadding;
   final double bottomContentPadding;
 
   @override
@@ -80,7 +84,12 @@ class _TemporaryConversationEmptyState extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: EdgeInsets.fromLTRB(32, 24, 32, bottomContentPadding + 24),
+        padding: EdgeInsets.fromLTRB(
+          32,
+          topContentPadding + 24,
+          32,
+          bottomContentPadding + 24,
+        ),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Column(
@@ -672,10 +681,18 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildMobileBody(BuildContext context, ColorScheme cs) {
     final bottomContentPadding = _controller.inputBarHeight + 16;
+    final topContentPadding = _chatTopOverlayInset(context) + 8;
+    final backgroundImageActive = _assistantBackgroundActive(context);
 
     return ChatInputOverlayLayout(
-      topInset: kToolbarHeight + MediaQuery.paddingOf(context).top,
-      background: _buildChatBackground(context, cs),
+      topInset: _chatTopOverlayInset(context),
+      background: backgroundImageActive
+          ? _buildChatBackground(context, cs)
+          : null,
+      topBackground: backgroundImageActive
+          ? _buildChatBackground(context, cs)
+          : null,
+      backgroundImageActive: backgroundImageActive,
       content: Builder(
         builder: (context) {
           final content = KeyedSubtree(
@@ -684,6 +701,7 @@ class _HomePageState extends State<HomePage>
             ),
             child: _buildMessageListView(
               context,
+              topContentPadding: topContentPadding,
               bottomContentPadding: bottomContentPadding,
               dividerPadding: const EdgeInsets.symmetric(
                 vertical: 10,
@@ -849,9 +867,15 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildTabletBody(BuildContext context, ColorScheme cs) {
     final bottomContentPadding = _controller.inputBarHeight + 16;
+    final topContentPadding = _chatTopOverlayInset(context) + 8;
+    final backgroundImageActive = _assistantBackgroundActive(context);
 
     return ChatInputOverlayLayout(
-      topInset: kToolbarHeight + MediaQuery.paddingOf(context).top,
+      topInset: _chatTopOverlayInset(context),
+      topBackground: backgroundImageActive
+          ? _buildAssistantBackground(context)
+          : null,
+      backgroundImageActive: backgroundImageActive,
       content: FadeTransition(
         opacity: _controller.convoFade,
         child:
@@ -861,6 +885,7 @@ class _HomePageState extends State<HomePage>
                   ),
                   child: _buildMessageListView(
                     context,
+                    topContentPadding: topContentPadding,
                     bottomContentPadding: bottomContentPadding,
                     dividerPadding: const EdgeInsets.symmetric(
                       vertical: 8,
@@ -943,45 +968,43 @@ class _HomePageState extends State<HomePage>
           if (!file.existsSync()) return const SizedBox.shrink();
           provider = FileImage(file);
         }
-        return Positioned.fill(
-          child: Stack(
-            children: [
-              Positioned.fill(
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: provider,
+                    fit: BoxFit.cover,
+                    colorFilter: ColorFilter.mode(
+                      Colors.black.withValues(alpha: 0.04),
+                      BlendMode.srcATop,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: provider,
-                      fit: BoxFit.cover,
-                      colorFilter: ColorFilter.mode(
-                        Colors.black.withValues(alpha: 0.04),
-                        BlendMode.srcATop,
-                      ),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: () {
+                        final top = (0.20 * maskStrength).clamp(0.0, 1.0);
+                        final bottom = (0.50 * maskStrength).clamp(0.0, 1.0);
+                        return [
+                          cs.surface.withValues(alpha: top),
+                          cs.surface.withValues(alpha: bottom),
+                        ];
+                      }(),
                     ),
                   ),
                 ),
               ),
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: () {
-                          final top = (0.20 * maskStrength).clamp(0.0, 1.0);
-                          final bottom = (0.50 * maskStrength).clamp(0.0, 1.0);
-                          return [
-                            cs.surface.withValues(alpha: top),
-                            cs.surface.withValues(alpha: bottom),
-                          ];
-                        }(),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
@@ -1032,6 +1055,24 @@ class _HomePageState extends State<HomePage>
     );
   }
 
+  bool _assistantBackgroundActive(BuildContext context) {
+    final bgRaw =
+        (context.watch<AssistantProvider>().currentAssistant?.background ?? '')
+            .trim();
+    if (bgRaw.isEmpty) return false;
+    if (bgRaw.startsWith('http')) return true;
+    try {
+      final fixed = SandboxPathResolver.fix(bgRaw);
+      return File(fixed).existsSync();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  double _chatTopOverlayInset(BuildContext context) {
+    return kToolbarHeight + MediaQuery.paddingOf(context).top;
+  }
+
   /// Map persisted truncateIndex (raw message count) to collapsed index.
   int _computeTruncCollapsedIndex() {
     final int truncRaw = _controller.chatController.loadedWindowTruncateIndex();
@@ -1051,12 +1092,14 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildMessageListView(
     BuildContext context, {
+    required double topContentPadding,
     required double bottomContentPadding,
     required EdgeInsetsGeometry dividerPadding,
   }) {
     if (_controller.isTemporaryConversation &&
         _controller.chatController.collapsedMessages.isEmpty) {
       return _TemporaryConversationEmptyState(
+        topContentPadding: topContentPadding,
         bottomContentPadding: bottomContentPadding,
       );
     }
@@ -1086,6 +1129,7 @@ class _HomePageState extends State<HomePage>
             ? (_controller.currentConversation?.chatSuggestions ??
                   const <String>[])
             : const <String>[],
+        topContentPadding: topContentPadding,
         bottomContentPadding: bottomContentPadding,
         dividerPadding: dividerPadding,
         streamingContentNotifier: _controller.streamingContentNotifier,
@@ -1221,6 +1265,7 @@ class _HomePageState extends State<HomePage>
       onLongPressLearning: _showLearningPromptSheet,
       onClearContext: _controller.clearContext,
       onCompressContext: _handleDesktopCompressContext,
+      backgroundImageActive: _assistantBackgroundActive(context),
     );
   }
 

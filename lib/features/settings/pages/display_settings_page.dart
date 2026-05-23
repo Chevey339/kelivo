@@ -1820,6 +1820,16 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.TextSelect,
+                label: l10n.displaySettingsPageInsertSuggestionOnlyTitle,
+                value: sp.insertSuggestionOnTapOnly,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setInsertSuggestionOnTapOnly(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.RefreshCw,
                 label: l10n
                     .displaySettingsPageRegenerateDeleteTrailingMessagesTitle,

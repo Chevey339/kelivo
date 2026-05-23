@@ -92,6 +92,7 @@ class ChatInputBar extends StatefulWidget {
     this.ocrActive = false,
     this.onToggleOcr,
     this.conversationId,
+    this.backgroundImageActive = false,
   });
 
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
@@ -139,6 +140,7 @@ class ChatInputBar extends StatefulWidget {
   final bool ocrActive;
   final VoidCallback? onToggleOcr;
   final String? conversationId;
+  final bool backgroundImageActive;
 
   @override
   State<ChatInputBar> createState() => _ChatInputBarState();
@@ -1453,6 +1455,22 @@ class _ChatInputBarState extends State<ChatInputBar>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final inputFillBase = theme.colorScheme.surface.withValues(
+      alpha: widget.backgroundImageActive
+          ? (isDark ? 0.50 : 0.52)
+          : (isDark ? 0.72 : 0.82),
+    );
+    final inputFillColor = isDark
+        ? Color.alphaBlend(
+            Colors.white.withValues(
+              alpha: widget.backgroundImageActive ? 0.09 : 0.07,
+            ),
+            inputFillBase,
+          )
+        : Color.alphaBlend(
+            theme.colorScheme.primary.withValues(alpha: 0.02),
+            inputFillBase,
+          );
     final hasText = _controller.text.trim().isNotEmpty;
     final hasImages = _images.isNotEmpty;
     final hasDocs = _docs.isNotEmpty;
@@ -1493,7 +1511,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           AppSpacing.sm,
           AppSpacing.xxs,
           AppSpacing.sm,
-          AppSpacing.sm,
+          AppSpacing.xs,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1632,9 +1650,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                     child: Container(
                       decoration: BoxDecoration(
                         // Translucent background over blurred content
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.06)
-                            : Colors.white.withValues(alpha: 0.07),
+                        color: inputFillColor,
                         borderRadius: BorderRadius.circular(20),
                         // Use previous gray border for better contrast on white
                         border: Border.all(

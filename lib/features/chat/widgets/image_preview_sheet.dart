@@ -1,9 +1,11 @@
 import 'dart:io';
-import 'dart:typed_data';
+import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
+import 'package:image/image.dart' as image_lib;
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
@@ -15,6 +17,15 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/clipboard_images.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import 'dart:ui' as ui;
+
+const int _previewBlankTrimPreservePadding = 48;
+const int _previewBlankAlphaTolerance = 8;
+const int _previewBlankColorTolerance = 3;
+const int _previewBlankMinContentPixels = 3;
+const int _previewBlankMaxContentPixels = 16;
+const int _previewBlankMinContentRun = 2;
+const int _previewBlankMaxContentRun = 6;
+const int _previewMaxTileSourceHeight = 2048;
 
 Future<void> showImagePreviewSheet(
   BuildContext context, {
@@ -55,7 +66,24 @@ class _ImagePreviewDesktopDialog extends StatefulWidget {
 class _ImagePreviewDesktopDialogState
     extends State<_ImagePreviewDesktopDialog> {
   bool _saving = false;
+  _ImagePreviewDisplay? _display;
+  bool _loadingDisplay = true;
   final ScrollController _scrollCtrl = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDisplay();
+  }
+
+  Future<void> _loadDisplay() async {
+    final display = await _readImagePreviewDisplayAsync(widget.file);
+    if (!mounted) return;
+    setState(() {
+      _display = display;
+      _loadingDisplay = false;
+    });
+  }
 
   Rect _shareAnchorRect(BuildContext context) {
     try {
@@ -323,17 +351,22 @@ class _ImagePreviewDesktopDialogState
                       controller: _scrollCtrl,
                       padding: const EdgeInsets.all(16),
                       child: Center(
-                        child: Card(
-                          elevation: 0,
-                          color: cs.surface,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(
-                              color: cs.outline.withValues(alpha: 0.08),
-                            ),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Image.file(widget.file, fit: BoxFit.contain),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            if (_loadingDisplay) {
+                              return const SizedBox(
+                                height: 360,
+                                child: Center(
+                                  child: CupertinoActivityIndicator(radius: 14),
+                                ),
+                              );
+                            }
+                            return _ImagePreviewCard(
+                              file: widget.file,
+                              display: _display,
+                              maxWidth: constraints.maxWidth,
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -354,6 +387,479 @@ class _ImagePreviewSheet extends StatefulWidget {
 
   @override
   State<_ImagePreviewSheet> createState() => _ImagePreviewSheetState();
+}
+
+class _ImagePreviewCard extends StatelessWidget {
+  const _ImagePreviewCard({
+    required this.file,
+    required this.display,
+    required this.maxWidth,
+  });
+
+  final File file;
+  final _ImagePreviewDisplay? display;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final width = maxWidth.isFinite ? maxWidth : null;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: cs.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: cs.outline.withValues(alpha: 0.08)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: _buildPreviewImageFrame(
+        file: file,
+        display: display,
+        width: width,
+      ),
+    );
+  }
+}
+
+Widget _buildPreviewImageFrame({
+  required File file,
+  required _ImagePreviewDisplay? display,
+  required double? width,
+}) {
+  if (display == null) {
+    return _buildPreviewImage(
+      image: FileImage(file),
+      width: width,
+      height: null,
+      fit: BoxFit.contain,
+    );
+  }
+
+  return SizedBox(
+    width: width,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final tile in display.tiles)
+          _buildPreviewImage(
+            image: tile.provider,
+            width: width,
+            height: _previewDisplayHeight(
+              width: width,
+              dimensions: tile.dimensions,
+            ),
+            fit: BoxFit.fill,
+          ),
+      ],
+    ),
+  );
+}
+
+Image _buildPreviewImage({
+  required ImageProvider image,
+  required double? width,
+  required double? height,
+  required BoxFit fit,
+}) {
+  return Image(image: image, width: width, height: height, fit: fit);
+}
+
+@visibleForTesting
+Image buildPreviewImageForTesting({
+  required File file,
+  required double? width,
+}) {
+  final display = _readImagePreviewDisplay(file);
+  final tile = display?.tiles.first;
+  return _buildPreviewImage(
+    image: tile?.provider ?? FileImage(file),
+    width: width,
+    height: _previewDisplayHeight(
+      width: width,
+      dimensions: tile?.dimensions ?? display?.dimensions,
+    ),
+    fit: BoxFit.contain,
+  );
+}
+
+@visibleForTesting
+({double? height, int tileCount, List<ImageProvider> providers})
+previewImageDisplayLayoutForTesting({
+  required File file,
+  required double? width,
+  Object? cachedDisplay,
+}) {
+  final display =
+      (cachedDisplay as _ImagePreviewDisplay?) ??
+      _readImagePreviewDisplay(file);
+  return (
+    height: _previewDisplayHeight(
+      width: width,
+      dimensions: display?.dimensions,
+    ),
+    tileCount: display?.tiles.length ?? 1,
+    providers:
+        display?.tiles.map((tile) => tile.provider).toList() ??
+        <ImageProvider>[FileImage(file)],
+  );
+}
+
+@visibleForTesting
+Object? readPreviewDisplayForTesting(File file) {
+  return _readImagePreviewDisplay(file);
+}
+
+class _ImagePreviewDisplay {
+  const _ImagePreviewDisplay({required this.dimensions, required this.tiles});
+
+  final ({int width, int height}) dimensions;
+  final List<_ImagePreviewTile> tiles;
+}
+
+class _ImagePreviewTile {
+  const _ImagePreviewTile({required this.provider, required this.dimensions});
+
+  final ImageProvider provider;
+  final ({int width, int height}) dimensions;
+}
+
+class _ImagePreviewDisplayPayload {
+  const _ImagePreviewDisplayPayload({
+    required this.dimensions,
+    required this.tiles,
+  });
+
+  final ({int width, int height}) dimensions;
+  final List<_ImagePreviewTilePayload> tiles;
+}
+
+class _ImagePreviewTilePayload {
+  const _ImagePreviewTilePayload({
+    required this.bytes,
+    required this.dimensions,
+    required this.useFile,
+  });
+
+  final Uint8List? bytes;
+  final ({int width, int height}) dimensions;
+  final bool useFile;
+}
+
+_ImagePreviewDisplay? _readImagePreviewDisplay(File file) {
+  try {
+    return _previewDisplayFromPayload(
+      _readImagePreviewDisplayPayloadSync(file.path),
+      file,
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+Future<_ImagePreviewDisplay?> _readImagePreviewDisplayAsync(File file) async {
+  try {
+    final payload = await compute(
+      _readImagePreviewDisplayPayloadSync,
+      file.path,
+      debugLabel: 'image-preview-display-processing',
+    );
+    return _previewDisplayFromPayload(payload, file);
+  } catch (_) {
+    return null;
+  }
+}
+
+@visibleForTesting
+Future<Object?> readPreviewDisplayAsyncForTesting(File file) {
+  return _readImagePreviewDisplayAsync(file);
+}
+
+_ImagePreviewDisplayPayload? _readImagePreviewDisplayPayloadSync(String path) {
+  final bytes = File(path).readAsBytesSync();
+  final decoded = image_lib.decodeImage(bytes);
+  if (decoded == null || decoded.width <= 0 || decoded.height <= 0) {
+    return null;
+  }
+  final trimmed = _trimPreviewBlankPadding(decoded);
+  final source = trimmed.image;
+  return _ImagePreviewDisplayPayload(
+    dimensions: (width: source.width, height: source.height),
+    tiles: _previewImageTilePayloads(
+      source,
+      forceMemoryImage:
+          trimmed.changed || source.height > _previewMaxTileSourceHeight,
+    ),
+  );
+}
+
+_ImagePreviewDisplay? _previewDisplayFromPayload(
+  _ImagePreviewDisplayPayload? payload,
+  File file,
+) {
+  if (payload == null) return null;
+  return _ImagePreviewDisplay(
+    dimensions: payload.dimensions,
+    tiles: payload.tiles
+        .map(
+          (tile) => _ImagePreviewTile(
+            provider: tile.useFile
+                ? FileImage(file)
+                : MemoryImage(tile.bytes ?? Uint8List(0)),
+            dimensions: tile.dimensions,
+          ),
+        )
+        .toList(growable: false),
+  );
+}
+
+List<_ImagePreviewTilePayload> _previewImageTilePayloads(
+  image_lib.Image image, {
+  required bool forceMemoryImage,
+}) {
+  if (!forceMemoryImage) {
+    return [
+      _ImagePreviewTilePayload(
+        bytes: null,
+        dimensions: (width: image.width, height: image.height),
+        useFile: true,
+      ),
+    ];
+  }
+
+  final tiles = <_ImagePreviewTilePayload>[];
+  var y = 0;
+  while (y < image.height) {
+    final tileHeight = (image.height - y) > _previewMaxTileSourceHeight
+        ? _previewMaxTileSourceHeight
+        : image.height - y;
+    final tileImage = image_lib.copyCrop(
+      image,
+      x: 0,
+      y: y,
+      width: image.width,
+      height: tileHeight,
+    );
+    tiles.add(
+      _ImagePreviewTilePayload(
+        bytes: Uint8List.fromList(image_lib.encodePng(tileImage)),
+        dimensions: (width: tileImage.width, height: tileImage.height),
+        useFile: false,
+      ),
+    );
+    y += tileHeight;
+  }
+  return tiles;
+}
+
+({image_lib.Image image, bool changed}) _trimPreviewBlankPadding(
+  image_lib.Image decoded,
+) {
+  final background = _previewBlankReferencePixel(decoded);
+  final width = decoded.width;
+  final height = decoded.height;
+
+  int? top;
+  for (var y = 0; y < height; y += 1) {
+    if (_previewRowHasContent(decoded, y, background)) {
+      top = y;
+      break;
+    }
+  }
+  if (top == null) return (image: decoded, changed: false);
+
+  var bottom = height - 1;
+  for (var y = height - 1; y >= top; y -= 1) {
+    if (_previewRowHasContent(decoded, y, background)) {
+      bottom = y;
+      break;
+    }
+  }
+
+  var left = 0;
+  for (var x = 0; x < width; x += 1) {
+    if (_previewColumnHasContent(decoded, x, top, bottom, background)) {
+      left = x;
+      break;
+    }
+  }
+
+  var right = width - 1;
+  for (var x = width - 1; x >= left; x -= 1) {
+    if (_previewColumnHasContent(decoded, x, top, bottom, background)) {
+      right = x;
+      break;
+    }
+  }
+
+  const padding = _previewBlankTrimPreservePadding;
+  final cropLeft = (left - padding).clamp(0, width - 1);
+  final cropTop = (top - padding).clamp(0, height - 1);
+  final cropRight = (right + padding).clamp(0, width - 1);
+  final cropBottom = (bottom + padding).clamp(0, height - 1);
+
+  if (cropLeft == 0 &&
+      cropTop == 0 &&
+      cropRight == width - 1 &&
+      cropBottom == height - 1) {
+    return (image: decoded, changed: false);
+  }
+
+  return (
+    image: image_lib.copyCrop(
+      decoded,
+      x: cropLeft,
+      y: cropTop,
+      width: cropRight - cropLeft + 1,
+      height: cropBottom - cropTop + 1,
+    ),
+    changed: true,
+  );
+}
+
+image_lib.Pixel _previewBlankReferencePixel(image_lib.Image image) {
+  final counts = <int, ({int count, image_lib.Pixel pixel})>{};
+  void add(image_lib.Pixel pixel) {
+    if (pixel.a <= _previewBlankAlphaTolerance) return;
+    final key =
+        ((pixel.r.toInt() ~/ 8) << 24) |
+        ((pixel.g.toInt() ~/ 8) << 16) |
+        ((pixel.b.toInt() ~/ 8) << 8) |
+        (pixel.a.toInt() ~/ 8);
+    final current = counts[key];
+    counts[key] = (
+      count: (current?.count ?? 0) + 1,
+      pixel: current?.pixel ?? pixel,
+    );
+  }
+
+  for (var x = 0; x < image.width; x += 1) {
+    add(image.getPixel(x, 0));
+    add(image.getPixel(x, image.height - 1));
+  }
+  for (var y = 1; y < image.height - 1; y += 1) {
+    add(image.getPixel(0, y));
+    add(image.getPixel(image.width - 1, y));
+  }
+
+  if (counts.isNotEmpty) {
+    return counts.values.reduce((a, b) => a.count >= b.count ? a : b).pixel;
+  }
+  return image.getPixel(0, 0);
+}
+
+bool _previewRowHasContent(
+  image_lib.Image image,
+  int y,
+  image_lib.Pixel background,
+) {
+  final pixelThreshold = _previewContentPixelThreshold(image.width);
+  final runThreshold = _previewContentRunThreshold(image.width);
+  var contentPixels = 0;
+  var currentRun = 0;
+  var longestRun = 0;
+  for (var x = 0; x < image.width; x += 1) {
+    if (_previewIsBlankPixel(image.getPixel(x, y), background)) {
+      currentRun = 0;
+      continue;
+    }
+    contentPixels += 1;
+    currentRun += 1;
+    if (currentRun > longestRun) longestRun = currentRun;
+    if (contentPixels >= pixelThreshold && longestRun >= runThreshold) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool _previewColumnHasContent(
+  image_lib.Image image,
+  int x,
+  int top,
+  int bottom,
+  image_lib.Pixel background,
+) {
+  final length = bottom - top + 1;
+  final pixelThreshold = _previewContentPixelThreshold(length);
+  final runThreshold = _previewContentRunThreshold(length);
+  var contentPixels = 0;
+  var currentRun = 0;
+  var longestRun = 0;
+  for (var y = top; y <= bottom; y += 1) {
+    if (_previewIsBlankPixel(image.getPixel(x, y), background)) {
+      currentRun = 0;
+      continue;
+    }
+    contentPixels += 1;
+    currentRun += 1;
+    if (currentRun > longestRun) longestRun = currentRun;
+    if (contentPixels >= pixelThreshold && longestRun >= runThreshold) {
+      return true;
+    }
+  }
+  return false;
+}
+
+int _previewContentPixelThreshold(int lineLength) {
+  final scaled = (lineLength * 0.01).ceil();
+  if (scaled < _previewBlankMinContentPixels) {
+    return _previewBlankMinContentPixels;
+  }
+  if (scaled > _previewBlankMaxContentPixels) {
+    return _previewBlankMaxContentPixels;
+  }
+  return scaled;
+}
+
+int _previewContentRunThreshold(int lineLength) {
+  final scaled = (lineLength * 0.005).ceil();
+  if (scaled < _previewBlankMinContentRun) {
+    return _previewBlankMinContentRun;
+  }
+  if (scaled > _previewBlankMaxContentRun) {
+    return _previewBlankMaxContentRun;
+  }
+  return scaled;
+}
+
+bool _previewIsBlankPixel(image_lib.Pixel pixel, image_lib.Pixel background) {
+  if (pixel.a <= _previewBlankAlphaTolerance) return true;
+  if (background.a <= _previewBlankAlphaTolerance) return false;
+  return _previewChannelNear(pixel.r, background.r) &&
+      _previewChannelNear(pixel.g, background.g) &&
+      _previewChannelNear(pixel.b, background.b) &&
+      _previewChannelNear(pixel.a, background.a);
+}
+
+bool _previewChannelNear(num a, num b) {
+  return (a - b).abs() <= _previewBlankColorTolerance;
+}
+
+double? _previewDisplayHeight({
+  required double? width,
+  required ({int width, int height})? dimensions,
+}) {
+  if (width == null || dimensions == null) return null;
+  return width * dimensions.height / dimensions.width;
+}
+
+Future<dynamic> _saveImagePreviewFile(File file, {required String name}) async {
+  return ImageGallerySaverPlus.saveFile(
+    Platform.isIOS ? file.uri.toString() : file.path,
+    name: name,
+    isReturnPathOfIOS: true,
+  );
+}
+
+@visibleForTesting
+Future<dynamic> saveImagePreviewFileForTesting(
+  File file, {
+  required String name,
+}) {
+  return _saveImagePreviewFile(file, name: name);
 }
 
 class _DesktopIconButton extends StatefulWidget {
@@ -447,7 +953,24 @@ class _DesktopIconButtonState extends State<_DesktopIconButton> {
 
 class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
   final DraggableScrollableController _ctrl = DraggableScrollableController();
+  _ImagePreviewDisplay? _display;
+  bool _loadingDisplay = true;
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDisplay();
+  }
+
+  Future<void> _loadDisplay() async {
+    final display = await _readImagePreviewDisplayAsync(widget.file);
+    if (!mounted) return;
+    setState(() {
+      _display = display;
+      _loadingDisplay = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -501,14 +1024,8 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
     setState(() => _saving = true);
     final l10n = AppLocalizations.of(context)!;
     try {
-      final Uint8List bytes = await widget.file.readAsBytes();
-      if (!mounted) return;
       final name = 'kelivo-${DateTime.now().millisecondsSinceEpoch}';
-      final result = await ImageGallerySaverPlus.saveImage(
-        bytes,
-        quality: 100,
-        name: name,
-      );
+      final result = await _saveImagePreviewFile(widget.file, name: name);
       if (!mounted) return;
       bool success = false;
       if (result is Map) {
@@ -583,21 +1100,24 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Card(
-                                  elevation: 0,
-                                  color: cs.surface,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    side: BorderSide(
-                                      color: cs.outline.withValues(alpha: 0.08),
+                                if (_loadingDisplay)
+                                  SizedBox(
+                                    height: math.min(
+                                      constraints.maxWidth * 1.2,
+                                      420.0,
                                     ),
+                                    child: const Center(
+                                      child: CupertinoActivityIndicator(
+                                        radius: 14,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  _ImagePreviewCard(
+                                    file: widget.file,
+                                    display: _display,
+                                    maxWidth: constraints.maxWidth,
                                   ),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: Image.file(
-                                    widget.file,
-                                    fit: BoxFit.contain,
-                                  ),
-                                ),
                                 const SizedBox(
                                   height: 80,
                                 ), // leave space for action bar overlap, outside the card

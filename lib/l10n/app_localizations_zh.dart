@@ -453,6 +453,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mermaidExportFailed => '导出失败';
 
   @override
+  String get mermaidImageTab => '图片';
+
+  @override
+  String get mermaidCodeTab => '代码';
+
+  @override
+  String get mermaidFullScreen => '全屏';
+
+  @override
+  String get mermaidGeneratingImage => '图片生成中';
+
+  @override
+  String get mermaidGenerationFailedHint => '生成失败，换个方式问问吧';
+
+  @override
   String get mermaidPreviewOpen => '浏览器预览';
 
   @override
@@ -3524,6 +3539,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageShowToolResultSummaryTitle => '显示工具结果摘要';
 
   @override
+  String get displaySettingsPageInsertSuggestionOnlyTitle => '点击建议时仅填入输入框';
+
+  @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
       '在工具步骤下方显示摘要文本';
 
@@ -3893,7 +3911,53 @@ class AppLocalizationsZh extends AppLocalizations {
   String get imageViewerPageShareButton => '分享图片';
 
   @override
+  String get imageViewerPageCloseButton => '关闭预览';
+
+  @override
   String get imageViewerPageSaveButton => '保存图片';
+
+  @override
+  String get imageViewerPageCopyButton => '复制图片';
+
+  @override
+  String get imageViewerPagePreviousButton => '上一张图片';
+
+  @override
+  String get imageViewerPageNextButton => '下一张图片';
+
+  @override
+  String get imageViewerPageZoomInButton => '放大';
+
+  @override
+  String get imageViewerPageZoomOutButton => '缩小';
+
+  @override
+  String get imageViewerPageResetZoomButton => '重置缩放';
+
+  @override
+  String get imageViewerPageFlipHorizontalButton => '左右镜像';
+
+  @override
+  String get imageViewerPageFlipVerticalButton => '上下镜像';
+
+  @override
+  String get imageViewerPageRotateLeftButton => '向左旋转';
+
+  @override
+  String get imageViewerPageRotateRightButton => '向右旋转';
+
+  @override
+  String imageViewerPageCounter(int index, int total) {
+    return '$index/$total';
+  }
+
+  @override
+  String imageViewerPageImageLabel(int index, int total) {
+    return '第 $index 张图片，共 $total 张';
+  }
+
+  @override
+  String get imageViewerPageImageLoadFailed => '无法加载图片';
 
   @override
   String get imageViewerPageSaveSuccess => '已保存到相册';
@@ -5323,6 +5387,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mermaidExportFailed => '导出失败';
+
+  @override
+  String get mermaidImageTab => '图片';
+
+  @override
+  String get mermaidCodeTab => '代码';
+
+  @override
+  String get mermaidFullScreen => '全屏';
+
+  @override
+  String get mermaidGeneratingImage => '图片生成中';
+
+  @override
+  String get mermaidGenerationFailedHint => '生成失败，换个方式问问吧';
 
   @override
   String get mermaidPreviewOpen => '浏览器预览';
@@ -8396,6 +8475,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageShowToolResultSummaryTitle => '显示工具结果摘要';
 
   @override
+  String get displaySettingsPageInsertSuggestionOnlyTitle => '点击建议时仅填入输入框';
+
+  @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
       '在工具步骤下方显示摘要文本';
 
@@ -8765,7 +8847,53 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get imageViewerPageShareButton => '分享图片';
 
   @override
+  String get imageViewerPageCloseButton => '关闭预览';
+
+  @override
   String get imageViewerPageSaveButton => '保存图片';
+
+  @override
+  String get imageViewerPageCopyButton => '复制图片';
+
+  @override
+  String get imageViewerPagePreviousButton => '上一张图片';
+
+  @override
+  String get imageViewerPageNextButton => '下一张图片';
+
+  @override
+  String get imageViewerPageZoomInButton => '放大';
+
+  @override
+  String get imageViewerPageZoomOutButton => '缩小';
+
+  @override
+  String get imageViewerPageResetZoomButton => '重置缩放';
+
+  @override
+  String get imageViewerPageFlipHorizontalButton => '左右镜像';
+
+  @override
+  String get imageViewerPageFlipVerticalButton => '上下镜像';
+
+  @override
+  String get imageViewerPageRotateLeftButton => '向左旋转';
+
+  @override
+  String get imageViewerPageRotateRightButton => '向右旋转';
+
+  @override
+  String imageViewerPageCounter(int index, int total) {
+    return '$index/$total';
+  }
+
+  @override
+  String imageViewerPageImageLabel(int index, int total) {
+    return '第 $index 张图片，共 $total 张';
+  }
+
+  @override
+  String get imageViewerPageImageLoadFailed => '无法加载图片';
 
   @override
   String get imageViewerPageSaveSuccess => '已保存到相册';
@@ -10195,6 +10323,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mermaidExportFailed => '匯出失敗';
+
+  @override
+  String get mermaidImageTab => '圖片';
+
+  @override
+  String get mermaidCodeTab => '程式碼';
+
+  @override
+  String get mermaidFullScreen => '全螢幕';
+
+  @override
+  String get mermaidGeneratingImage => '圖片生成中';
+
+  @override
+  String get mermaidGenerationFailedHint => '生成失敗，換個方式問問吧';
 
   @override
   String get mermaidPreviewOpen => '瀏覽器預覽';
@@ -13266,6 +13409,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageShowToolResultSummaryTitle => '顯示工具結果摘要';
 
   @override
+  String get displaySettingsPageInsertSuggestionOnlyTitle => '點擊建議時僅填入輸入框';
+
+  @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
       '在工具步驟下方顯示摘要文字';
 
@@ -13635,7 +13781,53 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get imageViewerPageShareButton => '分享圖片';
 
   @override
+  String get imageViewerPageCloseButton => '關閉預覽';
+
+  @override
   String get imageViewerPageSaveButton => '儲存圖片';
+
+  @override
+  String get imageViewerPageCopyButton => '複製圖片';
+
+  @override
+  String get imageViewerPagePreviousButton => '上一張圖片';
+
+  @override
+  String get imageViewerPageNextButton => '下一張圖片';
+
+  @override
+  String get imageViewerPageZoomInButton => '放大';
+
+  @override
+  String get imageViewerPageZoomOutButton => '縮小';
+
+  @override
+  String get imageViewerPageResetZoomButton => '重設縮放';
+
+  @override
+  String get imageViewerPageFlipHorizontalButton => '左右鏡像';
+
+  @override
+  String get imageViewerPageFlipVerticalButton => '上下鏡像';
+
+  @override
+  String get imageViewerPageRotateLeftButton => '向左旋轉';
+
+  @override
+  String get imageViewerPageRotateRightButton => '向右旋轉';
+
+  @override
+  String imageViewerPageCounter(int index, int total) {
+    return '$index/$total';
+  }
+
+  @override
+  String imageViewerPageImageLabel(int index, int total) {
+    return '第 $index 張圖片，共 $total 張';
+  }
+
+  @override
+  String get imageViewerPageImageLoadFailed => '無法載入圖片';
 
   @override
   String get imageViewerPageSaveSuccess => '已儲存到相簿';

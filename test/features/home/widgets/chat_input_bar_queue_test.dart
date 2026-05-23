@@ -27,6 +27,8 @@ void main() {
     String? queuedPreviewText,
     VoidCallback? onCancelQueuedInput,
     String? conversationId,
+    ThemeData? theme,
+    bool backgroundImageActive = false,
   }) {
     return MultiProvider(
       providers: [
@@ -38,6 +40,7 @@ void main() {
         ),
       ],
       child: MaterialApp(
+        theme: theme,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
@@ -51,6 +54,7 @@ void main() {
             queuedPreviewText: queuedPreviewText,
             onCancelQueuedInput: onCancelQueuedInput,
             conversationId: conversationId,
+            backgroundImageActive: backgroundImageActive,
           ),
         ),
       ),
@@ -265,9 +269,109 @@ void main() {
     controller.dispose();
     focusNode.dispose();
   });
+
+  testWidgets('输入框在亮色主题下有稳定底色', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        theme: ThemeData.light(),
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    final decoration = _mainInputDecoration(tester);
+    expect(decoration.color?.a, greaterThanOrEqualTo(0.70));
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('输入框在暗色主题下不是纯透明毛玻璃', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        theme: ThemeData.dark(),
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    final decoration = _mainInputDecoration(tester);
+    expect(decoration.color?.a, greaterThanOrEqualTo(0.60));
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('输入框在背景图模式下降低纯色覆盖', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        theme: ThemeData.light(),
+        backgroundImageActive: true,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    final decoration = _mainInputDecoration(tester);
+    expect(decoration.color?.a, inExclusiveRange(0.35, 0.70));
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('输入框外层底部留白只下移一点', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Padding &&
+            widget.padding == const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      ),
+      findsOneWidget,
+    );
+
+    controller.dispose();
+    focusNode.dispose();
+  });
 }
 
 Future<void> tapSendButton(WidgetTester tester) async {
   await tester.tap(find.byIcon(Lucide.ArrowUp));
   await tester.pumpAndSettle();
+}
+
+BoxDecoration _mainInputDecoration(WidgetTester tester) {
+  final candidates = tester
+      .widgetList<Container>(find.byType(Container))
+      .map((widget) => widget.decoration)
+      .whereType<BoxDecoration>()
+      .where(
+        (decoration) => decoration.borderRadius == BorderRadius.circular(20),
+      )
+      .toList();
+
+  expect(candidates, hasLength(1));
+  return candidates.single;
 }

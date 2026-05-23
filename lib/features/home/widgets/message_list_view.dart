@@ -97,6 +97,7 @@ class MessageListView extends StatefulWidget {
     required this.selecting,
     required this.selectedItems,
     required this.dividerPadding,
+    this.topContentPadding = 8,
     this.bottomContentPadding = 16,
     this.pinnedStreamingMessageId,
     this.isPinnedIndicatorActive = false,
@@ -151,6 +152,7 @@ class MessageListView extends StatefulWidget {
   final bool selecting;
   final Set<String> selectedItems;
   final EdgeInsetsGeometry dividerPadding;
+  final double topContentPadding;
   final double bottomContentPadding;
   final String? pinnedStreamingMessageId;
   final bool isPinnedIndicatorActive;
@@ -265,7 +267,7 @@ class _MessageListViewState extends State<MessageListView> {
               controller: widget.scrollController,
               padding: EdgeInsets.fromLTRB(
                 horizontalPad,
-                8,
+                widget.topContentPadding,
                 horizontalPad,
                 widget.bottomContentPadding +
                     (widget.isPinnedIndicatorActive ? 12 : 0),
@@ -318,6 +320,7 @@ class _MessageListViewState extends State<MessageListView> {
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.depth != 0) return false;
     if (notification.metrics.axis != Axis.vertical) return false;
     if (notification is ScrollUpdateNotification) {
       if (notification.dragDetails != null) {
@@ -682,20 +685,11 @@ class _MessageListViewState extends State<MessageListView> {
         // This allows user to toggle expanded state during streaming without it being reset
         stream_ctrl.ReasoningData? streamingReasoning = r;
         if (data.reasoningText != null && data.reasoningText!.isNotEmpty) {
-          if (r != null) {
-            r.text = data.reasoningText!;
-            r.startAt = data.reasoningStartAt;
-            if (data.reasoningFinishedAt != null) {
-              r.finishedAt = data.reasoningFinishedAt;
-            }
-            streamingReasoning = r;
-          } else {
-            streamingReasoning = stream_ctrl.ReasoningData()
-              ..text = data.reasoningText!
-              ..startAt = data.reasoningStartAt
-              ..finishedAt = data.reasoningFinishedAt
-              ..expanded = false;
-          }
+          streamingReasoning = stream_ctrl.ReasoningData()
+            ..text = data.reasoningText!
+            ..startAt = data.reasoningStartAt ?? r?.startAt
+            ..finishedAt = data.reasoningFinishedAt ?? r?.finishedAt
+            ..expanded = r?.expanded ?? false;
         }
 
         // Wrap in RepaintBoundary to isolate repaints from affecting other widgets

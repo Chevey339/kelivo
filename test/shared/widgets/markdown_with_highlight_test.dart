@@ -1,11 +1,14 @@
 import 'dart:async';
 
+import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,6 +36,15 @@ List<WidgetSpan> _widgetSpansFromRichText(WidgetTester tester) {
     spans.addAll(_collectWidgetSpans(richText.text));
   }
   return spans;
+}
+
+RenderParagraph _paragraphContaining(String text) {
+  return find
+      .byType(RichText)
+      .evaluate()
+      .map((element) => element.renderObject)
+      .whereType<RenderParagraph>()
+      .firstWhere((paragraph) => paragraph.text.toPlainText().contains(text));
 }
 
 const _transparentPngDataUrl =
@@ -389,6 +401,36 @@ void main() {
     final plainText = [...richTextPlainText, ...selectablePlainText].join('\n');
     expect(plainText, contains('Name'));
     expect(plainText, contains('42'));
+  });
+
+  testWidgets('MarkdownWithCodeHighlight expands compact tables for export', (
+    tester,
+  ) async {
+    _overrideMarkdownTablePlatform(TargetPlatform.android);
+    await tester.pumpWidget(
+      _settingsHarness(
+        onSettingsReady: (_) {},
+        child: const SizedBox(
+          width: 320,
+          child: ExportCaptureScope(
+            enabled: true,
+            child: MarkdownWithCodeHighlight(
+              text: '''
+| One | Two | Three | Four | Five |
+| - | - | - | - | - |
+| Alpha | Beta | Gamma | Delta | Epsilon |
+''',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('markdown-table-horizontal-scroll')),
+      findsNothing,
+    );
   });
 
   testWidgets('MarkdownWithCodeHighlight keeps table actions out of body', (
@@ -1022,6 +1064,35 @@ ${rows.join('\n')}
   );
 
   testWidgets(
+    'MarkdownWithCodeHighlight renders blockquote as neutral leading line',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness('> 引用内容\n> 第二行', width: 320));
+      await tester.pump();
+
+      final blockquote = find.byKey(const ValueKey('markdown-blockquote'));
+      expect(blockquote, findsOneWidget);
+
+      final blockquoteWidget = tester.widget<Container>(blockquote);
+      expect(blockquoteWidget.color, isNull);
+      expect(blockquoteWidget.decoration, isNull);
+
+      final line = find.descendant(
+        of: blockquote,
+        matching: find.byKey(const ValueKey('markdown-blockquote-line')),
+      );
+      expect(line, findsOneWidget);
+      expect(tester.getSize(line).width, 3);
+
+      final lineDecoration =
+          tester.widget<DecoratedBox>(line).decoration as BoxDecoration;
+      final cs = Theme.of(tester.element(blockquote)).colorScheme;
+      expect(lineDecoration.color, cs.outlineVariant.withValues(alpha: 0.82));
+      expect(lineDecoration.borderRadius, BorderRadius.circular(2));
+      expect(lineDecoration.border, isNull);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps late document tables stable after code blocks',
     (tester) async {
       const prefix = r'''
@@ -1208,6 +1279,210 @@ $code
   );
 
   testWidgets(
+    'MarkdownWithCodeHighlight frames cached Mermaid image in preview shell',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      const code = 'graph TD\nA-->B';
+      MermaidImageCache.put(code, Uint8List.fromList(_transparentPngBytes));
+
+      await tester.pumpWidget(
+        _markdownHarness('''
+```mermaid
+$code
+```'''),
+      );
+      await tester.pump();
+
+      expect(find.text('Image'), findsOneWidget);
+      expect(find.text('Code'), findsOneWidget);
+      expect(find.text('Copy'), findsNothing);
+      expect(find.text('Export PNG'), findsNothing);
+      expect(find.text('Full screen'), findsNothing);
+      expect(find.byTooltip('Copy'), findsOneWidget);
+      expect(find.byTooltip('Export PNG'), findsOneWidget);
+      expect(find.byTooltip('Full screen'), findsOneWidget);
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('mermaid-preview-body')))
+            .height,
+        406,
+      );
+      expect(find.byType(Image), findsOneWidget);
+      expect(find.textContaining('graph TD'), findsNothing);
+    },
+  );
+
+  testWidgets('MarkdownWithCodeHighlight disables selection for Mermaid tabs', (
+    tester,
+  ) async {
+    addTearDown(MermaidImageCache.clear);
+    const code = 'graph TD\nA-->B';
+    MermaidImageCache.put(code, Uint8List.fromList(_transparentPngBytes));
+
+    await tester.pumpWidget(
+      _markdownHarness('''
+```mermaid
+$code
+```'''),
+    );
+    await tester.pump();
+
+    for (final label in ['Image', 'Code']) {
+      final selectionContainers = find.ancestor(
+        of: find.text(label),
+        matching: find.byType(SelectionContainer),
+      );
+
+      expect(
+        tester
+            .widgetList<SelectionContainer>(selectionContainers)
+            .any((widget) => widget.delegate == null),
+        isTrue,
+      );
+    }
+  });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight opens Mermaid image from preview tap',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      const code = 'graph TD\nA-->B';
+      MermaidImageCache.put(code, Uint8List.fromList(_transparentPngBytes));
+
+      await tester.pumpWidget(
+        _markdownHarness('''
+```mermaid
+$code
+```'''),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byType(Image));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ImageViewerPage), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight pins Mermaid actions to trailing edge on wide layouts',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      const code = 'graph TD\nA-->B';
+      MermaidImageCache.put(code, Uint8List.fromList(_transparentPngBytes));
+
+      await tester.pumpWidget(
+        _markdownHarness('''
+```mermaid
+$code
+```''', width: 800),
+      );
+      await tester.pump();
+
+      final bodyRight = tester
+          .getTopRight(find.byKey(const ValueKey('mermaid-preview-body')))
+          .dx;
+      final fullScreenRight = tester
+          .getTopRight(find.byTooltip('Full screen'))
+          .dx;
+
+      expect(bodyRight - fullScreenRight, lessThanOrEqualTo(14));
+    },
+  );
+
+  testWidgets('MarkdownWithCodeHighlight toggles Mermaid image and code tabs', (
+    tester,
+  ) async {
+    addTearDown(MermaidImageCache.clear);
+    const code = 'graph TD\nA-->B';
+    MermaidImageCache.put(code, Uint8List.fromList(_transparentPngBytes));
+
+    await tester.pumpWidget(
+      _markdownHarness('''
+```mermaid
+$code
+```'''),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Code'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Image), findsNothing);
+    expect(find.textContaining('graph TD'), findsOneWidget);
+
+    await tester.tap(find.text('Image'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.textContaining('graph TD'), findsNothing);
+  });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight shows fixed Mermaid loading state while rendering',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      addTearDown(() => debugMermaidBitmapRenderOverride = null);
+      debugMermaidBitmapRenderOverride = (code, isDark, themeVars) {
+        return Completer<MermaidBitmapRenderResult>().future;
+      };
+
+      await tester.pumpWidget(
+        _markdownHarness('''
+```mermaid
+graph TD
+A-->B
+```'''),
+      );
+      await tester.pump(const Duration(milliseconds: 240));
+
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('mermaid-preview-body')))
+            .height,
+        406,
+      );
+      expect(find.text('Generating image'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.byType(Image), findsNothing);
+      expect(find.textContaining('graph TD'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight shows Mermaid error preview after render failure',
+    (tester) async {
+      addTearDown(MermaidImageCache.clear);
+      addTearDown(() => debugMermaidBitmapRenderOverride = null);
+      debugMermaidBitmapRenderOverride = (code, isDark, themeVars) async {
+        return MermaidBitmapRenderResult.failed();
+      };
+
+      await tester.pumpWidget(
+        _markdownHarness('''
+```mermaid
+graph TD
+A-->
+```'''),
+      );
+      await tester.pump(const Duration(milliseconds: 240));
+      await tester.pump();
+
+      expect(
+        find.text('Generation failed. Try asking another way.'),
+        findsOneWidget,
+      );
+      expect(find.byType(Image), findsNothing);
+      expect(find.textContaining('graph TD'), findsNothing);
+
+      await tester.tap(find.text('Code'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('graph TD'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps Mermaid bitmap visible while streaming code grows',
     (tester) async {
       addTearDown(MermaidImageCache.clear);
@@ -1349,12 +1624,12 @@ A-->B
 ''', streaming: true),
       );
       await tester.pump();
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.text('Generating image'), findsOneWidget);
 
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pump();
 
-      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.text('Generating image'), findsNothing);
       expect(find.byType(Image), findsNothing);
       expect(find.textContaining('graph TD'), findsOneWidget);
       expect(find.text('Open Preview'), findsNothing);
@@ -1461,7 +1736,7 @@ A-->B
     },
   );
 
-  testWidgets('MarkdownWithCodeHighlight vertically centers inline math', (
+  testWidgets('MarkdownWithCodeHighlight baseline-aligns inline math', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -1482,7 +1757,8 @@ A-->B
         .toList();
 
     expect(mathSpans, hasLength(1));
-    expect(mathSpans.single.alignment, PlaceholderAlignment.middle);
+    expect(mathSpans.single.alignment, PlaceholderAlignment.baseline);
+    expect(mathSpans.single.baseline, TextBaseline.alphabetic);
     expect(
       find.ancestor(
         of: _findMathWidget(),
@@ -1491,6 +1767,39 @@ A-->B
       findsNothing,
     );
   });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight expands line height for tall inline math',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'相对论动量公式：$p = \frac{mv}{\sqrt{1 - \frac{v^2}{c^2}}}$',
+        ),
+      );
+      await tester.pump();
+
+      final mathSpans = _widgetSpansFromRichText(tester)
+          .where(
+            (span) => find
+                .descendant(
+                  of: find.byWidget(span.child),
+                  matching: _findMathWidget(),
+                )
+                .evaluate()
+                .isNotEmpty,
+          )
+          .toList();
+
+      expect(mathSpans, hasLength(1));
+      expect(mathSpans.single.alignment, PlaceholderAlignment.baseline);
+      expect(mathSpans.single.baseline, TextBaseline.alphabetic);
+
+      final paragraph = _paragraphContaining('相对论动量公式');
+      final mathBox = tester.renderObject<RenderBox>(_findMathWidget());
+      expect(mathBox.size.height, greaterThan(30));
+      expect(paragraph.size.height, greaterThanOrEqualTo(mathBox.size.height));
+    },
+  );
 
   testWidgets('MarkdownWithCodeHighlight keeps dollar math switch scoped', (
     tester,
@@ -1585,6 +1894,22 @@ $$
 
       expect(_findMathWidget(), findsNWidgets(2));
       expect(find.textContaining(r'$E = mc^2$'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight renders dollar math after Chinese punctuation',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'热力学第一定律本质上就是能量守恒定律：$\Delta U = Q - W$。其中 $Q$ 是系统吸收的热量，$W$ 是系统对外做的功，$\Delta U$ 是内能的变化。对于理想气体，其内能只与温度有关，即 $\Delta U = nC_v\Delta T$，其中 $n$ 为物质的量，$C_v$ 为定容摩尔热容。',
+        ),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNWidgets(7));
+      expect(find.textContaining(r'$\Delta U$'), findsNothing);
+      expect(find.textContaining(r'$C_v$'), findsNothing);
     },
   );
 

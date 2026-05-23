@@ -219,7 +219,7 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
     String mermaidJs,
     Map<String, String>? themeVars,
   ) {
-    final bg = dark ? '#111111' : '#ffffff';
+    final bg = dark ? '#212121' : '#f8f8f8';
     final fg = dark ? '#eaeaea' : '#222222';
     final escaped = code
         .replaceAll('&', '&amp;')
@@ -242,7 +242,7 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
     <script>$mermaidJs</script>
     <style>
       html,body{margin:0;padding:0;background:$bg;color:$fg;}
-      .wrap{padding:8px;}
+      .wrap{padding:24px;box-sizing:border-box;}
       .mermaid{width:100%; text-align:center;}
     </style>
   </head>
@@ -288,10 +288,11 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
             w = Math.ceil(rect.width);
             h = Math.ceil(rect.height);
           }
+          const padding = 24;
           const scale = (window.devicePixelRatio || 1) * 2;
           const canvas = document.createElement('canvas');
-          canvas.width = Math.max(1, Math.floor(w * scale));
-          canvas.height = Math.max(1, Math.floor(h * scale));
+          canvas.width = Math.max(1, Math.floor((w + padding * 2) * scale));
+          canvas.height = Math.max(1, Math.floor((h + padding * 2) * scale));
           const ctx = canvas.getContext('2d');
           const xml = new XMLSerializer().serializeToString(svg);
           const img = new Image();
@@ -299,7 +300,7 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
             try {
               ctx.fillStyle = '$bg';
               ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              ctx.drawImage(img, padding * scale, padding * scale, w * scale, h * scale);
               const data = canvas.toDataURL('image/png');
               const b64 = data.split(',')[1] || '';
               sendExport(b64);
@@ -569,7 +570,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
     String mermaidJs,
     Map<String, String>? themeVars,
   ) {
-    final bg = dark ? '#111111' : '#ffffff';
+    final bg = dark ? '#212121' : '#f8f8f8';
     final fg = dark ? '#eaeaea' : '#222222';
     final escaped = code
         .replaceAll('&', '&amp;')
@@ -593,7 +594,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
     <script>$mermaidJs</script>
     <style>
       html,body{margin:0;padding:0;background:$bg;color:$fg;}
-      .wrap{padding:8px;}
+      .wrap{padding:24px;box-sizing:border-box;}
       .mermaid{width:100%; text-align:center;}
     </style>
   </head>
@@ -637,10 +638,11 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
             w = Math.ceil(rect.width);
             h = Math.ceil(rect.height);
           }
+          const padding = 24;
           const scale = (window.devicePixelRatio || 1) * 2;
           const canvas = document.createElement('canvas');
-          canvas.width = Math.max(1, Math.floor(w * scale));
-          canvas.height = Math.max(1, Math.floor(h * scale));
+          canvas.width = Math.max(1, Math.floor((w + padding * 2) * scale));
+          canvas.height = Math.max(1, Math.floor((h + padding * 2) * scale));
           const ctx = canvas.getContext('2d');
           const xml = new XMLSerializer().serializeToString(svg);
           const img = new Image();
@@ -648,7 +650,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
             try {
               ctx.fillStyle = '$bg';
               ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              ctx.drawImage(img, padding * scale, padding * scale, w * scale, h * scale);
               const data = canvas.toDataURL('image/png');
               const b64 = data.split(',')[1] || '';
               ExportChannel.postMessage(b64);
