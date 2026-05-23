@@ -1929,6 +1929,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get chatMessageWidgetSearchResultsTitle => 'Search results';
+
+  @override
+  String get chatMessageWidgetCitationSourcesTitle => 'Citation sources';
+
+  @override
   String get chatMessageWidgetRegenerateTooltip => 'Regenerate';
 
   @override

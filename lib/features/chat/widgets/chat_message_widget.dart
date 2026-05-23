@@ -42,6 +42,7 @@ import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../home/services/tool_approval_service.dart';
 import '../utils/thinking_tag_parser.dart';
+import 'citation_sources_sheet.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
 
@@ -2707,170 +2708,50 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   void _showCitationsSheet(List<Map<String, dynamic>> items) {
-    final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    final bool isDesktop =
-        defaultTargetPlatform == TargetPlatform.macOS ||
-        defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.linux;
+    final sources = <CitationSourceItem>[
+      for (int i = 0; i < items.length; i++)
+        CitationSourceItem.fromMap(items[i], fallbackIndex: i + 1),
+    ];
 
-    if (isDesktop) {
-      showDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        builder: (ctx) {
-          return Dialog(
-            elevation: 12,
-            insetPadding: const EdgeInsets.symmetric(
-              horizontal: 24,
-              vertical: 24,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minWidth: 380,
-                maxWidth: 460,
-                maxHeight: 360,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Material(
-                  color: cs.surface,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Header
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-                        child: Row(
-                          children: [
-                            Icon(Lucide.BookOpen, size: 18, color: cs.primary),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                l10n.chatMessageWidgetCitationsTitle(
-                                  items.length,
-                                ),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            Tooltip(
-                              message: l10n.mcpPageClose,
-                              child: IconButton(
-                                icon: Icon(
-                                  Lucide.X,
-                                  size: 18,
-                                  color: cs.onSurface.withValues(alpha: 0.75),
-                                ),
-                                onPressed: () => Navigator.of(ctx).maybePop(),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Body
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          child: SingleChildScrollView(
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 6),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  for (int i = 0; i < items.length; i++)
-                                    _SearchResultCard(
-                                      index: (items[i]['index'] ?? (i + 1))
-                                          .toString(),
-                                      title: (items[i]['title'] ?? '')
-                                          .toString(),
-                                      url: (items[i]['url'] ?? '').toString(),
-                                      text: (items[i]['text'] ?? '').toString(),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
+    showCitationSourcesBottomSheet(
+      context: context,
+      title: l10n.chatMessageWidgetSearchResultsTitle,
+      closeSemanticLabel: l10n.mcpPageClose,
+      items: sources,
+      onOpen: _openCitationSource,
+    );
+  }
+
+  Future<void> _openCitationSource(CitationSourceItem item) async {
+    final l10n = AppLocalizations.of(context)!;
+    final uri = _tryNormalizeExternalUri(item.url);
+    if (uri == null) {
+      showAppSnackBar(
+        context,
+        message: l10n.chatMessageWidgetOpenLinkError,
+        type: NotificationType.error,
       );
       return;
     }
-
-    // Mobile: keep bottom sheet
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: cs.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        final bottomInset = MediaQuery.viewInsetsOf(ctx).bottom;
-        return SafeArea(
-          child: FractionallySizedBox(
-            heightFactor: 0.5,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, bottomInset + 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Lucide.BookOpen, size: 18, color: cs.primary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          l10n.chatMessageWidgetCitationsTitle(items.length),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            for (int i = 0; i < items.length; i++)
-                              _SearchResultCard(
-                                index: (items[i]['index'] ?? (i + 1))
-                                    .toString(),
-                                title: (items[i]['title'] ?? '').toString(),
-                                url: (items[i]['url'] ?? '').toString(),
-                                text: (items[i]['text'] ?? '').toString(),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!mounted) return;
+      if (!ok) {
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetCannotOpenUrl(uri.toString()),
+          type: NotificationType.error,
         );
-      },
-    );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.chatMessageWidgetOpenLinkError,
+        type: NotificationType.error,
+      );
+    }
   }
 
   Widget _buildAssistantAvatar(ColorScheme cs) {
@@ -5636,197 +5517,6 @@ class _ApprovalButton extends StatelessWidget {
             fontWeight: FontWeight.w600,
             color: enabled ? color : color.withValues(alpha: 0.45),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Card-style search result item for tool detail view.
-/// Shows favicon, title, text snippet, and URL in a tappable card.
-class _SearchResultCard extends StatelessWidget {
-  const _SearchResultCard({
-    required this.title,
-    required this.url,
-    this.text = '',
-    this.index,
-  });
-  final String title;
-  final String url;
-  final String text;
-  final String? index;
-
-  static final _pureNumber = RegExp(r'^\d+$');
-
-  String _domain(String url) {
-    try {
-      return _tryNormalizeExternalUri(url)?.host ?? '';
-    } catch (_) {
-      return '';
-    }
-  }
-
-  /// A title is "real" if it is non-empty and not a pure number like "1","2".
-  bool _hasRealTitle() =>
-      title.isNotEmpty && !_pureNumber.hasMatch(title.trim());
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final domain = _domain(url);
-    final faviconUrl = domain.isNotEmpty ? 'https://favicone.com/$domain' : '';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: IosCardPress(
-        borderRadius: BorderRadius.circular(12),
-        baseColor: isDark
-            ? cs.surfaceContainerHighest.withValues(alpha: 0.5)
-            : cs.surfaceContainerHighest.withValues(alpha: 0.45),
-        pressedScale: 1.0,
-        duration: const Duration(milliseconds: 200),
-        onTap: () async {
-          final l10n = AppLocalizations.of(context)!;
-          final uri = _tryNormalizeExternalUri(url);
-          if (uri == null) {
-            showAppSnackBar(
-              context,
-              message: l10n.chatMessageWidgetOpenLinkError,
-              type: NotificationType.error,
-            );
-            return;
-          }
-          try {
-            final ok = await launchUrl(
-              uri,
-              mode: LaunchMode.externalApplication,
-            );
-            if (!ok && context.mounted) {
-              showAppSnackBar(
-                context,
-                message: l10n.chatMessageWidgetCannotOpenUrl(uri.toString()),
-                type: NotificationType.error,
-              );
-            }
-          } catch (_) {
-            if (!context.mounted) return;
-            showAppSnackBar(
-              context,
-              message: l10n.chatMessageWidgetOpenLinkError,
-              type: NotificationType.error,
-            );
-          }
-        },
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Favicon with optional index badge
-            SizedBox(
-              width: 36,
-              height: 36,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        color: cs.surfaceContainerHigh,
-                        child: faviconUrl.isNotEmpty
-                            ? Image.network(
-                                faviconUrl,
-                                width: 32,
-                                height: 32,
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => Icon(
-                                  Lucide.Globe,
-                                  size: 18,
-                                  color: cs.onSurface.withValues(alpha: 0.5),
-                                ),
-                              )
-                            : Icon(
-                                Lucide.Globe,
-                                size: 18,
-                                color: cs.onSurface.withValues(alpha: 0.5),
-                              ),
-                      ),
-                    ),
-                  ),
-                  if (index != null)
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: cs.primary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          index!,
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: cs.onPrimary,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    _hasRealTitle() ? title : domain,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  // Text snippet
-                  if (text.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      text,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurface.withValues(alpha: 0.6),
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  // URL
-                  const SizedBox(height: 3),
-                  Text(
-                    url,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: cs.onSurface.withValues(alpha: 0.4),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );

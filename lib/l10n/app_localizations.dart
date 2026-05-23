@@ -3713,6 +3713,18 @@ abstract class AppLocalizations {
   /// **'Citations ({count})'**
   String chatMessageWidgetCitationsTitle(int count);
 
+  /// No description provided for @chatMessageWidgetSearchResultsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search results'**
+  String get chatMessageWidgetSearchResultsTitle;
+
+  /// No description provided for @chatMessageWidgetCitationSourcesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Citation sources'**
+  String get chatMessageWidgetCitationSourcesTitle;
+
   /// No description provided for @chatMessageWidgetRegenerateTooltip.
   ///
   /// In en, this message translates to:

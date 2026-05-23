@@ -684,6 +684,8 @@
   "chatMessageWidgetCannotOpenUrl": "无法打开链接: {url}",
   "chatMessageWidgetOpenLinkError": "打开链接失败",
   "chatMessageWidgetCitationsTitle": "引用（共{count}条）",
+  "chatMessageWidgetSearchResultsTitle": "搜索结果",
+  "chatMessageWidgetCitationSourcesTitle": "引用来源",
   "chatMessageWidgetRegenerateTooltip": "重新生成",
   "chatMessageWidgetRegenerateConfirmTitle": "确认重新生成",
   "chatMessageWidgetRegenerateConfirmContent": "重新生成只会更新当前消息，不会删除下面的消息。确定要继续吗？",

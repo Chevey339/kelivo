@@ -799,6 +799,8 @@
       }
     }
   },
+  "chatMessageWidgetSearchResultsTitle": "Search results",
+  "chatMessageWidgetCitationSourcesTitle": "Citation sources",
   "chatMessageWidgetRegenerateTooltip": "Regenerate",
   "chatMessageWidgetRegenerateConfirmTitle": "Confirm Regenerate",
   "chatMessageWidgetRegenerateConfirmContent": "Regenerating only updates this message and keeps the messages below it. Continue?",

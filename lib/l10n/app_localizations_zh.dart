@@ -1875,6 +1875,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get chatMessageWidgetSearchResultsTitle => '搜索结果';
+
+  @override
+  String get chatMessageWidgetCitationSourcesTitle => '引用来源';
+
+  @override
   String get chatMessageWidgetRegenerateTooltip => '重新生成';
 
   @override
@@ -6811,6 +6817,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String get chatMessageWidgetSearchResultsTitle => '搜索结果';
+
+  @override
+  String get chatMessageWidgetCitationSourcesTitle => '引用来源';
+
+  @override
   String get chatMessageWidgetRegenerateTooltip => '重新生成';
 
   @override
@@ -11744,6 +11756,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String chatMessageWidgetCitationsTitle(int count) {
     return '引用（共$count條）';
   }
+
+  @override
+  String get chatMessageWidgetSearchResultsTitle => '搜尋結果';
+
+  @override
+  String get chatMessageWidgetCitationSourcesTitle => '引用來源';
 
   @override
   String get chatMessageWidgetRegenerateTooltip => '重新生成';

@@ -642,6 +642,8 @@
   "chatMessageWidgetCannotOpenUrl": "無法開啟連結: {url}",
   "chatMessageWidgetOpenLinkError": "開啟連結失敗",
   "chatMessageWidgetCitationsTitle": "引用（共{count}條）",
+  "chatMessageWidgetSearchResultsTitle": "搜尋結果",
+  "chatMessageWidgetCitationSourcesTitle": "引用來源",
   "chatMessageWidgetRegenerateTooltip": "重新生成",
   "chatMessageWidgetRegenerateConfirmTitle": "確認重新生成",
   "chatMessageWidgetRegenerateConfirmContent": "重新生成只會更新目前訊息，不會刪除下面的訊息。確定要繼續嗎？",
