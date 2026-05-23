@@ -1064,6 +1064,35 @@ ${rows.join('\n')}
   );
 
   testWidgets(
+    'MarkdownWithCodeHighlight renders blockquote as neutral leading line',
+    (tester) async {
+      await tester.pumpWidget(_markdownHarness('> 引用内容\n> 第二行', width: 320));
+      await tester.pump();
+
+      final blockquote = find.byKey(const ValueKey('markdown-blockquote'));
+      expect(blockquote, findsOneWidget);
+
+      final blockquoteWidget = tester.widget<Container>(blockquote);
+      expect(blockquoteWidget.color, isNull);
+      expect(blockquoteWidget.decoration, isNull);
+
+      final line = find.descendant(
+        of: blockquote,
+        matching: find.byKey(const ValueKey('markdown-blockquote-line')),
+      );
+      expect(line, findsOneWidget);
+      expect(tester.getSize(line).width, 3);
+
+      final lineDecoration =
+          tester.widget<DecoratedBox>(line).decoration as BoxDecoration;
+      final cs = Theme.of(tester.element(blockquote)).colorScheme;
+      expect(lineDecoration.color, cs.outlineVariant.withValues(alpha: 0.82));
+      expect(lineDecoration.borderRadius, BorderRadius.circular(2));
+      expect(lineDecoration.border, isNull);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps late document tables stable after code blocks',
     (tester) async {
       const prefix = r'''

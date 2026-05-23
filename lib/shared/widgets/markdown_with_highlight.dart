@@ -4007,7 +4007,7 @@ class LabelValueLineMd extends InlineMd {
   }
 }
 
-// Modern, app-styled block quote with soft background and accent border
+// Minimal block quote with a neutral rounded leading line.
 class ModernBlockQuote extends InlineMd {
   @override
   bool get inline => false;
@@ -4034,8 +4034,7 @@ class ModernBlockQuote extends InlineMd {
     final data = _unmaskBlockquoteFenceMarkers(sb.toString().trim());
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = cs.primaryContainer.withValues(alpha: isDark ? 0.18 : 0.12);
-    final accent = cs.primary.withValues(alpha: isDark ? 0.90 : 0.80);
+    final lineColor = cs.outlineVariant.withValues(alpha: isDark ? 0.52 : 0.82);
     final innerComponents =
         (config.components ?? MarkdownComponent.globalComponents)
             .where((component) => component is! CodeBlockMd)
@@ -4056,14 +4055,30 @@ class ModernBlockQuote extends InlineMd {
       child: Container(
         key: const ValueKey('markdown-blockquote'),
         margin: const EdgeInsets.symmetric(vertical: 6),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border(left: BorderSide(color: accent, width: 3)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-          child: innerMarkdown,
+        child: Stack(
+          children: [
+            PositionedDirectional(
+              start: 0,
+              top: 2,
+              bottom: 2,
+              width: 3,
+              child: DecoratedBox(
+                key: const ValueKey('markdown-blockquote-line'),
+                decoration: BoxDecoration(
+                  color: lineColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsetsDirectional.only(
+                start: 13,
+                top: 2,
+                bottom: 2,
+              ),
+              child: innerMarkdown,
+            ),
+          ],
         ),
       ),
     );
