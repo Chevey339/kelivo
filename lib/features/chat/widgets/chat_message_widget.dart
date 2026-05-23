@@ -5675,9 +5675,7 @@ class _SearchResultCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final domain = _domain(url);
-    final faviconUrl = domain.isNotEmpty
-        ? 'https://www.google.com/s2/favicons?domain=$domain&sz=32'
-        : '';
+    final faviconUrl = domain.isNotEmpty ? 'https://favicone.com/$domain' : '';
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: IosCardPress(
