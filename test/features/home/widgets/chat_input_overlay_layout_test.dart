@@ -75,6 +75,7 @@ void main() {
 
     final fadeFinder = find.byKey(fadeKey);
     expect(fadeFinder, findsOneWidget);
+    expect(tester.getTopLeft(fadeFinder).dy, 480);
     expect(tester.getBottomLeft(fadeFinder).dy, 600);
 
     final decoration = tester.widget<DecoratedBox>(
@@ -111,7 +112,7 @@ void main() {
     final fadeFinder = find.byKey(fadeKey);
     expect(fadeFinder, findsOneWidget);
     expect(tester.getTopLeft(fadeFinder).dy, 0);
-    expect(tester.getBottomLeft(fadeFinder).dy, 128);
+    expect(tester.getBottomLeft(fadeFinder).dy, 116);
 
     final decoration = tester.widget<DecoratedBox>(
       find.descendant(of: fadeFinder, matching: find.byType(DecoratedBox)),
@@ -167,7 +168,7 @@ void main() {
       ),
     );
     final clip = clipRect.clipper!.getClip(const Size(400, 600));
-    expect(clip.height, 128);
+    expect(clip.height, 116);
 
     final bottomClipRect = tester.widget<ClipRect>(
       find.ancestor(
@@ -176,7 +177,7 @@ void main() {
       ),
     );
     final bottomClip = bottomClipRect.clipper!.getClip(const Size(400, 600));
-    expect(bottomClip.top, 420);
-    expect(bottomClip.height, 180);
+    expect(bottomClip.top, 480);
+    expect(bottomClip.height, 120);
   });
 }
