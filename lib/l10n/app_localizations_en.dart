@@ -2017,7 +2017,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String chatMessageWidgetCitationsCount(int count) {
-    return 'Citations ($count)';
+    return '$count citations';
   }
 
   @override

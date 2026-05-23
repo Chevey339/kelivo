@@ -2017,6 +2017,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         (translationText != null && translationText.isNotEmpty);
     final bool isTranslating =
         translationText == l10n.chatMessageWidgetTranslating;
+    final latestSearchItems = _latestSearchItems();
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -2344,11 +2345,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             ),
           ],
           // Sources summary card (tap to open full citations)
-          if (_latestSearchItems().isNotEmpty) ...[
+          if (latestSearchItems.isNotEmpty) ...[
             const SizedBox(height: 8),
             _SourcesSummaryCard(
-              count: _latestSearchItems().length,
-              onTap: () => _showCitationsSheet(_latestSearchItems()),
+              count: latestSearchItems.length,
+              items: latestSearchItems,
+              onTap: () => _showCitationsSheet(latestSearchItems),
             ),
           ],
           // Action buttons (hidden while generating)
@@ -5524,38 +5526,160 @@ class _ApprovalButton extends StatelessWidget {
 }
 
 class _SourcesSummaryCard extends StatelessWidget {
-  const _SourcesSummaryCard({required this.count, required this.onTap});
+  const _SourcesSummaryCard({
+    required this.count,
+    required this.items,
+    required this.onTap,
+  });
+
   final int count;
+  final List<Map<String, dynamic>> items;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final label = l10n.chatMessageWidgetCitationsCount(count);
+    final isDark = theme.brightness == Brightness.dark;
+
     return IosCardPress(
-      borderRadius: BorderRadius.circular(12),
-      baseColor: cs.primaryContainer.withValues(
-        alpha: Theme.of(context).brightness == Brightness.dark ? 0.25 : 0.30,
-      ),
+      borderRadius: BorderRadius.circular(20),
+      baseColor: isDark
+          ? cs.surfaceContainerHighest.withValues(alpha: 0.48)
+          : const Color(0xFFF7F7F7),
       pressedScale: 1.0,
       duration: const Duration(milliseconds: 260),
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Lucide.BookOpen, size: 16, color: cs.secondary),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: cs.secondary,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 18),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SourceFaviconStack(items: items),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface.withValues(alpha: isDark ? 0.90 : 0.86),
+              ),
             ),
-          ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SourceFaviconStack extends StatelessWidget {
+  const _SourceFaviconStack({required this.items});
+
+  final List<Map<String, dynamic>> items;
+
+  static const double _iconSize = 16;
+  static const double _slotSize = 18;
+  static const double _overlapStep = 11;
+  static const int _maxIcons = 3;
+
+  @override
+  Widget build(BuildContext context) {
+    final domains = _domains();
+    if (domains.isEmpty) {
+      return const _SourceFaviconFallback(size: _slotSize);
+    }
+
+    return SizedBox(
+      width: _slotSize + (domains.length - 1) * _overlapStep,
+      height: _slotSize,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (var i = 0; i < domains.length; i++)
+            PositionedDirectional(
+              start: i * _overlapStep,
+              top: 1,
+              child: _SourceFavicon(domain: domains[i]),
+            ),
         ],
+      ),
+    );
+  }
+
+  List<String> _domains() {
+    final seen = <String>{};
+    final domains = <String>[];
+    for (final item in items) {
+      final url = (item['url'] ?? '').toString();
+      final host = _tryNormalizeExternalUri(url)?.host ?? '';
+      if (host.isEmpty || !seen.add(host)) {
+        continue;
+      }
+      domains.add(host);
+      if (domains.length == _maxIcons) {
+        break;
+      }
+    }
+    return domains;
+  }
+}
+
+class _SourceFavicon extends StatelessWidget {
+  const _SourceFavicon({required this.domain});
+
+  final String domain;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : Colors.black.withValues(alpha: 0.06);
+
+    return Container(
+      width: _SourceFaviconStack._iconSize,
+      height: _SourceFaviconStack._iconSize,
+      decoration: BoxDecoration(
+        color: isDark ? cs.surfaceContainerHigh : cs.surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: borderColor, width: 0.5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.network(
+        'https://favicone.com/$domain',
+        width: _SourceFaviconStack._iconSize,
+        height: _SourceFaviconStack._iconSize,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            const _SourceFaviconFallback(size: _SourceFaviconStack._iconSize),
+      ),
+    );
+  }
+}
+
+class _SourceFaviconFallback extends StatelessWidget {
+  const _SourceFaviconFallback({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Icon(
+        Lucide.Globe,
+        size: size * 0.72,
+        color: cs.onSurface.withValues(alpha: 0.52),
       ),
     );
   }

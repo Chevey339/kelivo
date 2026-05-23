@@ -3872,7 +3872,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatMessageWidgetCitationsCount.
   ///
   /// In en, this message translates to:
-  /// **'Citations ({count})'**
+  /// **'{count} citations'**
   String chatMessageWidgetCitationsCount(int count);
 
   /// No description provided for @chatSelectionSelectedCountTitle.

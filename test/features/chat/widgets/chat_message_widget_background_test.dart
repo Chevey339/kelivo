@@ -13,6 +13,7 @@ import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart'
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 
 SettingsProvider _createSettings(ChatMessageBackgroundStyle style) {
   final rawStyle = switch (style) {
@@ -30,6 +31,7 @@ Widget _buildHarness({
   required SettingsProvider settings,
   required Widget child,
   AskUserInteractionService? askUserService,
+  Locale? locale,
 }) {
   return MultiProvider(
     providers: [
@@ -41,6 +43,7 @@ Widget _buildHarness({
       ),
     ],
     child: MaterialApp(
+      locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(body: child),
@@ -51,10 +54,122 @@ Widget _buildHarness({
 Color _expectedNeutralStrong() =>
     ThemeData.light().colorScheme.onSurface.withValues(alpha: 0.78);
 
+Finder _findNetworkImage(String url) {
+  return find.byWidgetPredicate(
+    (widget) =>
+        widget is Image &&
+        widget.image is NetworkImage &&
+        (widget.image as NetworkImage).url == url,
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('ChatMessageWidget card background style', () {
+    testWidgets('search citations render source capsule with favicon stack', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          locale: const Locale('zh'),
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: 'Answer with search citations.',
+              conversationId: 'conversation-search-capsule',
+            ),
+            showModelIcon: false,
+            toolParts: const [
+              ToolUIPart(
+                id: 'builtin-search-result',
+                toolName: 'builtin_search',
+                arguments: {},
+                content:
+                    '{"items":[{"title":"One","url":"https://one.example.com/a","text":"A"},{"title":"Two","url":"https://two.example.com/b","text":"B"},{"title":"Three","url":"https://three.example.com/c","text":"C"},{"title":"Four","url":"https://four.example.com/d","text":"D"}]}',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('4个引用'), findsOneWidget);
+      expect(find.byIcon(Lucide.BookOpen), findsNothing);
+
+      final capsule = tester.widget<IosCardPress>(
+        find.ancestor(
+          of: find.text('4个引用'),
+          matching: find.byType(IosCardPress),
+        ),
+      );
+      expect(capsule.borderRadius, BorderRadius.circular(20));
+      expect(
+        capsule.padding,
+        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      );
+
+      expect(
+        _findNetworkImage('https://favicone.com/one.example.com'),
+        findsOneWidget,
+      );
+      expect(
+        _findNetworkImage('https://favicone.com/two.example.com'),
+        findsOneWidget,
+      );
+      expect(
+        _findNetworkImage('https://favicone.com/three.example.com'),
+        findsOneWidget,
+      );
+      expect(
+        _findNetworkImage('https://favicone.com/four.example.com'),
+        findsNothing,
+      );
+
+      await tester.tap(find.text('4个引用'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('搜索结果'), findsOneWidget);
+      expect(find.text('Four'), findsOneWidget);
+    });
+
+    testWidgets('search citation capsule falls back when source url is invalid', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          locale: const Locale('zh'),
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: 'Answer with one broken citation.',
+              conversationId: 'conversation-search-capsule-invalid-url',
+            ),
+            showModelIcon: false,
+            toolParts: const [
+              ToolUIPart(
+                id: 'builtin-search-invalid-url',
+                toolName: 'builtin_search',
+                arguments: {},
+                content:
+                    '{"items":[{"title":"Broken","url":"","text":"No usable source"}]}',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('1个引用'), findsOneWidget);
+      expect(find.byIcon(Lucide.Globe), findsOneWidget);
+    });
+
     testWidgets('thinking/tool timeline card uses blur in frosted mode', (
       tester,
     ) async {

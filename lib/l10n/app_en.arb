@@ -846,7 +846,7 @@
   "chatMessageWidgetArguments": "Arguments",
   "chatMessageWidgetResult": "Result",
   "chatMessageWidgetImages": "Images",
-  "chatMessageWidgetCitationsCount": "Citations ({count})",
+  "chatMessageWidgetCitationsCount": "{count} citations",
   "@chatMessageWidgetCitationsCount": {
     "placeholders": {
       "count": {

@@ -1962,7 +1962,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String chatMessageWidgetCitationsCount(int count) {
-    return '共$count条引用';
+    return '$count个引用';
   }
 
   @override
@@ -6904,7 +6904,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String chatMessageWidgetCitationsCount(int count) {
-    return '共$count条引用';
+    return '$count个引用';
   }
 
   @override
@@ -11845,7 +11845,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String chatMessageWidgetCitationsCount(int count) {
-    return '共$count條引用';
+    return '$count個引用';
   }
 
   @override

@@ -710,7 +710,7 @@
   "chatMessageWidgetArguments": "参数",
   "chatMessageWidgetResult": "结果",
   "chatMessageWidgetImages": "图片",
-  "chatMessageWidgetCitationsCount": "共{count}条引用",
+  "chatMessageWidgetCitationsCount": "{count}个引用",
   "chatSelectionSelectedCountTitle": "已选择{count}条消息",
   "chatSelectionExportTxt": "TXT",
   "chatSelectionExportMd": "MD",

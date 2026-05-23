@@ -668,7 +668,7 @@
   "chatMessageWidgetArguments": "參數",
   "chatMessageWidgetResult": "結果",
   "chatMessageWidgetImages": "圖片",
-  "chatMessageWidgetCitationsCount": "共{count}條引用",
+  "chatMessageWidgetCitationsCount": "{count}個引用",
   "chatSelectionSelectedCountTitle": "已選擇{count}條訊息",
   "chatSelectionExportTxt": "TXT",
   "chatSelectionExportMd": "MD",
