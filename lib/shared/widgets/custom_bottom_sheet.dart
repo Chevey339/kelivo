@@ -71,35 +71,44 @@ class CustomBottomSheet extends StatefulWidget {
 class _CustomBottomSheetState extends State<CustomBottomSheet>
     with SingleTickerProviderStateMixin {
   static const double _flingVelocityThreshold = 400;
-  static const double _dismissExtentGap = 0.08;
-  static const double _minimumContentLayoutHeight = 112;
-  static const double _dismissOverscrollThreshold = 24;
+  static const double _dismissDistanceThreshold = 200;
+  static const double _dismissExtentGapPx = 10;
 
-  late final AnimationController _presentationController;
-  final DraggableScrollableController _sheetController =
-      DraggableScrollableController();
-  double _extent = 0.60;
-  double _handleDragStartExtent = 0.60;
-  double? _scrollDragStartExtent;
-  double _topOverscrollDistance = 0;
-  bool _handleDragging = false;
-  bool _scrollDragChangedSheetExtent = false;
+  late final AnimationController _sheetAnimationController;
+  final ScrollController _scrollController = ScrollController();
+  Animation<double>? _topAnimation;
+  VoidCallback? _animationComplete;
+  double? _sheetTop;
+  double? _lastParentHeight;
+  double _handleDragStartTop = 0;
+  double _contentDragStartTop = 0;
+  int? _contentPointer;
+  double? _lastContentPointerY;
+  bool _contentDragChangedSheetTop = false;
   bool _dismissScheduled = false;
 
   @override
   void initState() {
     super.initState();
-    _presentationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 260),
-      reverseDuration: const Duration(milliseconds: 220),
-    )..forward();
+    _sheetAnimationController = AnimationController(vsync: this)
+      ..addListener(() {
+        final animation = _topAnimation;
+        if (animation == null) return;
+        setState(() => _sheetTop = animation.value);
+      })
+      ..addStatusListener((status) {
+        if (status != AnimationStatus.completed) return;
+        _topAnimation = null;
+        final onComplete = _animationComplete;
+        _animationComplete = null;
+        onComplete?.call();
+      });
   }
 
   @override
   void dispose() {
-    _presentationController.dispose();
-    _sheetController.dispose();
+    _sheetAnimationController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -115,340 +124,344 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
             : MediaQuery.sizeOf(context).height;
         final partialExtent = widget.partialHeightFactor;
         final expandedExtent = widget.expandedHeightFactor;
+        final expandedTop = parentHeight * (1 - expandedExtent);
+        final partialTop = parentHeight * (1 - partialExtent);
+        final hiddenTop = parentHeight;
+        final expandedHeight = parentHeight * expandedExtent;
 
-        return AnimatedBuilder(
-          animation: _presentationController,
-          builder: (context, _) {
-            final presentationProgress = Curves.easeOutCubic.transform(
-              _presentationController.value,
-            );
-            final sheetProgress =
-                (_extent / expandedExtent).clamp(0.0, 1.0).toDouble() *
-                presentationProgress;
+        _syncSheetTop(
+          parentHeight: parentHeight,
+          expandedTop: expandedTop,
+          partialTop: partialTop,
+          hiddenTop: hiddenTop,
+        );
 
-            return Material(
-              type: MaterialType.transparency,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _dismiss,
-                      child: ColoredBox(
-                        color: Colors.black.withValues(
-                          alpha: 0.12 * sheetProgress,
-                        ),
-                      ),
-                    ),
+        final sheetTop = _sheetTop ?? hiddenTop;
+        final sheetProgress =
+            ((hiddenTop - sheetTop) / (hiddenTop - expandedTop))
+                .clamp(0.0, 1.0)
+                .toDouble();
+
+        return Material(
+          type: MaterialType.transparency,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _dismiss,
+                  child: ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.12 * sheetProgress),
                   ),
-                  Transform.translate(
-                    offset: Offset(
-                      0,
-                      parentHeight * (1 - presentationProgress),
-                    ),
-                    child: NotificationListener<ScrollStartNotification>(
-                      onNotification: (notification) {
-                        if (notification.metrics.axis != Axis.vertical) {
-                          return false;
-                        }
-                        _scrollDragStartExtent = _currentExtent(partialExtent);
-                        _topOverscrollDistance = 0;
-                        _scrollDragChangedSheetExtent = false;
-                        return false;
-                      },
-                      child: NotificationListener<ScrollEndNotification>(
-                        onNotification: (notification) {
-                          if (notification.metrics.axis != Axis.vertical) {
-                            return false;
-                          }
-                          _settleScrollDrag(
-                            partialExtent: partialExtent,
-                            expandedExtent: expandedExtent,
-                          );
-                          return false;
-                        },
-                        child: NotificationListener<OverscrollNotification>(
-                          onNotification: (notification) {
-                            _handleOverscroll(
-                              notification,
-                              partialExtent: partialExtent,
-                            );
-                            return false;
-                          },
-                          child:
-                              NotificationListener<
-                                DraggableScrollableNotification
-                              >(
-                                onNotification: (notification) {
-                                  if (!_dismissScheduled) {
-                                    final changed =
-                                        (notification.extent - _extent).abs() >
-                                        0.001;
-                                    if (changed && !_handleDragging) {
-                                      _scrollDragStartExtent ??= _extent;
-                                      _scrollDragChangedSheetExtent = true;
-                                    }
-                                    setState(
-                                      () => _extent = notification.extent,
-                                    );
-                                  }
-                                  return false;
-                                },
-                                child: DraggableScrollableSheet(
-                                  controller: _sheetController,
-                                  initialChildSize: partialExtent,
-                                  minChildSize: partialExtent,
-                                  maxChildSize: expandedExtent,
-                                  builder: (context, scrollController) {
-                                    return ClipRRect(
-                                      key: CustomBottomSheet.panelKey,
-                                      borderRadius: const BorderRadius.vertical(
-                                        top: Radius.circular(20),
-                                      ),
-                                      child: ColoredBox(
-                                        color: cs.surface,
-                                        child: LayoutBuilder(
-                                          builder: (context, panelConstraints) {
-                                            if (panelConstraints.maxHeight <
-                                                _minimumContentLayoutHeight) {
-                                              return const SizedBox.shrink();
-                                            }
-
-                                            return SafeArea(
-                                              top: false,
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.stretch,
-                                                children: [
-                                                  GestureDetector(
-                                                    behavior:
-                                                        HitTestBehavior.opaque,
-                                                    onVerticalDragStart: (_) {
-                                                      _handleDragging = true;
-                                                      _handleDragStartExtent =
-                                                          _currentExtent(
-                                                            partialExtent,
-                                                          );
-                                                    },
-                                                    onVerticalDragUpdate:
-                                                        (details) {
-                                                          final next =
-                                                              _currentExtent(
-                                                                partialExtent,
-                                                              ) -
-                                                              details.delta.dy /
-                                                                  parentHeight;
-                                                          _jumpToExtent(
-                                                            next.clamp(
-                                                              partialExtent,
-                                                              expandedExtent,
-                                                            ),
-                                                          );
-                                                        },
-                                                    onVerticalDragEnd: (details) {
-                                                      _handleDragging = false;
-                                                      _settleHandle(
-                                                        velocityY:
-                                                            details
-                                                                .primaryVelocity ??
-                                                            0,
-                                                        partialExtent:
-                                                            partialExtent,
-                                                        expandedExtent:
-                                                            expandedExtent,
-                                                      );
-                                                    },
-                                                    onVerticalDragCancel: () {
-                                                      _handleDragging = false;
-                                                      _animateToExtent(
-                                                        partialExtent,
-                                                      );
-                                                    },
-                                                    child: _DragHandle(
-                                                      color: cs.onSurface,
-                                                    ),
-                                                  ),
-                                                  _SheetHeader(
-                                                    title: widget.title,
-                                                    count: widget.count,
-                                                    closeSemanticLabel: widget
-                                                        .closeSemanticLabel,
-                                                    onClose: _dismiss,
-                                                  ),
-                                                  Expanded(
-                                                    child:
-                                                        widget.builder?.call(
-                                                          context,
-                                                          scrollController,
-                                                        ) ??
-                                                        SingleChildScrollView(
-                                                          controller:
-                                                              scrollController,
-                                                          child: widget.child,
-                                                        ),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            );
-          },
+              Positioned(
+                left: 0,
+                right: 0,
+                top: sheetTop,
+                height: expandedHeight,
+                child: ClipRRect(
+                  key: CustomBottomSheet.panelKey,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
+                  child: ColoredBox(
+                    color: cs.surface,
+                    child: SafeArea(
+                      top: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onVerticalDragStart: (_) {
+                              _handleDragStartTop = _currentTop(partialTop);
+                            },
+                            onVerticalDragUpdate: (details) {
+                              _dragSheetBy(
+                                details.delta.dy,
+                                expandedTop: expandedTop,
+                                hiddenTop: hiddenTop,
+                              );
+                            },
+                            onVerticalDragEnd: (details) {
+                              _settleDrag(
+                                startTop: _handleDragStartTop,
+                                currentTop: _currentTop(partialTop),
+                                velocityY: details.primaryVelocity ?? 0,
+                                expandedTop: expandedTop,
+                                partialTop: partialTop,
+                              );
+                            },
+                            onVerticalDragCancel: () {
+                              _animateToTop(partialTop);
+                            },
+                            child: _DragHandle(color: cs.onSurface),
+                          ),
+                          _SheetHeader(
+                            title: widget.title,
+                            count: widget.count,
+                            closeSemanticLabel: widget.closeSemanticLabel,
+                            onClose: _dismiss,
+                          ),
+                          Expanded(
+                            child: Listener(
+                              onPointerDown: (event) => _startContentDrag(
+                                event.pointer,
+                                event.position.dy,
+                                partialTop: partialTop,
+                              ),
+                              onPointerMove: (event) => _updateContentDrag(
+                                event.pointer,
+                                event.position.dy,
+                                expandedTop: expandedTop,
+                                partialTop: partialTop,
+                                hiddenTop: hiddenTop,
+                              ),
+                              onPointerUp: (event) => _endContentDrag(
+                                event.pointer,
+                                expandedTop: expandedTop,
+                                partialTop: partialTop,
+                              ),
+                              onPointerCancel: (event) => _cancelContentDrag(
+                                event.pointer,
+                                partialTop: partialTop,
+                              ),
+                              child:
+                                  widget.builder?.call(
+                                    context,
+                                    _scrollController,
+                                  ) ??
+                                  SingleChildScrollView(
+                                    controller: _scrollController,
+                                    child: widget.child,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
   }
 
-  double _currentExtent(double fallback) {
-    if (!_sheetController.isAttached) return fallback;
-    return _sheetController.size;
-  }
-
-  void _jumpToExtent(double extent) {
-    if (!_sheetController.isAttached) return;
-    _sheetController.jumpTo(extent);
-  }
-
-  void _handleOverscroll(
-    OverscrollNotification notification, {
-    required double partialExtent,
+  void _syncSheetTop({
+    required double parentHeight,
+    required double expandedTop,
+    required double partialTop,
+    required double hiddenTop,
   }) {
-    if (notification.metrics.axis != Axis.vertical) return;
-    final dragDeltaY = notification.dragDetails?.delta.dy ?? 0;
-    final startedAtPartial =
-        (_scrollDragStartExtent ?? partialExtent) <= partialExtent + 0.02;
-    final isAtTop =
-        notification.metrics.pixels <= notification.metrics.minScrollExtent + 1;
-    final isAtPartial = _currentExtent(partialExtent) <= partialExtent + 0.02;
-
-    if (startedAtPartial && isAtPartial && isAtTop && dragDeltaY > 0) {
-      _topOverscrollDistance += dragDeltaY;
+    final previousHeight = _lastParentHeight;
+    if (_sheetTop == null) {
+      _sheetTop = hiddenTop;
+      _lastParentHeight = parentHeight;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _dismissScheduled) return;
+        _animateToTop(partialTop, duration: const Duration(milliseconds: 260));
+      });
+      return;
     }
+
+    if (previousHeight != null && previousHeight != parentHeight) {
+      final previousExpandedTop =
+          previousHeight * (1 - widget.expandedHeightFactor);
+      final previousHiddenTop = previousHeight;
+      final previousRange = previousHiddenTop - previousExpandedTop;
+      final progress = previousRange <= 0
+          ? 0.0
+          : ((previousHiddenTop - _sheetTop!) / previousRange).clamp(0.0, 1.0);
+      _sheetTop = hiddenTop - progress * (hiddenTop - expandedTop);
+    }
+    _lastParentHeight = parentHeight;
   }
 
-  void _settleScrollDrag({
-    required double partialExtent,
-    required double expandedExtent,
+  double _currentTop(double fallback) => _sheetTop ?? fallback;
+
+  void _startContentDrag(
+    int pointer,
+    double positionY, {
+    required double partialTop,
   }) {
-    final start = _scrollDragStartExtent ?? partialExtent;
-    final shouldDismissFromPartial =
-        start <= partialExtent + 0.02 &&
-        _topOverscrollDistance >= _dismissOverscrollThreshold;
-
-    if (_dismissScheduled) {
-      _resetScrollDragTracking();
-      return;
-    }
-
-    if (!_scrollDragChangedSheetExtent) {
-      _resetScrollDragTracking();
-      if (shouldDismissFromPartial) _dismiss();
-      return;
-    }
-
-    final current = _currentExtent(partialExtent);
-    final dragged = current - start;
-
-    _resetScrollDragTracking();
-
-    if (shouldDismissFromPartial) {
-      _dismiss();
-      return;
-    }
-
-    if (dragged > 0.005) {
-      _animateToExtent(expandedExtent);
-      return;
-    }
-
-    if (dragged < -0.005) {
-      if (start <= partialExtent + 0.02) {
-        _dismiss();
-        return;
-      }
-      _animateToExtent(partialExtent);
-      return;
-    }
-
-    final midpoint = (partialExtent + expandedExtent) / 2;
-    _animateToExtent(current >= midpoint ? expandedExtent : partialExtent);
+    if (_contentPointer != null) return;
+    _contentPointer = pointer;
+    _lastContentPointerY = positionY;
+    _contentDragStartTop = _currentTop(partialTop);
+    _contentDragChangedSheetTop = false;
   }
 
-  void _resetScrollDragTracking() {
-    _scrollDragStartExtent = null;
-    _topOverscrollDistance = 0;
-    _scrollDragChangedSheetExtent = false;
-  }
-
-  void _settleHandle({
-    required double velocityY,
-    required double partialExtent,
-    required double expandedExtent,
+  void _updateContentDrag(
+    int pointer,
+    double positionY, {
+    required double expandedTop,
+    required double partialTop,
+    required double hiddenTop,
   }) {
-    final current = _currentExtent(partialExtent);
-    final dragged = current - _handleDragStartExtent;
+    if (_contentPointer != pointer) return;
+    final lastY = _lastContentPointerY;
+    if (lastY == null) return;
+    final deltaY = positionY - lastY;
+    _lastContentPointerY = positionY;
+    if (deltaY == 0) return;
 
-    if (current < partialExtent - _dismissExtentGap) {
-      _dismiss();
-      return;
-    }
+    final currentTop = _currentTop(partialTop);
+    final shouldExpandSheet = deltaY < 0 && currentTop > expandedTop + 0.5;
+    final shouldCollapseSheet = deltaY > 0 && _contentScrollIsAtTop();
+    if (!shouldExpandSheet && !shouldCollapseSheet) return;
 
-    if (velocityY.abs() >= _flingVelocityThreshold) {
-      if (velocityY < 0) {
-        _animateToExtent(expandedExtent);
-        return;
-      }
-      if (current <= partialExtent + 0.02) {
-        _dismiss();
-        return;
-      }
-      _animateToExtent(partialExtent);
-      return;
-    }
-
-    if (dragged.abs() >= 0.12) {
-      if (dragged > 0) {
-        _animateToExtent(expandedExtent);
-        return;
-      }
-      if (current <= partialExtent) {
-        _dismiss();
-        return;
-      }
-      _animateToExtent(partialExtent);
-      return;
-    }
-
-    final midpoint = (partialExtent + expandedExtent) / 2;
-    _animateToExtent(current >= midpoint ? expandedExtent : partialExtent);
+    _contentDragChangedSheetTop = true;
+    if (shouldExpandSheet) _restoreScrollToTop();
+    _dragSheetBy(deltaY, expandedTop: expandedTop, hiddenTop: hiddenTop);
   }
 
-  void _animateToExtent(double extent) {
-    if (!_sheetController.isAttached) return;
-    _sheetController.animateTo(
-      extent,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
+  void _endContentDrag(
+    int pointer, {
+    required double expandedTop,
+    required double partialTop,
+  }) {
+    if (_contentPointer != pointer) return;
+    _contentPointer = null;
+    _lastContentPointerY = null;
+    if (!_contentDragChangedSheetTop) return;
+    _contentDragChangedSheetTop = false;
+    _settleDrag(
+      startTop: _contentDragStartTop,
+      currentTop: _currentTop(partialTop),
+      velocityY: 0,
+      expandedTop: expandedTop,
+      partialTop: partialTop,
     );
+  }
+
+  void _cancelContentDrag(int pointer, {required double partialTop}) {
+    if (_contentPointer != pointer) return;
+    _contentPointer = null;
+    _lastContentPointerY = null;
+    _contentDragChangedSheetTop = false;
+    _animateToTop(partialTop);
+  }
+
+  bool _contentScrollIsAtTop() {
+    if (!_scrollController.hasClients) return true;
+    final position = _scrollController.position;
+    return position.pixels <= position.minScrollExtent + 1;
+  }
+
+  void _restoreScrollToTop() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (position.pixels <= position.minScrollExtent) return;
+    position.jumpTo(position.minScrollExtent);
+  }
+
+  void _dragSheetBy(
+    double deltaY, {
+    required double expandedTop,
+    required double hiddenTop,
+  }) {
+    final current = _currentTop(hiddenTop);
+    final next = (current + deltaY).clamp(expandedTop, hiddenTop).toDouble();
+    if ((next - current).abs() < 0.1) return;
+    _sheetAnimationController.stop();
+    _topAnimation = null;
+    _animationComplete = null;
+    setState(() => _sheetTop = next);
+  }
+
+  void _settleDrag({
+    required double startTop,
+    required double currentTop,
+    required double velocityY,
+    required double expandedTop,
+    required double partialTop,
+  }) {
+    final dragged = currentTop - startTop;
+
+    if (velocityY <= -_flingVelocityThreshold || dragged < -0.5) {
+      _animateToTop(expandedTop);
+      return;
+    }
+
+    if (velocityY >= _flingVelocityThreshold || dragged > 0.5) {
+      if (_shouldDismissAfterDownDrag(
+        startTop: startTop,
+        currentTop: currentTop,
+        partialTop: partialTop,
+      )) {
+        _dismiss();
+        return;
+      }
+      _animateToTop(partialTop);
+      return;
+    }
+
+    _animateToTop(_nearestVisibleTop(currentTop, expandedTop, partialTop));
+  }
+
+  bool _shouldDismissAfterDownDrag({
+    required double startTop,
+    required double currentTop,
+    required double partialTop,
+  }) {
+    final draggedDownPx = currentTop - startTop;
+    final belowPartialPx = currentTop - partialTop;
+    return draggedDownPx >= _dismissDistanceThreshold &&
+        belowPartialPx > _dismissExtentGapPx;
+  }
+
+  double _nearestVisibleTop(
+    double currentTop,
+    double expandedTop,
+    double partialTop,
+  ) {
+    final expandedDistance = (currentTop - expandedTop).abs();
+    final partialDistance = (currentTop - partialTop).abs();
+    return expandedDistance < partialDistance ? expandedTop : partialTop;
+  }
+
+  void _animateToTop(
+    double targetTop, {
+    Duration duration = const Duration(milliseconds: 220),
+    Curve curve = Curves.easeOutCubic,
+    VoidCallback? onComplete,
+  }) {
+    final current = _currentTop(targetTop);
+    _sheetAnimationController.stop();
+    _animationComplete = null;
+    if ((current - targetTop).abs() < 0.5) {
+      setState(() => _sheetTop = targetTop);
+      onComplete?.call();
+      return;
+    }
+    _topAnimation = Tween<double>(
+      begin: current,
+      end: targetTop,
+    ).animate(CurvedAnimation(parent: _sheetAnimationController, curve: curve));
+    _animationComplete = onComplete;
+    _sheetAnimationController.duration = duration;
+    _sheetAnimationController.forward(from: 0);
   }
 
   void _dismiss() {
     if (_dismissScheduled) return;
     _dismissScheduled = true;
-    _presentationController.reverse().whenComplete(() {
-      if (mounted) widget.onDismiss();
-    });
+    final hiddenTop = _lastParentHeight;
+    if (hiddenTop == null) {
+      widget.onDismiss();
+      return;
+    }
+    _animateToTop(
+      hiddenTop,
+      duration: const Duration(milliseconds: 220),
+      onComplete: () {
+        if (mounted) widget.onDismiss();
+      },
+    );
   }
 }
 
