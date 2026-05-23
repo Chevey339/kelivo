@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../../icons/lucide_adapter.dart';
@@ -92,6 +94,23 @@ Future<void> showCitationSourcesBottomSheet({
   required List<CitationSourceItem> items,
   required ValueChanged<CitationSourceItem> onOpen,
 }) {
+  if (_isDesktopTarget) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return CitationSourcesDialog(
+          title: title,
+          count: items.length,
+          closeSemanticLabel: closeSemanticLabel,
+          items: items,
+          onDismiss: () => Navigator.of(dialogContext).maybePop(),
+          onOpen: onOpen,
+        );
+      },
+    );
+  }
+
   return showCustomBottomSheet<void>(
     context: context,
     title: title,
@@ -105,22 +124,182 @@ Future<void> showCitationSourcesBottomSheet({
   );
 }
 
+class CitationSourcesDialog extends StatefulWidget {
+  const CitationSourcesDialog({
+    super.key,
+    required this.title,
+    required this.items,
+    required this.onDismiss,
+    required this.onOpen,
+    this.count,
+    this.closeSemanticLabel,
+  });
+
+  static const dialogKey = ValueKey('citation_sources_dialog');
+  static const closeButtonKey = ValueKey('citation_sources_dialog_close');
+
+  final String title;
+  final int? count;
+  final String? closeSemanticLabel;
+  final List<CitationSourceItem> items;
+  final VoidCallback onDismiss;
+  final ValueChanged<CitationSourceItem> onOpen;
+
+  @override
+  State<CitationSourcesDialog> createState() => _CitationSourcesDialogState();
+}
+
+class _CitationSourcesDialogState extends State<CitationSourcesDialog> {
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Dialog(
+      key: CitationSourcesDialog.dialogKey,
+      elevation: 12,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          minWidth: 420,
+          maxWidth: 640,
+          maxHeight: 680,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Material(
+            color: cs.surface,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _CitationSourcesDialogHeader(
+                  title: widget.title,
+                  count: widget.count ?? widget.items.length,
+                  closeSemanticLabel: widget.closeSemanticLabel,
+                  onClose: widget.onDismiss,
+                ),
+                Expanded(
+                  child: Scrollbar(
+                    controller: _scrollController,
+                    child: _CitationSourceList(
+                      controller: _scrollController,
+                      items: widget.items,
+                      onOpen: widget.onOpen,
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CitationSourcesDialogHeader extends StatelessWidget {
+  const _CitationSourcesDialogHeader({
+    required this.title,
+    required this.onClose,
+    this.count,
+    this.closeSemanticLabel,
+  });
+
+  final String title;
+  final int? count;
+  final String? closeSemanticLabel;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final titleStyle = TextStyle(
+      color: cs.onSurface,
+      fontSize: 16,
+      fontWeight: FontWeight.w700,
+      height: 1.2,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 12, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: titleStyle,
+                  ),
+                ),
+                if (count != null && count! > 1) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    count!.toString(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: titleStyle.copyWith(
+                      color: cs.onSurface.withValues(alpha: 0.62),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          SizedBox(
+            key: CitationSourcesDialog.closeButtonKey,
+            width: 28,
+            height: 28,
+            child: IosIconButton(
+              icon: Lucide.X,
+              size: 20,
+              padding: EdgeInsets.zero,
+              color: cs.onSurface.withValues(alpha: 0.62),
+              semanticLabel: closeSemanticLabel,
+              onTap: onClose,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CitationSourceList extends StatelessWidget {
   const _CitationSourceList({
     required this.controller,
     required this.items,
     required this.onOpen,
+    this.padding = const EdgeInsets.fromLTRB(12, 4, 12, 0),
   });
 
   final ScrollController controller;
   final List<CitationSourceItem> items;
   final ValueChanged<CitationSourceItem> onOpen;
+  final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
       controller: controller,
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+      padding: padding,
       itemCount: items.length + 1,
       itemBuilder: (context, index) {
         if (index == items.length) {
@@ -140,6 +319,19 @@ class _CitationSourceList extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+bool get _isDesktopTarget {
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.macOS:
+    case TargetPlatform.windows:
+    case TargetPlatform.linux:
+      return true;
+    case TargetPlatform.android:
+    case TargetPlatform.iOS:
+    case TargetPlatform.fuchsia:
+      return false;
   }
 }
 
