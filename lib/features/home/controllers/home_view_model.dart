@@ -959,32 +959,47 @@ class HomeViewModel extends ChangeNotifier {
     final configured = (assistant?.limitContextMessages ?? true)
         ? (assistant?.contextMessageSize ?? 0)
         : 0;
-    // Use collapsed view for counting
-    final collapsed = collapseVersions(messages);
-    // Map raw truncate index to collapsed start index
-    final int tRaw = _chatController.loadedWindowTruncateIndex();
-    int startCollapsed = 0;
-    if (tRaw > 0) {
-      final seen = <String>{};
-      final int limit = tRaw < messages.length ? tRaw : messages.length;
-      int count = 0;
-      for (int i = 0; i < limit; i++) {
-        final gid0 = (messages[i].groupId ?? messages[i].id);
-        if (seen.add(gid0)) count++;
-      }
-      startCollapsed = count;
-    }
-    int remaining = 0;
-    for (int i = 0; i < collapsed.length; i++) {
-      if (i >= startCollapsed) {
-        if (collapsed[i].content.trim().isNotEmpty) remaining++;
-      }
-    }
+    final completeMessages = _chatController
+        .allMessagesForCurrentConversationContext();
+    final collapsed = collapseVersions(completeMessages);
+    final remaining = computeClearContextRemainingMessageCount(
+      completeMessages: completeMessages,
+      collapsedMessages: collapsed,
+      truncateIndex: currentConversation?.truncateIndex ?? -1,
+    );
     if (configured > 0) {
       final actual = remaining > configured ? configured : remaining;
       return withCountFormatter(actual.toString(), configured.toString());
     }
     return defaultLabel;
+  }
+
+  @visibleForTesting
+  static int computeClearContextRemainingMessageCount({
+    required List<ChatMessage> completeMessages,
+    required List<ChatMessage> collapsedMessages,
+    required int truncateIndex,
+  }) {
+    var safeTruncateIndex = truncateIndex;
+    if (safeTruncateIndex < 0 || safeTruncateIndex > completeMessages.length) {
+      safeTruncateIndex = 0;
+    }
+    final firstIndexByGroup = <String, int>{};
+    for (var i = 0; i < completeMessages.length; i++) {
+      final groupId = completeMessages[i].groupId ?? completeMessages[i].id;
+      firstIndexByGroup.putIfAbsent(groupId, () => i);
+    }
+
+    var remaining = 0;
+    for (final message in collapsedMessages) {
+      if (message.content.trim().isEmpty) continue;
+      final groupId = message.groupId ?? message.id;
+      final firstIndex = firstIndexByGroup[groupId];
+      if (firstIndex != null && firstIndex >= safeTruncateIndex) {
+        remaining++;
+      }
+    }
+    return remaining;
   }
 
   // ============================================================================
