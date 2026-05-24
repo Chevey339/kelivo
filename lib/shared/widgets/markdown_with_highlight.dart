@@ -307,15 +307,13 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         final label = span.toPlainText().trim();
         // Special handling: [citation](index:id)
         if (label.toLowerCase() == 'citation') {
-          final parts = url.split(':');
-          if (parts.length == 2) {
-            final indexText = parts[0].trim();
-            final id = parts[1].trim();
+          final citation = _parseCitationRef(url);
+          if (citation != null) {
             final cs = Theme.of(ctx).colorScheme;
             return GestureDetector(
               onTap: () {
-                if (widget.onCitationTap != null && id.isNotEmpty) {
-                  widget.onCitationTap!(id);
+                if (widget.onCitationTap != null && citation.id.isNotEmpty) {
+                  widget.onCitationTap!(citation.id);
                 } else {
                   // Fallback: do nothing
                 }
@@ -329,7 +327,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  indexText,
+                  citation.indexText,
                   style: const TextStyle(fontSize: 12, height: 1.0),
                 ),
               ),
@@ -670,6 +668,7 @@ String _preprocessFences(
     final url = match.group(2);
     return '[$text]($url)';
   });
+  out = _normalizeRawCitationMetadata(out);
 
   // Normalize inline $...$ math into \( ... \) so it always matches the LaTeX
   // renderer (even when vendors emit single-dollar math mixed with prose).
@@ -779,6 +778,69 @@ String _preprocessFences(
   });
 
   return out;
+}
+
+String _normalizeRawCitationMetadata(String input) {
+  final rawCitation = RegExp(
+    r'\[citation:([^\]\r\n]+)\]',
+    caseSensitive: false,
+  );
+  return input.replaceAllMapped(rawCitation, (match) {
+    final refs = _parseCitationRefList(match.group(1) ?? '');
+    if (refs.isEmpty) return match.group(0)!;
+    return refs.map((ref) => '[citation](${ref.markdownTarget})').join(' ');
+  });
+}
+
+List<_CitationRef> _parseCitationRefList(String raw) {
+  final refs = <_CitationRef>[];
+  for (final rawPart in raw.split(',')) {
+    var part = rawPart.trim();
+    if (part.isEmpty) return const <_CitationRef>[];
+    if (part.toLowerCase().startsWith('citation:')) {
+      part = part.substring('citation:'.length).trim();
+    }
+    final ref = _parseCitationRef(part);
+    if (ref == null) return const <_CitationRef>[];
+    refs.add(ref);
+  }
+  return refs;
+}
+
+_CitationRef? _parseCitationRef(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return null;
+
+  final separator = trimmed.indexOf(':');
+  final hasSeparator = separator != -1;
+  final indexText = separator == -1
+      ? trimmed
+      : trimmed.substring(0, separator).trim();
+  final id = separator == -1
+      ? indexText
+      : trimmed.substring(separator + 1).trim();
+
+  if (!_isCitationIndex(indexText) ||
+      (hasSeparator && !RegExp(r'\d').hasMatch(indexText)) ||
+      id.isEmpty) {
+    return null;
+  }
+  if (id.contains(')') || id.contains(']') || RegExp(r'\s').hasMatch(id)) {
+    return null;
+  }
+  return _CitationRef(indexText: indexText, id: id);
+}
+
+bool _isCitationIndex(String value) =>
+    RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(value);
+
+class _CitationRef {
+  const _CitationRef({required this.indexText, required this.id});
+
+  final String indexText;
+  final String id;
+
+  String get markdownTarget => indexText == id ? indexText : '$indexText:$id';
 }
 
 String _maskBlockquoteFenceMarkers(String input) {
