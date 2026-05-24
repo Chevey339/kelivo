@@ -651,12 +651,42 @@ class ChatController extends ChangeNotifier {
   /// Get messages collapsed by version (cached).
   List<ChatMessage> get collapsedMessages {
     if (_collapsedCache != null) return _collapsedCache!;
-    _collapsedCache = collapseVersions(_messages);
+    _collapsedCache = collapseVersions(_messagesWithVisibleGroupAnchors());
     _collapsedIdToIndex = <String, int>{};
     for (int i = 0; i < _collapsedCache!.length; i++) {
       _collapsedIdToIndex![_collapsedCache![i].id] = i;
     }
     return _collapsedCache!;
+  }
+
+  List<ChatMessage> _messagesWithVisibleGroupAnchors() {
+    final conversation = _currentConversation;
+    if (conversation == null || _messages.isEmpty || _loadedStartIndex <= 0) {
+      return _messages;
+    }
+
+    final groupIds = <String>{};
+    final seenInWindow = <String>{};
+    for (final message in _messages) {
+      final groupId = message.groupId ?? message.id;
+      if (seenInWindow.add(groupId) && message.version > 0) {
+        groupIds.add(groupId);
+      }
+    }
+    if (groupIds.isEmpty) return _messages;
+
+    final firstIndices = _chatService.getFirstMessageIndicesForGroups(
+      conversation.id,
+      groupIds,
+    );
+
+    return [
+      for (final message in _messages)
+        if ((firstIndices[message.groupId ?? message.id] ??
+                _loadedStartIndex) >=
+            _loadedStartIndex)
+          message,
+    ];
   }
 
   /// O(1) lookup of a message's index in the collapsed list.
