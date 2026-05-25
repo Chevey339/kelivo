@@ -240,8 +240,17 @@ class DioHttpClient extends http.BaseClient {
       void flushCompleteResponseLogLines() {
         final end = responseLogPending.lastIndexOf('\n');
         if (end < 0) return;
-        final text = responseLogPending.substring(0, end + 1);
-        responseLogPending = responseLogPending.substring(end + 1);
+        final completeText = responseLogPending.substring(0, end + 1);
+        var flushEnd = completeText.length;
+        if (RequestLogger.hasDanglingSensitiveValue(completeText)) {
+          flushEnd =
+              completeText.lastIndexOf('\n', completeText.length - 2) + 1;
+        }
+        if (flushEnd <= 0) return;
+        final text = completeText.substring(0, flushEnd);
+        responseLogPending =
+            completeText.substring(flushEnd) +
+            responseLogPending.substring(end + 1);
         writeResponseLogText(text);
       }
 

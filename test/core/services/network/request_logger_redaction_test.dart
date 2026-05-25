@@ -19,6 +19,7 @@ void main() {
         'Authorization': 'Bearer bearer-header-secret',
         'x-api-key': 'api-key-secret',
         'xi-api-key': 'elevenlabs-secret',
+        'X-Secret-Key': 'header-secret-key-secret',
       }, redactSecrets: true);
 
       expect(encoded, contains('Content-Type'));
@@ -29,6 +30,7 @@ void main() {
       expect(encoded, isNot(contains('bearer-header-secret')));
       expect(encoded, isNot(contains('api-key-secret')));
       expect(encoded, isNot(contains('elevenlabs-secret')));
+      expect(encoded, isNot(contains('header-secret-key-secret')));
     });
 
     test('redacts mixed-case sensitive header names', () {
@@ -48,12 +50,16 @@ void main() {
         'max_tokens': 128,
         'api_key': 'body-api-key-secret',
         'apiKey': 'body-camel-secret',
+        'secret_key': 'body-secret-key-secret',
+        'secretKey': 'body-secret-key-camel-secret',
         'nested': <String, Object?>{
           'access_token': 'access-secret',
           'Authorization': 'Bearer body-bearer-secret',
+          'x-secret-key': 'nested-secret-key-secret',
         },
         'items': <Object?>[
           <String, Object?>{'refresh_token': 'refresh-secret'},
+          <String, Object?>{'api_secret_key': 'api-secret-key-secret'},
         ],
       });
 
@@ -64,6 +70,8 @@ void main() {
       expect(decoded['max_tokens'], 128);
       expect(decoded['api_key'], '<redacted>');
       expect(decoded['apiKey'], '<redacted>');
+      expect(decoded['secret_key'], '<redacted>');
+      expect(decoded['secretKey'], '<redacted>');
       expect(
         (decoded['nested'] as Map<String, dynamic>)['access_token'],
         '<redacted>',
@@ -73,15 +81,28 @@ void main() {
         'Bearer <redacted>',
       );
       expect(
-        ((decoded['items'] as List<dynamic>).single
+        (decoded['nested'] as Map<String, dynamic>)['x-secret-key'],
+        '<redacted>',
+      );
+      expect(
+        ((decoded['items'] as List<dynamic>)[0]
             as Map<String, dynamic>)['refresh_token'],
+        '<redacted>',
+      );
+      expect(
+        ((decoded['items'] as List<dynamic>)[1]
+            as Map<String, dynamic>)['api_secret_key'],
         '<redacted>',
       );
       expect(sanitized, isNot(contains('body-api-key-secret')));
       expect(sanitized, isNot(contains('body-camel-secret')));
+      expect(sanitized, isNot(contains('body-secret-key-secret')));
+      expect(sanitized, isNot(contains('body-secret-key-camel-secret')));
       expect(sanitized, isNot(contains('access-secret')));
       expect(sanitized, isNot(contains('body-bearer-secret')));
+      expect(sanitized, isNot(contains('nested-secret-key-secret')));
       expect(sanitized, isNot(contains('refresh-secret')));
+      expect(sanitized, isNot(contains('api-secret-key-secret')));
     });
 
     test('redacts bearer tokens in malformed or non-JSON bodies', () {
@@ -109,7 +130,7 @@ void main() {
     test('redacts URL query credentials and user info', () {
       final sanitized = RequestLogger.sanitizeUrlForLogging(
         Uri.parse(
-          'https://user:password@example.com/v1/models?api_key=url-api-secret&key=url-key-secret&access_token=url-access-secret&model=visible-model',
+          'https://user:password@example.com/v1/models?api_key=url-api-secret&key=url-key-secret&access_token=url-access-secret&secret_key=url-secret-key-secret&model=visible-model',
         ),
       );
 
@@ -117,10 +138,12 @@ void main() {
       expect(sanitized, contains('api_key=%3Credacted%3E'));
       expect(sanitized, contains('key=%3Credacted%3E'));
       expect(sanitized, contains('access_token=%3Credacted%3E'));
+      expect(sanitized, contains('secret_key=%3Credacted%3E'));
       expect(sanitized, isNot(contains('user:password')));
       expect(sanitized, isNot(contains('url-api-secret')));
       expect(sanitized, isNot(contains('url-key-secret')));
       expect(sanitized, isNot(contains('url-access-secret')));
+      expect(sanitized, isNot(contains('url-secret-key-secret')));
     });
 
     test('redacts URL secrets inside plain text fragments', () {
@@ -197,13 +220,17 @@ void main() {
 
     test('redacts quoted sensitive keys in non-JSON fragments', () {
       final sanitized = RequestLogger.sanitizeBodyForLogging(
-        'data: {"access_token":"fragment-access-secret","api_key":"fragment-api-secret"}',
+        'data: {"access_token":"fragment-access-secret","api_key":"fragment-api-secret","secret_key":"fragment-secret-key-secret","secretKey":"fragment-secret-key-camel-secret"}',
       );
 
       expect(sanitized, contains('"access_token":"<redacted>"'));
       expect(sanitized, contains('"api_key":"<redacted>"'));
+      expect(sanitized, contains('"secret_key":"<redacted>"'));
+      expect(sanitized, contains('"secretKey":"<redacted>"'));
       expect(sanitized, isNot(contains('fragment-access-secret')));
       expect(sanitized, isNot(contains('fragment-api-secret')));
+      expect(sanitized, isNot(contains('fragment-secret-key-secret')));
+      expect(sanitized, isNot(contains('fragment-secret-key-camel-secret')));
     });
 
     test('redacts malformed sensitive values without closing quotes', () {
@@ -272,6 +299,65 @@ void main() {
         await tempDir.delete(recursive: true);
       }
     });
+
+    test(
+      'redacts response log secrets split across pretty JSON lines',
+      () async {
+        final tempDir = await Directory.systemTemp.createTemp(
+          'kelivo_request_logger_pretty_json_test_',
+        );
+        final previousPathProvider = PathProviderPlatform.instance;
+        PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        unawaited(
+          server.first.then((request) async {
+            request.response.bufferOutput = false;
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              '{\n  "message": "visible-before-secret",\n',
+            );
+            await request.response.flush();
+            request.response.write('  "access_token":\n');
+            await request.response.flush();
+            request.response.write('  "pretty-secret-token"\n}\n');
+            await request.response.close();
+          }),
+        );
+
+        RequestLogger.saveOutput = true;
+        await RequestLogger.setEnabled(true);
+
+        try {
+          final client = DioHttpClient();
+          try {
+            final request = http.Request(
+              'GET',
+              Uri.parse('http://${server.address.host}:${server.port}/stream'),
+            );
+            final response = await client.send(request);
+            await response.stream.toBytes();
+          } finally {
+            client.close();
+          }
+
+          final logText = await _readLogUntil(
+            tempDir,
+            (content) => content.contains('[RES') && content.contains('done'),
+          );
+
+          expect(logText, contains('visible-before-secret'));
+          expect(logText, contains('"access_token":\\n  "<redacted>"'));
+          expect(logText, isNot(contains('pretty-secret-token')));
+        } finally {
+          await RequestLogger.setEnabled(false);
+          RequestLogger.saveOutput = true;
+          await server.close(force: true);
+          PathProviderPlatform.instance = previousPathProvider;
+          await tempDir.delete(recursive: true);
+        }
+      },
+    );
 
     test(
       'writes response logs incrementally without waiting for done',
@@ -368,7 +454,7 @@ void main() {
           final request = http.Request(
             'GET',
             Uri.parse(
-              'http://${server.address.host}:${server.port}/models?api_key=request-url-api-secret&key=request-url-key-secret&model=visible-model',
+              'http://${server.address.host}:${server.port}/models?api_key=request-url-api-secret&key=request-url-key-secret&secret_key=request-url-secret-key-secret&model=visible-model',
             ),
           );
           final response = await client.send(request);
@@ -385,8 +471,10 @@ void main() {
         expect(logText, contains('model=visible-model'));
         expect(logText, contains('api_key=%3Credacted%3E'));
         expect(logText, contains('key=%3Credacted%3E'));
+        expect(logText, contains('secret_key=%3Credacted%3E'));
         expect(logText, isNot(contains('request-url-api-secret')));
         expect(logText, isNot(contains('request-url-key-secret')));
+        expect(logText, isNot(contains('request-url-secret-key-secret')));
       } finally {
         await RequestLogger.setEnabled(false);
         await server.close(force: true);

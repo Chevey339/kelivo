@@ -191,9 +191,14 @@ class RequestLogger {
   static bool _isSensitiveKey(String normalizedKey) {
     if (_sensitiveExactKeys.contains(normalizedKey)) return true;
     if (normalizedKey.contains('apikey')) return true;
+    if (normalizedKey.contains('secretkey')) return true;
     if (normalizedKey.endsWith('token')) return true;
     if (normalizedKey.endsWith('secret')) return true;
     return false;
+  }
+
+  static bool hasDanglingSensitiveValue(String text) {
+    return _danglingSensitiveValueRe.hasMatch(text);
   }
 
   static Object _redactValueForKey(String normalizedKey, Object? value) {
@@ -322,7 +327,12 @@ class RequestLogger {
   );
 
   static final RegExp _inlineSecretPairRe = RegExp(
-    r'''(^|[\s,{])(["']?)([A-Za-z0-9_-]*(?:api[_-]?key|token|secret|cookie))\2(\s*[:=]\s*)(?:(["'])([^"'\r\n]*)\5?|([^"'\s&,}\]\r\n]+))''',
+    r'''(^|[\s,{])(["']?)([A-Za-z0-9_-]*(?:api[_-]?key|secret[_-]?key|token|secret|cookie))\2(\s*[:=]\s*)(?:(["'])([^"'\r\n]*)\5?|([^"'\s&,}\]\r\n]+))''',
+    caseSensitive: false,
+  );
+
+  static final RegExp _danglingSensitiveValueRe = RegExp(
+    r'''(^|[\s,{])(["']?)(authorization|proxy-authorization|[A-Za-z0-9_-]*(?:api[_-]?key|secret[_-]?key|token|secret|cookie))\2\s*[:=]\s*$''',
     caseSensitive: false,
   );
 
