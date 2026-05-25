@@ -3895,6 +3895,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsServicesFieldSpeedLabel => '语速';
 
   @override
+  String get ttsServicesFieldLanguageTypeLabel => '语言类型';
+
+  @override
+  String get ttsServicesFieldLanguageLabel => '语言';
+
+  @override
+  String get ttsServicesValidationApiKeyRequired => 'API Key 不能为空';
+
+  @override
   String get ttsServicesViewDetailsButton => '查看详情';
 
   @override
@@ -8867,6 +8876,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsServicesFieldSpeedLabel => '语速';
 
   @override
+  String get ttsServicesFieldLanguageTypeLabel => '语言类型';
+
+  @override
+  String get ttsServicesFieldLanguageLabel => '语言';
+
+  @override
+  String get ttsServicesValidationApiKeyRequired => 'API Key 不能为空';
+
+  @override
   String get ttsServicesViewDetailsButton => '查看详情';
 
   @override
@@ -13835,6 +13853,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get ttsServicesFieldSpeedLabel => '語速';
+
+  @override
+  String get ttsServicesFieldLanguageTypeLabel => '語言類型';
+
+  @override
+  String get ttsServicesFieldLanguageLabel => '語言';
+
+  @override
+  String get ttsServicesValidationApiKeyRequired => 'API Key 不能為空';
 
   @override
   String get ttsServicesViewDetailsButton => '檢視詳細';

@@ -4052,6 +4052,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ttsServicesFieldSpeedLabel => 'Speed';
 
   @override
+  String get ttsServicesFieldLanguageTypeLabel => 'Language type';
+
+  @override
+  String get ttsServicesFieldLanguageLabel => 'Language';
+
+  @override
+  String get ttsServicesValidationApiKeyRequired => 'API Key is required';
+
+  @override
   String get ttsServicesViewDetailsButton => 'View details';
 
   @override

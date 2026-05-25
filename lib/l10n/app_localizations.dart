@@ -7562,6 +7562,24 @@ abstract class AppLocalizations {
   /// **'Speed'**
   String get ttsServicesFieldSpeedLabel;
 
+  /// No description provided for @ttsServicesFieldLanguageTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Language type'**
+  String get ttsServicesFieldLanguageTypeLabel;
+
+  /// No description provided for @ttsServicesFieldLanguageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get ttsServicesFieldLanguageLabel;
+
+  /// No description provided for @ttsServicesValidationApiKeyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key is required'**
+  String get ttsServicesValidationApiKeyRequired;
+
   /// No description provided for @ttsServicesViewDetailsButton.
   ///
   /// In en, this message translates to:

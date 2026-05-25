@@ -993,6 +993,12 @@ Future<TtsServiceOptions?> _showNetworkDialog(
         ? initial.apiKey
         : (initial is MiniMaxTtsOptions)
         ? initial.apiKey
+        : (initial is QwenTtsOptions)
+        ? initial.apiKey
+        : (initial is GroqTtsOptions)
+        ? initial.apiKey
+        : (initial is XaiTtsOptions)
+        ? initial.apiKey
         : (initial is ElevenLabsTtsOptions)
         ? initial.apiKey
         : (initial is MimoTtsOptions)
@@ -1005,6 +1011,12 @@ Future<TtsServiceOptions?> _showNetworkDialog(
         : (initial is GeminiTtsOptions)
         ? initial.baseUrl
         : (initial is MiniMaxTtsOptions)
+        ? initial.baseUrl
+        : (initial is QwenTtsOptions)
+        ? initial.baseUrl
+        : (initial is GroqTtsOptions)
+        ? initial.baseUrl
+        : (initial is XaiTtsOptions)
         ? initial.baseUrl
         : (initial is ElevenLabsTtsOptions)
         ? initial.baseUrl
@@ -1019,6 +1031,10 @@ Future<TtsServiceOptions?> _showNetworkDialog(
         ? initial.model
         : (initial is MiniMaxTtsOptions)
         ? initial.model
+        : (initial is QwenTtsOptions)
+        ? initial.model
+        : (initial is GroqTtsOptions)
+        ? initial.model
         : (initial is ElevenLabsTtsOptions)
         ? initial.modelId
         : (initial is MimoTtsOptions)
@@ -1032,6 +1048,12 @@ Future<TtsServiceOptions?> _showNetworkDialog(
         ? initial.voiceName
         : (initial is MiniMaxTtsOptions)
         ? initial.voiceId
+        : (initial is QwenTtsOptions)
+        ? initial.voice
+        : (initial is GroqTtsOptions)
+        ? initial.voice
+        : (initial is XaiTtsOptions)
+        ? initial.voiceId
         : (initial is ElevenLabsTtsOptions)
         ? initial.voiceId
         : (initial is MimoTtsOptions)
@@ -1043,6 +1065,12 @@ Future<TtsServiceOptions?> _showNetworkDialog(
   );
   final speedCtl = TextEditingController(
     text: (initial is MiniMaxTtsOptions) ? initial.speed.toString() : '1.0',
+  );
+  final languageTypeCtl = TextEditingController(
+    text: (initial is QwenTtsOptions) ? initial.languageType : 'Auto',
+  );
+  final languageCtl = TextEditingController(
+    text: (initial is XaiTtsOptions) ? initial.language : 'auto',
   );
 
   TtsServiceOptions? result;
@@ -1106,12 +1134,13 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                 networkTtsKindDisplayName(
                                   NetworkTtsKind.minimax,
                                 ),
+                                networkTtsKindDisplayName(NetworkTtsKind.qwen),
+                                networkTtsKindDisplayName(NetworkTtsKind.groq),
+                                networkTtsKindDisplayName(NetworkTtsKind.xai),
                                 networkTtsKindDisplayName(
                                   NetworkTtsKind.elevenlabs,
                                 ),
-                                networkTtsKindDisplayName(
-                                  NetworkTtsKind.mimo,
-                                ),
+                                networkTtsKindDisplayName(NetworkTtsKind.mimo),
                               ],
                               onSelected: (picked) {
                                 setState(() {
@@ -1132,6 +1161,24 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                         NetworkTtsKind.minimax,
                                       )) {
                                     kind = NetworkTtsKind.minimax;
+                                  }
+                                  if (picked ==
+                                      networkTtsKindDisplayName(
+                                        NetworkTtsKind.qwen,
+                                      )) {
+                                    kind = NetworkTtsKind.qwen;
+                                  }
+                                  if (picked ==
+                                      networkTtsKindDisplayName(
+                                        NetworkTtsKind.groq,
+                                      )) {
+                                    kind = NetworkTtsKind.groq;
+                                  }
+                                  if (picked ==
+                                      networkTtsKindDisplayName(
+                                        NetworkTtsKind.xai,
+                                      )) {
+                                    kind = NetworkTtsKind.xai;
                                   }
                                   if (picked ==
                                       networkTtsKindDisplayName(
@@ -1167,12 +1214,14 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                               hint: _defaultBaseUrl(kind),
                             ),
                             const SizedBox(height: 6),
-                            _InputRow(
-                              label: l10n.ttsServicesFieldModelLabel,
-                              controller: modelCtl,
-                              hint: _defaultModel(kind),
-                            ),
-                            const SizedBox(height: 6),
+                            if (kind != NetworkTtsKind.xai) ...[
+                              _InputRow(
+                                label: l10n.ttsServicesFieldModelLabel,
+                                controller: modelCtl,
+                                hint: _defaultModel(kind),
+                              ),
+                              const SizedBox(height: 6),
+                            ],
                             _InputRow(
                               label: _voiceLabelFor(kind, l10n),
                               controller: voiceCtl,
@@ -1190,6 +1239,22 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                 label: l10n.ttsServicesFieldSpeedLabel,
                                 controller: speedCtl,
                                 hint: '1.0',
+                              ),
+                            ],
+                            if (kind == NetworkTtsKind.qwen) ...[
+                              const SizedBox(height: 6),
+                              _InputRow(
+                                label: l10n.ttsServicesFieldLanguageTypeLabel,
+                                controller: languageTypeCtl,
+                                hint: 'Auto',
+                              ),
+                            ],
+                            if (kind == NetworkTtsKind.xai) ...[
+                              const SizedBox(height: 6),
+                              _InputRow(
+                                label: l10n.ttsServicesFieldLanguageLabel,
+                                controller: languageCtl,
+                                hint: 'auto',
                               ),
                             ],
                             const SizedBox(height: 14),
@@ -1267,6 +1332,39 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                       : emotionCtl.text.trim(),
                                   speed: spd,
                                 );
+                              } else if (kind == NetworkTtsKind.qwen) {
+                                result = QwenTtsOptions(
+                                  enabled: true,
+                                  name: name,
+                                  apiKey: apiKey,
+                                  baseUrl: base,
+                                  model: model,
+                                  voice: voice,
+                                  languageType:
+                                      languageTypeCtl.text.trim().isEmpty
+                                      ? 'Auto'
+                                      : languageTypeCtl.text.trim(),
+                                );
+                              } else if (kind == NetworkTtsKind.groq) {
+                                result = GroqTtsOptions(
+                                  enabled: true,
+                                  name: name,
+                                  apiKey: apiKey,
+                                  baseUrl: base,
+                                  model: model,
+                                  voice: voice,
+                                );
+                              } else if (kind == NetworkTtsKind.xai) {
+                                result = XaiTtsOptions(
+                                  enabled: true,
+                                  name: name,
+                                  apiKey: apiKey,
+                                  baseUrl: base,
+                                  voiceId: voice,
+                                  language: languageCtl.text.trim().isEmpty
+                                      ? 'auto'
+                                      : languageCtl.text.trim(),
+                                );
                               } else if (kind == NetworkTtsKind.elevenlabs) {
                                 result = ElevenLabsTtsOptions(
                                   enabled: true,
@@ -1328,6 +1426,12 @@ String _defaultBaseUrl(NetworkTtsKind k) {
       return 'https://generativelanguage.googleapis.com/v1beta';
     case NetworkTtsKind.minimax:
       return 'https://api.minimaxi.com/v1';
+    case NetworkTtsKind.qwen:
+      return 'https://dashscope.aliyuncs.com/api/v1';
+    case NetworkTtsKind.groq:
+      return 'https://api.groq.com/openai/v1';
+    case NetworkTtsKind.xai:
+      return 'https://api.x.ai/v1';
     case NetworkTtsKind.elevenlabs:
       return 'https://api.elevenlabs.io';
     case NetworkTtsKind.mimo:
@@ -1342,7 +1446,13 @@ String _defaultModel(NetworkTtsKind k) {
     case NetworkTtsKind.gemini:
       return 'gemini-2.5-flash-preview-tts';
     case NetworkTtsKind.minimax:
-      return 'speech-2.5-hd-preview';
+      return 'speech-2.6-turbo';
+    case NetworkTtsKind.qwen:
+      return 'qwen3-tts-flash';
+    case NetworkTtsKind.groq:
+      return 'canopylabs/orpheus-v1-english';
+    case NetworkTtsKind.xai:
+      return '';
     case NetworkTtsKind.elevenlabs:
       return 'eleven_multilingual_v2';
     case NetworkTtsKind.mimo:
@@ -1358,6 +1468,12 @@ String _defaultVoice(NetworkTtsKind k) {
       return 'Kore';
     case NetworkTtsKind.minimax:
       return 'female-shaonv';
+    case NetworkTtsKind.qwen:
+      return 'Cherry';
+    case NetworkTtsKind.groq:
+      return 'austin';
+    case NetworkTtsKind.xai:
+      return 'eve';
     case NetworkTtsKind.elevenlabs:
       return '';
     case NetworkTtsKind.mimo:
@@ -1372,6 +1488,12 @@ String _voiceLabelFor(NetworkTtsKind k, AppLocalizations l10n) {
     case NetworkTtsKind.gemini:
       return l10n.ttsServicesFieldVoiceLabel;
     case NetworkTtsKind.minimax:
+      return l10n.ttsServicesFieldVoiceIdLabel;
+    case NetworkTtsKind.qwen:
+      return l10n.ttsServicesFieldVoiceLabel;
+    case NetworkTtsKind.groq:
+      return l10n.ttsServicesFieldVoiceLabel;
+    case NetworkTtsKind.xai:
       return l10n.ttsServicesFieldVoiceIdLabel;
     case NetworkTtsKind.elevenlabs:
       return l10n.ttsServicesFieldVoiceIdLabel;
