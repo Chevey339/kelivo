@@ -76,6 +76,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   final Set<String> _pendingModels = {};
   bool _aihubmixAppCodeEnabled = false;
   bool _claudePromptCachingEnabled = false;
+  final List<_HeaderKV> _extraHeaders = [];
+  final List<_BodyKV> _extraBody = [];
 
   @override
   void initState() {
@@ -102,6 +104,42 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     _multiKeyEnabled = _cfg.multiKeyEnabled ?? false;
     _aihubmixAppCodeEnabled = _cfg.aihubmixAppCodeEnabled ?? false;
     _claudePromptCachingEnabled = _cfg.claudePromptCachingEnabled ?? false;
+    _initExtraHeaders(_cfg);
+    _initExtraBody(_cfg);
+  }
+
+  void _initExtraHeaders(ProviderConfig cfg) {
+    final list = cfg.extraHeaders ?? [];
+    final valid = list.where((e) => e['name'] != null).toList();
+    while (_extraHeaders.length < valid.length) {
+      _extraHeaders.add(_HeaderKV());
+    }
+    while (_extraHeaders.length > valid.length) {
+      _extraHeaders.last.name.dispose();
+      _extraHeaders.last.value.dispose();
+      _extraHeaders.removeLast();
+    }
+    for (int i = 0; i < valid.length; i++) {
+      _extraHeaders[i].name.text = valid[i]['name']!;
+      _extraHeaders[i].value.text = valid[i]['value'] ?? '';
+    }
+  }
+
+  void _initExtraBody(ProviderConfig cfg) {
+    final list = cfg.extraBody ?? [];
+    final valid = list.where((e) => e['key'] != null).toList();
+    while (_extraBody.length < valid.length) {
+      _extraBody.add(_BodyKV());
+    }
+    while (_extraBody.length > valid.length) {
+      _extraBody.last.keyCtrl.dispose();
+      _extraBody.last.valueCtrl.dispose();
+      _extraBody.removeLast();
+    }
+    for (int i = 0; i < valid.length; i++) {
+      _extraBody[i].keyCtrl.text = valid[i]['key']!;
+      _extraBody[i].valueCtrl.text = valid[i]['value'] ?? '';
+    }
   }
 
   @override
@@ -114,6 +152,14 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     _locationCtrl.dispose();
     _projectCtrl.dispose();
     _saJsonCtrl.dispose();
+    for (final h in _extraHeaders) {
+      h.name.dispose();
+      h.value.dispose();
+    }
+    for (final b in _extraBody) {
+      b.keyCtrl.dispose();
+      b.valueCtrl.dispose();
+    }
     super.dispose();
   }
 
@@ -867,7 +913,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
         _inputRow(
           context,
           label: l10n.providerDetailPageNameLabel,
@@ -964,6 +1009,65 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             ),
           ],
         ],
+        const SizedBox(height: 12),
+        // Extra request headers/body section
+        _iosSectionCard(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: Text(
+                l10n.providerDetailPageCustomHeadersTitle,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            for (int i = 0; i < _extraHeaders.length; i++)
+              _ProviderHeaderRow(
+                kv: _extraHeaders[i],
+                onDelete: () => setState(() {
+                  final kv = _extraHeaders.removeAt(i);
+                  kv.name.dispose();
+                  kv.value.dispose();
+                }),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              child: _OutlinedAddButton(
+                label: l10n.providerDetailPageAddHeader,
+                onTap: () => setState(() => _extraHeaders.add(_HeaderKV())),
+              ),
+            ),
+            const Divider(height: 1, thickness: 0.5),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+              child: Text(
+                l10n.providerDetailPageCustomBodyTitle,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            for (int i = 0; i < _extraBody.length; i++)
+              _ProviderBodyRow(
+                kv: _extraBody[i],
+                onDelete: () => setState(() {
+                  final kv = _extraBody.removeAt(i);
+                  kv.keyCtrl.dispose();
+                  kv.valueCtrl.dispose();
+                }),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              child: _OutlinedAddButton(
+                label: l10n.providerDetailPageAddBody,
+                onTap: () => setState(() => _extraBody.add(_BodyKV())),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 12),
         if (widget.keyName.toLowerCase() == 'siliconflow') ...[
           const SizedBox(height: 6),
@@ -2101,7 +2205,16 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       claudePromptCachingEnabled: _supportsClaudePromptCaching
           ? _claudePromptCachingEnabled
           : false,
-      // preserve models and modelOverrides and proxy fields implicitly via copyWith
+      extraHeaders: [
+        for (final h in _extraHeaders)
+          if (h.name.text.trim().isNotEmpty)
+            {'name': h.name.text.trim(), 'value': h.value.text},
+      ],
+      extraBody: [
+        for (final b in _extraBody)
+          if (b.keyCtrl.text.trim().isNotEmpty)
+            {'key': b.keyCtrl.text.trim(), 'value': b.valueCtrl.text},
+      ],
     );
     await settings.setProviderConfig(widget.keyName, updated);
 
@@ -3887,6 +4000,222 @@ class _BottomTabItemState extends State<_BottomTabItem> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+// Shared helper classes for extra headers/body editing
+class _HeaderKV {
+  final TextEditingController name = TextEditingController();
+  final TextEditingController value = TextEditingController();
+}
+
+class _BodyKV {
+  final TextEditingController keyCtrl = TextEditingController();
+  final TextEditingController valueCtrl = TextEditingController();
+}
+
+class _ProviderHeaderRow extends StatelessWidget {
+  const _ProviderHeaderRow({required this.kv, required this.onDelete});
+  final _HeaderKV kv;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12).copyWith(bottom: 8),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: kv.name,
+                  decoration: InputDecoration(
+                    hintText: l10n.modelDetailSheetHeaderKeyHint,
+                    filled: true,
+                    fillColor: isDark ? Colors.white10 : Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: cs.primary.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              IosIconButton(
+                icon: Lucide.Trash2,
+                size: 20,
+                color: cs.onSurface.withValues(alpha: 0.8),
+                onTap: onDelete,
+                semanticLabel: 'Delete header',
+                minSize: 40,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: kv.value,
+            decoration: InputDecoration(
+              hintText: l10n.modelDetailSheetHeaderValueHint,
+              filled: true,
+              fillColor: isDark ? Colors.white10 : Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: cs.outlineVariant.withValues(alpha: 0.4),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: cs.outlineVariant.withValues(alpha: 0.4),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: cs.primary.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProviderBodyRow extends StatelessWidget {
+  const _ProviderBodyRow({required this.kv, required this.onDelete});
+  final _BodyKV kv;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12).copyWith(bottom: 8),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: kv.keyCtrl,
+                  decoration: InputDecoration(
+                    hintText: l10n.modelDetailSheetBodyKeyHint,
+                    filled: true,
+                    fillColor: isDark ? Colors.white10 : Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: cs.primary.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              IosIconButton(
+                icon: Lucide.Trash2,
+                size: 20,
+                color: cs.onSurface.withValues(alpha: 0.8),
+                onTap: onDelete,
+                semanticLabel: 'Delete entry',
+                minSize: 40,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: kv.valueCtrl,
+            minLines: 3,
+            maxLines: 6,
+            decoration: InputDecoration(
+              hintText: l10n.modelDetailSheetBodyJsonHint,
+              filled: true,
+              fillColor: isDark ? Colors.white10 : Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: cs.outlineVariant.withValues(alpha: 0.4),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: cs.outlineVariant.withValues(alpha: 0.4),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: cs.primary.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OutlinedAddButton extends StatelessWidget {
+  const _OutlinedAddButton({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: cs.primary,
+          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          backgroundColor: isDark ? Colors.white10 : Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+        ),
+        onPressed: onTap,
+        icon: Icon(Lucide.Plus, size: 16),
+        label: Text(label),
       ),
     );
   }

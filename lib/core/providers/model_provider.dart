@@ -152,7 +152,9 @@ class OpenAIProvider extends BaseProvider {
     final client = _Http.clientFor(cfg);
     try {
       final uri = Uri.parse('${cfg.baseUrl}/models');
-      final headers = <String, String>{};
+      final headers = <String, String>{
+        ...ProviderManager._providerCustomHeaders(cfg),
+      };
       if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
       final res = await client.get(uri, headers: headers);
       if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -183,7 +185,10 @@ class ClaudeProvider extends BaseProvider {
     final client = _Http.clientFor(cfg);
     try {
       final uri = Uri.parse('${cfg.baseUrl}/models');
-      final headers = <String, String>{'anthropic-version': anthropicVersion};
+      final headers = <String, String>{
+        'anthropic-version': anthropicVersion,
+        ...ProviderManager._providerCustomHeaders(cfg),
+      };
       if (key.isNotEmpty) headers['x-api-key'] = key;
       final res = await client.get(uri, headers: headers);
       if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -228,7 +233,9 @@ class GoogleProvider extends BaseProvider {
     final client = _Http.clientFor(cfg);
     try {
       final url = _buildUrl(cfg);
-      final headers = <String, String>{};
+      final headers = <String, String>{
+        ...ProviderManager._providerCustomHeaders(cfg),
+      };
       if (cfg.vertexAI == true) {
         final jsonStr = (cfg.serviceAccountJson ?? '').trim();
         if (jsonStr.isNotEmpty) {
@@ -336,6 +343,30 @@ class ProviderManager {
     return cfg.apiKey;
   }
 
+  static Map<String, String> _providerCustomHeaders(ProviderConfig cfg) {
+    final list = cfg.extraHeaders;
+    if (list == null || list.isEmpty) return const {};
+    return {
+      for (final entry in list)
+        if (entry['name'] != null && entry['name']!.trim().isNotEmpty)
+          entry['name']!.trim(): entry['value'] ?? '',
+    };
+  }
+
+  static Map<String, dynamic> _providerCustomBody(ProviderConfig cfg) {
+    final list = cfg.extraBody;
+    if (list == null || list.isEmpty) return const {};
+    return {
+      for (final entry in list)
+        if (entry['key'] != null && entry['key']!.trim().isNotEmpty)
+          entry['key']!.trim(): _parseOverrideValue(entry['value'] ?? ''),
+    };
+  }
+
+  static dynamic _parseOverrideValue(String v) {
+    return ModelOverridePayloadParser.parseOverrideValue(v);
+  }
+
   // Per-model override helpers (duplicated logic from ChatApiService)
   static Map<String, dynamic> _modelOverride(
     ProviderConfig cfg,
@@ -424,7 +455,9 @@ class ProviderManager {
                 ],
                 if (useStream) 'stream': true,
               };
-        // Merge custom body overrides
+        // Merge custom body overrides (provider < model)
+        final pvBody = _providerCustomBody(cfg);
+        if (pvBody.isNotEmpty) (body as Map<String, dynamic>).addAll(pvBody);
         final extra = _customBody(cfg, modelId);
         if (extra.isNotEmpty) (body as Map<String, dynamic>).addAll(extra);
         // Merge custom headers overrides
@@ -446,6 +479,7 @@ class ProviderManager {
           'Authorization': 'Bearer $apiKey',
           'Content-Type': 'application/json',
         };
+        headers.addAll(_providerCustomHeaders(cfg));
         headers.addAll(_customHeaders(cfg, modelId));
         final res = await client.post(
           url,

@@ -955,6 +955,42 @@ class _DesktopProviderDetailPaneState
   final TextEditingController _balanceApiPathCtrl = TextEditingController();
   final TextEditingController _balanceResultPathCtrl = TextEditingController();
   bool _balanceLoading = false;
+  final List<_DesktopHeaderKV> _extraHeaders = [];
+  final List<_DesktopBodyKV> _extraBody = [];
+
+  void _initExtraHeaders(ProviderConfig cfg) {
+    final list = cfg.extraHeaders ?? [];
+    final valid = list.where((e) => e['name'] != null).toList();
+    while (_extraHeaders.length < valid.length) {
+      _extraHeaders.add(_DesktopHeaderKV());
+    }
+    while (_extraHeaders.length > valid.length) {
+      _extraHeaders.last.name.dispose();
+      _extraHeaders.last.value.dispose();
+      _extraHeaders.removeLast();
+    }
+    for (int i = 0; i < valid.length; i++) {
+      _extraHeaders[i].name.text = valid[i]['name']!;
+      _extraHeaders[i].value.text = valid[i]['value'] ?? '';
+    }
+  }
+
+  void _initExtraBody(ProviderConfig cfg) {
+    final list = cfg.extraBody ?? [];
+    final valid = list.where((e) => e['key'] != null).toList();
+    while (_extraBody.length < valid.length) {
+      _extraBody.add(_DesktopBodyKV());
+    }
+    while (_extraBody.length > valid.length) {
+      _extraBody.last.keyCtrl.dispose();
+      _extraBody.last.valueCtrl.dispose();
+      _extraBody.removeLast();
+    }
+    for (int i = 0; i < valid.length; i++) {
+      _extraBody[i].keyCtrl.text = valid[i]['key']!;
+      _extraBody[i].valueCtrl.text = valid[i]['value'] ?? '';
+    }
+  }
 
   void _syncCtrl(TextEditingController c, String newText) {
     final v = c.value;
@@ -1007,6 +1043,14 @@ class _DesktopProviderDetailPaneState
     _apiPathCtrl.dispose();
     _balanceApiPathCtrl.dispose();
     _balanceResultPathCtrl.dispose();
+    for (final h in _extraHeaders) {
+      h.name.dispose();
+      h.value.dispose();
+    }
+    for (final b in _extraBody) {
+      b.keyCtrl.dispose();
+      b.valueCtrl.dispose();
+    }
     super.dispose();
   }
 
@@ -1090,6 +1134,8 @@ class _DesktopProviderDetailPaneState
     );
     // Keep controllers synced without breaking IME composition
     _syncControllersFromConfig(cfg);
+    if (_extraHeaders.isEmpty) _initExtraHeaders(cfg);
+    if (_extraBody.isEmpty) _initExtraBody(cfg);
     final kind = ProviderConfig.classify(
       widget.providerKey,
       explicitType: cfg.providerType,
@@ -2221,6 +2267,8 @@ class _DesktopProviderDetailPaneState
         final proxyPassCtrl = TextEditingController(
           text: cfg.proxyPassword ?? '',
         );
+        _initExtraHeaders(cfg);
+        _initExtraBody(cfg);
         return Dialog(
           backgroundColor: cs.surface,
           shape: RoundedRectangleBorder(
@@ -3279,6 +3327,9 @@ class _DesktopProviderDetailPaneState
                               duration: const Duration(milliseconds: 180),
                               sizeCurve: Curves.easeOutCubic,
                             ),
+                            const Divider(height: 1, thickness: 0.5),
+                            _buildDesktopExtraHeaders(ctx, cs, l10n, spWatch),
+                            _buildDesktopExtraBody(ctx, cs, l10n, spWatch),
                           ],
                         ),
                       ),
@@ -4476,6 +4527,235 @@ class _DesktopProviderDetailPaneState
         _pendingModels.clear();
       });
     }
+  }
+
+  Future<void> _saveDesktopExtraHeaders(SettingsProvider spWatch) async {
+    final old = spWatch.getProviderConfig(
+      widget.providerKey,
+      defaultName: widget.displayName,
+    );
+    await spWatch.setProviderConfig(
+      widget.providerKey,
+      old.copyWith(
+        extraHeaders: [
+          for (final h in _extraHeaders)
+            if (h.name.text.trim().isNotEmpty)
+              {'name': h.name.text.trim(), 'value': h.value.text},
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopExtraHeaders(
+    BuildContext ctx,
+    ColorScheme cs,
+    AppLocalizations l10n,
+    SettingsProvider spWatch,
+  ) {
+    return StatefulBuilder(
+      builder: (ctx2, setLocal) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Text(
+                l10n.providerDetailPageCustomHeadersTitle,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface.withValues(alpha: 0.9),
+                ),
+              ),
+            ),
+            for (int i = 0; i < _extraHeaders.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Focus(
+                        onFocusChange: (has) async {
+                          if (!has) await _saveDesktopExtraHeaders(spWatch);
+                        },
+                        child: TextField(
+                          controller: _extraHeaders[i].name,
+                          style: const TextStyle(fontSize: 13),
+                          decoration: _proxyInputDecoration(context).copyWith(
+                            hintText: l10n.modelDetailSheetHeaderKeyHint,
+                          ),
+                          onSubmitted: (_) => _saveDesktopExtraHeaders(spWatch),
+                          onEditingComplete: () =>
+                              _saveDesktopExtraHeaders(spWatch),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Focus(
+                        onFocusChange: (has) async {
+                          if (!has) await _saveDesktopExtraHeaders(spWatch);
+                        },
+                        child: TextField(
+                          controller: _extraHeaders[i].value,
+                          style: const TextStyle(fontSize: 13),
+                          decoration: _proxyInputDecoration(context).copyWith(
+                            hintText: l10n.modelDetailSheetHeaderValueHint,
+                          ),
+                          onSubmitted: (_) => _saveDesktopExtraHeaders(spWatch),
+                          onEditingComplete: () =>
+                              _saveDesktopExtraHeaders(spWatch),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    _IconBtn(
+                      icon: lucide.Lucide.Trash2,
+                      color: cs.onSurface.withValues(alpha: 0.78),
+                      onTap: () {
+                        _extraHeaders[i].name.dispose();
+                        _extraHeaders[i].value.dispose();
+                        _extraHeaders.removeAt(i);
+                        _saveDesktopExtraHeaders(spWatch);
+                        setLocal(() {});
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: cs.primary,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+              ),
+              onPressed: () {
+                _extraHeaders.add(_DesktopHeaderKV());
+                setLocal(() {});
+              },
+              icon: Icon(lucide.Lucide.Plus, size: 16),
+              label: Text(l10n.providerDetailPageAddHeader),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _saveDesktopExtraBody(SettingsProvider spWatch) async {
+    final old = spWatch.getProviderConfig(
+      widget.providerKey,
+      defaultName: widget.displayName,
+    );
+    await spWatch.setProviderConfig(
+      widget.providerKey,
+      old.copyWith(
+        extraBody: [
+          for (final b in _extraBody)
+            if (b.keyCtrl.text.trim().isNotEmpty)
+              {'key': b.keyCtrl.text.trim(), 'value': b.valueCtrl.text},
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopExtraBody(
+    BuildContext ctx,
+    ColorScheme cs,
+    AppLocalizations l10n,
+    SettingsProvider spWatch,
+  ) {
+    return StatefulBuilder(
+      builder: (ctx2, setLocal) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Text(
+                l10n.providerDetailPageCustomBodyTitle,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface.withValues(alpha: 0.9),
+                ),
+              ),
+            ),
+            for (int i = 0; i < _extraBody.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Focus(
+                        onFocusChange: (has) async {
+                          if (!has) await _saveDesktopExtraBody(spWatch);
+                        },
+                        child: TextField(
+                          controller: _extraBody[i].keyCtrl,
+                          style: const TextStyle(fontSize: 13),
+                          decoration: _proxyInputDecoration(context).copyWith(
+                            hintText: l10n.modelDetailSheetBodyKeyHint,
+                          ),
+                          onSubmitted: (_) => _saveDesktopExtraBody(spWatch),
+                          onEditingComplete: () =>
+                              _saveDesktopExtraBody(spWatch),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      flex: 2,
+                      child: Focus(
+                        onFocusChange: (has) async {
+                          if (!has) await _saveDesktopExtraBody(spWatch);
+                        },
+                        child: TextField(
+                          controller: _extraBody[i].valueCtrl,
+                          style: const TextStyle(fontSize: 13),
+                          minLines: 2,
+                          maxLines: 4,
+                          decoration: _proxyInputDecoration(context).copyWith(
+                            hintText: l10n.modelDetailSheetBodyJsonHint,
+                          ),
+                          onSubmitted: (_) => _saveDesktopExtraBody(spWatch),
+                          onEditingComplete: () =>
+                              _saveDesktopExtraBody(spWatch),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    _IconBtn(
+                      icon: lucide.Lucide.Trash2,
+                      color: cs.onSurface.withValues(alpha: 0.78),
+                      onTap: () {
+                        _extraBody[i].keyCtrl.dispose();
+                        _extraBody[i].valueCtrl.dispose();
+                        _extraBody.removeAt(i);
+                        _saveDesktopExtraBody(spWatch);
+                        setLocal(() {});
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: cs.primary,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+              ),
+              onPressed: () {
+                _extraBody.add(_DesktopBodyKV());
+                setLocal(() {});
+              },
+              icon: Icon(lucide.Lucide.Plus, size: 16),
+              label: Text(l10n.providerDetailPageAddBody),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -6383,6 +6663,16 @@ class _CardPressState extends State<_CardPress> {
       ),
     );
   }
+}
+
+class _DesktopHeaderKV {
+  final TextEditingController name = TextEditingController();
+  final TextEditingController value = TextEditingController();
+}
+
+class _DesktopBodyKV {
+  final TextEditingController keyCtrl = TextEditingController();
+  final TextEditingController valueCtrl = TextEditingController();
 }
 
 // Removed embedded default model pane; now in setting/default_model_pane.dart

@@ -3994,6 +3994,9 @@ class ProviderConfig {
   final String? balanceResultPath;
   // Anthropic/OpenRouter Claude prompt caching for stable system prompts.
   final bool? claudePromptCachingEnabled;
+  // Per-provider extra request headers/body (applied to ALL requests to this provider).
+  final List<Map<String, String>>? extraHeaders;
+  final List<Map<String, String>>? extraBody;
 
   static String resolveProxyType(String? value) {
     switch (value?.trim().toLowerCase()) {
@@ -4036,6 +4039,8 @@ class ProviderConfig {
     this.balanceApiPath,
     this.balanceResultPath,
     this.claudePromptCachingEnabled = false,
+    this.extraHeaders,
+    this.extraBody,
   });
 
   // Sentinel for copyWith nullability control (allow explicit null set)
@@ -4072,6 +4077,8 @@ class ProviderConfig {
     String? balanceApiPath,
     String? balanceResultPath,
     bool? claudePromptCachingEnabled,
+    List<Map<String, String>>? extraHeaders,
+    List<Map<String, String>>? extraBody,
   }) => ProviderConfig(
     id: id ?? this.id,
     enabled: enabled ?? this.enabled,
@@ -4109,6 +4116,8 @@ class ProviderConfig {
     balanceResultPath: balanceResultPath ?? this.balanceResultPath,
     claudePromptCachingEnabled:
         claudePromptCachingEnabled ?? this.claudePromptCachingEnabled,
+    extraHeaders: extraHeaders ?? this.extraHeaders,
+    extraBody: extraBody ?? this.extraBody,
   );
 
   Map<String, dynamic> toJson() => {
@@ -4142,6 +4151,8 @@ class ProviderConfig {
     'balanceApiPath': balanceApiPath,
     'balanceResultPath': balanceResultPath,
     'claudePromptCachingEnabled': claudePromptCachingEnabled,
+    'extraHeaders': extraHeaders,
+    'extraBody': extraBody,
   };
 
   factory ProviderConfig.fromJson(Map<String, dynamic> json) => ProviderConfig(
@@ -4192,6 +4203,16 @@ class ProviderConfig {
     balanceResultPath: json['balanceResultPath'] as String?,
     claudePromptCachingEnabled:
         json['claudePromptCachingEnabled'] as bool? ?? false,
+    extraHeaders: (json['extraHeaders'] as List?)
+        ?.map(
+          (e) => (e as Map).map((k, v) => MapEntry(k.toString(), v.toString())),
+        )
+        .toList(),
+    extraBody: (json['extraBody'] as List?)
+        ?.map(
+          (e) => (e as Map).map((k, v) => MapEntry(k.toString(), v.toString())),
+        )
+        .toList(),
   );
 
   static ProviderKind classify(String key, {ProviderKind? explicitType}) {

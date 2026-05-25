@@ -18,6 +18,12 @@ Set<String> _builtInTools(ProviderConfig cfg, String modelId) =>
 Map<String, String> _customHeaders(ProviderConfig cfg, String modelId) =>
     ChatApiService._customHeaders(cfg, modelId);
 
+Map<String, String> _providerCustomHeaders(ProviderConfig cfg) =>
+    ChatApiService._providerCustomHeaders(cfg);
+
+Map<String, dynamic> _providerCustomBody(ProviderConfig cfg) =>
+    ChatApiService._providerCustomBody(cfg);
+
 dynamic _parseOverrideValue(String v) => ChatApiService._parseOverrideValue(v);
 
 Map<String, dynamic> _customBody(ProviderConfig cfg, String modelId) =>

@@ -136,6 +136,26 @@ class ChatApiService {
     );
   }
 
+  static Map<String, String> _providerCustomHeaders(ProviderConfig cfg) {
+    final list = cfg.extraHeaders;
+    if (list == null || list.isEmpty) return const {};
+    return {
+      for (final entry in list)
+        if (entry['name'] != null && entry['name']!.trim().isNotEmpty)
+          entry['name']!.trim(): entry['value'] ?? '',
+    };
+  }
+
+  static Map<String, dynamic> _providerCustomBody(ProviderConfig cfg) {
+    final list = cfg.extraBody;
+    if (list == null || list.isEmpty) return const {};
+    return {
+      for (final entry in list)
+        if (entry['key'] != null && entry['key']!.trim().isNotEmpty)
+          entry['key']!.trim(): _parseOverrideValue(entry['value'] ?? ''),
+    };
+  }
+
   static Map<String, String> _customHeaders(
     ProviderConfig cfg,
     String modelId,
@@ -697,10 +717,13 @@ class ChatApiService {
           'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
           'Content-Type': 'application/json',
         };
+        headers.addAll(_providerCustomHeaders(config));
         headers.addAll(_customHeaders(config, modelId));
         if (extraHeaders != null && extraHeaders.isNotEmpty) {
           headers.addAll(extraHeaders);
         }
+        final providerExtra = _providerCustomBody(config);
+        if (providerExtra.isNotEmpty) body.addAll(providerExtra);
         final extra = _customBody(config, modelId);
         if (extra.isNotEmpty) body.addAll(extra);
         if (extraBody != null && extraBody.isNotEmpty) {
@@ -827,10 +850,13 @@ class ChatApiService {
           'anthropic-version': '2023-06-01',
           'Content-Type': 'application/json',
         };
+        headers.addAll(_providerCustomHeaders(config));
         headers.addAll(_customHeaders(config, modelId));
         if (extraHeaders != null && extraHeaders.isNotEmpty) {
           headers.addAll(extraHeaders);
         }
+        final providerExtra = _providerCustomBody(config);
+        if (providerExtra.isNotEmpty) body.addAll(providerExtra);
         final extra = _customBody(config, modelId);
         if (extra.isNotEmpty) body.addAll(extra);
         if (extraBody != null && extraBody.isNotEmpty) {
@@ -934,10 +960,13 @@ class ChatApiService {
           final proj = (config.projectId ?? '').trim();
           if (proj.isNotEmpty) headers['X-Goog-User-Project'] = proj;
         }
+        headers.addAll(_providerCustomHeaders(config));
         headers.addAll(_customHeaders(config, modelId));
         if (extraHeaders != null && extraHeaders.isNotEmpty) {
           headers.addAll(extraHeaders);
         }
+        final providerExtra = _providerCustomBody(config);
+        if (providerExtra.isNotEmpty) body.addAll(providerExtra);
         final extra = _customBody(config, modelId);
         if (extra.isNotEmpty) body.addAll(extra);
         if (extraBody != null && extraBody.isNotEmpty) {

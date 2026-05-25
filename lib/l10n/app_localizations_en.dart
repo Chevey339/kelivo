@@ -4667,6 +4667,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'This action cannot be undone.';
 
   @override
+  String get providerDetailPageCustomHeadersTitle => 'Custom Headers';
+
+  @override
+  String get providerDetailPageAddHeader => 'Add Header';
+
+  @override
+  String get providerDetailPageCustomBodyTitle => 'Custom Body';
+
+  @override
+  String get providerDetailPageAddBody => 'Add Body';
+
+  @override
   String get requestLogSettingTitle => 'Request Logging';
 
   @override
