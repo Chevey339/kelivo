@@ -1994,6 +1994,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatMessageWidgetWriteClipboard => 'Write Clipboard';
 
   @override
+  String chatMessageWidgetSpeakText(String text) {
+    return 'Speaking: $text';
+  }
+
+  @override
   String chatMessageWidgetToolCall(String name) {
     return 'Tool Call: $name';
   }
@@ -4509,6 +4514,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get assistantEditLocalToolClipboardSubtitle =>
       'Read or write plain text from the device clipboard when explicitly needed.';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechTitle => 'Text to Speech';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechSubtitle =>
+      'Let the assistant read text aloud with the configured TTS playback.';
 
   @override
   String get assistantEditLocalToolAskUserTitle => 'Ask User';

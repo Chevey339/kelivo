@@ -3833,6 +3833,12 @@ abstract class AppLocalizations {
   /// **'Write Clipboard'**
   String get chatMessageWidgetWriteClipboard;
 
+  /// No description provided for @chatMessageWidgetSpeakText.
+  ///
+  /// In en, this message translates to:
+  /// **'Speaking: {text}'**
+  String chatMessageWidgetSpeakText(String text);
+
   /// No description provided for @chatMessageWidgetToolCall.
   ///
   /// In en, this message translates to:
@@ -8395,6 +8401,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Read or write plain text from the device clipboard when explicitly needed.'**
   String get assistantEditLocalToolClipboardSubtitle;
+
+  /// No description provided for @assistantEditLocalToolTextToSpeechTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Text to Speech'**
+  String get assistantEditLocalToolTextToSpeechTitle;
+
+  /// No description provided for @assistantEditLocalToolTextToSpeechSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the assistant read text aloud with the configured TTS playback.'**
+  String get assistantEditLocalToolTextToSpeechSubtitle;
 
   /// No description provided for @assistantEditLocalToolAskUserTitle.
   ///

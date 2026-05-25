@@ -826,6 +826,14 @@
   "chatMessageWidgetBuiltinSearch": "Built-in Search",
   "chatMessageWidgetReadClipboard": "Read Clipboard",
   "chatMessageWidgetWriteClipboard": "Write Clipboard",
+  "chatMessageWidgetSpeakText": "Speaking: {text}",
+  "@chatMessageWidgetSpeakText": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
   "chatMessageWidgetToolCall": "Tool Call: {name}",
   "@chatMessageWidgetToolCall": {
     "placeholders": {
@@ -1857,6 +1865,8 @@
   "assistantEditLocalToolTimeInfoSubtitle": "Read the device date, weekday, time, timezone, UTC offset, and timestamp.",
   "assistantEditLocalToolClipboardTitle": "Clipboard",
   "assistantEditLocalToolClipboardSubtitle": "Read or write plain text from the device clipboard when explicitly needed.",
+  "assistantEditLocalToolTextToSpeechTitle": "Text to Speech",
+  "assistantEditLocalToolTextToSpeechSubtitle": "Let the assistant read text aloud with the configured TTS playback.",
   "assistantEditLocalToolAskUserTitle": "Ask User",
   "assistantEditLocalToolAskUserSubtitle": "Let the assistant ask short questions and continue after you answer.",
   "assistantEditMemorySwitchTitle": "Memory",

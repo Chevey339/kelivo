@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
@@ -123,6 +124,7 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
       'write' => Lucide.ClipboardPen,
       _ => Lucide.Clipboard,
     },
+    LocalToolNames.textToSpeech => Lucide.Volume2,
     _ => null,
   };
 }
@@ -142,8 +144,89 @@ String? _localToolTitleFor(
       'write' => l10n.chatMessageWidgetWriteClipboard,
       _ => l10n.assistantEditLocalToolClipboardTitle,
     },
+    LocalToolNames.textToSpeech => _textToSpeechToolTitleFor(l10n, args),
     _ => null,
   };
+}
+
+String _textToSpeechToolTitleFor(
+  AppLocalizations l10n,
+  Map<String, dynamic> args,
+) {
+  final text = _textToSpeechToolText(args);
+  if (text.isEmpty) return l10n.assistantEditLocalToolTextToSpeechTitle;
+  return l10n.chatMessageWidgetSpeakText(text);
+}
+
+String _textToSpeechToolText(Map<String, dynamic> args) {
+  return (args['text'] ?? '').toString().trim();
+}
+
+void _replayTextToSpeech(BuildContext context, String text) {
+  final content = text.trim();
+  if (content.isEmpty) return;
+
+  final tts = context.read<TtsProvider>();
+  if (!tts.isAvailable) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: StateError('Text-to-speech is unavailable.'),
+        library: 'Kelivo chat message tools',
+        context: ErrorDescription('while replaying text-to-speech'),
+      ),
+    );
+    return;
+  }
+
+  unawaited(
+    tts.speak(content).catchError((Object error, StackTrace stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'Kelivo chat message tools',
+          context: ErrorDescription('while replaying text-to-speech'),
+        ),
+      );
+    }),
+  );
+}
+
+Widget _buildTextToSpeechReplayRow(
+  BuildContext context, {
+  required String text,
+  required Color textColor,
+  required Color buttonColor,
+  double fontSize = 12,
+  int maxLines = 2,
+}) {
+  final l10n = AppLocalizations.of(context)!;
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      Expanded(
+        child: Text(
+          text,
+          maxLines: maxLines,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: fontSize, height: 1.4, color: textColor),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Tooltip(
+        message: l10n.ttsFloatingReplayTooltip,
+        child: IosIconButton(
+          size: 14,
+          minSize: 30,
+          padding: const EdgeInsets.all(6),
+          color: buttonColor,
+          semanticLabel: l10n.ttsFloatingReplayTooltip,
+          builder: (color) => Icon(Lucide.RefreshCw, size: 14, color: color),
+          onTap: () => _replayTextToSpeech(context, text),
+        ),
+      ),
+    ],
+  );
 }
 
 String _askUserToolTitleFor(AppLocalizations l10n, Map<String, dynamic> args) {
@@ -3936,11 +4019,21 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
               .toString();
     final bool shouldShowSummary = settings.showToolResultSummary;
     final askUserExpanded = _askUserExpanded ?? true;
+    final ttsText = widget.part.toolName == LocalToolNames.textToSpeech
+        ? _textToSpeechToolText(widget.part.arguments)
+        : '';
     final Widget? content = _isAskUser
         ? _AskUserInlineBody(
             part: widget.part,
             compact: true,
             onRecoveredAnswer: widget.onRecoveredAnswer,
+          )
+        : ttsText.isNotEmpty
+        ? _buildTextToSpeechReplayRow(
+            context,
+            text: ttsText,
+            textColor: fg.body,
+            buttonColor: fg.accent,
           )
         : !shouldShowSummary || summaryText.trim().isEmpty
         ? null
@@ -4118,6 +4211,9 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     final fg = _chatSurfaceForegroundPalette(context);
     final hasImages = _imagePaths.isNotEmpty;
     final l10n = AppLocalizations.of(context)!;
+    final ttsText = widget.part.toolName == LocalToolNames.textToSpeech
+        ? _textToSpeechToolText(widget.part.arguments)
+        : '';
 
     if (widget.part.toolName == LocalToolNames.askUser) {
       return _AskUserToolCard(
@@ -4230,6 +4326,15 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                 ),
               ],
             ),
+            if (ttsText.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildTextToSpeechReplayRow(
+                context,
+                text: ttsText,
+                textColor: fg.body,
+                buttonColor: fg.accent,
+              ),
+            ],
             // Argument summary so users know what the tool is about to do
             if (isPendingApproval && widget.part.arguments.isNotEmpty) ...[
               const SizedBox(height: 8),

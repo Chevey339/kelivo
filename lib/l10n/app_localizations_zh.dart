@@ -1939,6 +1939,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatMessageWidgetWriteClipboard => '写入剪切板';
 
   @override
+  String chatMessageWidgetSpeakText(String text) {
+    return '正在朗读: $text';
+  }
+
+  @override
   String chatMessageWidgetToolCall(String name) {
     return '调用工具: $name';
   }
@@ -4338,6 +4343,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get assistantEditLocalToolClipboardSubtitle =>
       '在明确需要时读取或写入设备剪切板中的纯文本。';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechTitle => '文字转语音';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechSubtitle =>
+      '允许助手使用已配置的语音播放朗读文本。';
 
   @override
   String get assistantEditLocalToolAskUserTitle => '询问用户';
@@ -6975,6 +6987,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatMessageWidgetWriteClipboard => '写入剪切板';
 
   @override
+  String chatMessageWidgetSpeakText(String text) {
+    return '正在朗读: $text';
+  }
+
+  @override
   String chatMessageWidgetToolCall(String name) {
     return '调用工具: $name';
   }
@@ -9374,6 +9391,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get assistantEditLocalToolClipboardSubtitle =>
       '在明确需要时读取或写入设备剪切板中的纯文本。';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechTitle => '文字转语音';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechSubtitle =>
+      '允许助手使用已配置的语音播放朗读文本。';
 
   @override
   String get assistantEditLocalToolAskUserTitle => '询问用户';
@@ -12010,6 +12034,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatMessageWidgetWriteClipboard => '寫入剪貼簿';
 
   @override
+  String chatMessageWidgetSpeakText(String text) {
+    return '正在朗讀: $text';
+  }
+
+  @override
   String chatMessageWidgetToolCall(String name) {
     return '呼叫工具: $name';
   }
@@ -14410,6 +14439,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get assistantEditLocalToolClipboardSubtitle =>
       '在明確需要時讀取或寫入裝置剪貼簿中的純文字。';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechTitle => '文字轉語音';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechSubtitle =>
+      '允許助手使用已設定的語音播放朗讀文字。';
 
   @override
   String get assistantEditLocalToolAskUserTitle => '詢問使用者';

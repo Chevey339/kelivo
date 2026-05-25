@@ -4,11 +4,14 @@ import 'package:flutter/services.dart';
 
 import '../../../core/models/assistant.dart';
 
+typedef TextToSpeechStarter = Future<void> Function(String text);
+
 class LocalToolNames {
   const LocalToolNames._();
 
   static const String timeInfo = 'get_time_info';
   static const String clipboard = 'clipboard_tool';
+  static const String textToSpeech = 'text_to_speech';
   static const String askUser = 'ask_user_input_v0';
 }
 
@@ -57,6 +60,26 @@ class LocalToolsService {
               },
             },
             'required': ['action'],
+          },
+        },
+      });
+    }
+    if (assistant.localToolIds.contains(LocalToolNames.textToSpeech)) {
+      tools.add(const {
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.textToSpeech,
+          'description':
+              'Speak text aloud to the user using the configured text-to-speech playback. Use this when the user asks you to read something aloud, or when audio output is appropriate. The tool returns after playback has been requested; audio may continue in the background. Provide natural, readable text without markdown formatting.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'text': {
+                'type': 'string',
+                'description': 'The text to speak aloud.',
+              },
+            },
+            'required': ['text'],
           },
         },
       });
@@ -115,8 +138,9 @@ class LocalToolsService {
   static Future<String?> tryHandleToolCall(
     String name,
     Map<String, dynamic> args,
-    Assistant? assistant,
-  ) async {
+    Assistant? assistant, {
+    TextToSpeechStarter? onSpeakText,
+  }) async {
     if (assistant == null || !assistant.localToolIds.contains(name)) {
       return null;
     }
@@ -125,6 +149,9 @@ class LocalToolsService {
     }
     if (name == LocalToolNames.clipboard) {
       return _handleClipboardTool(args);
+    }
+    if (name == LocalToolNames.textToSpeech) {
+      return _handleTextToSpeechTool(args, onSpeakText);
     }
     return null;
   }
@@ -145,6 +172,21 @@ class LocalToolsService {
       default:
         throw ArgumentError('unknown clipboard action: $action');
     }
+  }
+
+  static Future<String> _handleTextToSpeechTool(
+    Map<String, dynamic> args,
+    TextToSpeechStarter? onSpeakText,
+  ) async {
+    final text = args['text']?.toString().trim();
+    if (text == null || text.isEmpty) {
+      throw ArgumentError('text is required for text_to_speech');
+    }
+    if (onSpeakText == null) {
+      throw StateError('text-to-speech executor is unavailable');
+    }
+    await onSpeakText(text);
+    return jsonEncode({'success': true});
   }
 
   static Map<String, dynamic> _buildTimeInfoPayload(DateTime now) {

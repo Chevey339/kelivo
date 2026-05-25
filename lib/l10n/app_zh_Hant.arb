@@ -662,6 +662,14 @@
   "chatMessageWidgetBuiltinSearch": "模型內建搜尋",
   "chatMessageWidgetReadClipboard": "讀取剪貼簿",
   "chatMessageWidgetWriteClipboard": "寫入剪貼簿",
+  "chatMessageWidgetSpeakText": "正在朗讀: {text}",
+  "@chatMessageWidgetSpeakText": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
   "chatMessageWidgetToolCall": "呼叫工具: {name}",
   "chatMessageWidgetToolResult": "呼叫工具: {name}",
   "chatMessageWidgetNoResultYet": "（暫無結果）",
@@ -1503,6 +1511,8 @@
   "assistantEditLocalToolTimeInfoSubtitle": "讀取裝置日期、星期、時間、時區、UTC 偏移和時間戳。",
   "assistantEditLocalToolClipboardTitle": "剪貼簿",
   "assistantEditLocalToolClipboardSubtitle": "在明確需要時讀取或寫入裝置剪貼簿中的純文字。",
+  "assistantEditLocalToolTextToSpeechTitle": "文字轉語音",
+  "assistantEditLocalToolTextToSpeechSubtitle": "允許助手使用已設定的語音播放朗讀文字。",
   "assistantEditLocalToolAskUserTitle": "詢問使用者",
   "assistantEditLocalToolAskUserSubtitle": "允許助手提出簡短問題，並在你回答後繼續生成。",
   "assistantEditMemorySwitchTitle": "記憶",

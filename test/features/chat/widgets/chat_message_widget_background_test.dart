@@ -31,12 +31,16 @@ Widget _buildHarness({
   required SettingsProvider settings,
   required Widget child,
   AskUserInteractionService? askUserService,
+  TtsProvider? ttsProvider,
   Locale? locale,
 }) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-      ChangeNotifierProvider(create: (_) => TtsProvider()),
+      if (ttsProvider != null)
+        ChangeNotifierProvider<TtsProvider>.value(value: ttsProvider)
+      else
+        ChangeNotifierProvider(create: (_) => TtsProvider()),
       ChangeNotifierProvider(create: (_) => ToolApprovalService()),
       ChangeNotifierProvider<AskUserInteractionService>.value(
         value: askUserService ?? AskUserInteractionService(),
@@ -61,6 +65,18 @@ Finder _findNetworkImage(String url) {
         widget.image is NetworkImage &&
         (widget.image as NetworkImage).url == url,
   );
+}
+
+class _RecordingTtsProvider extends TtsProvider {
+  final spokenTexts = <String>[];
+
+  @override
+  bool get isAvailable => true;
+
+  @override
+  Future<void> speak(String text, {bool flush = true}) async {
+    spokenTexts.add(text);
+  }
 }
 
 void main() {
@@ -422,6 +438,12 @@ void main() {
                 arguments: {'action': 'write', 'text': 'hello'},
                 content: '{"success":true,"text":"hello"}',
               ),
+              ToolUIPart(
+                id: 'tts',
+                toolName: 'text_to_speech',
+                arguments: {'text': 'Replay this line'},
+                content: '{"success":true}',
+              ),
             ],
           ),
         ),
@@ -432,6 +454,17 @@ void main() {
       expect(find.text('Time Info'), findsOneWidget);
       expect(find.text('Read Clipboard'), findsOneWidget);
       expect(find.text('Write Clipboard'), findsOneWidget);
+      expect(find.text('Speaking: Replay this line'), findsOneWidget);
+      expect(find.text('Replay this line'), findsOneWidget);
+      expect(find.byTooltip('Replay'), findsOneWidget);
+      final replayButton = tester.widget<IosIconButton>(
+        find.descendant(
+          of: find.byTooltip('Replay'),
+          matching: find.byType(IosIconButton),
+        ),
+      );
+      expect(replayButton.minSize, 30);
+      expect(replayButton.padding, const EdgeInsets.all(6));
       expect(find.text('Clipboard'), findsNothing);
       expect(find.text('Tool Result: get_time_info'), findsNothing);
       expect(find.text('Tool Result: clipboard_tool'), findsNothing);
@@ -453,6 +486,92 @@ void main() {
         ),
         findsOneWidget,
       );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Icon && widget.icon == Lucide.Volume2,
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('text to speech replay button speaks the tool text', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final ttsProvider = _RecordingTtsProvider();
+      addTearDown(ttsProvider.dispose);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          ttsProvider: ttsProvider,
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: '',
+              conversationId: 'conversation-local-tts-replay',
+              isStreaming: true,
+            ),
+            showModelIcon: false,
+            toolParts: const [
+              ToolUIPart(
+                id: 'tts',
+                toolName: 'text_to_speech',
+                arguments: {'text': 'Replay this line'},
+                content: '{"success":true}',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      await tester.tap(find.byTooltip('Replay'));
+      await tester.pump();
+
+      expect(ttsProvider.spokenTexts, ['Replay this line']);
+      expect(find.byTooltip('Replay'), findsOneWidget);
+    });
+
+    testWidgets('text to speech tool card opens details for long text', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: '',
+              conversationId: 'conversation-local-tts-toggle',
+              isStreaming: true,
+            ),
+            showModelIcon: false,
+            toolParts: const [
+              ToolUIPart(
+                id: 'tts',
+                toolName: 'text_to_speech',
+                arguments: {'text': 'Replay this line'},
+                content: '{"success":true}',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byTooltip('Replay'), findsOneWidget);
+
+      await tester.tap(find.text('Speaking: Replay this line'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Arguments'), findsOneWidget);
+      expect(find.text('Replay this line'), findsWidgets);
+      expect(find.byTooltip('Replay'), findsOneWidget);
     });
 
     testWidgets('unclosed think tag remains visible as assistant content', (
