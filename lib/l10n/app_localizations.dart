@@ -7352,6 +7352,12 @@ abstract class AppLocalizations {
   /// **'Text-to-Speech'**
   String get ttsServicesPageTitle;
 
+  /// No description provided for @ttsServicesPageSettingsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'TTS settings'**
+  String get ttsServicesPageSettingsTooltip;
+
   /// No description provided for @ttsServicesPageAddTooltip.
   ///
   /// In en, this message translates to:
@@ -7597,6 +7603,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close'**
   String get ttsServicesCloseButton;
+
+  /// No description provided for @ttsSettingsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'TTS Settings'**
+  String get ttsSettingsPageTitle;
+
+  /// No description provided for @ttsSettingsPlaybackSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback'**
+  String get ttsSettingsPlaybackSection;
+
+  /// No description provided for @ttsSettingsAutoPlayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-play Assistant Replies'**
+  String get ttsSettingsAutoPlayTitle;
+
+  /// No description provided for @ttsSettingsAutoPlayDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Start TTS automatically after an assistant reply finishes.'**
+  String get ttsSettingsAutoPlayDescription;
+
+  /// No description provided for @ttsSettingsTextSelectionSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Text Selection'**
+  String get ttsSettingsTextSelectionSection;
+
+  /// No description provided for @ttsSettingsTextSelectionFallbackDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'If no matching text is found, the full reply is played.'**
+  String get ttsSettingsTextSelectionFallbackDescription;
+
+  /// No description provided for @ttsSettingsTextSelectionFullTextTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Full text'**
+  String get ttsSettingsTextSelectionFullTextTitle;
+
+  /// No description provided for @ttsSettingsTextSelectionFullTextDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Play the complete assistant reply.'**
+  String get ttsSettingsTextSelectionFullTextDescription;
+
+  /// No description provided for @ttsSettingsTextSelectionQuotedOnlyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quoted text only'**
+  String get ttsSettingsTextSelectionQuotedOnlyTitle;
+
+  /// No description provided for @ttsSettingsTextSelectionQuotedOnlyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Play text inside “”, ‘’, \"\", \'\', 「」, or 『』.'**
+  String get ttsSettingsTextSelectionQuotedOnlyDescription;
+
+  /// No description provided for @ttsSettingsTextSelectionOutsideParenthesesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Outside parentheses'**
+  String get ttsSettingsTextSelectionOutsideParenthesesTitle;
+
+  /// No description provided for @ttsSettingsTextSelectionOutsideParenthesesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip text inside () and （）.'**
+  String get ttsSettingsTextSelectionOutsideParenthesesDescription;
+
+  /// No description provided for @ttsSettingsTextSelectionItalicOnlyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Italic text only'**
+  String get ttsSettingsTextSelectionItalicOnlyTitle;
+
+  /// No description provided for @ttsSettingsTextSelectionItalicOnlyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Play Markdown or HTML italic text.'**
+  String get ttsSettingsTextSelectionItalicOnlyDescription;
+
+  /// No description provided for @ttsSettingsTextSelectionNonItalicTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Non-italic text only'**
+  String get ttsSettingsTextSelectionNonItalicTitle;
+
+  /// No description provided for @ttsSettingsTextSelectionNonItalicDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip Markdown or HTML italic text.'**
+  String get ttsSettingsTextSelectionNonItalicDescription;
 
   /// No description provided for @ttsFloatingPlayerLabel.
   ///

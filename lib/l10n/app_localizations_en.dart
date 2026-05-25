@@ -3942,6 +3942,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ttsServicesPageTitle => 'Text-to-Speech';
 
   @override
+  String get ttsServicesPageSettingsTooltip => 'TTS settings';
+
+  @override
   String get ttsServicesPageAddTooltip => 'Add';
 
   @override
@@ -4068,6 +4071,62 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ttsServicesCloseButton => 'Close';
+
+  @override
+  String get ttsSettingsPageTitle => 'TTS Settings';
+
+  @override
+  String get ttsSettingsPlaybackSection => 'Playback';
+
+  @override
+  String get ttsSettingsAutoPlayTitle => 'Auto-play Assistant Replies';
+
+  @override
+  String get ttsSettingsAutoPlayDescription =>
+      'Start TTS automatically after an assistant reply finishes.';
+
+  @override
+  String get ttsSettingsTextSelectionSection => 'Text Selection';
+
+  @override
+  String get ttsSettingsTextSelectionFallbackDescription =>
+      'If no matching text is found, the full reply is played.';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextTitle => 'Full text';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextDescription =>
+      'Play the complete assistant reply.';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyTitle => 'Quoted text only';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyDescription =>
+      'Play text inside “”, ‘’, \"\", \'\', 「」, or 『』.';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesTitle =>
+      'Outside parentheses';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesDescription =>
+      'Skip text inside () and （）.';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyTitle => 'Italic text only';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyDescription =>
+      'Play Markdown or HTML italic text.';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicTitle => 'Non-italic text only';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicDescription =>
+      'Skip Markdown or HTML italic text.';
 
   @override
   String get ttsFloatingPlayerLabel => 'TTS player';

@@ -8,6 +8,7 @@ import '../../core/providers/settings_provider.dart';
 import '../../core/services/tts/network_tts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../utils/brand_assets.dart';
+import '../../features/settings/pages/tts_settings_page.dart';
 
 /// Desktop: TTS (语音服务) right-side pane
 /// Adapts mobile TTS page to desktop with hoverable list card style
@@ -64,6 +65,14 @@ class _DesktopTtsServicesPaneState extends State<DesktopTtsServicesPane> {
                           ),
                         ),
                       ),
+                      Tooltip(
+                        message: l10n.ttsServicesPageSettingsTooltip,
+                        child: _SmallIconBtn(
+                          icon: lucide.Lucide.Settings2,
+                          onTap: () => _showTtsSettingsDialog(context),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
                       _SmallIconBtn(
                         icon: lucide.Lucide.Plus,
                         onTap: _handleAddNetworkService,
@@ -366,6 +375,53 @@ void _showErrorDialog(BuildContext context, String message) {
               ),
             ],
           ),
+        ),
+      ),
+    ),
+  );
+}
+
+void _showTtsSettingsDialog(BuildContext context) {
+  final cs = Theme.of(context).colorScheme;
+  final l10n = AppLocalizations.of(context)!;
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => Dialog(
+      backgroundColor: cs.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 720),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 10, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.ttsSettingsPageTitle,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  _SmallIconBtn(
+                    icon: lucide.Lucide.X,
+                    onTap: () => Navigator.of(ctx).maybePop(),
+                  ),
+                ],
+              ),
+            ),
+            _deskDivider(ctx),
+            const Expanded(
+              child: TtsSettingsContent(
+                padding: EdgeInsets.fromLTRB(16, 14, 16, 18),
+              ),
+            ),
+          ],
         ),
       ),
     ),

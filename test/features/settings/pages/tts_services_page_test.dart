@@ -86,4 +86,38 @@ void main() {
     expect(find.text('Model'), findsNothing);
     expect(find.text('Language'), findsOneWidget);
   });
+
+  testWidgets('mobile TTS settings button opens playback settings', (
+    tester,
+  ) async {
+    final settings = SettingsProvider();
+    final tts = TtsProvider();
+    addTearDown(tts.dispose);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider<TtsProvider>.value(value: tts),
+        ],
+        child: const MaterialApp(
+          localizationsDelegates: [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: TtsServicesPage(),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('TTS settings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('TTS Settings'), findsOneWidget);
+    expect(find.text('Auto-play Assistant Replies'), findsOneWidget);
+    expect(find.text('Text Selection'), findsOneWidget);
+  });
 }

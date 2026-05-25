@@ -3788,6 +3788,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsServicesPageTitle => '语音服务';
 
   @override
+  String get ttsServicesPageSettingsTooltip => 'TTS 设置';
+
+  @override
   String get ttsServicesPageAddTooltip => '新增';
 
   @override
@@ -3911,6 +3914,58 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get ttsServicesCloseButton => '关闭';
+
+  @override
+  String get ttsSettingsPageTitle => 'TTS 设置';
+
+  @override
+  String get ttsSettingsPlaybackSection => '播放';
+
+  @override
+  String get ttsSettingsAutoPlayTitle => '自动播放助手回复';
+
+  @override
+  String get ttsSettingsAutoPlayDescription => '助手回复生成完成后自动开始 TTS 播放。';
+
+  @override
+  String get ttsSettingsTextSelectionSection => '文本选择';
+
+  @override
+  String get ttsSettingsTextSelectionFallbackDescription => '没有匹配内容时将播放完整回复。';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextTitle => '全文';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextDescription => '播放完整助手回复。';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyTitle => '仅引号内文字';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyDescription =>
+      '播放 “”、‘’、\"\"、\'\'、「」或『』内的文字。';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesTitle => '括号外文字';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesDescription =>
+      '跳过 () 和 （） 内的文字。';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyTitle => '仅斜体文字';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyDescription =>
+      '播放 Markdown 或 HTML 斜体文字。';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicTitle => '仅正体文字';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicDescription =>
+      '跳过 Markdown 或 HTML 斜体文字。';
 
   @override
   String get ttsFloatingPlayerLabel => '语音播放器';
@@ -8769,6 +8824,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsServicesPageTitle => '语音服务';
 
   @override
+  String get ttsServicesPageSettingsTooltip => 'TTS 设置';
+
+  @override
   String get ttsServicesPageAddTooltip => '新增';
 
   @override
@@ -8892,6 +8950,58 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get ttsServicesCloseButton => '关闭';
+
+  @override
+  String get ttsSettingsPageTitle => 'TTS 设置';
+
+  @override
+  String get ttsSettingsPlaybackSection => '播放';
+
+  @override
+  String get ttsSettingsAutoPlayTitle => '自动播放助手回复';
+
+  @override
+  String get ttsSettingsAutoPlayDescription => '助手回复生成完成后自动开始 TTS 播放。';
+
+  @override
+  String get ttsSettingsTextSelectionSection => '文本选择';
+
+  @override
+  String get ttsSettingsTextSelectionFallbackDescription => '没有匹配内容时将播放完整回复。';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextTitle => '全文';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextDescription => '播放完整助手回复。';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyTitle => '仅引号内文字';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyDescription =>
+      '播放 “”、‘’、\"\"、\'\'、「」或『』内的文字。';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesTitle => '括号外文字';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesDescription =>
+      '跳过 () 和 （） 内的文字。';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyTitle => '仅斜体文字';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyDescription =>
+      '播放 Markdown 或 HTML 斜体文字。';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicTitle => '仅正体文字';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicDescription =>
+      '跳过 Markdown 或 HTML 斜体文字。';
 
   @override
   String get ttsFloatingPlayerLabel => '语音播放器';
@@ -13748,6 +13858,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get ttsServicesPageTitle => '語音服務';
 
   @override
+  String get ttsServicesPageSettingsTooltip => 'TTS 設定';
+
+  @override
   String get ttsServicesPageAddTooltip => '新增';
 
   @override
@@ -13871,6 +13984,58 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get ttsServicesCloseButton => '關閉';
+
+  @override
+  String get ttsSettingsPageTitle => 'TTS 設定';
+
+  @override
+  String get ttsSettingsPlaybackSection => '播放';
+
+  @override
+  String get ttsSettingsAutoPlayTitle => '自動播放助理回覆';
+
+  @override
+  String get ttsSettingsAutoPlayDescription => '助理回覆產生完成後自動開始 TTS 播放。';
+
+  @override
+  String get ttsSettingsTextSelectionSection => '文字選擇';
+
+  @override
+  String get ttsSettingsTextSelectionFallbackDescription => '沒有符合內容時將播放完整回覆。';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextTitle => '全文';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextDescription => '播放完整助理回覆。';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyTitle => '僅引號內文字';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyDescription =>
+      '播放 “”、‘’、\"\"、\'\'、「」或『』內的文字。';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesTitle => '括號外文字';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesDescription =>
+      '跳過 () 和 （） 內的文字。';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyTitle => '僅斜體文字';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyDescription =>
+      '播放 Markdown 或 HTML 斜體文字。';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicTitle => '僅正體文字';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicDescription =>
+      '跳過 Markdown 或 HTML 斜體文字。';
 
   @override
   String get ttsFloatingPlayerLabel => '語音播放器';

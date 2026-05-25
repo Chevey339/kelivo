@@ -10,6 +10,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../core/services/haptics.dart';
+import 'tts_settings_page.dart';
 
 class TtsServicesPage extends StatelessWidget {
   const TtsServicesPage({super.key});
@@ -33,6 +34,20 @@ class TtsServicesPage extends StatelessWidget {
         ),
         title: Text(l10n.ttsServicesPageTitle),
         actions: [
+          Tooltip(
+            message: l10n.ttsServicesPageSettingsTooltip,
+            child: _TactileIconButton(
+              icon: Lucide.Settings2,
+              color: cs.onSurface,
+              size: 22,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const TtsSettingsPage(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
           Tooltip(
             message: l10n.ttsServicesPageAddTooltip,
             child: _TactileIconButton(

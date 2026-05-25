@@ -106,6 +106,9 @@ class ChatActions {
   /// Called when streaming finishes.
   VoidCallback? onStreamFinished;
 
+  /// Called when a successful assistant reply is finalized.
+  void Function(ChatMessage message)? onAssistantMessageFinished;
+
   /// Called when file processing starts.
   VoidCallback? onFileProcessingStarted;
 
@@ -1391,17 +1394,19 @@ class ChatActions {
       durationMs: finalDurationMs,
     );
 
+    final finalizedMessage = state.ctx.assistantMessage.copyWith(
+      content: sanitizedContent,
+      totalTokens: state.totalTokens,
+      isStreaming: false,
+      promptTokens: finalPromptTokens,
+      completionTokens: finalCompletionTokens,
+      cachedTokens: finalCachedTokens,
+      durationMs: finalDurationMs,
+    );
+
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
-      _messages[index] = _messages[index].copyWith(
-        content: sanitizedContent,
-        totalTokens: state.totalTokens,
-        isStreaming: false,
-        promptTokens: finalPromptTokens,
-        completionTokens: finalCompletionTokens,
-        cachedTokens: finalCachedTokens,
-        durationMs: finalDurationMs,
-      );
+      _messages[index] = finalizedMessage;
       onMessagesChanged?.call();
     }
 
@@ -1409,6 +1414,7 @@ class ChatActions {
     streamController.removeStreamingNotifier(messageId);
 
     _setConversationLoading(conversationId, false);
+    onAssistantMessageFinished?.call(finalizedMessage);
 
     // Use unified reasoning completion method
     await streamController.finishReasoningAndPersist(
