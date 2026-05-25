@@ -23,6 +23,7 @@ class TtsFloatingPlayer extends StatefulWidget {
 class _TtsFloatingPlayerState extends State<TtsFloatingPlayer> {
   static const double _horizontalMargin = 12;
   static const double _topMargin = 12;
+  static const double _initialTopOffset = 68;
   static const double _collapsedWidth = 120;
   static const double _expandedWidth = 232;
   static const double _surfaceHorizontalPadding = 3;
@@ -80,7 +81,10 @@ class _TtsFloatingPlayerState extends State<TtsFloatingPlayer> {
                             _horizontalMargin,
                             constraints.maxWidth - width - _horizontalMargin,
                           );
-                          final fallback = Offset(maxX, safeTop + _topMargin);
+                          final fallback = Offset(
+                            _horizontalMargin,
+                            safeTop + _initialTopOffset,
+                          );
                           final pos = _clampPosition(
                             _position ?? fallback,
                             constraints.maxWidth,
