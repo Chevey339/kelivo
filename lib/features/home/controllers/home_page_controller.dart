@@ -975,11 +975,12 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> speakMessage(ChatMessage message) async {
+    final tts = _context.read<TtsProvider>();
     if (PlatformUtils.isDesktopTarget) {
       final sp = _context.read<SettingsProvider>();
       final hasNetworkTts =
           sp.ttsServiceSelected >= 0 && sp.ttsServices.isNotEmpty;
-      if (!hasNetworkTts) {
+      if (!hasNetworkTts && !tts.isAvailable) {
         showAppSnackBar(
           _context,
           message: AppLocalizations.of(_context)!.desktopTtsPleaseAddProvider,
@@ -988,8 +989,7 @@ class HomePageController extends ChangeNotifier {
         return;
       }
     }
-    final tts = _context.read<TtsProvider>();
-    if (!tts.isSpeaking) {
+    if (!tts.playbackState.isActive) {
       await tts.speak(message.content);
     } else {
       await tts.stop();

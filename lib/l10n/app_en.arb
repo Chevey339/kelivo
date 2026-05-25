@@ -1673,6 +1673,16 @@
   "ttsServicesViewDetailsButton": "View details",
   "ttsServicesDialogErrorTitle": "Error Details",
   "ttsServicesCloseButton": "Close",
+  "ttsFloatingPlayerLabel": "TTS player",
+  "ttsFloatingPauseTooltip": "Pause",
+  "ttsFloatingResumeTooltip": "Resume",
+  "ttsFloatingReplayTooltip": "Replay",
+  "ttsFloatingRewind15Tooltip": "Back 15 seconds",
+  "ttsFloatingForward15Tooltip": "Forward 15 seconds",
+  "ttsFloatingSpeedTooltip": "Playback speed",
+  "ttsFloatingCloseTooltip": "Close player",
+  "ttsFloatingExpandTooltip": "Expand playback controls",
+  "ttsFloatingCollapseTooltip": "Collapse playback controls",
   "imageViewerPageShareFailedOpenFile": "Unable to share, tried to open file: {message}",
   "@imageViewerPageShareFailedOpenFile": {
     "placeholders": {

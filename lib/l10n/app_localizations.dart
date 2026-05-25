@@ -7580,6 +7580,66 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get ttsServicesCloseButton;
 
+  /// No description provided for @ttsFloatingPlayerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'TTS player'**
+  String get ttsFloatingPlayerLabel;
+
+  /// No description provided for @ttsFloatingPauseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get ttsFloatingPauseTooltip;
+
+  /// No description provided for @ttsFloatingResumeTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get ttsFloatingResumeTooltip;
+
+  /// No description provided for @ttsFloatingReplayTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay'**
+  String get ttsFloatingReplayTooltip;
+
+  /// No description provided for @ttsFloatingRewind15Tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Back 15 seconds'**
+  String get ttsFloatingRewind15Tooltip;
+
+  /// No description provided for @ttsFloatingForward15Tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward 15 seconds'**
+  String get ttsFloatingForward15Tooltip;
+
+  /// No description provided for @ttsFloatingSpeedTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback speed'**
+  String get ttsFloatingSpeedTooltip;
+
+  /// No description provided for @ttsFloatingCloseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close player'**
+  String get ttsFloatingCloseTooltip;
+
+  /// No description provided for @ttsFloatingExpandTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand playback controls'**
+  String get ttsFloatingExpandTooltip;
+
+  /// No description provided for @ttsFloatingCollapseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse playback controls'**
+  String get ttsFloatingCollapseTooltip;
+
   /// No description provided for @imageViewerPageShareFailedOpenFile.
   ///
   /// In en, this message translates to:

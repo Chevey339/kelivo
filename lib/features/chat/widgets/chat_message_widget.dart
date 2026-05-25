@@ -2417,39 +2417,42 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         ),
                         const SizedBox(width: 6),
                         Consumer<TtsProvider>(
-                          builder: (context, tts, _) => SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: Center(
-                              child: IosIconButton(
-                                size: 16,
-                                padding: EdgeInsets.all(4),
-                                onTap: widget.onSpeak,
-                                color: cs.onSurface.withValues(alpha: 0.9),
-                                builder: (color) => AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 200),
-                                  transitionBuilder: (child, anim) =>
-                                      ScaleTransition(
-                                        scale: anim,
-                                        child: FadeTransition(
-                                          opacity: anim,
-                                          child: child,
+                          builder: (context, tts, _) {
+                            final ttsActive = tts.playbackState.isActive;
+                            return SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: Center(
+                                child: IosIconButton(
+                                  size: 16,
+                                  padding: EdgeInsets.all(4),
+                                  onTap: widget.onSpeak,
+                                  color: cs.onSurface.withValues(alpha: 0.9),
+                                  builder: (color) => AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 200),
+                                    transitionBuilder: (child, anim) =>
+                                        ScaleTransition(
+                                          scale: anim,
+                                          child: FadeTransition(
+                                            opacity: anim,
+                                            child: child,
+                                          ),
                                         ),
+                                    child: Icon(
+                                      ttsActive
+                                          ? Lucide.CircleStop
+                                          : Lucide.Volume2,
+                                      key: ValueKey(
+                                        ttsActive ? 'stop' : 'speak',
                                       ),
-                                  child: Icon(
-                                    tts.isSpeaking
-                                        ? Lucide.CircleStop
-                                        : Lucide.Volume2,
-                                    key: ValueKey(
-                                      tts.isSpeaking ? 'stop' : 'speak',
+                                      size: 16,
+                                      color: color,
                                     ),
-                                    size: 16,
-                                    color: color,
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
                         const SizedBox(width: 6),
                         SizedBox(

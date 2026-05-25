@@ -3904,6 +3904,36 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsServicesCloseButton => '关闭';
 
   @override
+  String get ttsFloatingPlayerLabel => '语音播放器';
+
+  @override
+  String get ttsFloatingPauseTooltip => '暂停';
+
+  @override
+  String get ttsFloatingResumeTooltip => '继续播放';
+
+  @override
+  String get ttsFloatingReplayTooltip => '重新播放';
+
+  @override
+  String get ttsFloatingRewind15Tooltip => '后退 15 秒';
+
+  @override
+  String get ttsFloatingForward15Tooltip => '前进 15 秒';
+
+  @override
+  String get ttsFloatingSpeedTooltip => '播放倍速';
+
+  @override
+  String get ttsFloatingCloseTooltip => '关闭播放器';
+
+  @override
+  String get ttsFloatingExpandTooltip => '展开播放控制';
+
+  @override
+  String get ttsFloatingCollapseTooltip => '收起播放控制';
+
+  @override
   String imageViewerPageShareFailedOpenFile(String message) {
     return '无法分享，已尝试打开文件: $message';
   }
@@ -8846,6 +8876,36 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsServicesCloseButton => '关闭';
 
   @override
+  String get ttsFloatingPlayerLabel => '语音播放器';
+
+  @override
+  String get ttsFloatingPauseTooltip => '暂停';
+
+  @override
+  String get ttsFloatingResumeTooltip => '继续播放';
+
+  @override
+  String get ttsFloatingReplayTooltip => '重新播放';
+
+  @override
+  String get ttsFloatingRewind15Tooltip => '后退 15 秒';
+
+  @override
+  String get ttsFloatingForward15Tooltip => '前进 15 秒';
+
+  @override
+  String get ttsFloatingSpeedTooltip => '播放倍速';
+
+  @override
+  String get ttsFloatingCloseTooltip => '关闭播放器';
+
+  @override
+  String get ttsFloatingExpandTooltip => '展开播放控制';
+
+  @override
+  String get ttsFloatingCollapseTooltip => '收起播放控制';
+
+  @override
   String imageViewerPageShareFailedOpenFile(String message) {
     return '无法分享，已尝试打开文件: $message';
   }
@@ -13784,6 +13844,36 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get ttsServicesCloseButton => '關閉';
+
+  @override
+  String get ttsFloatingPlayerLabel => '語音播放器';
+
+  @override
+  String get ttsFloatingPauseTooltip => '暫停';
+
+  @override
+  String get ttsFloatingResumeTooltip => '繼續播放';
+
+  @override
+  String get ttsFloatingReplayTooltip => '重新播放';
+
+  @override
+  String get ttsFloatingRewind15Tooltip => '倒退 15 秒';
+
+  @override
+  String get ttsFloatingForward15Tooltip => '前進 15 秒';
+
+  @override
+  String get ttsFloatingSpeedTooltip => '播放倍速';
+
+  @override
+  String get ttsFloatingCloseTooltip => '關閉播放器';
+
+  @override
+  String get ttsFloatingExpandTooltip => '展開播放控制';
+
+  @override
+  String get ttsFloatingCollapseTooltip => '收起播放控制';
 
   @override
   String imageViewerPageShareFailedOpenFile(String message) {
