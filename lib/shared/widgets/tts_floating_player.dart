@@ -77,10 +77,6 @@ class _TtsFloatingPlayerState extends State<TtsFloatingPlayer> {
                               .clamp(0.0, availableWidth)
                               .toDouble();
                           final height = constraints.maxHeight;
-                          final maxX = math.max(
-                            _horizontalMargin,
-                            constraints.maxWidth - width - _horizontalMargin,
-                          );
                           final fallback = Offset(
                             _horizontalMargin,
                             safeTop + _initialTopOffset,

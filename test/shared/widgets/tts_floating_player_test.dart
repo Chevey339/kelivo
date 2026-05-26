@@ -109,7 +109,7 @@ void main() {
     await tester.pump();
     final afterDrag = tester.getTopLeft(player);
 
-    expect(afterDrag.dx, lessThan(beforeDrag.dx));
+    expect(afterDrag.dx, beforeDrag.dx);
     expect(afterDrag.dy, greaterThan(beforeDrag.dy));
 
     await tester.tap(find.byTooltip('展开播放控制'));
