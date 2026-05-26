@@ -525,6 +525,81 @@ void main() {
     });
 
     test(
+      'completed memory tool turn remains valid when followed by user text',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-opus-4-7',
+          thinkingBudget: 16000,
+          messages: const [
+            {'role': 'user', 'content': 'trigger message'},
+            {
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': [
+                {
+                  'id': 'toolu_01SBaeK3UtXTQmybQjpPZurX',
+                  'type': 'function',
+                  'function': {
+                    'name': 'create_memory',
+                    'arguments': '{"content":"test"}',
+                  },
+                  'metadata': {
+                    'anthropic': {
+                      'assistant_blocks': [
+                        {
+                          'type': 'thinking',
+                          'thinking': '需要记录这个偏好。',
+                          'signature': 'sig-memory-turn',
+                        },
+                        {
+                          'type': 'tool_use',
+                          'id': 'toolu_01SBaeK3UtXTQmybQjpPZurX',
+                          'name': 'create_memory',
+                          'input': {'content': 'test'},
+                        },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'toolu_01SBaeK3UtXTQmybQjpPZurX',
+              'name': 'create_memory',
+              'content': 'test',
+            },
+            {'role': 'assistant', 'content': 'confirmed'},
+            {'role': 'user', 'content': 'ok'},
+          ],
+        );
+
+        final messages = (body['messages'] as List).cast<Map>();
+        final assistantContent = (messages[1]['content'] as List).cast<Map>();
+        final toolResultContent = (messages[2]['content'] as List).cast<Map>();
+
+        expect(messages.map((message) => message['role']).toList(), [
+          'user',
+          'assistant',
+          'user',
+          'assistant',
+          'user',
+        ]);
+        expect(assistantContent[0]['type'], 'thinking');
+        expect(assistantContent[0]['signature'], 'sig-memory-turn');
+        expect(assistantContent[1]['type'], 'tool_use');
+        expect(assistantContent[1]['id'], 'toolu_01SBaeK3UtXTQmybQjpPZurX');
+        expect(toolResultContent.single['type'], 'tool_result');
+        expect(
+          toolResultContent.single['tool_use_id'],
+          'toolu_01SBaeK3UtXTQmybQjpPZurX',
+        );
+        expect(messages[3]['content'], 'confirmed');
+        expect(messages[4]['content'], 'ok');
+      },
+    );
+
+    test(
       'history tool replay uses complete Claude assistant tool blocks',
       () async {
         final body = await _captureClaudeRequestBody(
