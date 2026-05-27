@@ -1,6 +1,6 @@
 name: mcp_client
-description: Dart implementation of Model Context Protocol (MCP) client v2025-03-26. Supports embedded systems, modern async patterns, and full MCP standard compliance for LLM applications.
-version: 1.0.2
+description: Dart implementation of Model Context Protocol (MCP) client. Supports protocol revisions 2024-11-05 / 2025-03-26 / 2025-06-18 / 2025-11-25 with per-version capability negotiation, OAuth 2.1, and stdio / SSE / Streamable HTTP transports.
+version: 2.0.0
 homepage: https://app-appplayer.github.io/makemind
 repository: https://github.com/app-appplayer/mcp_client
 issue_tracker: https://github.com/app-appplayer/mcp_client/issues

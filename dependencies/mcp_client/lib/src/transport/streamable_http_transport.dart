@@ -11,6 +11,7 @@ import '../../logger.dart';
 import '../auth/oauth.dart';
 import '../auth/oauth_client.dart';
 import '../models/models.dart';
+import '../protocol/protocol.dart';
 import 'event_source.dart';
 import 'transport.dart';
 
@@ -69,6 +70,7 @@ class StreamableHttpClientTransport implements ClientTransport {
   bool _isClosed = false;
   final Semaphore _requestSemaphore;
   String? _sessionId;
+  String? _protocolVersion;
   final Map<int, Completer<dynamic>> _pendingRequests = {};
   EventSource? _eventSource;
   StreamSubscription? _sseSubscription;
@@ -83,6 +85,13 @@ class StreamableHttpClientTransport implements ClientTransport {
        _oauthClient = oauthClient,
        _tokenManager = tokenManager,
        _requestSemaphore = Semaphore(config.maxConcurrentRequests);
+
+  /// Spec 2025-06-18+: record the negotiated MCP protocol version so
+  /// every post-handshake HTTP request carries
+  /// `MCP-Protocol-Version: <version>`.
+  void setProtocolVersion(String version) {
+    _protocolVersion = version;
+  }
 
   /// Create a new Streamable HTTP transport
   static Future<StreamableHttpClientTransport> create({
@@ -189,6 +198,14 @@ class StreamableHttpClientTransport implements ClientTransport {
         headers['MCP-Session-Id'] = _sessionId!;
       }
 
+      // Spec 2025-06-18+: every post-handshake HTTP request MUST carry
+      // the negotiated protocol version. Older revisions ignore this
+      // header. Set via [setProtocolVersion] after initialize.
+      if (_protocolVersion != null &&
+          McpProtocol.requiresProtocolHeader(_protocolVersion!)) {
+        headers['MCP-Protocol-Version'] = _protocolVersion!;
+      }
+
       // Add OAuth token if available
       if (_tokenManager != null) {
         try {
@@ -222,9 +239,23 @@ class StreamableHttpClientTransport implements ClientTransport {
         _pendingRequests[requestId] = Completer<dynamic>();
       }
 
-      final response = await _httpClient
-          .post(uri, headers: headers, body: body)
-          .timeout(config.timeout);
+      // Build a streamed request so SSE responses can be read live.
+      //
+      // FastMCP routes server-initiated requests
+      // (`sampling/createMessage`, `elicitation/create`) on the in-flight
+      // POST's SSE response stream — not the standalone GET stream — and
+      // those requests fire mid-tool-call. Buffering the body via
+      // `httpClient.post(...).bodyBytes` deadlocks: the server holds the
+      // SSE response open waiting for our reply to a server-initiated
+      // request, but we can't see the request until the stream closes.
+      // Streaming the response while it's open lets us dispatch each SSE
+      // event the moment it arrives.
+      final request = http.Request('POST', uri)
+        ..body = body;
+      headers.forEach((k, v) => request.headers[k] = v);
+
+      final response =
+          await _httpClient.send(request).timeout(config.timeout);
 
       // Extract session ID from response headers
       final newSessionId = response.headers['mcp-session-id'];
@@ -236,6 +267,8 @@ class StreamableHttpClientTransport implements ClientTransport {
       if (response.statusCode == 202) {
         // 202 Accepted - no immediate response expected
         _logger.debug('Received 202 Accepted');
+        // Drain any stray bytes so the connection can be released.
+        await response.stream.drain<void>();
         return;
       }
 
@@ -248,6 +281,7 @@ class StreamableHttpClientTransport implements ClientTransport {
             'error': {'code': 32600, 'message': 'Session terminated'},
           });
         }
+        await response.stream.drain<void>();
         return;
       }
 
@@ -265,12 +299,16 @@ class StreamableHttpClientTransport implements ClientTransport {
           },
           if (requestId != null) 'id': requestId,
         });
+        await response.stream.drain<void>();
         return;
       }
 
       if (response.statusCode >= 400) {
+        // Buffer the error body for the exception message.
+        final errorBody = await response.stream.bytesToString();
         throw McpError(
-          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}'
+          '${errorBody.isEmpty ? '' : ' — $errorBody'}',
         );
       }
 
@@ -278,23 +316,23 @@ class StreamableHttpClientTransport implements ClientTransport {
       final contentType = response.headers['content-type']?.toLowerCase() ?? '';
 
       if (contentType.startsWith('application/json')) {
-        // Direct JSON response - decode bytes with UTF-8
-        final responseBytes = response.bodyBytes;
-        if (responseBytes.isNotEmpty) {
-          final responseBody = utf8.decode(responseBytes);
+        // Direct JSON response - read the entire body, decode as UTF-8.
+        final responseBody = await response.stream.bytesToString();
+        if (responseBody.isNotEmpty) {
           final responseMessage = jsonDecode(responseBody);
           _messageController.add(responseMessage);
         }
       } else if (contentType.startsWith('text/event-stream')) {
-        // SSE response - handle streaming
-        await _handleSseResponse(response, requestId);
+        // SSE response — process each event as it arrives so
+        // server-initiated requests embedded in this stream don't have
+        // to wait for the whole tool call to finish.
+        await _handleStreamedSseResponse(response, requestId);
       } else {
         _logger.warning('Unexpected content type: $contentType');
-        // Try to parse as JSON anyway - use bytes for UTF-8 safety
-        final responseBytes = response.bodyBytes;
-        if (responseBytes.isNotEmpty) {
+        // Try to parse as JSON anyway - read full body
+        final responseBody = await response.stream.bytesToString();
+        if (responseBody.isNotEmpty) {
           try {
-            final responseBody = utf8.decode(responseBytes);
             final responseMessage = jsonDecode(responseBody);
             _messageController.add(responseMessage);
           } catch (e) {
@@ -307,34 +345,30 @@ class StreamableHttpClientTransport implements ClientTransport {
     }
   }
 
-  /// Handle SSE response from POST request
-  Future<void> _handleSseResponse(
-    http.Response response,
+  /// Handle a streamed SSE response from a POST request, dispatching
+  /// each event as it arrives. Required for cases where the server
+  /// embeds server-initiated requests (`sampling/createMessage`,
+  /// `elicitation/create`) in the response stream and waits for the
+  /// client's reply before producing the final tool result — buffering
+  /// the body would deadlock.
+  Future<void> _handleStreamedSseResponse(
+    http.StreamedResponse response,
     int? requestId,
   ) async {
-    _logger.debug('Handling SSE response');
-    // Use bodyBytes for proper UTF-8 handling
-    final bytes = response.bodyBytes;
-    if (bytes.isNotEmpty) {
+    _logger.debug('Handling streamed SSE response');
+    final lineStream = response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+
+    await for (final line in lineStream) {
+      if (!line.startsWith('data:')) continue;
+      final data = line.substring(5).trim();
+      if (data.isEmpty || data == '[DONE]') continue;
       try {
-        final body = utf8.decode(bytes);
-        // Try to extract JSON from SSE data
-        final lines = body.split('\n');
-        for (final line in lines) {
-          if (line.startsWith('data:')) {
-            final data = line.substring(5).trim();
-            if (data.isNotEmpty && data != '[DONE]') {
-              try {
-                final json = jsonDecode(data);
-                _messageController.add(json);
-              } catch (e) {
-                _logger.debug('Failed to parse SSE data: $data');
-              }
-            }
-          }
-        }
+        final decoded = jsonDecode(data);
+        _messageController.add(decoded);
       } catch (e) {
-        _logger.error('Error parsing SSE response: $e');
+        _logger.debug('Failed to parse SSE data: $data');
       }
     }
   }

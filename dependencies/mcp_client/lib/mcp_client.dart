@@ -19,7 +19,6 @@ export 'src/transport/sse_auth_transport.dart';
 export 'src/transport/sse_compressed_transport.dart';
 export 'src/transport/sse_heartbeat_transport.dart';
 export 'src/protocol/protocol.dart';
-export 'src/protocol/batch.dart';
 export 'src/auth/oauth.dart';
 export 'src/auth/oauth_client.dart';
 export 'src/common/result.dart';
@@ -156,7 +155,8 @@ sealed class TransportConfig {
     bool enableCompression,
     Duration? heartbeatInterval,
     int maxMissedHeartbeats,
-    bool terminateOnClose,  // Whether to send DELETE on disconnect (default: true)
+    bool
+    terminateOnClose, // Whether to send DELETE on disconnect (default: true)
   }) = StreamableHttpTransportConfig;
 }
 
@@ -229,7 +229,7 @@ final class StreamableHttpTransportConfig extends TransportConfig {
     this.enableCompression = false,
     this.heartbeatInterval,
     this.maxMissedHeartbeats = 3,
-    this.terminateOnClose = true,  // Default: true for backward compatibility
+    this.terminateOnClose = true, // Default: true for backward compatibility
   });
 }
 
