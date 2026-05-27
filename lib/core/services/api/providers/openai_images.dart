@@ -517,9 +517,6 @@ void _applyOpenAIImagesExtraBody(
   String modelId,
   Map<String, dynamic>? extraBody,
 ) {
-  final defaults = _openAIImagesQualityDefaults(config, modelId);
-  if (defaults.isNotEmpty) body.addAll(defaults);
-
   final custom = _customBody(config, modelId);
   if (custom.isNotEmpty) body.addAll(custom);
   if (extraBody != null && extraBody.isNotEmpty) {
