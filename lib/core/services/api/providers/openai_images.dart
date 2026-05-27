@@ -529,26 +529,6 @@ void _applyOpenAIImagesExtraBody(
   }
 }
 
-Map<String, dynamic> _openAIImagesQualityDefaults(
-  ProviderConfig config,
-  String modelId,
-) {
-  final upstreamModelId = _apiModelId(config, modelId).toLowerCase();
-  if (!_supportsModernOpenAIImageQuality(upstreamModelId)) {
-    return const <String, dynamic>{};
-  }
-  return const <String, dynamic>{
-    'quality': 'high',
-    'output_format': 'png',
-  };
-}
-
-bool _supportsModernOpenAIImageQuality(String modelId) {
-  final normalized = modelId.toLowerCase();
-  return normalized.startsWith('gpt-image-') ||
-      normalized.startsWith('chatgpt-image-');
-}
-
 String _openAIImagesOutputMime(
   ProviderConfig config,
   String modelId,
