@@ -9,6 +9,8 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/ios_background_generation.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
@@ -106,6 +108,9 @@ class ChatActions {
   /// Called when streaming finishes.
   VoidCallback? onStreamFinished;
 
+  /// Called when a successful assistant reply is finalized.
+  void Function(ChatMessage message)? onAssistantMessageFinished;
+
   /// Called when file processing starts.
   VoidCallback? onFileProcessingStarted;
 
@@ -115,6 +120,88 @@ class ChatActions {
   // ============================================================================
   // Private Helpers
   // ============================================================================
+
+  AppLocalizations? get _l10n => AppLocalizations.of(contextProvider);
+
+  void _logIosBackgroundGenerationFailure(
+    String operation,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    debugPrint('[IosBackgroundGeneration] $operation failed: $error');
+    debugPrint('$stackTrace');
+  }
+
+  Future<void> _startIosBackgroundGeneration(
+    stream_ctrl.GenerationContext ctx,
+  ) async {
+    final settings = ctx.settings;
+    final l10n = _l10n;
+    if (l10n == null) return;
+    try {
+      await IosBackgroundGenerationService.instance.start(
+        enabled: settings.iosBackgroundGenerationEnabled,
+        liveActivityEnabled: settings.iosLiveActivityEnabled,
+        notificationsEnabled: settings.iosBackgroundNotificationsEnabled,
+        refreshEnabled: settings.iosBackgroundTaskRefreshEnabled,
+        title: l10n.iosBackgroundGenerationActiveTitle,
+        detail: l10n.iosBackgroundGenerationActiveDetail,
+        tokenLabel: l10n.iosBackgroundGenerationTokenCount(0),
+      );
+    } catch (error, stackTrace) {
+      _logIosBackgroundGenerationFailure('start', error, stackTrace);
+    }
+  }
+
+  Future<void> _updateIosBackgroundGeneration(
+    stream_ctrl.StreamingState state,
+  ) async {
+    final l10n = _l10n;
+    if (l10n == null) return;
+    try {
+      await IosBackgroundGenerationService.instance.update(
+        detail: l10n.iosBackgroundGenerationStreamingDetail,
+        tokenLabel: l10n.iosBackgroundGenerationTokenCount(state.totalTokens),
+        tokenCount: state.totalTokens,
+      );
+    } catch (error, stackTrace) {
+      _logIosBackgroundGenerationFailure('update', error, stackTrace);
+    }
+  }
+
+  Future<void> _finishIosBackgroundGeneration({
+    required bool success,
+    String? detail,
+  }) async {
+    final l10n = _l10n;
+    if (l10n == null) return;
+    try {
+      await IosBackgroundGenerationService.instance.finish(
+        title: success
+            ? l10n.iosBackgroundGenerationCompleteTitle
+            : l10n.iosBackgroundGenerationInterruptedTitle,
+        detail:
+            detail ??
+            (success
+                ? l10n.iosBackgroundGenerationCompleteDetail
+                : l10n.iosBackgroundGenerationInterruptedDetail),
+        success: success,
+      );
+    } catch (error, stackTrace) {
+      _logIosBackgroundGenerationFailure('finish', error, stackTrace);
+    }
+  }
+
+  Future<void> _cancelIosBackgroundGeneration() async {
+    final l10n = _l10n;
+    try {
+      await IosBackgroundGenerationService.instance.cancel(
+        detail: l10n?.iosBackgroundGenerationCancelledDetail,
+      );
+    } catch (error, stackTrace) {
+      _logIosBackgroundGenerationFailure('cancel', error, stackTrace);
+    }
+  }
 
   /// Track in-flight _finishStreaming futures so _handleStreamDone can await
   /// completion before removing notifiers or triggering rebuild.
@@ -895,6 +982,7 @@ class ChatActions {
         latestStreaming.content,
         immediate: true,
       );
+      await _cancelIosBackgroundGeneration();
     } else {
       _setConversationLoading(cid, false);
     }
@@ -923,6 +1011,7 @@ class ChatActions {
     streamController.markStreamingStarted(state.messageId);
 
     try {
+      await _startIosBackgroundGeneration(ctx);
       final stream = ChatApiService.sendMessageStream(
         config: ctx.config,
         modelId: ctx.modelId,
@@ -1177,6 +1266,8 @@ class ChatActions {
       await _finishReasoningOnContent(state);
     }
 
+    await _updateIosBackgroundGeneration(state);
+
     // Re-check before scheduling timer — timer creation after _finishStreaming
     // would create a new timer that periodically overwrites _messages[index]
     // with stale partial content.
@@ -1287,7 +1378,9 @@ class ChatActions {
     _finishStreamingFutures.remove(messageId);
 
     // Notify for background notification if needed
-    onStreamFinished?.call();
+    if (!state.finishHandled) {
+      onStreamFinished?.call();
+    }
 
     // Handle buffered reasoning for non-streaming mode
     if (!state.ctx.streamOutput && state.bufferedReasoning.isNotEmpty) {
@@ -1391,17 +1484,19 @@ class ChatActions {
       durationMs: finalDurationMs,
     );
 
+    final finalizedMessage = state.ctx.assistantMessage.copyWith(
+      content: sanitizedContent,
+      totalTokens: state.totalTokens,
+      isStreaming: false,
+      promptTokens: finalPromptTokens,
+      completionTokens: finalCompletionTokens,
+      cachedTokens: finalCachedTokens,
+      durationMs: finalDurationMs,
+    );
+
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
-      _messages[index] = _messages[index].copyWith(
-        content: sanitizedContent,
-        totalTokens: state.totalTokens,
-        isStreaming: false,
-        promptTokens: finalPromptTokens,
-        completionTokens: finalCompletionTokens,
-        cachedTokens: finalCachedTokens,
-        durationMs: finalDurationMs,
-      );
+      _messages[index] = finalizedMessage;
       onMessagesChanged?.call();
     }
 
@@ -1409,6 +1504,7 @@ class ChatActions {
     streamController.removeStreamingNotifier(messageId);
 
     _setConversationLoading(conversationId, false);
+    onAssistantMessageFinished?.call(finalizedMessage);
 
     // Use unified reasoning completion method
     await streamController.finishReasoningAndPersist(
@@ -1438,6 +1534,8 @@ class ChatActions {
 
     // Trigger follow-up suggestions after the final assistant reply is stored.
     onMaybeGenerateSuggestions?.call(conversationId);
+
+    await _finishIosBackgroundGeneration(success: true);
   }
 
   /// Handle stream error.
@@ -1506,6 +1604,7 @@ class ChatActions {
     await _conversationStreams.remove(conversationId)?.cancel();
     onStreamError?.call(errorText);
     onStreamFinished?.call();
+    await _finishIosBackgroundGeneration(success: false, detail: errorText);
   }
 
   /// Handle stream done callback.

@@ -213,6 +213,7 @@ Widget _markdownHarness(
   double? width,
   bool streaming = false,
   Map<String, Object>? preferences,
+  void Function(String id)? onCitationTap,
 }) {
   SharedPreferences.setMockInitialValues(preferences ?? {});
   return ChangeNotifierProvider(
@@ -222,7 +223,11 @@ Widget _markdownHarness(
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: width == null
-            ? MarkdownWithCodeHighlight(text: text, streaming: streaming)
+            ? MarkdownWithCodeHighlight(
+                text: text,
+                streaming: streaming,
+                onCitationTap: onCitationTap,
+              )
             : Align(
                 alignment: Alignment.topLeft,
                 child: SizedBox(
@@ -230,6 +235,7 @@ Widget _markdownHarness(
                   child: MarkdownWithCodeHighlight(
                     text: text,
                     streaming: streaming,
+                    onCitationTap: onCitationTap,
                   ),
                 ),
               ),
@@ -328,6 +334,79 @@ void main() {
       '| Bob \\| Jr. | said "hello" |  |',
     );
   });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight renders grouped raw citation metadata as separate capsules',
+    (tester) async {
+      final tapped = <String>[];
+
+      await tester.pumpWidget(
+        _markdownHarness(
+          '包含 3,000 万毫秒/月 [citation:1:96d0ed, 4:5675a3]',
+          width: 360,
+          onCitationTap: tapped.add,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('1'), findsOneWidget);
+      expect(find.text('4'), findsOneWidget);
+      expect(find.textContaining('citation:1:96d0ed'), findsNothing);
+
+      await tester.tap(find.text('1'));
+      await tester.tap(find.text('4'));
+
+      expect(tapped, ['96d0ed', '5675a3']);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight renders shorthand raw citation metadata by index',
+    (tester) async {
+      final tapped = <String>[];
+
+      await tester.pumpWidget(
+        _markdownHarness(
+          '参考这个结论 [citation:2]',
+          width: 360,
+          onCitationTap: tapped.add,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('2'), findsOneWidget);
+      expect(find.textContaining('citation:2'), findsNothing);
+
+      await tester.tap(find.text('2'));
+
+      expect(tapped, ['2']);
+    },
+  );
+
+  testWidgets('MarkdownWithCodeHighlight keeps citation metadata inside code', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness('`[citation:1:96d0ed]`', width: 360),
+    );
+    await tester.pump();
+
+    expect(find.textContaining('citation:1:96d0ed'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+  });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps citation-labeled normal links as links',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('[citation](https://example.com)', width: 360),
+      );
+      await tester.pump();
+
+      expect(find.text('citation'), findsOneWidget);
+      expect(find.text('https'), findsNothing);
+    },
+  );
 
   testWidgets('MarkdownWithCodeHighlight applies markdown image dimensions', (
     tester,

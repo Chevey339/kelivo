@@ -1,37 +1,25 @@
-/// Comprehensive MCP 2025-03-26 client example showcasing all new features
+/// MCP 2.0 client showcase: OAuth, Streamable HTTP, enhanced tools,
+/// resource templates, progress + cancellation. Targets MCP spec
+/// revisions 2024-11-05 / 2025-03-26 / 2025-06-18 / 2025-11-25.
 library;
 
 import 'dart:async';
 import 'package:mcp_client/mcp_client.dart';
 
 void main() async {
-  // Run comprehensive client example
   await runMcp2025ClientExample();
 }
 
-/// Complete MCP 2025-03-26 client implementation example
 Future<void> runMcp2025ClientExample() async {
-  print('🚀 Starting MCP 2025-03-26 Enhanced Client...');
+  print('🚀 Starting MCP 2.0 client showcase...');
 
-  // 1. OAuth Authentication Example
   await _demonstrateOAuthAuthentication();
-
-  // 2. Streamable HTTP Transport Example
   await _demonstrateStreamableHttpTransport();
-
-  // 3. JSON-RPC Batching Example
-  await _demonstrateBatching();
-
-  // 4. Enhanced Tool Usage Example
   await _demonstrateEnhancedTools();
-
-  // 5. Resource Templates Example
   await _demonstrateResourceTemplates();
-
-  // 6. Progress and Cancellation Example
   await _demonstrateProgressAndCancellation();
 
-  print('✅ All MCP 2025-03-26 features demonstrated successfully!');
+  print('✅ Showcase complete.');
 }
 
 /// Demonstrate OAuth 2.1 authentication
@@ -147,87 +135,6 @@ Future<void> _demonstrateStreamableHttpTransport() async {
     }
   } catch (e) {
     print('⚠️  HTTP transport demo completed: $e');
-  }
-}
-
-/// Demonstrate JSON-RPC batching
-Future<void> _demonstrateBatching() async {
-  print('\n📦 === JSON-RPC Batching Example ===');
-
-  try {
-    // Create mock transport for batching demo
-    final mockTransport = MockBatchTransport();
-
-    // Create batching wrapper
-    final batchTransport = BatchingClientTransport(
-      mockTransport,
-      maxBatchSize: 10,
-      batchTimeout: const Duration(milliseconds: 100),
-    );
-
-    print('🔧 Batch configuration:');
-    print('   - Max batch size: 10');
-    print('   - Batch timeout: 100ms');
-
-    // Send multiple requests that will be batched
-    final futures = <Future<dynamic>>[];
-
-    print('📤 Sending 5 requests to be batched...');
-
-    for (int i = 1; i <= 5; i++) {
-      final future = batchTransport.sendRequest({
-        'jsonrpc': '2.0',
-        'id': i,
-        'method': 'tools/list',
-        'params': {},
-      });
-      futures.add(future);
-      print('   Request $i queued');
-    }
-
-    // Wait for all responses
-    print('⏳ Waiting for batch response...');
-
-    try {
-      final results = await Future.wait(futures);
-      print('✅ Received ${results.length} responses from batch');
-
-      for (int i = 0; i < results.length; i++) {
-        print('   Response ${i + 1}: processed');
-      }
-    } catch (e) {
-      print('ℹ️  Batch demo completed (mock responses)');
-    }
-
-    // Demonstrate batch utilities
-    print('\n🛠️  Batch Utilities:');
-
-    final requests = [
-      {'jsonrpc': '2.0', 'id': 1, 'method': 'test1'},
-      {'jsonrpc': '2.0', 'id': 2, 'method': 'test2'},
-      {'jsonrpc': '2.0', 'id': 3, 'method': 'test3'},
-    ];
-
-    // Create a batch request
-    final batchRequest = BatchRequest(requests: requests);
-    print('   Created batch with ${batchRequest.length} requests');
-    print('   Batch is full: ${batchRequest.isFull}');
-
-    // Split large batches
-    final largeRequests = List.generate(
-      25,
-      (i) => {'jsonrpc': '2.0', 'id': i + 1, 'method': 'test_${i + 1}'},
-    );
-
-    final splitBatches = BatchUtils.splitBatch(
-      BatchRequest(requests: largeRequests),
-      10,
-    );
-    print('   Split 25 requests into ${splitBatches.length} batches');
-
-    print('✅ Batching demonstration completed');
-  } catch (e) {
-    print('⚠️  Batching demo completed: $e');
   }
 }
 
@@ -364,55 +271,6 @@ Future<void> _demonstrateProgressAndCancellation() async {
     }
   } catch (e) {
     print('⚠️  Progress & cancellation demo completed: $e');
-  }
-}
-
-/// Mock transport for batching demonstration
-class MockBatchTransport implements ClientTransport {
-  final _messageController = StreamController<dynamic>.broadcast();
-  final _closeCompleter = Completer<void>();
-
-  @override
-  Stream<dynamic> get onMessage => _messageController.stream;
-
-  @override
-  Future<void> get onClose => _closeCompleter.future;
-
-  @override
-  void send(dynamic message) {
-    if (message is List) {
-      print('📦 Received batch with ${message.length} requests');
-      // Simulate batch response
-      Timer(const Duration(milliseconds: 100), () {
-        final responses =
-            message
-                .map(
-                  (req) => {
-                    'jsonrpc': '2.0',
-                    'id': req['id'],
-                    'result': {'status': 'processed'},
-                  },
-                )
-                .toList();
-        _messageController.add(responses);
-      });
-    } else {
-      print('📤 Received single request: ${message['method']}');
-      // Handle single request
-      _messageController.add({
-        'jsonrpc': '2.0',
-        'id': message['id'],
-        'result': {'status': 'processed'},
-      });
-    }
-  }
-
-  @override
-  void close() {
-    if (!_closeCompleter.isCompleted) {
-      _closeCompleter.complete();
-    }
-    _messageController.close();
   }
 }
 

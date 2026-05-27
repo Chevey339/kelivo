@@ -389,6 +389,73 @@ class S3BackupClient {
     // the client (by draining the stream).
   }
 
+  static Future<void> _sendSignedDownloadToFile(
+    S3Config cfg, {
+    required Uri uri,
+    required File destination,
+  }) async {
+    final now = DateTime.now().toUtc();
+    final amzDate = _amzDate(now);
+    final dateStamp = _dateStamp(now);
+    final payloadHash = _hashHex(const <int>[]);
+    final query = uri.queryParameters;
+    final canonicalQuery = query.isEmpty ? '' : _canonicalQuery(query);
+
+    final host = _hostHeader(uri);
+    final reqHeaders = <String, String>{
+      'host': host,
+      'x-amz-date': amzDate,
+      'x-amz-content-sha256': payloadHash,
+    };
+    if (cfg.sessionToken.trim().isNotEmpty) {
+      reqHeaders['x-amz-security-token'] = cfg.sessionToken.trim();
+    }
+
+    final canonHeaders = _canonicalHeaders(reqHeaders);
+    final signedHeaders = _signedHeaders(reqHeaders);
+    final canonicalRequest = [
+      'GET',
+      uri.path.isEmpty ? '/' : uri.path,
+      canonicalQuery,
+      canonHeaders,
+      signedHeaders,
+      payloadHash,
+    ].join('\n');
+    final canonicalRequestHash = _hashHex(utf8.encode(canonicalRequest));
+    final scope = '$dateStamp/${cfg.region.trim()}/s3/aws4_request';
+    final sts = _stringToSign(
+      amzDate: amzDate,
+      credentialScope: scope,
+      canonicalRequestHash: canonicalRequestHash,
+    );
+    final sig = _signature(
+      secretAccessKey: cfg.secretAccessKey,
+      dateStamp: dateStamp,
+      region: cfg.region.trim(),
+      service: 's3',
+      stringToSign: sts,
+    );
+    final auth =
+        'AWS4-HMAC-SHA256 Credential=${cfg.accessKeyId.trim()}/$scope, SignedHeaders=$signedHeaders, Signature=$sig';
+
+    final req = http.Request('GET', uri);
+    req.headers.addAll({...reqHeaders, 'Authorization': auth});
+
+    final client = http.Client();
+    try {
+      final streamed = await client.send(req);
+      if (streamed.statusCode != 200) {
+        final res = await http.Response.fromStream(streamed);
+        throw Exception('S3 download failed: ${_extractErrorMessage(res)}');
+      }
+      await destination.parent.create(recursive: true);
+      final sink = destination.openWrite();
+      await streamed.stream.pipe(sink);
+    } finally {
+      client.close();
+    }
+  }
+
   static String _extractErrorMessage(http.Response res) {
     final regionHint = res.headers['x-amz-bucket-region'] ?? '';
     try {
@@ -804,14 +871,7 @@ class S3BackupClient {
   }) async {
     _validateConfigBasics(cfg);
     final uri = _buildObjectUri(cfg, key);
-    final res = await _sendSigned(cfg, method: 'GET', uri: uri);
-    if (res.statusCode != 200) {
-      throw Exception('S3 download failed: ${_extractErrorMessage(res)}');
-    }
-    // Write bytes to file — the response is already fully read by _sendSigned,
-    // but at least the caller gets a File instead of holding the bytes in a
-    // variable that persists through restore.
-    await destination.writeAsBytes(res.bodyBytes);
+    await _sendSignedDownloadToFile(cfg, uri: uri, destination: destination);
   }
 
   Future<void> deleteObject(S3Config cfg, {required String key}) async {

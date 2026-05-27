@@ -20,6 +20,21 @@ Uri _openAICompatibleUrl(ProviderConfig config) {
   return Uri.parse('$rawBase$path');
 }
 
+Future<String> _saveResponsesImageGenerationMarkdown(
+  String imageBase64, {
+  String? outputFormat,
+}) async {
+  final normalizedFormat = (outputFormat ?? '').trim().toLowerCase();
+  final mime = switch (normalizedFormat) {
+    'jpeg' || 'jpg' => 'image/jpeg',
+    'webp' => 'image/webp',
+    _ => 'image/png',
+  };
+  final savedPath = await AppDirectories.saveBase64Image(mime, imageBase64);
+  if (savedPath == null || savedPath.isEmpty) return '';
+  return '\n![image]($savedPath)\n';
+}
+
 void _applyCompatibleBuiltInSearch(
   Map<String, dynamic> body, {
   required ProviderConfig config,
@@ -272,7 +287,9 @@ void _applyOpenRouterClaudePromptCaching(
   required String upstreamModelId,
 }) {
   if (!_shouldCacheClaudeSystemPrompt(config, upstreamModelId)) return;
-  body['cache_control'] = {'type': 'ephemeral'};
+  body['cache_control'] = ProviderConfig.claudePromptCacheControl(
+    config.claudePromptCachingTtl,
+  );
 }
 
 void _maybeAddStreamingUsageOptions(
@@ -1284,6 +1301,15 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       }
                     }
                   }
+                } else if (it is Map && it['type'] == 'image_generation_call') {
+                  final b64 = (it['result'] ?? '').toString();
+                  if (b64.isNotEmpty) {
+                    final mdImg = await _saveResponsesImageGenerationMarkdown(
+                      b64,
+                      outputFormat: (it['output_format'] ?? '').toString(),
+                    );
+                    if (mdImg.isNotEmpty) buf.write(mdImg);
+                  }
                 }
               }
               outText = buf.toString();
@@ -1558,6 +1584,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   // Responses API: track by output_index to capture call_id reliably
   final Map<int, Map<String, String>> respToolCallsByIndex =
       <int, Map<String, String>>{}; // index -> {call_id,name,args}
+  final Map<int, _ResponsesImageGenerationResult> responsesImagesByIndex =
+      <int, _ResponsesImageGenerationResult>{};
   List<Map<String, dynamic>> lastResponseOutputItems =
       const <Map<String, dynamic>>[];
   String? finishReason;
@@ -2183,6 +2211,23 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   'name': name,
                   'args': '',
                 };
+              } else if (item is Map &&
+                  (item['type'] ?? '') == 'image_generation_call') {
+                responsesImagesByIndex.putIfAbsent(
+                  idx,
+                  () => const _ResponsesImageGenerationResult(),
+                );
+              }
+            } catch (_) {}
+          } else if (type == 'response.image_generation_call.partial_image') {
+            try {
+              final b64 = (json['partial_image_b64'] ?? '').toString();
+              if (b64.isNotEmpty) {
+                final idx = (json['output_index'] ?? 0) as int;
+                responsesImagesByIndex[idx] = _ResponsesImageGenerationResult(
+                  base64: b64,
+                  outputFormat: (json['output_format'] ?? '').toString(),
+                );
               }
             } catch (_) {}
           } else if (type == 'response.function_call_arguments.delta') {
@@ -2212,6 +2257,15 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   },
                 );
                 if (args.isNotEmpty) entry['args'] = args;
+              } else if (item is Map &&
+                  (item['type'] ?? '') == 'image_generation_call') {
+                final b64 = (item['result'] ?? '').toString();
+                if (b64.isNotEmpty) {
+                  responsesImagesByIndex[idx] = _ResponsesImageGenerationResult(
+                    base64: b64,
+                    outputFormat: (item['output_format'] ?? '').toString(),
+                  );
+                }
               }
             } catch (_) {}
           } else if (type is String && type.contains('function_call')) {
@@ -2250,6 +2304,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             try {
               final output = json['response']?['output'];
               final items = <Map<String, dynamic>>[];
+              final completedImageIndexes = <int>{};
               // Save output items for potential follow-up call input
               lastResponseOutputItems = const <Map<String, dynamic>>[];
               if (output is List) {
@@ -2261,7 +2316,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               if (output is List) {
                 int idx = 1;
                 final seen = <String>{};
-                for (final it in output) {
+                for (
+                  int outputIndex = 0;
+                  outputIndex < output.length;
+                  outputIndex++
+                ) {
+                  final it = output[outputIndex];
                   if (it is! Map) continue;
                   if (it['type'] == 'message') {
                     final content = it['content'] as List? ?? const <dynamic>[];
@@ -2290,12 +2350,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     // it['result'] is directly the base64 image data
                     final b64 = (it['result'] ?? '').toString();
                     if (b64.isNotEmpty) {
-                      final savedPath = await AppDirectories.saveBase64Image(
-                        'image/png',
+                      completedImageIndexes.add(outputIndex);
+                      final mdImg = await _saveResponsesImageGenerationMarkdown(
                         b64,
+                        outputFormat: (it['output_format'] ?? '').toString(),
                       );
-                      if (savedPath != null && savedPath.isNotEmpty) {
-                        final mdImg = '\n![Generated Image]($savedPath)\n';
+                      if (mdImg.isNotEmpty) {
                         yield ChatStreamChunk(
                           content: mdImg,
                           isDone: false,
@@ -2306,6 +2366,28 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     }
                   }
                 }
+              }
+              if (responsesImagesByIndex.isNotEmpty) {
+                final sortedIndexes = responsesImagesByIndex.keys.toList()
+                  ..sort();
+                for (final index in sortedIndexes) {
+                  if (completedImageIndexes.contains(index)) continue;
+                  final image = responsesImagesByIndex[index];
+                  if (image == null || image.base64.isEmpty) continue;
+                  final mdImg = await _saveResponsesImageGenerationMarkdown(
+                    image.base64,
+                    outputFormat: image.outputFormat,
+                  );
+                  if (mdImg.isNotEmpty) {
+                    yield ChatStreamChunk(
+                      content: mdImg,
+                      isDone: false,
+                      totalTokens: totalTokens,
+                      usage: usage,
+                    );
+                  }
+                }
+                responsesImagesByIndex.clear();
               }
               if (items.isNotEmpty) {
                 final payload = jsonEncode({'items': items});

@@ -81,6 +81,22 @@ ChatMessage _message(int index) {
   );
 }
 
+ChatMessage _versionedMessage({
+  required String id,
+  required String role,
+  required String groupId,
+  required int version,
+}) {
+  return ChatMessage(
+    id: id,
+    role: role,
+    content: id,
+    conversationId: 'conversation-1',
+    groupId: groupId,
+    version: version,
+  );
+}
+
 void main() {
   group('ChatController lazy history', () {
     late List<ChatMessage> messages;
@@ -136,6 +152,79 @@ void main() {
       expect(controller.totalMessageCount, 5000);
       expect(controller.hasMoreBefore, isTrue);
     });
+
+    test(
+      'collapsed tail window excludes a version whose group anchor is older',
+      () {
+        messages = <ChatMessage>[
+          ...List<ChatMessage>.generate(100, _message),
+          _versionedMessage(
+            id: 'message-10-v1',
+            role: 'user',
+            groupId: 'message-10',
+            version: 1,
+          ),
+        ];
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Long chat with edited old message',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+
+        controller.setCurrentConversation(conversation);
+
+        expect(controller.messages.last.id, 'message-10-v1');
+        expect(controller.loadedStartIndex, 81);
+        expect(controller.messages.length, 20);
+        expect(
+          controller.collapsedMessages.map((message) => message.id),
+          isNot(contains('message-10-v1')),
+        );
+        expect(controller.collapsedMessages.first.id, 'message-81');
+        expect(controller.collapsedMessages.last.id, 'message-99');
+      },
+    );
+
+    test(
+      'collapsed tail window keeps a version whose group anchor is visible',
+      () {
+        messages = <ChatMessage>[
+          ...List<ChatMessage>.generate(99, _message),
+          _versionedMessage(
+            id: 'message-99-v0',
+            role: 'assistant',
+            groupId: 'message-99',
+            version: 0,
+          ),
+          _versionedMessage(
+            id: 'message-99-v1',
+            role: 'assistant',
+            groupId: 'message-99',
+            version: 1,
+          ),
+        ];
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Long chat with edited recent message',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+
+        controller.setCurrentConversation(conversation);
+
+        final collapsedIds = controller.collapsedMessages
+            .map((message) => message.id)
+            .toList();
+        expect(collapsedIds, contains('message-99-v1'));
+        expect(collapsedIds, isNot(contains('message-99-v0')));
+        expect(controller.collapsedMessages.last.id, 'message-99-v1');
+      },
+    );
 
     test(
       'loading older history prepends one page before the visible window',

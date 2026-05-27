@@ -8,7 +8,9 @@ import '../../../utils/brand_assets.dart';
 import '../../../core/services/tts/network_tts.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../core/services/haptics.dart';
+import 'tts_settings_page.dart';
 
 class TtsServicesPage extends StatelessWidget {
   const TtsServicesPage({super.key});
@@ -32,6 +34,20 @@ class TtsServicesPage extends StatelessWidget {
         ),
         title: Text(l10n.ttsServicesPageTitle),
         actions: [
+          Tooltip(
+            message: l10n.ttsServicesPageSettingsTooltip,
+            child: _TactileIconButton(
+              icon: Lucide.Settings2,
+              color: cs.onSurface,
+              size: 22,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const TtsSettingsPage(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
           Tooltip(
             message: l10n.ttsServicesPageAddTooltip,
             child: _TactileIconButton(
@@ -750,330 +766,518 @@ void _showMobileErrorDetails(BuildContext context, String message) {
 // Removed selected tag; background highlight indicates selection
 
 Future<TtsServiceOptions?> _showAddNetworkTtsSheet(BuildContext context) =>
-    _showNetworkTtsSheet(context, null);
+    _showNetworkTtsEditorPage(context, null);
 
 Future<TtsServiceOptions?> _showEditNetworkTtsSheet(
   BuildContext context,
   TtsServiceOptions initial,
-) => _showNetworkTtsSheet(context, initial);
+) => _showNetworkTtsEditorPage(context, initial);
 
-Future<TtsServiceOptions?> _showNetworkTtsSheet(
+Future<TtsServiceOptions?> _showNetworkTtsEditorPage(
   BuildContext context,
   TtsServiceOptions? initial,
-) async {
-  final cs = Theme.of(context).colorScheme;
-  final l10n = AppLocalizations.of(context)!;
-  NetworkTtsKind kind = initial?.kind ?? NetworkTtsKind.openai;
-  final nameCtl = TextEditingController(text: initial?.name ?? '');
-  final apiKeyCtl = TextEditingController(
-    text: (initial is OpenAiTtsOptions)
-        ? initial.apiKey
-        : (initial is GeminiTtsOptions)
-        ? initial.apiKey
-        : (initial is MiniMaxTtsOptions)
-        ? initial.apiKey
-        : (initial is ElevenLabsTtsOptions)
-        ? initial.apiKey
-        : (initial is MimoTtsOptions)
-        ? initial.apiKey
-        : '',
+) {
+  return Navigator.of(context).push<TtsServiceOptions>(
+    MaterialPageRoute(builder: (_) => _NetworkTtsEditorPage(initial: initial)),
   );
-  final baseCtl = TextEditingController(
-    text: (initial is OpenAiTtsOptions)
-        ? initial.baseUrl
-        : (initial is GeminiTtsOptions)
-        ? initial.baseUrl
-        : (initial is MiniMaxTtsOptions)
-        ? initial.baseUrl
-        : (initial is ElevenLabsTtsOptions)
-        ? initial.baseUrl
-        : (initial is MimoTtsOptions)
-        ? initial.baseUrl
-        : '',
-  );
-  final modelCtl = TextEditingController(
-    text: (initial is OpenAiTtsOptions)
-        ? initial.model
-        : (initial is GeminiTtsOptions)
-        ? initial.model
-        : (initial is MiniMaxTtsOptions)
-        ? initial.model
-        : (initial is ElevenLabsTtsOptions)
-        ? initial.modelId
-        : (initial is MimoTtsOptions)
-        ? initial.model
-        : '',
-  );
-  final voiceCtl = TextEditingController(
-    text: (initial is OpenAiTtsOptions)
-        ? initial.voice
-        : (initial is GeminiTtsOptions)
-        ? initial.voiceName
-        : (initial is MiniMaxTtsOptions)
-        ? initial.voiceId
-        : (initial is ElevenLabsTtsOptions)
-        ? initial.voiceId
-        : (initial is MimoTtsOptions)
-        ? initial.voice
-        : '',
-  );
-  final emotionCtl = TextEditingController(
-    text: (initial is MiniMaxTtsOptions) ? initial.emotion : 'calm',
-  );
-  final speedCtl = TextEditingController(
-    text: (initial is MiniMaxTtsOptions) ? initial.speed.toString() : '1.0',
-  );
+}
 
-  TtsServiceOptions? result;
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: cs.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
-    builder: (ctx) {
-      return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Drag handle + Header with only a Check on the right
-            const SizedBox(height: 6),
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: cs.onSurface.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
+class _NetworkTtsEditorPage extends StatefulWidget {
+  const _NetworkTtsEditorPage({this.initial});
+
+  final TtsServiceOptions? initial;
+
+  @override
+  State<_NetworkTtsEditorPage> createState() => _NetworkTtsEditorPageState();
+}
+
+class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
+  final _formKey = GlobalKey<FormState>();
+  late NetworkTtsKind _kind;
+  late final TextEditingController _nameCtl;
+  late final TextEditingController _apiKeyCtl;
+  late final TextEditingController _baseCtl;
+  late final TextEditingController _modelCtl;
+  late final TextEditingController _voiceCtl;
+  late final TextEditingController _emotionCtl;
+  late final TextEditingController _speedCtl;
+  late final TextEditingController _languageTypeCtl;
+  late final TextEditingController _languageCtl;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    _kind = initial?.kind ?? NetworkTtsKind.openai;
+    _nameCtl = TextEditingController(text: initial?.name ?? '');
+    _apiKeyCtl = TextEditingController(text: _apiKeyOf(initial));
+    _baseCtl = TextEditingController(text: _baseUrlOf(initial));
+    _modelCtl = TextEditingController(text: _modelOf(initial));
+    _voiceCtl = TextEditingController(text: _voiceOf(initial));
+    _emotionCtl = TextEditingController(
+      text: (initial is MiniMaxTtsOptions) ? initial.emotion : 'calm',
+    );
+    _speedCtl = TextEditingController(
+      text: (initial is MiniMaxTtsOptions) ? initial.speed.toString() : '1.0',
+    );
+    _languageTypeCtl = TextEditingController(
+      text: (initial is QwenTtsOptions) ? initial.languageType : 'Auto',
+    );
+    _languageCtl = TextEditingController(
+      text: (initial is XaiTtsOptions) ? initial.language : 'auto',
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameCtl.dispose();
+    _apiKeyCtl.dispose();
+    _baseCtl.dispose();
+    _modelCtl.dispose();
+    _voiceCtl.dispose();
+    _emotionCtl.dispose();
+    _speedCtl.dispose();
+    _languageTypeCtl.dispose();
+    _languageCtl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+
+    return Scaffold(
+      backgroundColor: cs.surface,
+      appBar: AppBar(
+        leading: Tooltip(
+          message: l10n.ttsServicesPageBackButton,
+          child: _TactileIconButton(
+            icon: Lucide.ArrowLeft,
+            color: cs.onSurface,
+            size: 22,
+            onTap: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        title: Text(
+          widget.initial == null
+              ? l10n.ttsServicesDialogAddTitle
+              : l10n.ttsServicesDialogEditTitle,
+        ),
+        actions: [
+          Tooltip(
+            message: widget.initial == null
+                ? l10n.ttsServicesDialogAddButton
+                : l10n.ttsServicesDialogSaveButton,
+            child: _TactileIconButton(
+              icon: Lucide.Check,
+              color: cs.onSurface,
+              size: 22,
+              onTap: _submit,
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
-              child: Row(
-                children: [
-                  _TactileIconButton(
-                    icon: Lucide.X,
-                    color: cs.onSurface,
-                    size: 20,
-                    onTap: () => Navigator.of(ctx).maybePop(),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        initial == null
-                            ? l10n.ttsServicesDialogAddTitle
-                            : l10n.ttsServicesDialogEditTitle,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+          ),
+          const SizedBox(width: 12),
+        ],
+      ),
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  children: [
+                    _header(
+                      context,
+                      l10n.ttsServicesDialogProviderType,
+                      first: true,
                     ),
-                  ),
-                  _TactileIconButton(
-                    icon: Lucide.Check,
-                    color: cs.onSurface,
-                    size: 20,
-                    onTap: () {
-                      final name = (nameCtl.text.trim().isEmpty)
-                          ? networkTtsKindDisplayName(kind)
-                          : nameCtl.text.trim();
-                      final apiKey = apiKeyCtl.text.trim();
-                      final base = baseCtl.text.trim().isEmpty
-                          ? _defaultBaseUrl(kind)
-                          : baseCtl.text.trim();
-                      final model = modelCtl.text.trim().isEmpty
-                          ? _defaultModel(kind)
-                          : modelCtl.text.trim();
-                      final voice = voiceCtl.text.trim().isEmpty
-                          ? _defaultVoice(kind)
-                          : voiceCtl.text.trim();
-                      if (apiKey.isEmpty) {
-                        Navigator.of(ctx).maybePop();
-                        return;
-                      }
-                      if (kind == NetworkTtsKind.openai) {
-                        result = OpenAiTtsOptions(
-                          enabled: true,
-                          name: name,
-                          apiKey: apiKey,
-                          baseUrl: base,
-                          model: model,
-                          voice: voice,
-                        );
-                      } else if (kind == NetworkTtsKind.gemini) {
-                        result = GeminiTtsOptions(
-                          enabled: true,
-                          name: name,
-                          apiKey: apiKey,
-                          baseUrl: base,
-                          model: model,
-                          voiceName: voice,
-                        );
-                      } else if (kind == NetworkTtsKind.minimax) {
-                        final spd =
-                            double.tryParse(speedCtl.text.trim()) ?? 1.0;
-                        result = MiniMaxTtsOptions(
-                          enabled: true,
-                          name: name,
-                          apiKey: apiKey,
-                          baseUrl: base,
-                          model: model,
-                          voiceId: voice,
-                          emotion: emotionCtl.text.trim().isEmpty
-                              ? 'calm'
-                              : emotionCtl.text.trim(),
-                          speed: spd,
-                        );
-                      } else if (kind == NetworkTtsKind.elevenlabs) {
-                        // ElevenLabs
-                        result = ElevenLabsTtsOptions(
-                          enabled: true,
-                          name: name,
-                          apiKey: apiKey,
-                          baseUrl: base,
-                          modelId: model.isEmpty ? _defaultModel(kind) : model,
-                          voiceId: voice,
-                        );
-                      } else if (kind == NetworkTtsKind.mimo) {
-                        result = MimoTtsOptions(
-                          enabled: true,
-                          name: name,
-                          apiKey: apiKey,
-                          baseUrl: base,
-                          model: model,
-                          voice: voice,
-                        );
-                      }
-                      Navigator.of(ctx).pop();
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 6),
-            // Content
-            Padding(
-              padding: EdgeInsets.only(
-                left: 12,
-                right: 12,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 12,
-              ),
-              child: StatefulBuilder(
-                builder: (ctx2, setState) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _sheetSelectRow(
-                        ctx2,
-                        label: l10n.ttsServicesDialogProviderType,
-                        value: networkTtsKindDisplayName(kind),
-                        options: [
-                          networkTtsKindDisplayName(NetworkTtsKind.openai),
-                          networkTtsKindDisplayName(NetworkTtsKind.gemini),
-                          networkTtsKindDisplayName(NetworkTtsKind.minimax),
-                          networkTtsKindDisplayName(NetworkTtsKind.elevenlabs),
-                          networkTtsKindDisplayName(NetworkTtsKind.mimo),
-                        ],
-                        onSelected: (picked) async {
-                          if (picked ==
-                              networkTtsKindDisplayName(
-                                NetworkTtsKind.openai,
-                              )) {
-                            kind = NetworkTtsKind.openai;
-                          }
-                          if (picked ==
-                              networkTtsKindDisplayName(
-                                NetworkTtsKind.gemini,
-                              )) {
-                            kind = NetworkTtsKind.gemini;
-                          }
-                          if (picked ==
-                              networkTtsKindDisplayName(
-                                NetworkTtsKind.minimax,
-                              )) {
-                            kind = NetworkTtsKind.minimax;
-                          }
-                          if (picked ==
-                              networkTtsKindDisplayName(
-                                NetworkTtsKind.elevenlabs,
-                              )) {
-                            kind = NetworkTtsKind.elevenlabs;
-                          }
-                          if (picked ==
-                              networkTtsKindDisplayName(
-                                NetworkTtsKind.mimo,
-                              )) {
-                            kind = NetworkTtsKind.mimo;
-                          }
-                          (ctx as Element).markNeedsBuild();
-                        },
-                      ),
-                      const SizedBox(height: 6),
-                      _inputRowMobile(
-                        context,
-                        label: l10n.ttsServicesFieldNameLabel,
-                        controller: nameCtl,
-                        hint: networkTtsKindDisplayName(kind),
-                      ),
-                      const SizedBox(height: 6),
-                      _inputRowMobile(
-                        context,
-                        label: l10n.ttsServicesFieldApiKeyLabel,
-                        controller: apiKeyCtl,
-                        obscure: true,
-                      ),
-                      const SizedBox(height: 6),
-                      _inputRowMobile(
-                        context,
-                        label: l10n.ttsServicesFieldBaseUrlLabel,
-                        controller: baseCtl,
-                        hint: _defaultBaseUrl(kind),
-                      ),
-                      const SizedBox(height: 6),
-                      _inputRowMobile(
-                        context,
-                        label: l10n.ttsServicesFieldModelLabel,
-                        controller: modelCtl,
-                        hint: _defaultModel(kind),
-                      ),
-                      const SizedBox(height: 6),
-                      _inputRowMobile(
-                        context,
-                        label: _voiceLabelFor(kind, l10n),
-                        controller: voiceCtl,
-                        hint: _defaultVoice(kind),
-                      ),
-                      if (kind == NetworkTtsKind.minimax) ...[
-                        const SizedBox(height: 6),
-                        _inputRowMobile(
-                          context,
-                          label: l10n.ttsServicesFieldEmotionLabel,
-                          controller: emotionCtl,
-                          hint: 'calm',
-                        ),
-                        const SizedBox(height: 6),
-                        _inputRowMobile(
-                          context,
-                          label: l10n.ttsServicesFieldSpeedLabel,
-                          controller: speedCtl,
-                          hint: '1.0',
+                    _iosSectionCard(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                          child: _ProviderKindWrap(
+                            value: _kind,
+                            onChanged: (kind) {
+                              setState(() => _kind = kind);
+                            },
+                          ),
                         ),
                       ],
-
-                    ],
-                  );
-                },
+                    ),
+                    _header(context, l10n.ttsServicesPageTitle),
+                    _iosSectionCard(
+                      children: [
+                        _TtsEditorTextField(
+                          label: l10n.ttsServicesFieldNameLabel,
+                          controller: _nameCtl,
+                          hint: networkTtsKindDisplayName(_kind),
+                        ),
+                        _TtsEditorTextField(
+                          label: l10n.ttsServicesFieldApiKeyLabel,
+                          controller: _apiKeyCtl,
+                          obscure: true,
+                          validator: (value) =>
+                              (value == null || value.trim().isEmpty)
+                              ? l10n.ttsServicesValidationApiKeyRequired
+                              : null,
+                        ),
+                        _TtsEditorTextField(
+                          label: l10n.ttsServicesFieldBaseUrlLabel,
+                          controller: _baseCtl,
+                          hint: _defaultBaseUrl(_kind),
+                        ),
+                        if (_kind != NetworkTtsKind.xai) ...[
+                          _TtsEditorTextField(
+                            label: l10n.ttsServicesFieldModelLabel,
+                            controller: _modelCtl,
+                            hint: _defaultModel(_kind),
+                          ),
+                        ],
+                        _TtsEditorTextField(
+                          label: _voiceLabelFor(_kind, l10n),
+                          controller: _voiceCtl,
+                          hint: _defaultVoice(_kind),
+                        ),
+                        if (_kind == NetworkTtsKind.minimax) ...[
+                          _TtsEditorTextField(
+                            label: l10n.ttsServicesFieldEmotionLabel,
+                            controller: _emotionCtl,
+                            hint: 'calm',
+                          ),
+                          _TtsEditorTextField(
+                            label: l10n.ttsServicesFieldSpeedLabel,
+                            controller: _speedCtl,
+                            hint: '1.0',
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                          ),
+                        ],
+                        if (_kind == NetworkTtsKind.qwen) ...[
+                          _TtsEditorTextField(
+                            label: l10n.ttsServicesFieldLanguageTypeLabel,
+                            controller: _languageTypeCtl,
+                            hint: 'Auto',
+                          ),
+                        ],
+                        if (_kind == NetworkTtsKind.xai) ...[
+                          _TtsEditorTextField(
+                            label: l10n.ttsServicesFieldLanguageLabel,
+                            controller: _languageCtl,
+                            hint: 'auto',
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: IosTileButton(
+                    label: widget.initial == null
+                        ? l10n.ttsServicesDialogAddButton
+                        : l10n.ttsServicesDialogSaveButton,
+                    icon: Lucide.Check,
+                    onTap: _submit,
+                    backgroundColor: cs.primary,
+                    foregroundColor: cs.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      );
-    },
-  );
-  return result;
+      ),
+    );
+  }
+
+  void _submit() {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+    Navigator.of(context).pop(_buildOptions());
+  }
+
+  TtsServiceOptions _buildOptions() {
+    final initial = widget.initial;
+    final name = _nameCtl.text.trim().isEmpty
+        ? networkTtsKindDisplayName(_kind)
+        : _nameCtl.text.trim();
+    final apiKey = _apiKeyCtl.text.trim();
+    final base = _baseCtl.text.trim().isEmpty
+        ? _defaultBaseUrl(_kind)
+        : _baseCtl.text.trim();
+    final model = _modelCtl.text.trim().isEmpty
+        ? _defaultModel(_kind)
+        : _modelCtl.text.trim();
+    final voice = _voiceCtl.text.trim().isEmpty
+        ? _defaultVoice(_kind)
+        : _voiceCtl.text.trim();
+    switch (_kind) {
+      case NetworkTtsKind.openai:
+        return OpenAiTtsOptions(
+          id: initial?.id,
+          enabled: true,
+          name: name,
+          apiKey: apiKey,
+          baseUrl: base,
+          model: model,
+          voice: voice,
+        );
+      case NetworkTtsKind.gemini:
+        return GeminiTtsOptions(
+          id: initial?.id,
+          enabled: true,
+          name: name,
+          apiKey: apiKey,
+          baseUrl: base,
+          model: model,
+          voiceName: voice,
+        );
+      case NetworkTtsKind.minimax:
+        return MiniMaxTtsOptions(
+          id: initial?.id,
+          enabled: true,
+          name: name,
+          apiKey: apiKey,
+          baseUrl: base,
+          model: model,
+          voiceId: voice,
+          emotion: _emotionCtl.text.trim().isEmpty
+              ? 'calm'
+              : _emotionCtl.text.trim(),
+          speed: double.tryParse(_speedCtl.text.trim()) ?? 1.0,
+        );
+      case NetworkTtsKind.qwen:
+        return QwenTtsOptions(
+          id: initial?.id,
+          enabled: true,
+          name: name,
+          apiKey: apiKey,
+          baseUrl: base,
+          model: model,
+          voice: voice,
+          languageType: _languageTypeCtl.text.trim().isEmpty
+              ? 'Auto'
+              : _languageTypeCtl.text.trim(),
+        );
+      case NetworkTtsKind.groq:
+        return GroqTtsOptions(
+          id: initial?.id,
+          enabled: true,
+          name: name,
+          apiKey: apiKey,
+          baseUrl: base,
+          model: model,
+          voice: voice,
+        );
+      case NetworkTtsKind.xai:
+        return XaiTtsOptions(
+          id: initial?.id,
+          enabled: true,
+          name: name,
+          apiKey: apiKey,
+          baseUrl: base,
+          voiceId: voice,
+          language: _languageCtl.text.trim().isEmpty
+              ? 'auto'
+              : _languageCtl.text.trim(),
+        );
+      case NetworkTtsKind.elevenlabs:
+        return ElevenLabsTtsOptions(
+          id: initial?.id,
+          enabled: true,
+          name: name,
+          apiKey: apiKey,
+          baseUrl: base,
+          modelId: model,
+          voiceId: voice,
+        );
+      case NetworkTtsKind.mimo:
+        return MimoTtsOptions(
+          id: initial?.id,
+          enabled: true,
+          name: name,
+          apiKey: apiKey,
+          baseUrl: base,
+          model: model,
+          voice: voice,
+        );
+    }
+  }
+}
+
+class _ProviderKindWrap extends StatelessWidget {
+  const _ProviderKindWrap({required this.value, required this.onChanged});
+
+  final NetworkTtsKind value;
+  final ValueChanged<NetworkTtsKind> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final kind in _networkTtsKinds)
+          _ProviderKindChip(
+            kind: kind,
+            selected: kind == value,
+            onTap: () => onChanged(kind),
+          ),
+      ],
+    );
+  }
+}
+
+class _ProviderKindChip extends StatelessWidget {
+  const _ProviderKindChip({
+    required this.kind,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final NetworkTtsKind kind;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return _TactileRow(
+      pressedScale: 0.98,
+      onTap: onTap,
+      builder: (pressed) {
+        final bg = selected
+            ? cs.primary.withValues(alpha: 0.13)
+            : cs.onSurface.withValues(alpha: 0.06);
+        final border = selected
+            ? cs.primary.withValues(alpha: 0.5)
+            : cs.outlineVariant.withValues(alpha: 0.22);
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: pressed
+                ? Color.alphaBlend(cs.onSurface.withValues(alpha: 0.06), bg)
+                : bg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: border, width: 0.8),
+          ),
+          child: Text(
+            networkTtsKindDisplayName(kind),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: selected ? cs.primary : cs.onSurface,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TtsEditorTextField extends StatefulWidget {
+  const _TtsEditorTextField({
+    required this.label,
+    required this.controller,
+    this.hint,
+    this.obscure = false,
+    this.validator,
+    this.keyboardType,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final String? hint;
+  final bool obscure;
+  final FormFieldValidator<String>? validator;
+  final TextInputType? keyboardType;
+
+  @override
+  State<_TtsEditorTextField> createState() => _TtsEditorTextFieldState();
+}
+
+class _TtsEditorTextFieldState extends State<_TtsEditorTextField> {
+  bool _obscured = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fieldBg = isDark ? Colors.white12 : const Color(0xFFF2F3F5);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface.withValues(alpha: 0.72),
+            ),
+          ),
+          const SizedBox(height: 7),
+          TextFormField(
+            controller: widget.controller,
+            obscureText: widget.obscure && _obscured,
+            keyboardType: widget.keyboardType,
+            validator: widget.validator,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: cs.onSurface.withValues(alpha: 0.92),
+            ),
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              isDense: true,
+              filled: true,
+              fillColor: fieldBg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: cs.primary, width: 1),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: cs.error, width: 1),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: cs.error, width: 1),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+              suffixIcon: widget.obscure
+                  ? _SmallTactileIcon(
+                      icon: _obscured ? Lucide.Eye : Lucide.EyeOff,
+                      onTap: () => setState(() => _obscured = !_obscured),
+                    )
+                  : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 Future<void> _showSystemTtsConfig(BuildContext context) async {
@@ -1367,39 +1571,62 @@ Widget _sheetDivider(BuildContext context) {
   );
 }
 
-Widget _inputRowMobile(
-  BuildContext context, {
-  required String label,
-  required TextEditingController controller,
-  String? hint,
-  bool obscure = false,
-}) {
-  final cs = Theme.of(context).colorScheme;
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: cs.onSurface.withValues(alpha: 0.7),
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          obscureText: obscure,
-          decoration: InputDecoration(
-            hintText: hint,
-            isDense: true,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        ),
-      ],
-    ),
-  );
+const List<NetworkTtsKind> _networkTtsKinds = [
+  NetworkTtsKind.openai,
+  NetworkTtsKind.gemini,
+  NetworkTtsKind.minimax,
+  NetworkTtsKind.qwen,
+  NetworkTtsKind.groq,
+  NetworkTtsKind.xai,
+  NetworkTtsKind.elevenlabs,
+  NetworkTtsKind.mimo,
+];
+
+String _apiKeyOf(TtsServiceOptions? option) {
+  if (option is OpenAiTtsOptions) return option.apiKey;
+  if (option is GeminiTtsOptions) return option.apiKey;
+  if (option is MiniMaxTtsOptions) return option.apiKey;
+  if (option is QwenTtsOptions) return option.apiKey;
+  if (option is GroqTtsOptions) return option.apiKey;
+  if (option is XaiTtsOptions) return option.apiKey;
+  if (option is ElevenLabsTtsOptions) return option.apiKey;
+  if (option is MimoTtsOptions) return option.apiKey;
+  return '';
+}
+
+String _baseUrlOf(TtsServiceOptions? option) {
+  if (option is OpenAiTtsOptions) return option.baseUrl;
+  if (option is GeminiTtsOptions) return option.baseUrl;
+  if (option is MiniMaxTtsOptions) return option.baseUrl;
+  if (option is QwenTtsOptions) return option.baseUrl;
+  if (option is GroqTtsOptions) return option.baseUrl;
+  if (option is XaiTtsOptions) return option.baseUrl;
+  if (option is ElevenLabsTtsOptions) return option.baseUrl;
+  if (option is MimoTtsOptions) return option.baseUrl;
+  return '';
+}
+
+String _modelOf(TtsServiceOptions? option) {
+  if (option is OpenAiTtsOptions) return option.model;
+  if (option is GeminiTtsOptions) return option.model;
+  if (option is MiniMaxTtsOptions) return option.model;
+  if (option is QwenTtsOptions) return option.model;
+  if (option is GroqTtsOptions) return option.model;
+  if (option is ElevenLabsTtsOptions) return option.modelId;
+  if (option is MimoTtsOptions) return option.model;
+  return '';
+}
+
+String _voiceOf(TtsServiceOptions? option) {
+  if (option is OpenAiTtsOptions) return option.voice;
+  if (option is GeminiTtsOptions) return option.voiceName;
+  if (option is MiniMaxTtsOptions) return option.voiceId;
+  if (option is QwenTtsOptions) return option.voice;
+  if (option is GroqTtsOptions) return option.voice;
+  if (option is XaiTtsOptions) return option.voiceId;
+  if (option is ElevenLabsTtsOptions) return option.voiceId;
+  if (option is MimoTtsOptions) return option.voice;
+  return '';
 }
 
 String _defaultBaseUrl(NetworkTtsKind k) {
@@ -1410,6 +1637,12 @@ String _defaultBaseUrl(NetworkTtsKind k) {
       return 'https://generativelanguage.googleapis.com/v1beta';
     case NetworkTtsKind.minimax:
       return 'https://api.minimaxi.com/v1';
+    case NetworkTtsKind.qwen:
+      return 'https://dashscope.aliyuncs.com/api/v1';
+    case NetworkTtsKind.groq:
+      return 'https://api.groq.com/openai/v1';
+    case NetworkTtsKind.xai:
+      return 'https://api.x.ai/v1';
     case NetworkTtsKind.elevenlabs:
       return 'https://api.elevenlabs.io';
     case NetworkTtsKind.mimo:
@@ -1424,7 +1657,13 @@ String _defaultModel(NetworkTtsKind k) {
     case NetworkTtsKind.gemini:
       return 'gemini-2.5-flash-preview-tts';
     case NetworkTtsKind.minimax:
-      return 'speech-2.5-hd-preview';
+      return 'speech-2.6-turbo';
+    case NetworkTtsKind.qwen:
+      return 'qwen3-tts-flash';
+    case NetworkTtsKind.groq:
+      return 'canopylabs/orpheus-v1-english';
+    case NetworkTtsKind.xai:
+      return '';
     case NetworkTtsKind.elevenlabs:
       return 'eleven_multilingual_v2';
     case NetworkTtsKind.mimo:
@@ -1440,6 +1679,12 @@ String _defaultVoice(NetworkTtsKind k) {
       return 'Kore';
     case NetworkTtsKind.minimax:
       return 'female-shaonv';
+    case NetworkTtsKind.qwen:
+      return 'Cherry';
+    case NetworkTtsKind.groq:
+      return 'austin';
+    case NetworkTtsKind.xai:
+      return 'eve';
     case NetworkTtsKind.elevenlabs:
       return '';
     case NetworkTtsKind.mimo:
@@ -1454,6 +1699,12 @@ String _voiceLabelFor(NetworkTtsKind k, AppLocalizations l10n) {
     case NetworkTtsKind.gemini:
       return l10n.ttsServicesFieldVoiceLabel; // same label
     case NetworkTtsKind.minimax:
+      return l10n.ttsServicesFieldVoiceIdLabel;
+    case NetworkTtsKind.qwen:
+      return l10n.ttsServicesFieldVoiceLabel;
+    case NetworkTtsKind.groq:
+      return l10n.ttsServicesFieldVoiceLabel;
+    case NetworkTtsKind.xai:
       return l10n.ttsServicesFieldVoiceIdLabel;
     case NetworkTtsKind.elevenlabs:
       return l10n.ttsServicesFieldVoiceIdLabel;

@@ -616,4 +616,95 @@ void main() {
       },
     );
   });
+
+  group('OpenAI Responses image generation', () {
+    test('renders partial image when completed output is empty', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'kelivo_openai_responses_partial_image_',
+      );
+      final previousPathProvider = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+      addTearDown(() async {
+        PathProviderPlatform.instance = previousPathProvider;
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        await request.drain<void>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+        );
+        request.response.headers.set('Transfer-Encoding', 'chunked');
+
+        request.response.write(
+          'data: ${jsonEncode({
+            'type': 'response.output_item.added',
+            'item': {'id': 'ig_1', 'type': 'image_generation_call', 'status': 'in_progress'},
+            'output_index': 0,
+          })}\n\n',
+        );
+        request.response.write(
+          'data: ${jsonEncode({
+            'type': 'response.image_generation_call.partial_image',
+            'item_id': 'ig_1',
+            'output_index': 0,
+            'output_format': 'png',
+            'partial_image_b64': base64Encode(const [1, 2, 3, 4]),
+          })}\n\n',
+        );
+        request.response.write(
+          'data: ${jsonEncode({
+            'type': 'response.output_item.done',
+            'item': {
+              'id': 'msg_1',
+              'type': 'message',
+              'status': 'completed',
+              'content': [
+                {'type': 'output_text', 'text': ''},
+              ],
+              'role': 'assistant',
+            },
+            'output_index': 1,
+          })}\n\n',
+        );
+        request.response.write(
+          'data: ${jsonEncode({
+            'type': 'response.completed',
+            'response': {
+              'output': [],
+              'usage': {'input_tokens': 1, 'output_tokens': 1},
+            },
+          })}\n\n',
+        );
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server), useResponseApi: true),
+        modelId: 'gpt-5.5',
+        messages: const [
+          {'role': 'user', 'content': 'draw a puppy'},
+        ],
+      ).toList();
+
+      final content = chunks.map((chunk) => chunk.content).join();
+      final imagePath = RegExp(
+        r'!\[image\]\(([^)]+)\)',
+      ).firstMatch(content)!.group(1)!;
+      expect(content, contains('![image]('));
+      expect(imagePath.endsWith('.png'), isTrue);
+      expect(await File(imagePath).readAsBytes(), const [1, 2, 3, 4]);
+      expect(chunks.last.isDone, isTrue);
+    });
+  });
 }

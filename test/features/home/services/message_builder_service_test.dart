@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -350,6 +351,155 @@ void main() {
         toolMessage['metadata']['google']['part']['thoughtSignature'],
         'sig-gemini',
       );
+    });
+
+    test('未完成的工具占位事件不会被重建为 API tool call', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService({
+          'a1': [
+            {
+              'id': 'call_1',
+              'name': 'create_memory',
+              'arguments': {'content': 'test'},
+              'content': null,
+              'metadata': {
+                'anthropic': {
+                  'assistant_blocks': [
+                    {
+                      'type': 'tool_use',
+                      'id': 'call_1',
+                      'name': 'create_memory',
+                      'input': {'content': 'test'},
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        }),
+        contextProvider: _FakeBuildContext(),
+      );
+
+      final apiMessages = service.buildApiMessages(
+        messages: [
+          _message(id: 'u1', role: 'user', content: '记一下'),
+          _message(id: 'a1', role: 'assistant', content: '稍后继续。'),
+          _message(id: 'u2', role: 'user', content: 'ok'),
+        ],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+        includeToolMessages: true,
+      );
+
+      expect(
+        apiMessages.where((message) => message['tool_calls'] is List),
+        isEmpty,
+      );
+      expect(
+        apiMessages.where((message) => message['role'] == 'tool'),
+        isEmpty,
+      );
+      expect(apiMessages.map((message) => message['content']).toList(), [
+        '记一下',
+        '稍后继续。',
+        'ok',
+      ]);
+    });
+
+    test('上下文裁剪不会保留缺少 tool result 的 assistant tool call', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService({}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final apiMessages = <Map<String, dynamic>>[
+        {'role': 'user', 'content': 'before'},
+        {
+          'role': 'assistant',
+          'content': '\n\n',
+          'tool_calls': [
+            {
+              'id': 'call_1',
+              'type': 'function',
+              'function': {'name': 'create_memory', 'arguments': '{}'},
+            },
+          ],
+        },
+        {
+          'role': 'tool',
+          'tool_call_id': 'call_1',
+          'name': 'create_memory',
+          'content': 'ok',
+        },
+        {'role': 'assistant', 'content': 'done'},
+        {'role': 'user', 'content': 'next'},
+      ];
+
+      service.applyContextLimit(
+        apiMessages,
+        const Assistant(id: 'assistant-1', name: 'test', contextMessageSize: 3),
+      );
+
+      expect(
+        apiMessages.where((message) => message['tool_calls'] is List),
+        isEmpty,
+      );
+      expect(
+        apiMessages.where((message) => message['role'] == 'tool'),
+        isEmpty,
+      );
+      expect(apiMessages.map((message) => message['content']).toList(), [
+        'done',
+        'next',
+      ]);
+    });
+
+    test('上下文裁剪会保留完整的 assistant tool call 与 tool result', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService({}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final apiMessages = <Map<String, dynamic>>[
+        {'role': 'user', 'content': 'before'},
+        {
+          'role': 'assistant',
+          'content': '\n\n',
+          'tool_calls': [
+            {
+              'id': 'call_1',
+              'type': 'function',
+              'function': {'name': 'create_memory', 'arguments': '{}'},
+            },
+          ],
+        },
+        {
+          'role': 'tool',
+          'tool_call_id': 'call_1',
+          'name': 'create_memory',
+          'content': 'ok',
+        },
+        {'role': 'assistant', 'content': 'done'},
+        {'role': 'user', 'content': 'next'},
+      ];
+
+      service.applyContextLimit(
+        apiMessages,
+        const Assistant(id: 'assistant-1', name: 'test', contextMessageSize: 4),
+      );
+
+      expect(
+        apiMessages.where((message) => message['tool_calls'] is List),
+        hasLength(1),
+      );
+      expect(
+        apiMessages.where((message) => message['role'] == 'tool'),
+        hasLength(1),
+      );
+      expect(apiMessages.map((message) => message['role']).toList(), [
+        'assistant',
+        'tool',
+        'assistant',
+        'user',
+      ]);
     });
   });
 }

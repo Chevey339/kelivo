@@ -11,6 +11,7 @@ ProviderConfig _claudeConfig(
   String baseUrl, {
   Map<String, dynamic> modelOverrides = const <String, dynamic>{},
   bool claudePromptCachingEnabled = false,
+  String? claudePromptCachingTtl,
 }) {
   return ProviderConfig(
     id: 'ClaudeCompatTest',
@@ -21,6 +22,7 @@ ProviderConfig _claudeConfig(
     providerType: ProviderKind.claude,
     modelOverrides: modelOverrides,
     claudePromptCachingEnabled: claudePromptCachingEnabled,
+    claudePromptCachingTtl: claudePromptCachingTtl,
   );
 }
 
@@ -60,6 +62,7 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
   double? temperature,
   double? topP,
   bool claudePromptCachingEnabled = false,
+  String? claudePromptCachingTtl,
   List<Map<String, dynamic>> messages = const [
     {'role': 'user', 'content': 'hello'},
   ],
@@ -91,6 +94,7 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
     config: _claudeConfig(
       'http://${server.address.address}:${server.port}',
       claudePromptCachingEnabled: claudePromptCachingEnabled,
+      claudePromptCachingTtl: claudePromptCachingTtl,
     ),
     modelId: modelId,
     messages: messages,
@@ -223,6 +227,41 @@ void main() {
         expect((body['messages'] as List).cast<Map>().single['role'], 'user');
       },
     );
+
+    test(
+      'prompt caching can request official Claude one hour cache ttl',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-sonnet-4-6',
+          claudePromptCachingEnabled: true,
+          claudePromptCachingTtl: '1h',
+          messages: const [
+            {'role': 'system', 'content': 'Stable persona and long context.'},
+            {'role': 'user', 'content': 'hello'},
+          ],
+        );
+
+        expect(body['cache_control'], {'type': 'ephemeral', 'ttl': '1h'});
+      },
+    );
+
+    test('prompt caching ttl round trips through provider config json', () {
+      final config = ProviderConfig(
+        id: 'ClaudeCompatTest',
+        enabled: true,
+        name: 'ClaudeCompatTest',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.anthropic.com/v1',
+        providerType: ProviderKind.claude,
+        claudePromptCachingEnabled: true,
+        claudePromptCachingTtl: '1h',
+      );
+
+      final roundTripped = ProviderConfig.fromJson(config.toJson());
+
+      expect(roundTripped.claudePromptCachingEnabled, isTrue);
+      expect(roundTripped.claudePromptCachingTtl, '1h');
+    });
 
     test(
       'prompt caching disabled omits official Claude cache control',
@@ -523,6 +562,81 @@ void main() {
       expect(toolResultContent.single['type'], 'tool_result');
       expect(toolResultContent.single['tool_use_id'], 'toolu_1');
     });
+
+    test(
+      'completed memory tool turn remains valid when followed by user text',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-opus-4-7',
+          thinkingBudget: 16000,
+          messages: const [
+            {'role': 'user', 'content': 'trigger message'},
+            {
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': [
+                {
+                  'id': 'toolu_01SBaeK3UtXTQmybQjpPZurX',
+                  'type': 'function',
+                  'function': {
+                    'name': 'create_memory',
+                    'arguments': '{"content":"test"}',
+                  },
+                  'metadata': {
+                    'anthropic': {
+                      'assistant_blocks': [
+                        {
+                          'type': 'thinking',
+                          'thinking': '需要记录这个偏好。',
+                          'signature': 'sig-memory-turn',
+                        },
+                        {
+                          'type': 'tool_use',
+                          'id': 'toolu_01SBaeK3UtXTQmybQjpPZurX',
+                          'name': 'create_memory',
+                          'input': {'content': 'test'},
+                        },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'toolu_01SBaeK3UtXTQmybQjpPZurX',
+              'name': 'create_memory',
+              'content': 'test',
+            },
+            {'role': 'assistant', 'content': 'confirmed'},
+            {'role': 'user', 'content': 'ok'},
+          ],
+        );
+
+        final messages = (body['messages'] as List).cast<Map>();
+        final assistantContent = (messages[1]['content'] as List).cast<Map>();
+        final toolResultContent = (messages[2]['content'] as List).cast<Map>();
+
+        expect(messages.map((message) => message['role']).toList(), [
+          'user',
+          'assistant',
+          'user',
+          'assistant',
+          'user',
+        ]);
+        expect(assistantContent[0]['type'], 'thinking');
+        expect(assistantContent[0]['signature'], 'sig-memory-turn');
+        expect(assistantContent[1]['type'], 'tool_use');
+        expect(assistantContent[1]['id'], 'toolu_01SBaeK3UtXTQmybQjpPZurX');
+        expect(toolResultContent.single['type'], 'tool_result');
+        expect(
+          toolResultContent.single['tool_use_id'],
+          'toolu_01SBaeK3UtXTQmybQjpPZurX',
+        );
+        expect(messages[3]['content'], 'confirmed');
+        expect(messages[4]['content'], 'ok');
+      },
+    );
 
     test(
       'history tool replay uses complete Claude assistant tool blocks',

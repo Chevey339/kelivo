@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:archive/archive_io.dart';
 import 'package:http/http.dart' as http;
@@ -117,49 +118,109 @@ class DataSync {
 
   Future<File> prepareBackupFile(WebDavConfig cfg) async {
     final tmp = await _ensureTempDir();
+    await _cleanupPreviousBackupTempFiles(tmp);
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-    final outPath = p.join(tmp.path, 'kelivo_backup_$timestamp.zip');
+    final workDir = Directory(p.join(tmp.path, 'kelivo_backup_$timestamp'));
+    await workDir.create(recursive: true);
+
+    final outPath = p.join(workDir.path, 'kelivo_backup_$timestamp.zip');
     final outFile = File(outPath);
     if (await outFile.exists()) await outFile.delete();
 
-    // --- Step 1: Prepare temp files that need ChatService (main isolate) ---
-    // settings.json
-    final settingsJson = await _exportSettingsJson();
-    final settingsTmp = await _writeTempText('_bk_settings.json', settingsJson);
-
-    // chats.json — stream to file to avoid huge string in memory
+    File? settingsTmp;
     File? chatsTmp;
-    if (cfg.includeChats) {
-      chatsTmp = await _exportChatsToFile();
-    }
-
-    // Resolve directory paths (need AppDirectories on main isolate)
-    final uploadDirPath = (await _getUploadDir()).path;
-    final avatarsDirPath = (await _getAvatarsDir()).path;
-    final imagesDirPath = (await _getImagesDir()).path;
-
-    // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
-    await Isolate.run(() {
-      _packZipSync(
-        outPath: outPath,
-        settingsPath: settingsTmp.path,
-        chatsPath: chatsTmp?.path,
-        includeFiles: cfg.includeFiles,
-        uploadDirPath: uploadDirPath,
-        avatarsDirPath: avatarsDirPath,
-        imagesDirPath: imagesDirPath,
+    try {
+      // --- Step 1: Prepare temp files that need ChatService (main isolate) ---
+      // settings.json
+      final settingsJson = await _exportSettingsJson();
+      settingsTmp = await _writeTempText(
+        workDir,
+        '_bk_settings.json',
+        settingsJson,
       );
-    });
 
-    // Cleanup temp intermediate files
-    try {
-      await settingsTmp.delete();
-    } catch (_) {}
-    try {
-      if (chatsTmp != null) await chatsTmp.delete();
-    } catch (_) {}
+      // chats.json — stream to file to avoid huge string in memory
+      if (cfg.includeChats) {
+        chatsTmp = await _exportChatsToFile(workDir);
+      }
 
-    return outFile;
+      // Resolve directory paths (need AppDirectories on main isolate)
+      final uploadDirPath = (await _getUploadDir()).path;
+      final avatarsDirPath = (await _getAvatarsDir()).path;
+      final imagesDirPath = (await _getImagesDir()).path;
+      final settingsPath = settingsTmp.path;
+      final chatsPath = chatsTmp?.path;
+      final includeFiles = cfg.includeFiles;
+
+      // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
+      await Isolate.run(() {
+        _packZipSync(
+          outPath: outPath,
+          settingsPath: settingsPath,
+          chatsPath: chatsPath,
+          includeFiles: includeFiles,
+          uploadDirPath: uploadDirPath,
+          avatarsDirPath: avatarsDirPath,
+          imagesDirPath: imagesDirPath,
+        );
+      });
+
+      return outFile;
+    } catch (_) {
+      await _deleteDirectoryQuietly(workDir);
+      rethrow;
+    } finally {
+      // Cleanup temp intermediate files. The final zip is returned to callers
+      // and must be deleted by the upload/export caller after it is consumed.
+      await _deleteFileQuietly(settingsTmp);
+      await _deleteFileQuietly(chatsTmp);
+    }
+  }
+
+  static Future<void> cleanupTemporaryBackupFile(File? file) async {
+    if (file == null) return;
+    final parent = file.parent;
+    await _deleteFileQuietly(file);
+    try {
+      if (await parent.exists() && await parent.list().isEmpty) {
+        await parent.delete();
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> _deleteFileQuietly(File? file) async {
+    if (file == null) return;
+    try {
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> _deleteDirectoryQuietly(Directory? directory) async {
+    if (directory == null) return;
+    try {
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> _cleanupPreviousBackupTempFiles(Directory tmp) async {
+    try {
+      if (!await tmp.exists()) return;
+      await for (final ent in tmp.list(followLinks: false)) {
+        final name = p.basename(ent.path);
+        if (ent is Directory && name.startsWith('kelivo_backup_')) {
+          await _deleteDirectoryQuietly(ent);
+        } else if (ent is File &&
+            ((name.startsWith('kelivo_backup_') && name.endsWith('.zip')) ||
+                name == '_bk_settings.json' ||
+                name == '_bk_chats.json')) {
+          await _deleteFileQuietly(ent);
+        }
+      }
+    } catch (_) {}
   }
 
   /// Synchronous ZIP packing — runs inside an Isolate.
@@ -172,30 +233,42 @@ class DataSync {
     required String avatarsDirPath,
     required String imagesDirPath,
   }) {
-    final encoder = ZipFileEncoder();
-    encoder.create(outPath);
+    final writer = _StreamingZipWriter(outPath);
+    try {
+      // settings.json
+      _addFileToZip(writer, settingsPath, 'settings.json');
 
-    // settings.json
-    encoder.addFileSync(File(settingsPath), 'settings.json');
+      // chats.json
+      if (chatsPath != null) {
+        _addFileToZip(writer, chatsPath, 'chats.json');
+      }
 
-    // chats.json
-    if (chatsPath != null) {
-      encoder.addFileSync(File(chatsPath), 'chats.json');
+      // files under upload/, images/, and avatars/
+      if (includeFiles) {
+        _addDirectoryToZip(writer, uploadDirPath, 'upload');
+        _addDirectoryToZip(writer, avatarsDirPath, 'avatars');
+        _addDirectoryToZip(writer, imagesDirPath, 'images');
+      }
+
+      writer.closeSync();
+    } finally {
+      writer.closeIfNeededSync();
     }
+  }
 
-    // files under upload/, images/, and avatars/
-    if (includeFiles) {
-      _addDirectoryToZip(encoder, uploadDirPath, 'upload');
-      _addDirectoryToZip(encoder, avatarsDirPath, 'avatars');
-      _addDirectoryToZip(encoder, imagesDirPath, 'images');
-    }
-
-    encoder.closeSync();
+  static void _addFileToZip(
+    _StreamingZipWriter writer,
+    String filePath,
+    String entryName,
+  ) {
+    final file = File(filePath);
+    if (!file.existsSync()) return;
+    writer.addFile(file, _zipEntryName(entryName));
   }
 
   /// Add all files from [srcDirPath] into the zip under [zipPrefix].
   static void _addDirectoryToZip(
-    ZipFileEncoder encoder,
+    _StreamingZipWriter writer,
     String srcDirPath,
     String zipPrefix,
   ) {
@@ -207,9 +280,13 @@ class DataSync {
         final rel = p.relative(ent.path, from: srcDirPath);
         // ZIP entries must use forward slashes regardless of platform
         final relPosix = rel.replaceAll('\\', '/');
-        encoder.addFileSync(ent, '$zipPrefix/$relPosix');
+        _addFileToZip(writer, ent.path, '$zipPrefix/$relPosix');
       }
     }
+  }
+
+  static String _zipEntryName(String name) {
+    return name.replaceAll('\\', '/').replaceAll(RegExp(r'^/+'), '');
   }
 
   /// Synchronous ZIP extraction — runs inside an Isolate.
@@ -219,53 +296,66 @@ class DataSync {
     final inputStream = InputFileStream(zipPath);
     try {
       final archive = ZipDecoder().decodeStream(inputStream);
-      for (final entry in archive) {
-        // Normalize entry name to use forward slashes and remove traversal
-        final normalized = entry.name.replaceAll('\\', '/');
-        final parts = normalized
-            .split('/')
-            .where((seg) => seg.isNotEmpty && seg != '.' && seg != '..')
-            .toList();
-        if (parts.isEmpty) continue;
-        final outPath = p.joinAll([extractDirPath, ...parts]);
-        if (entry.isFile) {
-          final outFile = File(outPath)..createSync(recursive: true);
-          outFile.writeAsBytesSync(entry.content as List<int>);
-        } else {
-          Directory(outPath).createSync(recursive: true);
+      try {
+        for (final entry in archive) {
+          // Normalize entry name to use forward slashes and remove traversal
+          final normalized = entry.name.replaceAll('\\', '/');
+          final parts = normalized
+              .split('/')
+              .where((seg) => seg.isNotEmpty && seg != '.' && seg != '..')
+              .toList();
+          if (parts.isEmpty) continue;
+          final outPath = p.joinAll([extractDirPath, ...parts]);
+          if (entry.isFile) {
+            File(outPath).parent.createSync(recursive: true);
+            final output = OutputFileStream(outPath);
+            try {
+              entry.writeContent(output);
+            } finally {
+              output.closeSync();
+            }
+          } else {
+            Directory(outPath).createSync(recursive: true);
+          }
         }
+      } finally {
+        archive.clearSync();
       }
     } finally {
-      inputStream.close();
+      inputStream.closeSync();
     }
   }
 
   Future<void> backupToWebDav(WebDavConfig cfg) async {
     final file = await prepareBackupFile(cfg);
-    await _ensureCollection(cfg);
-    final target = _fileUri(cfg, p.basename(file.path));
-    final fileLen = await file.length();
-    // Use a streamed request so we don't load the entire file into RAM.
-    final req = http.StreamedRequest('PUT', target);
-    req.headers.addAll({
-      'content-type': 'application/zip',
-      'content-length': fileLen.toString(),
-      ..._authHeaders(cfg),
-    });
-    // Pipe the file stream into the request body.
-    file.openRead().listen(
-      req.sink.add,
-      onDone: req.sink.close,
-      onError: req.sink.addError,
-    );
-    final client = http.Client();
     try {
-      final res = await client.send(req).then(http.Response.fromStream);
-      if (res.statusCode < 200 || res.statusCode >= 300) {
-        throw Exception('Upload failed: ${res.statusCode}');
+      await _ensureCollection(cfg);
+      final target = _fileUri(cfg, p.basename(file.path));
+      final fileLen = await file.length();
+      // Use a streamed request so we don't load the entire file into RAM.
+      final req = http.StreamedRequest('PUT', target);
+      req.headers.addAll({
+        'content-type': 'application/zip',
+        'content-length': fileLen.toString(),
+        ..._authHeaders(cfg),
+      });
+      // Pipe the file stream into the request body.
+      file.openRead().listen(
+        req.sink.add,
+        onDone: req.sink.close,
+        onError: req.sink.addError,
+      );
+      final client = http.Client();
+      try {
+        final res = await client.send(req).then(http.Response.fromStream);
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          throw Exception('Upload failed: ${res.statusCode}');
+        }
+      } finally {
+        client.close();
       }
     } finally {
-      client.close();
+      await cleanupTemporaryBackupFile(file);
     }
   }
 
@@ -373,6 +463,7 @@ class DataSync {
   }) async {
     // Stream the download to a file instead of buffering in memory.
     final client = http.Client();
+    File? file;
     try {
       final req = http.Request('GET', item.href);
       req.headers.addAll(_authHeaders(cfg));
@@ -383,15 +474,13 @@ class DataSync {
         throw Exception('Download failed: ${streamed.statusCode}');
       }
       final tmpDir = await _ensureTempDir();
-      final file = File(p.join(tmpDir.path, item.displayName));
+      file = File(p.join(tmpDir.path, item.displayName));
       final sink = file.openWrite();
       await streamed.stream.pipe(sink);
       await _restoreFromBackupFile(file, cfg, mode: mode);
-      try {
-        await file.delete();
-      } catch (_) {}
     } finally {
       client.close();
+      await _deleteFileQuietly(file);
     }
   }
 
@@ -433,9 +522,12 @@ class DataSync {
     return dir;
   }
 
-  Future<File> _writeTempText(String name, String content) async {
-    final tmp = await _ensureTempDir();
-    final f = File(p.join(tmp.path, name));
+  Future<File> _writeTempText(
+    Directory directory,
+    String name,
+    String content,
+  ) async {
+    final f = File(p.join(directory.path, name));
     await f.writeAsString(content);
     return f;
   }
@@ -460,13 +552,12 @@ class DataSync {
 
   /// Stream chat data to a temporary JSON file instead of building a huge
   /// in-memory String.  Uses IOSink for low memory overhead.
-  Future<File> _exportChatsToFile() async {
+  Future<File> _exportChatsToFile(Directory directory) async {
     if (!chatService.initialized) {
       await chatService.init();
     }
     final conversations = chatService.getAllConversations();
-    final tmp = await _ensureTempDir();
-    final file = File(p.join(tmp.path, '_bk_chats.json'));
+    final file = File(p.join(directory.path, '_bk_chats.json'));
     final sink = file.openWrite();
 
     try {
@@ -537,428 +628,384 @@ class DataSync {
     );
     await extractDir.create(recursive: true);
 
-    // Run ZIP extraction in an isolate to keep the UI responsive.
-    await Isolate.run(() {
-      _extractZipSync(file.path, extractDir.path);
-    });
+    try {
+      // Run ZIP extraction in an isolate to keep the UI responsive.
+      await Isolate.run(() {
+        _extractZipSync(file.path, extractDir.path);
+      });
 
-    // Restore settings
-    final settingsFile = File(p.join(extractDir.path, 'settings.json'));
-    if (await settingsFile.exists()) {
-      try {
-        final txt = await settingsFile.readAsString();
-        final map = jsonDecode(txt) as Map<String, dynamic>;
-        final prefs = await SharedPreferencesAsync.instance;
-        if (mode == RestoreMode.overwrite) {
-          // For overwrite mode, restore all settings
-          await prefs.restore(map);
-        } else {
-          // For merge mode, intelligently merge settings
-          final existing = await prefs.snapshot();
+      // Restore settings
+      final settingsFile = File(p.join(extractDir.path, 'settings.json'));
+      if (await settingsFile.exists()) {
+        try {
+          final txt = await settingsFile.readAsString();
+          final map = jsonDecode(txt) as Map<String, dynamic>;
+          final prefs = await SharedPreferencesAsync.instance;
+          if (mode == RestoreMode.overwrite) {
+            // For overwrite mode, restore all settings
+            await prefs.restore(map);
+          } else {
+            // For merge mode, intelligently merge settings
+            final existing = await prefs.snapshot();
 
-          // Keys that should be merged as JSON arrays/objects
-          const mergeableKeys = {
-            'assistants_v1', // Assistant configurations
-            'provider_configs_v1', // Provider configurations
-            'pinned_models_v1', // Pinned models list
-            'providers_order_v1', // Provider order list
-            'provider_groups_v1', // Provider group list [{id,name,createdAt}]
-            'provider_group_map_v1', // providerKey -> groupId
-            'provider_group_collapsed_v1', // groupId|__ungrouped__ -> bool
-            'search_services_v1', // Search services configuration
-            'assistant_tags_v1', // Ordered tag list [{id,name}]
-            'assistant_tag_map_v1', // assistantId -> tagId
-            'assistant_tag_collapsed_v1', // tagId -> bool
-          };
+            // Keys that should be merged as JSON arrays/objects
+            const mergeableKeys = {
+              'assistants_v1', // Assistant configurations
+              'provider_configs_v1', // Provider configurations
+              'pinned_models_v1', // Pinned models list
+              'providers_order_v1', // Provider order list
+              'provider_groups_v1', // provider group list
+              'provider_group_map_v1', // providerKey -> groupId
+              'provider_group_collapsed_v1', // groupId|__ungrouped__ -> bool
+              'search_services_v1', // Search services configuration
+              'assistant_tags_v1', // Ordered tag list [{id,name}]
+              'assistant_tag_map_v1', // assistantId -> tagId
+              'assistant_tag_collapsed_v1', // tagId -> bool
+            };
 
-          for (final entry in map.entries) {
-            final key = entry.key;
-            final newValue = entry.value;
+            for (final entry in map.entries) {
+              final key = entry.key;
+              final newValue = entry.value;
 
-            if (mergeableKeys.contains(key)) {
-              // Special handling for mergeable configurations
-              if (key == 'assistants_v1' && existing.containsKey(key)) {
-                // Merge assistants by ID with field-level rules.
-                // Preserve local avatar if already set to avoid clearing/overwriting.
-                try {
-                  final existingAssistants =
-                      jsonDecode(existing[key] as String) as List;
-                  final newAssistants = jsonDecode(newValue as String) as List;
-                  final assistantMap = <String, Map<String, dynamic>>{};
+              if (mergeableKeys.contains(key)) {
+                // Special handling for mergeable configurations
+                if (key == 'assistants_v1' && existing.containsKey(key)) {
+                  // Merge assistants by ID with field-level rules.
+                  // Preserve local avatar if already set to avoid clearing/overwriting.
+                  try {
+                    final existingAssistants =
+                        jsonDecode(existing[key] as String) as List;
+                    final newAssistants =
+                        jsonDecode(newValue as String) as List;
+                    final assistantMap = <String, Map<String, dynamic>>{};
 
-                  // Seed map with existing assistants
-                  for (final a in existingAssistants) {
-                    if (a is Map && a.containsKey('id')) {
-                      // Store as mutable map<String, dynamic>
-                      assistantMap[a['id'].toString()] =
-                          Map<String, dynamic>.from(a);
-                    }
-                  }
-
-                  // Merge with imported assistants
-                  for (final a in newAssistants) {
-                    if (a is Map && a.containsKey('id')) {
-                      final id = a['id'].toString();
-                      final incoming = Map<String, dynamic>.from(a);
-
-                      if (!assistantMap.containsKey(id)) {
-                        // New assistant entirely
-                        assistantMap[id] = incoming;
-                        continue;
+                    // Seed map with existing assistants
+                    for (final a in existingAssistants) {
+                      if (a is Map && a.containsKey('id')) {
+                        // Store as mutable map<String, dynamic>
+                        assistantMap[a['id'].toString()] =
+                            Map<String, dynamic>.from(a);
                       }
+                    }
 
-                      final local = assistantMap[id]!;
+                    // Merge with imported assistants
+                    for (final a in newAssistants) {
+                      if (a is Map && a.containsKey('id')) {
+                        final id = a['id'].toString();
+                        final incoming = Map<String, dynamic>.from(a);
 
-                      // Start with default behavior: imported values override
-                      final merged = <String, dynamic>{...local, ...incoming};
-
-                      // Special rule: do not override existing non-empty avatar
-                      final localAvatar = (local['avatar'] ?? '').toString();
-                      final incomingAvatar = (incoming['avatar'] ?? '');
-                      if (localAvatar.trim().isNotEmpty) {
-                        // Keep local avatar regardless of imported value
-                        merged['avatar'] = localAvatar;
-                      } else {
-                        // Only take imported avatar if present (non-empty)
-                        final s = incomingAvatar is String
-                            ? incomingAvatar
-                            : incomingAvatar?.toString();
-                        if (s == null || s.trim().isEmpty) {
-                          merged['avatar'] = null;
-                        } else {
-                          merged['avatar'] = s;
+                        if (!assistantMap.containsKey(id)) {
+                          // New assistant entirely
+                          assistantMap[id] = incoming;
+                          continue;
                         }
-                      }
 
-                      // Special rule: do not override existing non-empty background
-                      final localBg = (local['background'] ?? '').toString();
-                      final incomingBg = (incoming['background'] ?? '');
-                      if (localBg.trim().isNotEmpty) {
-                        // Keep local background regardless of imported value
-                        merged['background'] = localBg;
-                      } else {
-                        // Only take imported background if present (non-empty)
-                        final sb = incomingBg is String
-                            ? incomingBg
-                            : incomingBg?.toString();
-                        if (sb == null || sb.trim().isEmpty) {
-                          merged['background'] = null;
+                        final local = assistantMap[id]!;
+
+                        // Start with default behavior: imported values override
+                        final merged = <String, dynamic>{...local, ...incoming};
+
+                        // Special rule: do not override existing non-empty avatar
+                        final localAvatar = (local['avatar'] ?? '').toString();
+                        final incomingAvatar = (incoming['avatar'] ?? '');
+                        if (localAvatar.trim().isNotEmpty) {
+                          // Keep local avatar regardless of imported value
+                          merged['avatar'] = localAvatar;
                         } else {
-                          merged['background'] = sb;
+                          // Only take imported avatar if present (non-empty)
+                          final s = incomingAvatar is String
+                              ? incomingAvatar
+                              : incomingAvatar?.toString();
+                          if (s == null || s.trim().isEmpty) {
+                            merged['avatar'] = null;
+                          } else {
+                            merged['avatar'] = s;
+                          }
                         }
+
+                        // Special rule: do not override existing non-empty background
+                        final localBg = (local['background'] ?? '').toString();
+                        final incomingBg = (incoming['background'] ?? '');
+                        if (localBg.trim().isNotEmpty) {
+                          // Keep local background regardless of imported value
+                          merged['background'] = localBg;
+                        } else {
+                          // Only take imported background if present (non-empty)
+                          final sb = incomingBg is String
+                              ? incomingBg
+                              : incomingBg?.toString();
+                          if (sb == null || sb.trim().isEmpty) {
+                            merged['background'] = null;
+                          } else {
+                            merged['background'] = sb;
+                          }
+                        }
+
+                        assistantMap[id] = merged;
                       }
-
-                      assistantMap[id] = merged;
                     }
+
+                    final mergedAssistants = assistantMap.values.toList();
+                    await prefs.restoreSingle(
+                      key,
+                      jsonEncode(mergedAssistants),
+                    );
+                  } catch (e) {
+                    // If merge fails, keep existing
                   }
+                } else if (key == 'provider_configs_v1' &&
+                    existing.containsKey(key)) {
+                  // Merge provider configs: combine both maps
+                  try {
+                    final existingConfigs =
+                        jsonDecode(existing[key] as String)
+                            as Map<String, dynamic>;
+                    final newConfigs =
+                        jsonDecode(newValue as String) as Map<String, dynamic>;
 
-                  final mergedAssistants = assistantMap.values.toList();
-                  await prefs.restoreSingle(key, jsonEncode(mergedAssistants));
-                } catch (e) {
-                  // If merge fails, keep existing
-                }
-              } else if (key == 'provider_configs_v1' &&
-                  existing.containsKey(key)) {
-                // Merge provider configs: combine both maps
-                try {
-                  final existingConfigs =
-                      jsonDecode(existing[key] as String)
-                          as Map<String, dynamic>;
-                  final newConfigs =
-                      jsonDecode(newValue as String) as Map<String, dynamic>;
-
-                  // Merge configs, new values override existing for same keys
-                  final mergedConfigs = {...existingConfigs, ...newConfigs};
-                  await prefs.restoreSingle(key, jsonEncode(mergedConfigs));
-                } catch (e) {
-                  // If merge fails, keep existing
-                }
-              } else if (key == 'pinned_models_v1' &&
-                  existing.containsKey(key)) {
-                // Merge pinned models: combine and deduplicate
-                try {
-                  final existingModels =
-                      jsonDecode(existing[key] as String) as List;
-                  final newModels = jsonDecode(newValue as String) as List;
-                  final modelSet = <String>{};
-
-                  // Add all models to set for deduplication
-                  for (final model in existingModels) {
-                    if (model is String) modelSet.add(model);
+                    // Merge configs, new values override existing for same keys
+                    final mergedConfigs = {...existingConfigs, ...newConfigs};
+                    await prefs.restoreSingle(key, jsonEncode(mergedConfigs));
+                  } catch (e) {
+                    // If merge fails, keep existing
                   }
-                  for (final model in newModels) {
-                    if (model is String) modelSet.add(model);
-                  }
+                } else if (key == 'pinned_models_v1' &&
+                    existing.containsKey(key)) {
+                  // Merge pinned models: combine and deduplicate
+                  try {
+                    final existingModels =
+                        jsonDecode(existing[key] as String) as List;
+                    final newModels = jsonDecode(newValue as String) as List;
+                    final modelSet = <String>{};
 
-                  await prefs.restoreSingle(key, jsonEncode(modelSet.toList()));
-                } catch (e) {
-                  // If merge fails, keep existing
-                }
-              } else if (key == 'assistant_tags_v1') {
-                // Merge tag list by id; keep existing order, append new tags at end (incoming order)
-                try {
-                  final existingStr = (existing[key] ?? '') as String?;
-                  final newStr = (newValue ?? '') as String?;
-                  final existingList =
-                      (existingStr == null || existingStr.isEmpty)
-                      ? <dynamic>[]
-                      : (jsonDecode(existingStr) as List);
-                  final newList = (newStr == null || newStr.isEmpty)
-                      ? <dynamic>[]
-                      : (jsonDecode(newStr) as List);
-
-                  // Map existing by id and maintain order
-                  final existingOrder = <String>[];
-                  final tagById = <String, Map<String, dynamic>>{};
-                  for (final e in existingList) {
-                    if (e is Map && e['id'] != null) {
-                      final id = e['id'].toString();
-                      existingOrder.add(id);
-                      tagById[id] = Map<String, dynamic>.from(e);
+                    // Add all models to set for deduplication
+                    for (final model in existingModels) {
+                      if (model is String) modelSet.add(model);
                     }
+                    for (final model in newModels) {
+                      if (model is String) modelSet.add(model);
+                    }
+
+                    await prefs.restoreSingle(
+                      key,
+                      jsonEncode(modelSet.toList()),
+                    );
+                  } catch (e) {
+                    // If merge fails, keep existing
                   }
-                  // Add new tags that don't exist yet
-                  for (final e in newList) {
-                    if (e is Map && e['id'] != null) {
-                      final id = e['id'].toString();
-                      if (!tagById.containsKey(id)) {
+                } else if (key == 'assistant_tags_v1') {
+                  // Merge tag list by id; keep existing order, append new tags at end (incoming order)
+                  try {
+                    final existingStr = (existing[key] ?? '') as String?;
+                    final newStr = (newValue ?? '') as String?;
+                    final existingList =
+                        (existingStr == null || existingStr.isEmpty)
+                        ? <dynamic>[]
+                        : (jsonDecode(existingStr) as List);
+                    final newList = (newStr == null || newStr.isEmpty)
+                        ? <dynamic>[]
+                        : (jsonDecode(newStr) as List);
+
+                    // Map existing by id and maintain order
+                    final existingOrder = <String>[];
+                    final tagById = <String, Map<String, dynamic>>{};
+                    for (final e in existingList) {
+                      if (e is Map && e['id'] != null) {
+                        final id = e['id'].toString();
+                        existingOrder.add(id);
                         tagById[id] = Map<String, dynamic>.from(e);
-                        existingOrder.add(id);
                       }
                     }
+                    // Add new tags that don't exist yet
+                    for (final e in newList) {
+                      if (e is Map && e['id'] != null) {
+                        final id = e['id'].toString();
+                        if (!tagById.containsKey(id)) {
+                          tagById[id] = Map<String, dynamic>.from(e);
+                          existingOrder.add(id);
+                        }
+                      }
+                    }
+                    final merged = [
+                      for (final id in existingOrder) tagById[id],
+                    ].whereType<Map<String, dynamic>>().toList();
+                    await prefs.restoreSingle(key, jsonEncode(merged));
+                  } catch (_) {
+                    // If merge fails, fall back to existing (no action)
                   }
-                  final merged = [
-                    for (final id in existingOrder) tagById[id],
-                  ].whereType<Map<String, dynamic>>().toList();
-                  await prefs.restoreSingle(key, jsonEncode(merged));
-                } catch (_) {
-                  // If merge fails, fall back to existing (no action)
-                }
-              } else if (key == 'assistant_tag_map_v1') {
-                // Merge assistant->tag mapping; prefer existing on conflicts
-                try {
-                  final existingStr = (existing[key] ?? '') as String?;
-                  final newStr = (newValue ?? '') as String?;
-                  final existingMap =
-                      (existingStr == null || existingStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(existingStr) as Map<String, dynamic>);
-                  final newMap = (newStr == null || newStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(newStr) as Map<String, dynamic>);
-                  final merged = <String, dynamic>{...newMap, ...existingMap};
-                  await prefs.restoreSingle(key, jsonEncode(merged));
-                } catch (_) {}
-              } else if (key == 'assistant_tag_collapsed_v1') {
-                // Merge collapse states; prefer existing on conflicts
-                try {
-                  final existingStr = (existing[key] ?? '') as String?;
-                  final newStr = (newValue ?? '') as String?;
-                  final existingMap =
-                      (existingStr == null || existingStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(existingStr) as Map<String, dynamic>);
-                  final newMap = (newStr == null || newStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(newStr) as Map<String, dynamic>);
-                  final merged = <String, dynamic>{...newMap, ...existingMap};
-                  await prefs.restoreSingle(key, jsonEncode(merged));
-                } catch (_) {}
-              } else if (key == 'provider_groups_v1') {
-                // Merge provider groups by id; keep existing order, append new groups at end (incoming order)
-                try {
-                  final existingStr = (existing[key] ?? '') as String?;
-                  final newStr = (newValue ?? '') as String?;
-                  final existingList =
-                      (existingStr == null || existingStr.isEmpty)
-                      ? <dynamic>[]
-                      : (jsonDecode(existingStr) as List);
-                  final newList = (newStr == null || newStr.isEmpty)
-                      ? <dynamic>[]
-                      : (jsonDecode(newStr) as List);
+                } else if (key == 'assistant_tag_map_v1') {
+                  // Merge assistant->tag mapping; prefer existing on conflicts
+                  try {
+                    final existingStr = (existing[key] ?? '') as String?;
+                    final newStr = (newValue ?? '') as String?;
+                    final existingMap =
+                        (existingStr == null || existingStr.isEmpty)
+                        ? <String, dynamic>{}
+                        : (jsonDecode(existingStr) as Map<String, dynamic>);
+                    final newMap = (newStr == null || newStr.isEmpty)
+                        ? <String, dynamic>{}
+                        : (jsonDecode(newStr) as Map<String, dynamic>);
+                    final merged = <String, dynamic>{...newMap, ...existingMap};
+                    await prefs.restoreSingle(key, jsonEncode(merged));
+                  } catch (_) {}
+                } else if (key == 'assistant_tag_collapsed_v1') {
+                  // Merge collapse states; prefer existing on conflicts
+                  try {
+                    final existingStr = (existing[key] ?? '') as String?;
+                    final newStr = (newValue ?? '') as String?;
+                    final existingMap =
+                        (existingStr == null || existingStr.isEmpty)
+                        ? <String, dynamic>{}
+                        : (jsonDecode(existingStr) as Map<String, dynamic>);
+                    final newMap = (newStr == null || newStr.isEmpty)
+                        ? <String, dynamic>{}
+                        : (jsonDecode(newStr) as Map<String, dynamic>);
+                    final merged = <String, dynamic>{...newMap, ...existingMap};
+                    await prefs.restoreSingle(key, jsonEncode(merged));
+                  } catch (_) {}
+                } else if (key == 'provider_groups_v1') {
+                  // Merge provider groups by id; keep existing order, append new groups at end (incoming order)
+                  try {
+                    final existingStr = (existing[key] ?? '') as String?;
+                    final newStr = (newValue ?? '') as String?;
+                    final existingList =
+                        (existingStr == null || existingStr.isEmpty)
+                        ? <dynamic>[]
+                        : (jsonDecode(existingStr) as List);
+                    final newList = (newStr == null || newStr.isEmpty)
+                        ? <dynamic>[]
+                        : (jsonDecode(newStr) as List);
 
-                  final existingOrder = <String>[];
-                  final groupById = <String, Map<String, dynamic>>{};
-                  for (final e in existingList) {
-                    if (e is Map && e['id'] != null) {
-                      final id = e['id'].toString();
-                      existingOrder.add(id);
-                      groupById[id] = Map<String, dynamic>.from(e);
-                    }
-                  }
-                  for (final e in newList) {
-                    if (e is Map && e['id'] != null) {
-                      final id = e['id'].toString();
-                      if (!groupById.containsKey(id)) {
-                        groupById[id] = Map<String, dynamic>.from(e);
+                    final existingOrder = <String>[];
+                    final groupById = <String, Map<String, dynamic>>{};
+                    for (final e in existingList) {
+                      if (e is Map && e['id'] != null) {
+                        final id = e['id'].toString();
                         existingOrder.add(id);
+                        groupById[id] = Map<String, dynamic>.from(e);
                       }
                     }
-                  }
-                  final merged = [
-                    for (final id in existingOrder) groupById[id],
-                  ].whereType<Map<String, dynamic>>().toList();
-                  await prefs.restoreSingle(key, jsonEncode(merged));
-                } catch (_) {}
-              } else if (key == 'provider_group_map_v1') {
-                // Merge provider->group mapping; prefer existing on conflicts
-                try {
-                  final existingStr = (existing[key] ?? '') as String?;
-                  final newStr = (newValue ?? '') as String?;
-                  final existingMap =
-                      (existingStr == null || existingStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(existingStr) as Map<String, dynamic>);
-                  final newMap = (newStr == null || newStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(newStr) as Map<String, dynamic>);
-                  final merged = <String, dynamic>{...newMap, ...existingMap};
-                  await prefs.restoreSingle(key, jsonEncode(merged));
-                } catch (_) {}
-              } else if (key == 'provider_group_collapsed_v1') {
-                // Merge collapse states; prefer existing on conflicts
-                try {
-                  final existingStr = (existing[key] ?? '') as String?;
-                  final newStr = (newValue ?? '') as String?;
-                  final existingMap =
-                      (existingStr == null || existingStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(existingStr) as Map<String, dynamic>);
-                  final newMap = (newStr == null || newStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(newStr) as Map<String, dynamic>);
-                  final merged = <String, dynamic>{...newMap, ...existingMap};
-                  await prefs.restoreSingle(key, jsonEncode(merged));
-                } catch (_) {}
-              } else if ((key == 'providers_order_v1' ||
-                      key == 'search_services_v1') &&
-                  existing.containsKey(key)) {
-                // For these lists, prefer the imported version if different
-                // This ensures new providers/services are properly ordered
-                await prefs.restoreSingle(key, newValue);
-              } else {
-                // For new keys, add them
+                    for (final e in newList) {
+                      if (e is Map && e['id'] != null) {
+                        final id = e['id'].toString();
+                        if (!groupById.containsKey(id)) {
+                          groupById[id] = Map<String, dynamic>.from(e);
+                          existingOrder.add(id);
+                        }
+                      }
+                    }
+                    final merged = [
+                      for (final id in existingOrder) groupById[id],
+                    ].whereType<Map<String, dynamic>>().toList();
+                    await prefs.restoreSingle(key, jsonEncode(merged));
+                  } catch (_) {}
+                } else if (key == 'provider_group_map_v1') {
+                  // Merge provider->group mapping; prefer existing on conflicts
+                  try {
+                    final existingStr = (existing[key] ?? '') as String?;
+                    final newStr = (newValue ?? '') as String?;
+                    final existingMap =
+                        (existingStr == null || existingStr.isEmpty)
+                        ? <String, dynamic>{}
+                        : (jsonDecode(existingStr) as Map<String, dynamic>);
+                    final newMap = (newStr == null || newStr.isEmpty)
+                        ? <String, dynamic>{}
+                        : (jsonDecode(newStr) as Map<String, dynamic>);
+                    final merged = <String, dynamic>{...newMap, ...existingMap};
+                    await prefs.restoreSingle(key, jsonEncode(merged));
+                  } catch (_) {}
+                } else if (key == 'provider_group_collapsed_v1') {
+                  // Merge collapse states; prefer existing on conflicts
+                  try {
+                    final existingStr = (existing[key] ?? '') as String?;
+                    final newStr = (newValue ?? '') as String?;
+                    final existingMap =
+                        (existingStr == null || existingStr.isEmpty)
+                        ? <String, dynamic>{}
+                        : (jsonDecode(existingStr) as Map<String, dynamic>);
+                    final newMap = (newStr == null || newStr.isEmpty)
+                        ? <String, dynamic>{}
+                        : (jsonDecode(newStr) as Map<String, dynamic>);
+                    final merged = <String, dynamic>{...newMap, ...existingMap};
+                    await prefs.restoreSingle(key, jsonEncode(merged));
+                  } catch (_) {}
+                } else if ((key == 'providers_order_v1' ||
+                        key == 'search_services_v1') &&
+                    existing.containsKey(key)) {
+                  // For these lists, prefer the imported version if different
+                  // This ensures new providers/services are properly ordered
+                  await prefs.restoreSingle(key, newValue);
+                } else {
+                  // For new keys, add them
+                  await prefs.restoreSingle(key, newValue);
+                }
+              } else if (!existing.containsKey(key)) {
+                // For non-mergeable keys, only add if not existing
                 await prefs.restoreSingle(key, newValue);
               }
-            } else if (!existing.containsKey(key)) {
-              // For non-mergeable keys, only add if not existing
-              await prefs.restoreSingle(key, newValue);
+              // Skip existing non-mergeable keys to preserve user preferences
             }
-            // Skip existing non-mergeable keys to preserve user preferences
           }
-        }
-      } catch (_) {}
-    }
+        } catch (_) {}
+      }
 
-    // Restore chats
-    final chatsFile = File(p.join(extractDir.path, 'chats.json'));
-    if (cfg.includeChats && await chatsFile.exists()) {
-      try {
-        final obj =
-            jsonDecode(await chatsFile.readAsString()) as Map<String, dynamic>;
-        final convs =
-            (obj['conversations'] as List?)
-                ?.map(
-                  (e) =>
-                      Conversation.fromJson((e as Map).cast<String, dynamic>()),
-                )
-                .toList() ??
-            const <Conversation>[];
-        final msgs =
-            (obj['messages'] as List?)
-                ?.map(
-                  (e) =>
-                      ChatMessage.fromJson((e as Map).cast<String, dynamic>()),
-                )
-                .toList() ??
-            const <ChatMessage>[];
-        final toolEvents =
-            ((obj['toolEvents'] as Map?) ?? const <String, dynamic>{}).map(
-              (k, v) => MapEntry(
-                k.toString(),
-                (v as List)
-                    .cast<Map>()
-                    .map((e) => e.cast<String, dynamic>())
-                    .toList(),
-              ),
-            );
-        final geminiThoughtSigs =
-            ((obj['geminiThoughtSigs'] as Map?) ?? const <String, dynamic>{})
-                .map((k, v) => MapEntry(k.toString(), v.toString()));
-
-        if (mode == RestoreMode.overwrite) {
-          // Clear and restore via ChatService
-          await chatService.clearAllData();
-          final byConv = <String, List<ChatMessage>>{};
-          for (final m in msgs) {
-            (byConv[m.conversationId] ??= <ChatMessage>[]).add(m);
-          }
-          for (final c in convs) {
-            final list = byConv[c.id] ?? const <ChatMessage>[];
-            await chatService.restoreConversation(c, list);
-          }
-          // Tool events
-          for (final entry in toolEvents.entries) {
-            try {
-              await chatService.setToolEvents(entry.key, entry.value);
-            } catch (_) {}
-          }
-          for (final entry in geminiThoughtSigs.entries) {
-            try {
-              await chatService.setGeminiThoughtSignature(
-                entry.key,
-                entry.value,
+      // Restore chats
+      final chatsFile = File(p.join(extractDir.path, 'chats.json'));
+      if (cfg.includeChats && await chatsFile.exists()) {
+        try {
+          final obj =
+              jsonDecode(await chatsFile.readAsString())
+                  as Map<String, dynamic>;
+          final convs =
+              (obj['conversations'] as List?)
+                  ?.map(
+                    (e) => Conversation.fromJson(
+                      (e as Map).cast<String, dynamic>(),
+                    ),
+                  )
+                  .toList() ??
+              const <Conversation>[];
+          final msgs =
+              (obj['messages'] as List?)
+                  ?.map(
+                    (e) => ChatMessage.fromJson(
+                      (e as Map).cast<String, dynamic>(),
+                    ),
+                  )
+                  .toList() ??
+              const <ChatMessage>[];
+          final toolEvents =
+              ((obj['toolEvents'] as Map?) ?? const <String, dynamic>{}).map(
+                (k, v) => MapEntry(
+                  k.toString(),
+                  (v as List)
+                      .cast<Map>()
+                      .map((e) => e.cast<String, dynamic>())
+                      .toList(),
+                ),
               );
-            } catch (_) {}
-          }
-        } else {
-          // Merge mode: Add only non-existing conversations and messages
-          final existingConvs = chatService.getAllConversations();
-          final existingConvIds = existingConvs.map((c) => c.id).toSet();
+          final geminiThoughtSigs =
+              ((obj['geminiThoughtSigs'] as Map?) ?? const <String, dynamic>{})
+                  .map((k, v) => MapEntry(k.toString(), v.toString()));
 
-          // Create a map of message IDs to avoid duplicates
-          final existingMsgIds = <String>{};
-          for (final conv in existingConvs) {
-            final messages = chatService.getMessages(conv.id);
-            existingMsgIds.addAll(messages.map((m) => m.id));
-          }
-
-          // Group messages by conversation
-          final byConv = <String, List<ChatMessage>>{};
-          for (final m in msgs) {
-            if (!existingMsgIds.contains(m.id)) {
+          if (mode == RestoreMode.overwrite) {
+            // Clear and restore via ChatService
+            await chatService.clearAllData();
+            final byConv = <String, List<ChatMessage>>{};
+            for (final m in msgs) {
               (byConv[m.conversationId] ??= <ChatMessage>[]).add(m);
             }
-          }
-
-          // Restore non-existing conversations and their messages
-          for (final c in convs) {
-            if (!existingConvIds.contains(c.id)) {
+            for (final c in convs) {
               final list = byConv[c.id] ?? const <ChatMessage>[];
               await chatService.restoreConversation(c, list);
-            } else if (byConv.containsKey(c.id)) {
-              // Conversation exists but has new messages
-              final newMessages = byConv[c.id]!;
-              for (final msg in newMessages) {
-                await chatService.addMessageDirectly(c.id, msg);
-              }
             }
-          }
-
-          // Merge tool events
-          for (final entry in toolEvents.entries) {
-            final existing = chatService.getToolEvents(entry.key);
-            if (existing.isEmpty) {
+            // Tool events
+            for (final entry in toolEvents.entries) {
               try {
                 await chatService.setToolEvents(entry.key, entry.value);
               } catch (_) {}
             }
-          }
-          for (final entry in geminiThoughtSigs.entries) {
-            final existingSig = chatService.getGeminiThoughtSignature(
-              entry.key,
-            );
-            if (existingSig == null || existingSig.isEmpty) {
+            for (final entry in geminiThoughtSigs.entries) {
               try {
                 await chatService.setGeminiThoughtSignature(
                   entry.key,
@@ -966,139 +1013,448 @@ class DataSync {
                 );
               } catch (_) {}
             }
-          }
-        }
-      } catch (_) {}
-    }
+          } else {
+            // Merge mode: Add only non-existing conversations and messages
+            final existingConvs = chatService.getAllConversations();
+            final existingConvIds = existingConvs.map((c) => c.id).toSet();
 
-    // Restore files
-    if (cfg.includeFiles) {
-      if (mode == RestoreMode.overwrite) {
-        // Overwrite mode: Delete existing directories and copy all
-        // Restore upload directory
-        final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
-        if (await uploadSrc.exists()) {
-          final dst = await _getUploadDir();
-          if (await dst.exists()) {
-            try {
-              await dst.delete(recursive: true);
-            } catch (_) {}
-          }
-          await dst.create(recursive: true);
-          for (final ent in uploadSrc.listSync(recursive: true)) {
-            if (ent is File) {
-              final rel = p.relative(ent.path, from: uploadSrc.path);
-              final target = File(p.join(dst.path, rel));
-              await target.parent.create(recursive: true);
-              await ent.copy(target.path);
+            // Create a map of message IDs to avoid duplicates
+            final existingMsgIds = <String>{};
+            for (final conv in existingConvs) {
+              final messages = chatService.getMessages(conv.id);
+              existingMsgIds.addAll(messages.map((m) => m.id));
+            }
+
+            // Group messages by conversation
+            final byConv = <String, List<ChatMessage>>{};
+            for (final m in msgs) {
+              if (!existingMsgIds.contains(m.id)) {
+                (byConv[m.conversationId] ??= <ChatMessage>[]).add(m);
+              }
+            }
+
+            // Restore non-existing conversations and their messages
+            for (final c in convs) {
+              if (!existingConvIds.contains(c.id)) {
+                final list = byConv[c.id] ?? const <ChatMessage>[];
+                await chatService.restoreConversation(c, list);
+              } else if (byConv.containsKey(c.id)) {
+                // Conversation exists but has new messages
+                final newMessages = byConv[c.id]!;
+                for (final msg in newMessages) {
+                  await chatService.addMessageDirectly(c.id, msg);
+                }
+              }
+            }
+
+            // Merge tool events
+            for (final entry in toolEvents.entries) {
+              final existing = chatService.getToolEvents(entry.key);
+              if (existing.isEmpty) {
+                try {
+                  await chatService.setToolEvents(entry.key, entry.value);
+                } catch (_) {}
+              }
+            }
+            for (final entry in geminiThoughtSigs.entries) {
+              final existingSig = chatService.getGeminiThoughtSignature(
+                entry.key,
+              );
+              if (existingSig == null || existingSig.isEmpty) {
+                try {
+                  await chatService.setGeminiThoughtSignature(
+                    entry.key,
+                    entry.value,
+                  );
+                } catch (_) {}
+              }
             }
           }
-        }
+        } catch (_) {}
+      }
 
-        // Restore images directory
-        final imagesSrc = Directory(p.join(extractDir.path, 'images'));
-        if (await imagesSrc.exists()) {
-          final dst = await _getImagesDir();
-          if (await dst.exists()) {
-            try {
-              await dst.delete(recursive: true);
-            } catch (_) {}
-          }
-          await dst.create(recursive: true);
-          for (final ent in imagesSrc.listSync(recursive: true)) {
-            if (ent is File) {
-              final rel = p.relative(ent.path, from: imagesSrc.path);
-              final target = File(p.join(dst.path, rel));
-              await target.parent.create(recursive: true);
-              await ent.copy(target.path);
+      // Restore files
+      if (cfg.includeFiles) {
+        if (mode == RestoreMode.overwrite) {
+          // Overwrite mode: Delete existing directories and copy all
+          // Restore upload directory
+          final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
+          if (await uploadSrc.exists()) {
+            final dst = await _getUploadDir();
+            if (await dst.exists()) {
+              try {
+                await dst.delete(recursive: true);
+              } catch (_) {}
             }
-          }
-        }
-
-        // Restore avatars directory
-        final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
-        if (await avatarsSrc.exists()) {
-          final dst = await _getAvatarsDir();
-          if (await dst.exists()) {
-            try {
-              await dst.delete(recursive: true);
-            } catch (_) {}
-          }
-          await dst.create(recursive: true);
-          for (final ent in avatarsSrc.listSync(recursive: true)) {
-            if (ent is File) {
-              final rel = p.relative(ent.path, from: avatarsSrc.path);
-              final target = File(p.join(dst.path, rel));
-              await target.parent.create(recursive: true);
-              await ent.copy(target.path);
-            }
-          }
-        }
-      } else {
-        // Merge mode: Only copy non-existing files
-        // Merge upload directory
-        final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
-        if (await uploadSrc.exists()) {
-          final dst = await _getUploadDir();
-          if (!await dst.exists()) {
             await dst.create(recursive: true);
-          }
-          for (final ent in uploadSrc.listSync(recursive: true)) {
-            if (ent is File) {
-              final rel = p.relative(ent.path, from: uploadSrc.path);
-              final target = File(p.join(dst.path, rel));
-              if (!await target.exists()) {
+            for (final ent in uploadSrc.listSync(recursive: true)) {
+              if (ent is File) {
+                final rel = p.relative(ent.path, from: uploadSrc.path);
+                final target = File(p.join(dst.path, rel));
                 await target.parent.create(recursive: true);
                 await ent.copy(target.path);
               }
             }
           }
-        }
 
-        // Merge images directory
-        final imagesSrc = Directory(p.join(extractDir.path, 'images'));
-        if (await imagesSrc.exists()) {
-          final dst = await _getImagesDir();
-          if (!await dst.exists()) {
+          // Restore images directory
+          final imagesSrc = Directory(p.join(extractDir.path, 'images'));
+          if (await imagesSrc.exists()) {
+            final dst = await _getImagesDir();
+            if (await dst.exists()) {
+              try {
+                await dst.delete(recursive: true);
+              } catch (_) {}
+            }
             await dst.create(recursive: true);
-          }
-          for (final ent in imagesSrc.listSync(recursive: true)) {
-            if (ent is File) {
-              final rel = p.relative(ent.path, from: imagesSrc.path);
-              final target = File(p.join(dst.path, rel));
-              if (!await target.exists()) {
+            for (final ent in imagesSrc.listSync(recursive: true)) {
+              if (ent is File) {
+                final rel = p.relative(ent.path, from: imagesSrc.path);
+                final target = File(p.join(dst.path, rel));
                 await target.parent.create(recursive: true);
                 await ent.copy(target.path);
               }
             }
           }
-        }
 
-        // Merge avatars directory
-        final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
-        if (await avatarsSrc.exists()) {
-          final dst = await _getAvatarsDir();
-          if (!await dst.exists()) {
+          // Restore avatars directory
+          final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
+          if (await avatarsSrc.exists()) {
+            final dst = await _getAvatarsDir();
+            if (await dst.exists()) {
+              try {
+                await dst.delete(recursive: true);
+              } catch (_) {}
+            }
             await dst.create(recursive: true);
-          }
-          for (final ent in avatarsSrc.listSync(recursive: true)) {
-            if (ent is File) {
-              final rel = p.relative(ent.path, from: avatarsSrc.path);
-              final target = File(p.join(dst.path, rel));
-              if (!await target.exists()) {
+            for (final ent in avatarsSrc.listSync(recursive: true)) {
+              if (ent is File) {
+                final rel = p.relative(ent.path, from: avatarsSrc.path);
+                final target = File(p.join(dst.path, rel));
                 await target.parent.create(recursive: true);
                 await ent.copy(target.path);
+              }
+            }
+          }
+        } else {
+          // Merge mode: Only copy non-existing files
+          // Merge upload directory
+          final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
+          if (await uploadSrc.exists()) {
+            final dst = await _getUploadDir();
+            if (!await dst.exists()) {
+              await dst.create(recursive: true);
+            }
+            for (final ent in uploadSrc.listSync(recursive: true)) {
+              if (ent is File) {
+                final rel = p.relative(ent.path, from: uploadSrc.path);
+                final target = File(p.join(dst.path, rel));
+                if (!await target.exists()) {
+                  await target.parent.create(recursive: true);
+                  await ent.copy(target.path);
+                }
+              }
+            }
+          }
+
+          // Merge images directory
+          final imagesSrc = Directory(p.join(extractDir.path, 'images'));
+          if (await imagesSrc.exists()) {
+            final dst = await _getImagesDir();
+            if (!await dst.exists()) {
+              await dst.create(recursive: true);
+            }
+            for (final ent in imagesSrc.listSync(recursive: true)) {
+              if (ent is File) {
+                final rel = p.relative(ent.path, from: imagesSrc.path);
+                final target = File(p.join(dst.path, rel));
+                if (!await target.exists()) {
+                  await target.parent.create(recursive: true);
+                  await ent.copy(target.path);
+                }
+              }
+            }
+          }
+
+          // Merge avatars directory
+          final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
+          if (await avatarsSrc.exists()) {
+            final dst = await _getAvatarsDir();
+            if (!await dst.exists()) {
+              await dst.create(recursive: true);
+            }
+            for (final ent in avatarsSrc.listSync(recursive: true)) {
+              if (ent is File) {
+                final rel = p.relative(ent.path, from: avatarsSrc.path);
+                final target = File(p.join(dst.path, rel));
+                if (!await target.exists()) {
+                  await target.parent.create(recursive: true);
+                  await ent.copy(target.path);
+                }
               }
             }
           }
         }
       }
+    } finally {
+      await _deleteDirectoryQuietly(extractDir);
+    }
+  }
+}
+
+class _StreamingZipWriter {
+  _StreamingZipWriter(String outPath) : _output = OutputFileStream(outPath);
+
+  static const int _localFileHeaderSignature = 0x04034b50;
+  static const int _centralDirectoryHeaderSignature = 0x02014b50;
+  static const int _endOfCentralDirectorySignature = 0x06054b50;
+  static const int _dataDescriptorSignature = 0x08074b50;
+  static const int _versionNeeded = 20;
+  static const int _utf8Flag = 1 << 11;
+  static const int _dataDescriptorFlag = 1 << 3;
+  static const int _deflateMethod = 8;
+  static const int _maxZip32 = 0xffffffff;
+  static const int _maxZipEntries = 0xffff;
+  static const int _chunkSize = 1024 * 1024;
+
+  final OutputFileStream _output;
+  final List<_StreamingZipEntry> _entries = <_StreamingZipEntry>[];
+  bool _closed = false;
+
+  void addFile(File file, String entryName) {
+    if (_closed) {
+      throw StateError('Cannot add files after the ZIP writer is closed.');
+    }
+    if (entryName.isEmpty) return;
+
+    final stat = file.statSync();
+    final uncompressedSize = stat.size;
+    _checkZip32(uncompressedSize, 'file size');
+    _checkZip32(_output.length, 'local header offset');
+
+    final modified = stat.modified;
+    final modTime = _zipTime(modified);
+    final modDate = _zipDate(modified);
+    final nameBytes = utf8.encode(entryName);
+    final localHeaderOffset = _output.length;
+
+    _writeLocalHeader(nameBytes: nameBytes, modTime: modTime, modDate: modDate);
+
+    final written = _writeDeflatedFile(file);
+    _checkZip32(written.compressedSize, 'compressed size');
+    _checkZip32(written.uncompressedSize, 'uncompressed size');
+
+    _writeDataDescriptor(written);
+
+    _entries.add(
+      _StreamingZipEntry(
+        nameBytes: nameBytes,
+        modTime: modTime,
+        modDate: modDate,
+        crc32: written.crc32,
+        compressedSize: written.compressedSize,
+        uncompressedSize: written.uncompressedSize,
+        localHeaderOffset: localHeaderOffset,
+        mode: stat.mode,
+      ),
+    );
+  }
+
+  void closeSync() {
+    if (_closed) return;
+    _checkEntryCount();
+
+    final centralDirectoryOffset = _output.length;
+    _checkZip32(centralDirectoryOffset, 'central directory offset');
+    for (final entry in _entries) {
+      _writeCentralDirectoryHeader(entry);
+    }
+    final centralDirectorySize = _output.length - centralDirectoryOffset;
+    _checkZip32(centralDirectorySize, 'central directory size');
+
+    _writeEndOfCentralDirectory(
+      centralDirectoryOffset: centralDirectoryOffset,
+      centralDirectorySize: centralDirectorySize,
+    );
+    _output.closeSync();
+    _closed = true;
+  }
+
+  void closeIfNeededSync() {
+    if (!_closed) {
+      _output.closeSync();
+      _closed = true;
+    }
+  }
+
+  void _writeLocalHeader({
+    required List<int> nameBytes,
+    required int modTime,
+    required int modDate,
+  }) {
+    _output.writeUint32(_localFileHeaderSignature);
+    _output.writeUint16(_versionNeeded);
+    _output.writeUint16(_utf8Flag | _dataDescriptorFlag);
+    _output.writeUint16(_deflateMethod);
+    _output.writeUint16(modTime);
+    _output.writeUint16(modDate);
+    _output.writeUint32(0);
+    _output.writeUint32(0);
+    _output.writeUint32(0);
+    _output.writeUint16(nameBytes.length);
+    _output.writeUint16(0);
+    _output.writeBytes(nameBytes);
+  }
+
+  _StreamingZipWrittenFile _writeDeflatedFile(File file) {
+    final compressedSink = _CountingOutputSink(_output);
+    final inputSink = ZLibCodec(
+      level: ZLibOption.defaultLevel,
+      raw: true,
+    ).encoder.startChunkedConversion(compressedSink);
+
+    final raf = file.openSync();
+    final buffer = Uint8List(_chunkSize);
+    var crc32 = 0;
+    var uncompressedSize = 0;
+    try {
+      while (true) {
+        final read = raf.readIntoSync(buffer);
+        if (read == 0) break;
+        final chunk = Uint8List.sublistView(buffer, 0, read);
+        crc32 = getCrc32(chunk, crc32);
+        uncompressedSize += read;
+        inputSink.add(chunk);
+      }
+      inputSink.close();
+    } finally {
+      raf.closeSync();
     }
 
-    try {
-      await extractDir.delete(recursive: true);
-    } catch (_) {}
+    return _StreamingZipWrittenFile(
+      crc32: crc32,
+      compressedSize: compressedSink.bytesWritten,
+      uncompressedSize: uncompressedSize,
+    );
   }
+
+  void _writeDataDescriptor(_StreamingZipWrittenFile written) {
+    _output.writeUint32(_dataDescriptorSignature);
+    _output.writeUint32(written.crc32);
+    _output.writeUint32(written.compressedSize);
+    _output.writeUint32(written.uncompressedSize);
+  }
+
+  void _writeCentralDirectoryHeader(_StreamingZipEntry entry) {
+    _output.writeUint32(_centralDirectoryHeaderSignature);
+    _output.writeUint16(_versionNeeded);
+    _output.writeUint16(_versionNeeded);
+    _output.writeUint16(_utf8Flag | _dataDescriptorFlag);
+    _output.writeUint16(_deflateMethod);
+    _output.writeUint16(entry.modTime);
+    _output.writeUint16(entry.modDate);
+    _output.writeUint32(entry.crc32);
+    _output.writeUint32(entry.compressedSize);
+    _output.writeUint32(entry.uncompressedSize);
+    _output.writeUint16(entry.nameBytes.length);
+    _output.writeUint16(0);
+    _output.writeUint16(0);
+    _output.writeUint16(0);
+    _output.writeUint16(0);
+    _output.writeUint32(entry.mode << 16);
+    _output.writeUint32(entry.localHeaderOffset);
+    _output.writeBytes(entry.nameBytes);
+  }
+
+  void _writeEndOfCentralDirectory({
+    required int centralDirectoryOffset,
+    required int centralDirectorySize,
+  }) {
+    _output.writeUint32(_endOfCentralDirectorySignature);
+    _output.writeUint16(0);
+    _output.writeUint16(0);
+    _output.writeUint16(_entries.length);
+    _output.writeUint16(_entries.length);
+    _output.writeUint32(centralDirectorySize);
+    _output.writeUint32(centralDirectoryOffset);
+    _output.writeUint16(0);
+  }
+
+  static int _zipTime(DateTime value) {
+    return ((value.hour & 0x1f) << 11) |
+        ((value.minute & 0x3f) << 5) |
+        ((value.second ~/ 2) & 0x1f);
+  }
+
+  static int _zipDate(DateTime value) {
+    final year = value.year < 1980 ? 1980 : value.year;
+    return (((year - 1980) & 0x7f) << 9) |
+        ((value.month & 0x0f) << 5) |
+        (value.day & 0x1f);
+  }
+
+  static void _checkZip32(int value, String field) {
+    if (value > _maxZip32) {
+      throw FileSystemException('ZIP entry exceeds ZIP32 limit: $field');
+    }
+  }
+
+  void _checkEntryCount() {
+    if (_entries.length > _maxZipEntries) {
+      throw FileSystemException('ZIP entry count exceeds ZIP32 limit');
+    }
+  }
+}
+
+class _CountingOutputSink implements Sink<List<int>> {
+  _CountingOutputSink(this._output);
+
+  final OutputFileStream _output;
+  int bytesWritten = 0;
+
+  @override
+  void add(List<int> data) {
+    if (data.isEmpty) return;
+    _output.writeBytes(data);
+    bytesWritten += data.length;
+  }
+
+  @override
+  void close() {}
+}
+
+class _StreamingZipEntry {
+  const _StreamingZipEntry({
+    required this.nameBytes,
+    required this.modTime,
+    required this.modDate,
+    required this.crc32,
+    required this.compressedSize,
+    required this.uncompressedSize,
+    required this.localHeaderOffset,
+    required this.mode,
+  });
+
+  final List<int> nameBytes;
+  final int modTime;
+  final int modDate;
+  final int crc32;
+  final int compressedSize;
+  final int uncompressedSize;
+  final int localHeaderOffset;
+  final int mode;
+}
+
+class _StreamingZipWrittenFile {
+  const _StreamingZipWrittenFile({
+    required this.crc32,
+    required this.compressedSize,
+    required this.uncompressedSize,
+  });
+
+  final int crc32;
+  final int compressedSize;
+  final int uncompressedSize;
 }
 
 // ===== SharedPreferences async snapshot/restore helpers =====

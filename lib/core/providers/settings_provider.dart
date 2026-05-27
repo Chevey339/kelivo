@@ -10,6 +10,7 @@ import 'dart:async';
 import 'dart:convert';
 import '../services/search/search_service.dart';
 import '../services/tts/network_tts.dart';
+import '../services/tts/tts_text_selection.dart';
 import '../services/network/request_logger.dart';
 import '../services/logging/flutter_logger.dart';
 import '../models/api_keys.dart';
@@ -218,6 +219,15 @@ class SettingsProvider extends ChangeNotifier {
   // Android background chat generation mode
   static const String _androidBackgroundChatModeKey =
       'android_background_chat_mode_v1';
+  // iOS background generation settings
+  static const String _iosBackgroundGenerationEnabledKey =
+      'ios_background_generation_enabled_v1';
+  static const String _iosBackgroundTaskRefreshEnabledKey =
+      'ios_background_task_refresh_enabled_v1';
+  static const String _iosLiveActivityEnabledKey =
+      'ios_live_activity_enabled_v1';
+  static const String _iosBackgroundNotificationsEnabledKey =
+      'ios_background_notifications_enabled_v1';
   // Fonts
   static const String _displayAppFontFamilyKey = 'display_app_font_family_v1';
   static const String _displayCodeFontFamilyKey = 'display_code_font_family_v1';
@@ -262,6 +272,9 @@ class SettingsProvider extends ChangeNotifier {
   // TTS services (network)
   static const String _ttsServicesKey = 'tts_services_v1';
   static const String _ttsSelectedKey = 'tts_selected_v1';
+  static const String _ttsAutoPlayAssistantRepliesKey =
+      'tts_auto_play_assistant_replies_v1';
+  static const String _ttsTextSelectionModeKey = 'tts_text_selection_mode_v1';
   // Desktop UI
   static const String _desktopSidebarWidthKey = 'desktop_sidebar_width_v1';
   static const String _desktopSidebarOpenKey = 'desktop_sidebar_open_v1';
@@ -271,9 +284,13 @@ class SettingsProvider extends ChangeNotifier {
   // ===== Network TTS services =====
   List<TtsServiceOptions> _ttsServices = const <TtsServiceOptions>[];
   int _ttsServiceSelected = -1; // -1 => use System TTS
+  bool _ttsAutoPlayAssistantReplies = false;
+  TtsTextSelectionMode _ttsTextSelectionMode = TtsTextSelectionMode.fullText;
   List<TtsServiceOptions> get ttsServices => _ttsServices;
   int get ttsServiceSelected => _ttsServiceSelected;
   bool get usingSystemTts => _ttsServiceSelected < 0;
+  bool get ttsAutoPlayAssistantReplies => _ttsAutoPlayAssistantReplies;
+  TtsTextSelectionMode get ttsTextSelectionMode => _ttsTextSelectionMode;
   TtsServiceOptions? get selectedTtsService =>
       (_ttsServiceSelected >= 0 && _ttsServiceSelected < _ttsServices.length)
       ? _ttsServices[_ttsServiceSelected]
@@ -1010,6 +1027,14 @@ class SettingsProvider extends ChangeNotifier {
     } catch (_) {
       _androidBackgroundChatMode = AndroidBackgroundChatMode.off;
     }
+    _iosBackgroundGenerationEnabled =
+        prefs.getBool(_iosBackgroundGenerationEnabledKey) ?? false;
+    _iosBackgroundTaskRefreshEnabled =
+        prefs.getBool(_iosBackgroundTaskRefreshEnabledKey) ?? false;
+    _iosLiveActivityEnabled =
+        prefs.getBool(_iosLiveActivityEnabledKey) ?? false;
+    _iosBackgroundNotificationsEnabled =
+        prefs.getBool(_iosBackgroundNotificationsEnabledKey) ?? false;
 
     // load search settings
     final searchServicesStr = prefs.getString(_searchServicesKey);
@@ -1074,6 +1099,11 @@ class SettingsProvider extends ChangeNotifier {
       _ttsServiceSelected = _ttsServices.isEmpty ? -1 : 0;
       await prefs.setInt(_ttsSelectedKey, _ttsServiceSelected);
     }
+    _ttsAutoPlayAssistantReplies =
+        prefs.getBool(_ttsAutoPlayAssistantRepliesKey) ?? false;
+    _ttsTextSelectionMode = TtsTextSelectionModeStorage.fromStorageValue(
+      prefs.getString(_ttsTextSelectionModeKey),
+    );
     // webdav config
     final webdavStr = prefs.getString(_webDavConfigKey);
     if (webdavStr != null && webdavStr.isNotEmpty) {
@@ -1234,6 +1264,22 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_ttsSelectedKey, _ttsServiceSelected);
+  }
+
+  Future<void> setTtsAutoPlayAssistantReplies(bool value) async {
+    if (_ttsAutoPlayAssistantReplies == value) return;
+    _ttsAutoPlayAssistantReplies = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_ttsAutoPlayAssistantRepliesKey, value);
+  }
+
+  Future<void> setTtsTextSelectionMode(TtsTextSelectionMode mode) async {
+    if (_ttsTextSelectionMode == mode) return;
+    _ttsTextSelectionMode = mode;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_ttsTextSelectionModeKey, mode.storageValue);
   }
 
   // ===== User Font Settings =====
@@ -2063,6 +2109,79 @@ class SettingsProvider extends ChangeNotifier {
         // Defer import here is not possible; rely on main.dart sync. This is a no-op placeholder.
       }
     } catch (_) {}
+  }
+
+  // ===== iOS background chat generation =====
+  bool _iosBackgroundGenerationEnabled = false;
+  bool get iosBackgroundGenerationEnabled => _iosBackgroundGenerationEnabled;
+  Future<void> setIosBackgroundGenerationEnabled(bool v) async {
+    if (_iosBackgroundGenerationEnabled == v) return;
+    _iosBackgroundGenerationEnabled = v;
+    if (!v) {
+      _iosBackgroundTaskRefreshEnabled = false;
+      _iosLiveActivityEnabled = false;
+      _iosBackgroundNotificationsEnabled = false;
+    }
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      _iosBackgroundGenerationEnabledKey,
+      _iosBackgroundGenerationEnabled,
+    );
+    if (!v) {
+      await prefs.setBool(_iosBackgroundTaskRefreshEnabledKey, false);
+      await prefs.setBool(_iosLiveActivityEnabledKey, false);
+      await prefs.setBool(_iosBackgroundNotificationsEnabledKey, false);
+    }
+  }
+
+  bool _iosBackgroundTaskRefreshEnabled = false;
+  bool get iosBackgroundTaskRefreshEnabled => _iosBackgroundTaskRefreshEnabled;
+  Future<void> setIosBackgroundTaskRefreshEnabled(bool v) async {
+    if (_iosBackgroundTaskRefreshEnabled == v) return;
+    _iosBackgroundTaskRefreshEnabled = v;
+    if (v) _iosBackgroundGenerationEnabled = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      _iosBackgroundTaskRefreshEnabledKey,
+      _iosBackgroundTaskRefreshEnabled,
+    );
+    if (v) {
+      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
+    }
+  }
+
+  bool _iosLiveActivityEnabled = false;
+  bool get iosLiveActivityEnabled => _iosLiveActivityEnabled;
+  Future<void> setIosLiveActivityEnabled(bool v) async {
+    if (_iosLiveActivityEnabled == v) return;
+    _iosLiveActivityEnabled = v;
+    if (v) _iosBackgroundGenerationEnabled = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_iosLiveActivityEnabledKey, _iosLiveActivityEnabled);
+    if (v) {
+      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
+    }
+  }
+
+  bool _iosBackgroundNotificationsEnabled = false;
+  bool get iosBackgroundNotificationsEnabled =>
+      _iosBackgroundNotificationsEnabled;
+  Future<void> setIosBackgroundNotificationsEnabled(bool v) async {
+    if (_iosBackgroundNotificationsEnabled == v) return;
+    _iosBackgroundNotificationsEnabled = v;
+    if (v) _iosBackgroundGenerationEnabled = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      _iosBackgroundNotificationsEnabledKey,
+      _iosBackgroundNotificationsEnabled,
+    );
+    if (v) {
+      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
+    }
   }
 
   void setDynamicColorSupported(bool v) {
@@ -3644,6 +3763,10 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._searchEnabled = searchEnabled ?? _searchEnabled;
     copy._searchAutoTestOnLaunch =
         searchAutoTestOnLaunch ?? _searchAutoTestOnLaunch;
+    copy._ttsServices = _ttsServices;
+    copy._ttsServiceSelected = _ttsServiceSelected;
+    copy._ttsAutoPlayAssistantReplies = _ttsAutoPlayAssistantReplies;
+    copy._ttsTextSelectionMode = _ttsTextSelectionMode;
     // Copy other fields
     copy._providersOrder = _providersOrder;
     copy._themeMode = _themeMode;
@@ -3712,6 +3835,11 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._newChatOnLaunch = _newChatOnLaunch;
     copy._newChatOnAssistantSwitch = _newChatOnAssistantSwitch;
     copy._newChatAfterDelete = _newChatAfterDelete;
+    copy._iosBackgroundGenerationEnabled = _iosBackgroundGenerationEnabled;
+    copy._iosBackgroundTaskRefreshEnabled = _iosBackgroundTaskRefreshEnabled;
+    copy._iosLiveActivityEnabled = _iosLiveActivityEnabled;
+    copy._iosBackgroundNotificationsEnabled =
+        _iosBackgroundNotificationsEnabled;
     copy._desktopSendShortcut = _desktopSendShortcut;
     copy._desktopMessageNavButtonsMode = _desktopMessageNavButtonsMode;
     copy._chatFontScale = _chatFontScale;
@@ -3994,6 +4122,28 @@ class ProviderConfig {
   final String? balanceResultPath;
   // Anthropic/OpenRouter Claude prompt caching for stable system prompts.
   final bool? claudePromptCachingEnabled;
+  final String? claudePromptCachingTtl;
+
+  static const String claudePromptCachingTtl5m = '5m';
+  static const String claudePromptCachingTtl1h = '1h';
+
+  static String resolveClaudePromptCachingTtl(String? value) {
+    switch (value?.trim().toLowerCase()) {
+      case claudePromptCachingTtl1h:
+        return claudePromptCachingTtl1h;
+      case claudePromptCachingTtl5m:
+      default:
+        return claudePromptCachingTtl5m;
+    }
+  }
+
+  static Map<String, dynamic> claudePromptCacheControl(String? ttl) {
+    final cacheControl = <String, dynamic>{'type': 'ephemeral'};
+    if (resolveClaudePromptCachingTtl(ttl) == claudePromptCachingTtl1h) {
+      cacheControl['ttl'] = claudePromptCachingTtl1h;
+    }
+    return cacheControl;
+  }
 
   static String resolveProxyType(String? value) {
     switch (value?.trim().toLowerCase()) {
@@ -4036,6 +4186,7 @@ class ProviderConfig {
     this.balanceApiPath,
     this.balanceResultPath,
     this.claudePromptCachingEnabled = false,
+    this.claudePromptCachingTtl = claudePromptCachingTtl5m,
   });
 
   // Sentinel for copyWith nullability control (allow explicit null set)
@@ -4072,6 +4223,7 @@ class ProviderConfig {
     String? balanceApiPath,
     String? balanceResultPath,
     bool? claudePromptCachingEnabled,
+    String? claudePromptCachingTtl,
   }) => ProviderConfig(
     id: id ?? this.id,
     enabled: enabled ?? this.enabled,
@@ -4109,6 +4261,8 @@ class ProviderConfig {
     balanceResultPath: balanceResultPath ?? this.balanceResultPath,
     claudePromptCachingEnabled:
         claudePromptCachingEnabled ?? this.claudePromptCachingEnabled,
+    claudePromptCachingTtl:
+        claudePromptCachingTtl ?? this.claudePromptCachingTtl,
   );
 
   Map<String, dynamic> toJson() => {
@@ -4142,6 +4296,9 @@ class ProviderConfig {
     'balanceApiPath': balanceApiPath,
     'balanceResultPath': balanceResultPath,
     'claudePromptCachingEnabled': claudePromptCachingEnabled,
+    'claudePromptCachingTtl': resolveClaudePromptCachingTtl(
+      claudePromptCachingTtl,
+    ),
   };
 
   factory ProviderConfig.fromJson(Map<String, dynamic> json) => ProviderConfig(
@@ -4192,6 +4349,9 @@ class ProviderConfig {
     balanceResultPath: json['balanceResultPath'] as String?,
     claudePromptCachingEnabled:
         json['claudePromptCachingEnabled'] as bool? ?? false,
+    claudePromptCachingTtl: resolveClaudePromptCachingTtl(
+      json['claudePromptCachingTtl'] as String?,
+    ),
   );
 
   static ProviderKind classify(String key, {ProviderKind? explicitType}) {

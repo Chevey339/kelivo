@@ -1,3 +1,45 @@
+## [2.0.0] - 2026-04-30 - MCP spec compliance + 2025-11-25 alignment
+
+Big-Bang spec normalization. Supports protocol revisions 2024-11-05, 2025-03-26, 2025-06-18, and 2025-11-25 with per-version capability gating. Pairs with mcp_server 2.0.
+
+### Breaking
+- **Sampling direction fixed.** `client.createMessage(...)` (which sent a request to the server) is removed. Sampling is server-initiated per spec — register a handler with `client.onSamplingRequest((req) async { ... })` so the host LLM fulfils it.
+- **Roots direction fixed.** `client.listRoots()` (which sent a request to the server) is removed. The server requests roots from the client; configure them locally with `client.addRoot(...)` / `client.removeRoot(...)` and read via `client.roots`. Override the default response handler with `client.onListRoots(...)`. `roots/add` and `roots/remove` JSON-RPC methods (non-spec) are deleted.
+- **Cancellation is now a notification.** `client.cancelOperation(opId)` (which sent a `cancel` request) is removed; use `client.notifyCancelled(requestId, reason: ...)` which emits the spec `notifications/cancelled` notification.
+- **Logging method name corrected.** `setLoggingLevel` now sends `logging/setLevel` (camelCase) per spec — was `logging/set_level`.
+- **`client.healthCheck()` removed** — `health/check` is non-spec; expose health via your transport (e.g. an HTTP `/health` endpoint).
+- **`onSamplingResponse` listener removed** — the non-spec `sampling/response` notification path is gone, replaced by the standard request/response shape.
+
+### Added
+- `client.onSamplingRequest(handler)` — register a host LLM completion handler.
+- `client.onElicitationRequest(handler)` — register a user-input handler (spec 2025-06-18 `elicitation/create`).
+- `client.onListRoots(handler)` — override the default `roots/list` response.
+- `client.notifyCancelled(requestId, {reason})` and `client.notifyProgress(token, progress, {total, message})` — spec notifications.
+- `ClientCapabilities.elicitation` flag.
+- `McpProtocol.v2025_06_18` and `McpProtocol.v2025_11_25` constants. `defaultVersion` advances to `v2025_11_25`.
+- Per-version capability gates: `McpProtocol.supportsBatching` / `supportsElicitation` / `requiresProtocolHeader`.
+- Schema: `Tool.title` / `Tool.outputSchema` / `Tool.icons` / `Tool.meta`. `CallToolResult.structuredContent`. `AudioContent`. `ResourceLinkContent`.
+- Incoming-request infrastructure routes server-initiated requests to registered handlers and returns a JSON-RPC response with the matching id.
+
+---
+
+## [1.1.1] - 2026-04-28
+
+### Changed
+- README cleanup — removed "MCP Family" section, installation block, dev.to articles, and donation links.
+
+---
+
+## 1.1.0
+
+* New Features
+  * Deferred Tool Loading support (Progressive Tool Disclosure)
+    * `ToolMetadata` - Lightweight tool representation (name + description only)
+    * `ToolRegistry` - Cache layer for tool definitions with metadata extraction
+    * `ClientToolMetadataExtension` - Extension for easy metadata access
+    * Reduces token usage by 60-80% when sending tool definitions to LLMs
+    * Zero breaking changes - fully backward compatible, opt-in only
+
 ## 1.0.2
 
 * Bug Fixes

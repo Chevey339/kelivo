@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
@@ -42,6 +43,7 @@ import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../home/services/tool_approval_service.dart';
 import '../utils/thinking_tag_parser.dart';
+import 'citation_sources_sheet.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
 
@@ -122,6 +124,7 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
       'write' => Lucide.ClipboardPen,
       _ => Lucide.Clipboard,
     },
+    LocalToolNames.textToSpeech => Lucide.Volume2,
     _ => null,
   };
 }
@@ -141,8 +144,89 @@ String? _localToolTitleFor(
       'write' => l10n.chatMessageWidgetWriteClipboard,
       _ => l10n.assistantEditLocalToolClipboardTitle,
     },
+    LocalToolNames.textToSpeech => _textToSpeechToolTitleFor(l10n, args),
     _ => null,
   };
+}
+
+String _textToSpeechToolTitleFor(
+  AppLocalizations l10n,
+  Map<String, dynamic> args,
+) {
+  final text = _textToSpeechToolText(args);
+  if (text.isEmpty) return l10n.assistantEditLocalToolTextToSpeechTitle;
+  return l10n.chatMessageWidgetSpeakText(text);
+}
+
+String _textToSpeechToolText(Map<String, dynamic> args) {
+  return (args['text'] ?? '').toString().trim();
+}
+
+void _replayTextToSpeech(BuildContext context, String text) {
+  final content = text.trim();
+  if (content.isEmpty) return;
+
+  final tts = context.read<TtsProvider>();
+  if (!tts.isAvailable) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: StateError('Text-to-speech is unavailable.'),
+        library: 'Kelivo chat message tools',
+        context: ErrorDescription('while replaying text-to-speech'),
+      ),
+    );
+    return;
+  }
+
+  unawaited(
+    tts.speak(content).catchError((Object error, StackTrace stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'Kelivo chat message tools',
+          context: ErrorDescription('while replaying text-to-speech'),
+        ),
+      );
+    }),
+  );
+}
+
+Widget _buildTextToSpeechReplayRow(
+  BuildContext context, {
+  required String text,
+  required Color textColor,
+  required Color buttonColor,
+  double fontSize = 12,
+  int maxLines = 2,
+}) {
+  final l10n = AppLocalizations.of(context)!;
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      Expanded(
+        child: Text(
+          text,
+          maxLines: maxLines,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: fontSize, height: 1.4, color: textColor),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Tooltip(
+        message: l10n.ttsFloatingReplayTooltip,
+        child: IosIconButton(
+          size: 14,
+          minSize: 30,
+          padding: const EdgeInsets.all(6),
+          color: buttonColor,
+          semanticLabel: l10n.ttsFloatingReplayTooltip,
+          builder: (color) => Icon(Lucide.RefreshCw, size: 14, color: color),
+          onTap: () => _replayTextToSpeech(context, text),
+        ),
+      ),
+    ],
+  );
 }
 
 String _askUserToolTitleFor(AppLocalizations l10n, Map<String, dynamic> args) {
@@ -2016,6 +2100,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         (translationText != null && translationText.isNotEmpty);
     final bool isTranslating =
         translationText == l10n.chatMessageWidgetTranslating;
+    final latestSearchItems = _latestSearchItems();
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -2343,11 +2428,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             ),
           ],
           // Sources summary card (tap to open full citations)
-          if (_latestSearchItems().isNotEmpty) ...[
+          if (latestSearchItems.isNotEmpty) ...[
             const SizedBox(height: 8),
             _SourcesSummaryCard(
-              count: _latestSearchItems().length,
-              onTap: () => _showCitationsSheet(_latestSearchItems()),
+              count: latestSearchItems.length,
+              items: latestSearchItems,
+              onTap: () => _showCitationsSheet(latestSearchItems),
             ),
           ],
           // Action buttons (hidden while generating)
@@ -2414,39 +2500,42 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         ),
                         const SizedBox(width: 6),
                         Consumer<TtsProvider>(
-                          builder: (context, tts, _) => SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: Center(
-                              child: IosIconButton(
-                                size: 16,
-                                padding: EdgeInsets.all(4),
-                                onTap: widget.onSpeak,
-                                color: cs.onSurface.withValues(alpha: 0.9),
-                                builder: (color) => AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 200),
-                                  transitionBuilder: (child, anim) =>
-                                      ScaleTransition(
-                                        scale: anim,
-                                        child: FadeTransition(
-                                          opacity: anim,
-                                          child: child,
+                          builder: (context, tts, _) {
+                            final ttsActive = tts.playbackState.isActive;
+                            return SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: Center(
+                                child: IosIconButton(
+                                  size: 16,
+                                  padding: EdgeInsets.all(4),
+                                  onTap: widget.onSpeak,
+                                  color: cs.onSurface.withValues(alpha: 0.9),
+                                  builder: (color) => AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 200),
+                                    transitionBuilder: (child, anim) =>
+                                        ScaleTransition(
+                                          scale: anim,
+                                          child: FadeTransition(
+                                            opacity: anim,
+                                            child: child,
+                                          ),
                                         ),
+                                    child: Icon(
+                                      ttsActive
+                                          ? Lucide.CircleStop
+                                          : Lucide.Volume2,
+                                      key: ValueKey(
+                                        ttsActive ? 'stop' : 'speak',
                                       ),
-                                  child: Icon(
-                                    tts.isSpeaking
-                                        ? Lucide.CircleStop
-                                        : Lucide.Volume2,
-                                    key: ValueKey(
-                                      tts.isSpeaking ? 'stop' : 'speak',
+                                      size: 16,
+                                      color: color,
                                     ),
-                                    size: 16,
-                                    color: color,
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
                         const SizedBox(width: 6),
                         SizedBox(
@@ -2707,170 +2796,50 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   }
 
   void _showCitationsSheet(List<Map<String, dynamic>> items) {
-    final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    final bool isDesktop =
-        defaultTargetPlatform == TargetPlatform.macOS ||
-        defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.linux;
+    final sources = <CitationSourceItem>[
+      for (int i = 0; i < items.length; i++)
+        CitationSourceItem.fromMap(items[i], fallbackIndex: i + 1),
+    ];
 
-    if (isDesktop) {
-      showDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        builder: (ctx) {
-          return Dialog(
-            elevation: 12,
-            insetPadding: const EdgeInsets.symmetric(
-              horizontal: 24,
-              vertical: 24,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minWidth: 380,
-                maxWidth: 460,
-                maxHeight: 360,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Material(
-                  color: cs.surface,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Header
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-                        child: Row(
-                          children: [
-                            Icon(Lucide.BookOpen, size: 18, color: cs.primary),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                l10n.chatMessageWidgetCitationsTitle(
-                                  items.length,
-                                ),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            Tooltip(
-                              message: l10n.mcpPageClose,
-                              child: IconButton(
-                                icon: Icon(
-                                  Lucide.X,
-                                  size: 18,
-                                  color: cs.onSurface.withValues(alpha: 0.75),
-                                ),
-                                onPressed: () => Navigator.of(ctx).maybePop(),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Body
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          child: SingleChildScrollView(
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 6),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  for (int i = 0; i < items.length; i++)
-                                    _SearchResultCard(
-                                      index: (items[i]['index'] ?? (i + 1))
-                                          .toString(),
-                                      title: (items[i]['title'] ?? '')
-                                          .toString(),
-                                      url: (items[i]['url'] ?? '').toString(),
-                                      text: (items[i]['text'] ?? '').toString(),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
+    showCitationSourcesBottomSheet(
+      context: context,
+      title: l10n.chatMessageWidgetSearchResultsTitle,
+      closeSemanticLabel: l10n.mcpPageClose,
+      items: sources,
+      onOpen: _openCitationSource,
+    );
+  }
+
+  Future<void> _openCitationSource(CitationSourceItem item) async {
+    final l10n = AppLocalizations.of(context)!;
+    final uri = _tryNormalizeExternalUri(item.url);
+    if (uri == null) {
+      showAppSnackBar(
+        context,
+        message: l10n.chatMessageWidgetOpenLinkError,
+        type: NotificationType.error,
       );
       return;
     }
-
-    // Mobile: keep bottom sheet
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: cs.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        final bottomInset = MediaQuery.viewInsetsOf(ctx).bottom;
-        return SafeArea(
-          child: FractionallySizedBox(
-            heightFactor: 0.5,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, bottomInset + 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Lucide.BookOpen, size: 18, color: cs.primary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          l10n.chatMessageWidgetCitationsTitle(items.length),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            for (int i = 0; i < items.length; i++)
-                              _SearchResultCard(
-                                index: (items[i]['index'] ?? (i + 1))
-                                    .toString(),
-                                title: (items[i]['title'] ?? '').toString(),
-                                url: (items[i]['url'] ?? '').toString(),
-                                text: (items[i]['text'] ?? '').toString(),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!mounted) return;
+      if (!ok) {
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetCannotOpenUrl(uri.toString()),
+          type: NotificationType.error,
         );
-      },
-    );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.chatMessageWidgetOpenLinkError,
+        type: NotificationType.error,
+      );
+    }
   }
 
   Widget _buildAssistantAvatar(ColorScheme cs) {
@@ -4050,11 +4019,21 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
               .toString();
     final bool shouldShowSummary = settings.showToolResultSummary;
     final askUserExpanded = _askUserExpanded ?? true;
+    final ttsText = widget.part.toolName == LocalToolNames.textToSpeech
+        ? _textToSpeechToolText(widget.part.arguments)
+        : '';
     final Widget? content = _isAskUser
         ? _AskUserInlineBody(
             part: widget.part,
             compact: true,
             onRecoveredAnswer: widget.onRecoveredAnswer,
+          )
+        : ttsText.isNotEmpty
+        ? _buildTextToSpeechReplayRow(
+            context,
+            text: ttsText,
+            textColor: fg.body,
+            buttonColor: fg.accent,
           )
         : !shouldShowSummary || summaryText.trim().isEmpty
         ? null
@@ -4232,6 +4211,9 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     final fg = _chatSurfaceForegroundPalette(context);
     final hasImages = _imagePaths.isNotEmpty;
     final l10n = AppLocalizations.of(context)!;
+    final ttsText = widget.part.toolName == LocalToolNames.textToSpeech
+        ? _textToSpeechToolText(widget.part.arguments)
+        : '';
 
     if (widget.part.toolName == LocalToolNames.askUser) {
       return _AskUserToolCard(
@@ -4344,6 +4326,15 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                 ),
               ],
             ),
+            if (ttsText.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildTextToSpeechReplayRow(
+                context,
+                text: ttsText,
+                textColor: fg.body,
+                buttonColor: fg.accent,
+              ),
+            ],
             // Argument summary so users know what the tool is about to do
             if (isPendingApproval && widget.part.arguments.isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -5642,190 +5633,50 @@ class _ApprovalButton extends StatelessWidget {
   }
 }
 
-/// Card-style search result item for tool detail view.
-/// Shows favicon, title, text snippet, and URL in a tappable card.
-class _SearchResultCard extends StatelessWidget {
-  const _SearchResultCard({
-    required this.title,
-    required this.url,
-    this.text = '',
-    this.index,
+class _SourcesSummaryCard extends StatelessWidget {
+  const _SourcesSummaryCard({
+    required this.count,
+    required this.items,
+    required this.onTap,
   });
-  final String title;
-  final String url;
-  final String text;
-  final String? index;
 
-  static final _pureNumber = RegExp(r'^\d+$');
-
-  String _domain(String url) {
-    try {
-      return _tryNormalizeExternalUri(url)?.host ?? '';
-    } catch (_) {
-      return '';
-    }
-  }
-
-  /// A title is "real" if it is non-empty and not a pure number like "1","2".
-  bool _hasRealTitle() =>
-      title.isNotEmpty && !_pureNumber.hasMatch(title.trim());
+  final int count;
+  final List<Map<String, dynamic>> items;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final domain = _domain(url);
-    final faviconUrl = domain.isNotEmpty
-        ? 'https://www.google.com/s2/favicons?domain=$domain&sz=32'
-        : '';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: IosCardPress(
-        borderRadius: BorderRadius.circular(12),
-        baseColor: isDark
-            ? cs.surfaceContainerHighest.withValues(alpha: 0.5)
-            : cs.surfaceContainerHighest.withValues(alpha: 0.45),
-        pressedScale: 1.0,
-        duration: const Duration(milliseconds: 200),
-        onTap: () async {
-          final l10n = AppLocalizations.of(context)!;
-          final uri = _tryNormalizeExternalUri(url);
-          if (uri == null) {
-            showAppSnackBar(
-              context,
-              message: l10n.chatMessageWidgetOpenLinkError,
-              type: NotificationType.error,
-            );
-            return;
-          }
-          try {
-            final ok = await launchUrl(
-              uri,
-              mode: LaunchMode.externalApplication,
-            );
-            if (!ok && context.mounted) {
-              showAppSnackBar(
-                context,
-                message: l10n.chatMessageWidgetCannotOpenUrl(uri.toString()),
-                type: NotificationType.error,
-              );
-            }
-          } catch (_) {
-            if (!context.mounted) return;
-            showAppSnackBar(
-              context,
-              message: l10n.chatMessageWidgetOpenLinkError,
-              type: NotificationType.error,
-            );
-          }
-        },
-        padding: const EdgeInsets.all(12),
+    final l10n = AppLocalizations.of(context)!;
+    final label = l10n.chatMessageWidgetCitationsCount(count);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return IosCardPress(
+      borderRadius: BorderRadius.circular(20),
+      baseColor: isDark
+          ? cs.surfaceContainerHighest.withValues(alpha: 0.48)
+          : const Color(0xFFF7F7F7),
+      pressedScale: 1.0,
+      duration: const Duration(milliseconds: 260),
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 18),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Favicon with optional index badge
-            SizedBox(
-              width: 36,
-              height: 36,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        color: cs.surfaceContainerHigh,
-                        child: faviconUrl.isNotEmpty
-                            ? Image.network(
-                                faviconUrl,
-                                width: 32,
-                                height: 32,
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => Icon(
-                                  Lucide.Globe,
-                                  size: 18,
-                                  color: cs.onSurface.withValues(alpha: 0.5),
-                                ),
-                              )
-                            : Icon(
-                                Lucide.Globe,
-                                size: 18,
-                                color: cs.onSurface.withValues(alpha: 0.5),
-                              ),
-                      ),
-                    ),
-                  ),
-                  if (index != null)
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: cs.primary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          index!,
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: cs.onPrimary,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    _hasRealTitle() ? title : domain,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  // Text snippet
-                  if (text.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      text,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: cs.onSurface.withValues(alpha: 0.6),
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  // URL
-                  const SizedBox(height: 3),
-                  Text(
-                    url,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: cs.onSurface.withValues(alpha: 0.4),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+            _SourceFaviconStack(items: items),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface.withValues(alpha: isDark ? 0.90 : 0.86),
               ),
             ),
           ],
@@ -5835,39 +5686,108 @@ class _SearchResultCard extends StatelessWidget {
   }
 }
 
-class _SourcesSummaryCard extends StatelessWidget {
-  const _SourcesSummaryCard({required this.count, required this.onTap});
-  final int count;
-  final VoidCallback onTap;
+class _SourceFaviconStack extends StatelessWidget {
+  const _SourceFaviconStack({required this.items});
+
+  final List<Map<String, dynamic>> items;
+
+  static const double _iconSize = 16;
+  static const double _slotSize = 18;
+  static const double _overlapStep = 11;
+  static const int _maxIcons = 3;
+
+  @override
+  Widget build(BuildContext context) {
+    final domains = _domains();
+    if (domains.isEmpty) {
+      return const _SourceFaviconFallback(size: _slotSize);
+    }
+
+    return SizedBox(
+      width: _slotSize + (domains.length - 1) * _overlapStep,
+      height: _slotSize,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (var i = 0; i < domains.length; i++)
+            PositionedDirectional(
+              start: i * _overlapStep,
+              top: 1,
+              child: _SourceFavicon(domain: domains[i]),
+            ),
+        ],
+      ),
+    );
+  }
+
+  List<String> _domains() {
+    final seen = <String>{};
+    final domains = <String>[];
+    for (final item in items) {
+      final url = (item['url'] ?? '').toString();
+      final host = _tryNormalizeExternalUri(url)?.host ?? '';
+      if (host.isEmpty || !seen.add(host)) {
+        continue;
+      }
+      domains.add(host);
+      if (domains.length == _maxIcons) {
+        break;
+      }
+    }
+    return domains;
+  }
+}
+
+class _SourceFavicon extends StatelessWidget {
+  const _SourceFavicon({required this.domain});
+
+  final String domain;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : Colors.black.withValues(alpha: 0.06);
+
+    return Container(
+      width: _SourceFaviconStack._iconSize,
+      height: _SourceFaviconStack._iconSize,
+      decoration: BoxDecoration(
+        color: isDark ? cs.surfaceContainerHigh : cs.surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: borderColor, width: 0.5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.network(
+        'https://favicone.com/$domain',
+        width: _SourceFaviconStack._iconSize,
+        height: _SourceFaviconStack._iconSize,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            const _SourceFaviconFallback(size: _SourceFaviconStack._iconSize),
+      ),
+    );
+  }
+}
+
+class _SourceFaviconFallback extends StatelessWidget {
+  const _SourceFaviconFallback({required this.size});
+
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-    final label = l10n.chatMessageWidgetCitationsCount(count);
-    return IosCardPress(
-      borderRadius: BorderRadius.circular(12),
-      baseColor: cs.primaryContainer.withValues(
-        alpha: Theme.of(context).brightness == Brightness.dark ? 0.25 : 0.30,
-      ),
-      pressedScale: 1.0,
-      duration: const Duration(milliseconds: 260),
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Lucide.BookOpen, size: 16, color: cs.secondary),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: cs.secondary,
-            ),
-          ),
-        ],
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Icon(
+        Lucide.Globe,
+        size: size * 0.72,
+        color: cs.onSurface.withValues(alpha: 0.52),
       ),
     );
   }

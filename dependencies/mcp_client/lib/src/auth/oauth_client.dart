@@ -469,7 +469,7 @@ class OAuthTokenManager {
     return _currentToken!.isExpired;
   }
 
-  /// 토큰이 곧 만료될지 확인
+  /// Returns true if the token will expire within [threshold].
   bool willExpireSoon({Duration threshold = const Duration(minutes: 5)}) {
     if (_currentToken == null || _currentToken!.expiresIn == null) return true;
 
@@ -480,7 +480,7 @@ class OAuthTokenManager {
     return expiresAt.difference(now) <= threshold;
   }
 
-  /// 토큰 저장
+  /// Stores the token in memory; persists to secure storage when [persistent] is true.
   Future<void> storeToken(OAuthToken token, {bool persistent = false}) async {
     _currentToken = token;
     _tokenController.add(token);
@@ -491,7 +491,7 @@ class OAuthTokenManager {
     }
   }
 
-  /// 토큰 갱신
+  /// Replaces the current token with [newToken] and fires the refresh callback.
   Future<void> refreshToken(OAuthToken newToken) async {
     final oldToken = _currentToken;
     await storeToken(newToken);
@@ -501,19 +501,19 @@ class OAuthTokenManager {
     }
   }
 
-  /// 토큰 취소
+  /// Revokes the current token at the authorization server and clears it locally.
   Future<void> revokeToken() async {
     if (_currentToken != null) {
       try {
         await _client.revokeToken(token: _currentToken!.accessToken);
       } catch (e) {
-        // 취소 실패해도 로컬에서는 제거
+        // Even if remote revocation fails, drop the local token.
       }
     }
     clearToken();
   }
 
-  /// 만료된 토큰 정리
+  /// Drops expired tokens from memory.
   Future<int> cleanupExpiredTokens() async {
     var cleaned = 0;
     if (isTokenExpired) {
@@ -523,35 +523,34 @@ class OAuthTokenManager {
     return cleaned;
   }
 
-  /// 토큰 안전 삭제
+  /// Securely deletes the token from memory.
   Future<void> securelyDeleteToken() async {
     clearToken();
-    // 메모리에서 완전 제거
+    // Fully clear the in-memory reference.
     _currentToken = null;
   }
 
-  /// 영구 저장된 토큰 로드
+  /// Loads previously persisted tokens.
   Future<void> loadPersistedTokens() async {
-    // 구현 필요 - 실제로는 SecureStorage 등 사용
-    // 여기서는 테스트용으로 빈 구현
+    // TODO: integrate with SecureStorage. Empty placeholder for tests.
   }
 
-  /// 암호화된 토큰 저장
+  /// Stores an encrypted token.
   Future<void> storeEncryptedToken(
     OAuthToken token,
     String encryptionKey,
   ) async {
-    // 구현 필요 - 실제로는 암호화 로직 사용
+    // TODO: apply real encryption logic.
     await storeToken(token, persistent: true);
   }
 
-  /// 암호화된 토큰 로드
+  /// Loads an encrypted token.
   Future<OAuthToken?> loadEncryptedToken(String encryptionKey) async {
-    // 구현 필요 - 실제로는 복호화 로직 사용
+    // TODO: apply real decryption logic.
     return _currentToken;
   }
 
-  /// 토큰 만료 체크
+  /// Checks token expiry and emits a near-expiry lifecycle event when due.
   Future<void> checkTokenExpiry() async {
     if (willExpireSoon()) {
       _lifecycleController.add(
@@ -565,7 +564,7 @@ class OAuthTokenManager {
     }
   }
 
-  /// 백그라운드 갱신 시작
+  /// Starts the background refresh timer.
   void startBackgroundRefresh() {
     _scheduleRefresh();
     if (onBackgroundRefresh != null) {
@@ -573,17 +572,17 @@ class OAuthTokenManager {
     }
   }
 
-  /// 백그라운드 갱신 중지
+  /// Stops the background refresh timer.
   void stopBackgroundRefresh() {
     _refreshTimer?.cancel();
   }
 
-  // 토큰 영구 저장 (내부 메소드)
+  // Persists the token (internal).
   Future<void> _persistToken(OAuthToken token) async {
-    // 구현 필요 - 실제로는 SecureStorage 등 사용
+    // TODO: integrate with SecureStorage.
   }
 
-  // 콜백 및 이벤트 스트림
+  // Callbacks and event streams.
   Function(OAuthToken oldToken, OAuthToken newToken)? onTokenRefresh;
   Function(dynamic error, int attempt)? onRefreshFailure;
   Function()? onBackgroundRefresh;
@@ -591,7 +590,7 @@ class OAuthTokenManager {
   final StreamController<TokenLifecycleEvent> _lifecycleController =
       StreamController<TokenLifecycleEvent>.broadcast();
 
-  /// 토큰 생명주기 이벤트 스트림
+  /// Stream of token lifecycle events.
   Stream<TokenLifecycleEvent> get lifecycleEvents =>
       _lifecycleController.stream;
 
@@ -604,7 +603,7 @@ class OAuthTokenManager {
   }
 }
 
-/// 토큰 생명주기 이벤트 타입
+/// Token lifecycle event types.
 enum TokenEventType {
   issued,
   accessed,
@@ -615,7 +614,7 @@ enum TokenEventType {
   error,
 }
 
-/// 토큰 생명주기 이벤트
+/// Token lifecycle event.
 class TokenLifecycleEvent {
   final TokenEventType type;
   final DateTime timestamp;

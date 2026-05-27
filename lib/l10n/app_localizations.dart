@@ -1871,6 +1871,186 @@ abstract class AppLocalizations {
   /// **'Background Generation (Android)'**
   String get displaySettingsPageAndroidBackgroundChatTitle;
 
+  /// No description provided for @displaySettingsPageIosBackgroundChatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Background Generation (iOS)'**
+  String get displaySettingsPageIosBackgroundChatTitle;
+
+  /// No description provided for @iosBackgroundSettingsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS Background Generation'**
+  String get iosBackgroundSettingsPageTitle;
+
+  /// No description provided for @iosBackgroundStatusOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get iosBackgroundStatusOn;
+
+  /// No description provided for @iosBackgroundStatusOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get iosBackgroundStatusOff;
+
+  /// No description provided for @iosBackgroundGenerationEnableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Background Generation'**
+  String get iosBackgroundGenerationEnableTitle;
+
+  /// No description provided for @iosBackgroundGenerationEnableSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use iOS background time to keep the current reply running after the app leaves the foreground.'**
+  String get iosBackgroundGenerationEnableSubtitle;
+
+  /// No description provided for @iosBackgroundTaskRefreshTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Background Task Recovery'**
+  String get iosBackgroundTaskRefreshTitle;
+
+  /// No description provided for @iosBackgroundTaskRefreshSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask iOS for refresh and processing opportunities when system conditions allow.'**
+  String get iosBackgroundTaskRefreshSubtitle;
+
+  /// No description provided for @iosLiveActivityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Activity'**
+  String get iosLiveActivityTitle;
+
+  /// No description provided for @iosLiveActivitySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show background replies on the Lock Screen and Dynamic Island when supported.'**
+  String get iosLiveActivitySubtitle;
+
+  /// No description provided for @iosBackgroundNotificationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Task Notifications'**
+  String get iosBackgroundNotificationsTitle;
+
+  /// No description provided for @iosBackgroundNotificationsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a local notification when a background reply completes or is interrupted.'**
+  String get iosBackgroundNotificationsSubtitle;
+
+  /// No description provided for @iosBackgroundLimitNoticeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS may still suspend work'**
+  String get iosBackgroundLimitNoticeTitle;
+
+  /// No description provided for @iosBackgroundLimitNoticeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Kelivo running forever.'**
+  String get iosBackgroundLimitNoticeBody;
+
+  /// No description provided for @iosBackgroundUnsupportedLiveActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Requires iOS 16.1 or later and Live Activities enabled in Settings.'**
+  String get iosBackgroundUnsupportedLiveActivity;
+
+  /// No description provided for @iosBackgroundNativeStatusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System status'**
+  String get iosBackgroundNativeStatusTitle;
+
+  /// No description provided for @iosBackgroundNativeStatusUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable until running on iOS'**
+  String get iosBackgroundNativeStatusUnavailable;
+
+  /// No description provided for @iosBackgroundLiveActivityAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Activities available'**
+  String get iosBackgroundLiveActivityAvailable;
+
+  /// No description provided for @iosBackgroundLiveActivityUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Activities unavailable'**
+  String get iosBackgroundLiveActivityUnavailable;
+
+  /// No description provided for @iosBackgroundNotificationsAuthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications allowed'**
+  String get iosBackgroundNotificationsAuthorized;
+
+  /// No description provided for @iosBackgroundNotificationsNotAuthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications not allowed'**
+  String get iosBackgroundNotificationsNotAuthorized;
+
+  /// No description provided for @iosBackgroundGenerationActiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo is generating'**
+  String get iosBackgroundGenerationActiveTitle;
+
+  /// No description provided for @iosBackgroundGenerationActiveDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant is replying in the background'**
+  String get iosBackgroundGenerationActiveDetail;
+
+  /// No description provided for @iosBackgroundGenerationStreamingDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Receiving assistant response'**
+  String get iosBackgroundGenerationStreamingDetail;
+
+  /// No description provided for @iosBackgroundGenerationTokenCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tokens'**
+  String iosBackgroundGenerationTokenCount(int count);
+
+  /// No description provided for @iosBackgroundGenerationCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation complete'**
+  String get iosBackgroundGenerationCompleteTitle;
+
+  /// No description provided for @iosBackgroundGenerationCompleteDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant reply is ready'**
+  String get iosBackgroundGenerationCompleteDetail;
+
+  /// No description provided for @iosBackgroundGenerationInterruptedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation interrupted'**
+  String get iosBackgroundGenerationInterruptedTitle;
+
+  /// No description provided for @iosBackgroundGenerationInterruptedDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The background reply stopped before completion'**
+  String get iosBackgroundGenerationInterruptedDetail;
+
+  /// No description provided for @iosBackgroundGenerationCancelledDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation stopped'**
+  String get iosBackgroundGenerationCancelledDetail;
+
   /// No description provided for @androidBackgroundStatusOn.
   ///
   /// In en, this message translates to:
@@ -3713,6 +3893,18 @@ abstract class AppLocalizations {
   /// **'Citations ({count})'**
   String chatMessageWidgetCitationsTitle(int count);
 
+  /// No description provided for @chatMessageWidgetSearchResultsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search results'**
+  String get chatMessageWidgetSearchResultsTitle;
+
+  /// No description provided for @chatMessageWidgetCitationSourcesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Citation sources'**
+  String get chatMessageWidgetCitationSourcesTitle;
+
   /// No description provided for @chatMessageWidgetRegenerateTooltip.
   ///
   /// In en, this message translates to:
@@ -3821,6 +4013,12 @@ abstract class AppLocalizations {
   /// **'Write Clipboard'**
   String get chatMessageWidgetWriteClipboard;
 
+  /// No description provided for @chatMessageWidgetSpeakText.
+  ///
+  /// In en, this message translates to:
+  /// **'Speaking: {text}'**
+  String chatMessageWidgetSpeakText(String text);
+
   /// No description provided for @chatMessageWidgetToolCall.
   ///
   /// In en, this message translates to:
@@ -3860,7 +4058,7 @@ abstract class AppLocalizations {
   /// No description provided for @chatMessageWidgetCitationsCount.
   ///
   /// In en, this message translates to:
-  /// **'Citations ({count})'**
+  /// **'{count} citations'**
   String chatMessageWidgetCitationsCount(int count);
 
   /// No description provided for @chatSelectionSelectedCountTitle.
@@ -5543,8 +5741,32 @@ abstract class AppLocalizations {
   /// No description provided for @providerDetailPageClaudePromptCachingHelp.
   ///
   /// In en, this message translates to:
-  /// **'Adds cache_control to the system prompt for Claude requests through Anthropic or OpenRouter.'**
+  /// **'Adds cache_control to Claude requests through Anthropic or OpenRouter.'**
   String get providerDetailPageClaudePromptCachingHelp;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingTtlTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache TTL'**
+  String get providerDetailPageClaudePromptCachingTtlTitle;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingTtlHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'5 minutes is the default. 1 hour costs more to write but can reduce rebuilds in long conversations.'**
+  String get providerDetailPageClaudePromptCachingTtlHelp;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingTtl5m.
+  ///
+  /// In en, this message translates to:
+  /// **'5 min'**
+  String get providerDetailPageClaudePromptCachingTtl5m;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingTtl1h.
+  ///
+  /// In en, this message translates to:
+  /// **'1 hour'**
+  String get providerDetailPageClaudePromptCachingTtl1h;
 
   /// No description provided for @providerDetailPageBalanceTitle.
   ///
@@ -7340,6 +7562,12 @@ abstract class AppLocalizations {
   /// **'Text-to-Speech'**
   String get ttsServicesPageTitle;
 
+  /// No description provided for @ttsServicesPageSettingsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'TTS settings'**
+  String get ttsServicesPageSettingsTooltip;
+
   /// No description provided for @ttsServicesPageAddTooltip.
   ///
   /// In en, this message translates to:
@@ -7550,6 +7778,24 @@ abstract class AppLocalizations {
   /// **'Speed'**
   String get ttsServicesFieldSpeedLabel;
 
+  /// No description provided for @ttsServicesFieldLanguageTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Language type'**
+  String get ttsServicesFieldLanguageTypeLabel;
+
+  /// No description provided for @ttsServicesFieldLanguageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get ttsServicesFieldLanguageLabel;
+
+  /// No description provided for @ttsServicesValidationApiKeyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key is required'**
+  String get ttsServicesValidationApiKeyRequired;
+
   /// No description provided for @ttsServicesViewDetailsButton.
   ///
   /// In en, this message translates to:
@@ -7567,6 +7813,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close'**
   String get ttsServicesCloseButton;
+
+  /// No description provided for @ttsSettingsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'TTS Settings'**
+  String get ttsSettingsPageTitle;
+
+  /// No description provided for @ttsSettingsPlaybackSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback'**
+  String get ttsSettingsPlaybackSection;
+
+  /// No description provided for @ttsSettingsAutoPlayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-play Assistant Replies'**
+  String get ttsSettingsAutoPlayTitle;
+
+  /// No description provided for @ttsSettingsAutoPlayDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Start TTS automatically after an assistant reply finishes.'**
+  String get ttsSettingsAutoPlayDescription;
+
+  /// No description provided for @ttsSettingsTextSelectionSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Text Selection'**
+  String get ttsSettingsTextSelectionSection;
+
+  /// No description provided for @ttsSettingsTextSelectionFallbackDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'If no matching text is found, the full reply is played.'**
+  String get ttsSettingsTextSelectionFallbackDescription;
+
+  /// No description provided for @ttsSettingsTextSelectionFullTextTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Full text'**
+  String get ttsSettingsTextSelectionFullTextTitle;
+
+  /// No description provided for @ttsSettingsTextSelectionFullTextDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Play the complete assistant reply.'**
+  String get ttsSettingsTextSelectionFullTextDescription;
+
+  /// No description provided for @ttsSettingsTextSelectionQuotedOnlyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quoted text only'**
+  String get ttsSettingsTextSelectionQuotedOnlyTitle;
+
+  /// No description provided for @ttsSettingsTextSelectionQuotedOnlyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Play text inside “”, ‘’, \"\", \'\', 「」, or 『』.'**
+  String get ttsSettingsTextSelectionQuotedOnlyDescription;
+
+  /// No description provided for @ttsSettingsTextSelectionOutsideParenthesesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Outside parentheses'**
+  String get ttsSettingsTextSelectionOutsideParenthesesTitle;
+
+  /// No description provided for @ttsSettingsTextSelectionOutsideParenthesesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip text inside () and （）.'**
+  String get ttsSettingsTextSelectionOutsideParenthesesDescription;
+
+  /// No description provided for @ttsSettingsTextSelectionItalicOnlyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Italic text only'**
+  String get ttsSettingsTextSelectionItalicOnlyTitle;
+
+  /// No description provided for @ttsSettingsTextSelectionItalicOnlyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Play Markdown or HTML italic text.'**
+  String get ttsSettingsTextSelectionItalicOnlyDescription;
+
+  /// No description provided for @ttsSettingsTextSelectionNonItalicTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Non-italic text only'**
+  String get ttsSettingsTextSelectionNonItalicTitle;
+
+  /// No description provided for @ttsSettingsTextSelectionNonItalicDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip Markdown or HTML italic text.'**
+  String get ttsSettingsTextSelectionNonItalicDescription;
+
+  /// No description provided for @ttsFloatingPlayerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'TTS player'**
+  String get ttsFloatingPlayerLabel;
+
+  /// No description provided for @ttsFloatingPauseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get ttsFloatingPauseTooltip;
+
+  /// No description provided for @ttsFloatingResumeTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get ttsFloatingResumeTooltip;
+
+  /// No description provided for @ttsFloatingReplayTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay'**
+  String get ttsFloatingReplayTooltip;
+
+  /// No description provided for @ttsFloatingRewind15Tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Back 15 seconds'**
+  String get ttsFloatingRewind15Tooltip;
+
+  /// No description provided for @ttsFloatingForward15Tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward 15 seconds'**
+  String get ttsFloatingForward15Tooltip;
+
+  /// No description provided for @ttsFloatingSpeedTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback speed'**
+  String get ttsFloatingSpeedTooltip;
+
+  /// No description provided for @ttsFloatingCloseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close player'**
+  String get ttsFloatingCloseTooltip;
+
+  /// No description provided for @ttsFloatingExpandTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand playback controls'**
+  String get ttsFloatingExpandTooltip;
+
+  /// No description provided for @ttsFloatingCollapseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse playback controls'**
+  String get ttsFloatingCollapseTooltip;
 
   /// No description provided for @imageViewerPageShareFailedOpenFile.
   ///
@@ -8203,6 +8605,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Read or write plain text from the device clipboard when explicitly needed.'**
   String get assistantEditLocalToolClipboardSubtitle;
+
+  /// No description provided for @assistantEditLocalToolTextToSpeechTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Text to Speech'**
+  String get assistantEditLocalToolTextToSpeechTitle;
+
+  /// No description provided for @assistantEditLocalToolTextToSpeechSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the assistant read text aloud with the configured TTS playback.'**
+  String get assistantEditLocalToolTextToSpeechSubtitle;
 
   /// No description provided for @assistantEditLocalToolAskUserTitle.
   ///

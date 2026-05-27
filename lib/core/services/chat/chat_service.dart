@@ -111,6 +111,38 @@ class ChatService extends ChangeNotifier {
     return conversation.messageIds.indexOf(messageId);
   }
 
+  Map<String, int> getFirstMessageIndicesForGroups(
+    String conversationId,
+    Iterable<String> groupIds,
+  ) {
+    final remaining = groupIds.where((id) => id.isNotEmpty).toSet();
+    if (remaining.isEmpty) return const <String, int>{};
+
+    final result = <String, int>{};
+    final count = getMessageCount(conversationId);
+    for (
+      var start = 0;
+      start < count && remaining.isNotEmpty;
+      start += defaultLoadedWindowMax
+    ) {
+      final range = getMessagesRange(
+        conversationId,
+        start: start,
+        limit: defaultLoadedWindowMax,
+      );
+      for (var offset = 0; offset < range.length; offset++) {
+        final message = range[offset];
+        final groupId = message.groupId ?? message.id;
+        if (remaining.remove(groupId)) {
+          result[groupId] = start + offset;
+          if (remaining.isEmpty) break;
+        }
+      }
+    }
+
+    return result;
+  }
+
   ChatMessage? _messageForConversation(
     String conversationId,
     String messageId,

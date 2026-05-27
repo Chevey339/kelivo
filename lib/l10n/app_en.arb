@@ -419,6 +419,43 @@
   "displaySettingsPageChatMessageBackgroundFrosted": "Frosted Glass",
   "displaySettingsPageChatMessageBackgroundSolid": "Solid Color",
   "displaySettingsPageAndroidBackgroundChatTitle": "Background Generation (Android)",
+  "displaySettingsPageIosBackgroundChatTitle": "Background Generation (iOS)",
+  "iosBackgroundSettingsPageTitle": "iOS Background Generation",
+  "iosBackgroundStatusOn": "On",
+  "iosBackgroundStatusOff": "Off",
+  "iosBackgroundGenerationEnableTitle": "Background Generation",
+  "iosBackgroundGenerationEnableSubtitle": "Use iOS background time to keep the current reply running after the app leaves the foreground.",
+  "iosBackgroundTaskRefreshTitle": "Background Task Recovery",
+  "iosBackgroundTaskRefreshSubtitle": "Ask iOS for refresh and processing opportunities when system conditions allow.",
+  "iosLiveActivityTitle": "Live Activity",
+  "iosLiveActivitySubtitle": "Show background replies on the Lock Screen and Dynamic Island when supported.",
+  "iosBackgroundNotificationsTitle": "Task Notifications",
+  "iosBackgroundNotificationsSubtitle": "Send a local notification when a background reply completes or is interrupted.",
+  "iosBackgroundLimitNoticeTitle": "iOS may still suspend work",
+  "iosBackgroundLimitNoticeBody": "These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Kelivo running forever.",
+  "iosBackgroundUnsupportedLiveActivity": "Requires iOS 16.1 or later and Live Activities enabled in Settings.",
+  "iosBackgroundNativeStatusTitle": "System status",
+  "iosBackgroundNativeStatusUnavailable": "Unavailable until running on iOS",
+  "iosBackgroundLiveActivityAvailable": "Live Activities available",
+  "iosBackgroundLiveActivityUnavailable": "Live Activities unavailable",
+  "iosBackgroundNotificationsAuthorized": "Notifications allowed",
+  "iosBackgroundNotificationsNotAuthorized": "Notifications not allowed",
+  "iosBackgroundGenerationActiveTitle": "Kelivo is generating",
+  "iosBackgroundGenerationActiveDetail": "The assistant is replying in the background",
+  "iosBackgroundGenerationStreamingDetail": "Receiving assistant response",
+  "iosBackgroundGenerationTokenCount": "{count} tokens",
+  "@iosBackgroundGenerationTokenCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "iosBackgroundGenerationCompleteTitle": "Generation complete",
+  "iosBackgroundGenerationCompleteDetail": "Assistant reply is ready",
+  "iosBackgroundGenerationInterruptedTitle": "Generation interrupted",
+  "iosBackgroundGenerationInterruptedDetail": "The background reply stopped before completion",
+  "iosBackgroundGenerationCancelledDetail": "Generation stopped",
   "androidBackgroundStatusOn": "On",
   "androidBackgroundStatusOff": "Off",
   "androidBackgroundStatusOther": "On and notify",
@@ -799,6 +836,8 @@
       }
     }
   },
+  "chatMessageWidgetSearchResultsTitle": "Search results",
+  "chatMessageWidgetCitationSourcesTitle": "Citation sources",
   "chatMessageWidgetRegenerateTooltip": "Regenerate",
   "chatMessageWidgetRegenerateConfirmTitle": "Confirm Regenerate",
   "chatMessageWidgetRegenerateConfirmContent": "Regenerating only updates this message and keeps the messages below it. Continue?",
@@ -824,6 +863,14 @@
   "chatMessageWidgetBuiltinSearch": "Built-in Search",
   "chatMessageWidgetReadClipboard": "Read Clipboard",
   "chatMessageWidgetWriteClipboard": "Write Clipboard",
+  "chatMessageWidgetSpeakText": "Speaking: {text}",
+  "@chatMessageWidgetSpeakText": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      }
+    }
+  },
   "chatMessageWidgetToolCall": "Tool Call: {name}",
   "@chatMessageWidgetToolCall": {
     "placeholders": {
@@ -844,7 +891,7 @@
   "chatMessageWidgetArguments": "Arguments",
   "chatMessageWidgetResult": "Result",
   "chatMessageWidgetImages": "Images",
-  "chatMessageWidgetCitationsCount": "Citations ({count})",
+  "chatMessageWidgetCitationsCount": "{count} citations",
   "@chatMessageWidgetCitationsCount": {
     "placeholders": {
       "count": {
@@ -1274,7 +1321,11 @@
   "providerDetailPageAihubmixAppCodeLabel": "APP-Code (10% off)",
   "providerDetailPageAihubmixAppCodeHelp": "Adds header APP-Code requests to get a 10% discount. Only affects AIhubmix.",
   "providerDetailPageClaudePromptCachingTitle": "Claude Prompt Caching",
-  "providerDetailPageClaudePromptCachingHelp": "Adds cache_control to the system prompt for Claude requests through Anthropic or OpenRouter.",
+  "providerDetailPageClaudePromptCachingHelp": "Adds cache_control to Claude requests through Anthropic or OpenRouter.",
+  "providerDetailPageClaudePromptCachingTtlTitle": "Cache TTL",
+  "providerDetailPageClaudePromptCachingTtlHelp": "5 minutes is the default. 1 hour costs more to write but can reduce rebuilds in long conversations.",
+  "providerDetailPageClaudePromptCachingTtl5m": "5 min",
+  "providerDetailPageClaudePromptCachingTtl1h": "1 hour",
   "providerDetailPageBalanceTitle": "Account Balance",
   "providerDetailPageBalanceInfo": "Get account balance",
   "providerDetailPageBalanceApiPathLabel": "Balance API Path",
@@ -1626,6 +1677,7 @@
   "themeSettingsPageColorPalettesSection": "Color Palettes",
   "ttsServicesPageBackButton": "Back",
   "ttsServicesPageTitle": "Text-to-Speech",
+  "ttsServicesPageSettingsTooltip": "TTS settings",
   "ttsServicesPageAddTooltip": "Add",
   "ttsServicesPageAddNotImplemented": "Add TTS service not implemented",
   "ttsServicesPageSystemTtsTitle": "System TTS",
@@ -1668,9 +1720,38 @@
   "ttsServicesFieldVoiceIdLabel": "Voice ID",
   "ttsServicesFieldEmotionLabel": "Emotion",
   "ttsServicesFieldSpeedLabel": "Speed",
+  "ttsServicesFieldLanguageTypeLabel": "Language type",
+  "ttsServicesFieldLanguageLabel": "Language",
+  "ttsServicesValidationApiKeyRequired": "API Key is required",
   "ttsServicesViewDetailsButton": "View details",
   "ttsServicesDialogErrorTitle": "Error Details",
   "ttsServicesCloseButton": "Close",
+  "ttsSettingsPageTitle": "TTS Settings",
+  "ttsSettingsPlaybackSection": "Playback",
+  "ttsSettingsAutoPlayTitle": "Auto-play Assistant Replies",
+  "ttsSettingsAutoPlayDescription": "Start TTS automatically after an assistant reply finishes.",
+  "ttsSettingsTextSelectionSection": "Text Selection",
+  "ttsSettingsTextSelectionFallbackDescription": "If no matching text is found, the full reply is played.",
+  "ttsSettingsTextSelectionFullTextTitle": "Full text",
+  "ttsSettingsTextSelectionFullTextDescription": "Play the complete assistant reply.",
+  "ttsSettingsTextSelectionQuotedOnlyTitle": "Quoted text only",
+  "ttsSettingsTextSelectionQuotedOnlyDescription": "Play text inside “”, ‘’, \"\", '', 「」, or 『』.",
+  "ttsSettingsTextSelectionOutsideParenthesesTitle": "Outside parentheses",
+  "ttsSettingsTextSelectionOutsideParenthesesDescription": "Skip text inside () and （）.",
+  "ttsSettingsTextSelectionItalicOnlyTitle": "Italic text only",
+  "ttsSettingsTextSelectionItalicOnlyDescription": "Play Markdown or HTML italic text.",
+  "ttsSettingsTextSelectionNonItalicTitle": "Non-italic text only",
+  "ttsSettingsTextSelectionNonItalicDescription": "Skip Markdown or HTML italic text.",
+  "ttsFloatingPlayerLabel": "TTS player",
+  "ttsFloatingPauseTooltip": "Pause",
+  "ttsFloatingResumeTooltip": "Resume",
+  "ttsFloatingReplayTooltip": "Replay",
+  "ttsFloatingRewind15Tooltip": "Back 15 seconds",
+  "ttsFloatingForward15Tooltip": "Forward 15 seconds",
+  "ttsFloatingSpeedTooltip": "Playback speed",
+  "ttsFloatingCloseTooltip": "Close player",
+  "ttsFloatingExpandTooltip": "Expand playback controls",
+  "ttsFloatingCollapseTooltip": "Collapse playback controls",
   "imageViewerPageShareFailedOpenFile": "Unable to share, tried to open file: {message}",
   "@imageViewerPageShareFailedOpenFile": {
     "placeholders": {
@@ -1825,6 +1906,8 @@
   "assistantEditLocalToolTimeInfoSubtitle": "Read the device date, weekday, time, timezone, UTC offset, and timestamp.",
   "assistantEditLocalToolClipboardTitle": "Clipboard",
   "assistantEditLocalToolClipboardSubtitle": "Read or write plain text from the device clipboard when explicitly needed.",
+  "assistantEditLocalToolTextToSpeechTitle": "Text to Speech",
+  "assistantEditLocalToolTextToSpeechSubtitle": "Let the assistant read text aloud with the configured TTS playback.",
   "assistantEditLocalToolAskUserTitle": "Ask User",
   "assistantEditLocalToolAskUserSubtitle": "Let the assistant ask short questions and continue after you answer.",
   "assistantEditMemorySwitchTitle": "Memory",
