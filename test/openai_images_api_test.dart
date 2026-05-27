@@ -8,7 +8,11 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 
-ProviderConfig _openAiConfig(String baseUrl, {bool useResponseApi = false}) {
+ProviderConfig _openAiConfig(
+  String baseUrl, {
+  bool useResponseApi = false,
+  Map<String, dynamic> modelOverrides = const {},
+}) {
   return ProviderConfig(
     id: 'OpenAITest',
     enabled: true,
@@ -17,6 +21,7 @@ ProviderConfig _openAiConfig(String baseUrl, {bool useResponseApi = false}) {
     baseUrl: baseUrl,
     providerType: ProviderKind.openai,
     useResponseApi: useResponseApi,
+    modelOverrides: modelOverrides,
   );
 }
 
@@ -98,6 +103,86 @@ void main() {
         '![image](https://example.com/generated.png)',
       );
       expect(chunks.single.usage?.totalTokens, 8);
+    });
+
+    test('uses high-quality lossless defaults for modern image models', () async {
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/generated.png'},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server)),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw a detailed tabby cat'},
+        ],
+      ).toList();
+
+      expect(requestBody['quality'], 'high');
+      expect(requestBody['output_format'], 'png');
+    });
+
+    test('allows image quality defaults to be overridden', () async {
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/generated.webp'},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      await ChatApiService.sendMessageStream(
+        config: _openAiConfig(
+          _baseUrl(server),
+          modelOverrides: const {
+            'gpt-image-2': {
+              'body': [
+                {'key': 'quality', 'value': 'medium'},
+              ],
+            },
+          },
+        ),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw a small icon'},
+        ],
+        extraBody: const {'output_format': 'webp'},
+      ).toList();
+
+      expect(requestBody['quality'], 'medium');
+      expect(requestBody['output_format'], 'webp');
     });
 
     test(

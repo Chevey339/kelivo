@@ -420,6 +420,9 @@ void _applyOpenAIImagesExtraBody(
   String modelId,
   Map<String, dynamic>? extraBody,
 ) {
+  final defaults = _openAIImagesQualityDefaults(config, modelId);
+  if (defaults.isNotEmpty) body.addAll(defaults);
+
   final custom = _customBody(config, modelId);
   if (custom.isNotEmpty) body.addAll(custom);
   if (extraBody != null && extraBody.isNotEmpty) {
@@ -427,6 +430,26 @@ void _applyOpenAIImagesExtraBody(
       body[key] = value is String ? _parseOverrideValue(value) : value;
     });
   }
+}
+
+Map<String, dynamic> _openAIImagesQualityDefaults(
+  ProviderConfig config,
+  String modelId,
+) {
+  final upstreamModelId = _apiModelId(config, modelId).toLowerCase();
+  if (!_supportsModernOpenAIImageQuality(upstreamModelId)) {
+    return const <String, dynamic>{};
+  }
+  return const <String, dynamic>{
+    'quality': 'high',
+    'output_format': 'png',
+  };
+}
+
+bool _supportsModernOpenAIImageQuality(String modelId) {
+  final normalized = modelId.toLowerCase();
+  return normalized.startsWith('gpt-image-') ||
+      normalized.startsWith('chatgpt-image-');
 }
 
 String _openAIImagesOutputMime(
