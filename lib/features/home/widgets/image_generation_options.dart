@@ -395,9 +395,6 @@ class ImageGenerationOptionsSheet extends StatelessWidget {
                   labelBuilder: (v) => _aspectRatioLabel(l10n, v),
                   onSelected: (v) {
                     controller.aspectRatio = v;
-                    if (v != 'auto' && controller.sizeTier == 'auto') {
-                      controller.sizeTier = '1K';
-                    }
                     onChanged();
                   },
                 ),
