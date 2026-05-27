@@ -930,6 +930,101 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageAndroidBackgroundChatTitle => '后台聊天生成';
 
   @override
+  String get displaySettingsPageIosBackgroundChatTitle => 'iOS 后台生成';
+
+  @override
+  String get iosBackgroundSettingsPageTitle => 'iOS 后台生成';
+
+  @override
+  String get iosBackgroundStatusOn => '开启';
+
+  @override
+  String get iosBackgroundStatusOff => '关闭';
+
+  @override
+  String get iosBackgroundGenerationEnableTitle => '后台生成';
+
+  @override
+  String get iosBackgroundGenerationEnableSubtitle =>
+      'App 离开前台后，使用 iOS 分配的后台时间继续当前回复。';
+
+  @override
+  String get iosBackgroundTaskRefreshTitle => '后台任务恢复';
+
+  @override
+  String get iosBackgroundTaskRefreshSubtitle => '在系统条件允许时，向 iOS 请求刷新和处理机会。';
+
+  @override
+  String get iosLiveActivityTitle => '实时活动';
+
+  @override
+  String get iosLiveActivitySubtitle => '支持时在锁屏和灵动岛显示后台回复状态。';
+
+  @override
+  String get iosBackgroundNotificationsTitle => '任务通知';
+
+  @override
+  String get iosBackgroundNotificationsSubtitle => '后台回复完成或中断时发送本地通知。';
+
+  @override
+  String get iosBackgroundLimitNoticeTitle => 'iOS 仍可能暂停任务';
+
+  @override
+  String get iosBackgroundLimitNoticeBody =>
+      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Kelivo 运行。';
+
+  @override
+  String get iosBackgroundUnsupportedLiveActivity =>
+      '需要 iOS 16.1 或更高版本，并在系统设置中允许实时活动。';
+
+  @override
+  String get iosBackgroundNativeStatusTitle => '系统状态';
+
+  @override
+  String get iosBackgroundNativeStatusUnavailable => '需要在 iOS 上运行后查看';
+
+  @override
+  String get iosBackgroundLiveActivityAvailable => '实时活动可用';
+
+  @override
+  String get iosBackgroundLiveActivityUnavailable => '实时活动不可用';
+
+  @override
+  String get iosBackgroundNotificationsAuthorized => '通知已允许';
+
+  @override
+  String get iosBackgroundNotificationsNotAuthorized => '通知未允许';
+
+  @override
+  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
+
+  @override
+  String get iosBackgroundGenerationActiveDetail => '助手正在后台回复';
+
+  @override
+  String get iosBackgroundGenerationStreamingDetail => '正在接收助手回复';
+
+  @override
+  String iosBackgroundGenerationTokenCount(int count) {
+    return '$count tokens';
+  }
+
+  @override
+  String get iosBackgroundGenerationCompleteTitle => '生成完成';
+
+  @override
+  String get iosBackgroundGenerationCompleteDetail => '助手回复已准备好';
+
+  @override
+  String get iosBackgroundGenerationInterruptedTitle => '生成已中断';
+
+  @override
+  String get iosBackgroundGenerationInterruptedDetail => '后台回复在完成前停止';
+
+  @override
+  String get iosBackgroundGenerationCancelledDetail => '生成已停止';
+
+  @override
   String get androidBackgroundStatusOn => '开启';
 
   @override
@@ -1937,6 +2032,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatMessageWidgetWriteClipboard => '写入剪切板';
+
+  @override
+  String chatMessageWidgetSpeakText(String text) {
+    return '正在朗读: $text';
+  }
 
   @override
   String chatMessageWidgetToolCall(String name) {
@@ -3788,6 +3888,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsServicesPageTitle => '语音服务';
 
   @override
+  String get ttsServicesPageSettingsTooltip => 'TTS 设置';
+
+  @override
   String get ttsServicesPageAddTooltip => '新增';
 
   @override
@@ -3895,6 +3998,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsServicesFieldSpeedLabel => '语速';
 
   @override
+  String get ttsServicesFieldLanguageTypeLabel => '语言类型';
+
+  @override
+  String get ttsServicesFieldLanguageLabel => '语言';
+
+  @override
+  String get ttsServicesValidationApiKeyRequired => 'API Key 不能为空';
+
+  @override
   String get ttsServicesViewDetailsButton => '查看详情';
 
   @override
@@ -3902,6 +4014,88 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get ttsServicesCloseButton => '关闭';
+
+  @override
+  String get ttsSettingsPageTitle => 'TTS 设置';
+
+  @override
+  String get ttsSettingsPlaybackSection => '播放';
+
+  @override
+  String get ttsSettingsAutoPlayTitle => '自动播放助手回复';
+
+  @override
+  String get ttsSettingsAutoPlayDescription => '助手回复生成完成后自动开始 TTS 播放。';
+
+  @override
+  String get ttsSettingsTextSelectionSection => '文本选择';
+
+  @override
+  String get ttsSettingsTextSelectionFallbackDescription => '没有匹配内容时将播放完整回复。';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextTitle => '全文';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextDescription => '播放完整助手回复。';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyTitle => '仅引号内文字';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyDescription =>
+      '播放 “”、‘’、\"\"、\'\'、「」或『』内的文字。';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesTitle => '括号外文字';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesDescription =>
+      '跳过 () 和 （） 内的文字。';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyTitle => '仅斜体文字';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyDescription =>
+      '播放 Markdown 或 HTML 斜体文字。';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicTitle => '仅正体文字';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicDescription =>
+      '跳过 Markdown 或 HTML 斜体文字。';
+
+  @override
+  String get ttsFloatingPlayerLabel => '语音播放器';
+
+  @override
+  String get ttsFloatingPauseTooltip => '暂停';
+
+  @override
+  String get ttsFloatingResumeTooltip => '继续播放';
+
+  @override
+  String get ttsFloatingReplayTooltip => '重新播放';
+
+  @override
+  String get ttsFloatingRewind15Tooltip => '后退 15 秒';
+
+  @override
+  String get ttsFloatingForward15Tooltip => '前进 15 秒';
+
+  @override
+  String get ttsFloatingSpeedTooltip => '播放倍速';
+
+  @override
+  String get ttsFloatingCloseTooltip => '关闭播放器';
+
+  @override
+  String get ttsFloatingExpandTooltip => '展开播放控制';
+
+  @override
+  String get ttsFloatingCollapseTooltip => '收起播放控制';
 
   @override
   String imageViewerPageShareFailedOpenFile(String message) {
@@ -4244,6 +4438,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get assistantEditLocalToolClipboardSubtitle =>
       '在明确需要时读取或写入设备剪切板中的纯文本。';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechTitle => '文字转语音';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechSubtitle =>
+      '允许助手使用已配置的语音播放朗读文本。';
 
   @override
   String get assistantEditLocalToolAskUserTitle => '询问用户';
@@ -5884,6 +6085,101 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageAndroidBackgroundChatTitle => '后台聊天生成';
 
   @override
+  String get displaySettingsPageIosBackgroundChatTitle => 'iOS 后台生成';
+
+  @override
+  String get iosBackgroundSettingsPageTitle => 'iOS 后台生成';
+
+  @override
+  String get iosBackgroundStatusOn => '开启';
+
+  @override
+  String get iosBackgroundStatusOff => '关闭';
+
+  @override
+  String get iosBackgroundGenerationEnableTitle => '后台生成';
+
+  @override
+  String get iosBackgroundGenerationEnableSubtitle =>
+      'App 离开前台后，使用 iOS 分配的后台时间继续当前回复。';
+
+  @override
+  String get iosBackgroundTaskRefreshTitle => '后台任务恢复';
+
+  @override
+  String get iosBackgroundTaskRefreshSubtitle => '在系统条件允许时，向 iOS 请求刷新和处理机会。';
+
+  @override
+  String get iosLiveActivityTitle => '实时活动';
+
+  @override
+  String get iosLiveActivitySubtitle => '支持时在锁屏和灵动岛显示后台回复状态。';
+
+  @override
+  String get iosBackgroundNotificationsTitle => '任务通知';
+
+  @override
+  String get iosBackgroundNotificationsSubtitle => '后台回复完成或中断时发送本地通知。';
+
+  @override
+  String get iosBackgroundLimitNoticeTitle => 'iOS 仍可能暂停任务';
+
+  @override
+  String get iosBackgroundLimitNoticeBody =>
+      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Kelivo 运行。';
+
+  @override
+  String get iosBackgroundUnsupportedLiveActivity =>
+      '需要 iOS 16.1 或更高版本，并在系统设置中允许实时活动。';
+
+  @override
+  String get iosBackgroundNativeStatusTitle => '系统状态';
+
+  @override
+  String get iosBackgroundNativeStatusUnavailable => '需要在 iOS 上运行后查看';
+
+  @override
+  String get iosBackgroundLiveActivityAvailable => '实时活动可用';
+
+  @override
+  String get iosBackgroundLiveActivityUnavailable => '实时活动不可用';
+
+  @override
+  String get iosBackgroundNotificationsAuthorized => '通知已允许';
+
+  @override
+  String get iosBackgroundNotificationsNotAuthorized => '通知未允许';
+
+  @override
+  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
+
+  @override
+  String get iosBackgroundGenerationActiveDetail => '助手正在后台回复';
+
+  @override
+  String get iosBackgroundGenerationStreamingDetail => '正在接收助手回复';
+
+  @override
+  String iosBackgroundGenerationTokenCount(int count) {
+    return '$count tokens';
+  }
+
+  @override
+  String get iosBackgroundGenerationCompleteTitle => '生成完成';
+
+  @override
+  String get iosBackgroundGenerationCompleteDetail => '助手回复已准备好';
+
+  @override
+  String get iosBackgroundGenerationInterruptedTitle => '生成已中断';
+
+  @override
+  String get iosBackgroundGenerationInterruptedDetail => '后台回复在完成前停止';
+
+  @override
+  String get iosBackgroundGenerationCancelledDetail => '生成已停止';
+
+  @override
   String get androidBackgroundStatusOn => '开启';
 
   @override
@@ -6891,6 +7187,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetWriteClipboard => '写入剪切板';
+
+  @override
+  String chatMessageWidgetSpeakText(String text) {
+    return '正在朗读: $text';
+  }
 
   @override
   String chatMessageWidgetToolCall(String name) {
@@ -8742,6 +9043,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsServicesPageTitle => '语音服务';
 
   @override
+  String get ttsServicesPageSettingsTooltip => 'TTS 设置';
+
+  @override
   String get ttsServicesPageAddTooltip => '新增';
 
   @override
@@ -8849,6 +9153,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsServicesFieldSpeedLabel => '语速';
 
   @override
+  String get ttsServicesFieldLanguageTypeLabel => '语言类型';
+
+  @override
+  String get ttsServicesFieldLanguageLabel => '语言';
+
+  @override
+  String get ttsServicesValidationApiKeyRequired => 'API Key 不能为空';
+
+  @override
   String get ttsServicesViewDetailsButton => '查看详情';
 
   @override
@@ -8856,6 +9169,88 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get ttsServicesCloseButton => '关闭';
+
+  @override
+  String get ttsSettingsPageTitle => 'TTS 设置';
+
+  @override
+  String get ttsSettingsPlaybackSection => '播放';
+
+  @override
+  String get ttsSettingsAutoPlayTitle => '自动播放助手回复';
+
+  @override
+  String get ttsSettingsAutoPlayDescription => '助手回复生成完成后自动开始 TTS 播放。';
+
+  @override
+  String get ttsSettingsTextSelectionSection => '文本选择';
+
+  @override
+  String get ttsSettingsTextSelectionFallbackDescription => '没有匹配内容时将播放完整回复。';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextTitle => '全文';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextDescription => '播放完整助手回复。';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyTitle => '仅引号内文字';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyDescription =>
+      '播放 “”、‘’、\"\"、\'\'、「」或『』内的文字。';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesTitle => '括号外文字';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesDescription =>
+      '跳过 () 和 （） 内的文字。';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyTitle => '仅斜体文字';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyDescription =>
+      '播放 Markdown 或 HTML 斜体文字。';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicTitle => '仅正体文字';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicDescription =>
+      '跳过 Markdown 或 HTML 斜体文字。';
+
+  @override
+  String get ttsFloatingPlayerLabel => '语音播放器';
+
+  @override
+  String get ttsFloatingPauseTooltip => '暂停';
+
+  @override
+  String get ttsFloatingResumeTooltip => '继续播放';
+
+  @override
+  String get ttsFloatingReplayTooltip => '重新播放';
+
+  @override
+  String get ttsFloatingRewind15Tooltip => '后退 15 秒';
+
+  @override
+  String get ttsFloatingForward15Tooltip => '前进 15 秒';
+
+  @override
+  String get ttsFloatingSpeedTooltip => '播放倍速';
+
+  @override
+  String get ttsFloatingCloseTooltip => '关闭播放器';
+
+  @override
+  String get ttsFloatingExpandTooltip => '展开播放控制';
+
+  @override
+  String get ttsFloatingCollapseTooltip => '收起播放控制';
 
   @override
   String imageViewerPageShareFailedOpenFile(String message) {
@@ -9198,6 +9593,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get assistantEditLocalToolClipboardSubtitle =>
       '在明确需要时读取或写入设备剪切板中的纯文本。';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechTitle => '文字转语音';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechSubtitle =>
+      '允许助手使用已配置的语音播放朗读文本。';
 
   @override
   String get assistantEditLocalToolAskUserTitle => '询问用户';
@@ -10838,6 +11240,101 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageAndroidBackgroundChatTitle => '後台聊天生成';
 
   @override
+  String get displaySettingsPageIosBackgroundChatTitle => 'iOS 後台生成';
+
+  @override
+  String get iosBackgroundSettingsPageTitle => 'iOS 後台生成';
+
+  @override
+  String get iosBackgroundStatusOn => '開啟';
+
+  @override
+  String get iosBackgroundStatusOff => '關閉';
+
+  @override
+  String get iosBackgroundGenerationEnableTitle => '後台生成';
+
+  @override
+  String get iosBackgroundGenerationEnableSubtitle =>
+      'App 離開前台後，使用 iOS 分配的後台時間繼續目前回覆。';
+
+  @override
+  String get iosBackgroundTaskRefreshTitle => '後台任務恢復';
+
+  @override
+  String get iosBackgroundTaskRefreshSubtitle => '在系統條件允許時，向 iOS 請求重新整理和處理機會。';
+
+  @override
+  String get iosLiveActivityTitle => '即時活動';
+
+  @override
+  String get iosLiveActivitySubtitle => '支援時在鎖定畫面和動態島顯示後台回覆狀態。';
+
+  @override
+  String get iosBackgroundNotificationsTitle => '任務通知';
+
+  @override
+  String get iosBackgroundNotificationsSubtitle => '後台回覆完成或中斷時發送本機通知。';
+
+  @override
+  String get iosBackgroundLimitNoticeTitle => 'iOS 仍可能暫停任務';
+
+  @override
+  String get iosBackgroundLimitNoticeBody =>
+      '這些選項使用 Apple 支援的後台時間、BackgroundTasks、通知和即時活動。它們能提升連續性，但不能強制 iOS 永久保持 Kelivo 運行。';
+
+  @override
+  String get iosBackgroundUnsupportedLiveActivity =>
+      '需要 iOS 16.1 或更高版本，並在系統設定中允許即時活動。';
+
+  @override
+  String get iosBackgroundNativeStatusTitle => '系統狀態';
+
+  @override
+  String get iosBackgroundNativeStatusUnavailable => '需要在 iOS 上運行後查看';
+
+  @override
+  String get iosBackgroundLiveActivityAvailable => '即時活動可用';
+
+  @override
+  String get iosBackgroundLiveActivityUnavailable => '即時活動不可用';
+
+  @override
+  String get iosBackgroundNotificationsAuthorized => '通知已允許';
+
+  @override
+  String get iosBackgroundNotificationsNotAuthorized => '通知未允許';
+
+  @override
+  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
+
+  @override
+  String get iosBackgroundGenerationActiveDetail => '助理正在後台回覆';
+
+  @override
+  String get iosBackgroundGenerationStreamingDetail => '正在接收助理回覆';
+
+  @override
+  String iosBackgroundGenerationTokenCount(int count) {
+    return '$count tokens';
+  }
+
+  @override
+  String get iosBackgroundGenerationCompleteTitle => '生成完成';
+
+  @override
+  String get iosBackgroundGenerationCompleteDetail => '助理回覆已準備好';
+
+  @override
+  String get iosBackgroundGenerationInterruptedTitle => '生成已中斷';
+
+  @override
+  String get iosBackgroundGenerationInterruptedDetail => '後台回覆在完成前停止';
+
+  @override
+  String get iosBackgroundGenerationCancelledDetail => '生成已停止';
+
+  @override
   String get androidBackgroundStatusOn => '開啟';
 
   @override
@@ -11844,6 +12341,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetWriteClipboard => '寫入剪貼簿';
+
+  @override
+  String chatMessageWidgetSpeakText(String text) {
+    return '正在朗讀: $text';
+  }
 
   @override
   String chatMessageWidgetToolCall(String name) {
@@ -13694,6 +14196,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get ttsServicesPageTitle => '語音服務';
 
   @override
+  String get ttsServicesPageSettingsTooltip => 'TTS 設定';
+
+  @override
   String get ttsServicesPageAddTooltip => '新增';
 
   @override
@@ -13801,6 +14306,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get ttsServicesFieldSpeedLabel => '語速';
 
   @override
+  String get ttsServicesFieldLanguageTypeLabel => '語言類型';
+
+  @override
+  String get ttsServicesFieldLanguageLabel => '語言';
+
+  @override
+  String get ttsServicesValidationApiKeyRequired => 'API Key 不能為空';
+
+  @override
   String get ttsServicesViewDetailsButton => '檢視詳細';
 
   @override
@@ -13808,6 +14322,88 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get ttsServicesCloseButton => '關閉';
+
+  @override
+  String get ttsSettingsPageTitle => 'TTS 設定';
+
+  @override
+  String get ttsSettingsPlaybackSection => '播放';
+
+  @override
+  String get ttsSettingsAutoPlayTitle => '自動播放助理回覆';
+
+  @override
+  String get ttsSettingsAutoPlayDescription => '助理回覆產生完成後自動開始 TTS 播放。';
+
+  @override
+  String get ttsSettingsTextSelectionSection => '文字選擇';
+
+  @override
+  String get ttsSettingsTextSelectionFallbackDescription => '沒有符合內容時將播放完整回覆。';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextTitle => '全文';
+
+  @override
+  String get ttsSettingsTextSelectionFullTextDescription => '播放完整助理回覆。';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyTitle => '僅引號內文字';
+
+  @override
+  String get ttsSettingsTextSelectionQuotedOnlyDescription =>
+      '播放 “”、‘’、\"\"、\'\'、「」或『』內的文字。';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesTitle => '括號外文字';
+
+  @override
+  String get ttsSettingsTextSelectionOutsideParenthesesDescription =>
+      '跳過 () 和 （） 內的文字。';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyTitle => '僅斜體文字';
+
+  @override
+  String get ttsSettingsTextSelectionItalicOnlyDescription =>
+      '播放 Markdown 或 HTML 斜體文字。';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicTitle => '僅正體文字';
+
+  @override
+  String get ttsSettingsTextSelectionNonItalicDescription =>
+      '跳過 Markdown 或 HTML 斜體文字。';
+
+  @override
+  String get ttsFloatingPlayerLabel => '語音播放器';
+
+  @override
+  String get ttsFloatingPauseTooltip => '暫停';
+
+  @override
+  String get ttsFloatingResumeTooltip => '繼續播放';
+
+  @override
+  String get ttsFloatingReplayTooltip => '重新播放';
+
+  @override
+  String get ttsFloatingRewind15Tooltip => '倒退 15 秒';
+
+  @override
+  String get ttsFloatingForward15Tooltip => '前進 15 秒';
+
+  @override
+  String get ttsFloatingSpeedTooltip => '播放倍速';
+
+  @override
+  String get ttsFloatingCloseTooltip => '關閉播放器';
+
+  @override
+  String get ttsFloatingExpandTooltip => '展開播放控制';
+
+  @override
+  String get ttsFloatingCollapseTooltip => '收起播放控制';
 
   @override
   String imageViewerPageShareFailedOpenFile(String message) {
@@ -14152,6 +14748,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get assistantEditLocalToolClipboardSubtitle =>
       '在明確需要時讀取或寫入裝置剪貼簿中的純文字。';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechTitle => '文字轉語音';
+
+  @override
+  String get assistantEditLocalToolTextToSpeechSubtitle =>
+      '允許助手使用已設定的語音播放朗讀文字。';
 
   @override
   String get assistantEditLocalToolAskUserTitle => '詢問使用者';

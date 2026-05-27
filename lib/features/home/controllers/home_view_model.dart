@@ -129,6 +129,7 @@ class HomeViewModel extends ChangeNotifier {
     _chatActions.onMaybeGenerateSummary = _onMaybeGenerateSummary;
     _chatActions.onMaybeGenerateSuggestions = _onMaybeGenerateSuggestions;
     _chatActions.onStreamFinished = _onStreamFinished;
+    _chatActions.onAssistantMessageFinished = _onAssistantMessageFinished;
     _chatActions.onFileProcessingStarted = _onFileProcessingStarted;
     _chatActions.onFileProcessingFinished = _onFileProcessingFinished;
   }
@@ -167,6 +168,9 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Called when streaming finishes (UI may show notification).
   VoidCallback? onStreamFinished;
+
+  /// Called when a successful assistant reply is finalized.
+  void Function(ChatMessage message)? onAssistantMessageFinished;
 
   /// Called to schedule inline image sanitization.
   void Function(String messageId, String content, {bool immediate})?
@@ -269,6 +273,10 @@ class HomeViewModel extends ChangeNotifier {
 
   void _onStreamFinished() {
     onStreamFinished?.call();
+  }
+
+  void _onAssistantMessageFinished(ChatMessage message) {
+    onAssistantMessageFinished?.call(message);
   }
 
   void _onFileProcessingStarted() {

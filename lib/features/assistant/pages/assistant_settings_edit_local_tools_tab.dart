@@ -15,6 +15,9 @@ class _LocalToolsTab extends StatelessWidget {
     final clipboardEnabled = assistant.localToolIds.contains(
       LocalToolNames.clipboard,
     );
+    final textToSpeechEnabled = assistant.localToolIds.contains(
+      LocalToolNames.textToSpeech,
+    );
     final askUserEnabled = assistant.localToolIds.contains(
       LocalToolNames.askUser,
     );
@@ -50,6 +53,15 @@ class _LocalToolsTab extends StatelessWidget {
               subtitle: l10n.assistantEditLocalToolClipboardSubtitle,
               enabled: clipboardEnabled,
               onChanged: (value) => updateTool(LocalToolNames.clipboard, value),
+            ),
+            _iosDivider(context),
+            _LocalToolRow(
+              icon: Lucide.Volume2,
+              title: l10n.assistantEditLocalToolTextToSpeechTitle,
+              subtitle: l10n.assistantEditLocalToolTextToSpeechSubtitle,
+              enabled: textToSpeechEnabled,
+              onChanged: (value) =>
+                  updateTool(LocalToolNames.textToSpeech, value),
             ),
             _iosDivider(context),
             _LocalToolRow(

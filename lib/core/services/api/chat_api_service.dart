@@ -1261,6 +1261,13 @@ class _GeminiSignatureMeta {
   bool get hasAny => hasText || hasImages;
 }
 
+class _ResponsesImageGenerationResult {
+  final String base64;
+  final String? outputFormat;
+
+  const _ResponsesImageGenerationResult({this.base64 = '', this.outputFormat});
+}
+
 class ChatStreamChunk {
   final String content;
   // Optional reasoning delta (when model supports reasoning)

@@ -129,40 +129,42 @@ class MessageBuilderService {
       if (includeToolMessages && m.role == 'assistant') {
         final events = chatService.getToolEvents(m.id);
         if (events.isNotEmpty) {
-          toolContinuationReasoningContent =
-              _reasoningContentForToolContinuation(m);
-          final calls = <Map<String, dynamic>>[];
-          final toolMessages = <Map<String, dynamic>>[];
+          // Tool-call history is only valid once every call has a result.
+          final hasPendingToolEvent = events.any((e) => e['content'] == null);
+          if (!hasPendingToolEvent) {
+            toolContinuationReasoningContent =
+                _reasoningContentForToolContinuation(m);
+            final calls = <Map<String, dynamic>>[];
+            final toolMessages = <Map<String, dynamic>>[];
 
-          for (int i = 0; i < events.length; i++) {
-            final e = events[i];
-            final name = (e['name'] ?? '').toString().trim();
-            if (name.isEmpty) continue;
-            final rawId = (e['id'] ?? '').toString().trim();
-            final id = rawId.isNotEmpty
-                ? rawId
-                : 'call_${m.id.substring(0, m.id.length < 8 ? m.id.length : 8)}_$i';
+            for (int i = 0; i < events.length; i++) {
+              final e = events[i];
+              final name = (e['name'] ?? '').toString().trim();
+              if (name.isEmpty) continue;
+              final rawId = (e['id'] ?? '').toString().trim();
+              final id = rawId.isNotEmpty
+                  ? rawId
+                  : 'call_${m.id.substring(0, m.id.length < 8 ? m.id.length : 8)}_$i';
 
-            Map<String, dynamic> args = const <String, dynamic>{};
-            final a = e['arguments'];
-            if (a is Map) {
-              args = a.map((k, v) => MapEntry(k.toString(), v));
-            }
-            String argumentsJson = '{}';
-            try {
-              argumentsJson = jsonEncode(args);
-            } catch (_) {}
+              Map<String, dynamic> args = const <String, dynamic>{};
+              final a = e['arguments'];
+              if (a is Map) {
+                args = a.map((k, v) => MapEntry(k.toString(), v));
+              }
+              String argumentsJson = '{}';
+              try {
+                argumentsJson = jsonEncode(args);
+              } catch (_) {}
 
-            calls.add({
-              'id': id,
-              'type': 'function',
-              'function': {'name': name, 'arguments': argumentsJson},
-              if (e['metadata'] is Map)
-                'metadata': (e['metadata'] as Map).cast<String, dynamic>(),
-            });
+              calls.add({
+                'id': id,
+                'type': 'function',
+                'function': {'name': name, 'arguments': argumentsJson},
+                if (e['metadata'] is Map)
+                  'metadata': (e['metadata'] as Map).cast<String, dynamic>(),
+              });
 
-            final c = e['content'];
-            if (c != null) {
+              final c = e['content'];
               toolMessages.add({
                 'role': 'tool',
                 'name': name,
@@ -172,20 +174,20 @@ class MessageBuilderService {
                   'metadata': (e['metadata'] as Map).cast<String, dynamic>(),
               });
             }
-          }
 
-          if (calls.isNotEmpty) {
-            final assistantToolMessage = <String, dynamic>{
-              'role': 'assistant',
-              'content': '\n\n',
-              'tool_calls': calls,
-            };
-            if (toolContinuationReasoningContent.isNotEmpty) {
-              assistantToolMessage['reasoning_content'] =
-                  toolContinuationReasoningContent;
+            if (calls.isNotEmpty) {
+              final assistantToolMessage = <String, dynamic>{
+                'role': 'assistant',
+                'content': '\n\n',
+                'tool_calls': calls,
+              };
+              if (toolContinuationReasoningContent.isNotEmpty) {
+                assistantToolMessage['reasoning_content'] =
+                    toolContinuationReasoningContent;
+              }
+              out.add(assistantToolMessage);
+              out.addAll(toolMessages);
             }
-            out.add(assistantToolMessage);
-            out.addAll(toolMessages);
           }
         }
       }

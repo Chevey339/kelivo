@@ -499,6 +499,53 @@ void main() {
     });
 
     test(
+      'downloadToFile writes object response directly to destination',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        final seenPaths = <String>[];
+        final payload = List<int>.generate(128 * 1024, (i) => i % 251);
+        server.listen((request) async {
+          seenPaths.add(request.uri.path);
+          if (request.method == 'GET' &&
+              request.uri.path == '/backup-bucket/kelivo_backups/demo.zip') {
+            request.response.statusCode = HttpStatus.ok;
+            for (var offset = 0; offset < payload.length; offset += 4096) {
+              final end = (offset + 4096).clamp(0, payload.length).toInt();
+              request.response.add(payload.sublist(offset, end));
+              await request.response.flush();
+            }
+          } else {
+            request.response.statusCode = HttpStatus.notFound;
+          }
+          await request.response.close();
+        });
+
+        final tmpDir = await Directory.systemTemp.createTemp(
+          'kelivo_s3_download_',
+        );
+        addTearDown(() async {
+          if (await tmpDir.exists()) {
+            await tmpDir.delete(recursive: true);
+          }
+        });
+
+        final destination = File('${tmpDir.path}/demo.zip');
+        await const S3BackupClient().downloadToFile(
+          _config(server),
+          key: 'kelivo_backups/demo.zip',
+          destination: destination,
+        );
+
+        expect(seenPaths, contains('/backup-bucket/kelivo_backups/demo.zip'));
+        expect(await destination.readAsBytes(), payload);
+      },
+    );
+
+    test(
       'listObjects uses primary bucket URL when provider accepts it',
       () async {
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

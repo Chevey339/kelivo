@@ -16,6 +16,7 @@ import '../../../core/providers/backup_reminder_provider.dart';
 import '../../../core/providers/s3_backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/backup/data_sync.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/backup/cherry_importer.dart';
@@ -1365,44 +1366,50 @@ class _BackupPageState extends State<BackupPage> {
       context,
       () => vm.exportToFile(),
     );
-    if (!context.mounted) return;
 
-    final isMobile = Platform.isAndroid || Platform.isIOS;
-    if (isMobile) {
-      try {
-        final saved = await NativeFileSave.saveFileFromPath(
-          sourcePath: file.path,
-          fileName: file.uri.pathSegments.last,
-        );
-        if (saved && context.mounted) {
-          await context.read<BackupReminderProvider>().recordBackupCompleted();
-        }
-      } catch (e) {
-        if (!context.mounted) return;
-        showAppSnackBar(
-          context,
-          message: e.toString(),
-          type: NotificationType.error,
-        );
-      }
-    } else {
-      final savePath = await FilePicker.platform.saveFile(
-        dialogTitle: l10n.backupPageExportToFile,
-        fileName: file.uri.pathSegments.last,
-        type: FileType.custom,
-        allowedExtensions: ['zip'],
-      );
-      if (savePath != null) {
+    try {
+      if (!context.mounted) return;
+      final isMobile = Platform.isAndroid || Platform.isIOS;
+      if (isMobile) {
         try {
-          await File(savePath).parent.create(recursive: true);
-          await file.copy(savePath);
-          if (context.mounted) {
+          final saved = await NativeFileSave.saveFileFromPath(
+            sourcePath: file.path,
+            fileName: file.uri.pathSegments.last,
+          );
+          if (saved && context.mounted) {
             await context
                 .read<BackupReminderProvider>()
                 .recordBackupCompleted();
           }
-        } catch (_) {}
+        } catch (e) {
+          if (!context.mounted) return;
+          showAppSnackBar(
+            context,
+            message: e.toString(),
+            type: NotificationType.error,
+          );
+        }
+      } else {
+        final savePath = await FilePicker.platform.saveFile(
+          dialogTitle: l10n.backupPageExportToFile,
+          fileName: file.uri.pathSegments.last,
+          type: FileType.custom,
+          allowedExtensions: ['zip'],
+        );
+        if (savePath != null) {
+          try {
+            await File(savePath).parent.create(recursive: true);
+            await file.copy(savePath);
+            if (context.mounted) {
+              await context
+                  .read<BackupReminderProvider>()
+                  .recordBackupCompleted();
+            }
+          } catch (_) {}
+        }
       }
+    } finally {
+      await DataSync.cleanupTemporaryBackupFile(file);
     }
   }
 
