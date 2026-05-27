@@ -32,8 +32,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>com.psyche.kelivo.background-generation.refresh</string>
-		<string>com.psyche.kelivo.background-generation.processing</string>
+		<string>psyche.kelivo.background-generation.refresh</string>
+		<string>psyche.kelivo.background-generation.processing</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
@@ -46,8 +46,6 @@
         <key>NSPhotoLibraryUsageDescription</key>
 	<string>允许访问相册以选择头像图片 / Allow access to your photos to pick an avatar.</string>
 	<key>NSSupportsLiveActivities</key>
-	<true/>
-	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
