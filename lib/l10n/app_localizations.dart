@@ -9068,6 +9068,30 @@ abstract class AppLocalizations {
   /// **'This action cannot be undone.'**
   String get providerDetailPageDeleteAllModelsWarning;
 
+  /// No description provided for @providerDetailPageCustomHeadersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Headers'**
+  String get providerDetailPageCustomHeadersTitle;
+
+  /// No description provided for @providerDetailPageAddHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Header'**
+  String get providerDetailPageAddHeader;
+
+  /// No description provided for @providerDetailPageCustomBodyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Body'**
+  String get providerDetailPageCustomBodyTitle;
+
+  /// No description provided for @providerDetailPageAddBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Body'**
+  String get providerDetailPageAddBody;
+
   /// No description provided for @requestLogSettingTitle.
   ///
   /// In en, this message translates to:

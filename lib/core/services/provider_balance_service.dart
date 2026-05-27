@@ -122,6 +122,7 @@ class ProviderBalanceService {
       final headers = <String, String>{
         if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
         ...providerDefaultHeaders(config),
+        ..._providerExtraHeaders(config),
       };
       final response = await client.get(uri, headers: headers);
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -187,5 +188,15 @@ class ProviderBalanceService {
       if (selected.key != null) return selected.key!.key;
     }
     return config.apiKey;
+  }
+
+  static Map<String, String> _providerExtraHeaders(ProviderConfig config) {
+    final list = config.extraHeaders;
+    if (list == null || list.isEmpty) return const {};
+    return {
+      for (final entry in list)
+        if (entry['name'] != null && entry['name']!.trim().isNotEmpty)
+          entry['name']!.trim(): entry['value'] ?? '',
+    };
   }
 }

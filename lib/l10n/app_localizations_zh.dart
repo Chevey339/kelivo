@@ -4693,6 +4693,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageDeleteAllModelsWarning => '此操作不可撤回';
 
   @override
+  String get providerDetailPageCustomHeadersTitle => '自定义 Headers';
+
+  @override
+  String get providerDetailPageAddHeader => '添加 Header';
+
+  @override
+  String get providerDetailPageCustomBodyTitle => '自定义 Body';
+
+  @override
+  String get providerDetailPageAddBody => '添加 Body';
+
+  @override
   String get requestLogSettingTitle => '请求日志打印';
 
   @override
@@ -9836,6 +9848,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerDetailPageDeleteAllModelsWarning => '此操作不可撤回';
 
   @override
+  String get providerDetailPageCustomHeadersTitle => '自定义 Headers';
+
+  @override
+  String get providerDetailPageAddHeader => '添加 Header';
+
+  @override
+  String get providerDetailPageCustomBodyTitle => '自定义 Body';
+
+  @override
+  String get providerDetailPageAddBody => '添加 Body';
+
+  @override
   String get requestLogSettingTitle => '请求日志打印';
 
   @override
@@ -14977,6 +15001,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageDeleteAllModelsWarning => '此操作不可撤回';
+
+  @override
+  String get providerDetailPageCustomHeadersTitle => '自訂 Headers';
+
+  @override
+  String get providerDetailPageAddHeader => '新增 Header';
+
+  @override
+  String get providerDetailPageCustomBodyTitle => '自訂 Body';
+
+  @override
+  String get providerDetailPageAddBody => '新增 Body';
 
   @override
   String get requestLogSettingTitle => '請求日誌列印';

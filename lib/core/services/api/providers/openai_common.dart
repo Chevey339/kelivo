@@ -1207,7 +1207,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     'Content-Type': 'application/json',
     'Accept': stream ? 'text/event-stream' : 'application/json',
   };
-  // Merge custom headers (override takes precedence)
+  // Merge custom headers (provider < model < assistant override precedence)
+  headers.addAll(_providerCustomHeaders(config));
   headers.addAll(_customHeaders(config, modelId));
   if (extraHeaders != null && extraHeaders.isNotEmpty) {
     headers.addAll(extraHeaders);
@@ -1232,7 +1233,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     upstreamModelId: upstreamModelId,
   );
 
-  // Merge custom body keys (override takes precedence)
+  // Merge custom body keys (provider < model < assistant override precedence)
+  final baseBodyCfg = _providerCustomBody(config);
+  if (baseBodyCfg.isNotEmpty) {
+    body.addAll(baseBodyCfg);
+  }
   final extraBodyCfg = _customBody(config, modelId);
   if (extraBodyCfg.isNotEmpty) {
     body.addAll(extraBodyCfg);
@@ -1455,6 +1460,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             'Content-Type': 'application/json',
             'Accept': 'application/json',
           };
+          headers2.addAll(_providerCustomHeaders(config));
           headers2.addAll(_customHeaders(config, modelId));
           if (extraHeaders != null && extraHeaders.isNotEmpty) {
             headers2.addAll(extraHeaders);
@@ -1832,6 +1838,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             );
 
             // Apply custom body overrides
+            final baseBodyCfg2 = _providerCustomBody(config);
+            if (baseBodyCfg2.isNotEmpty) {
+              body2.addAll(baseBodyCfg2);
+            }
             if (extraBodyCfg.isNotEmpty) {
               body2.addAll(extraBodyCfg);
             }
@@ -1860,6 +1870,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               'Accept': 'text/event-stream',
             };
             // Apply custom headers
+            headers2.addAll(_providerCustomHeaders(config));
             headers2.addAll(_customHeaders(config, modelId));
             if (extraHeaders != null && extraHeaders.isNotEmpty) {
               headers2.addAll(extraHeaders);
@@ -2552,6 +2563,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 );
 
                 // Apply overrides
+                final baseBodyCfg3 = _providerCustomBody(config);
+                if (baseBodyCfg3.isNotEmpty) body2.addAll(baseBodyCfg3);
                 final extraCfg = _customBody(config, modelId);
                 if (extraCfg.isNotEmpty) body2.addAll(extraCfg);
                 if (extraBody != null && extraBody.isNotEmpty) {
@@ -2584,6 +2597,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   'Content-Type': 'application/json',
                   'Accept': 'text/event-stream',
                 };
+                headers2.addAll(_providerCustomHeaders(config));
                 headers2.addAll(_customHeaders(config, modelId));
                 if (extraHeaders != null && extraHeaders.isNotEmpty) {
                   headers2.addAll(extraHeaders);
@@ -3302,6 +3316,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               host: host,
               upstreamModelId: upstreamModelId,
             );
+            final baseBodyCfg4 = _providerCustomBody(config);
+            if (baseBodyCfg4.isNotEmpty) {
+              body2.addAll(baseBodyCfg4);
+            }
             if (extraBodyCfg.isNotEmpty) {
               body2.addAll(extraBodyCfg);
             }
@@ -3327,6 +3345,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               'Content-Type': 'application/json',
               'Accept': 'text/event-stream',
             };
+            headers2.addAll(_providerCustomHeaders(config));
             headers2.addAll(_customHeaders(config, modelId));
             if (extraHeaders != null && extraHeaders.isNotEmpty) {
               headers2.addAll(extraHeaders);
@@ -3884,6 +3903,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   host: host,
                   upstreamModelId: upstreamModelId,
                 );
+                final baseBodyCfg5 = _providerCustomBody(config);
+                if (baseBodyCfg5.isNotEmpty) {
+                  body2.addAll(baseBodyCfg5);
+                }
                 if (extraBodyCfg.isNotEmpty) {
                   body2.addAll(extraBodyCfg);
                 }
@@ -3910,6 +3933,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   'Content-Type': 'application/json',
                   'Accept': 'text/event-stream',
                 };
+                headers2.addAll(_providerCustomHeaders(config));
                 headers2.addAll(_customHeaders(config, modelId));
                 if (extraHeaders != null && extraHeaders.isNotEmpty) {
                   headers2.addAll(extraHeaders);
