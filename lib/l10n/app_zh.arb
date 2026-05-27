@@ -1882,5 +1882,34 @@
         "type": "int"
       }
     }
+  },
+  "imageGenTitle": "生图参数",
+  "imageGenReset": "重置",
+  "imageGenQualityLabel": "画质",
+  "imageGenSizeLabel": "清晰度",
+  "imageGenAspectRatioLabel": "图像比例",
+  "imageGenFormatLabel": "输出格式",
+  "imageGenCompressionLabel": "压缩质量",
+  "imageGenCountLabel": "数量",
+  "imageGenAuto": "自动",
+  "imageGenLow": "低",
+  "imageGenMedium": "中",
+  "imageGenHigh": "高",
+  "imageGenAutoSize": "自动尺寸",
+  "imageGenAutoRatio": "自动比例",
+  "imageGenCustomRatio": "自定义",
+  "imageGenCustomRatioLabel": "自定义比例",
+  "imageGenCustomRatioHint": "例如 7:5、2.39:1",
+  "imageGenActualSize": "实际尺寸",
+  "imageGenCurrent": "当前",
+  "imageGenPNG": "PNG",
+  "imageGenLossless": "无损",
+  "imageGenPaletteTooltip": "生图参数：{summary}",
+  "@imageGenPaletteTooltip": {
+    "placeholders": {
+      "summary": {
+        "type": "String"
+      }
+    }
   }
 }

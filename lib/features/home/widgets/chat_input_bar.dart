@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'dart:math' as math;
 import '../../../theme/design_tokens.dart';
 import '../../../icons/lucide_adapter.dart';
+import 'image_generation_options.dart';
 import '../../../icons/reasoning_icons.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -169,13 +170,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   String? _imageModeModelKey;
   String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
-  String _imageQuality = 'high';
-  String _imageSizeTier = 'auto';
-  String _imageAspectRatio = 'auto';
-  String _customAspectRatio = '16:9';
-  String _imageOutputFormat = 'png';
-  int? _imageOutputCompression;
-  int _imageCount = 1;
+  final _imageGenController = ImageGenerationOptionsController();
 
   bool get _composerLocked => widget.hasQueuedInput;
 
@@ -215,281 +210,20 @@ class _ChatInputBarState extends State<ChatInputBar>
     return key == null || key != _dismissedImageModeModelKey;
   }
 
-  static const Map<String, Map<String, String>> _imageSizePresets = {
-    '1K': {
-      '1:1': '1024x1024',
-      '4:3': '1024x768',
-      '3:4': '768x1024',
-      '3:2': '1536x1024',
-      '2:3': '1024x1536',
-      '16:9': '1280x720',
-      '9:16': '720x1280',
-      '21:9': '1280x544',
-      '9:21': '544x1280',
-      '5:4': '1024x816',
-      '4:5': '816x1024',
-      '2:1': '1280x640',
-      '1:2': '640x1280',
-      '3:1': '1408x480',
-      '1:3': '480x1408',
-    },
-    '2K': {
-      '1:1': '2048x2048',
-      '4:3': '2048x1536',
-      '3:4': '1536x2048',
-      '3:2': '2160x1440',
-      '2:3': '1440x2160',
-      '16:9': '2560x1440',
-      '9:16': '1440x2560',
-      '21:9': '2560x1088',
-      '9:21': '1088x2560',
-      '5:4': '2304x1840',
-      '4:5': '1840x2304',
-      '2:1': '2880x1440',
-      '1:2': '1440x2880',
-      '3:1': '3072x1024',
-      '1:3': '1024x3072',
-    },
-    '4K': {
-      '1:1': '2880x2880',
-      '4:3': '3200x2400',
-      '3:4': '2400x3200',
-      '3:2': '3456x2304',
-      '2:3': '2304x3456',
-      '16:9': '3840x2160',
-      '9:16': '2160x3840',
-      '21:9': '3840x1600',
-      '9:21': '1600x3840',
-      '5:4': '3200x2560',
-      '4:5': '2560x3200',
-      '2:1': '3840x1920',
-      '1:2': '1920x3840',
-      '3:1': '3840x1280',
-      '1:3': '1280x3840',
-    },
-  };
+  bool get _imageParamsCustomized => _imageGenController.customized;
 
-  static const Map<String, int> _imageTierPixelBudget = {
-    '1K': 1572864,
-    '2K': 4194304,
-    '4K': 8294400,
-  };
-
-  bool get _imageParamsCustomized {
-    return _imageQuality != 'high' ||
-        _imageSizeTier != 'auto' ||
-        _imageAspectRatio != 'auto' ||
-        _imageOutputFormat != 'png' ||
-        _imageOutputCompression != null ||
-        _imageCount != 1;
-  }
-
-  String get _resolvedImageSize {
-    if (_imageSizeTier == 'auto' || _imageAspectRatio == 'auto') {
-      return 'auto';
-    }
-    final ratio = _imageAspectRatio == 'custom'
-        ? _customAspectRatio.trim()
-        : _imageAspectRatio;
-    return _calculateImageSize(_imageSizeTier, ratio) ?? 'auto';
-  }
+  String get _imageParamsSummary =>
+      _imageGenController.summary(AppLocalizations.of(context)!);
 
   Map<String, dynamic> _imageGenerationExtraBody() {
     if (!_imageModeActive || !_allowImagesApiRouting) {
       return const <String, dynamic>{};
     }
-    return <String, dynamic>{
-      'quality': _imageQuality,
-      'size': _resolvedImageSize,
-      'output_format': _imageOutputFormat,
-      if (_imageOutputFormat != 'png' && _imageOutputCompression != null)
-        'output_compression': _imageOutputCompression,
-      if (_imageCount > 1) 'n': _imageCount,
-    };
+    return _imageGenController.toExtraBody();
   }
 
-  void _restoreImageParams(Map<String, dynamic> body) {
-    final quality = body['quality']?.toString();
-    final size = body['size']?.toString();
-    final format = body['output_format']?.toString();
-    final compression = body['output_compression'];
-    final count = body['n'];
-    if (quality == 'auto' ||
-        quality == 'low' ||
-        quality == 'medium' ||
-        quality == 'high') {
-      _imageQuality = quality!;
-    }
-    _restoreImageSize(size);
-    if (format == 'png' || format == 'jpeg' || format == 'webp') {
-      _imageOutputFormat = format!;
-    }
-    _imageOutputCompression = compression is int
-        ? compression
-        : int.tryParse(compression?.toString() ?? '');
-    final parsedCount = count is int
-        ? count
-        : int.tryParse(count?.toString() ?? '');
-    if (parsedCount != null && parsedCount >= 1 && parsedCount <= 4) {
-      _imageCount = parsedCount;
-    }
-  }
-
-  void _restoreImageSize(String? size) {
-    final normalized = _normalizeImageSize(size ?? '');
-    if (normalized == null || normalized == 'auto') {
-      _imageSizeTier = 'auto';
-      _imageAspectRatio = 'auto';
-      return;
-    }
-    for (final tierEntry in _imageSizePresets.entries) {
-      for (final ratioEntry in tierEntry.value.entries) {
-        if (ratioEntry.value == normalized) {
-          _imageSizeTier = tierEntry.key;
-          _imageAspectRatio = ratioEntry.key;
-          return;
-        }
-      }
-    }
-
-    final parsed = _parseImageSize(normalized);
-    if (parsed == null) return;
-    _imageSizeTier = _closestImageSizeTier(parsed.width * parsed.height);
-    _imageAspectRatio = 'custom';
-    _customAspectRatio = _formatAspectRatio(parsed.width, parsed.height);
-  }
-
-  String get _imageParamsSummary {
-    final size = _resolvedImageSize;
-    final sizeLabel = size == 'auto'
-        ? '自动尺寸'
-        : '$_imageSizeTier ${_imageAspectRatioLabel(_imageAspectRatio)} $size';
-    final count = _imageCount > 1 ? ' ×$_imageCount' : '';
-    return '${_imageQuality.toUpperCase()} · $sizeLabel · '
-        '${_imageOutputFormat.toUpperCase()}$count';
-  }
-
-  String _imageAspectRatioLabel(String ratio) {
-    if (ratio == 'auto') return '自动比例';
-    if (ratio == 'custom') return _customAspectRatio.trim().isEmpty
-        ? '自定义比例'
-        : _customAspectRatio.trim();
-    return ratio;
-  }
-
-  static String? _calculateImageSize(String tier, String ratio) {
-    final normalizedRatio = _normalizeAspectRatio(ratio);
-    if (normalizedRatio == null) return null;
-    final preset = _imageSizePresets[tier]?[normalizedRatio];
-    if (preset != null) return preset;
-
-    final parsed = _parseAspectRatio(normalizedRatio);
-    final pixelBudget = _imageTierPixelBudget[tier];
-    if (parsed == null || pixelBudget == null) return null;
-    final targetRatio = parsed.width / parsed.height;
-    var bestWidth = 0;
-    var bestHeight = 0;
-    var bestPixels = 0;
-    const sizeMultiple = 16;
-    const maxEdge = 3840;
-    const minPixels = 655360;
-    const maxAspectRatio = 3.0;
-    const maxRatioError = 0.01;
-
-    for (var w = sizeMultiple; w <= maxEdge; w += sizeMultiple) {
-      final idealH = w / targetRatio;
-      final candidates = <int>{
-        (idealH / sizeMultiple).floor() * sizeMultiple,
-        (idealH / sizeMultiple).ceil() * sizeMultiple,
-      };
-      for (final h in candidates) {
-        if (h < sizeMultiple || h > maxEdge) continue;
-        final pixels = w * h;
-        if (pixels > pixelBudget || pixels < minPixels) continue;
-        if (math.max(w / h, h / w) > maxAspectRatio) continue;
-        final actualRatio = w / h;
-        final ratioError = (actualRatio - targetRatio).abs() / targetRatio;
-        if (ratioError > maxRatioError) continue;
-        if (pixels > bestPixels) {
-          bestPixels = pixels;
-          bestWidth = w;
-          bestHeight = h;
-        }
-      }
-    }
-
-    if (bestPixels == 0) return null;
-    return '${bestWidth}x$bestHeight';
-  }
-
-  static ({double width, double height})? _parseAspectRatio(String ratio) {
-    final match = RegExp(r'^\s*(\d+(?:\.\d+)?)\s*[:xX×]\s*(\d+(?:\.\d+)?)\s*$')
-        .firstMatch(ratio);
-    if (match == null) return null;
-    final width = double.tryParse(match.group(1) ?? '');
-    final height = double.tryParse(match.group(2) ?? '');
-    if (width == null || height == null || width <= 0 || height <= 0) {
-      return null;
-    }
-    return (width: width, height: height);
-  }
-
-  static String? _normalizeAspectRatio(String ratio) {
-    final parsed = _parseAspectRatio(ratio);
-    if (parsed == null) return null;
-    final width = parsed.width;
-    final height = parsed.height;
-    if (width % 1 != 0 || height % 1 != 0) {
-      return '${_trimDouble(width)}:${_trimDouble(height)}';
-    }
-    final intWidth = width.round();
-    final intHeight = height.round();
-    final divisor = _gcd(intWidth, intHeight);
-    return '${intWidth ~/ divisor}:${intHeight ~/ divisor}';
-  }
-
-  static String? _normalizeImageSize(String size) {
-    final trimmed = size.trim();
-    if (trimmed.isEmpty) return null;
-    if (trimmed == 'auto') return trimmed;
-    final parsed = _parseImageSize(trimmed);
-    if (parsed == null) return null;
-    return '${parsed.width}x${parsed.height}';
-  }
-
-  static ({int width, int height})? _parseImageSize(String size) {
-    final match = RegExp(r'^\s*(\d+)\s*[xX×]\s*(\d+)\s*$')
-        .firstMatch(size);
-    if (match == null) return null;
-    final width = int.tryParse(match.group(1) ?? '');
-    final height = int.tryParse(match.group(2) ?? '');
-    if (width == null || height == null || width <= 0 || height <= 0) {
-      return null;
-    }
-    return (width: width, height: height);
-  }
-
-  static String _closestImageSizeTier(int pixels) {
-    return _imageTierPixelBudget.entries
-        .map((entry) => (
-              tier: entry.key,
-              delta: (entry.value - pixels).abs(),
-            ))
-        .reduce((a, b) => a.delta <= b.delta ? a : b)
-        .tier;
-  }
-
-  static String _formatAspectRatio(int width, int height) {
-    final divisor = _gcd(width, height);
-    return '${width ~/ divisor}:${height ~/ divisor}';
-  }
-
-  static int _gcd(int a, int b) => b == 0 ? a : _gcd(b, a % b);
-
-  static String _trimDouble(double value) {
-    final rounded = value.toStringAsFixed(4);
-    return rounded.replaceFirst(RegExp(r'\.0+$'), '').replaceFirst(RegExp(r'0+$'), '');
-  }
+  // Instance method for onChanged to avoid recreating the callback on every build
+  void _onTextChanged(String _) => setState(() {});
 
   // Instance method for onChanged to avoid recreating the callback on every build
   void _onTextChanged(String _) => setState(() {});
@@ -520,7 +254,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       _docs
         ..clear()
         ..addAll(input.documents);
-      _restoreImageParams(input.extraBody);
+      _imageGenController.restoreFromBody(input.extraBody);
     });
   }
 
@@ -645,277 +379,15 @@ class _ChatInputBarState extends State<ChatInputBar>
       showDragHandle: true,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            Widget chips({
-              required String label,
-              required List<({String value, String label})> options,
-              required String selected,
-              required ValueChanged<String> onSelected,
-            }) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final option in options)
-                        ChoiceChip(
-                          label: Text(option.label),
-                          selected: selected == option.value,
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          onSelected: (_) {
-                            setState(() => onSelected(option.value));
-                            setSheetState(() {});
-                          },
-                        ),
-                    ],
-                  ),
-                ],
-              );
-            }
-
-            Widget numberChips({
-              required String label,
-              required List<int> options,
-              required int selected,
-              required ValueChanged<int> onSelected,
-            }) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final option in options)
-                        ChoiceChip(
-                          label: Text(option.toString()),
-                          selected: selected == option,
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          onSelected: (_) {
-                            setState(() => onSelected(option));
-                            setSheetState(() {});
-                          },
-                        ),
-                    ],
-                  ),
-                ],
-              );
-            }
-
-            final media = MediaQuery.of(context);
-            final maxSheetHeight = math.min(
-              media.size.height * 0.74,
-              media.size.height - media.padding.top - 12,
-            );
-
-            return SafeArea(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: maxSheetHeight),
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    left: 16,
-                    right: 16,
-                    bottom: 12 + media.viewInsets.bottom,
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Lucide.Palette,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              '生图参数',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _imageQuality = 'high';
-                                _imageSizeTier = 'auto';
-                                _imageAspectRatio = 'auto';
-                                _customAspectRatio = '16:9';
-                                _imageOutputFormat = 'png';
-                                _imageOutputCompression = null;
-                                _imageCount = 1;
-                              });
-                              setSheetState(() {});
-                            },
-                            child: const Text('重置'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      chips(
-                        label: '画质',
-                        selected: _imageQuality,
-                        options: const [
-                          (value: 'auto', label: '自动'),
-                          (value: 'low', label: '低'),
-                          (value: 'medium', label: '中'),
-                          (value: 'high', label: '高'),
-                        ],
-                        onSelected: (value) => _imageQuality = value,
-                      ),
-                      const SizedBox(height: 10),
-                      chips(
-                        label: '清晰度 / 分辨率档位',
-                        selected: _imageSizeTier,
-                        options: const [
-                          (value: 'auto', label: '自动'),
-                          (value: '1K', label: '1K'),
-                          (value: '2K', label: '2K'),
-                          (value: '4K', label: '4K'),
-                        ],
-                        onSelected: (value) {
-                          _imageSizeTier = value;
-                          if (value == 'auto') _imageAspectRatio = 'auto';
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      chips(
-                        label: '图像比例',
-                        selected: _imageAspectRatio,
-                        options: const [
-                          (value: 'auto', label: '自动'),
-                          (value: '1:1', label: '1:1 方图'),
-                          (value: '4:3', label: '4:3'),
-                          (value: '3:4', label: '3:4'),
-                          (value: '3:2', label: '3:2'),
-                          (value: '2:3', label: '2:3'),
-                          (value: '16:9', label: '16:9 横屏'),
-                          (value: '9:16', label: '9:16 竖屏'),
-                          (value: '21:9', label: '21:9 超宽'),
-                          (value: '9:21', label: '9:21 长图'),
-                          (value: '5:4', label: '5:4'),
-                          (value: '4:5', label: '4:5'),
-                          (value: '2:1', label: '2:1'),
-                          (value: '1:2', label: '1:2'),
-                          (value: '3:1', label: '3:1'),
-                          (value: '1:3', label: '1:3'),
-                          (value: 'custom', label: '自定义'),
-                        ],
-                        onSelected: (value) {
-                          _imageAspectRatio = value;
-                          if (value != 'auto' && _imageSizeTier == 'auto') {
-                            _imageSizeTier = '1K';
-                          }
-                        },
-                      ),
-                      if (_imageAspectRatio == 'custom') ...[
-                        const SizedBox(height: 10),
-                        TextFormField(
-                          initialValue: _customAspectRatio,
-                          decoration: const InputDecoration(
-                            labelText: '自定义比例',
-                            hintText: '例如 7:5、2.39:1',
-                            isDense: true,
-                          ),
-                          onChanged: (value) {
-                            setState(() => _customAspectRatio = value);
-                            setSheetState(() {});
-                          },
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Text(
-                        '实际尺寸：$_resolvedImageSize',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.64),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      chips(
-                        label: '输出格式',
-                        selected: _imageOutputFormat,
-                        options: const [
-                          (value: 'png', label: 'PNG 无损'),
-                          (value: 'jpeg', label: 'JPEG'),
-                          (value: 'webp', label: 'WEBP'),
-                        ],
-                        onSelected: (value) {
-                          _imageOutputFormat = value;
-                          if (value == 'png') _imageOutputCompression = null;
-                        },
-                      ),
-                      if (_imageOutputFormat != 'png') ...[
-                        const SizedBox(height: 10),
-                        chips(
-                          label: '压缩质量',
-                          selected: (_imageOutputCompression ?? 90).toString(),
-                          options: const [
-                            (value: '100', label: '100'),
-                            (value: '90', label: '90'),
-                            (value: '75', label: '75'),
-                            (value: '50', label: '50'),
-                          ],
-                          onSelected: (value) {
-                            _imageOutputCompression = int.tryParse(value);
-                          },
-                        ),
-                      ],
-                      const SizedBox(height: 10),
-                      numberChips(
-                        label: '数量',
-                        selected: _imageCount,
-                        options: const [1, 2, 3, 4],
-                        onSelected: (value) => _imageCount = value,
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '当前：$_imageParamsSummary',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.64),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: () => Navigator.of(sheetContext).pop(),
-                          child: const Text('完成'),
-                        ),
-                      ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
+      builder: (_) => StatefulBuilder(
+        builder: (context, setSheetState) => ImageGenerationOptionsSheet(
+          controller: _imageGenController,
+          onChanged: () {
+            setState(() {});
+            setSheetState(() {});
           },
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -1593,14 +1065,14 @@ class _ChatInputBarState extends State<ChatInputBar>
             _OverflowAction(
               width: normalButtonW,
               builder: () => _CompactIconButton(
-                tooltip: '生图参数：$_imageParamsSummary',
+                tooltip: l10n.imageGenPaletteTooltip(_imageParamsSummary),
                 icon: Lucide.Palette,
                 active: _imageParamsCustomized,
                 onTap: lockTap(() => unawaited(_showImageGenerationOptions())),
               ),
               menu: DesktopContextMenuItem(
                 icon: Lucide.Palette,
-                label: '生图参数：$_imageParamsSummary',
+                label: l10n.imageGenPaletteTooltip(_imageParamsSummary),
                 onTap: lockTap(() => unawaited(_showImageGenerationOptions())),
               ),
             ),
