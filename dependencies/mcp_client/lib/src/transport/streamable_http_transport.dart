@@ -69,6 +69,7 @@ class StreamableHttpClientTransport implements ClientTransport {
 
   bool _isClosed = false;
   final Semaphore _requestSemaphore;
+  String _baseUrl;
   String? _sessionId;
   String? _protocolVersion;
   final Map<int, Completer<dynamic>> _pendingRequests = {};
@@ -84,6 +85,7 @@ class StreamableHttpClientTransport implements ClientTransport {
   }) : _httpClient = httpClient,
        _oauthClient = oauthClient,
        _tokenManager = tokenManager,
+       _baseUrl = config.baseUrl,
        _requestSemaphore = Semaphore(config.maxConcurrentRequests);
 
   /// Spec 2025-06-18+: record the negotiated MCP protocol version so
@@ -102,7 +104,7 @@ class StreamableHttpClientTransport implements ClientTransport {
     int? maxConcurrentRequests,
     bool? useHttp2,
     http.Client? httpClient,
-    bool terminateOnClose = true,  // Default: true for backward compatibility
+    bool terminateOnClose = true, // Default: true for backward compatibility
   }) async {
     final config = StreamableHttpTransportConfig(
       baseUrl: baseUrl,
@@ -144,7 +146,7 @@ class StreamableHttpClientTransport implements ClientTransport {
   Future<void> get onClose => _closeCompleter.future;
 
   /// Get the base URL
-  String get baseUrl => config.baseUrl;
+  String get baseUrl => _baseUrl;
 
   /// Get the maximum concurrent requests
   int get maxConcurrentRequests => config.maxConcurrentRequests;
@@ -230,7 +232,7 @@ class StreamableHttpClientTransport implements ClientTransport {
       }
 
       final body = jsonEncode(message);
-      final uri = Uri.parse(config.baseUrl);
+      final uri = Uri.parse(_baseUrl);
 
       // Store request ID if this is a request
       int? requestId;
@@ -250,12 +252,10 @@ class StreamableHttpClientTransport implements ClientTransport {
       // request, but we can't see the request until the stream closes.
       // Streaming the response while it's open lets us dispatch each SSE
       // event the moment it arrives.
-      final request = http.Request('POST', uri)
-        ..body = body;
+      final request = http.Request('POST', uri)..body = body;
       headers.forEach((k, v) => request.headers[k] = v);
 
-      final response =
-          await _httpClient.send(request).timeout(config.timeout);
+      final response = await _sendWithRedirects(request);
 
       // Extract session ID from response headers
       final newSessionId = response.headers['mcp-session-id'];
@@ -345,6 +345,48 @@ class StreamableHttpClientTransport implements ClientTransport {
     }
   }
 
+  Future<http.StreamedResponse> _sendWithRedirects(
+    http.Request request, {
+    int redirectCount = 0,
+  }) async {
+    final response = await _httpClient.send(request).timeout(config.timeout);
+    if (!_isPreserveMethodRedirect(response.statusCode)) {
+      return response;
+    }
+
+    final location = response.headers['location'];
+    if (location == null || location.trim().isEmpty) {
+      return response;
+    }
+    if (redirectCount >= 5) {
+      await response.stream.drain<void>();
+      throw McpError('Too many HTTP redirects while connecting to MCP server');
+    }
+
+    final currentUri = request.url;
+    final redirectedUri = currentUri.resolve(location);
+    await response.stream.drain<void>();
+
+    _baseUrl = redirectedUri.toString();
+    final redirectedRequest =
+        http.Request(request.method, redirectedUri)
+          ..bodyBytes = request.bodyBytes
+          ..followRedirects = request.followRedirects
+          ..maxRedirects = request.maxRedirects
+          ..persistentConnection = request.persistentConnection;
+    request.headers.forEach((key, value) {
+      redirectedRequest.headers[key] = value;
+    });
+
+    return _sendWithRedirects(
+      redirectedRequest,
+      redirectCount: redirectCount + 1,
+    );
+  }
+
+  bool _isPreserveMethodRedirect(int statusCode) =>
+      statusCode == 307 || statusCode == 308;
+
   /// Handle a streamed SSE response from a POST request, dispatching
   /// each event as it arrives. Required for cases where the server
   /// embeds server-initiated requests (`sampling/createMessage`,
@@ -389,15 +431,15 @@ class StreamableHttpClientTransport implements ClientTransport {
   /// Establish SSE GET stream
   Future<void> _establishGetStream() async {
     try {
-      final uri = Uri.parse(config.baseUrl);
-      
+      final uri = Uri.parse(_baseUrl);
+
       // Set up headers
       final headers = <String, String>{
         'Accept': 'text/event-stream',
         'Cache-Control': 'no-cache',
         ...config.headers,
       };
-      
+
       if (_sessionId != null) {
         headers['MCP-Session-Id'] = _sessionId!;
       }
@@ -414,7 +456,7 @@ class StreamableHttpClientTransport implements ClientTransport {
 
       // Create EventSource instance
       _eventSource = EventSource();
-      
+
       // Connect to SSE endpoint
       await _eventSource!.connect(
         uri.toString(),
@@ -447,7 +489,6 @@ class StreamableHttpClientTransport implements ClientTransport {
       rethrow;
     }
   }
-
 
   @override
   void close() {
@@ -489,7 +530,7 @@ class StreamableHttpClientTransport implements ClientTransport {
         ...config.headers,
       };
 
-      final uri = Uri.parse(config.baseUrl);
+      final uri = Uri.parse(_baseUrl);
       final response = await _httpClient
           .delete(uri, headers: headers)
           .timeout(Duration(seconds: 5));
