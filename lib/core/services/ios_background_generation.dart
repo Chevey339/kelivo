@@ -37,6 +37,7 @@ class IosBackgroundGenerationService {
   );
 
   bool debugForceIosForTest = false;
+  bool _nativeGenerationActive = false;
 
   bool get _isIos => debugForceIosForTest || Platform.isIOS;
 
@@ -84,19 +85,24 @@ class IosBackgroundGenerationService {
     required String tokenLabel,
     int tokenCount = 0,
   }) async {
-    if (!_isIos || !enabled) return;
+    if (!_isIos || !enabled) {
+      _nativeGenerationActive = false;
+      return;
+    }
     if (notificationsEnabled) {
       await requestNotificationAuthorization();
     }
-    await _channel.invokeMethod<bool>('start', <String, Object?>{
-      'liveActivityEnabled': liveActivityEnabled,
-      'notificationsEnabled': notificationsEnabled,
-      'refreshEnabled': refreshEnabled,
-      'title': title,
-      'detail': detail,
-      'tokenCount': tokenCount,
-      'tokenLabel': tokenLabel,
-    });
+    final started = await _channel
+        .invokeMethod<bool>('start', <String, Object?>{
+          'liveActivityEnabled': liveActivityEnabled,
+          'notificationsEnabled': notificationsEnabled,
+          'refreshEnabled': refreshEnabled,
+          'title': title,
+          'detail': detail,
+          'tokenCount': tokenCount,
+          'tokenLabel': tokenLabel,
+        });
+    _nativeGenerationActive = started == true;
   }
 
   Future<void> update({
@@ -104,7 +110,7 @@ class IosBackgroundGenerationService {
     required String tokenLabel,
     int? tokenCount,
   }) async {
-    if (!_isIos) return;
+    if (!_isIos || !_nativeGenerationActive) return;
     await _channel.invokeMethod<bool>('update', <String, Object?>{
       'detail': detail,
       'tokenLabel': tokenLabel,
@@ -117,22 +123,31 @@ class IosBackgroundGenerationService {
     required String detail,
     required bool success,
   }) async {
-    if (!_isIos) return;
-    await _channel.invokeMethod<bool>('finish', <String, Object?>{
-      'title': title,
-      'detail': detail,
-      'success': success,
-    });
+    if (!_isIos || !_nativeGenerationActive) return;
+    try {
+      await _channel.invokeMethod<bool>('finish', <String, Object?>{
+        'title': title,
+        'detail': detail,
+        'success': success,
+      });
+    } finally {
+      _nativeGenerationActive = false;
+    }
   }
 
   Future<void> cancel({String? detail}) async {
-    if (!_isIos) return;
-    await _channel.invokeMethod<bool>('cancel', <String, Object?>{
-      if (detail != null) 'detail': detail,
-    });
+    if (!_isIos || !_nativeGenerationActive) return;
+    try {
+      await _channel.invokeMethod<bool>('cancel', <String, Object?>{
+        if (detail != null) 'detail': detail,
+      });
+    } finally {
+      _nativeGenerationActive = false;
+    }
   }
 
   void resetForTest() {
     debugForceIosForTest = false;
+    _nativeGenerationActive = false;
   }
 }

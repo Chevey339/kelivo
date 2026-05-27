@@ -148,6 +148,7 @@ private final class IosBackgroundGenerationHandler {
     finishLiveActivity(title: title, detail: detail)
     if notificationsEnabled { showCompletionNotification(title: title, body: detail) }
     endBackgroundTask()
+    resetGenerationOptions()
     result(true)
   }
 
@@ -158,7 +159,13 @@ private final class IosBackgroundGenerationHandler {
       detail: args["detail"] as? String ?? ""
     )
     endBackgroundTask()
+    resetGenerationOptions()
     result(true)
+  }
+
+  private func resetGenerationOptions() {
+    notificationsEnabled = false
+    refreshEnabled = false
   }
 
   private func getStatus(result: @escaping FlutterResult) {

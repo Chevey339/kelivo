@@ -73,6 +73,46 @@ void main() {
     expect(calls, isEmpty);
   });
 
+  test('disabled start prevents stale native session calls', () async {
+    final service = IosBackgroundGenerationService.instance
+      ..debugForceIosForTest = true;
+
+    await service.start(
+      enabled: true,
+      liveActivityEnabled: true,
+      notificationsEnabled: true,
+      refreshEnabled: true,
+      title: 'Generating',
+      detail: 'Assistant is replying',
+      tokenLabel: '0 tokens',
+    );
+    await service.finish(
+      title: 'Complete',
+      detail: 'Assistant reply is ready',
+      success: true,
+    );
+    calls.clear();
+
+    await service.start(
+      enabled: false,
+      liveActivityEnabled: true,
+      notificationsEnabled: true,
+      refreshEnabled: true,
+      title: 'Generating',
+      detail: 'Assistant is replying',
+      tokenLabel: '0 tokens',
+    );
+    await service.update(detail: 'Streaming', tokenLabel: '12 tokens');
+    await service.finish(
+      title: 'Complete',
+      detail: 'Assistant reply is ready',
+      success: true,
+    );
+    await service.cancel(detail: 'Stopped');
+
+    expect(calls, isEmpty);
+  });
+
   test('sends live activity data without synthetic progress', () async {
     final service = IosBackgroundGenerationService.instance
       ..debugForceIosForTest = true;
@@ -96,14 +136,12 @@ void main() {
       detail: 'Assistant reply is ready',
       success: true,
     );
-    await service.cancel(detail: 'Stopped');
 
     expect(calls.map((call) => call.method), <String>[
       'requestNotificationAuthorization',
       'start',
       'update',
       'finish',
-      'cancel',
     ]);
     expect(calls[1].arguments, <String, Object?>{
       'liveActivityEnabled': true,
@@ -119,6 +157,29 @@ void main() {
       'tokenLabel': '12 tokens',
       'tokenCount': 12,
     });
+  });
+
+  test('cancel clears an active native session', () async {
+    final service = IosBackgroundGenerationService.instance
+      ..debugForceIosForTest = true;
+
+    await service.start(
+      enabled: true,
+      liveActivityEnabled: true,
+      notificationsEnabled: false,
+      refreshEnabled: true,
+      title: 'Generating',
+      detail: 'Assistant is replying',
+      tokenLabel: '0 tokens',
+    );
+    await service.cancel(detail: 'Stopped');
+    await service.finish(
+      title: 'Complete',
+      detail: 'Assistant reply is ready',
+      success: true,
+    );
+
+    expect(calls.map((call) => call.method), <String>['start', 'cancel']);
   });
 
   test('reports native status maps with safe defaults', () async {
