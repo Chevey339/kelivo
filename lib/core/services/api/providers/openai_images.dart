@@ -55,6 +55,7 @@ Stream<ChatStreamChunk> _sendOpenAIImagesStream(
     extraBody: extraBody,
   );
   final markdown = await _openAIImagesResponseToMarkdown(
+    client,
     response,
     outputMime: outputMime,
   );
@@ -796,6 +797,7 @@ List<Map<String, dynamic>> _openAIImagesItemsFromResponsesOutput(
 }
 
 Future<String> _openAIImagesResponseToMarkdown(
+  http.Client client,
   Map<String, dynamic> response, {
   required String outputMime,
 }) async {
@@ -807,7 +809,8 @@ Future<String> _openAIImagesResponseToMarkdown(
     final normalized = _normalizeOpenAIImagesItem(item);
     final url = (normalized['url'] ?? '').toString().trim();
     if (url.isNotEmpty) {
-      lines.add('![image]($url)');
+      final localPath = await _saveOpenAIImagesRemoteImage(client, url);
+      lines.add('![image](${localPath ?? url})');
       continue;
     }
     final b64 = (normalized['b64_json'] ?? '').toString().trim();
@@ -821,6 +824,29 @@ Future<String> _openAIImagesResponseToMarkdown(
     lines.add('![image]($path)');
   }
   return lines.join('\n\n');
+}
+
+Future<String?> _saveOpenAIImagesRemoteImage(
+  http.Client client,
+  String url,
+) async {
+  try {
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty) {
+      return null;
+    }
+    final response = await client.get(uri);
+    if (response.statusCode < 200 || response.statusCode >= 300) return null;
+    final mime = _mimeFromHttpImageResponse(response, url);
+    return AppDirectories.saveBase64Image(
+      mime,
+      base64Encode(response.bodyBytes),
+    );
+  } catch (_) {
+    return null;
+  }
 }
 
 TokenUsage? _openAIImagesUsage(Map<String, dynamic> response) {

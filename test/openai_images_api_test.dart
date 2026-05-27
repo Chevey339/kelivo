@@ -560,6 +560,65 @@ void main() {
       );
     });
 
+    test('downloads remote image URL responses as local files', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'kelivo_openai_url_output_',
+      );
+      final previousPathProvider = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+      addTearDown(() async {
+        PathProviderPlatform.instance = previousPathProvider;
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        if (request.uri.path == '/generated.png') {
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType('image', 'png');
+          request.response.add(const [9, 8, 7, 6]);
+          await request.response.close();
+          return;
+        }
+
+        await request.drain<void>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {
+                'url':
+                    'http://${server.address.address}:${server.port}/generated.png',
+              },
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server)),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw a cached cat'},
+        ],
+      ).toList();
+
+      final imagePath = RegExp(
+        r'!\[image\]\(([^)]+)\)',
+      ).firstMatch(chunks.single.content)!.group(1)!;
+      expect(imagePath.startsWith('http://'), isFalse);
+      expect(imagePath.endsWith('.png'), isTrue);
+      expect(await File(imagePath).readAsBytes(), const [9, 8, 7, 6]);
+    });
+
     test('saves base64 image responses with requested output format', () async {
       late Map<String, dynamic> requestBody;
       final tempDir = await Directory.systemTemp.createTemp(
