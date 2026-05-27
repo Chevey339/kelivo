@@ -111,34 +111,6 @@ Future<Map<String, dynamic>> _sendOpenAIImageEdit(
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
 }) async {
-  final allRemote = imageRefs.every((ref) => ref.kind == 'url');
-  if (allRemote) {
-    final body = <String, dynamic>{
-      'model': _apiModelId(config, modelId),
-      'prompt': prompt,
-      'images': [
-        for (final ref in imageRefs) {'image_url': ref.src},
-      ],
-    };
-    _applyOpenAIImagesExtraBody(body, config, modelId, extraBody);
-    final response = await client.post(
-      _openAIImagesUrl(config, '/images/edits'),
-      headers: _openAIImagesJsonHeaders(
-        config,
-        modelId,
-        extraHeaders: extraHeaders,
-      ),
-      body: jsonEncode(body),
-    );
-    return _decodeOpenAIImagesResponse(response);
-  }
-
-  if (imageRefs.any((ref) => ref.kind == 'url')) {
-    throw const FormatException(
-      'OpenAI image edits cannot mix remote image URLs with local image files.',
-    );
-  }
-
   final request = http.MultipartRequest(
     'POST',
     _openAIImagesUrl(config, '/images/edits'),
@@ -155,7 +127,7 @@ Future<Map<String, dynamic>> _sendOpenAIImageEdit(
     request.fields[entry.key] = entry.value.toString();
   }
   for (final ref in imageRefs) {
-    request.files.add(await _openAIImageMultipartFile(ref));
+    request.files.add(await _openAIImageMultipartFile(client, ref));
   }
   final streamed = await client.send(request);
   final response = await http.Response.fromStream(streamed);
@@ -347,7 +319,10 @@ _ImageRef _imageRefFromSource(String source) {
   return _ImageRef('path', source);
 }
 
-Future<http.MultipartFile> _openAIImageMultipartFile(_ImageRef ref) async {
+Future<http.MultipartFile> _openAIImageMultipartFile(
+  http.Client client,
+  _ImageRef ref,
+) async {
   if (ref.kind == 'data') {
     final mime = _mimeFromDataUrl(ref.src);
     final commaIndex = ref.src.indexOf(',');
@@ -361,6 +336,22 @@ Future<http.MultipartFile> _openAIImageMultipartFile(_ImageRef ref) async {
       contentType: _openAIImageMediaType(mime),
     );
   }
+  if (ref.kind == 'url') {
+    final uri = Uri.parse(ref.src);
+    final response = await client.get(uri);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw HttpException(
+        'Failed to download image ${uri.toString()}: HTTP ${response.statusCode}',
+      );
+    }
+    final mime = _mimeFromHttpImageResponse(response, ref.src);
+    return http.MultipartFile.fromBytes(
+      'image[]',
+      response.bodyBytes,
+      filename: 'image.${AppDirectories.extFromMime(mime)}',
+      contentType: _openAIImageMediaType(mime),
+    );
+  }
   final fixed = SandboxPathResolver.fix(ref.src);
   final mime = _mimeFromPath(fixed);
   return http.MultipartFile.fromPath(
@@ -368,6 +359,20 @@ Future<http.MultipartFile> _openAIImageMultipartFile(_ImageRef ref) async {
     fixed,
     contentType: _openAIImageMediaType(mime),
   );
+}
+
+String _mimeFromHttpImageResponse(http.Response response, String fallbackSource) {
+  final contentType = response.headers[HttpHeaders.contentTypeHeader]
+      ?.split(';')
+      .first
+      .trim()
+      .toLowerCase();
+  if (contentType == 'image/jpeg' ||
+      contentType == 'image/png' ||
+      contentType == 'image/webp') {
+    return contentType!;
+  }
+  return _mimeFromPath(fallbackSource);
 }
 
 MediaType _openAIImageMediaType(String mime) {

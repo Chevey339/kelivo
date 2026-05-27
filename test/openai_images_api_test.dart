@@ -400,6 +400,61 @@ void main() {
       expect(requestBody, contains('content-type: image/png'));
     });
 
+    test('downloads remote input images and uploads edits as multipart', () async {
+      late Uri requestUri;
+      late String contentType;
+      late String requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        if (request.method == 'GET' && request.uri.path == '/remote.png') {
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType('image', 'png');
+          request.response.add(const [1, 2, 3, 4]);
+          await request.response.close();
+          return;
+        }
+
+        requestUri = request.uri;
+        contentType = request.headers.contentType?.mimeType ?? '';
+        requestBody = latin1.decode(await _readBytes(request));
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/remote-edit.png'},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server)),
+        modelId: 'gpt-image-2',
+        messages: [
+          {
+            'role': 'user',
+            'content':
+                'make this brighter ![source](http://${server.address.address}:${server.port}/remote.png)',
+          },
+        ],
+      ).toList();
+
+      expect(requestUri.path, '/v1/images/edits');
+      expect(contentType, 'multipart/form-data');
+      expect(requestBody, contains('name="prompt"'));
+      expect(requestBody, contains('make this brighter'));
+      expect(requestBody, contains('name="image[]"'));
+      expect(requestBody, contains('filename="image.png"'));
+      expect(requestBody, contains('content-type: image/png'));
+      expect(requestBody, isNot(contains('"images"')));
+    });
+
     test('rejects dall-e-3 edits before sending a request', () async {
       await expectLater(
         ChatApiService.sendMessageStream(
