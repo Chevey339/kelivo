@@ -721,6 +721,56 @@ void main() {
       },
     );
 
+    test('fills requested count when provider returns fewer images', () async {
+      final requestBodies = <Map<String, dynamic>>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      var requestIndex = 0;
+      server.listen((request) async {
+        requestBodies.add(
+          jsonDecode(await utf8.decoder.bind(request).join())
+              as Map<String, dynamic>,
+        );
+        requestIndex += 1;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/generated-$requestIndex.png'},
+            ],
+            'usage': {'input_tokens': 1, 'output_tokens': 2},
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server)),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw image variants'},
+        ],
+        extraBody: const {'n': 3},
+      ).toList();
+
+      expect(requestBodies, hasLength(3));
+      expect(requestBodies.first['n'], 3);
+      expect(requestBodies.skip(1).every((body) => body['n'] == 1), isTrue);
+      expect(
+        chunks.single.content,
+        [
+          '![image](https://example.com/generated-1.png)',
+          '![image](https://example.com/generated-2.png)',
+          '![image](https://example.com/generated-3.png)',
+        ].join('\n\n'),
+      );
+      expect(chunks.single.usage?.totalTokens, 9);
+    });
+
     test(
       'throws useful exception on non-success Images API response',
       () async {

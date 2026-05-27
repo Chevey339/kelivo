@@ -46,24 +46,14 @@ Stream<ChatStreamChunk> _sendOpenAIImagesStream(
       'OpenAI Images API model $upstreamModelId does not support image edits with input images.',
     );
   }
-  final response = input.imageRefs.isEmpty
-      ? await _sendOpenAIImageGeneration(
-          client,
-          config,
-          modelId,
-          input.prompt,
-          extraHeaders: extraHeaders,
-          extraBody: extraBody,
-        )
-      : await _sendOpenAIImageEdit(
-          client,
-          config,
-          modelId,
-          input.prompt,
-          input.imageRefs,
-          extraHeaders: extraHeaders,
-          extraBody: extraBody,
-        );
+  final response = await _sendOpenAIImagesWithCountFallback(
+    client,
+    config,
+    modelId,
+    input,
+    extraHeaders: extraHeaders,
+    extraBody: extraBody,
+  );
   final markdown = await _openAIImagesResponseToMarkdown(
     response,
     outputMime: outputMime,
@@ -75,6 +65,113 @@ Stream<ChatStreamChunk> _sendOpenAIImagesStream(
     totalTokens: usage?.totalTokens ?? 0,
     usage: usage,
   );
+}
+
+Future<Map<String, dynamic>> _sendOpenAIImagesWithCountFallback(
+  http.Client client,
+  ProviderConfig config,
+  String modelId,
+  _OpenAIImagesInput input, {
+  Map<String, String>? extraHeaders,
+  Map<String, dynamic>? extraBody,
+}) async {
+  final requestedCount = _openAIImagesRequestedCount(extraBody);
+
+  Future<Map<String, dynamic>> sendOnce(Map<String, dynamic>? body) {
+    return input.imageRefs.isEmpty
+        ? _sendOpenAIImageGeneration(
+            client,
+            config,
+            modelId,
+            input.prompt,
+            extraHeaders: extraHeaders,
+            extraBody: body,
+          )
+        : _sendOpenAIImageEdit(
+            client,
+            config,
+            modelId,
+            input.prompt,
+            input.imageRefs,
+            extraHeaders: extraHeaders,
+            extraBody: body,
+          );
+  }
+
+  final response = await sendOnce(extraBody);
+  var combined = response;
+  var received = _openAIImagesDataCount(combined);
+  if (requestedCount <= 1 || received >= requestedCount) {
+    return combined;
+  }
+
+  final singleBody = _openAIImagesExtraBodyWithCount(extraBody, 1);
+  while (received < requestedCount) {
+    final next = await sendOnce(singleBody);
+    combined = _combineOpenAIImagesResponses(combined, next);
+    final nextCount = _openAIImagesDataCount(next);
+    if (nextCount <= 0) break;
+    received += nextCount;
+  }
+  return combined;
+}
+
+int _openAIImagesRequestedCount(Map<String, dynamic>? extraBody) {
+  final raw = extraBody?['n'];
+  final parsed = raw is int ? raw : int.tryParse(raw?.toString() ?? '');
+  if (parsed == null) return 1;
+  return parsed.clamp(1, 10).toInt();
+}
+
+Map<String, dynamic>? _openAIImagesExtraBodyWithCount(
+  Map<String, dynamic>? extraBody,
+  int count,
+) {
+  final body = <String, dynamic>{
+    if (extraBody != null) ...extraBody,
+    'n': count,
+  };
+  return body;
+}
+
+int _openAIImagesDataCount(Map<String, dynamic> response) {
+  final data = response['data'];
+  return data is List ? data.length : 0;
+}
+
+Map<String, dynamic> _combineOpenAIImagesResponses(
+  Map<String, dynamic> first,
+  Map<String, dynamic> second,
+) {
+  final data = <dynamic>[
+    if (first['data'] is List) ...(first['data'] as List),
+    if (second['data'] is List) ...(second['data'] as List),
+  ];
+  final combined = <String, dynamic>{...first, 'data': data};
+  final usage = _combineOpenAIImagesUsage(first['usage'], second['usage']);
+  if (usage != null) combined['usage'] = usage;
+  return combined;
+}
+
+Map<String, dynamic>? _combineOpenAIImagesUsage(dynamic first, dynamic second) {
+  if (first is! Map && second is! Map) return null;
+  final keys = <String>{
+    if (first is Map) ...first.keys.map((key) => key.toString()),
+    if (second is Map) ...second.keys.map((key) => key.toString()),
+  };
+  final usage = <String, dynamic>{};
+  for (final key in keys) {
+    final a = first is Map ? first[key] : null;
+    final b = second is Map ? second[key] : null;
+    if (a is num || b is num) {
+      usage[key] = (a is num ? a : 0) + (b is num ? b : 0);
+    } else if (b != null) {
+      usage[key] = b;
+    } else if (a != null) {
+      usage[key] = a;
+    }
+  }
+  return usage;
 }
 
 Future<Map<String, dynamic>> _sendOpenAIImageGeneration(

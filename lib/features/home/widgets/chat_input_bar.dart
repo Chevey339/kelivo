@@ -644,6 +644,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
@@ -662,13 +663,16 @@ class _ChatInputBarState extends State<ChatInputBar>
                   ),
                   const SizedBox(height: 8),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: 6,
+                    runSpacing: 6,
                     children: [
                       for (final option in options)
                         ChoiceChip(
                           label: Text(option.label),
                           selected: selected == option.value,
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
                           onSelected: (_) {
                             setState(() => onSelected(option.value));
                             setSheetState(() {});
@@ -695,13 +699,16 @@ class _ChatInputBarState extends State<ChatInputBar>
                   ),
                   const SizedBox(height: 8),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: 6,
+                    runSpacing: 6,
                     children: [
                       for (final option in options)
                         ChoiceChip(
                           label: Text(option.toString()),
                           selected: selected == option,
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
                           onSelected: (_) {
                             setState(() => onSelected(option));
                             setSheetState(() {});
@@ -713,18 +720,26 @@ class _ChatInputBarState extends State<ChatInputBar>
               );
             }
 
+            final media = MediaQuery.of(context);
+            final maxSheetHeight = math.min(
+              media.size.height * 0.74,
+              media.size.height - media.padding.top - 12,
+            );
+
             return SafeArea(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: 20,
-                  right: 20,
-                  bottom: 20 + MediaQuery.of(context).viewInsets.bottom,
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxSheetHeight),
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    bottom: 12 + media.viewInsets.bottom,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                       Row(
                         children: [
                           Icon(
@@ -755,7 +770,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
                       chips(
                         label: '画质',
                         selected: _imageQuality,
@@ -767,7 +782,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                         ],
                         onSelected: (value) => _imageQuality = value,
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 10),
                       chips(
                         label: '清晰度 / 分辨率档位',
                         selected: _imageSizeTier,
@@ -782,7 +797,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                           if (value == 'auto') _imageAspectRatio = 'auto';
                         },
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 10),
                       chips(
                         label: '图像比例',
                         selected: _imageAspectRatio,
@@ -837,7 +852,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                               .withValues(alpha: 0.64),
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 10),
                       chips(
                         label: '输出格式',
                         selected: _imageOutputFormat,
@@ -852,7 +867,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                         },
                       ),
                       if (_imageOutputFormat != 'png') ...[
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 10),
                         chips(
                           label: '压缩质量',
                           selected: (_imageOutputCompression ?? 90).toString(),
@@ -867,14 +882,14 @@ class _ChatInputBarState extends State<ChatInputBar>
                           },
                         ),
                       ],
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 10),
                       numberChips(
                         label: '数量',
                         selected: _imageCount,
                         options: const [1, 2, 3, 4],
                         onSelected: (value) => _imageCount = value,
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 10),
                       Text(
                         '当前：$_imageParamsSummary',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -884,7 +899,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                               .withValues(alpha: 0.64),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
@@ -892,7 +907,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                           child: const Text('完成'),
                         ),
                       ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
