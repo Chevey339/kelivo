@@ -956,6 +956,113 @@ class AppLocalizationsEn extends AppLocalizations {
       'Background Generation (Android)';
 
   @override
+  String get displaySettingsPageIosBackgroundChatTitle =>
+      'Background Generation (iOS)';
+
+  @override
+  String get iosBackgroundSettingsPageTitle => 'iOS Background Generation';
+
+  @override
+  String get iosBackgroundStatusOn => 'On';
+
+  @override
+  String get iosBackgroundStatusOff => 'Off';
+
+  @override
+  String get iosBackgroundGenerationEnableTitle => 'Background Generation';
+
+  @override
+  String get iosBackgroundGenerationEnableSubtitle =>
+      'Use iOS background time to keep the current reply running after the app leaves the foreground.';
+
+  @override
+  String get iosBackgroundTaskRefreshTitle => 'Background Task Recovery';
+
+  @override
+  String get iosBackgroundTaskRefreshSubtitle =>
+      'Ask iOS for refresh and processing opportunities when system conditions allow.';
+
+  @override
+  String get iosLiveActivityTitle => 'Live Activity';
+
+  @override
+  String get iosLiveActivitySubtitle =>
+      'Show background replies on the Lock Screen and Dynamic Island when supported.';
+
+  @override
+  String get iosBackgroundNotificationsTitle => 'Task Notifications';
+
+  @override
+  String get iosBackgroundNotificationsSubtitle =>
+      'Send a local notification when a background reply completes or is interrupted.';
+
+  @override
+  String get iosBackgroundLimitNoticeTitle => 'iOS may still suspend work';
+
+  @override
+  String get iosBackgroundLimitNoticeBody =>
+      'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Kelivo running forever.';
+
+  @override
+  String get iosBackgroundUnsupportedLiveActivity =>
+      'Requires iOS 16.1 or later and Live Activities enabled in Settings.';
+
+  @override
+  String get iosBackgroundNativeStatusTitle => 'System status';
+
+  @override
+  String get iosBackgroundNativeStatusUnavailable =>
+      'Unavailable until running on iOS';
+
+  @override
+  String get iosBackgroundLiveActivityAvailable => 'Live Activities available';
+
+  @override
+  String get iosBackgroundLiveActivityUnavailable =>
+      'Live Activities unavailable';
+
+  @override
+  String get iosBackgroundNotificationsAuthorized => 'Notifications allowed';
+
+  @override
+  String get iosBackgroundNotificationsNotAuthorized =>
+      'Notifications not allowed';
+
+  @override
+  String get iosBackgroundGenerationActiveTitle => 'Kelivo is generating';
+
+  @override
+  String get iosBackgroundGenerationActiveDetail =>
+      'The assistant is replying in the background';
+
+  @override
+  String get iosBackgroundGenerationStreamingDetail =>
+      'Receiving assistant response';
+
+  @override
+  String iosBackgroundGenerationTokenCount(int count) {
+    return '$count tokens';
+  }
+
+  @override
+  String get iosBackgroundGenerationCompleteTitle => 'Generation complete';
+
+  @override
+  String get iosBackgroundGenerationCompleteDetail =>
+      'Assistant reply is ready';
+
+  @override
+  String get iosBackgroundGenerationInterruptedTitle =>
+      'Generation interrupted';
+
+  @override
+  String get iosBackgroundGenerationInterruptedDetail =>
+      'The background reply stopped before completion';
+
+  @override
+  String get iosBackgroundGenerationCancelledDetail => 'Generation stopped';
+
+  @override
   String get androidBackgroundStatusOn => 'On';
 
   @override
