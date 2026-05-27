@@ -614,6 +614,56 @@ void main() {
       expect(await File(imagePath).readAsBytes(), const [1, 2, 3, 4]);
     });
 
+    test('saves data URL image fields as local files', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'kelivo_openai_data_url_output_',
+      );
+      final previousPathProvider = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+      addTearDown(() async {
+        PathProviderPlatform.instance = previousPathProvider;
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        await request.drain<void>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {
+                'image_url':
+                    'data:image/png;base64,${base64Encode(const [5, 6, 7, 8])}',
+              },
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server)),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw a data url cat'},
+        ],
+      ).toList();
+
+      final imagePath = RegExp(
+        r'!\[image\]\(([^)]+)\)',
+      ).firstMatch(chunks.single.content)!.group(1)!;
+      expect(imagePath.startsWith('data:image/'), isFalse);
+      expect(await File(imagePath).readAsBytes(), const [5, 6, 7, 8]);
+    });
+
     test(
       'throws instead of rendering null when base64 image save fails',
       () async {
@@ -770,6 +820,148 @@ void main() {
       );
       expect(chunks.single.usage?.totalTokens, 9);
     });
+
+    test('passes 4K image options unchanged to generations', () async {
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/generated-4k.png'},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server)),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw a 4K landscape'},
+        ],
+        extraBody: const {
+          'quality': 'high',
+          'size': '3840x2160',
+          'output_format': 'png',
+        },
+      ).toList();
+
+      expect(requestBody['quality'], 'high');
+      expect(requestBody['size'], '3840x2160');
+      expect(requestBody['output_format'], 'png');
+      expect(
+        chunks.single.content,
+        '![image](https://example.com/generated-4k.png)',
+      );
+    });
+
+    test(
+      'fills requested count from Images API event stream responses',
+      () async {
+        final requestBodies = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        var requestIndex = 0;
+        server.listen((request) async {
+          requestBodies.add(
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>,
+          );
+          requestIndex += 1;
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.write(
+            'data: ${jsonEncode({
+              'type': 'image_generation.completed',
+              'url': 'https://example.com/stream-$requestIndex.png',
+            })}\n\n',
+          );
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _openAiConfig(_baseUrl(server)),
+          modelId: 'gpt-image-2',
+          messages: const [
+            {'role': 'user', 'content': 'draw streamed variants'},
+          ],
+          extraBody: const {'n': 3},
+        ).toList();
+
+        expect(requestBodies, hasLength(3));
+        expect(requestBodies.first['n'], 3);
+        expect(requestBodies.skip(1).every((body) => body['n'] == 1), isTrue);
+        expect(
+          chunks.single.content,
+          [
+            '![image](https://example.com/stream-1.png)',
+            '![image](https://example.com/stream-2.png)',
+            '![image](https://example.com/stream-3.png)',
+          ].join('\n\n'),
+        );
+      },
+    );
+
+    test(
+      'parses nested Images API data lists from compatible providers',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          await request.drain<void>();
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'data': {
+                'data': [
+                  {'url': 'https://example.com/nested-1.png'},
+                  {'image_url': 'https://example.com/nested-2.png'},
+                ],
+              },
+            }),
+          );
+          await request.response.close();
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _openAiConfig(_baseUrl(server)),
+          modelId: 'gpt-image-2',
+          messages: const [
+            {'role': 'user', 'content': 'draw nested variants'},
+          ],
+        ).toList();
+
+        expect(
+          chunks.single.content,
+          [
+            '![image](https://example.com/nested-1.png)',
+            '![image](https://example.com/nested-2.png)',
+          ].join('\n\n'),
+        );
+      },
+    );
 
     test(
       'throws useful exception on non-success Images API response',

@@ -86,13 +86,19 @@ class ImageGenerationOptionsController {
   }
 
   String get resolvedSize {
-    if (sizeTier == 'auto' || aspectRatio == 'auto') {
-      return 'auto';
-    }
-    final ratio = aspectRatio == 'custom'
-        ? customAspectRatio.trim()
-        : aspectRatio;
+    if (sizeTier == 'auto') return 'auto';
+    final ratio = _resolvedAspectRatio;
+    if (ratio.isEmpty) return 'auto';
     return _calculateImageSize(sizeTier, ratio) ?? 'auto';
+  }
+
+  String get _resolvedAspectRatio {
+    if (aspectRatio == 'custom') return customAspectRatio.trim();
+    if (aspectRatio == 'auto') {
+      final fallback = customAspectRatio.trim();
+      return fallback.isEmpty ? '16:9' : fallback;
+    }
+    return aspectRatio;
   }
 
   Map<String, dynamic> toExtraBody() {
@@ -149,7 +155,9 @@ class ImageGenerationOptionsController {
   }
 
   String _aspectRatioLabel(AppLocalizations l10n) {
-    if (aspectRatio == 'auto') return l10n.imageGenAutoRatio;
+    if (aspectRatio == 'auto') {
+      return sizeTier == 'auto' ? l10n.imageGenAutoRatio : _resolvedAspectRatio;
+    }
     if (aspectRatio == 'custom') {
       return customAspectRatio.trim().isEmpty
           ? l10n.imageGenCustomRatio

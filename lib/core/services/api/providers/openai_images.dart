@@ -554,13 +554,245 @@ Map<String, dynamic> _decodeOpenAIImagesResponse(http.Response response) {
   if (response.statusCode < 200 || response.statusCode >= 300) {
     throw HttpException('HTTP ${response.statusCode}: ${response.body}');
   }
-  final decoded = jsonDecode(response.body);
-  if (decoded is! Map) {
-    throw const FormatException(
-      'OpenAI Images API returned a non-object body.',
-    );
+  final contentType = response.headers[HttpHeaders.contentTypeHeader]
+      ?.toLowerCase();
+  final body = response.body.trimLeft();
+  if ((contentType?.contains('text/event-stream') ?? false) ||
+      body.startsWith('data:')) {
+    return _decodeOpenAIImagesStreamResponse(response.body);
   }
-  return decoded.cast<String, dynamic>();
+  final decoded = jsonDecode(response.body);
+  return _normalizeOpenAIImagesPayload(decoded);
+}
+
+Map<String, dynamic> _decodeOpenAIImagesStreamResponse(String body) {
+  Map<String, dynamic>? resultPayload;
+  final completedItems = <Map<String, dynamic>>[];
+  final outputItems = <Map<String, dynamic>>[];
+
+  for (final payload in _openAIImagesSsePayloads(body)) {
+    if (payload == '[DONE]') continue;
+    final decoded = jsonDecode(payload);
+    if (decoded is! Map) continue;
+    final event = decoded.cast<String, dynamic>();
+    final errorMessage = _openAIImagesStreamErrorMessage(event);
+    if (errorMessage != null) throw HttpException(errorMessage);
+
+    final type = (event['type'] ?? '').toString();
+    final object = (event['object'] ?? '').toString();
+    if (object == 'image.generation.result' || object == 'image.edit.result') {
+      resultPayload = _normalizeOpenAIImagesPayload(event);
+      continue;
+    }
+    if (type == 'image_generation.completed' ||
+        type == 'image_edit.completed') {
+      completedItems.add(_normalizeOpenAIImagesItem(event));
+      continue;
+    }
+    if (type == 'response.output_item.done') {
+      final item = event['item'];
+      if (item is Map && item['type'] == 'image_generation_call') {
+        outputItems.add(item.cast<String, dynamic>());
+      }
+      continue;
+    }
+    if (type == 'response.completed') {
+      final response = event['response'];
+      if (response is Map) {
+        final normalized = _normalizeOpenAIImagesPayload(response);
+        final data = normalized['data'];
+        if (data is List && data.isNotEmpty) resultPayload = normalized;
+      }
+    }
+  }
+
+  if (resultPayload != null) return resultPayload!;
+  if (completedItems.isNotEmpty) {
+    return <String, dynamic>{'data': completedItems};
+  }
+  final outputData = _openAIImagesItemsFromResponsesOutput(outputItems);
+  if (outputData.isNotEmpty) return <String, dynamic>{'data': outputData};
+  throw const FormatException(
+    'OpenAI Images API stream returned no final image data.',
+  );
+}
+
+Iterable<String> _openAIImagesSsePayloads(String body) sync* {
+  final normalized = body.replaceAll('\r\n', '\n');
+  for (final block in normalized.split(RegExp(r'\n\n+'))) {
+    final dataLines = <String>[];
+    for (final line in block.split('\n')) {
+      if (!line.startsWith('data:')) continue;
+      dataLines.add(line.substring(5).trimLeft());
+    }
+    final data = dataLines.join('\n').trim();
+    if (data.isNotEmpty) yield data;
+  }
+}
+
+String? _openAIImagesStreamErrorMessage(Map<String, dynamic> event) {
+  final error = event['error'];
+  if (error is Map) {
+    final message = (error['message'] ?? error['error']).toString().trim();
+    if (message.isNotEmpty && message != 'null') return message;
+  }
+  if (error is String && error.trim().isNotEmpty) return error.trim();
+  final type = (event['type'] ?? '').toString();
+  if (type.endsWith('.failed')) {
+    final message = (event['message'] ?? 'OpenAI Images API stream failed')
+        .toString()
+        .trim();
+    return message.isEmpty ? 'OpenAI Images API stream failed' : message;
+  }
+  return null;
+}
+
+Map<String, dynamic> _normalizeOpenAIImagesPayload(dynamic decoded) {
+  if (decoded is List) {
+    return <String, dynamic>{'data': _normalizeOpenAIImagesItems(decoded)};
+  }
+  if (decoded is! Map) {
+    throw const FormatException('OpenAI Images API returned a non-object body.');
+  }
+  final map = decoded.cast<String, dynamic>();
+  final data = map['data'];
+  if (data is List) {
+    return <String, dynamic>{
+      ...map,
+      'data': _normalizeOpenAIImagesItems(data),
+    };
+  }
+  if (data is Map) {
+    final nested = _openAIImagesDataFromMap(data);
+    if (nested.isNotEmpty) {
+      return <String, dynamic>{...map, 'data': nested};
+    }
+  }
+  final output = map['output'];
+  if (output is List) {
+    final items = _openAIImagesItemsFromResponsesOutput(output);
+    if (items.isNotEmpty) return <String, dynamic>{...map, 'data': items};
+  }
+  final topLevelItem = _normalizeOpenAIImagesItem(map);
+  if (_openAIImagesItemHasImage(topLevelItem)) {
+    return <String, dynamic>{...map, 'data': [topLevelItem]};
+  }
+  final knownListItems = _openAIImagesDataFromMap(map);
+  if (knownListItems.isNotEmpty) {
+    return <String, dynamic>{...map, 'data': knownListItems};
+  }
+  return map;
+}
+
+List<Map<String, dynamic>> _openAIImagesDataFromMap(Map<dynamic, dynamic> map) {
+  for (final key in const ['data', 'result', 'images', 'results', 'items']) {
+    final value = map[key];
+    if (value is List) return _normalizeOpenAIImagesItems(value);
+    if (value is Map) {
+      final nested = _openAIImagesDataFromMap(value);
+      if (nested.isNotEmpty) return nested;
+    }
+  }
+  return const <Map<String, dynamic>>[];
+}
+
+List<Map<String, dynamic>> _normalizeOpenAIImagesItems(List<dynamic> items) {
+  return items
+      .map((item) {
+        if (item is Map) return _normalizeOpenAIImagesItem(item);
+        if (item is String && item.trim().isNotEmpty) {
+          final value = item.trim();
+          return _normalizeOpenAIImagesItem(<String, dynamic>{
+            _looksLikeOpenAIImagesHttpUrl(value) ? 'url' : 'b64_json': value,
+          });
+        }
+        return const <String, dynamic>{};
+      })
+      .where(_openAIImagesItemHasImage)
+      .toList(growable: false);
+}
+
+Map<String, dynamic> _normalizeOpenAIImagesItem(Map<dynamic, dynamic> raw) {
+  final item = raw.cast<String, dynamic>();
+  final normalized = <String, dynamic>{...item};
+  final url = _firstOpenAIImagesString(item, const ['url', 'image_url']);
+  if (url != null) {
+    if (_looksLikeOpenAIImagesHttpUrl(url)) {
+      normalized['url'] = url;
+    } else if (_looksLikeOpenAIImagesDataUrl(url)) {
+      normalized['b64_json'] = _stripOpenAIImagesDataUrl(url);
+    }
+  }
+
+  final b64 = _firstOpenAIImagesString(
+    item,
+    const ['b64_json', 'base64', 'image', 'data', 'result'],
+  );
+  if (b64 != null) {
+    if (_looksLikeOpenAIImagesHttpUrl(b64)) {
+      normalized['url'] = b64;
+      normalized.remove('b64_json');
+    } else {
+      normalized['b64_json'] = _stripOpenAIImagesDataUrl(b64);
+    }
+  }
+  return normalized;
+}
+
+String? _firstOpenAIImagesString(Map<String, dynamic> item, List<String> keys) {
+  for (final key in keys) {
+    final value = item[key];
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    if (value is Map) {
+      final nested = _normalizeOpenAIImagesItem(value);
+      final nestedUrl = (nested['url'] ?? '').toString().trim();
+      if (nestedUrl.isNotEmpty) return nestedUrl;
+      final nestedB64 = (nested['b64_json'] ?? '').toString().trim();
+      if (nestedB64.isNotEmpty) return nestedB64;
+    }
+  }
+  return null;
+}
+
+bool _openAIImagesItemHasImage(Map<String, dynamic> item) {
+  final url = (item['url'] ?? '').toString().trim();
+  final b64 = (item['b64_json'] ?? '').toString().trim();
+  return url.isNotEmpty || b64.isNotEmpty;
+}
+
+bool _looksLikeOpenAIImagesHttpUrl(String value) {
+  final lower = value.toLowerCase();
+  return lower.startsWith('http://') || lower.startsWith('https://');
+}
+
+bool _looksLikeOpenAIImagesDataUrl(String value) {
+  return value.toLowerCase().startsWith('data:image/');
+}
+
+String _stripOpenAIImagesDataUrl(String value) {
+  if (!value.toLowerCase().startsWith('data:')) return value;
+  final commaIndex = value.indexOf(',');
+  return commaIndex >= 0 ? value.substring(commaIndex + 1) : value;
+}
+
+List<Map<String, dynamic>> _openAIImagesItemsFromResponsesOutput(
+  List<dynamic> output,
+) {
+  final items = <Map<String, dynamic>>[];
+  for (final raw in output) {
+    if (raw is! Map || raw['type'] != 'image_generation_call') continue;
+    final item = raw.cast<String, dynamic>();
+    final result = item['result'];
+    final merged = <String, dynamic>{...item};
+    if (result is Map) {
+      merged.addAll(result.cast<String, dynamic>());
+    } else if (result is String && result.trim().isNotEmpty) {
+      merged['b64_json'] = result.trim();
+    }
+    final normalized = _normalizeOpenAIImagesItem(merged);
+    if (_openAIImagesItemHasImage(normalized)) items.add(normalized);
+  }
+  return items;
 }
 
 Future<String> _openAIImagesResponseToMarkdown(
@@ -572,12 +804,13 @@ Future<String> _openAIImagesResponseToMarkdown(
   final lines = <String>[];
   for (final item in data) {
     if (item is! Map) continue;
-    final url = (item['url'] ?? '').toString().trim();
+    final normalized = _normalizeOpenAIImagesItem(item);
+    final url = (normalized['url'] ?? '').toString().trim();
     if (url.isNotEmpty) {
       lines.add('![image]($url)');
       continue;
     }
-    final b64 = (item['b64_json'] ?? '').toString().trim();
+    final b64 = (normalized['b64_json'] ?? '').toString().trim();
     if (b64.isEmpty) continue;
     final path = await AppDirectories.saveBase64Image(outputMime, b64);
     if (path == null || path.isEmpty) {
