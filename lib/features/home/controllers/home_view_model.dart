@@ -384,6 +384,7 @@ class HomeViewModel extends ChangeNotifier {
       imagePaths: List<String>.of(input.imagePaths),
       documents: List<DocumentAttachment>.of(input.documents),
       allowImagesApiRouting: input.allowImagesApiRouting,
+      extraBody: Map<String, dynamic>.of(input.extraBody),
     );
   }
 

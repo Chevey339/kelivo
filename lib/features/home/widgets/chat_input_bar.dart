@@ -169,6 +169,11 @@ class _ChatInputBarState extends State<ChatInputBar>
   String? _imageModeModelKey;
   String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
+  String _imageQuality = 'high';
+  String _imageSize = 'auto';
+  String _imageOutputFormat = 'png';
+  int? _imageOutputCompression;
+  int _imageCount = 1;
 
   bool get _composerLocked => widget.hasQueuedInput;
 
@@ -208,6 +213,72 @@ class _ChatInputBarState extends State<ChatInputBar>
     return key == null || key != _dismissedImageModeModelKey;
   }
 
+  bool get _imageParamsCustomized {
+    return _imageQuality != 'high' ||
+        _imageSize != 'auto' ||
+        _imageOutputFormat != 'png' ||
+        _imageOutputCompression != null ||
+        _imageCount != 1;
+  }
+
+  Map<String, dynamic> _imageGenerationExtraBody() {
+    if (!_imageModeActive || !_allowImagesApiRouting) {
+      return const <String, dynamic>{};
+    }
+    return <String, dynamic>{
+      'quality': _imageQuality,
+      'size': _imageSize,
+      'output_format': _imageOutputFormat,
+      if (_imageOutputFormat != 'png' && _imageOutputCompression != null)
+        'output_compression': _imageOutputCompression,
+      if (_imageCount > 1) 'n': _imageCount,
+    };
+  }
+
+  void _restoreImageParams(Map<String, dynamic> body) {
+    final quality = body['quality']?.toString();
+    final size = body['size']?.toString();
+    final format = body['output_format']?.toString();
+    final compression = body['output_compression'];
+    final count = body['n'];
+    if (quality == 'auto' ||
+        quality == 'low' ||
+        quality == 'medium' ||
+        quality == 'high') {
+      _imageQuality = quality!;
+    }
+    if (size == 'auto' ||
+        size == '1024x1024' ||
+        size == '1536x1024' ||
+        size == '1024x1536') {
+      _imageSize = size!;
+    }
+    if (format == 'png' || format == 'jpeg' || format == 'webp') {
+      _imageOutputFormat = format!;
+    }
+    _imageOutputCompression = compression is int
+        ? compression
+        : int.tryParse(compression?.toString() ?? '');
+    final parsedCount = count is int
+        ? count
+        : int.tryParse(count?.toString() ?? '');
+    if (parsedCount != null && parsedCount >= 1 && parsedCount <= 4) {
+      _imageCount = parsedCount;
+    }
+  }
+
+  String get _imageParamsSummary {
+    final ratio = switch (_imageSize) {
+      '1024x1024' => '1:1',
+      '1536x1024' => '3:2',
+      '1024x1536' => '2:3',
+      _ => '自动',
+    };
+    final count = _imageCount > 1 ? ' ×$_imageCount' : '';
+    return '${_imageQuality.toUpperCase()} · $ratio · '
+        '${_imageOutputFormat.toUpperCase()}$count';
+  }
+
   // Instance method for onChanged to avoid recreating the callback on every build
   void _onTextChanged(String _) => setState(() {});
 
@@ -237,6 +308,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       _docs
         ..clear()
         ..addAll(input.documents);
+      _restoreImageParams(input.extraBody);
     });
   }
 
@@ -331,6 +403,7 @@ class _ChatInputBarState extends State<ChatInputBar>
               imagePaths: List.of(_images),
               documents: List.of(_docs),
               allowImagesApiRouting: _allowImagesApiRouting,
+              extraBody: _imageGenerationExtraBody(),
             ),
           ) ??
           ChatInputSubmissionResult.rejected;
@@ -351,6 +424,211 @@ class _ChatInputBarState extends State<ChatInputBar>
     } finally {
       _isSubmitting = false;
     }
+  }
+
+  Future<void> _showImageGenerationOptions() async {
+    if (_composerLocked) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Widget chips({
+              required String label,
+              required List<({String value, String label})> options,
+              required String selected,
+              required ValueChanged<String> onSelected,
+            }) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final option in options)
+                        ChoiceChip(
+                          label: Text(option.label),
+                          selected: selected == option.value,
+                          onSelected: (_) {
+                            setState(() => onSelected(option.value));
+                            setSheetState(() {});
+                          },
+                        ),
+                    ],
+                  ),
+                ],
+              );
+            }
+
+            Widget numberChips({
+              required String label,
+              required List<int> options,
+              required int selected,
+              required ValueChanged<int> onSelected,
+            }) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final option in options)
+                        ChoiceChip(
+                          label: Text(option.toString()),
+                          selected: selected == option,
+                          onSelected: (_) {
+                            setState(() => onSelected(option));
+                            setSheetState(() {});
+                          },
+                        ),
+                    ],
+                  ),
+                ],
+              );
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  bottom: 20 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Lucide.Palette,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              '生图参数',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _imageQuality = 'high';
+                                _imageSize = 'auto';
+                                _imageOutputFormat = 'png';
+                                _imageOutputCompression = null;
+                                _imageCount = 1;
+                              });
+                              setSheetState(() {});
+                            },
+                            child: const Text('重置'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      chips(
+                        label: '画质',
+                        selected: _imageQuality,
+                        options: const [
+                          (value: 'auto', label: '自动'),
+                          (value: 'low', label: '低'),
+                          (value: 'medium', label: '中'),
+                          (value: 'high', label: '高'),
+                        ],
+                        onSelected: (value) => _imageQuality = value,
+                      ),
+                      const SizedBox(height: 18),
+                      chips(
+                        label: '比例 / 尺寸',
+                        selected: _imageSize,
+                        options: const [
+                          (value: 'auto', label: '自动'),
+                          (value: '1024x1024', label: '1:1'),
+                          (value: '1536x1024', label: '横图 3:2'),
+                          (value: '1024x1536', label: '竖图 2:3'),
+                        ],
+                        onSelected: (value) => _imageSize = value,
+                      ),
+                      const SizedBox(height: 18),
+                      chips(
+                        label: '输出格式',
+                        selected: _imageOutputFormat,
+                        options: const [
+                          (value: 'png', label: 'PNG 无损'),
+                          (value: 'jpeg', label: 'JPEG'),
+                          (value: 'webp', label: 'WEBP'),
+                        ],
+                        onSelected: (value) {
+                          _imageOutputFormat = value;
+                          if (value == 'png') _imageOutputCompression = null;
+                        },
+                      ),
+                      if (_imageOutputFormat != 'png') ...[
+                        const SizedBox(height: 18),
+                        chips(
+                          label: '压缩质量',
+                          selected: (_imageOutputCompression ?? 90).toString(),
+                          options: const [
+                            (value: '100', label: '100'),
+                            (value: '90', label: '90'),
+                            (value: '75', label: '75'),
+                            (value: '50', label: '50'),
+                          ],
+                          onSelected: (value) {
+                            _imageOutputCompression = int.tryParse(value);
+                          },
+                        ),
+                      ],
+                      const SizedBox(height: 18),
+                      numberChips(
+                        label: '数量',
+                        selected: _imageCount,
+                        options: const [1, 2, 3, 4],
+                        onSelected: (value) => _imageCount = value,
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        '当前：$_imageParamsSummary',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.64),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: () => Navigator.of(sheetContext).pop(),
+                          child: const Text('完成'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _insertNewlineAtCursor() {
@@ -1021,6 +1299,25 @@ class _ChatInputBarState extends State<ChatInputBar>
             }(),
           ),
         );
+
+        if (_imageModeActive) {
+          actions.add(
+            _OverflowAction(
+              width: normalButtonW,
+              builder: () => _CompactIconButton(
+                tooltip: '生图参数：$_imageParamsSummary',
+                icon: Lucide.Palette,
+                active: _imageParamsCustomized,
+                onTap: lockTap(() => unawaited(_showImageGenerationOptions())),
+              ),
+              menu: DesktopContextMenuItem(
+                icon: Lucide.Palette,
+                label: '生图参数：$_imageParamsSummary',
+                onTap: lockTap(() => unawaited(_showImageGenerationOptions())),
+              ),
+            ),
+          );
+        }
 
         if (widget.supportsReasoning) {
           actions.add(

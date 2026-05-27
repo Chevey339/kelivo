@@ -499,6 +499,7 @@ class ChatActions {
         supportsReasoning: supportsReasoning,
         enableReasoning: enableReasoning,
         generateTitleOnFinish: true,
+        requestExtraBody: input.extraBody,
       );
 
       await _executeGeneration(ctx);
