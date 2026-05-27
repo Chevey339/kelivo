@@ -4122,6 +4122,28 @@ class ProviderConfig {
   final String? balanceResultPath;
   // Anthropic/OpenRouter Claude prompt caching for stable system prompts.
   final bool? claudePromptCachingEnabled;
+  final String? claudePromptCachingTtl;
+
+  static const String claudePromptCachingTtl5m = '5m';
+  static const String claudePromptCachingTtl1h = '1h';
+
+  static String resolveClaudePromptCachingTtl(String? value) {
+    switch (value?.trim().toLowerCase()) {
+      case claudePromptCachingTtl1h:
+        return claudePromptCachingTtl1h;
+      case claudePromptCachingTtl5m:
+      default:
+        return claudePromptCachingTtl5m;
+    }
+  }
+
+  static Map<String, dynamic> claudePromptCacheControl(String? ttl) {
+    final cacheControl = <String, dynamic>{'type': 'ephemeral'};
+    if (resolveClaudePromptCachingTtl(ttl) == claudePromptCachingTtl1h) {
+      cacheControl['ttl'] = claudePromptCachingTtl1h;
+    }
+    return cacheControl;
+  }
 
   static String resolveProxyType(String? value) {
     switch (value?.trim().toLowerCase()) {
@@ -4164,6 +4186,7 @@ class ProviderConfig {
     this.balanceApiPath,
     this.balanceResultPath,
     this.claudePromptCachingEnabled = false,
+    this.claudePromptCachingTtl = claudePromptCachingTtl5m,
   });
 
   // Sentinel for copyWith nullability control (allow explicit null set)
@@ -4200,6 +4223,7 @@ class ProviderConfig {
     String? balanceApiPath,
     String? balanceResultPath,
     bool? claudePromptCachingEnabled,
+    String? claudePromptCachingTtl,
   }) => ProviderConfig(
     id: id ?? this.id,
     enabled: enabled ?? this.enabled,
@@ -4237,6 +4261,8 @@ class ProviderConfig {
     balanceResultPath: balanceResultPath ?? this.balanceResultPath,
     claudePromptCachingEnabled:
         claudePromptCachingEnabled ?? this.claudePromptCachingEnabled,
+    claudePromptCachingTtl:
+        claudePromptCachingTtl ?? this.claudePromptCachingTtl,
   );
 
   Map<String, dynamic> toJson() => {
@@ -4270,6 +4296,9 @@ class ProviderConfig {
     'balanceApiPath': balanceApiPath,
     'balanceResultPath': balanceResultPath,
     'claudePromptCachingEnabled': claudePromptCachingEnabled,
+    'claudePromptCachingTtl': resolveClaudePromptCachingTtl(
+      claudePromptCachingTtl,
+    ),
   };
 
   factory ProviderConfig.fromJson(Map<String, dynamic> json) => ProviderConfig(
@@ -4320,6 +4349,9 @@ class ProviderConfig {
     balanceResultPath: json['balanceResultPath'] as String?,
     claudePromptCachingEnabled:
         json['claudePromptCachingEnabled'] as bool? ?? false,
+    claudePromptCachingTtl: resolveClaudePromptCachingTtl(
+      json['claudePromptCachingTtl'] as String?,
+    ),
   );
 
   static ProviderKind classify(String key, {ProviderKind? explicitType}) {

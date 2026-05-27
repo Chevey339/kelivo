@@ -5741,8 +5741,32 @@ abstract class AppLocalizations {
   /// No description provided for @providerDetailPageClaudePromptCachingHelp.
   ///
   /// In en, this message translates to:
-  /// **'Adds cache_control to the system prompt for Claude requests through Anthropic or OpenRouter.'**
+  /// **'Adds cache_control to Claude requests through Anthropic or OpenRouter.'**
   String get providerDetailPageClaudePromptCachingHelp;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingTtlTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache TTL'**
+  String get providerDetailPageClaudePromptCachingTtlTitle;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingTtlHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'5 minutes is the default. 1 hour costs more to write but can reduce rebuilds in long conversations.'**
+  String get providerDetailPageClaudePromptCachingTtlHelp;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingTtl5m.
+  ///
+  /// In en, this message translates to:
+  /// **'5 min'**
+  String get providerDetailPageClaudePromptCachingTtl5m;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingTtl1h.
+  ///
+  /// In en, this message translates to:
+  /// **'1 hour'**
+  String get providerDetailPageClaudePromptCachingTtl1h;
 
   /// No description provided for @providerDetailPageBalanceTitle.
   ///

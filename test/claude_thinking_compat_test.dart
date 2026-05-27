@@ -11,6 +11,7 @@ ProviderConfig _claudeConfig(
   String baseUrl, {
   Map<String, dynamic> modelOverrides = const <String, dynamic>{},
   bool claudePromptCachingEnabled = false,
+  String? claudePromptCachingTtl,
 }) {
   return ProviderConfig(
     id: 'ClaudeCompatTest',
@@ -21,6 +22,7 @@ ProviderConfig _claudeConfig(
     providerType: ProviderKind.claude,
     modelOverrides: modelOverrides,
     claudePromptCachingEnabled: claudePromptCachingEnabled,
+    claudePromptCachingTtl: claudePromptCachingTtl,
   );
 }
 
@@ -60,6 +62,7 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
   double? temperature,
   double? topP,
   bool claudePromptCachingEnabled = false,
+  String? claudePromptCachingTtl,
   List<Map<String, dynamic>> messages = const [
     {'role': 'user', 'content': 'hello'},
   ],
@@ -91,6 +94,7 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
     config: _claudeConfig(
       'http://${server.address.address}:${server.port}',
       claudePromptCachingEnabled: claudePromptCachingEnabled,
+      claudePromptCachingTtl: claudePromptCachingTtl,
     ),
     modelId: modelId,
     messages: messages,
@@ -223,6 +227,41 @@ void main() {
         expect((body['messages'] as List).cast<Map>().single['role'], 'user');
       },
     );
+
+    test(
+      'prompt caching can request official Claude one hour cache ttl',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-sonnet-4-6',
+          claudePromptCachingEnabled: true,
+          claudePromptCachingTtl: '1h',
+          messages: const [
+            {'role': 'system', 'content': 'Stable persona and long context.'},
+            {'role': 'user', 'content': 'hello'},
+          ],
+        );
+
+        expect(body['cache_control'], {'type': 'ephemeral', 'ttl': '1h'});
+      },
+    );
+
+    test('prompt caching ttl round trips through provider config json', () {
+      final config = ProviderConfig(
+        id: 'ClaudeCompatTest',
+        enabled: true,
+        name: 'ClaudeCompatTest',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.anthropic.com/v1',
+        providerType: ProviderKind.claude,
+        claudePromptCachingEnabled: true,
+        claudePromptCachingTtl: '1h',
+      );
+
+      final roundTripped = ProviderConfig.fromJson(config.toJson());
+
+      expect(roundTripped.claudePromptCachingEnabled, isTrue);
+      expect(roundTripped.claudePromptCachingTtl, '1h');
+    });
 
     test(
       'prompt caching disabled omits official Claude cache control',

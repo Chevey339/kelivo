@@ -2291,6 +2291,10 @@ class _DesktopProviderDetailPaneState
                     _supportsClaudePromptCaching(cfgNow, kindNow);
                 final claudePromptCachingEnabled =
                     cfgNow.claudePromptCachingEnabled ?? false;
+                final claudePromptCachingTtl =
+                    ProviderConfig.resolveClaudePromptCachingTtl(
+                      cfgNow.claudePromptCachingTtl,
+                    );
                 final groupsNow = spWatch.providerGroups;
                 final groupValue =
                     spWatch.groupIdForProvider(widget.providerKey) ??
@@ -3017,6 +3021,74 @@ class _DesktopProviderDetailPaneState
                                     ),
                                   ],
                                 ),
+                              ),
+                              AnimatedCrossFade(
+                                firstChild: const SizedBox.shrink(),
+                                secondChild: Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: row(
+                                    l10n.providerDetailPageClaudePromptCachingTtlTitle,
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        Tooltip(
+                                          message: l10n
+                                              .providerDetailPageClaudePromptCachingTtlHelp,
+                                          child: Icon(
+                                            Icons.help_outline,
+                                            size: 16,
+                                            color: cs.onSurface.withValues(
+                                              alpha: 0.6,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        DesktopSelectDropdown<String>(
+                                          value: claudePromptCachingTtl,
+                                          minWidth: 136,
+                                          options: [
+                                            DesktopSelectOption(
+                                              value: ProviderConfig
+                                                  .claudePromptCachingTtl5m,
+                                              label: l10n
+                                                  .providerDetailPageClaudePromptCachingTtl5m,
+                                            ),
+                                            DesktopSelectOption(
+                                              value: ProviderConfig
+                                                  .claudePromptCachingTtl1h,
+                                              label: l10n
+                                                  .providerDetailPageClaudePromptCachingTtl1h,
+                                            ),
+                                          ],
+                                          triggerFillColor:
+                                              Theme.of(ctx).brightness ==
+                                                  Brightness.dark
+                                              ? Colors.white10
+                                              : const Color(0xFFF7F7F9),
+                                          onSelected: (value) async {
+                                            final old = spWatch
+                                                .getProviderConfig(
+                                                  widget.providerKey,
+                                                  defaultName:
+                                                      widget.displayName,
+                                                );
+                                            await spWatch.setProviderConfig(
+                                              widget.providerKey,
+                                              old.copyWith(
+                                                claudePromptCachingTtl: value,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                crossFadeState: claudePromptCachingEnabled
+                                    ? CrossFadeState.showSecond
+                                    : CrossFadeState.showFirst,
+                                duration: const Duration(milliseconds: 180),
+                                sizeCurve: Curves.easeOutCubic,
                               ),
                             ],
                             const SizedBox(height: 4),

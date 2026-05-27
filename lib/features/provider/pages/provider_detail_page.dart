@@ -76,6 +76,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   final Set<String> _pendingModels = {};
   bool _aihubmixAppCodeEnabled = false;
   bool _claudePromptCachingEnabled = false;
+  String _claudePromptCachingTtl = ProviderConfig.claudePromptCachingTtl5m;
 
   @override
   void initState() {
@@ -102,6 +103,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     _multiKeyEnabled = _cfg.multiKeyEnabled ?? false;
     _aihubmixAppCodeEnabled = _cfg.aihubmixAppCodeEnabled ?? false;
     _claudePromptCachingEnabled = _cfg.claudePromptCachingEnabled ?? false;
+    _claudePromptCachingTtl = ProviderConfig.resolveClaudePromptCachingTtl(
+      _cfg.claudePromptCachingTtl,
+    );
   }
 
   @override
@@ -811,6 +815,24 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       l10n.providerDetailPageClaudePromptCachingTitle,
                   onChanged: (v) {
                     setState(() => _claudePromptCachingEnabled = v);
+                    _save();
+                  },
+                ),
+              ),
+            if (_supportsClaudePromptCaching && _claudePromptCachingEnabled)
+              _iosRowWithHelp(
+                context,
+                label: l10n.providerDetailPageClaudePromptCachingTtlTitle,
+                helpText: l10n.providerDetailPageClaudePromptCachingTtlHelp,
+                trailing: _PromptCachingTtlSegmentedControl(
+                  value: _claudePromptCachingTtl,
+                  fiveMinuteLabel:
+                      l10n.providerDetailPageClaudePromptCachingTtl5m,
+                  oneHourLabel: l10n.providerDetailPageClaudePromptCachingTtl1h,
+                  semanticLabel:
+                      l10n.providerDetailPageClaudePromptCachingTtlTitle,
+                  onChanged: (value) {
+                    setState(() => _claudePromptCachingTtl = value);
                     _save();
                   },
                 ),
@@ -2101,6 +2123,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       claudePromptCachingEnabled: _supportsClaudePromptCaching
           ? _claudePromptCachingEnabled
           : false,
+      claudePromptCachingTtl: _supportsClaudePromptCaching
+          ? _claudePromptCachingTtl
+          : ProviderConfig.claudePromptCachingTtl5m,
       // preserve models and modelOverrides and proxy fields implicitly via copyWith
     );
     await settings.setProviderConfig(widget.keyName, updated);
@@ -3887,6 +3912,103 @@ class _BottomTabItemState extends State<_BottomTabItem> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _PromptCachingTtlSegmentedControl extends StatelessWidget {
+  const _PromptCachingTtlSegmentedControl({
+    required this.value,
+    required this.fiveMinuteLabel,
+    required this.oneHourLabel,
+    required this.semanticLabel,
+    required this.onChanged,
+  });
+
+  final String value;
+  final String fiveMinuteLabel;
+  final String oneHourLabel;
+  final String semanticLabel;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final background = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.05);
+
+    return Semantics(
+      label: semanticLabel,
+      child: Container(
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _PromptCachingTtlSegment(
+              label: fiveMinuteLabel,
+              selected: value == ProviderConfig.claudePromptCachingTtl5m,
+              selectedColor: cs.primary,
+              onTap: () => onChanged(ProviderConfig.claudePromptCachingTtl5m),
+            ),
+            _PromptCachingTtlSegment(
+              label: oneHourLabel,
+              selected: value == ProviderConfig.claudePromptCachingTtl1h,
+              selectedColor: cs.primary,
+              onTap: () => onChanged(ProviderConfig.claudePromptCachingTtl1h),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PromptCachingTtlSegment extends StatelessWidget {
+  const _PromptCachingTtlSegment({
+    required this.label,
+    required this.selected,
+    required this.selectedColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final Color selectedColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? selectedColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected
+                ? cs.onPrimary
+                : cs.onSurface.withValues(alpha: 0.7),
+          ),
+          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
       ),
     );
   }

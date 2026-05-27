@@ -287,7 +287,9 @@ void _applyOpenRouterClaudePromptCaching(
   required String upstreamModelId,
 }) {
   if (!_shouldCacheClaudeSystemPrompt(config, upstreamModelId)) return;
-  body['cache_control'] = {'type': 'ephemeral'};
+  body['cache_control'] = ProviderConfig.claudePromptCacheControl(
+    config.claudePromptCachingTtl,
+  );
 }
 
 void _maybeAddStreamingUsageOptions(

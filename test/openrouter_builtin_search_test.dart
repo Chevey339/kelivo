@@ -12,6 +12,7 @@ ProviderConfig _openRouterConfig({
   bool searchEnabled = true,
   bool useResponseApi = false,
   bool claudePromptCachingEnabled = false,
+  String? claudePromptCachingTtl,
 }) {
   return ProviderConfig(
     id: 'OpenRouter',
@@ -22,6 +23,7 @@ ProviderConfig _openRouterConfig({
     providerType: ProviderKind.openai,
     useResponseApi: useResponseApi,
     claudePromptCachingEnabled: claudePromptCachingEnabled,
+    claudePromptCachingTtl: claudePromptCachingTtl,
     modelOverrides: <String, dynamic>{
       if (searchEnabled)
         modelId: <String, dynamic>{
@@ -257,6 +259,61 @@ void main() {
         expect(receivedBody!['cache_control'], {'type': 'ephemeral'});
       },
     );
+
+    test('Claude prompt caching adds OpenRouter one hour cache ttl', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      Map<String, dynamic>? receivedBody;
+      server.listen((request) async {
+        receivedBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {'role': 'assistant', 'content': 'ok'},
+                'finish_reason': 'stop',
+              },
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      await HttpOverrides.runZoned(
+        () async {
+          await ChatApiService.sendMessageStream(
+            config: _openRouterConfig(
+              modelId: 'anthropic/claude-sonnet-4.5',
+              searchEnabled: false,
+              claudePromptCachingEnabled: true,
+              claudePromptCachingTtl: '1h',
+            ),
+            modelId: 'anthropic/claude-sonnet-4.5',
+            messages: const <Map<String, dynamic>>[
+              {'role': 'system', 'content': 'Stable persona and long context.'},
+              {'role': 'user', 'content': 'hello'},
+            ],
+            stream: false,
+          ).toList();
+        },
+        createHttpClient: (context) {
+          return _ProxyHttpOverrides(server.port).createHttpClient(context);
+        },
+      );
+
+      expect(receivedBody, isNotNull);
+      expect(receivedBody!['cache_control'], {
+        'type': 'ephemeral',
+        'ttl': '1h',
+      });
+    });
 
     test('Claude prompt caching skips non-Claude OpenRouter models', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
