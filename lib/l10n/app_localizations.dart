@@ -1871,6 +1871,186 @@ abstract class AppLocalizations {
   /// **'Background Generation (Android)'**
   String get displaySettingsPageAndroidBackgroundChatTitle;
 
+  /// No description provided for @displaySettingsPageIosBackgroundChatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Background Generation (iOS)'**
+  String get displaySettingsPageIosBackgroundChatTitle;
+
+  /// No description provided for @iosBackgroundSettingsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS Background Generation'**
+  String get iosBackgroundSettingsPageTitle;
+
+  /// No description provided for @iosBackgroundStatusOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get iosBackgroundStatusOn;
+
+  /// No description provided for @iosBackgroundStatusOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get iosBackgroundStatusOff;
+
+  /// No description provided for @iosBackgroundGenerationEnableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Background Generation'**
+  String get iosBackgroundGenerationEnableTitle;
+
+  /// No description provided for @iosBackgroundGenerationEnableSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use iOS background time to keep the current reply running after the app leaves the foreground.'**
+  String get iosBackgroundGenerationEnableSubtitle;
+
+  /// No description provided for @iosBackgroundTaskRefreshTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Background Task Recovery'**
+  String get iosBackgroundTaskRefreshTitle;
+
+  /// No description provided for @iosBackgroundTaskRefreshSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask iOS for refresh and processing opportunities when system conditions allow.'**
+  String get iosBackgroundTaskRefreshSubtitle;
+
+  /// No description provided for @iosLiveActivityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Activity'**
+  String get iosLiveActivityTitle;
+
+  /// No description provided for @iosLiveActivitySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show background replies on the Lock Screen and Dynamic Island when supported.'**
+  String get iosLiveActivitySubtitle;
+
+  /// No description provided for @iosBackgroundNotificationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Task Notifications'**
+  String get iosBackgroundNotificationsTitle;
+
+  /// No description provided for @iosBackgroundNotificationsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a local notification when a background reply completes or is interrupted.'**
+  String get iosBackgroundNotificationsSubtitle;
+
+  /// No description provided for @iosBackgroundLimitNoticeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS may still suspend work'**
+  String get iosBackgroundLimitNoticeTitle;
+
+  /// No description provided for @iosBackgroundLimitNoticeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Kelivo running forever.'**
+  String get iosBackgroundLimitNoticeBody;
+
+  /// No description provided for @iosBackgroundUnsupportedLiveActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Requires iOS 16.1 or later and Live Activities enabled in Settings.'**
+  String get iosBackgroundUnsupportedLiveActivity;
+
+  /// No description provided for @iosBackgroundNativeStatusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System status'**
+  String get iosBackgroundNativeStatusTitle;
+
+  /// No description provided for @iosBackgroundNativeStatusUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable until running on iOS'**
+  String get iosBackgroundNativeStatusUnavailable;
+
+  /// No description provided for @iosBackgroundLiveActivityAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Activities available'**
+  String get iosBackgroundLiveActivityAvailable;
+
+  /// No description provided for @iosBackgroundLiveActivityUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Activities unavailable'**
+  String get iosBackgroundLiveActivityUnavailable;
+
+  /// No description provided for @iosBackgroundNotificationsAuthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications allowed'**
+  String get iosBackgroundNotificationsAuthorized;
+
+  /// No description provided for @iosBackgroundNotificationsNotAuthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications not allowed'**
+  String get iosBackgroundNotificationsNotAuthorized;
+
+  /// No description provided for @iosBackgroundGenerationActiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo is generating'**
+  String get iosBackgroundGenerationActiveTitle;
+
+  /// No description provided for @iosBackgroundGenerationActiveDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant is replying in the background'**
+  String get iosBackgroundGenerationActiveDetail;
+
+  /// No description provided for @iosBackgroundGenerationStreamingDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Receiving assistant response'**
+  String get iosBackgroundGenerationStreamingDetail;
+
+  /// No description provided for @iosBackgroundGenerationTokenCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tokens'**
+  String iosBackgroundGenerationTokenCount(int count);
+
+  /// No description provided for @iosBackgroundGenerationCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation complete'**
+  String get iosBackgroundGenerationCompleteTitle;
+
+  /// No description provided for @iosBackgroundGenerationCompleteDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant reply is ready'**
+  String get iosBackgroundGenerationCompleteDetail;
+
+  /// No description provided for @iosBackgroundGenerationInterruptedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation interrupted'**
+  String get iosBackgroundGenerationInterruptedTitle;
+
+  /// No description provided for @iosBackgroundGenerationInterruptedDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The background reply stopped before completion'**
+  String get iosBackgroundGenerationInterruptedDetail;
+
+  /// No description provided for @iosBackgroundGenerationCancelledDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation stopped'**
+  String get iosBackgroundGenerationCancelledDetail;
+
   /// No description provided for @androidBackgroundStatusOn.
   ///
   /// In en, this message translates to:

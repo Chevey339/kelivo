@@ -219,6 +219,15 @@ class SettingsProvider extends ChangeNotifier {
   // Android background chat generation mode
   static const String _androidBackgroundChatModeKey =
       'android_background_chat_mode_v1';
+  // iOS background generation settings
+  static const String _iosBackgroundGenerationEnabledKey =
+      'ios_background_generation_enabled_v1';
+  static const String _iosBackgroundTaskRefreshEnabledKey =
+      'ios_background_task_refresh_enabled_v1';
+  static const String _iosLiveActivityEnabledKey =
+      'ios_live_activity_enabled_v1';
+  static const String _iosBackgroundNotificationsEnabledKey =
+      'ios_background_notifications_enabled_v1';
   // Fonts
   static const String _displayAppFontFamilyKey = 'display_app_font_family_v1';
   static const String _displayCodeFontFamilyKey = 'display_code_font_family_v1';
@@ -1018,6 +1027,14 @@ class SettingsProvider extends ChangeNotifier {
     } catch (_) {
       _androidBackgroundChatMode = AndroidBackgroundChatMode.off;
     }
+    _iosBackgroundGenerationEnabled =
+        prefs.getBool(_iosBackgroundGenerationEnabledKey) ?? false;
+    _iosBackgroundTaskRefreshEnabled =
+        prefs.getBool(_iosBackgroundTaskRefreshEnabledKey) ?? false;
+    _iosLiveActivityEnabled =
+        prefs.getBool(_iosLiveActivityEnabledKey) ?? false;
+    _iosBackgroundNotificationsEnabled =
+        prefs.getBool(_iosBackgroundNotificationsEnabledKey) ?? false;
 
     // load search settings
     final searchServicesStr = prefs.getString(_searchServicesKey);
@@ -2092,6 +2109,79 @@ class SettingsProvider extends ChangeNotifier {
         // Defer import here is not possible; rely on main.dart sync. This is a no-op placeholder.
       }
     } catch (_) {}
+  }
+
+  // ===== iOS background chat generation =====
+  bool _iosBackgroundGenerationEnabled = false;
+  bool get iosBackgroundGenerationEnabled => _iosBackgroundGenerationEnabled;
+  Future<void> setIosBackgroundGenerationEnabled(bool v) async {
+    if (_iosBackgroundGenerationEnabled == v) return;
+    _iosBackgroundGenerationEnabled = v;
+    if (!v) {
+      _iosBackgroundTaskRefreshEnabled = false;
+      _iosLiveActivityEnabled = false;
+      _iosBackgroundNotificationsEnabled = false;
+    }
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      _iosBackgroundGenerationEnabledKey,
+      _iosBackgroundGenerationEnabled,
+    );
+    if (!v) {
+      await prefs.setBool(_iosBackgroundTaskRefreshEnabledKey, false);
+      await prefs.setBool(_iosLiveActivityEnabledKey, false);
+      await prefs.setBool(_iosBackgroundNotificationsEnabledKey, false);
+    }
+  }
+
+  bool _iosBackgroundTaskRefreshEnabled = false;
+  bool get iosBackgroundTaskRefreshEnabled => _iosBackgroundTaskRefreshEnabled;
+  Future<void> setIosBackgroundTaskRefreshEnabled(bool v) async {
+    if (_iosBackgroundTaskRefreshEnabled == v) return;
+    _iosBackgroundTaskRefreshEnabled = v;
+    if (v) _iosBackgroundGenerationEnabled = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      _iosBackgroundTaskRefreshEnabledKey,
+      _iosBackgroundTaskRefreshEnabled,
+    );
+    if (v) {
+      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
+    }
+  }
+
+  bool _iosLiveActivityEnabled = false;
+  bool get iosLiveActivityEnabled => _iosLiveActivityEnabled;
+  Future<void> setIosLiveActivityEnabled(bool v) async {
+    if (_iosLiveActivityEnabled == v) return;
+    _iosLiveActivityEnabled = v;
+    if (v) _iosBackgroundGenerationEnabled = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_iosLiveActivityEnabledKey, _iosLiveActivityEnabled);
+    if (v) {
+      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
+    }
+  }
+
+  bool _iosBackgroundNotificationsEnabled = false;
+  bool get iosBackgroundNotificationsEnabled =>
+      _iosBackgroundNotificationsEnabled;
+  Future<void> setIosBackgroundNotificationsEnabled(bool v) async {
+    if (_iosBackgroundNotificationsEnabled == v) return;
+    _iosBackgroundNotificationsEnabled = v;
+    if (v) _iosBackgroundGenerationEnabled = true;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      _iosBackgroundNotificationsEnabledKey,
+      _iosBackgroundNotificationsEnabled,
+    );
+    if (v) {
+      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
+    }
   }
 
   void setDynamicColorSupported(bool v) {
@@ -3745,6 +3835,11 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._newChatOnLaunch = _newChatOnLaunch;
     copy._newChatOnAssistantSwitch = _newChatOnAssistantSwitch;
     copy._newChatAfterDelete = _newChatAfterDelete;
+    copy._iosBackgroundGenerationEnabled = _iosBackgroundGenerationEnabled;
+    copy._iosBackgroundTaskRefreshEnabled = _iosBackgroundTaskRefreshEnabled;
+    copy._iosLiveActivityEnabled = _iosLiveActivityEnabled;
+    copy._iosBackgroundNotificationsEnabled =
+        _iosBackgroundNotificationsEnabled;
     copy._desktopSendShortcut = _desktopSendShortcut;
     copy._desktopMessageNavButtonsMode = _desktopMessageNavButtonsMode;
     copy._chatFontScale = _chatFontScale;
