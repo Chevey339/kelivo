@@ -9,8 +9,6 @@ import 'package:socks5_proxy/socks_client.dart' as socks;
 
 import 'request_logger.dart';
 
-const int _maxLoggedResponseBodyBytes = 1024 * 1024;
-
 Future<InternetAddress?> _resolveProxyAddress(String host) async {
   final parsed = InternetAddress.tryParse(host);
   if (parsed != null) return parsed;
@@ -225,9 +223,7 @@ class DioHttpClient extends http.BaseClient {
           ? body.contentLength
           : null;
       final controller = StreamController<List<int>>(sync: true);
-      var responseLogBytes = 0;
       var responseLogPending = '';
-      var responseLogTruncated = false;
       var responseLogFinished = false;
 
       void writeResponseLogText(String text) {
@@ -256,19 +252,7 @@ class DioHttpClient extends http.BaseClient {
 
       void captureResponseLogChunk(List<int> chunk) {
         if (!RequestLogger.enabled || !RequestLogger.saveOutput) return;
-        final remaining = _maxLoggedResponseBodyBytes - responseLogBytes;
-        if (remaining <= 0) {
-          responseLogTruncated = true;
-          return;
-        }
-        final bytes = remaining >= chunk.length
-            ? chunk
-            : chunk.sublist(0, remaining);
-        responseLogBytes += bytes.length;
-        if (bytes.length < chunk.length) {
-          responseLogTruncated = true;
-        }
-        final s = RequestLogger.safeDecodeUtf8(bytes);
+        final s = RequestLogger.safeDecodeUtf8(chunk);
         if (s.isEmpty) return;
         responseLogPending += s;
         flushCompleteResponseLogLines();
@@ -283,11 +267,6 @@ class DioHttpClient extends http.BaseClient {
         responseLogFinished = true;
         writeResponseLogText(responseLogPending);
         responseLogPending = '';
-        if (responseLogTruncated) {
-          writeResponseLogText(
-            '[response log truncated after $_maxLoggedResponseBodyBytes bytes]',
-          );
-        }
       }
 
       controller.onListen = () {
