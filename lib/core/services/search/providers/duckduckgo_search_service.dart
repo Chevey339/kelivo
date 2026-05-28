@@ -1,4 +1,4 @@
-import 'package:ddgs/ddgs.dart';
+import 'package:ddgs/ddgs.dart' show DDGS;
 import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
