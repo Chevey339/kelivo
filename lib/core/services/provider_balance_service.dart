@@ -26,6 +26,23 @@ class ProviderBalanceValueParser {
       throw const ProviderBalanceException('Balance result path is empty');
     }
 
+    // Division: path / literal (or path / path)
+    final div = RegExp(r'\s/\s').firstMatch(expr);
+    if (div != null) {
+      final left = _readNumber(json, expr.substring(0, div.start));
+      final right = _readNumber(json, expr.substring(div.end));
+      return _formatValue(left / right);
+    }
+
+    // Multiplication: path * literal (or path * path)
+    final mul = RegExp(r'\s\*\s').firstMatch(expr);
+    if (mul != null) {
+      final left = _readNumber(json, expr.substring(0, mul.start));
+      final right = _readNumber(json, expr.substring(mul.end));
+      return _formatValue(left * right);
+    }
+
+    // Subtraction: path - literal (or path - path)
     final minus = RegExp(r'\s-\s').firstMatch(expr);
     if (minus != null) {
       final left = _readNumber(json, expr.substring(0, minus.start));
@@ -33,16 +50,29 @@ class ProviderBalanceValueParser {
       return _formatValue(left - right);
     }
 
+    // Addition: path + literal (or path + path)
+    final plus = RegExp(r'\s\+\s').firstMatch(expr);
+    if (plus != null) {
+      final left = _readNumber(json, expr.substring(0, plus.start));
+      final right = _readNumber(json, expr.substring(plus.end));
+      return _formatValue(left + right);
+    }
+
     return _formatValue(_readPath(json, expr));
   }
 
   static num _readNumber(dynamic json, String path) {
-    final value = _readPath(json, path);
+    final trimmed = path.trim();
+    // Try literal number first (e.g. "500000" for division)
+    final literal = num.tryParse(trimmed);
+    if (literal != null) return literal;
+
+    final value = _readPath(json, trimmed);
     if (value is num) return value;
     final parsed = num.tryParse(value.toString());
     if (parsed == null) {
       throw ProviderBalanceException(
-        'Balance value at "${path.trim()}" is not numeric',
+        'Balance value at "$trimmed" is not numeric',
       );
     }
     return parsed;
