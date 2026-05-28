@@ -1,5 +1,25 @@
 part of '../chat_api_service.dart';
 
+int _readClaudeUsageInt(dynamic value) {
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
+}
+
+TokenUsage _claudeUsageFromMap(Map<String, dynamic> usage) {
+  final inTok = _readClaudeUsageInt(usage['input_tokens']);
+  final outTok = _readClaudeUsageInt(usage['output_tokens']);
+  final cached =
+      _readClaudeUsageInt(usage['cache_read_input_tokens']) +
+      _readClaudeUsageInt(usage['cache_creation_input_tokens']);
+  return TokenUsage(
+    promptTokens: inTok,
+    completionTokens: outTok,
+    cachedTokens: cached,
+    totalTokens: inTok + outTok,
+  );
+}
+
 Stream<ChatStreamChunk> _sendClaudeStream(
   http.Client client,
   ProviderConfig config,
@@ -362,15 +382,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       try {
         final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
         if (u != null) {
-          final inTok = (u['input_tokens'] ?? 0) as int? ?? 0;
-          final outTok = (u['output_tokens'] ?? 0) as int? ?? 0;
-          final round = TokenUsage(
-            promptTokens: inTok,
-            completionTokens: outTok,
-            cachedTokens: 0,
-            totalTokens: inTok + outTok,
+          totalUsage = (totalUsage ?? const TokenUsage()).merge(
+            _claudeUsageFromMap(u),
           );
-          totalUsage = (totalUsage ?? const TokenUsage()).merge(round);
         }
       } catch (_) {}
       final content = (obj['content'] as List?) ?? const <dynamic>[];
@@ -867,11 +881,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
             }
           } else if (type == 'message_delta') {
             final u = obj['usage'] ?? obj['message']?['usage'];
-            if (u != null) {
-              final inTok = (u['input_tokens'] ?? 0) as int;
-              final outTok = (u['output_tokens'] ?? 0) as int;
+            if (u is Map) {
               usage = (usage ?? const TokenUsage()).merge(
-                TokenUsage(promptTokens: inTok, completionTokens: outTok),
+                _claudeUsageFromMap(u.cast<String, dynamic>()),
               );
               roundTokens = usage.totalTokens;
             }
@@ -909,13 +921,8 @@ Stream<ChatStreamChunk> _sendClaudeStream(
 
     // If no client tool calls, decide whether to continue (pause_turn/server tool) or finalize
     if (anthToolUse.isEmpty) {
-      final hadServerTool =
-          assistantBlocks.any(
-            (b) => b['type'] == 'tool_use' || b['type'] == 'text',
-          ) &&
-          srvIndexToId.isNotEmpty;
       final sr = lastStopReason ?? '';
-      if (sr == 'pause_turn' || hadServerTool) {
+      if (sr == 'pause_turn') {
         // Continue this turn with assistant content only
         convo = [
           ...convo,

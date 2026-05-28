@@ -207,6 +207,16 @@ abstract class BuiltInToolsHelper {
     return host.contains('openrouter.ai') || providerId.contains('openrouter');
   }
 
+  static bool isDeepSeekProvider(ProviderConfig? cfg) {
+    if (cfg == null) return false;
+    final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
+    final providerId = cfg.id.toLowerCase();
+    final providerName = cfg.name.toLowerCase();
+    return host.contains('deepseek.com') ||
+        providerId.contains('deepseek') ||
+        providerName.contains('deepseek');
+  }
+
   static bool isDashScopeChatBuiltInSearchSupportedModel(String? modelId) {
     final m = _normalizedModelId(modelId);
     return _matchesExactOrSnapshot(
@@ -297,6 +307,7 @@ abstract class BuiltInToolsHelper {
       case ProviderKind.google:
         return true;
       case ProviderKind.claude:
+        if (isDeepSeekProvider(cfg)) return true;
         return isClaudeBuiltInSearchSupportedModel(upstreamModelId);
       case ProviderKind.openai:
         if (isOpenRouterProvider(cfg)) {
@@ -350,7 +361,8 @@ abstract class BuiltInToolsHelper {
       cfg: cfg,
       modelId: modelId,
     );
-    return isClaudeDynamicWebSearchSupportedModel(upstreamModelId);
+    return !isDeepSeekProvider(cfg) &&
+        isClaudeDynamicWebSearchSupportedModel(upstreamModelId);
   }
 
   static bool isClaudeDynamicWebSearchEnabled({

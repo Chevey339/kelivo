@@ -43,6 +43,20 @@ ProviderConfig _vertexClaudeConfig({
   );
 }
 
+ProviderConfig _deepSeekClaudeConfig({
+  Map<String, dynamic> modelOverrides = const <String, dynamic>{},
+}) {
+  return ProviderConfig(
+    id: 'DeepSeekClaudeCompatTest',
+    enabled: true,
+    name: 'DeepSeekClaudeCompatTest',
+    apiKey: 'test-key',
+    baseUrl: 'https://api.deepseek.com/anthropic',
+    providerType: ProviderKind.claude,
+    modelOverrides: modelOverrides,
+  );
+}
+
 class _ProxyHttpOverrides extends HttpOverrides {
   _ProxyHttpOverrides(this.port);
 
@@ -450,6 +464,136 @@ void main() {
         isTrue,
       );
     });
+
+    test(
+      'DeepSeek Claude-compatible built-in search uses old web search tool',
+      () async {
+        final cfg = _deepSeekClaudeConfig(
+          modelOverrides: const <String, dynamic>{
+            'deepseek-chat': <String, dynamic>{
+              'builtInTools': <String>[BuiltInToolNames.search],
+              'webSearch': <String, dynamic>{
+                'toolVersion': 'web_search_20260209',
+              },
+            },
+          },
+        );
+
+        expect(
+          BuiltInToolsHelper.supportsBuiltInSearchForModel(
+            cfg: cfg,
+            modelId: 'deepseek-chat',
+          ),
+          isTrue,
+        );
+        expect(
+          BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
+            cfg: cfg,
+            modelId: 'deepseek-chat',
+          ),
+          isFalse,
+        );
+
+        final body = await _captureClaudeBuiltInSearchBody(
+          modelId: 'deepseek-chat',
+          config: cfg,
+        );
+
+        final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
+        expect(
+          tools.any((tool) => tool['type'] == 'web_search_20250305'),
+          isTrue,
+        );
+        expect(
+          tools.any((tool) => tool['type'] == 'web_search_20260209'),
+          isFalse,
+        );
+        expect(
+          tools.any((tool) => tool['type'] == 'code_execution_20250825'),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'DeepSeek server web search end_turn does not trigger a continuation request',
+      () async {
+        final requestBodies = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requestBodies.add(
+            (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                .cast<String, dynamic>(),
+          );
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.write('''
+event: message_start
+data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","model":"deepseek-v4-flash","content":[],"stop_reason":null,"usage":{"input_tokens":1,"output_tokens":0}}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"server_tool_use","id":"srv_1","name":"web_search","input":{}}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"query\\":\\"kelivo\\"}"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"web_search_tool_result","tool_use_id":"srv_1","content":[{"type":"web_search_result","title":"Kelivo","url":"https://example.com"}]}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1}
+
+event: content_block_start
+data: {"type":"content_block_start","index":2,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"text_delta","text":"done"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":2}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":10,"output_tokens":5,"server_tool_use":{"web_search_requests":1}}}
+
+event: message_stop
+data: {"type":"message_stop"}
+
+''');
+          await request.response.close();
+        });
+
+        final cfg = _deepSeekClaudeConfig(
+          modelOverrides: const <String, dynamic>{
+            'deepseek-v4-flash': <String, dynamic>{
+              'builtInTools': <String>[BuiltInToolNames.search],
+            },
+          },
+        ).copyWith(baseUrl: 'http://${server.address.address}:${server.port}');
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: cfg,
+          modelId: 'deepseek-v4-flash',
+          messages: const [
+            {'role': 'user', 'content': '搜索一下kelivo'},
+          ],
+          stream: true,
+        ).toList();
+
+        expect(chunks.where((chunk) => chunk.content == 'done'), hasLength(1));
+        expect(chunks.last.isDone, isTrue);
+        expect(requestBodies, hasLength(1));
+      },
+    );
 
     test(
       'Vertex Claude keeps old search tool selection even with new flag',
