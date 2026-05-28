@@ -882,13 +882,8 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     }
 
     if (anthToolUse.isEmpty) {
-      final hadServerTool =
-          assistantBlocks.any(
-            (b) => b['type'] == 'tool_use' || b['type'] == 'text',
-          ) &&
-          srvIndexToId.isNotEmpty;
       final sr = lastStopReason ?? '';
-      if (sr == 'pause_turn' || hadServerTool) {
+      if (sr == 'pause_turn') {
         // Continue this turn with assistant content only (not fully supported by Vertex streamRawPredict yet, but good for future proofing)
         convo = [
           ...convo,
