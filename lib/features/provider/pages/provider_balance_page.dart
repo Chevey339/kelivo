@@ -27,6 +27,7 @@ class ProviderBalancePage extends StatefulWidget {
 class _ProviderBalancePageState extends State<ProviderBalancePage> {
   final _balanceApiPathCtrl = TextEditingController();
   final _balanceResultPathCtrl = TextEditingController();
+  final _balanceHeadersCtrl = TextEditingController();
 
   bool _balanceEnabled = false;
   bool _balanceLoading = false;
@@ -50,13 +51,38 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
         cfg.balanceApiPath ?? defaults.balanceApiPath ?? '';
     _balanceResultPathCtrl.text =
         cfg.balanceResultPath ?? defaults.balanceResultPath ?? '';
+    _balanceHeadersCtrl.text = _balanceHeadersToText(cfg.balanceHeaders);
   }
 
   @override
   void dispose() {
     _balanceApiPathCtrl.dispose();
     _balanceResultPathCtrl.dispose();
+    _balanceHeadersCtrl.dispose();
     super.dispose();
+  }
+
+  /// Convert Map<String, String> to multi-line "Key: Value" text.
+  static String _balanceHeadersToText(Map<String, String>? headers) {
+    if (headers == null || headers.isEmpty) return '';
+    return headers.entries.map((e) => '${e.key}: ${e.value}').join('\n');
+  }
+
+  /// Parse multi-line "Key: Value" text back to Map<String, String>.
+  static Map<String, String> _balanceHeadersFromText(String text) {
+    final map = <String, String>{};
+    for (final line in text.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      final colon = trimmed.indexOf(':');
+      if (colon <= 0) continue;
+      final key = trimmed.substring(0, colon).trim();
+      final value = trimmed.substring(colon + 1).trim();
+      if (key.isNotEmpty && value.isNotEmpty) {
+        map[key] = value;
+      }
+    }
+    return map;
   }
 
   @override
@@ -117,6 +143,30 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
                   _saveBalance();
                 },
                 decoration: _balanceInputDecoration(context),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _inputRow(
+              context,
+              label: l10n.providerDetailPageBalanceHeadersLabel,
+              child: TextField(
+                controller: _balanceHeadersCtrl,
+                maxLines: 3,
+                minLines: 2,
+                onChanged: (_) {
+                  setState(() {
+                    _balanceValue = null;
+                    _balanceError = null;
+                  });
+                  _saveBalance();
+                },
+                decoration: _balanceInputDecoration(context).copyWith(
+                  hintText: 'x-api-key: your-key\nAuthorization: Bearer xxx',
+                ),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontFamily: 'monospace',
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -227,6 +277,7 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
         balanceEnabled: _balanceEnabled,
         balanceApiPath: _balanceApiPathCtrl.text.trim(),
         balanceResultPath: _balanceResultPathCtrl.text.trim(),
+        balanceHeaders: _balanceHeadersFromText(_balanceHeadersCtrl.text),
       ),
     );
     ProviderBalanceBadge.clearCacheFor(widget.providerKey);
@@ -284,6 +335,7 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
       _balanceEnabled = defaults.balanceEnabled ?? false;
       _balanceApiPathCtrl.text = defaults.balanceApiPath ?? '';
       _balanceResultPathCtrl.text = defaults.balanceResultPath ?? '';
+      _balanceHeadersCtrl.text = _balanceHeadersToText(defaults.balanceHeaders);
       _balanceValue = null;
       _balanceError = null;
     });

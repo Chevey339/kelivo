@@ -1007,6 +1007,7 @@
   "providerDetailPageBalanceInfo": "获取账户余额",
   "providerDetailPageBalanceApiPathLabel": "余额 API 路径",
   "providerDetailPageBalanceResultPathLabel": "结果 JSON 路径",
+  "providerDetailPageBalanceHeadersLabel": "自定义请求头",
   "providerDetailPageBalanceQueryButton": "查询余额",
   "providerDetailPageBalanceQuerying": "查询中...",
   "providerDetailPageBalanceResetDefaultsButton": "重置",

@@ -4120,6 +4120,9 @@ class ProviderConfig {
   final bool? balanceEnabled;
   final String? balanceApiPath;
   final String? balanceResultPath;
+  // Custom HTTP headers for balance query (e.g. {'x-api-key': 'xxx'}).
+  // Stored as a Map to support arbitrary auth schemes.
+  final Map<String, String>? balanceHeaders;
   // Anthropic/OpenRouter Claude prompt caching for stable system prompts.
   final bool? claudePromptCachingEnabled;
   final String? claudePromptCachingTtl;
@@ -4185,6 +4188,7 @@ class ProviderConfig {
     this.balanceEnabled,
     this.balanceApiPath,
     this.balanceResultPath,
+    this.balanceHeaders,
     this.claudePromptCachingEnabled = false,
     this.claudePromptCachingTtl = claudePromptCachingTtl5m,
   });
@@ -4222,6 +4226,7 @@ class ProviderConfig {
     bool? balanceEnabled,
     String? balanceApiPath,
     String? balanceResultPath,
+    Map<String, String>? balanceHeaders,
     bool? claudePromptCachingEnabled,
     String? claudePromptCachingTtl,
   }) => ProviderConfig(
@@ -4259,6 +4264,7 @@ class ProviderConfig {
     balanceEnabled: balanceEnabled ?? this.balanceEnabled,
     balanceApiPath: balanceApiPath ?? this.balanceApiPath,
     balanceResultPath: balanceResultPath ?? this.balanceResultPath,
+    balanceHeaders: balanceHeaders ?? this.balanceHeaders,
     claudePromptCachingEnabled:
         claudePromptCachingEnabled ?? this.claudePromptCachingEnabled,
     claudePromptCachingTtl:
@@ -4295,6 +4301,7 @@ class ProviderConfig {
     'balanceEnabled': balanceEnabled,
     'balanceApiPath': balanceApiPath,
     'balanceResultPath': balanceResultPath,
+    'balanceHeaders': balanceHeaders,
     'claudePromptCachingEnabled': claudePromptCachingEnabled,
     'claudePromptCachingTtl': resolveClaudePromptCachingTtl(
       claudePromptCachingTtl,
@@ -4347,6 +4354,8 @@ class ProviderConfig {
     balanceEnabled: json['balanceEnabled'] as bool?,
     balanceApiPath: json['balanceApiPath'] as String?,
     balanceResultPath: json['balanceResultPath'] as String?,
+    balanceHeaders: (json['balanceHeaders'] as Map<String, dynamic>?)
+        ?.map((k, v) => MapEntry(k, v.toString())),
     claudePromptCachingEnabled:
         json['claudePromptCachingEnabled'] as bool? ?? false,
     claudePromptCachingTtl: resolveClaudePromptCachingTtl(

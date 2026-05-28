@@ -1330,6 +1330,7 @@
   "providerDetailPageBalanceInfo": "Get account balance",
   "providerDetailPageBalanceApiPathLabel": "Balance API Path",
   "providerDetailPageBalanceResultPathLabel": "Result JSON Path",
+  "providerDetailPageBalanceHeadersLabel": "Custom Headers",
   "providerDetailPageBalanceQueryButton": "Check Balance",
   "providerDetailPageBalanceQuerying": "Checking...",
   "providerDetailPageBalanceResetDefaultsButton": "Reset",

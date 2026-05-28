@@ -1000,6 +1000,7 @@
   "providerDetailPageBalanceInfo": "取得帳戶餘額",
   "providerDetailPageBalanceApiPathLabel": "餘額 API 路徑",
   "providerDetailPageBalanceResultPathLabel": "結果 JSON 路徑",
+  "providerDetailPageBalanceHeadersLabel": "自訂請求標頭",
   "providerDetailPageBalanceQueryButton": "查詢餘額",
   "providerDetailPageBalanceQuerying": "查詢中...",
   "providerDetailPageBalanceResetDefaultsButton": "重設",

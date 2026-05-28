@@ -122,6 +122,7 @@ class ProviderBalanceService {
       final headers = <String, String>{
         if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
         ...providerDefaultHeaders(config),
+        if (config.balanceHeaders != null) ...config.balanceHeaders!,
       };
       final response = await client.get(uri, headers: headers);
       if (response.statusCode < 200 || response.statusCode >= 300) {

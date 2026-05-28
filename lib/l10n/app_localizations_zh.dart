@@ -2984,6 +2984,8 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '结果 JSON 路径';
+  String get providerDetailPageBalanceHeadersLabel => '自定义请求头';
+  String get providerDetailPageBalanceHeadersLabel => '自定义请求头';
 
   @override
   String get providerDetailPageBalanceQueryButton => '查询余额';
@@ -13295,6 +13297,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageBalanceResultPathLabel => '結果 JSON 路徑';
+  String get providerDetailPageBalanceHeadersLabel => '自訂請求標頭';
 
   @override
   String get providerDetailPageBalanceQueryButton => '查詢餘額';
