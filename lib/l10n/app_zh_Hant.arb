@@ -1290,6 +1290,7 @@
   "desktopDisplaySettingsTopicPositionTitle": "主題位置",
   "desktopDisplaySettingsTopicPositionLeft": "左側",
   "desktopDisplaySettingsTopicPositionRight": "右側",
+  "desktopDisplaySettingsTopicTitleAutoBlurTitle": "自動模糊話題標題",
   "displaySettingsPageNewChatOnLaunchSubtitle": "應用程式啟動時自動建立新對話",
   "displaySettingsPageChatFontSizeTitle": "聊天字體大小",
   "displaySettingsPageAutoScrollEnableTitle": "自動回到底部",

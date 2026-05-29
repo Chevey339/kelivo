@@ -3253,6 +3253,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     bool includeUpdateBanner = false,
   }) {
     final children = <Widget>[];
+    final topicTitleAutoBlur = context
+        .watch<SettingsProvider>()
+        .desktopTopicTitleAutoBlur;
     if (includeUpdateBanner) {
       children.add(
         Builder(
@@ -3388,6 +3391,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                     _ChatTile(
                           chat: pinnedList[i],
                           textColor: textBase,
+                          titleAutoBlur: topicTitleAutoBlur,
                           selected:
                               pinnedList[i].id ==
                               chatService.currentConversationId,
@@ -3453,6 +3457,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                     _ChatTile(
                           chat: group.items[j],
                           textColor: textBase,
+                          titleAutoBlur: topicTitleAutoBlur,
                           selected:
                               group.items[j].id ==
                               chatService.currentConversationId,
@@ -3513,6 +3518,7 @@ class _ChatTile extends StatefulWidget {
   const _ChatTile({
     required this.chat,
     required this.textColor,
+    required this.titleAutoBlur,
     this.onTap,
     this.onLongPress,
     this.onSecondaryTap,
@@ -3522,6 +3528,7 @@ class _ChatTile extends StatefulWidget {
 
   final ChatItem chat;
   final Color textColor;
+  final bool titleAutoBlur;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final void Function(Offset globalPosition)? onSecondaryTap;
@@ -3561,6 +3568,30 @@ class _ChatTileState extends State<_ChatTile> {
               : cs.surface.withValues(alpha: 0.9))
         : tileColor;
     final double vGap = _isDesktop ? 4 : 4;
+    Widget title = Text(
+      widget.chat.title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: _isDesktop ? 14 : 15,
+        color: widget.textColor,
+        fontWeight: FontWeight.w400,
+      ),
+    );
+
+    if (_isDesktop && widget.titleAutoBlur) {
+      title = TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 0, end: _hovered ? 0 : 3.0),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        builder: (context, sigma, child) => ImageFiltered(
+          imageFilter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+          child: child,
+        ),
+        child: title,
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.only(bottom: vGap),
       child: GestureDetector(
@@ -3597,18 +3628,7 @@ class _ChatTileState extends State<_ChatTile> {
             ),
             child: Row(
               children: [
-                Expanded(
-                  child: Text(
-                    widget.chat.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: _isDesktop ? 14 : 15,
-                      color: widget.textColor,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ),
+                Expanded(child: title),
                 if (widget.loading) ...[
                   const SizedBox(width: 8),
                   _LoadingDot(),

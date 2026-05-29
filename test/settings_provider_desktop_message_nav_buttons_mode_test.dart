@@ -83,4 +83,49 @@ void main() {
       );
     });
   });
+
+  group('SettingsProvider desktop topic title auto blur', () {
+    test('defaults to disabled', () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = SettingsProvider();
+
+      await _waitForSettingsLoad();
+
+      expect(settings.desktopTopicTitleAutoBlur, isFalse);
+    });
+
+    test('loads persisted value', () async {
+      SharedPreferences.setMockInitialValues({
+        'display_desktop_topic_title_auto_blur_v1': true,
+      });
+      final settings = SettingsProvider();
+
+      await _waitForSettingsLoad();
+
+      expect(settings.desktopTopicTitleAutoBlur, isTrue);
+    });
+
+    test('persists changes to preferences', () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = SettingsProvider();
+
+      await _waitForSettingsLoad();
+      await settings.setDesktopTopicTitleAutoBlur(true);
+
+      expect(settings.desktopTopicTitleAutoBlur, isTrue);
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getBool('display_desktop_topic_title_auto_blur_v1'),
+        isTrue,
+      );
+
+      await settings.setDesktopTopicTitleAutoBlur(false);
+
+      expect(settings.desktopTopicTitleAutoBlur, isFalse);
+      expect(
+        prefs.getBool('display_desktop_topic_title_auto_blur_v1'),
+        isFalse,
+      );
+    });
+  });
 }

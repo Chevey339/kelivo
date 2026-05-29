@@ -1641,6 +1641,7 @@
   "desktopDisplaySettingsTopicPositionTitle": "Topic position",
   "desktopDisplaySettingsTopicPositionLeft": "Left",
   "desktopDisplaySettingsTopicPositionRight": "Right",
+  "desktopDisplaySettingsTopicTitleAutoBlurTitle": "Auto-blur topic titles",
   "displaySettingsPageNewChatOnLaunchSubtitle": "Automatically create a new chat on launch",
   "displaySettingsPageChatFontSizeTitle": "Chat Font Size",
   "displaySettingsPageAutoScrollEnableTitle": "Auto-scroll to bottom",
