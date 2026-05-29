@@ -1300,6 +1300,7 @@
   "desktopDisplaySettingsTopicPositionTitle": "话题位置",
   "desktopDisplaySettingsTopicPositionLeft": "左侧",
   "desktopDisplaySettingsTopicPositionRight": "右侧",
+  "desktopDisplaySettingsTopicTitleAutoBlurTitle": "自动模糊话题标题",
   "displaySettingsPageNewChatOnLaunchSubtitle": "应用启动时自动创建新对话",
   "displaySettingsPageChatFontSizeTitle": "聊天字体大小",
   "displaySettingsPageAutoScrollEnableTitle": "自动回到底部",

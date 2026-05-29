@@ -28,6 +28,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ChatMessageBackgroundRow(),
                   _RowDivider(),
                   _TopicPositionRow(),
+                  _RowDivider(),
+                  _DesktopTopicTitleAutoBlurRow(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -502,6 +504,22 @@ class _TopicPositionRow extends StatelessWidget {
     return _LabeledRow(
       label: l10n.desktopDisplaySettingsTopicPositionTitle,
       trailing: const _TopicPositionDropdown(),
+    );
+  }
+}
+
+class _DesktopTopicTitleAutoBlurRow extends StatelessWidget {
+  const _DesktopTopicTitleAutoBlurRow();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.desktopDisplaySettingsTopicTitleAutoBlurTitle,
+      value: sp.desktopTopicTitleAutoBlur,
+      onChanged: (v) => context
+          .read<SettingsProvider>()
+          .setDesktopTopicTitleAutoBlur(v),
     );
   }
 }
