@@ -1,32 +1,33 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
-import 'package:provider/provider.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import '../../../l10n/app_localizations.dart';
-import '../widgets/side_drawer.dart';
-import '../../../icons/lucide_adapter.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
+
 import '../../../core/models/assistant.dart';
+import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/settings_provider.dart';
-import '../../../core/providers/assistant_provider.dart';
+import '../../../desktop/hotkeys/chat_action_bus.dart';
+import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
+import '../../../icons/lucide_adapter.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../utils/sandbox_path_resolver.dart';
-import '../../../desktop/hotkeys/chat_action_bus.dart';
-import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
+import '../widgets/side_drawer.dart';
 
 /// Desktop/Tablet layout scaffold for the home page
 /// Handles the overall structure: left sidebar, main content, optional right sidebar
 /// All message list rendering and input bar logic remain in home_page.dart
-class HomeDesktopScaffold extends StatelessWidget {
+class HomeDesktopScaffold extends StatefulWidget {
   const HomeDesktopScaffold({
     super.key,
     required this.scaffoldKey,
@@ -103,8 +104,58 @@ class HomeDesktopScaffold extends StatelessWidget {
   final PreferredSizeWidget? appBarOverride;
   final Widget body;
 
+  @override
+  State<HomeDesktopScaffold> createState() => _HomeDesktopScaffoldState();
+}
+
+class _HomeDesktopScaffoldState extends State<HomeDesktopScaffold> {
+  bool _sidebarHoverExpanded = false;
+
+  GlobalKey<ScaffoldState> get scaffoldKey => widget.scaffoldKey;
+  ValueNotifier<int> get assistantPickerCloseTick =>
+      widget.assistantPickerCloseTick;
+  Set<String> get loadingConversationIds => widget.loadingConversationIds;
+  String get title => widget.title;
+  String? get providerName => widget.providerName;
+  String? get modelDisplay => widget.modelDisplay;
+  bool get tabletSidebarOpen => widget.tabletSidebarOpen;
+  bool get rightSidebarOpen => widget.rightSidebarOpen;
+  double get embeddedSidebarWidth => widget.embeddedSidebarWidth;
+  double get rightSidebarWidth => widget.rightSidebarWidth;
+  VoidCallback get onToggleSidebar => widget.onToggleSidebar;
+  VoidCallback get onToggleRightSidebar => widget.onToggleRightSidebar;
+  void Function(String id) get onSelectConversation =>
+      widget.onSelectConversation;
+  VoidCallback get onNewConversation => widget.onNewConversation;
+  Future<void> Function() get onCreateNewConversation =>
+      widget.onCreateNewConversation;
+  Future<void> Function() get onToggleTemporaryConversation =>
+      widget.onToggleTemporaryConversation;
+  VoidCallback get onSelectModel => widget.onSelectModel;
+  bool get canToggleTemporaryConversation =>
+      widget.canToggleTemporaryConversation;
+  bool get temporaryConversationEnabled => widget.temporaryConversationEnabled;
+  bool get globalSearchMode => widget.globalSearchMode;
+  String get globalSearchQuery => widget.globalSearchQuery;
+  ValueChanged<String> get onGlobalSearchQueryChanged =>
+      widget.onGlobalSearchQueryChanged;
+  Future<void> Function(String conversationId, String messageId)
+  get onOpenGlobalSearchResult => widget.onOpenGlobalSearchResult;
+  void Function(double dx) get onSidebarWidthChanged =>
+      widget.onSidebarWidthChanged;
+  VoidCallback get onSidebarWidthChangeEnd => widget.onSidebarWidthChangeEnd;
+  void Function(double dx) get onRightSidebarWidthChanged =>
+      widget.onRightSidebarWidthChanged;
+  VoidCallback get onRightSidebarWidthChangeEnd =>
+      widget.onRightSidebarWidthChangeEnd;
+  Widget Function(BuildContext context) get buildAssistantBackground =>
+      widget.buildAssistantBackground;
+  PreferredSizeWidget? get appBarOverride => widget.appBarOverride;
+  Widget get body => widget.body;
+
   static const Duration _sidebarAnimDuration = Duration(milliseconds: 260);
   static const Curve _sidebarAnimCurve = Curves.easeOutCubic;
+  static const double _collapsedSidebarHoverWidth = 56;
 
   bool get _isDesktop =>
       defaultTargetPlatform == TargetPlatform.macOS ||
@@ -112,10 +163,27 @@ class HomeDesktopScaffold extends StatelessWidget {
       defaultTargetPlatform == TargetPlatform.linux;
 
   @override
+  void didUpdateWidget(covariant HomeDesktopScaffold oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.tabletSidebarOpen && _sidebarHoverExpanded) {
+      _sidebarHoverExpanded = false;
+    }
+  }
+
+  void _setSidebarHoverExpanded(bool expanded) {
+    if (!_isDesktop || tabletSidebarOpen || _sidebarHoverExpanded == expanded) {
+      return;
+    }
+    setState(() => _sidebarHoverExpanded = expanded);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final sp = context.watch<SettingsProvider>();
     final topicsOnRight = sp.desktopTopicPosition == DesktopTopicPosition.right;
+    final effectiveLeftSidebarOpen =
+        tabletSidebarOpen || (_isDesktop && _sidebarHoverExpanded);
 
     return Stack(
       children: [
@@ -124,11 +192,16 @@ class HomeDesktopScaffold extends StatelessWidget {
           child: Row(
             children: [
               // Left sidebar
-              _buildLeftSidebar(context, cs, topicsOnRight),
+              _buildLeftSidebar(
+                context,
+                cs,
+                topicsOnRight,
+                effectiveLeftSidebarOpen,
+              ),
               // Left sidebar resize handle / divider
               if (_isDesktop)
                 SidebarResizeHandle(
-                  visible: tabletSidebarOpen,
+                  visible: effectiveLeftSidebarOpen,
                   onDrag: onSidebarWidthChanged,
                   onDragEnd: onSidebarWidthChangeEnd,
                 )
@@ -163,6 +236,18 @@ class HomeDesktopScaffold extends StatelessWidget {
             ],
           ),
         ),
+        if (_isDesktop && !tabletSidebarOpen && !_sidebarHoverExpanded)
+          Positioned(
+            left: 0,
+            top: kToolbarHeight,
+            bottom: 0,
+            width: _collapsedSidebarHoverWidth,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              onEnter: (_) => _setSidebarHoverExpanded(true),
+              child: const SizedBox.expand(),
+            ),
+          ),
       ],
     );
   }
@@ -171,6 +256,7 @@ class HomeDesktopScaffold extends StatelessWidget {
     BuildContext context,
     ColorScheme cs,
     bool topicsOnRight,
+    bool effectiveOpen,
   ) {
     final sidebar = SideDrawer(
       embedded: true,
@@ -196,10 +282,10 @@ class HomeDesktopScaffold extends StatelessWidget {
           onSelectConversation(id),
     );
 
-    return AnimatedContainer(
+    final panel = AnimatedContainer(
       duration: _sidebarAnimDuration,
       curve: _sidebarAnimCurve,
-      width: tabletSidebarOpen ? embeddedSidebarWidth : 0,
+      width: effectiveOpen ? embeddedSidebarWidth : 0,
       color: Colors.transparent,
       child: ClipRect(
         child: OverflowBox(
@@ -209,6 +295,14 @@ class HomeDesktopScaffold extends StatelessWidget {
           child: SizedBox(width: embeddedSidebarWidth, child: sidebar),
         ),
       ),
+    );
+
+    if (!_isDesktop || tabletSidebarOpen) return panel;
+
+    return MouseRegion(
+      onEnter: (_) => _setSidebarHoverExpanded(true),
+      onExit: (_) => _setSidebarHoverExpanded(false),
+      child: panel,
     );
   }
 
@@ -295,17 +389,20 @@ class HomeDesktopScaffold extends StatelessWidget {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
-      leading: IosIconButton(
-        size: 20,
-        padding: const EdgeInsets.all(8),
-        minSize: 40,
-        builder: (color) => SvgPicture.asset(
-          'assets/icons/list.svg',
-          width: 14,
-          height: 14,
-          colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+      leading: MouseRegion(
+        onEnter: (_) => _setSidebarHoverExpanded(true),
+        child: IosIconButton(
+          size: 20,
+          padding: const EdgeInsets.all(8),
+          minSize: 40,
+          builder: (color) => SvgPicture.asset(
+            'assets/icons/list.svg',
+            width: 14,
+            height: 14,
+            colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          ),
+          onTap: onToggleSidebar,
         ),
-        onTap: onToggleSidebar,
       ),
       titleSpacing: 2,
       title: _buildTitle(context, cs),
@@ -405,6 +502,13 @@ class HomeDesktopScaffold extends StatelessWidget {
       );
     }
 
+    Widget titleText = AnimatedTextSwap(
+      text: title,
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
     final row = Row(
       mainAxisSize: MainAxisSize.max,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -422,12 +526,7 @@ class HomeDesktopScaffold extends StatelessWidget {
           child: AnimatedSize(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
-            child: AnimatedTextSwap(
-              text: title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: titleText,
           ),
         ),
         if (capsule != null) ...[
