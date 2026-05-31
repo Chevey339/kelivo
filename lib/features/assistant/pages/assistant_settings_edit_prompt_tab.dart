@@ -200,6 +200,41 @@ class _PromptTabState extends State<_PromptTab> {
     if (!mounted || next == null || next == _sysCtrl.text) return;
     await _applySystemPromptChange(next);
   }
+Future<void> _exportSystemPrompt() async {
+    final l10n = AppLocalizations.of(context)!;
+    final text = _sysCtrl.text.trim();
+    if (text.isEmpty) {
+      showAppSnackBar(
+        context,
+        message: '系统提示词为空，无法导出',
+        type: NotificationType.warning,
+      );
+      return;
+    }
+    try {
+      final outputPath = await FilePicker.platform.saveFile(
+        dialogTitle: '导出系统提示词',
+        fileName: 'system_prompt_${widget.assistantId.substring(0, 8)}.md',
+        type: FileType.custom,
+        allowedExtensions: ['md', 'txt'],
+      );
+      if (outputPath == null || outputPath.isEmpty) return;
+      await File(outputPath).writeAsString(text);
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '已导出到 $outputPath',
+        type: NotificationType.success,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '导出失败: $e',
+        type: NotificationType.error,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -265,6 +300,14 @@ class _PromptTabState extends State<_PromptTab> {
                   dense: true,
                   neutral: false,
                   onTap: _importSystemPrompt,
+                ),
+                const SizedBox(width: 6),
+                _IosButton(
+                  label: '导出',
+                  icon: Icons.file_download,
+                  dense: true,
+                  neutral: true,
+                  onTap: _exportSystemPrompt,
                 ),
               ],
             ),

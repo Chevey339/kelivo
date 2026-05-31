@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/skill_provider.dart';
@@ -41,7 +42,7 @@ class _SkillImportSheetState extends State<SkillImportSheet> {
             ),
             const SizedBox(height: 16),
             Text(
-              '导入技能',
+              '技能管理',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -50,13 +51,24 @@ class _SkillImportSheetState extends State<SkillImportSheet> {
             ),
             const SizedBox(height: 4),
             Text(
-              '支持 SKILL.md 文件、粘贴内容或扫描目录',
+              '从文件或剪贴板导入 SKILL.md',
               style: TextStyle(
                 fontSize: 13,
                 color: cs.onSurface.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 20),
+
+            // ── 导入区 ──
+            Text(
+              '导入',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+            const SizedBox(height: 8),
             _option(
               icon: Lucide.Copy,
               title: '从剪贴板导入',
@@ -67,15 +79,8 @@ class _SkillImportSheetState extends State<SkillImportSheet> {
             _option(
               icon: Lucide.FileText,
               title: '从文件导入',
-              subtitle: '输入 SKILL.md 文件路径',
-              onTap: () => _importFromFile(context),
-            ),
-            const SizedBox(height: 8),
-            _option(
-              icon: Lucide.FolderOpen,
-              title: '从目录批量导入',
-              subtitle: '扫描文件夹下所有 SKILL.md',
-              onTap: () => _importFromDirectory(context),
+              subtitle: '使用文件选择器选取 SKILL.md',
+              onTap: () => _importFromFilePicker(context),
             ),
             if (_importing) ...[
               const SizedBox(height: 16),
@@ -85,7 +90,7 @@ class _SkillImportSheetState extends State<SkillImportSheet> {
               ),
               const SizedBox(height: 8),
               Text(
-                '导入中...',
+                '处理中...',
                 style: TextStyle(
                   fontSize: 12,
                   color: cs.onSurface.withValues(alpha: 0.5),
@@ -150,6 +155,10 @@ class _SkillImportSheetState extends State<SkillImportSheet> {
     );
   }
 
+  // ============================================================================
+  // 从剪贴板导入
+  // ============================================================================
+
   Future<void> _importFromClipboard(BuildContext context) async {
     final skillProvider = context.read<SkillProvider>();
     final text = await _showInputDialog(context, '粘贴 SKILL.md 内容', hint: '将 SKILL.md 内容粘贴到这里...');
@@ -171,57 +180,60 @@ class _SkillImportSheetState extends State<SkillImportSheet> {
     }
   }
 
-  Future<void> _importFromFile(BuildContext context) async {
-    final skillProvider = context.read<SkillProvider>();
-    final path = await _showInputDialog(
-      context,
-      '输入 SKILL.md 文件路径',
-      hint: '/sdcard/Download/skill.md',
-    );
-    if (path == null || path.trim().isEmpty) return;
+  // ============================================================================
+  // 从 FilePicker 导入（类似系统提示词）
+  // ============================================================================
 
-    setState(() => _importing = true);
+  Future<void> _importFromFilePicker(BuildContext context) async {
+    final skillProvider = context.read<SkillProvider>();
     try {
-      final skill = await skillProvider.importFromFile(path.trim());
-      if (skill != null && context.mounted) {
-        _showSnack(context, '已导入: ${skill.name}', Colors.green);
-        Navigator.of(context).pop();
-      } else if (context.mounted) {
-        _showSnack(context, '文件不存在或格式错误', Colors.red);
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        type: FileType.custom,
+        allowedExtensions: ['md', 'markdown', 'txt'],
+      );
+      if (result == null || result.files.isEmpty) return;
+      final picked = result.files.first;
+
+      String? content;
+      if (picked.bytes != null && picked.bytes!.isNotEmpty) {
+        content = String.fromCharCodes(picked.bytes!);
+      } else if (picked.path != null && picked.path!.isNotEmpty) {
+        content = await File(picked.path!).readAsString();
+      }
+
+      if (content == null || content.trim().isEmpty) {
+        if (context.mounted) {
+          _showSnack(context, '文件为空', Colors.orange);
+        }
+        return;
+      }
+
+      setState(() => _importing = true);
+      try {
+        final skill = await skillProvider.importFromString(
+          content.trim(),
+          filePath: picked.path,
+        );
+        if (skill != null && context.mounted) {
+          _showSnack(context, '已导入: ${skill.name}', Colors.green);
+          Navigator.of(context).pop();
+        } else if (context.mounted) {
+          _showSnack(context, '解析失败，请检查 SKILL.md 格式', Colors.red);
+        }
+      } catch (e) {
+        if (context.mounted) _showSnack(context, '导入失败: $e', Colors.red);
+      } finally {
+        if (mounted) setState(() => _importing = false);
       }
     } catch (e) {
-      if (context.mounted) _showSnack(context, '导入失败: $e', Colors.red);
-    } finally {
-      if (mounted) setState(() => _importing = false);
+      if (context.mounted) _showSnack(context, '选择文件失败: $e', Colors.red);
     }
   }
 
-  Future<void> _importFromDirectory(BuildContext context) async {
-    final skillProvider = context.read<SkillProvider>();
-    final home = Platform.environment['HOME'] ?? '/data/data/com.termux/files/home';
-    final path = await _showInputDialog(
-      context,
-      '输入技能目录路径',
-      hint: '~/skills/',
-      initial: '$home/skills/',
-    );
-    if (path == null || path.trim().isEmpty) return;
-
-    setState(() => _importing = true);
-    try {
-      final count = await skillProvider.importFromDirectory(path.trim());
-      if (count > 0 && context.mounted) {
-        _showSnack(context, '已批量导入 $count 个技能', Colors.green);
-        Navigator.of(context).pop();
-      } else if (context.mounted) {
-        _showSnack(context, '目录中未找到 SKILL.md 文件', Colors.orange);
-      }
-    } catch (e) {
-      if (context.mounted) _showSnack(context, '导入失败: $e', Colors.red);
-    } finally {
-      if (mounted) setState(() => _importing = false);
-    }
-  }
+  // ============================================================================
+  // 工具方法
+  // ============================================================================
 
   Future<String?> _showInputDialog(
     BuildContext context,
@@ -265,10 +277,4 @@ class _SkillImportSheetState extends State<SkillImportSheet> {
       SnackBar(content: Text(msg), backgroundColor: color, behavior: SnackBarBehavior.floating),
     );
   }
-}
-
-// Lucide icons we need but may not be in adapter:
-// FolderOpen — use Icons.folder_open as fallback
-extension _FallbackIcon on Lucide {
-  static const IconData FolderOpen = Icons.folder_open;
 }
