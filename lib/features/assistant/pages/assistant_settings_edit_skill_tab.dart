@@ -1,8 +1,5 @@
 part of 'assistant_settings_edit_page.dart';
 
-import '../../../core/providers/skill_provider.dart';
-import '../../../core/models/skill.dart';
-
 /// 技能 Tab — 在 Assistant 编辑页中管理技能绑定
 class _SkillTab extends StatefulWidget {
   const _SkillTab({required this.assistantId});

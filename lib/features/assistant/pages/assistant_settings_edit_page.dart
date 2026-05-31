@@ -34,6 +34,8 @@ import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/providers/skill_provider.dart';
+import '../../../core/models/skill.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../../icons/lucide_adapter.dart';
