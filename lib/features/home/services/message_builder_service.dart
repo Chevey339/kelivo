@@ -8,6 +8,7 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/instruction_injection.dart';
 import '../../../core/models/world_book.dart';
+import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/skill_provider.dart';
@@ -625,7 +626,10 @@ class MessageBuilderService {
     }
   }
 
-  /// Inject skill prompts into apiMessages (keyword-triggered, after instructions).
+  /// 注入技能工具信息到 system prompt
+  ///
+  /// 技能不再是关键词注入机制，而是作为 AI 可调用的 use_skill 工具。
+  /// 这里只注入轻量级的可用技能列表说明，完整内容由 AI 通过工具调用按需获取。
   Future<void> injectSkillPrompts(
     List<Map<String, dynamic>> apiMessages,
     String? assistantId,
@@ -634,45 +638,37 @@ class MessageBuilderService {
     try {
       final skillProvider = contextProvider.read<SkillProvider>();
       await skillProvider.initialize();
-      final active = skillProvider.getActiveSkillsForAssistant(assistantId);
-      if (active.isEmpty) return;
 
-      // Extract recent context for trigger matching (last 3 messages)
-      final recentBuf = StringBuffer();
-      int count = 0;
-      for (int i = sourceMessages.length - 1; i >= 0 && count < 3; i--) {
-        final content = sourceMessages[i].content.trim();
-        if (content.isEmpty) continue;
-        recentBuf.writeln(content);
-        count++;
-      }
-      final recentText = recentBuf.toString().trim();
-      if (recentText.isEmpty) return;
+      // 通过 AssistantProvider 获取当前 assistant 的 enabledSkills
+      final assistantProvider = contextProvider.read<AssistantProvider>();
+      final allAssistants = assistantProvider.assistants;
+      final assistant = allAssistants.where((a) => a.id == assistantId).isNotEmpty
+          ? allAssistants.firstWhere((a) => a.id == assistantId)
+          : null;
+      if (assistant == null || assistant.enabledSkills.isEmpty) return;
 
-      // Match by triggers
-      final triggered = skillProvider.matchByTriggers(
-        recentText,
-        assistantId: assistantId,
+      final enabledSkills = skillProvider.listEnabledMetadata(
+        assistant.enabledSkills.toSet(),
       );
-      if (triggered.isEmpty) return;
+      if (enabledSkills.isEmpty) return;
 
-      // Take top 3 by priority
-      final top = triggered.take(3).toList();
       final sb = StringBuffer();
       sb.writeln('\n## Skills');
       sb.writeln(
-        'The following specialized skills are activated based on the conversation context.',
+        'The following specialized skills are available for this conversation. '
+        'Use the `use_skill` tool to load a skill\'s instructions when the user\'s request matches.',
       );
-      sb.writeln('Apply the knowledge, rules, and templates as appropriate.\n');
-
-      for (final skill in top) {
-        sb.writeln('### ${skill.name} v${skill.version}');
-        if (skill.description.isNotEmpty) {
-          sb.writeln('\n> ${skill.description}\n');
+      sb.writeln();
+      sb.writeln('<available_skills>');
+      for (final s in enabledSkills) {
+        sb.writeln('  <skill>');
+        sb.writeln('    <name>${s.name}</name>');
+        if (s.description.isNotEmpty) {
+          sb.writeln('    <description>${s.description}</description>');
         }
-        sb.writeln(skill.content);
-        sb.writeln();
+        sb.writeln('  </skill>');
       }
+      sb.write('</available_skills>');
 
       _appendToSystemMessage(apiMessages, sb.toString());
     } catch (e) {

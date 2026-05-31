@@ -1,6 +1,9 @@
 part of 'assistant_settings_edit_page.dart';
 
 /// 技能 Tab — 在 Assistant 编辑页中管理技能绑定
+///
+/// 绑定方式：assistant.enabledSkills (技能名称集合)
+/// 不再使用 skill.assistantIds
 class _SkillTab extends StatefulWidget {
   const _SkillTab({required this.assistantId});
   final String assistantId;
@@ -12,12 +15,20 @@ class _SkillTab extends StatefulWidget {
 class _SkillTabState extends State<_SkillTab> {
   String _searchQuery = '';
 
+  /// 获取当前 assistant 的 enabledSkills 列表
+  Set<String> _getEnabledSkillNames() {
+    final assistantProvider = context.read<AssistantProvider>();
+    final assistant = assistantProvider.getById(widget.assistantId);
+    return assistant?.enabledSkills.toSet() ?? <String>{};
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final skillProvider = context.watch<SkillProvider>();
     final allSkills = skillProvider.skills;
+    final enabledNames = _getEnabledSkillNames();
 
     if (allSkills.isEmpty) {
       return Center(
@@ -65,16 +76,12 @@ class _SkillTabState extends State<_SkillTab> {
           s.triggers.any((t) => t.toLowerCase().contains(q));
     }).toList()
       ..sort((a, b) {
-        final aBound = a.assistantIds.contains(widget.assistantId);
-        final bBound = b.assistantIds.contains(widget.assistantId);
+        final aBound = enabledNames.contains(a.name);
+        final bBound = enabledNames.contains(b.name);
         if (aBound && !bBound) return -1;
         if (!aBound && bBound) return 1;
         return a.name.compareTo(b.name);
       });
-
-    final boundCount = allSkills
-        .where((s) => s.assistantIds.contains(widget.assistantId))
-        .length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -93,7 +100,7 @@ class _SkillTabState extends State<_SkillTab> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            '已绑定 $boundCount / ${allSkills.length} 个技能',
+            '已绑定 ${enabledNames.length} / ${allSkills.length} 个技能',
             style: TextStyle(
               fontSize: 12,
               color: cs.onSurface.withValues(alpha: 0.5),
@@ -117,27 +124,26 @@ class _SkillTabState extends State<_SkillTab> {
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final skill = filtered[index];
-                    final isBound = skill.assistantIds.contains(
-                      widget.assistantId,
-                    );
+                    final isBound = enabledNames.contains(skill.name);
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _SkillBindingCard(
                         skill: skill,
                         isBound: isBound,
                         onToggle: () {
-                          final provider = context.read<SkillProvider>();
-                          final currentIds = List<String>.from(
-                            skill.assistantIds,
-                          );
+                          final assistantProvider = context.read<AssistantProvider>();
+                          final assistant = assistantProvider.getById(widget.assistantId);
+                          if (assistant == null) return;
+                          final currentSet = Set<String>.from(assistant.enabledSkills);
                           if (isBound) {
-                            currentIds.remove(widget.assistantId);
+                            currentSet.remove(skill.name);
                           } else {
-                            currentIds.add(widget.assistantId);
+                            currentSet.add(skill.name);
                           }
-                          provider.setAssistantIds(
-                            skill.id,
-                            currentIds,
+                          assistantProvider.updateAssistant(
+                            assistant.copyWith(
+                              enabledSkills: currentSet.toList(growable: false)..sort(),
+                            ),
                           );
                         },
                         cs: cs,

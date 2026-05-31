@@ -8,6 +8,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/skill_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
@@ -149,6 +150,8 @@ class ToolHandlerService {
   /// Returns a list of tool definitions including:
   /// - Search tool (if enabled and model supports tools)
   /// - Memory tools (if assistant has memory enabled)
+  /// - Skill tools (use_skill, if assistant has enabled skills)
+  /// - Local tools
   /// - MCP tools (from selected servers for the assistant)
   List<Map<String, dynamic>> buildToolDefinitions(
     SettingsProvider settings,
@@ -169,6 +172,12 @@ class ToolHandlerService {
     // Memory tools
     if (assistant?.enableMemory == true && supportsTools) {
       toolDefs.addAll(_buildMemoryToolDefinitions());
+    }
+
+    // Skill tool (use_skill)
+    if (supportsTools && assistant != null && assistant.enabledSkills.isNotEmpty) {
+      final skillDefs = _buildSkillToolDefinitions(assistant);
+      toolDefs.addAll(skillDefs);
     }
 
     // Local tools
@@ -252,7 +261,63 @@ class ToolHandlerService {
     ];
   }
 
-  /// Build MCP tool definitions from connected servers.
+  /// Build use_skill tool definition.
+  ///
+  /// The `use_skill` tool lets the AI load skill content on-demand.
+  /// Skills are listed in the system prompt; AI decides when to invoke.
+  List<Map<String, dynamic>> _buildSkillToolDefinitions(Assistant assistant) {
+    final skillProvider = contextProvider.read<SkillProvider>();
+    final enabledSkills = skillProvider.listEnabledMetadata(
+      assistant.enabledSkills.toSet(),
+    );
+
+    if (enabledSkills.isEmpty) return [];
+
+    // Build a description listing all available skills
+    final skillsDesc = StringBuffer();
+    skillsDesc.writeln(
+      'Load and apply a skill to get specialized instructions or capabilities. '
+      'Call this tool when the user request matches one of the available skills.',
+    );
+    skillsDesc.writeln();
+    skillsDesc.writeln('<available_skills>');
+    for (final s in enabledSkills) {
+      skillsDesc.writeln('  <skill>');
+      skillsDesc.writeln('    <name>${s.name}</name>');
+      if (s.description.isNotEmpty) {
+        skillsDesc.writeln('    <description>${s.description}</description>');
+      }
+      skillsDesc.writeln('  </skill>');
+    }
+    skillsDesc.write('</available_skills>');
+
+    return [
+      {
+        'type': 'function',
+        'function': {
+          'name': 'use_skill',
+          'description': skillsDesc.toString(),
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'name': {
+                'type': 'string',
+                'description': 'The name of the skill to use',
+              },
+              'path': {
+                'type': 'string',
+                'description':
+                    'Optional relative path to a file inside the skill directory. '
+                    'Omit to read the default SKILL.md instructions. '
+                    'Only use paths explicitly listed in the SKILL.md content.',
+              },
+            },
+            'required': ['name'],
+          },
+        },
+      },
+    ];
+  }
   List<Map<String, dynamic>> _buildMcpToolDefinitions({
     required SettingsProvider settings,
     required Assistant? assistant,
@@ -328,6 +393,7 @@ class ToolHandlerService {
   }) {
     final mcp = contextProvider.read<McpProvider>();
     final toolSvc = contextProvider.read<McpToolService>();
+    final skillProvider = contextProvider.read<SkillProvider>();
     // Capture AssistantProvider reference before async gap to avoid
     // use_build_context_synchronously warning
     final assistantProvider = contextProvider.read<AssistantProvider>();
@@ -338,6 +404,32 @@ class ToolHandlerService {
         if (name == SearchToolService.toolName && settings.searchEnabled) {
           final q = (args['query'] ?? '').toString();
           return await SearchToolService.executeSearch(q, settings);
+        }
+
+        // Skill tool (use_skill)
+        if (name == 'use_skill') {
+          if (assistant == null) {
+            return jsonEncode({'error': 'No assistant configured'});
+          }
+          final skillName = (args['name'] ?? '').toString().trim();
+          if (skillName.isEmpty) {
+            return jsonEncode({'error': 'skill name is required'});
+          }
+          if (!assistant.enabledSkills.contains(skillName)) {
+            return jsonEncode({
+              'error': 'skill "$skillName" is not enabled',
+              'instruction':
+                  'Only enabled skills can be used. Available: ${assistant.enabledSkills.join(", ")}',
+            });
+          }
+          final path = (args['path'] ?? '').toString().trim();
+          final content = path.isEmpty
+              ? skillProvider.readSkillBody(skillName)
+              : skillProvider.readSkillFile(skillName, path);
+          if (content == null) {
+            return jsonEncode({'error': 'skill "$skillName"${path.isNotEmpty ? '/$path' : ''} not found'});
+          }
+          return content;
         }
 
         // Memory tools

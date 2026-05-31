@@ -41,6 +41,22 @@ class _SkillManagePageState extends State<SkillManagePage> {
         ),
         title: Text('技能'),
         actions: [
+          // 刷新（重扫 ~/skills/）
+          IosIconButton(
+            icon: Lucide.RefreshCw,
+            onTap: () async {
+              await context.read<SkillProvider>().refreshFromFileSystem();
+              if (context.mounted) {
+                showAppSnackBar(
+                  context,
+                  message: '已从 ~/skills/ 刷新',
+                  type: NotificationType.info,
+                );
+              }
+            },
+          ),
+          const SizedBox(width: 4),
+          // 导入
           IosIconButton(
             icon: Lucide.Import,
             onTap: () async {
@@ -73,7 +89,7 @@ class _SkillManagePageState extends State<SkillManagePage> {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: Slidable(
-                          key: ValueKey('skill-${skill.id}'),
+                          key: ValueKey('skill-${skill.name}'),
                           endActionPane: ActionPane(
                             motion: const StretchMotion(),
                             extentRatio: 0.42,
@@ -131,7 +147,7 @@ class _SkillManagePageState extends State<SkillManagePage> {
                                     ),
                                   );
                                   if (ok == true && context.mounted) {
-                                    await context.read<SkillProvider>().delete(skill.id);
+                                    await context.read<SkillProvider>().delete(skill.name);
                                     if (context.mounted) {
                                       showAppSnackBar(
                                         context,
@@ -149,12 +165,9 @@ class _SkillManagePageState extends State<SkillManagePage> {
                             onTap: () async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => SkillDetailPage(skillId: skill.id),
+                                  builder: (_) => SkillDetailPage(skillName: skill.name),
                                 ),
                               );
-                            },
-                            onToggle: () {
-                              context.read<SkillProvider>().toggleEnabled(skill.id);
                             },
                             onDelete: () {},
                           ),
@@ -178,8 +191,6 @@ class _StatsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = skills.length;
-    final enabled = skills.where((s) => s.enabled).length;
-    final global = skills.where((s) => s.assistantIds.isEmpty).length;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -199,8 +210,7 @@ class _StatsBar extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _stat('共 $total', '总技能数'),
-          _stat('$enabled 活跃', '已启用'),
-          _stat('$global 全局', '全局生效'),
+          _stat('$total 就绪', '已导入'),
         ],
       ),
     );

@@ -9,11 +9,11 @@ import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 
-/// 技能详情页 — 预览/编辑/绑定助手/导出
+/// 技能详情页 — 预览/编辑/导出
 class SkillDetailPage extends StatefulWidget {
-  const SkillDetailPage({super.key, required this.skillId});
+  const SkillDetailPage({super.key, required this.skillName});
 
-  final String skillId;
+  final String skillName;
 
   @override
   State<SkillDetailPage> createState() => _SkillDetailPageState();
@@ -21,25 +21,25 @@ class SkillDetailPage extends StatefulWidget {
 
 class _SkillDetailPageState extends State<SkillDetailPage> {
   late Skill _skill;
-  bool _showRaw = false; // toggle between rendered / raw markdown
+  bool _showRaw = false;
 
   @override
   void initState() {
     super.initState();
     final provider = context.read<SkillProvider>();
-    _skill = provider.getById(widget.skillId) ?? _fallback();
+    _skill = provider.getByName(widget.skillName) ?? _fallback();
   }
 
   Skill _fallback() => Skill(
-    id: widget.skillId,
-    name: '未找到',
+    name: widget.skillName,
+    description: '未找到',
     createdAt: DateTime.now(),
     updatedAt: DateTime.now(),
   );
 
   void _refresh() {
     final provider = context.read<SkillProvider>();
-    final updated = provider.getById(widget.skillId);
+    final updated = provider.getByName(widget.skillName);
     if (updated != null) {
       setState(() => _skill = updated);
     }
@@ -82,28 +82,20 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
 
             const SizedBox(height: 16),
 
-            // ===== 开关控制 =====
-            _ToggleRow(
-              value: skill.enabled,
-              onChanged: (v) {
-                context.read<SkillProvider>().toggleEnabled(skill.id);
-                _refresh();
-              },
+            // ===== 助手绑定信息 =====
+            _AssistantBindInfo(
+              skillName: skill.name,
               cs: cs,
               isDark: isDark,
             ),
 
             const SizedBox(height: 16),
 
-            // ===== 助手绑定 =====
-            _AssistantBindRow(
-              skill: skill,
-              cs: cs,
-              isDark: isDark,
-              onTap: () => _showAssistantPickerDialog(context),
-            ),
-
-            const SizedBox(height: 16),
+            // ===== 子文件列表 =====
+            if (skill.files.isNotEmpty) ...[
+              _SubFilesCard(skill: skill, cs: cs, isDark: isDark),
+              const SizedBox(height: 16),
+            ],
 
             // ===== 内容预览 =====
             Text(
@@ -126,12 +118,9 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
   }
 
   Future<void> _exportSkill(BuildContext context) async {
-    final skillProvider = context.read<SkillProvider>();
-    final skill = skillProvider.getById(widget.skillId);
-    if (skill == null) return;
-
+    final skillName = widget.skillName;
     final home = Platform.environment['HOME'] ?? '/data/data/com.termux/files/home';
-    final defaultPath = '$home/${skill.name}.skill.md';
+    final defaultPath = '$home/$skillName.skill.md';
 
     final controller = TextEditingController(text: defaultPath);
     final path = await showDialog<String>(
@@ -160,7 +149,8 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
     );
 
     if (path != null && path.trim().isNotEmpty) {
-      final ok = await skillProvider.exportToFile(widget.skillId, path.trim());
+      final skillProvider = context.read<SkillProvider>();
+      final ok = await skillProvider.exportToFile(skillName, path.trim());
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -171,84 +161,6 @@ class _SkillDetailPageState extends State<SkillDetailPage> {
         );
       }
     }
-  }
-
-  Future<void> _showAssistantPickerDialog(BuildContext context) async {
-    final assistantProvider = context.read<AssistantProvider>();
-    final skillProvider = context.read<SkillProvider>();
-    final assistants = assistantProvider.assistants;
-    final currentIds = Set<String>.from(_skill.assistantIds);
-
-    final selected = <String>[...currentIds];
-
-    await showDialog(
-      context: context,
-      builder: (dctx) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text('绑定助手'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 全局选项
-              CheckboxListTile(
-                title: const Text('🌐 全局生效（所有助手）'),
-                subtitle: const Text('技能对所有助手都可用'),
-                value: selected.isEmpty,
-                onChanged: (v) {
-                  if (v == true) {
-                    selected.clear();
-                    setState(() {});
-                  }
-                  Navigator.of(dctx).pop();
-                },
-              ),
-              const Divider(),
-              // 各助手
-              Expanded(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: assistants.length,
-                  itemBuilder: (ctx, i) {
-                    final a = assistants[i];
-                    final isSelected = selected.contains(a.id);
-                    return CheckboxListTile(
-                      title: Text(a.name),
-                      subtitle: Text('ID: ${a.id.substring(0, 8)}...'),
-                      value: isSelected,
-                      onChanged: (v) {
-                        setState(() {
-                          if (v == true) {
-                            selected.add(a.id);
-                          } else {
-                            selected.remove(a.id);
-                          }
-                        });
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dctx).pop(),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await skillProvider.setAssistantIds(widget.skillId, selected);
-              _refresh();
-              if (dctx.mounted) Navigator.of(dctx).pop();
-            },
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -285,9 +197,11 @@ class _MetaCard extends StatelessWidget {
         children: [
           _metaRow('版本', skill.version.isNotEmpty ? 'v${skill.version}' : '-'),
           const SizedBox(height: 6),
-          _metaRow('作者', skill.author.isNotEmpty ? skill.author : '-'),
-          const SizedBox(height: 6),
-          _metaRow('优先级', skill.priority.toString()),
+          _metaRow('描述', skill.description.isNotEmpty ? skill.description : '-'),
+          if (skill.author.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _metaRow('作者', skill.author),
+          ],
           if (skill.triggers.isNotEmpty) ...[
             const SizedBox(height: 6),
             _metaRow('关键词', skill.triggers.join(', ')),
@@ -326,24 +240,28 @@ class _MetaCard extends StatelessWidget {
   }
 }
 
-/// 开关行
-class _ToggleRow extends StatelessWidget {
-  const _ToggleRow({
-    required this.value,
-    required this.onChanged,
+/// 助手绑定信息
+class _AssistantBindInfo extends StatelessWidget {
+  const _AssistantBindInfo({
+    required this.skillName,
     required this.cs,
     required this.isDark,
   });
 
-  final bool value;
-  final ValueChanged<bool> onChanged;
+  final String skillName;
   final ColorScheme cs;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final assistantProvider = context.watch<AssistantProvider>();
+    final boundAssistants = assistantProvider.assistants
+        .where((a) => a.enabledSkills.contains(skillName))
+        .toList();
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(14),
@@ -351,78 +269,44 @@ class _ToggleRow extends StatelessWidget {
           color: cs.outlineVariant.withValues(alpha: isDark ? 0.1 : 0.08),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(value ? Lucide.Zap : Lucide.X, size: 20, color: value ? Colors.green : cs.onSurface.withValues(alpha: 0.5)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              value ? '已启用' : '已禁用',
-              style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface),
-            ),
+          Row(
+            children: [
+              Icon(Lucide.User, size: 18, color: cs.primary),
+              const SizedBox(width: 8),
+              Text(
+                '绑定助手',
+                style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface),
+              ),
+            ],
           ),
-          Switch(
-            value: value,
-            onChanged: (v) {
-              Haptics.light();
-              onChanged(v);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 助手绑定行
-class _AssistantBindRow extends StatelessWidget {
-  const _AssistantBindRow({
-    required this.skill,
-    required this.cs,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  final Skill skill;
-  final ColorScheme cs;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.1 : 0.08),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(Lucide.User, size: 20, color: cs.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 8),
+          if (boundAssistants.isEmpty)
+            Text(
+              '未绑定到任何助手 — 前往助手设置中启用此技能',
+              style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.5)),
+            )
+          else
+            ...boundAssistants.map((a) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
                 children: [
-                  Text(
-                    '绑定助手',
-                    style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface),
-                  ),
-                  Text(
-                    skill.assistantIds.isEmpty ? '全局生效（所有助手）' : '已绑定 ${skill.assistantIds.length} 个助手',
-                    style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.5)),
+                  Icon(Lucide.Check, size: 14, color: Colors.green),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      a.name,
+                      style: TextStyle(fontSize: 13, color: cs.onSurface),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
-            ),
-            Icon(Lucide.ChevronRight, size: 16, color: cs.onSurface.withValues(alpha: 0.4)),
-          ],
-        ),
+            )),
+        ],
       ),
     );
   }
@@ -462,7 +346,91 @@ class _RawContent extends StatelessWidget {
   }
 }
 
-/// 简化的 Markdown 渲染预览（用 Text 展示，保留格式标记）
+/// 子文件列表卡片
+class _SubFilesCard extends StatelessWidget {
+  const _SubFilesCard({
+    required this.skill,
+    required this.cs,
+    required this.isDark,
+  });
+
+  final Skill skill;
+  final ColorScheme cs;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.1 : 0.08),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Lucide.Folder, size: 18, color: cs.primary),
+              const SizedBox(width: 8),
+              Text(
+                '子文件 (${skill.files.length})',
+                style: TextStyle(fontWeight: FontWeight.w600, color: cs.onSurface),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...skill.files.map((f) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                Icon(Lucide.FileText, size: 14, color: cs.onSurface.withValues(alpha: 0.5)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    f.relativePath,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                      color: cs.primary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  _formatSize(f.sizeBytes),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: cs.onSurface.withValues(alpha: 0.4),
+                  ),
+                ),
+              ],
+            ),
+          )),
+          if (skill.files.isEmpty)
+            Text(
+              '无子文件',
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.onSurface.withValues(alpha: 0.4),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
 class _MarkdownPreview extends StatelessWidget {
   const _MarkdownPreview({
     required this.content,
@@ -476,7 +444,6 @@ class _MarkdownPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 简单分行展示，保留可见的 markdown 标记
     final lines = content.split('\n');
     return Container(
       width: double.infinity,
@@ -515,4 +482,3 @@ class _MarkdownPreview extends StatelessWidget {
     );
   }
 }
-

@@ -12,13 +12,11 @@ class SkillCard extends StatefulWidget {
     super.key,
     required this.skill,
     required this.onTap,
-    required this.onToggle,
     required this.onDelete,
   });
 
   final Skill skill;
   final VoidCallback onTap;
-  final VoidCallback onToggle;
   final VoidCallback onDelete;
 
   @override
@@ -137,21 +135,7 @@ class _SkillCardState extends State<SkillCard> {
                       spacing: 6,
                       runSpacing: 4,
                       children: [
-                        // 生效范围标签
-                        _tag(
-                          skill.assistantIds.isEmpty ? '全局' : '助手绑定',
-                          color: skill.assistantIds.isEmpty
-                              ? Colors.green
-                              : cs.primary,
-                          cs: cs,
-                        ),
-                        // 状态标签
-                        _tag(
-                          skill.enabled ? '已启用' : '已禁用',
-                          color: skill.enabled ? Colors.green : cs.onSurface.withValues(alpha: 0.7),
-                          cs: cs,
-                        ),
-                        // 前3个触发词
+                        // 前3个触发词（元数据说明）
                         ...skill.triggers.take(3).map(
                           (t) => _tag(t, color: cs.tertiary, cs: cs),
                         ),

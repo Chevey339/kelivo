@@ -79,8 +79,22 @@ class _SkillImportSheetState extends State<SkillImportSheet> {
             _option(
               icon: Lucide.FileText,
               title: '从文件导入',
-              subtitle: '使用文件选择器选取 SKILL.md',
+              subtitle: '选取单个 SKILL.md 文件',
               onTap: () => _importFromFilePicker(context),
+            ),
+            const SizedBox(height: 8),
+            _option(
+              icon: Lucide.FolderOpen,
+              title: '从文件夹导入（含子文件）',
+              subtitle: '选取含 SKILL.md + 子文件的目录',
+              onTap: () => _importFromDirectory(context),
+            ),
+            const SizedBox(height: 8),
+            _option(
+              icon: Lucide.GitFork,
+              title: '从 GitHub 导入',
+              subtitle: '输入仓库 URL，自动发现子文件',
+              onTap: () => _importFromGitHub(context),
             ),
             if (_importing) ...[
               const SizedBox(height: 16),
@@ -228,6 +242,83 @@ class _SkillImportSheetState extends State<SkillImportSheet> {
       }
     } catch (e) {
       if (context.mounted) _showSnack(context, '选择文件失败: $e', Colors.red);
+    }
+  }
+
+  // ============================================================================
+  // 从文件夹导入（含子文件）
+  // ============================================================================
+
+  Future<void> _importFromDirectory(BuildContext context) async {
+    final skillProvider = context.read<SkillProvider>();
+    try {
+      final result = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: '选择含 SKILL.md 的目录',
+      );
+      if (result == null || result.isEmpty) return;
+
+      setState(() => _importing = true);
+      try {
+        final skill = await skillProvider.importFromDirectoryAsSkill(result);
+        if (skill != null && context.mounted) {
+          _showSnack(
+            context,
+            skill.files.isEmpty
+                ? '已导入: ${skill.name}'
+                : '已导入: ${skill.name}（含 ${skill.files.length} 个子文件）',
+            Colors.green,
+          );
+          Navigator.of(context).pop();
+        } else if (context.mounted) {
+          _showSnack(context, '目录中未找到 SKILL.md', Colors.red);
+        }
+      } catch (e) {
+        if (context.mounted) _showSnack(context, '导入失败: $e', Colors.red);
+      } finally {
+        if (mounted) setState(() => _importing = false);
+      }
+    } catch (e) {
+      if (context.mounted) _showSnack(context, '选择目录失败: $e', Colors.red);
+    }
+  }
+
+  // ============================================================================
+  // 从 GitHub 导入
+  // ============================================================================
+
+  Future<void> _importFromGitHub(BuildContext context) async {
+    final skillProvider = context.read<SkillProvider>();
+    final url = await _showInputDialog(
+      context,
+      'GitHub 仓库 URL',
+      hint: 'https://github.com/user/repo',
+      initial: 'https://github.com/',
+    );
+    if (url == null || url.trim().isEmpty) return;
+
+    setState(() => _importing = true);
+    try {
+      final skill = await skillProvider.importFromGitHub(url.trim());
+      if (skill != null && context.mounted) {
+        _showSnack(
+          context,
+          skill.files.isEmpty
+              ? '已从 GitHub 导入: ${skill.name}'
+              : '已从 GitHub 导入: ${skill.name}（含 ${skill.files.length} 个子文件）',
+          Colors.green,
+        );
+        Navigator.of(context).pop();
+      } else if (context.mounted) {
+        _showSnack(
+          context,
+          'GitHub 导入失败：请检查 URL 或网络连接',
+          Colors.red,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) _showSnack(context, 'GitHub 导入失败: $e', Colors.red);
+    } finally {
+      if (mounted) setState(() => _importing = false);
     }
   }
 
