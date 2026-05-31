@@ -121,7 +121,7 @@ class SkillManagePage extends StatelessWidget {
                                       ],
                                     ),
                                   );
-                                  if (ok == true) {
+                                  if (ok == true && context.mounted) {
                                     await context.read<SkillProvider>().delete(skill.id);
                                     if (context.mounted) {
                                       showAppSnackBar(
