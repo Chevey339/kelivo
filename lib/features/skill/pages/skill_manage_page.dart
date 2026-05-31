@@ -11,8 +11,21 @@ import '../widgets/skill_card.dart';
 import '../widgets/skill_import_sheet.dart';
 import 'skill_detail_page.dart';
 
-class SkillManagePage extends StatelessWidget {
+class SkillManagePage extends StatefulWidget {
   const SkillManagePage({super.key});
+  @override
+  State<SkillManagePage> createState() => _SkillManagePageState();
+}
+
+class _SkillManagePageState extends State<SkillManagePage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<SkillProvider>().initialize();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +39,7 @@ class SkillManagePage extends StatelessWidget {
           icon: Lucide.ArrowLeft,
           onTap: () => Navigator.of(context).maybePop(),
         ),
-        title: Text('🧩 技能'),
+        title: Text('技能'),
         actions: [
           IosIconButton(
             icon: Lucide.Import,

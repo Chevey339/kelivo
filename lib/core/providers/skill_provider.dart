@@ -36,6 +36,7 @@ class SkillProvider extends ChangeNotifier {
     await _load();
     await _importBuiltIns();
     _initialized = true;
+    notifyListeners();
   }
 
   /// 首次启动时从 assets 导入内置技能
