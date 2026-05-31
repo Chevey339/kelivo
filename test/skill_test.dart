@@ -1,5 +1,6 @@
 import 'dart:io';
 
+// ignore_for_file: avoid_print
 // Relative imports since we're inside the project
 import '../lib/core/models/skill.dart';
 import '../lib/core/services/skill/skill_parser.dart';
