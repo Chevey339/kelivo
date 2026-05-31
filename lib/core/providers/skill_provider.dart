@@ -10,7 +10,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 
 import '../models/skill.dart';
 import '../services/skill/skill_parser.dart';
@@ -45,7 +44,6 @@ class SkillProvider extends ChangeNotifier {
     try {
       // assets/skills/ 下每个子目录包含 SKILL.md
       // 先尝试列出 assets 中的技能目录
-      final manifest = await rootBundle.loadString('assets/skills/');
       // 如果 assets/skills/ 返回的是目录列表则处理，否则逐个尝试已知技能
     } catch (_) {
       // rootBundle 无法列出目录，fallback: 逐个尝试已知技能

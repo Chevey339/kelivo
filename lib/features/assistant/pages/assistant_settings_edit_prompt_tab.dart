@@ -201,7 +201,6 @@ class _PromptTabState extends State<_PromptTab> {
     await _applySystemPromptChange(next);
   }
 Future<void> _exportSystemPrompt() async {
-    final l10n = AppLocalizations.of(context)!;
     final text = _sysCtrl.text.trim();
     if (text.isEmpty) {
       showAppSnackBar(

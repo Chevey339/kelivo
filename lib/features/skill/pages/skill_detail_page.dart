@@ -22,7 +22,6 @@ class SkillDetailPage extends StatefulWidget {
 class _SkillDetailPageState extends State<SkillDetailPage> {
   late Skill _skill;
   bool _showRaw = false; // toggle between rendered / raw markdown
-  final bool _showAssistantPicker = false;
 
   @override
   void initState() {

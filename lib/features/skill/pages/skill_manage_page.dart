@@ -3,9 +3,7 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/skill.dart';
-import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/skill_provider.dart';
-import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -20,7 +18,6 @@ class SkillManagePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
     final skillProvider = context.watch<SkillProvider>();
     final skills = skillProvider.skills;
 

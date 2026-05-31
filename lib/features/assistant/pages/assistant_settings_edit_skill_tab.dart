@@ -14,12 +14,9 @@ class _SkillTabState extends State<_SkillTab> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final skillProvider = context.watch<SkillProvider>();
-    final assistantProvider = context.watch<AssistantProvider>();
-    final assistant = assistantProvider.getById(widget.assistantId);
     final allSkills = skillProvider.skills;
 
     if (allSkills.isEmpty) {
