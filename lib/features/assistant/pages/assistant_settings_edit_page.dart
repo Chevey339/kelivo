@@ -57,6 +57,7 @@ part 'assistant_settings_edit_local_tools_tab.dart';
 part 'assistant_settings_edit_mcp_tab.dart';
 part 'assistant_settings_edit_quick_phrase_tab.dart';
 part 'assistant_settings_edit_custom_request_tab.dart';
+part 'assistant_settings_edit_skill_tab.dart';
 
 const int _contextMessageMin = Assistant.minContextMessageSize;
 const int _contextMessageMax = Assistant.maxContextMessageSize;
@@ -128,6 +129,12 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
       label: l10n.assistantEditPageRegexTab,
       icon: Lucide.CaseSensitive,
       child: AssistantRegexTab(assistantId: assistantId),
+    ),
+    _AssistantEditTabSpec(
+      id: assistantEditTabSkill,
+      label: '技能',
+      icon: Lucide.Sparkles,
+      child: _SkillTab(assistantId: assistantId),
     ),
   ];
 }
@@ -1480,6 +1487,7 @@ enum _AssistantDesktopMenu {
   quick,
   custom,
   regex,
+  skill,
 }
 
 Future<void> showAssistantDesktopDialog(
@@ -1599,6 +1607,8 @@ class _DesktopAssistantDialogShellState
                         return AssistantRegexDesktopPane(
                           assistantId: widget.assistantId,
                         );
+                      case _AssistantDesktopMenu.skill:
+                        return _SkillTab(assistantId: widget.assistantId);
                     }
                   }(),
                 ),
@@ -1635,6 +1645,7 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
       (_AssistantDesktopMenu.quick, l10n.assistantEditPageQuickPhraseTab),
       (_AssistantDesktopMenu.custom, l10n.assistantEditPageCustomTab),
       (_AssistantDesktopMenu.regex, l10n.assistantEditPageRegexTab),
+      (_AssistantDesktopMenu.skill, '技能'),
     ];
     return SizedBox(
       width: 220,

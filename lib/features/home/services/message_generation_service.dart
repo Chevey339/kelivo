@@ -186,6 +186,11 @@ class MessageGenerationService {
       apiMessages,
       assistantId,
     );
+    await messageBuilderService.injectSkillPrompts(
+      apiMessages,
+      assistantId,
+      messages,
+    );
     await messageBuilderService.injectWorldBookPrompts(
       apiMessages,
       assistantId,

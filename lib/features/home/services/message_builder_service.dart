@@ -10,6 +10,7 @@ import '../../../core/models/instruction_injection.dart';
 import '../../../core/models/world_book.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/skill_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
@@ -621,6 +622,61 @@ class MessageBuilderService {
     if (settings.searchEnabled && !hasBuiltInSearch) {
       final prompt = SearchToolService.getSystemPrompt();
       _appendToSystemMessage(apiMessages, prompt);
+    }
+  }
+
+  /// Inject skill prompts into apiMessages (keyword-triggered, after instructions).
+  Future<void> injectSkillPrompts(
+    List<Map<String, dynamic>> apiMessages,
+    String? assistantId,
+    List<ChatMessage> sourceMessages,
+  ) async {
+    try {
+      final skillProvider = contextProvider.read<SkillProvider>();
+      await skillProvider.initialize();
+      final active = skillProvider.getActiveSkillsForAssistant(assistantId);
+      if (active.isEmpty) return;
+
+      // Extract recent context for trigger matching (last 3 messages)
+      final recentBuf = StringBuffer();
+      int count = 0;
+      for (int i = sourceMessages.length - 1; i >= 0 && count < 3; i--) {
+        final content = sourceMessages[i].content.trim();
+        if (content.isEmpty) continue;
+        recentBuf.writeln(content);
+        count++;
+      }
+      final recentText = recentBuf.toString().trim();
+      if (recentText.isEmpty) return;
+
+      // Match by triggers
+      final triggered = skillProvider.matchByTriggers(
+        recentText,
+        assistantId: assistantId,
+      );
+      if (triggered.isEmpty) return;
+
+      // Take top 3 by priority
+      final top = triggered.take(3).toList();
+      final sb = StringBuffer();
+      sb.writeln('\n## Skills');
+      sb.writeln(
+        'The following specialized skills are activated based on the conversation context.',
+      );
+      sb.writeln('Apply the knowledge, rules, and templates as appropriate.\n');
+
+      for (final skill in top) {
+        sb.writeln('### ${skill.name} v${skill.version}');
+        if (skill.description.isNotEmpty) {
+          sb.writeln('\n> ${skill.description}\n');
+        }
+        sb.writeln(skill.content);
+        sb.writeln();
+      }
+
+      _appendToSystemMessage(apiMessages, sb.toString());
+    } catch (e) {
+      debugPrint('[MessageBuilder] injectSkillPrompts error: $e');
     }
   }
 

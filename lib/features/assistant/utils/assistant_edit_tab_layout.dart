@@ -6,11 +6,13 @@ const String assistantEditTabLocalTools = 'localTools';
 const String assistantEditTabQuickPhrase = 'quickPhrase';
 const String assistantEditTabCustom = 'custom';
 const String assistantEditTabRegex = 'regex';
+const String assistantEditTabSkill = 'skill';
 
 const List<String> defaultAssistantEditTabIds = [
   assistantEditTabBasic,
   assistantEditTabPrompts,
   assistantEditTabMemory,
+  assistantEditTabSkill,
   assistantEditTabQuickPhrase,
   assistantEditTabCustom,
   assistantEditTabRegex,

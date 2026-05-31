@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../utils/url_launcher_ext.dart';
 import '../../../shared/widgets/favicon.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../icons/lucide_adapter.dart';
+import '../../skill/pages/skill_manage_page.dart';
 
 class MorePage extends StatelessWidget {
   const MorePage({super.key});
@@ -51,6 +54,10 @@ class MorePage extends StatelessWidget {
                   ),
                 ],
               ),
+
+              // Skills section
+              title('技能'),
+              _SkillEntry(cs: cs, theme: theme),
             ],
           ),
         ),
@@ -113,6 +120,67 @@ class LeaderBoardItem extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 技能导航入口
+class _SkillEntry extends StatelessWidget {
+  const _SkillEntry({required this.cs, required this.theme});
+
+  final ColorScheme cs;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return IosCardPress(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SkillManagePage()),
+        );
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              alignment: Alignment.center,
+              child: const Text('🧩', style: TextStyle(fontSize: 18)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '技能管理中心',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    '导入/管理 SKILL.md 技能包',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Lucide.ChevronRight, size: 16, color: cs.onSurface.withValues(alpha: 0.4)),
+          ],
         ),
       ),
     );
