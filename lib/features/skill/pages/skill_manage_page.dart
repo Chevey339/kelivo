@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../../../core/models/skill.dart';
 import '../../../core/providers/skill_provider.dart';
 import '../../../icons/lucide_adapter.dart';
-import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../widgets/skill_card.dart';
