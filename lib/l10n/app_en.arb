@@ -762,6 +762,7 @@
   "messageMoreSheetNotImplemented": "Not yet implemented",
   "messageMoreSheetEdit": "Edit",
   "messageMoreSheetShare": "Share",
+  "messageMoreSheetSelectMessages": "Select Messages",
   "messageMoreSheetCreateBranch": "Create Branch",
   "messageMoreSheetDelete": "Delete This Version",
   "messageMoreSheetDeleteAllVersions": "Delete All Versions",
@@ -912,6 +913,24 @@
   "chatSelectionExportImage": "Image",
   "chatSelectionThinkingTools": "Thinking tools",
   "chatSelectionThinkingContent": "Thinking content",
+  "chatSelectionDeleteSelected": "Delete Selected",
+  "chatSelectionSelectMessagesToDelete": "Please select messages to delete",
+  "chatSelectionDeleteSelectedConfirm": "Delete {count} selected version(s)? This cannot be undone.",
+  "@chatSelectionDeleteSelectedConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatSelectionDeleteSelectedAllVersionsConfirm": "Delete all versions of {count} selected message(s)? This cannot be undone.",
+  "@chatSelectionDeleteSelectedAllVersionsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "messageExportSheetAssistant": "Assistant",
   "messageExportSheetDefaultTitle": "New Chat",
   "messageExportSheetExporting": "Exporting…",

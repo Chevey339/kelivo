@@ -1862,6 +1862,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMoreSheetShare => '分享';
 
   @override
+  String get messageMoreSheetSelectMessages => '选择消息';
+
+  @override
   String get messageMoreSheetCreateBranch => '创建分支';
 
   @override
@@ -2084,6 +2087,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatSelectionThinkingContent => '思考内容';
+
+  @override
+  String get chatSelectionDeleteSelected => '删除所选';
+
+  @override
+  String get chatSelectionSelectMessagesToDelete => '请选择要删除的消息';
+
+  @override
+  String chatSelectionDeleteSelectedConfirm(int count) {
+    return '确定要删除已选择的$count个版本吗？此操作不可撤销。';
+  }
+
+  @override
+  String chatSelectionDeleteSelectedAllVersionsConfirm(int count) {
+    return '确定要删除已选择$count条消息的全部版本吗？此操作不可撤销。';
+  }
 
   @override
   String get messageExportSheetAssistant => '助手';
@@ -7018,6 +7037,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageMoreSheetShare => '分享';
 
   @override
+  String get messageMoreSheetSelectMessages => '选择消息';
+
+  @override
   String get messageMoreSheetCreateBranch => '创建分支';
 
   @override
@@ -7240,6 +7262,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatSelectionThinkingContent => '思考内容';
+
+  @override
+  String get chatSelectionDeleteSelected => '删除所选';
+
+  @override
+  String get chatSelectionSelectMessagesToDelete => '请选择要删除的消息';
+
+  @override
+  String chatSelectionDeleteSelectedConfirm(int count) {
+    return '确定要删除已选择的$count个版本吗？此操作不可撤销。';
+  }
+
+  @override
+  String chatSelectionDeleteSelectedAllVersionsConfirm(int count) {
+    return '确定要删除已选择$count条消息的全部版本吗？此操作不可撤销。';
+  }
 
   @override
   String get messageExportSheetAssistant => '助手';
@@ -12173,6 +12211,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageMoreSheetShare => '分享';
 
   @override
+  String get messageMoreSheetSelectMessages => '選擇訊息';
+
+  @override
   String get messageMoreSheetCreateBranch => '建立分支';
 
   @override
@@ -12395,6 +12436,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatSelectionThinkingContent => '思考內容';
+
+  @override
+  String get chatSelectionDeleteSelected => '刪除所選';
+
+  @override
+  String get chatSelectionSelectMessagesToDelete => '請選擇要刪除的訊息';
+
+  @override
+  String chatSelectionDeleteSelectedConfirm(int count) {
+    return '確定要刪除已選擇的$count個版本嗎？此操作不可撤銷。';
+  }
+
+  @override
+  String chatSelectionDeleteSelectedAllVersionsConfirm(int count) {
+    return '確定要刪除已選擇$count條訊息的全部版本嗎？此操作不可撤銷。';
+  }
 
   @override
   String get messageExportSheetAssistant => '助理';

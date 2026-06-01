@@ -54,6 +54,7 @@ void main() {
   testWidgets('多版本消息菜单显示删除全部版本', (tester) async {
     await _openMoreSheet(tester, canDeleteAllVersions: true);
 
+    expect(find.text('Select Messages'), findsOneWidget);
     expect(find.text('Delete This Version'), findsOneWidget);
     expect(find.text('Delete All Versions'), findsOneWidget);
   });
@@ -61,6 +62,7 @@ void main() {
   testWidgets('单版本消息菜单不显示删除全部版本', (tester) async {
     await _openMoreSheet(tester, canDeleteAllVersions: false);
 
+    expect(find.text('Select Messages'), findsOneWidget);
     expect(find.text('Delete This Version'), findsOneWidget);
     expect(find.text('Delete All Versions'), findsNothing);
   });

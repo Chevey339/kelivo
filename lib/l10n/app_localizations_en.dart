@@ -1922,6 +1922,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageMoreSheetShare => 'Share';
 
   @override
+  String get messageMoreSheetSelectMessages => 'Select Messages';
+
+  @override
   String get messageMoreSheetCreateBranch => 'Create Branch';
 
   @override
@@ -2151,6 +2154,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatSelectionThinkingContent => 'Thinking content';
+
+  @override
+  String get chatSelectionDeleteSelected => 'Delete Selected';
+
+  @override
+  String get chatSelectionSelectMessagesToDelete =>
+      'Please select messages to delete';
+
+  @override
+  String chatSelectionDeleteSelectedConfirm(int count) {
+    return 'Delete $count selected version(s)? This cannot be undone.';
+  }
+
+  @override
+  String chatSelectionDeleteSelectedAllVersionsConfirm(int count) {
+    return 'Delete all versions of $count selected message(s)? This cannot be undone.';
+  }
 
   @override
   String get messageExportSheetAssistant => 'Assistant';

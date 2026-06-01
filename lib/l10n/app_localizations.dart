@@ -3701,6 +3701,12 @@ abstract class AppLocalizations {
   /// **'Share'**
   String get messageMoreSheetShare;
 
+  /// No description provided for @messageMoreSheetSelectMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Messages'**
+  String get messageMoreSheetSelectMessages;
+
   /// No description provided for @messageMoreSheetCreateBranch.
   ///
   /// In en, this message translates to:
@@ -4096,6 +4102,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Thinking content'**
   String get chatSelectionThinkingContent;
+
+  /// No description provided for @chatSelectionDeleteSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Selected'**
+  String get chatSelectionDeleteSelected;
+
+  /// No description provided for @chatSelectionSelectMessagesToDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select messages to delete'**
+  String get chatSelectionSelectMessagesToDelete;
+
+  /// No description provided for @chatSelectionDeleteSelectedConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count} selected version(s)? This cannot be undone.'**
+  String chatSelectionDeleteSelectedConfirm(int count);
+
+  /// No description provided for @chatSelectionDeleteSelectedAllVersionsConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all versions of {count} selected message(s)? This cannot be undone.'**
+  String chatSelectionDeleteSelectedAllVersionsConfirm(int count);
 
   /// No description provided for @messageExportSheetAssistant.
   ///

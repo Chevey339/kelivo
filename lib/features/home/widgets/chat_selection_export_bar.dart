@@ -81,7 +81,7 @@ class ChatSelectionExportBar extends StatelessWidget {
                         Row(
                           children: [
                             Expanded(
-                              child: _ExportPillButton(
+                              child: _SelectionActionButton(
                                 icon: Lucide.FileText,
                                 label: l10n.chatSelectionExportTxt,
                                 color: cs.tertiary,
@@ -91,7 +91,7 @@ class ChatSelectionExportBar extends StatelessWidget {
                             ),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: _ExportPillButton(
+                              child: _SelectionActionButton(
                                 icon: Lucide.BookOpenText,
                                 label: l10n.chatSelectionExportMd,
                                 color: cs.primary,
@@ -101,7 +101,7 @@ class ChatSelectionExportBar extends StatelessWidget {
                             ),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: _ExportPillButton(
+                              child: _SelectionActionButton(
                                 icon: Lucide.Image,
                                 label: l10n.chatSelectionExportImage,
                                 color: cs.secondary,
@@ -150,8 +150,8 @@ class ChatSelectionExportBar extends StatelessWidget {
   }
 }
 
-class _ExportPillButton extends StatelessWidget {
-  const _ExportPillButton({
+class _SelectionActionButton extends StatelessWidget {
+  const _SelectionActionButton({
     required this.icon,
     required this.label,
     required this.color,

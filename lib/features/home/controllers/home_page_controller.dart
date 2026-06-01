@@ -43,6 +43,8 @@ import '../services/file_upload_service.dart';
 import '../widgets/chat_input_bar.dart';
 import '../../model/widgets/model_select_sheet.dart';
 
+enum ChatSelectionMode { share, delete }
+
 /// Translation data for UI state (expanded/collapsed).
 class TranslationData {
   bool expanded = true; // default to expanded when translation is added
@@ -133,6 +135,7 @@ class HomePageController extends ChangeNotifier {
 
   // Selection mode
   bool _selecting = false;
+  ChatSelectionMode _selectionMode = ChatSelectionMode.share;
   final Set<String> _selectedItems = <String>{};
   bool _showThinkingTools = false;
   bool _showThinkingContent = false;
@@ -186,6 +189,7 @@ class HomePageController extends ChangeNotifier {
   Map<String, TranslationData> get translations => _translations;
   ChatController get chatController => _chatController;
   bool get selecting => _selecting;
+  ChatSelectionMode get selectionMode => _selectionMode;
   Set<String> get selectedItems => _selectedItems;
   int get selectedCount => _selectedItems.length;
   bool get showThinkingTools => _showThinkingTools;
@@ -849,6 +853,46 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteSelectedMessages({required bool deleteAllVersions}) async {
+    final selectedMessageIds = Set<String>.of(_selectedItems);
+    if (selectedMessageIds.isEmpty) return;
+
+    final deletedMessageIds = _selectedMessageIdsForDeletion(
+      selectedMessageIds,
+      deleteAllVersions: deleteAllVersions,
+    );
+    for (final id in deletedMessageIds) {
+      _translations.remove(id);
+    }
+    await _viewModel.deleteMessages(
+      messageIds: selectedMessageIds,
+      deleteAllVersions: deleteAllVersions,
+    );
+    _selecting = false;
+    _selectedItems.clear();
+    notifyListeners();
+  }
+
+  Set<String> _selectedMessageIdsForDeletion(
+    Set<String> selectedMessageIds, {
+    required bool deleteAllVersions,
+  }) {
+    if (!deleteAllVersions) return selectedMessageIds;
+
+    final selectedGroupIds = <String>{};
+    final allMessages = _allCurrentConversationMessages();
+    for (final message in allMessages) {
+      if (selectedMessageIds.contains(message.id)) {
+        selectedGroupIds.add(message.groupId ?? message.id);
+      }
+    }
+    return {
+      for (final message in allMessages)
+        if (selectedGroupIds.contains(message.groupId ?? message.id))
+          message.id,
+    };
+  }
+
   Future<void> forkConversation(ChatMessage message) async {
     if (currentConversation == null) return;
     if (!isDesktopPlatform) {
@@ -1020,8 +1064,21 @@ class HomePageController extends ChangeNotifier {
   }
 
   void shareMessage(int messageIndex, List<ChatMessage> messageList) {
+    startMessageSelection(
+      messageIndex: messageIndex,
+      messageList: messageList,
+      mode: ChatSelectionMode.share,
+    );
+  }
+
+  void startMessageSelection({
+    required int messageIndex,
+    required List<ChatMessage> messageList,
+    required ChatSelectionMode mode,
+  }) {
     dismissKeyboard();
     _selecting = true;
+    _selectionMode = mode;
     _selectedItems.clear();
     _showThinkingTools = false;
     _showThinkingContent = false;
@@ -1073,6 +1130,36 @@ class HomePageController extends ChangeNotifier {
       _selectedItems.add(anchor.id);
     }
     notifyListeners();
+  }
+
+  bool get selectedMessagesIncludeMultipleVersions {
+    return _selectedSelectionGroupIds().any((groupId) {
+      var count = 0;
+      for (final message in _allCurrentConversationMessages()) {
+        if ((message.groupId ?? message.id) == groupId) count++;
+        if (count > 1) return true;
+      }
+      return false;
+    });
+  }
+
+  Set<String> _selectedSelectionGroupIds() {
+    if (_selectedItems.isEmpty) return const <String>{};
+    return {
+      for (final message
+          in _chatController.allCollapsedMessagesForCurrentConversation())
+        if (_selectedItems.contains(message.id)) message.groupId ?? message.id,
+    };
+  }
+
+  List<ChatMessage> _allCurrentConversationMessages() {
+    final conversation = currentConversation;
+    if (conversation == null) return const <ChatMessage>[];
+    return _chatService.getMessagesRange(
+      conversation.id,
+      start: 0,
+      limit: _chatService.getMessageCount(conversation.id),
+    );
   }
 
   void selectAll() {
@@ -1255,6 +1342,7 @@ class HomePageController extends ChangeNotifier {
 
   void cancelSelection() {
     _selecting = false;
+    _selectionMode = ChatSelectionMode.share;
     _selectedItems.clear();
     notifyListeners();
   }

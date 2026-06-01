@@ -52,6 +52,7 @@ import '../widgets/message_list_view.dart';
 import '../widgets/chat_input_section.dart';
 import '../widgets/chat_input_overlay_layout.dart';
 import '../widgets/chat_selection_app_bar.dart';
+import '../widgets/chat_selection_delete_bar.dart';
 import '../widgets/chat_selection_export_bar.dart';
 import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
@@ -428,7 +429,7 @@ class _HomePageState extends State<HomePage>
   final BackdropKey _messageListBackdropKey = BackdropKey();
   final GlobalKey _inputBarKey = GlobalKey();
   final GlobalKey _selectionMiniMapKey = GlobalKey();
-  final GlobalKey _selectionExportBarKey = GlobalKey();
+  final GlobalKey _selectionActionBarKey = GlobalKey();
   bool _scrollNavHovering = false;
   StreamSubscription<String>? _processTextSub;
 
@@ -726,16 +727,7 @@ class _HomePageState extends State<HomePage>
         },
       ),
       bottomOverlay: _controller.selecting
-          ? ChatSelectionExportBar(
-              key: _selectionExportBarKey,
-              onExportMarkdown: _controller.exportSelectedAsMarkdown,
-              onExportTxt: _controller.exportSelectedAsTxt,
-              onExportImage: _controller.exportSelectedAsImage,
-              showThinkingTools: _controller.showThinkingTools,
-              showThinkingContent: _controller.showThinkingContent,
-              onToggleThinkingTools: _controller.toggleThinkingTools,
-              onToggleThinkingContent: _controller.toggleThinkingContent,
-            )
+          ? _buildSelectionActionBar(context)
           : NotificationListener<SizeChangedLayoutNotification>(
               onNotification: (n) {
                 WidgetsBinding.instance.addPostFrameCallback(
@@ -836,10 +828,10 @@ class _HomePageState extends State<HomePage>
     if (collapsed.isEmpty) return;
 
     if (PlatformUtils.isDesktop &&
-        _selectionExportBarKey.currentContext != null) {
+        _selectionActionBarKey.currentContext != null) {
       await showDesktopMiniMapPopover(
         context,
-        anchorKey: _selectionExportBarKey,
+        anchorKey: _selectionActionBarKey,
         messages: collapsed,
         selecting: true,
         selectedMessageIds: _controller.selectedItems,
@@ -862,6 +854,37 @@ class _HomePageState extends State<HomePage>
         id,
         !_controller.selectedItems.contains(id),
       ),
+    );
+  }
+
+  Widget _buildSelectionActionBar(BuildContext context) {
+    if (_controller.selectionMode == ChatSelectionMode.delete) {
+      return ChatSelectionDeleteBar(
+        key: _selectionActionBarKey,
+        hasMultiVersionSelection:
+            _controller.selectedMessagesIncludeMultipleVersions,
+        onDeleteCurrentVersions: () {
+          unawaited(
+            _handleDeleteSelectedMessages(context, deleteAllVersions: false),
+          );
+        },
+        onDeleteAllVersions: () {
+          unawaited(
+            _handleDeleteSelectedMessages(context, deleteAllVersions: true),
+          );
+        },
+      );
+    }
+
+    return ChatSelectionExportBar(
+      key: _selectionActionBarKey,
+      onExportMarkdown: _controller.exportSelectedAsMarkdown,
+      onExportTxt: _controller.exportSelectedAsTxt,
+      onExportImage: _controller.exportSelectedAsImage,
+      showThinkingTools: _controller.showThinkingTools,
+      showThinkingContent: _controller.showThinkingContent,
+      onToggleThinkingTools: _controller.toggleThinkingTools,
+      onToggleThinkingContent: _controller.toggleThinkingContent,
     );
   }
 
@@ -905,16 +928,7 @@ class _HomePageState extends State<HomePage>
               constraints: const BoxConstraints(
                 maxWidth: ChatLayoutConstants.maxInputWidth,
               ),
-              child: ChatSelectionExportBar(
-                key: _selectionExportBarKey,
-                onExportMarkdown: _controller.exportSelectedAsMarkdown,
-                onExportTxt: _controller.exportSelectedAsTxt,
-                onExportImage: _controller.exportSelectedAsImage,
-                showThinkingTools: _controller.showThinkingTools,
-                showThinkingContent: _controller.showThinkingContent,
-                onToggleThinkingTools: _controller.toggleThinkingTools,
-                onToggleThinkingContent: _controller.toggleThinkingContent,
-              ),
+              child: _buildSelectionActionBar(context),
             )
           : NotificationListener<SizeChangedLayoutNotification>(
               onNotification: (n) {
@@ -1158,6 +1172,12 @@ class _HomePageState extends State<HomePage>
         onForkConversation: (message) => _controller.forkConversation(message),
         onShareMessage: (index, messages) =>
             _controller.shareMessage(index, messages),
+        onSelectMessages: (index, messages) =>
+            _controller.startMessageSelection(
+              messageIndex: index,
+              messageList: messages,
+              mode: ChatSelectionMode.delete,
+            ),
         onSpeakMessage: (message) => _controller.speakMessage(message),
         onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),
         onRecoveredAskUserAnswer: (message, part, result) =>
@@ -1662,6 +1682,59 @@ class _HomePageState extends State<HomePage>
     }
 
     await _controller.deleteMessage(message: message, byGroup: byGroup);
+  }
+
+  Future<void> _handleDeleteSelectedMessages(
+    BuildContext context, {
+    required bool deleteAllVersions,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    if (_controller.selectedItems.isEmpty) {
+      showAppSnackBar(
+        context,
+        message: l10n.chatSelectionSelectMessagesToDelete,
+        type: NotificationType.info,
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          deleteAllVersions
+              ? l10n.homePageDeleteAllVersions
+              : l10n.chatSelectionDeleteSelected,
+        ),
+        content: Text(
+          deleteAllVersions
+              ? l10n.chatSelectionDeleteSelectedAllVersionsConfirm(
+                  _controller.selectedItems.length,
+                )
+              : l10n.chatSelectionDeleteSelectedConfirm(
+                  _controller.selectedItems.length,
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.homePageCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.homePageDelete,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    await _controller.deleteSelectedMessages(
+      deleteAllVersions: deleteAllVersions,
+    );
   }
 
   Map<String, TranslationUiState> _buildTranslationUiStates() {
