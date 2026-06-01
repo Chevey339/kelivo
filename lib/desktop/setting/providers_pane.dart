@@ -4400,15 +4400,19 @@ class _DesktopProviderDetailPaneState
     });
   }
 
-  Future<void> _clearAssistantSelectionsForModels(Set<String> modelIds) async {
+  Future<void> _clearAssistantSelectionsForModels(
+    Set<String> modelIds,
+    AssistantProvider assistantProvider,
+  ) async {
     if (modelIds.isEmpty) return;
-    final ap = context.read<AssistantProvider>();
     try {
-      for (final assistant in ap.assistants) {
+      for (final assistant in assistantProvider.assistants) {
         if (assistant.chatModelProvider == widget.providerKey &&
             assistant.chatModelId != null &&
             modelIds.contains(assistant.chatModelId)) {
-          await ap.updateAssistant(assistant.copyWith(clearChatModel: true));
+          await assistantProvider.updateAssistant(
+            assistant.copyWith(clearChatModel: true),
+          );
         }
       }
     } catch (e, st) {
@@ -4511,11 +4515,12 @@ class _DesktopProviderDetailPaneState
     if (!mounted) return;
 
     final sp = context.read<SettingsProvider>();
+    final assistantProvider = context.read<AssistantProvider>();
     final deletedCount = await sp.deleteModels(
       widget.providerKey,
       modelsToDelete,
     );
-    await _clearAssistantSelectionsForModels(modelsToDelete);
+    await _clearAssistantSelectionsForModels(modelsToDelete, assistantProvider);
     if (!mounted) return;
     setState(() {
       _selectedModels.clear();
@@ -4626,9 +4631,11 @@ class _DesktopProviderDetailPaneState
       ),
     );
     if (ok != true) return;
+    if (!mounted) return;
     final modelsToDelete = Set<String>.from(cfg.models);
+    final assistantProvider = context.read<AssistantProvider>();
     await sp.deleteModels(widget.providerKey, modelsToDelete);
-    await _clearAssistantSelectionsForModels(modelsToDelete);
+    await _clearAssistantSelectionsForModels(modelsToDelete, assistantProvider);
     if (!mounted) return;
     setState(() {
       _selectedModels.clear();

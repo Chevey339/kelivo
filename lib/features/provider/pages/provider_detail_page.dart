@@ -2517,9 +2517,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     });
   }
 
-  Future<void> _clearAssistantSelectionsForModels(Set<String> modelIds) async {
+  Future<void> _clearAssistantSelectionsForModels(
+    Set<String> modelIds,
+    AssistantProvider assistantProvider,
+  ) async {
     if (modelIds.isEmpty) return;
-    final assistantProvider = context.read<AssistantProvider>();
     try {
       for (final assistant in assistantProvider.assistants) {
         if (assistant.chatModelProvider == widget.keyName &&
@@ -2578,11 +2580,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     if (!mounted) return;
 
     final settings = context.read<SettingsProvider>();
+    final assistantProvider = context.read<AssistantProvider>();
     final deletedCount = await settings.deleteModels(
       widget.keyName,
       modelsToDelete,
     );
-    await _clearAssistantSelectionsForModels(modelsToDelete);
+    await _clearAssistantSelectionsForModels(modelsToDelete, assistantProvider);
     if (!mounted) return;
     setState(() {
       _selectedModels.clear();
@@ -2699,9 +2702,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       ),
     );
     if (ok != true) return;
+    if (!mounted) return;
+    final assistantProvider = context.read<AssistantProvider>();
     final modelsToDelete = Set<String>.from(cfg.models);
     await settings.deleteModels(widget.keyName, modelsToDelete);
-    await _clearAssistantSelectionsForModels(modelsToDelete);
+    await _clearAssistantSelectionsForModels(modelsToDelete, assistantProvider);
     if (!mounted) return;
     setState(() {
       _selectedModels.clear();
