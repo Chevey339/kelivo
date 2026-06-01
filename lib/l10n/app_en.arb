@@ -2021,11 +2021,31 @@
   "messageWebViewRefreshTooltip": "Refresh",
   "messageWebViewForwardTooltip": "Forward",
   "chatInputBarOcrTooltip": "Image OCR",
+  "providerDetailPageMultiSelectButton": "Multi-select",
   "providerDetailPageBatchDetectButton": "Detect",
   "providerDetailPageBatchDetecting": "Detecting...",
   "providerDetailPageBatchDetectStart": "Start Detection",
   "providerDetailPageDetectSuccess": "Detection successful",
   "providerDetailPageDetectFailed": "Detection failed",
+  "providerDetailPageDeleteSelectedModelsButton": "Delete",
+  "providerDetailPageDeleteSelectedModelsTooltip": "Delete selected models",
+  "providerDetailPageDeleteSelectedModelsConfirm": "Delete {count} selected model(s)? This cannot be undone.",
+  "@providerDetailPageDeleteSelectedModelsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "providerDetailPageSelectedModelsDeletedSnackbar": "Deleted {count} model(s)",
+  "@providerDetailPageSelectedModelsDeletedSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "providerDetailPageDeleteAllModelsTooltip": "Delete all models",
   "providerDetailPageDeleteAllModelsWarning": "This action cannot be undone.",
   "requestLogSettingTitle": "Request Logging",
   "requestLogSettingSubtitle": "When enabled, request/response details are written to logs/logs.txt (rotated daily).",

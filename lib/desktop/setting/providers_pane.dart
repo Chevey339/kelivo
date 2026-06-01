@@ -1966,12 +1966,26 @@ class _DesktopProviderDetailPaneState
                         },
                       ),
                     ),
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message:
+                          l10n.providerDetailPageDeleteSelectedModelsTooltip,
+                      child: _IconTextBtn(
+                        icon: lucide.Lucide.Trash2,
+                        label:
+                            l10n.providerDetailPageDeleteSelectedModelsButton,
+                        color: _selectedModels.isEmpty || _isDetecting
+                            ? cs.onSurface.withValues(alpha: 0.4)
+                            : cs.error,
+                        onTap: _confirmDeleteSelectedModels,
+                      ),
+                    ),
                   ] else ...[
                     if (!_isDetecting)
                       Tooltip(
-                        message: l10n.searchServicesPageTestConnectionTooltip,
+                        message: l10n.providerDetailPageMultiSelectButton,
                         child: _IconBtn(
-                          icon: lucide.Lucide.HeartPulse,
+                          icon: lucide.Lucide.CheckSquare,
                           onTap: _enterSelectionMode,
                         ),
                       )
@@ -1994,7 +2008,7 @@ class _DesktopProviderDetailPaneState
                     if (models.isNotEmpty) ...[
                       const SizedBox(width: 6),
                       Tooltip(
-                        message: '删除全部模型',
+                        message: l10n.providerDetailPageDeleteAllModelsTooltip,
                         child: _IconBtn(
                           icon: lucide.Lucide.Trash2,
                           color: cs.onSurface.withValues(alpha: 0.85),
@@ -4376,8 +4390,6 @@ class _DesktopProviderDetailPaneState
     setState(() {
       _isSelectionMode = true;
       _selectedModels.clear();
-      _detectionResults.clear();
-      _detectionErrorMessages.clear();
     });
   }
 
@@ -4385,9 +4397,148 @@ class _DesktopProviderDetailPaneState
     setState(() {
       _isSelectionMode = false;
       _selectedModels.clear();
-      _detectionResults.clear();
-      _detectionErrorMessages.clear();
     });
+  }
+
+  Future<void> _clearAssistantSelectionsForModels(Set<String> modelIds) async {
+    if (modelIds.isEmpty) return;
+    final ap = context.read<AssistantProvider>();
+    try {
+      for (final assistant in ap.assistants) {
+        if (assistant.chatModelProvider == widget.providerKey &&
+            assistant.chatModelId != null &&
+            modelIds.contains(assistant.chatModelId)) {
+          await ap.updateAssistant(assistant.copyWith(clearChatModel: true));
+        }
+      }
+    } catch (e, st) {
+      FlutterLogger.log(
+        '[DesktopProviders] clear assistant model selections failed: $e\n$st',
+        tag: 'Provider',
+      );
+      assert(() {
+        debugPrint(
+          '[DesktopProviders] clear assistant model selections failed: $e',
+        );
+        return true;
+      }());
+    }
+  }
+
+  Future<void> _confirmDeleteSelectedModels() async {
+    if (_selectedModels.isEmpty || _isDetecting) return;
+    final modelsToDelete = Set<String>.from(_selectedModels);
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.providerDetailPageConfirmDeleteTitle,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    _IconBtn(
+                      icon: lucide.Lucide.X,
+                      onTap: () => Navigator.of(ctx).maybePop(false),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(
+                height: 1,
+                thickness: 0.5,
+                color: cs.outlineVariant.withValues(alpha: 0.12),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    l10n.providerDetailPageDeleteSelectedModelsConfirm(
+                      modelsToDelete.length,
+                    ),
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _DeskIosButton(
+                      label: l10n.providerDetailPageCancelButton,
+                      filled: false,
+                      dense: true,
+                      onTap: () => Navigator.of(ctx).maybePop(false),
+                    ),
+                    const SizedBox(width: 8),
+                    _DeskIosButton(
+                      label: l10n.providerDetailPageDeleteButton,
+                      filled: true,
+                      dense: true,
+                      onTap: () => Navigator.of(ctx).maybePop(true),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (ok != true) return;
+    if (!mounted) return;
+
+    final sp = context.read<SettingsProvider>();
+    final deletedCount = await sp.deleteModels(
+      widget.providerKey,
+      modelsToDelete,
+    );
+    await _clearAssistantSelectionsForModels(modelsToDelete);
+    if (!mounted) return;
+    setState(() {
+      _selectedModels.clear();
+      _detectionResults.removeWhere((id, _) => modelsToDelete.contains(id));
+      _detectionErrorMessages.removeWhere(
+        (id, _) => modelsToDelete.contains(id),
+      );
+      _pendingModels.removeAll(modelsToDelete);
+      if (_currentDetectingModel != null &&
+          modelsToDelete.contains(_currentDetectingModel)) {
+        _currentDetectingModel = null;
+      }
+      _isSelectionMode = false;
+    });
+    if (deletedCount > 0) {
+      showAppSnackBar(
+        context,
+        message: l10n.providerDetailPageSelectedModelsDeletedSnackbar(
+          deletedCount,
+        ),
+        type: NotificationType.info,
+      );
+    }
   }
 
   Future<void> _confirmDeleteAllModels() async {
@@ -4475,8 +4626,9 @@ class _DesktopProviderDetailPaneState
       ),
     );
     if (ok != true) return;
-    final cleared = cfg.copyWith(models: const [], modelOverrides: const {});
-    await sp.setProviderConfig(widget.providerKey, cleared);
+    final modelsToDelete = Set<String>.from(cfg.models);
+    await sp.deleteModels(widget.providerKey, modelsToDelete);
+    await _clearAssistantSelectionsForModels(modelsToDelete);
     if (!mounted) return;
     setState(() {
       _selectedModels.clear();
@@ -4495,10 +4647,8 @@ class _DesktopProviderDetailPaneState
 
     setState(() {
       _isDetecting = true;
-      _detectionResults.clear();
-      _detectionErrorMessages.clear();
-      _isSelectionMode = false;
-      _selectedModels.clear();
+      _detectionResults.removeWhere((id, _) => modelsToTest.contains(id));
+      _detectionErrorMessages.removeWhere((id, _) => modelsToTest.contains(id));
       _pendingModels.clear();
       _pendingModels.addAll(modelsToTest);
       _currentDetectingModel = null;
@@ -6304,6 +6454,9 @@ class _ModelRow extends StatelessWidget {
               IosCheckbox(
                 value: isSelected,
                 onChanged: (value) => onSelectionChanged?.call(value),
+                size: 18,
+                hitTestSize: 26,
+                borderWidth: 1.6,
               ),
               const SizedBox(width: 10),
             ],

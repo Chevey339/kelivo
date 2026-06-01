@@ -4707,6 +4707,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarOcrTooltip => 'OCR 文字识别';
 
   @override
+  String get providerDetailPageMultiSelectButton => '多选';
+
+  @override
   String get providerDetailPageBatchDetectButton => '检测';
 
   @override
@@ -4720,6 +4723,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providerDetailPageDetectFailed => '检测失败';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsButton => '删除';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsTooltip => '删除所选模型';
+
+  @override
+  String providerDetailPageDeleteSelectedModelsConfirm(int count) {
+    return '确定删除选中的 $count 个模型吗？此操作不可撤回。';
+  }
+
+  @override
+  String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
+    return '已删除 $count 个模型';
+  }
+
+  @override
+  String get providerDetailPageDeleteAllModelsTooltip => '删除全部模型';
 
   @override
   String get providerDetailPageDeleteAllModelsWarning => '此操作不可撤回';
@@ -9882,6 +9904,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarOcrTooltip => 'OCR 文字识别';
 
   @override
+  String get providerDetailPageMultiSelectButton => '多选';
+
+  @override
   String get providerDetailPageBatchDetectButton => '检测';
 
   @override
@@ -9895,6 +9920,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageDetectFailed => '检测失败';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsButton => '删除';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsTooltip => '删除所选模型';
+
+  @override
+  String providerDetailPageDeleteSelectedModelsConfirm(int count) {
+    return '确定删除选中的 $count 个模型吗？此操作不可撤回。';
+  }
+
+  @override
+  String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
+    return '已删除 $count 个模型';
+  }
+
+  @override
+  String get providerDetailPageDeleteAllModelsTooltip => '删除全部模型';
 
   @override
   String get providerDetailPageDeleteAllModelsWarning => '此操作不可撤回';
@@ -15057,6 +15101,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarOcrTooltip => 'OCR 文字辨識';
 
   @override
+  String get providerDetailPageMultiSelectButton => '多選';
+
+  @override
   String get providerDetailPageBatchDetectButton => '檢測';
 
   @override
@@ -15070,6 +15117,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageDetectFailed => '檢測失敗';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsButton => '刪除';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsTooltip => '刪除所選模型';
+
+  @override
+  String providerDetailPageDeleteSelectedModelsConfirm(int count) {
+    return '確定刪除選中的 $count 個模型嗎？此操作不可撤回。';
+  }
+
+  @override
+  String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
+    return '已刪除 $count 個模型';
+  }
+
+  @override
+  String get providerDetailPageDeleteAllModelsTooltip => '刪除全部模型';
 
   @override
   String get providerDetailPageDeleteAllModelsWarning => '此操作不可撤回';

@@ -1681,11 +1681,31 @@
   "messageWebViewNoConsoleMessages": "暂无控制台消息",
   "messageWebViewRefreshTooltip": "刷新",
   "messageWebViewForwardTooltip": "前进",
+  "providerDetailPageMultiSelectButton": "多选",
   "providerDetailPageBatchDetectButton": "检测",
   "providerDetailPageBatchDetecting": "检测中...",
   "providerDetailPageBatchDetectStart": "开始检测",
   "providerDetailPageDetectSuccess": "检测成功",
   "providerDetailPageDetectFailed": "检测失败",
+  "providerDetailPageDeleteSelectedModelsButton": "删除",
+  "providerDetailPageDeleteSelectedModelsTooltip": "删除所选模型",
+  "providerDetailPageDeleteSelectedModelsConfirm": "确定删除选中的 {count} 个模型吗？此操作不可撤回。",
+  "@providerDetailPageDeleteSelectedModelsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "providerDetailPageSelectedModelsDeletedSnackbar": "已删除 {count} 个模型",
+  "@providerDetailPageSelectedModelsDeletedSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "providerDetailPageDeleteAllModelsTooltip": "删除全部模型",
   "providerDetailPageDeleteAllModelsWarning": "此操作不可撤回",
   "requestLogSettingTitle": "请求日志打印",
   "requestLogSettingSubtitle": "开启后会将请求/响应详情写入 logs/logs.txt",

@@ -2204,6 +2204,38 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_providerConfigsKey, jsonEncode(map));
   }
 
+  Future<int> deleteModels(String providerKey, Set<String> modelIds) async {
+    if (modelIds.isEmpty) return 0;
+    final old = _providerConfigs[providerKey];
+    if (old == null) return 0;
+    final deletedModelIds = old.models
+        .where((modelId) => modelIds.contains(modelId))
+        .toSet();
+    if (deletedModelIds.isEmpty) return 0;
+    final nextModels = old.models
+        .where((modelId) => !deletedModelIds.contains(modelId))
+        .toList();
+    final deletedCount = old.models.length - nextModels.length;
+
+    final nextOverrides = nextModels.isEmpty
+        ? <String, dynamic>{}
+        : Map<String, dynamic>.from(old.modelOverrides);
+    if (nextModels.isNotEmpty) {
+      for (final modelId in deletedModelIds) {
+        nextOverrides.remove(modelId);
+      }
+    }
+
+    await setProviderConfig(
+      providerKey,
+      old.copyWith(models: nextModels, modelOverrides: nextOverrides),
+    );
+    for (final modelId in deletedModelIds) {
+      await clearSelectionsForModel(providerKey, modelId);
+    }
+    return deletedCount;
+  }
+
   // ===== Provider Avatars =====
   Future<void> setProviderAvatarEmoji(String key, String emoji) async {
     final e = emoji.trim();

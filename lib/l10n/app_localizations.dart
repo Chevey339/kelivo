@@ -9086,6 +9086,12 @@ abstract class AppLocalizations {
   /// **'Image OCR'**
   String get chatInputBarOcrTooltip;
 
+  /// No description provided for @providerDetailPageMultiSelectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-select'**
+  String get providerDetailPageMultiSelectButton;
+
   /// No description provided for @providerDetailPageBatchDetectButton.
   ///
   /// In en, this message translates to:
@@ -9115,6 +9121,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Detection failed'**
   String get providerDetailPageDetectFailed;
+
+  /// No description provided for @providerDetailPageDeleteSelectedModelsButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get providerDetailPageDeleteSelectedModelsButton;
+
+  /// No description provided for @providerDetailPageDeleteSelectedModelsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete selected models'**
+  String get providerDetailPageDeleteSelectedModelsTooltip;
+
+  /// No description provided for @providerDetailPageDeleteSelectedModelsConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count} selected model(s)? This cannot be undone.'**
+  String providerDetailPageDeleteSelectedModelsConfirm(int count);
+
+  /// No description provided for @providerDetailPageSelectedModelsDeletedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {count} model(s)'**
+  String providerDetailPageSelectedModelsDeletedSnackbar(int count);
+
+  /// No description provided for @providerDetailPageDeleteAllModelsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all models'**
+  String get providerDetailPageDeleteAllModelsTooltip;
 
   /// No description provided for @providerDetailPageDeleteAllModelsWarning.
   ///

@@ -1677,11 +1677,31 @@
   "messageWebViewNoConsoleMessages": "暫無控制台訊息",
   "messageWebViewRefreshTooltip": "重新整理",
   "messageWebViewForwardTooltip": "前進",
+  "providerDetailPageMultiSelectButton": "多選",
   "providerDetailPageBatchDetectButton": "檢測",
   "providerDetailPageBatchDetecting": "檢測中...",
   "providerDetailPageBatchDetectStart": "開始檢測",
   "providerDetailPageDetectSuccess": "檢測成功",
   "providerDetailPageDetectFailed": "檢測失敗",
+  "providerDetailPageDeleteSelectedModelsButton": "刪除",
+  "providerDetailPageDeleteSelectedModelsTooltip": "刪除所選模型",
+  "providerDetailPageDeleteSelectedModelsConfirm": "確定刪除選中的 {count} 個模型嗎？此操作不可撤回。",
+  "@providerDetailPageDeleteSelectedModelsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "providerDetailPageSelectedModelsDeletedSnackbar": "已刪除 {count} 個模型",
+  "@providerDetailPageSelectedModelsDeletedSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "providerDetailPageDeleteAllModelsTooltip": "刪除全部模型",
   "providerDetailPageDeleteAllModelsWarning": "此操作不可撤回",
   "requestLogSettingTitle": "請求日誌列印",
   "requestLogSettingSubtitle": "開啟後會將請求/回應詳細寫入 logs/logs.txt",

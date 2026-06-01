@@ -4898,6 +4898,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarOcrTooltip => 'Image OCR';
 
   @override
+  String get providerDetailPageMultiSelectButton => 'Multi-select';
+
+  @override
   String get providerDetailPageBatchDetectButton => 'Detect';
 
   @override
@@ -4911,6 +4914,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerDetailPageDetectFailed => 'Detection failed';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsButton => 'Delete';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsTooltip =>
+      'Delete selected models';
+
+  @override
+  String providerDetailPageDeleteSelectedModelsConfirm(int count) {
+    return 'Delete $count selected model(s)? This cannot be undone.';
+  }
+
+  @override
+  String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
+    return 'Deleted $count model(s)';
+  }
+
+  @override
+  String get providerDetailPageDeleteAllModelsTooltip => 'Delete all models';
 
   @override
   String get providerDetailPageDeleteAllModelsWarning =>

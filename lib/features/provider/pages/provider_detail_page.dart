@@ -212,13 +212,13 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             Tooltip(
               message: _isDetecting
                   ? l10n.providerDetailPageBatchDetecting
-                  : l10n.providerDetailPageTestButton,
+                  : l10n.providerDetailPageMultiSelectButton,
               child: _TactileIconButton(
-                icon: _isDetecting ? Lucide.Loader : Lucide.HeartPulse,
+                icon: _isDetecting ? Lucide.Loader : Lucide.CheckSquare,
                 color: cs.onSurface,
                 semanticLabel: _isDetecting
                     ? l10n.providerDetailPageBatchDetecting
-                    : l10n.providerDetailPageTestButton,
+                    : l10n.providerDetailPageMultiSelectButton,
                 size: 22,
                 onTap: _isDetecting ? () {} : _enterSelectionMode,
               ),
@@ -1292,176 +1292,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             left: 0,
             right: 0,
             bottom: 12 + MediaQuery.of(context).padding.bottom,
-            child: Center(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Color.alphaBlend(
-                          Colors.white.withValues(alpha: 0.12),
-                          cs.surface,
-                        )
-                      : const Color(0xFFF2F3F5),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _TactileRow(
-                      pressedScale: 0.97,
-                      haptics: false,
-                      onTap: () {
-                        if (allSelected) {
-                          setState(() {
-                            _selectedModels.clear();
-                          });
-                        } else {
-                          _selectAll();
-                        }
-                      },
-                      builder: (pressed) {
-                        final icon = allSelected
-                            ? Lucide.Square
-                            : Lucide.CheckSquare;
-                        final label = allSelected
-                            ? l10n.mcpAssistantSheetClearAll
-                            : l10n.mcpAssistantSheetSelectAll;
-                        return Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: cs.onSurface.withValues(alpha: 0.2),
-                            ),
-                            color: pressed
-                                ? cs.onSurface.withValues(alpha: 0.06)
-                                : null,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 10,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 160),
-                                transitionBuilder: (child, anim) =>
-                                    ScaleTransition(scale: anim, child: child),
-                                child: Icon(
-                                  icon,
-                                  key: ValueKey(allSelected),
-                                  size: 20,
-                                  color: cs.onSurface,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                label,
-                                style: TextStyle(
-                                  color: cs.onSurface,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                    _TactileRow(
-                      pressedScale: 0.97,
-                      haptics: false,
-                      onTap: () =>
-                          setState(() => _detectUseStream = !_detectUseStream),
-                      builder: (pressed) {
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          curve: Curves.easeOutCubic,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 9,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: cs.onSurface.withValues(alpha: 0.2),
-                            ),
-                            color: pressed
-                                ? cs.onSurface.withValues(alpha: 0.06)
-                                : (_detectUseStream
-                                      ? cs.onSurface.withValues(alpha: 0.08)
-                                      : Colors.transparent),
-                          ),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 160),
-                            transitionBuilder: (child, anim) =>
-                                ScaleTransition(scale: anim, child: child),
-                            child: Icon(
-                              _detectUseStream
-                                  ? Lucide.AudioWaveform
-                                  : Lucide.SquareEqual,
-                              key: ValueKey(_detectUseStream),
-                              size: 18,
-                              color: cs.onSurface,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                    _TactileRow(
-                      pressedScale: 0.97,
-                      haptics: false,
-                      onTap: _selectedModels.isEmpty ? null : _startDetection,
-                      builder: (pressed) {
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: _selectedModels.isEmpty
-                                ? cs.onSurface.withValues(alpha: 0.1)
-                                : cs.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 10,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _isDetecting
-                                    ? Lucide.Loader
-                                    : Lucide.HeartPulse,
-                                size: 20,
-                                color: _selectedModels.isEmpty
-                                    ? cs.onSurface.withValues(alpha: 0.5)
-                                    : cs.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _isDetecting
-                                    ? l10n.providerDetailPageBatchDetecting
-                                    : l10n.providerDetailPageBatchDetectButton,
-                                style: TextStyle(
-                                  color: _selectedModels.isEmpty
-                                      ? cs.onSurface.withValues(alpha: 0.5)
-                                      : cs.primary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
+            child: _buildModelSelectionToolbar(
+              l10n: l10n,
+              cs: cs,
+              allSelected: allSelected,
             ),
           )
         else
@@ -1469,125 +1303,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             left: 0,
             right: 0,
             bottom: 12 + MediaQuery.of(context).padding.bottom,
-            child: Center(
-              child: Container(
-                decoration: BoxDecoration(
-                  // Solid color: dark theme uses an opaque lightened surface; light uses input-like gray
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Color.alphaBlend(
-                          Colors.white.withValues(alpha: 0.12),
-                          cs.surface,
-                        )
-                      : const Color(0xFFF2F3F5),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _TactileRow(
-                      pressedScale: 0.97,
-                      haptics: false,
-                      onTap: () => _showModelPicker(context),
-                      builder: (pressed) {
-                        return Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: cs.primary.withValues(alpha: 0.35),
-                            ),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 10,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Lucide.Boxes, size: 20, color: cs.primary),
-                              const SizedBox(width: 8),
-                              Text(
-                                l10n.providerDetailPageFetchModelsButton,
-                                style: TextStyle(
-                                  color: cs.primary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                    _TactileRow(
-                      pressedScale: 0.97,
-                      haptics: false,
-                      onTap: () async {
-                        await showCreateModelSheet(
-                          context,
-                          providerKey: widget.keyName,
-                        );
-                      },
-                      builder: (pressed) {
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: cs.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 10,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Lucide.Plus, size: 20, color: cs.primary),
-                              const SizedBox(width: 8),
-                              Text(
-                                l10n.providerDetailPageAddNewModelButton,
-                                style: TextStyle(
-                                  color: cs.primary,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                    if (models.isNotEmpty) ...[
-                      const SizedBox(width: 10),
-                      _TactileRow(
-                        pressedScale: 0.97,
-                        haptics: false,
-                        onTap: _deleteAllModels,
-                        builder: (pressed) {
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: cs.error.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Lucide.Trash2, size: 18, color: cs.error),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+            child: _buildModelActionToolbar(
+              l10n: l10n,
+              cs: cs,
+              hasModels: models.isNotEmpty,
             ),
           ),
       ],
@@ -2262,12 +1981,521 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     }
   }
 
+  Widget _buildToolbarShell({
+    required Widget child,
+    required ColorScheme colorScheme,
+    required double horizontalMargin,
+    required EdgeInsetsGeometry padding,
+    required double maxWidth,
+  }) {
+    final toolbarColor = Theme.of(context).brightness == Brightness.dark
+        ? Color.alphaBlend(
+            Colors.white.withValues(alpha: 0.12),
+            colorScheme.surface,
+          )
+        : const Color(0xFFF2F3F5);
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: horizontalMargin),
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: maxWidth - horizontalMargin * 2,
+          ),
+          decoration: BoxDecoration(
+            color: toolbarColor,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          padding: padding,
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModelActionToolbar({
+    required AppLocalizations l10n,
+    required ColorScheme cs,
+    required bool hasModels,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final compact = availableWidth < 370;
+        final horizontalMargin = compact ? 10.0 : 16.0;
+        final itemGap = compact ? 8.0 : 10.0;
+        final toolbarPadding = EdgeInsets.symmetric(
+          horizontal: compact ? 10 : 14,
+          vertical: 10,
+        );
+        final textButtonPadding = EdgeInsets.symmetric(
+          horizontal: compact ? 14 : 18,
+          vertical: 10,
+        );
+        final iconButtonPadding = EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 18,
+          vertical: 10,
+        );
+
+        return _buildToolbarShell(
+          colorScheme: cs,
+          horizontalMargin: horizontalMargin,
+          padding: toolbarPadding,
+          maxWidth: availableWidth,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                fit: FlexFit.loose,
+                child: _buildActionToolbarButton(
+                  label: l10n.providerDetailPageFetchModelsButton,
+                  icon: Lucide.Boxes,
+                  showLabel: !compact,
+                  padding: compact ? iconButtonPadding : textButtonPadding,
+                  colorScheme: cs,
+                  outlined: true,
+                  onTap: () => _showModelPicker(context),
+                ),
+              ),
+              SizedBox(width: itemGap),
+              Flexible(
+                fit: FlexFit.loose,
+                child: _buildActionToolbarButton(
+                  label: l10n.providerDetailPageAddNewModelButton,
+                  icon: Lucide.Plus,
+                  showLabel: !compact,
+                  padding: compact ? iconButtonPadding : textButtonPadding,
+                  colorScheme: cs,
+                  onTap: () async {
+                    await showCreateModelSheet(
+                      context,
+                      providerKey: widget.keyName,
+                    );
+                  },
+                ),
+              ),
+              if (hasModels) ...[
+                SizedBox(width: itemGap),
+                _buildActionToolbarButton(
+                  label: l10n.providerDetailPageDeleteAllModelsTooltip,
+                  icon: Lucide.Trash2,
+                  showLabel: false,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  colorScheme: cs,
+                  destructive: true,
+                  onTap: _deleteAllModels,
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildActionToolbarButton({
+    required String label,
+    required IconData icon,
+    required bool showLabel,
+    required EdgeInsetsGeometry padding,
+    required ColorScheme colorScheme,
+    required VoidCallback onTap,
+    bool outlined = false,
+    bool destructive = false,
+  }) {
+    final fg = destructive ? colorScheme.error : colorScheme.primary;
+    return Semantics(
+      button: true,
+      label: label,
+      child: _TactileRow(
+        pressedScale: 0.97,
+        haptics: false,
+        onTap: onTap,
+        builder: (pressed) {
+          return Container(
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            decoration: BoxDecoration(
+              color: destructive
+                  ? colorScheme.error.withValues(alpha: 0.1)
+                  : (outlined
+                        ? null
+                        : colorScheme.primary.withValues(alpha: 0.12)),
+              borderRadius: BorderRadius.circular(999),
+              border: outlined
+                  ? Border.all(
+                      color: colorScheme.primary.withValues(alpha: 0.35),
+                    )
+                  : null,
+            ),
+            padding: padding,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: destructive ? 18 : 20, color: fg),
+                if (showLabel) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: fg,
+                        fontSize: 14,
+                        fontWeight: outlined
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildModelSelectionToolbar({
+    required AppLocalizations l10n,
+    required ColorScheme cs,
+    required bool allSelected,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final compact = availableWidth < 370;
+        final horizontalMargin = compact ? 10.0 : 16.0;
+        final itemGap = compact ? 8.0 : 10.0;
+        final toolbarPadding = EdgeInsets.symmetric(
+          horizontal: compact ? 10 : 14,
+          vertical: 10,
+        );
+        final textButtonPadding = EdgeInsets.symmetric(
+          horizontal: compact ? 14 : 18,
+          vertical: 10,
+        );
+        final iconButtonPadding = EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 14,
+          vertical: compact ? 10 : 9,
+        );
+        final iconOnlyPadding = EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 18,
+          vertical: 10,
+        );
+        final selectLabel = allSelected
+            ? l10n.mcpAssistantSheetClearAll
+            : l10n.mcpAssistantSheetSelectAll;
+        final selectIcon = allSelected ? Lucide.Square : Lucide.CheckSquare;
+        final deleteDisabled = _selectedModels.isEmpty || _isDetecting;
+
+        return _buildToolbarShell(
+          colorScheme: cs,
+          horizontalMargin: horizontalMargin,
+          padding: toolbarPadding,
+          maxWidth: availableWidth,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildSelectionToolbarSelectButton(
+                label: selectLabel,
+                icon: selectIcon,
+                showLabel: !compact,
+                padding: iconOnlyPadding,
+                colorScheme: cs,
+                allSelected: allSelected,
+              ),
+              SizedBox(width: itemGap),
+              _buildSelectionToolbarStreamButton(
+                padding: iconButtonPadding,
+                colorScheme: cs,
+              ),
+              SizedBox(width: itemGap),
+              if (compact)
+                _buildSelectionToolbarDetectButton(
+                  l10n: l10n,
+                  showLabel: false,
+                  padding: iconOnlyPadding,
+                  colorScheme: cs,
+                )
+              else
+                Flexible(
+                  fit: FlexFit.loose,
+                  child: _buildSelectionToolbarDetectButton(
+                    l10n: l10n,
+                    showLabel: true,
+                    padding: textButtonPadding,
+                    colorScheme: cs,
+                  ),
+                ),
+              SizedBox(width: itemGap),
+              _buildSelectionToolbarDeleteButton(
+                l10n: l10n,
+                showLabel: !compact,
+                padding: iconOnlyPadding,
+                disabled: deleteDisabled,
+                colorScheme: cs,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSelectionToolbarSelectButton({
+    required String label,
+    required IconData icon,
+    required bool showLabel,
+    required EdgeInsetsGeometry padding,
+    required ColorScheme colorScheme,
+    required bool allSelected,
+  }) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: _TactileRow(
+        pressedScale: 0.97,
+        haptics: false,
+        onTap: () {
+          if (allSelected) {
+            setState(() {
+              _selectedModels.clear();
+            });
+          } else {
+            _selectAll();
+          }
+        },
+        builder: (pressed) {
+          return Container(
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: colorScheme.onSurface.withValues(alpha: 0.2),
+              ),
+              color: pressed
+                  ? colorScheme.onSurface.withValues(alpha: 0.06)
+                  : null,
+            ),
+            padding: padding,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 160),
+                  transitionBuilder: (child, anim) =>
+                      ScaleTransition(scale: anim, child: child),
+                  child: Icon(
+                    icon,
+                    key: ValueKey(allSelected),
+                    size: 20,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                if (showLabel) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSelectionToolbarStreamButton({
+    required EdgeInsetsGeometry padding,
+    required ColorScheme colorScheme,
+  }) {
+    return _TactileRow(
+      pressedScale: 0.97,
+      haptics: false,
+      onTap: () => setState(() => _detectUseStream = !_detectUseStream),
+      builder: (pressed) {
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          padding: padding,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: colorScheme.onSurface.withValues(alpha: 0.2),
+            ),
+            color: pressed
+                ? colorScheme.onSurface.withValues(alpha: 0.06)
+                : (_detectUseStream
+                      ? colorScheme.onSurface.withValues(alpha: 0.08)
+                      : Colors.transparent),
+          ),
+          child: Center(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 160),
+              transitionBuilder: (child, anim) =>
+                  ScaleTransition(scale: anim, child: child),
+              child: Icon(
+                _detectUseStream ? Lucide.AudioWaveform : Lucide.SquareEqual,
+                key: ValueKey(_detectUseStream),
+                size: 18,
+                color: colorScheme.onSurface,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSelectionToolbarDetectButton({
+    required AppLocalizations l10n,
+    required bool showLabel,
+    required EdgeInsetsGeometry padding,
+    required ColorScheme colorScheme,
+  }) {
+    final disabled = _selectedModels.isEmpty;
+    final label = _isDetecting
+        ? l10n.providerDetailPageBatchDetecting
+        : l10n.providerDetailPageBatchDetectButton;
+    return Semantics(
+      button: true,
+      label: label,
+      enabled: !disabled,
+      child: _TactileRow(
+        pressedScale: 0.97,
+        haptics: false,
+        onTap: disabled ? null : _startDetection,
+        builder: (pressed) {
+          return Container(
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            decoration: BoxDecoration(
+              color: disabled
+                  ? colorScheme.onSurface.withValues(alpha: 0.1)
+                  : colorScheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            padding: padding,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _isDetecting ? Lucide.Loader : Lucide.HeartPulse,
+                  size: 20,
+                  color: disabled
+                      ? colorScheme.onSurface.withValues(alpha: 0.5)
+                      : colorScheme.primary,
+                ),
+                if (showLabel) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: disabled
+                            ? colorScheme.onSurface.withValues(alpha: 0.5)
+                            : colorScheme.primary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSelectionToolbarDeleteButton({
+    required AppLocalizations l10n,
+    required bool showLabel,
+    required EdgeInsetsGeometry padding,
+    required bool disabled,
+    required ColorScheme colorScheme,
+  }) {
+    final label = l10n.providerDetailPageDeleteSelectedModelsButton;
+    return Semantics(
+      button: true,
+      label: label,
+      enabled: !disabled,
+      child: _TactileRow(
+        pressedScale: 0.97,
+        haptics: false,
+        onTap: disabled ? null : _confirmDeleteSelectedModels,
+        builder: (pressed) {
+          return Container(
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            decoration: BoxDecoration(
+              color: disabled
+                  ? colorScheme.onSurface.withValues(alpha: 0.1)
+                  : colorScheme.error.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            padding: padding,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Lucide.Trash2,
+                  size: 20,
+                  color: disabled
+                      ? colorScheme.onSurface.withValues(alpha: 0.5)
+                      : colorScheme.error,
+                ),
+                if (showLabel) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: disabled
+                            ? colorScheme.onSurface.withValues(alpha: 0.5)
+                            : colorScheme.error,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _enterSelectionMode() {
     setState(() {
       _isSelectionMode = true;
       _selectedModels.clear();
-      _detectionResults.clear();
-      _detectionErrorMessages.clear();
     });
   }
 
@@ -2275,8 +2503,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     setState(() {
       _isSelectionMode = false;
       _selectedModels.clear();
-      _detectionResults.clear();
-      _detectionErrorMessages.clear();
     });
   }
 
@@ -2291,6 +2517,97 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     });
   }
 
+  Future<void> _clearAssistantSelectionsForModels(Set<String> modelIds) async {
+    if (modelIds.isEmpty) return;
+    final assistantProvider = context.read<AssistantProvider>();
+    try {
+      for (final assistant in assistantProvider.assistants) {
+        if (assistant.chatModelProvider == widget.keyName &&
+            assistant.chatModelId != null &&
+            modelIds.contains(assistant.chatModelId)) {
+          await assistantProvider.updateAssistant(
+            assistant.copyWith(clearChatModel: true),
+          );
+        }
+      }
+    } catch (e, st) {
+      FlutterLogger.log(
+        '[ProviderDetail] clear assistant model selections failed: $e\n$st',
+        tag: 'Provider',
+      );
+      assert(() {
+        debugPrint(
+          '[ProviderDetail] clear assistant model selections failed: $e',
+        );
+        return true;
+      }());
+    }
+  }
+
+  Future<void> _confirmDeleteSelectedModels() async {
+    if (_selectedModels.isEmpty || _isDetecting) return;
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final modelsToDelete = Set<String>.from(_selectedModels);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cs.surface,
+        title: Text(l10n.providerDetailPageConfirmDeleteTitle),
+        content: Text(
+          l10n.providerDetailPageDeleteSelectedModelsConfirm(
+            modelsToDelete.length,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.providerDetailPageCancelButton),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.providerDetailPageDeleteButton,
+              style: TextStyle(color: cs.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    if (!mounted) return;
+
+    final settings = context.read<SettingsProvider>();
+    final deletedCount = await settings.deleteModels(
+      widget.keyName,
+      modelsToDelete,
+    );
+    await _clearAssistantSelectionsForModels(modelsToDelete);
+    if (!mounted) return;
+    setState(() {
+      _selectedModels.clear();
+      _detectionResults.removeWhere((id, _) => modelsToDelete.contains(id));
+      _detectionErrorMessages.removeWhere(
+        (id, _) => modelsToDelete.contains(id),
+      );
+      _pendingModels.removeAll(modelsToDelete);
+      if (_currentDetectingModel != null &&
+          modelsToDelete.contains(_currentDetectingModel)) {
+        _currentDetectingModel = null;
+      }
+      _isSelectionMode = false;
+    });
+    if (deletedCount > 0) {
+      showAppSnackBar(
+        context,
+        message: l10n.providerDetailPageSelectedModelsDeletedSnackbar(
+          deletedCount,
+        ),
+        type: NotificationType.info,
+      );
+    }
+  }
+
   Future<void> _startDetection() async {
     if (_selectedModels.isEmpty || _isDetecting) return;
 
@@ -2298,10 +2615,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
 
     setState(() {
       _isDetecting = true;
-      _detectionResults.clear();
-      _detectionErrorMessages.clear();
-      _isSelectionMode = false;
-      _selectedModels.clear();
+      _detectionResults.removeWhere((id, _) => modelsToTest.contains(id));
+      _detectionErrorMessages.removeWhere((id, _) => modelsToTest.contains(id));
       _pendingModels.clear();
       _pendingModels.addAll(modelsToTest);
       _currentDetectingModel = null;
@@ -2330,6 +2645,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         if (mounted) {
           setState(() {
             _detectionResults[modelId] = true;
+            _detectionErrorMessages.remove(modelId);
           });
         }
       } catch (e) {
@@ -2383,8 +2699,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       ),
     );
     if (ok != true) return;
-    final cleared = cfg.copyWith(models: const [], modelOverrides: const {});
-    await settings.setProviderConfig(widget.keyName, cleared);
+    final modelsToDelete = Set<String>.from(cfg.models);
+    await settings.deleteModels(widget.keyName, modelsToDelete);
+    await _clearAssistantSelectionsForModels(modelsToDelete);
     if (!mounted) return;
     setState(() {
       _selectedModels.clear();
@@ -3132,6 +3449,40 @@ class _ModelCard extends StatelessWidget {
           );
     String displayName = effective.displayName.trim();
     if (displayName.isEmpty) displayName = modelId;
+    final Widget? detectionIndicator = isDetecting
+        ? SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+          )
+        : isPending
+        ? Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: cs.onSurface.withValues(alpha: 0.3),
+                width: 2,
+              ),
+            ),
+          )
+        : detectionResult != null
+        ? MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: Tooltip(
+              message: detectionResult!
+                  ? l10n.providerDetailPageDetectSuccess
+                  : (detectionErrorMessage ??
+                        l10n.providerDetailPageDetectFailed),
+              child: Icon(
+                detectionResult! ? Lucide.CheckCircle : Lucide.XCircle,
+                size: 16,
+                color: detectionResult! ? Colors.green : cs.error,
+              ),
+            ),
+          )
+        : null;
     return _TactileRow(
       pressedScale: 0.98,
       haptics: false,
@@ -3161,68 +3512,22 @@ class _ModelCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              displayName,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          if (isDetecting) ...[
-                            const SizedBox(width: 8),
-                            SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: cs.primary,
-                              ),
-                            ),
-                          ] else if (isPending) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 16,
-                              height: 16,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: cs.onSurface.withValues(alpha: 0.3),
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                          ] else if (detectionResult != null) ...[
-                            const SizedBox(width: 8),
-                            MouseRegion(
-                              cursor: SystemMouseCursors.click,
-                              child: Tooltip(
-                                message: detectionResult!
-                                    ? l10n.providerDetailPageDetectSuccess
-                                    : (detectionErrorMessage ??
-                                          l10n.providerDetailPageDetectFailed),
-                                child: Icon(
-                                  detectionResult!
-                                      ? Lucide.CheckCircle
-                                      : Lucide.XCircle,
-                                  size: 16,
-                                  color: detectionResult!
-                                      ? Colors.green
-                                      : cs.error,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
+                      Text(
+                        displayName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       ModelTagWrap(model: effective),
                     ],
                   ),
                 ),
+                if (detectionIndicator != null) ...[
+                  const SizedBox(width: 8),
+                  detectionIndicator,
+                ],
                 if (!isSelectionMode) ...[
                   const SizedBox(width: 8),
                   _TactileIconButton(
