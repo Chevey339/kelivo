@@ -104,9 +104,9 @@ class ImageGenerationOptionsController {
   Map<String, dynamic> toExtraBody() {
     final size = resolvedSize;
     return <String, dynamic>{
-      'quality': quality,
+      if (quality != 'high') 'quality': quality,
       if (size != 'auto') 'size': size,
-      'output_format': outputFormat,
+      if (outputFormat != 'png') 'output_format': outputFormat,
       if (outputFormat != 'png' && outputCompression != null)
         'output_compression': outputCompression,
       if (count > 1) 'n': count,
