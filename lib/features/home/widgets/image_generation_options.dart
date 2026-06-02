@@ -114,6 +114,7 @@ class ImageGenerationOptionsController {
   }
 
   void restoreFromBody(Map<String, dynamic> body) {
+    reset();
     final q = body['quality']?.toString();
     final size = body['size']?.toString();
     final format = body['output_format']?.toString();

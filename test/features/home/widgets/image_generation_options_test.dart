@@ -28,5 +28,38 @@ void main() {
         'output_compression': 80,
       });
     });
+
+    test('restoreFromBody resets stale values before applying partial body', () {
+      final controller = ImageGenerationOptionsController()
+        ..quality = 'medium'
+        ..sizeTier = '4K'
+        ..aspectRatio = '16:9'
+        ..outputFormat = 'webp'
+        ..outputCompression = 80
+        ..count = 4;
+
+      controller.restoreFromBody({'n': 2});
+
+      expect(controller.quality, 'high');
+      expect(controller.resolvedSize, 'auto');
+      expect(controller.outputFormat, 'png');
+      expect(controller.outputCompression, isNull);
+      expect(controller.count, 2);
+    });
+
+    test('restoreFromBody with empty body restores defaults', () {
+      final controller = ImageGenerationOptionsController()
+        ..quality = 'low'
+        ..sizeTier = '2K'
+        ..aspectRatio = '1:1'
+        ..outputFormat = 'jpeg'
+        ..outputCompression = 60
+        ..count = 3;
+
+      controller.restoreFromBody(const <String, dynamic>{});
+
+      expect(controller.customized, isFalse);
+      expect(controller.toExtraBody(), isEmpty);
+    });
   });
 }
