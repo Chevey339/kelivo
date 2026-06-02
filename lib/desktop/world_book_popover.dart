@@ -7,6 +7,7 @@ import '../core/models/world_book.dart';
 import '../core/providers/world_book_provider.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 Future<void> showDesktopWorldBookPopover(
   BuildContext context, {
@@ -340,7 +341,7 @@ class _CancelRowState extends State<_CancelRow> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeights.regular,
                     color: cs.onSurface.withValues(alpha: 0.75),
                     decoration: TextDecoration.none,
                   ),
@@ -422,7 +423,7 @@ class _RowItemState extends State<_RowItem> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: AppFontWeights.medium,
                     color: widget.active
                         ? cs.primary.withValues(alpha: opacity)
                         : cs.onSurface.withValues(alpha: opacity),
@@ -450,7 +451,7 @@ class _RowItemState extends State<_RowItem> {
                         textAlign: TextAlign.right,
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeights.regular,
                           color: cs.onSurface.withValues(alpha: 0.70 * opacity),
                           decoration: TextDecoration.none,
                         ),

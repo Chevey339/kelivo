@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'desktop_nav_rail.dart';
@@ -320,7 +321,7 @@ class _TitleBarLeading extends StatelessWidget {
           l10n.aboutPageAppName,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeights.semibold,
             color: cs.onSurface.withValues(alpha: 0.8),
             // Avoid accidental underline when not under a Material ancestor in edge cases
             decoration: TextDecoration.none,

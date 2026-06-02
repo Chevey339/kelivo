@@ -7,6 +7,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
+import '../../../theme/app_font_weights.dart';
 
 Future<void> showAssistantMcpSheet(
   BuildContext context, {
@@ -53,7 +54,7 @@ class _AssistantMcpSheet extends StatelessWidget {
         style: TextStyle(
           fontSize: 11,
           color: cs.primary,
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFontWeights.semibold,
         ),
       ),
     );
@@ -90,9 +91,9 @@ class _AssistantMcpSheet extends StatelessWidget {
                         child: Text(
                           l10n.mcpAssistantSheetTitle,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -199,7 +200,7 @@ class _AssistantMcpSheet extends StatelessWidget {
                                   child: Text(
                                     s.name,
                                     style: TextStyle(
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: AppFontWeights.emphasis,
                                       color: cs.onSurface,
                                     ),
                                     maxLines: 1,

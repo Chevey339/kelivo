@@ -3,6 +3,7 @@ import '../core/models/chat_message.dart';
 import '../features/chat/models/message_edit_result.dart';
 import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart';
+import '../theme/app_font_weights.dart';
 
 Future<MessageEditResult?> showMessageEditDesktopDialog(
   BuildContext context, {
@@ -68,9 +69,9 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                     children: [
                       Text(
                         l10n.messageEditPageTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                       const Spacer(),
@@ -90,7 +91,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                           l10n.messageEditPageSaveAndSend,
                           style: TextStyle(
                             color: cs.primary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                       ),
@@ -107,7 +108,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                           l10n.messageEditPageSave,
                           style: TextStyle(
                             color: cs.primary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                       ),
@@ -166,7 +167,7 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
                           vertical: 12,
                         ),
                       ),
-                      style: const TextStyle(fontSize: 15, height: 1.5),
+                      style: TextStyle(fontSize: 15, height: 1.5),
                     ),
                   ),
                 ),

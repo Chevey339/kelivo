@@ -9,6 +9,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import '../../../features/instruction_injection/pages/instruction_injection_page.dart';
+import '../../../theme/app_font_weights.dart';
 
 /// Bottom sheet for displaying instruction injection items on mobile/tablet.
 ///
@@ -219,7 +220,7 @@ class _SheetTopBar extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                     color: cs.onSurface,
                   ),
                 ),
@@ -306,7 +307,7 @@ class _GroupHeader extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: AppFontWeights.emphasis,
                   color: textBase,
                 ),
               ),
@@ -354,7 +355,7 @@ class _InstructionInjectionRow extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: AppFontWeights.medium,
                   color: onColor,
                 ),
                 maxLines: 1,

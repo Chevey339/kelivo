@@ -243,9 +243,9 @@ class _PromptTabState extends State<_PromptTab> {
                 Expanded(
                   child: Text(
                     l10n.assistantEditSystemPromptTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                     ),
                   ),
                 ),
@@ -303,7 +303,10 @@ class _PromptTabState extends State<_PromptTab> {
             const SizedBox(height: 8),
             Text(
               l10n.assistantEditAvailableVariables,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: AppFontWeights.semibold,
+              ),
             ),
             const SizedBox(height: 4),
             _VarExplainList(
@@ -348,7 +351,10 @@ class _PromptTabState extends State<_PromptTab> {
           children: [
             Text(
               l10n.assistantEditMessageTemplateTitle,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: AppFontWeights.emphasis,
+              ),
             ),
             const SizedBox(height: 10),
             TextField(
@@ -383,7 +389,10 @@ class _PromptTabState extends State<_PromptTab> {
             const SizedBox(height: 8),
             Text(
               l10n.assistantEditAvailableVariables,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: AppFontWeights.semibold,
+              ),
             ),
             const SizedBox(height: 4),
             _VarExplainList(
@@ -530,9 +539,9 @@ class _PromptTabState extends State<_PromptTab> {
                   children: [
                     Text(
                       l10n.assistantEditPresetTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -545,9 +554,9 @@ class _PromptTabState extends State<_PromptTab> {
                   Expanded(
                     child: Text(
                       l10n.assistantEditPresetTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                   ),
@@ -601,8 +610,7 @@ class _PromptTabState extends State<_PromptTab> {
                     );
                   },
                   itemCount: items.length,
-                  onReorder: (oldIndex, newIndex) async {
-                    if (newIndex > oldIndex) newIndex -= 1;
+                  onReorderItem: (oldIndex, newIndex) async {
                     final list = List<PresetMessage>.of(a.presetMessages);
                     final item = list.removeAt(oldIndex);
                     list.insert(newIndex, item);
@@ -952,7 +960,7 @@ class _HoverTextButtonState extends State<_HoverTextButton> {
             widget.label,
             style: TextStyle(
               color: textColor,
-              fontWeight: FontWeight.w700,
+              fontWeight: AppFontWeights.emphasis,
               fontSize: 13.5,
             ),
           ),
@@ -1103,9 +1111,9 @@ class _SystemPromptDesktopDialogState
                             l10n.assistantEditSystemPromptTitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: AppFontWeights.emphasis,
                             ),
                           ),
                         ),
@@ -1235,7 +1243,7 @@ class _HoverPillButtonState extends State<_HoverPillButton> {
                 style: TextStyle(
                   color: widget.color,
                   fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: AppFontWeights.emphasis,
                 ),
               ),
             ],
@@ -1293,9 +1301,9 @@ Future<void> _showEditPresetDialog(
                     Expanded(
                       child: Text(
                         l10n.assistantEditPresetEditDialogTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                     ),
@@ -1382,9 +1390,9 @@ Future<void> _showEditPresetDialog(
                   Expanded(
                     child: Text(
                       l10n.assistantEditPresetEditDialogTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                   ),
@@ -1483,7 +1491,7 @@ class _VarExplainList extends StatelessWidget {
                     color: cs.primary,
                     decoration: TextDecoration.underline,
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
               ),

@@ -10,6 +10,7 @@ import '../../model/widgets/model_select_sheet.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../core/services/haptics.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class MultiKeyManagerPage extends StatefulWidget {
   const MultiKeyManagerPage({
@@ -115,9 +116,9 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                   padding: const EdgeInsets.only(right: 12),
                   child: Text(
                     '$total',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeights.medium,
                     ),
                   ),
                 ),
@@ -129,9 +130,9 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                   padding: const EdgeInsets.only(right: 12),
                   child: Text(
                     '$normal',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeights.medium,
                     ),
                   ),
                 ),
@@ -143,9 +144,9 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                   padding: const EdgeInsets.only(right: 12),
                   child: Text(
                     '$errors',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeights.medium,
                     ),
                   ),
                 ),
@@ -324,7 +325,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                 Expanded(
                   child: Text(
                     name,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: TextStyle(fontWeight: AppFontWeights.semibold),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -425,7 +426,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 15))),
+          Expanded(child: Text(label, style: TextStyle(fontSize: 15))),
           if (trailing != null)
             DefaultTextStyle.merge(
               style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
@@ -865,9 +866,9 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                         alignment: Alignment.center,
                         child: Text(
                           l10n.multiKeyPageAdd,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                       ),
@@ -982,9 +983,9 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                         alignment: Alignment.center,
                         child: Text(
                           l10n.multiKeyPageEdit,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                       ),

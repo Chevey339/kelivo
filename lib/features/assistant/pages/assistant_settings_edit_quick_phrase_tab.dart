@@ -52,9 +52,9 @@ class _QuickPhraseTab extends StatelessWidget {
                               phrase == null
                                   ? l10n.quickPhraseAddTitle
                                   : l10n.quickPhraseEditTitle,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13.5,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: AppFontWeights.emphasis,
                               ),
                             ),
                           ),
@@ -289,8 +289,7 @@ class _QuickPhraseTab extends StatelessWidget {
               },
             );
           },
-          onReorder: (oldIndex, newIndex) {
-            if (newIndex > oldIndex) newIndex -= 1;
+          onReorderItem: (oldIndex, newIndex) {
             // Update immediately for smooth drop animation
             context.read<QuickPhraseProvider>().reorderPhrases(
               oldIndex: oldIndex,
@@ -347,7 +346,7 @@ class _QuickPhraseTab extends StatelessWidget {
                                     l10n.quickPhraseDeleteButton,
                                     style: TextStyle(
                                       color: cs.error,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: AppFontWeights.emphasis,
                                     ),
                                   ),
                                 ],
@@ -399,9 +398,9 @@ class _QuickPhraseTab extends StatelessWidget {
                                         phrase.title,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 15,
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight: AppFontWeights.semibold,
                                         ),
                                       ),
                                     ),
@@ -594,9 +593,9 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
                 widget.phrase == null
                     ? l10n.quickPhraseAddTitle
                     : l10n.quickPhraseEditTitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),

@@ -10,6 +10,7 @@ import '../../l10n/app_localizations.dart';
 import '../../core/providers/mcp_provider.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../shared/widgets/ios_switch.dart';
+import '../../theme/app_font_weights.dart';
 
 Future<void> showDesktopMcpEditDialog(
   BuildContext context, {
@@ -229,9 +230,9 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                   isEdit
                       ? l10n.mcpServerEditSheetTitleEdit
                       : l10n.mcpServerEditSheetTitleAdd,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
               ),
@@ -274,9 +275,9 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
               Expanded(
                 child: Text(
                   l10n.mcpServerEditSheetEnabledLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: AppFontWeights.medium,
                   ),
                 ),
               ),
@@ -296,16 +297,16 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
               children: [
                 Text(
                   l10n.mcpServerEditSheetNameLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: AppFontWeights.medium,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     _nameCtrl.text,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: TextStyle(fontWeight: AppFontWeights.semibold),
                   ),
                 ),
               ],
@@ -321,7 +322,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           const SizedBox(height: 10),
           Text(
             l10n.mcpServerEditSheetTransportLabel,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.medium),
           ),
           const SizedBox(height: 6),
           Builder(
@@ -401,7 +402,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           const SizedBox(height: 16),
           Text(
             l10n.mcpServerEditSheetStdioEnvironmentTitle,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.semibold),
           ),
           const SizedBox(height: 8),
           Column(
@@ -483,7 +484,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
         if (!isBuiltin && _transport != McpTransportType.stdio) ...[
           Text(
             l10n.mcpServerEditSheetCustomHeadersTitle,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.semibold),
           ),
           const SizedBox(height: 8),
           Column(
@@ -598,8 +599,9 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                         children: [
                           Text(
                             tool.name,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w700),
+                            style: TextStyle(
+                              fontWeight: AppFontWeights.emphasis,
+                            ),
                           ),
                           if ((tool.description ?? '').isNotEmpty) ...[
                             const SizedBox(height: 4),
@@ -607,8 +609,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                               tool.description!,
                               style: TextStyle(
                                 fontSize: 12,
-                                color:
-                                    cs.onSurface.withValues(alpha: 0.7),
+                                color: cs.onSurface.withValues(alpha: 0.7),
                               ),
                             ),
                           ],
@@ -620,26 +621,20 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                               children: tool.params.map((p) {
                                 final color = p.required
                                     ? cs.primary
-                                    : cs.onSurface
-                                          .withValues(alpha: 0.5);
+                                    : cs.onSurface.withValues(alpha: 0.5);
                                 final bg = p.required
-                                    ? cs.primary
-                                          .withValues(alpha: 0.12)
-                                    : cs.onSurface
-                                          .withValues(alpha: 0.06);
+                                    ? cs.primary.withValues(alpha: 0.12)
+                                    : cs.onSurface.withValues(alpha: 0.06);
                                 return Container(
-                                  padding:
-                                      const EdgeInsets.symmetric(
+                                  padding: const EdgeInsets.symmetric(
                                     horizontal: 8,
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
                                     color: bg,
-                                    borderRadius:
-                                        BorderRadius.circular(999),
+                                    borderRadius: BorderRadius.circular(999),
                                     border: Border.all(
-                                      color: color
-                                          .withValues(alpha: 0.5),
+                                      color: color.withValues(alpha: 0.5),
                                     ),
                                   ),
                                   child: Text(
@@ -647,7 +642,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: color,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: AppFontWeights.semibold,
                                     ),
                                   ),
                                 );
@@ -659,12 +654,9 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                     ),
                     IosSwitch(
                       value: tool.enabled,
-                      onChanged: (v) =>
-                          context.read<McpProvider>().setToolEnabled(
-                                server!.id,
-                                tool.name,
-                                v,
-                              ),
+                      onChanged: (v) => context
+                          .read<McpProvider>()
+                          .setToolEnabled(server!.id, tool.name, v),
                     ),
                   ],
                 ),
@@ -687,8 +679,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                             l10n.mcpToolNeedsApproval,
                             style: TextStyle(
                               fontSize: 12,
-                              color: cs.onSurface
-                                  .withValues(alpha: 0.6),
+                              color: cs.onSurface.withValues(alpha: 0.6),
                             ),
                           ),
                         ),
@@ -696,11 +687,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                           value: tool.needsApproval,
                           onChanged: (v) => context
                               .read<McpProvider>()
-                              .setToolNeedsApproval(
-                                server!.id,
-                                tool.name,
-                                v,
-                              ),
+                              .setToolNeedsApproval(server!.id, tool.name, v),
                         ),
                       ],
                     ),
@@ -828,7 +815,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           label,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+            fontWeight: bold ? AppFontWeights.emphasis : AppFontWeights.medium,
             color: cs.onSurface.withValues(alpha: 0.8),
           ),
         ),
@@ -837,7 +824,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           controller: controller,
           style: TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w400,
+            fontWeight: AppFontWeights.regular,
             color: cs.onSurface,
           ),
           decoration: InputDecoration(
@@ -1014,7 +1001,7 @@ class _SegChoiceBar extends StatelessWidget {
                           color: selected
                               ? cs.primary
                               : cs.onSurface.withValues(alpha: 0.82),
-                          fontWeight: FontWeight.w500,
+                          fontWeight: AppFontWeights.medium,
                         ),
                       ),
                     ),
@@ -1122,7 +1109,7 @@ class _SegTabBar extends StatelessWidget {
                           color: selected
                               ? cs.primary
                               : cs.onSurface.withValues(alpha: 0.82),
-                          fontWeight: FontWeight.w500,
+                          fontWeight: AppFontWeights.medium,
                         ),
                       ),
                     ),

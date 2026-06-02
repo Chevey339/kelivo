@@ -129,7 +129,7 @@ class _LocalToolRow extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 15,
                             color: color,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                         const SizedBox(height: 3),

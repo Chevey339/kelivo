@@ -9,6 +9,7 @@ import '../../core/services/tts/network_tts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../utils/brand_assets.dart';
 import '../../features/settings/pages/tts_settings_page.dart';
+import '../../theme/app_font_weights.dart';
 
 /// Desktop: TTS (语音服务) right-side pane
 /// Adapts mobile TTS page to desktop with hoverable list card style
@@ -59,7 +60,7 @@ class _DesktopTtsServicesPaneState extends State<DesktopTtsServicesPane> {
                             l10n.ttsServicesPageTitle,
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w400,
+                              fontWeight: AppFontWeights.regular,
                               color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
@@ -221,9 +222,9 @@ class _NetworkServiceCardState extends State<_NetworkServiceCard> {
                           : networkTtsKindDisplayName(widget.service.kind),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                   ),
@@ -338,9 +339,9 @@ void _showErrorDialog(BuildContext context, String message) {
                   Expanded(
                     child: Text(
                       l10n.ttsServicesDialogErrorTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                   ),
@@ -402,9 +403,9 @@ void _showTtsSettingsDialog(BuildContext context) {
                   Expanded(
                     child: Text(
                       l10n.ttsSettingsPageTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                   ),
@@ -528,9 +529,9 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
                       titleText,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -612,9 +613,9 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
                       Expanded(
                         child: Text(
                           l10n.ttsServicesPageSystemTtsSettingsTitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -1155,9 +1156,9 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                             initial == null
                                 ? l10n.ttsServicesDialogAddTitle
                                 : l10n.ttsServicesDialogEditTitle,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: AppFontWeights.emphasis,
                             ),
                           ),
                         ),

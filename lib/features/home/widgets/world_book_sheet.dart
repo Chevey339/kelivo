@@ -6,6 +6,7 @@ import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../theme/app_font_weights.dart';
 
 class WorldBookSheet extends StatelessWidget {
   const WorldBookSheet({super.key, required this.assistantId});
@@ -120,7 +121,7 @@ class _SheetTopBar extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                     color: cs.onSurface,
                   ),
                 ),
@@ -199,7 +200,7 @@ class _SelectableRow extends StatelessWidget {
                     label,
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                       color: onColor.withValues(alpha: opacity),
                     ),
                     maxLines: 1,

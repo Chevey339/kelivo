@@ -4,6 +4,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class SelectCopyPage extends StatelessWidget {
   const SelectCopyPage({super.key, required this.message});
@@ -35,7 +36,10 @@ class SelectCopyPage extends StatelessWidget {
             icon: Icon(Lucide.Copy, size: 18, color: cs.primary),
             label: Text(
               l10n.selectCopyPageCopyAll,
-              style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: cs.primary,
+                fontWeight: AppFontWeights.semibold,
+              ),
             ),
           ),
         ],
@@ -48,7 +52,7 @@ class SelectCopyPage extends StatelessWidget {
               child: SelectionArea(
                 child: Text(
                   message.content,
-                  style: const TextStyle(fontSize: 15, height: 1.5),
+                  style: TextStyle(fontSize: 15, height: 1.5),
                 ),
               ),
             ),

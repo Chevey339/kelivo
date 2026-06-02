@@ -16,6 +16,7 @@ import '../../settings/widgets/language_select_sheet.dart'
     show LanguageOption, supportedLanguages, showLanguageSelector;
 import '../../../core/services/haptics.dart';
 import '../../model/widgets/model_select_sheet.dart' show showModelSelector;
+import '../../../theme/app_font_weights.dart';
 
 class TranslatePage extends StatefulWidget {
   const TranslatePage({super.key});
@@ -339,7 +340,7 @@ class _TranslatePageState extends State<TranslatePage> {
                     ),
                     contextMenuBuilder: (context, editableTextState) =>
                         const SizedBox.shrink(),
-                    style: const TextStyle(fontSize: 15, height: 1.4),
+                    style: TextStyle(fontSize: 15, height: 1.4),
                   ),
                 ),
               ),
@@ -363,7 +364,7 @@ class _TranslatePageState extends State<TranslatePage> {
                     enableInteractiveSelection: false,
                     contextMenuBuilder: (context, editableTextState) =>
                         const SizedBox.shrink(),
-                    style: const TextStyle(fontSize: 15, height: 1.4),
+                    style: TextStyle(fontSize: 15, height: 1.4),
                   ),
                 ),
               ),
@@ -386,7 +387,7 @@ class _TranslatePageState extends State<TranslatePage> {
                         children: [
                           Text(
                             (_lang ?? supportedLanguages.first).flag,
-                            style: const TextStyle(fontSize: 18),
+                            style: TextStyle(fontSize: 18),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -397,9 +398,9 @@ class _TranslatePageState extends State<TranslatePage> {
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14.5,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: AppFontWeights.semibold,
                               ),
                             ),
                           ),
@@ -448,7 +449,7 @@ class _TranslatePageState extends State<TranslatePage> {
                                   l10n.chatMessageWidgetStopTooltip,
                                   style: TextStyle(
                                     color: isDark ? Colors.black : Colors.white,
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: AppFontWeights.emphasis,
                                   ),
                                 ),
                               ],
@@ -467,7 +468,7 @@ class _TranslatePageState extends State<TranslatePage> {
                                   l10n.chatMessageWidgetTranslateTooltip,
                                   style: TextStyle(
                                     color: isDark ? Colors.black : Colors.white,
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: AppFontWeights.emphasis,
                                   ),
                                 ),
                               ],

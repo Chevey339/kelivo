@@ -8,6 +8,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../services/debug_conversation_factory.dart';
+import '../../../theme/app_font_weights.dart';
 
 class DebugPage extends StatefulWidget {
   const DebugPage({super.key});
@@ -254,7 +255,7 @@ class _DebugSectionCard extends StatelessWidget {
                 title,
                 style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: AppFontWeights.emphasis,
                   color: cs.onSurface,
                 ),
               ),

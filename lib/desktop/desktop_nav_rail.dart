@@ -8,6 +8,7 @@ import '../core/providers/settings_provider.dart';
 import 'user_profile_dialog.dart';
 import '../icons/lucide_adapter.dart' as lucide;
 import '../utils/sandbox_path_resolver.dart';
+import '../theme/app_font_weights.dart';
 
 /// A compact left rail for desktop with avatar, primary actions, and bottom system toggles.
 class DesktopNavRail extends StatelessWidget {
@@ -191,7 +192,7 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
         letter,
         style: TextStyle(
           color: cs.primary,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           decoration: TextDecoration.none,
           fontSize: 36 * 0.44, // keep initial scaled to avatar size
         ),

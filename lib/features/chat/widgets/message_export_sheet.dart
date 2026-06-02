@@ -33,6 +33,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../theme/app_font_weights.dart';
 import '../../home/widgets/model_icon.dart';
 import '../utils/thinking_tag_parser.dart';
 import 'chat_message_widget.dart'
@@ -1500,9 +1501,9 @@ class _ExportDialogState extends State<_ExportDialog> {
                     Expanded(
                       child: Text(
                         l10n.messageExportSheetFormatTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1730,9 +1731,9 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
                     Expanded(
                       child: Text(
                         l10n.messageExportSheetFormatTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1984,9 +1985,9 @@ class _BatchExportSheetState extends State<_BatchExportSheet> {
             Center(
               child: Text(
                 l10n.messageExportSheetFormatTitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),
@@ -2239,9 +2240,9 @@ class _ExportSheetState extends State<_ExportSheet> {
             Center(
               child: Text(
                 l10n.messageExportSheetFormatTitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),
@@ -2433,7 +2434,7 @@ class _ExportedMessageCard extends StatelessWidget {
               title,
               style: TextStyle(
                 fontSize: titleFontSize,
-                fontWeight: FontWeight.w700,
+                fontWeight: AppFontWeights.emphasis,
                 color: headerFg.withValues(alpha: 0.95),
               ),
               overflow: TextOverflow.ellipsis,
@@ -2544,7 +2545,7 @@ class _ExportedChatImage extends StatelessWidget {
                 conversationTitle,
                 style: TextStyle(
                   fontSize: titleFontSize,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: AppFontWeights.emphasis,
                   color: cs.onSurface.withValues(alpha: 0.95),
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -2829,9 +2830,9 @@ class _ExportOptionTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeights.semibold,
                       ),
                     ),
                     const SizedBox(height: 4),

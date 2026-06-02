@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../theme/app_font_weights.dart';
 
 Future<String?> showMiniMapSheet(
   BuildContext context,
@@ -162,9 +163,9 @@ class _MiniMapSheetState extends State<_MiniMapSheet>
                     Expanded(
                       child: Text(
                         AppLocalizations.of(context)!.miniMapTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -531,7 +532,7 @@ class _MiniMapRow extends StatelessWidget {
                             asstText.isNotEmpty ? _oneLine(asstText) : ' ',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 15.7, height: 1.5),
+                            style: TextStyle(fontSize: 15.7, height: 1.5),
                             textAlign: TextAlign.left,
                           ),
                         ),
@@ -555,7 +556,7 @@ class _MiniMapRow extends StatelessWidget {
                             asstText.isNotEmpty ? _oneLine(asstText) : ' ',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 15.7, height: 1.5),
+                            style: TextStyle(fontSize: 15.7, height: 1.5),
                             textAlign: TextAlign.left,
                           ),
                         ),

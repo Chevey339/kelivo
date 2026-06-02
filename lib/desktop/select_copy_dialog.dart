@@ -4,6 +4,7 @@ import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart';
 import '../shared/widgets/snackbar.dart';
 import 'package:flutter/services.dart';
+import '../theme/app_font_weights.dart';
 
 Future<void> showSelectCopyDesktopDialog(
   BuildContext context, {
@@ -59,9 +60,9 @@ class _SelectCopyDesktopDialog extends StatelessWidget {
                     children: [
                       Text(
                         l10n.selectCopyPageTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                       const Spacer(),
@@ -72,7 +73,7 @@ class _SelectCopyDesktopDialog extends StatelessWidget {
                           l10n.selectCopyPageCopyAll,
                           style: TextStyle(
                             color: cs.primary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                       ),
@@ -109,7 +110,7 @@ class _SelectCopyDesktopDialog extends StatelessWidget {
                           child: SelectionArea(
                             child: Text(
                               message.content,
-                              style: const TextStyle(fontSize: 15, height: 1.5),
+                              style: TextStyle(fontSize: 15, height: 1.5),
                             ),
                           ),
                         ),

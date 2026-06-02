@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../core/models/quick_phrase.dart';
 import '../icons/lucide_adapter.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 Future<QuickPhrase?> showDesktopQuickPhrasePopover(
   BuildContext context, {
@@ -305,9 +306,9 @@ class _RowItemState extends State<_RowItem> {
                   widget.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeights.regular,
                     decoration: TextDecoration.none,
                   ),
                 ),
@@ -323,7 +324,7 @@ class _RowItemState extends State<_RowItem> {
                   textAlign: TextAlign.right,
                   style: TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeights.regular,
                     color: cs.onSurface.withValues(alpha: 0.70),
                     decoration: TextDecoration.none,
                   ),

@@ -10,6 +10,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class _ImportResult {
   final String key;
@@ -291,9 +292,9 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                           alignment: Alignment.center,
                           child: Text(
                             l10n.importProviderSheetTitle,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: AppFontWeights.semibold,
                             ),
                           ),
                         ),

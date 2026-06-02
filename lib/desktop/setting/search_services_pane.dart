@@ -8,6 +8,7 @@ import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:uuid/uuid.dart';
 import '../../shared/widgets/ios_switch.dart';
+import '../../theme/app_font_weights.dart';
 
 class DesktopSearchServicesPane extends StatefulWidget {
   const DesktopSearchServicesPane({super.key});
@@ -51,7 +52,7 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                             l10n.searchServicesPageTitle,
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w400,
+                              fontWeight: AppFontWeights.regular,
                               color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
@@ -129,8 +130,7 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                     ),
                   );
                 },
-                onReorder: (oldIndex, newIndex) async {
-                  if (newIndex > oldIndex) newIndex -= 1;
+                onReorderItem: (oldIndex, newIndex) async {
                   final sp = context.read<SettingsProvider>();
                   final current = List<SearchServiceOptions>.from(
                     sp.searchServices,
@@ -341,9 +341,9 @@ class _ServiceCardState extends State<_ServiceCard> {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
               ),
@@ -363,7 +363,7 @@ class _ServiceCardState extends State<_ServiceCard> {
                     style: TextStyle(
                       fontSize: 11,
                       color: statusFg,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                 ),
@@ -495,7 +495,7 @@ class _StepperRowState extends State<_StepperRow> {
               '${widget.value}',
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w400,
+                fontWeight: AppFontWeights.regular,
                 color: cs.onSurface.withValues(alpha: 0.9),
               ),
             ),
@@ -649,7 +649,7 @@ class _BrandBadge extends StatelessWidget {
         name.substring(0, 1).toUpperCase(),
         style: TextStyle(
           color: cs.primary,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           fontSize: size * 0.42,
         ),
       ),
@@ -818,9 +818,9 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
                       Expanded(
                         child: Text(
                           l10n.searchServicesAddDialogTitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -1177,9 +1177,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
                       Expanded(
                         child: Text(
                           name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -1503,7 +1503,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
                   it.name,
                   style: TextStyle(
                     fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                     color: fg,
                   ),
                 ),
@@ -1850,7 +1850,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
               widget.label,
               style: TextStyle(
                 color: textColor,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 fontSize: widget.dense ? 13 : 14,
               ),
             ),

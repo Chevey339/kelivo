@@ -9,6 +9,7 @@ import '../../../core/providers/mcp_provider.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../theme/app_font_weights.dart';
 
 Future<void> showMcpJsonEditSheet(BuildContext context) async {
   final cs = Theme.of(context).colorScheme;
@@ -133,9 +134,9 @@ class _McpJsonEditSheetState extends State<_McpJsonEditSheet> {
                   const Spacer(),
                   Text(
                     AppLocalizations.of(context)!.mcpJsonEditTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                     ),
                   ),
                   const Spacer(),
@@ -190,7 +191,7 @@ class _McpJsonEditSheetState extends State<_McpJsonEditSheet> {
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                 child: Text(
                   _error!,
-                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                  style: TextStyle(color: Colors.redAccent, fontSize: 12),
                 ),
               ),
             ],

@@ -19,6 +19,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/clipboard_images.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../l10n/app_localizations.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class ImageViewerPage extends StatefulWidget {
   const ImageViewerPage({
@@ -1856,7 +1857,7 @@ class _GlassLabel extends StatelessWidget {
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.86),
           fontSize: 13,
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFontWeights.semibold,
           letterSpacing: 0,
         ),
       ),

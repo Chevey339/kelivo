@@ -14,6 +14,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../assistant/pages/assistant_settings_edit_page.dart';
 import '../../assistant/pages/tags_manager_page.dart';
 import '../../assistant/widgets/tags_manager_dialog.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class AssistantEntryActions {
   const AssistantEntryActions._();
@@ -189,9 +190,9 @@ class AssistantEntryActions {
                     Expanded(
                       child: Text(
                         text,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: AppFontWeights.medium,
                         ),
                       ),
                     ),

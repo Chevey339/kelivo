@@ -6,6 +6,7 @@ import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../core/providers/hotkey_provider.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class DesktopHotkeysPane extends StatefulWidget {
   const DesktopHotkeysPane({super.key});
@@ -40,7 +41,7 @@ class _DesktopHotkeysPaneState extends State<DesktopHotkeysPane> {
                             l10n.settingsPageHotkeys,
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w400,
+                              fontWeight: AppFontWeights.regular,
                               color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
@@ -166,7 +167,7 @@ class _HotkeyRowState extends State<_HotkeyRow> {
               displayLabel(),
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w500,
+                fontWeight: AppFontWeights.medium,
                 color: cs.onSurface.withValues(alpha: 0.92),
               ),
             ),
@@ -353,7 +354,7 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 13.5,
-              fontWeight: FontWeight.w500,
+              fontWeight: AppFontWeights.medium,
               color: cs.onSurface.withValues(alpha: 0.9),
             ),
           ),

@@ -43,6 +43,7 @@ import '../../../shared/widgets/emoji_text.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/brand_assets.dart';
@@ -463,7 +464,7 @@ class _AssistantOutlineHeader extends StatelessWidget {
             style: TextStyle(
               fontSize: 21,
               height: 1.18,
-              fontWeight: FontWeight.w700,
+              fontWeight: AppFontWeights.emphasis,
               color: cs.onSurface.withValues(alpha: 0.94),
             ),
           ),
@@ -654,8 +655,7 @@ class _AssistantTabLayoutPage extends StatelessWidget {
             child: ReorderableListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 2, 16, 24),
               itemCount: tabs.length,
-              onReorder: (oldIndex, newIndex) async {
-                if (newIndex > oldIndex) newIndex -= 1;
+              onReorderItem: (oldIndex, newIndex) async {
                 final next = tabs.map((tab) => tab.id).toList();
                 final moved = next.removeAt(oldIndex);
                 next.insert(newIndex, moved);
@@ -804,7 +804,7 @@ class _AssistantTabLayoutTile extends StatelessWidget {
                 style: TextStyle(
                   color: fg,
                   fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),
@@ -929,7 +929,7 @@ class _SegTabBar extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: color ?? baseTextColor,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: AppFontWeights.medium,
                                 ),
                               );
                             },
@@ -993,7 +993,7 @@ class _InputRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.semibold),
         ),
         const SizedBox(height: 6),
         Container(
@@ -1089,7 +1089,7 @@ class _BrandAvatarLike extends StatelessWidget {
         name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
         style: TextStyle(
           color: cs.primary,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           fontSize: size * 0.42,
         ),
       ),
@@ -1457,7 +1457,7 @@ class _IosButtonState extends State<_IosButton> {
                 widget.label,
                 style: TextStyle(
                   color: textColor,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                   fontSize: widget.dense ? 13 : 14,
                 ),
               ),
@@ -1536,9 +1536,9 @@ class _DesktopAssistantDialogShellState
                     name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                     ),
                   ),
                 ),
@@ -1677,7 +1677,7 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 14.5,
-                      fontWeight: FontWeight.w400,
+                      fontWeight: AppFontWeights.regular,
                       color: fg,
                       decoration: TextDecoration.none,
                     ),
@@ -1769,7 +1769,7 @@ class _DesktopAssistantBasicPaneState
                         (a.name.isNotEmpty ? a.name.characters.first : '?'),
                         style: TextStyle(
                           color: cs.primary,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                           fontSize: 22,
                         ),
                       ),
@@ -1808,7 +1808,7 @@ class _DesktopAssistantBasicPaneState
                           (a.name.isNotEmpty ? a.name.characters.first : '?'),
                           style: TextStyle(
                             color: cs.primary,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                             fontSize: 22,
                           ),
                         ),
@@ -1825,7 +1825,7 @@ class _DesktopAssistantBasicPaneState
                       alignment: Alignment.center,
                       child: Text(
                         av.characters.take(1).toString(),
-                        style: const TextStyle(fontSize: 26),
+                        style: TextStyle(fontSize: 26),
                       ),
                     );
                   }
@@ -1890,7 +1890,10 @@ class _DesktopAssistantBasicPaneState
           children: [
             Text(
               text,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: AppFontWeights.semibold,
+              ),
             ),
             const SizedBox(width: 6),
             Tooltip(
@@ -1954,7 +1957,7 @@ class _DesktopAssistantBasicPaneState
                   label,
                   style: TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                     color: cs.onSurface.withValues(alpha: 0.9),
                   ),
                 ),
@@ -2200,7 +2203,7 @@ class _DesktopAssistantBasicPaneState
                           ),
                         ),
                       ),
-                      style: const TextStyle(fontSize: 13.5),
+                      style: TextStyle(fontSize: 13.5),
                       onSubmitted: (v) {
                         final trimmed = v.trim();
                         final n = int.tryParse(trimmed);
@@ -2260,9 +2263,9 @@ class _DesktopAssistantBasicPaneState
                       Expanded(
                         child: Text(
                           l10n.assistantEditChatModelTitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                       ),
@@ -2359,9 +2362,9 @@ class _DesktopAssistantBasicPaneState
                                   display,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: AppFontWeights.semibold,
                                   ),
                                 ),
                               ),
@@ -2383,9 +2386,9 @@ class _DesktopAssistantBasicPaneState
                 children: [
                   Text(
                     l10n.assistantEditChatBackgroundTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -2447,7 +2450,7 @@ class _DesktopAssistantBasicPaneState
                                   l10n.assistantEditChooseImageButton,
                                   style: TextStyle(
                                     fontSize: 14,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: AppFontWeights.semibold,
                                     color: textColor,
                                   ),
                                 ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/services/haptics.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class IosTileButton extends StatefulWidget {
   const IosTileButton({
@@ -111,7 +112,7 @@ class _IosTileButtonState extends State<IosTileButton> {
                 widget.label,
                 style: TextStyle(
                   fontSize: widget.fontSize,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                   color: widget.enabled
                       ? textColor
                       : textColor.withValues(alpha: 0.45),

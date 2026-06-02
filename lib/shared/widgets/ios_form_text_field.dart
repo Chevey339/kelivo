@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class IosFormTextField extends StatelessWidget {
   const IosFormTextField({
@@ -102,7 +103,7 @@ class IosFormTextField extends StatelessWidget {
           : null,
       style: TextStyle(
         fontSize: 15,
-        fontWeight: FontWeight.w500,
+        fontWeight: AppFontWeights.medium,
         color: valueColor,
         height: maxLines > 1 ? 1.25 : 1.15,
       ),
@@ -112,7 +113,7 @@ class IosFormTextField extends StatelessWidget {
         hintText: hintText,
         hintStyle: TextStyle(
           fontSize: 15,
-          fontWeight: FontWeight.w500,
+          fontWeight: AppFontWeights.medium,
           color: hintColor,
         ),
         border: InputBorder.none,
@@ -143,7 +144,7 @@ class IosFormTextField extends StatelessWidget {
         label,
         style: TextStyle(
           fontSize: 15,
-          fontWeight: FontWeight.w500,
+          fontWeight: AppFontWeights.medium,
           color: labelColor,
         ),
         maxLines: 1,
@@ -189,7 +190,7 @@ class IosFormTextField extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 13,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               color: labelColor,
             ),
           ),

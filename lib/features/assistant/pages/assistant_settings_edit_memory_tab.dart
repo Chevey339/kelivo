@@ -47,9 +47,9 @@ class _MemoryTab extends StatelessWidget {
                           Expanded(
                             child: Text(
                               l10n.assistantEditMemoryDialogTitle,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13.5,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: AppFontWeights.emphasis,
                               ),
                             ),
                           ),
@@ -192,9 +192,9 @@ class _MemoryTab extends StatelessWidget {
                       Expanded(
                         child: Text(
                           l10n.assistantEditMemoryDialogTitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -365,9 +365,9 @@ class _MemoryTab extends StatelessWidget {
               Expanded(
                 child: Text(
                   l10n.assistantEditManageMemoryTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
               ),
@@ -387,7 +387,7 @@ class _MemoryTab extends StatelessWidget {
                         l10n.assistantEditAddMemoryButton,
                         style: TextStyle(
                           color: color,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                     ],
@@ -437,7 +437,7 @@ class _MemoryTab extends StatelessWidget {
                         m.content,
                         maxLines: 5,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: 14),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -475,9 +475,9 @@ class _MemoryTab extends StatelessWidget {
               Expanded(
                 child: Text(
                   l10n.assistantEditManageSummariesTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
               ),
@@ -545,7 +545,7 @@ class _MemoryTab extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: cs.onSurface.withValues(alpha: 0.6),
-                                    fontWeight: FontWeight.w500,
+                                    fontWeight: AppFontWeights.medium,
                                   ),
                                 ),
                               ),
@@ -560,7 +560,7 @@ class _MemoryTab extends StatelessWidget {
                                   conv.summary ?? '',
                                   maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 14),
+                                  style: TextStyle(fontSize: 14),
                                 ),
                               ),
                               const SizedBox(width: 6),
@@ -645,9 +645,9 @@ class _MemoryTab extends StatelessWidget {
                           Expanded(
                             child: Text(
                               l10n.assistantEditSummaryDialogTitle,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13.5,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: AppFontWeights.emphasis,
                               ),
                             ),
                           ),
@@ -778,9 +778,9 @@ class _MemoryTab extends StatelessWidget {
                     Expanded(
                       child: Text(
                         l10n.assistantEditSummaryDialogTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                     ),
@@ -1034,9 +1034,9 @@ class _RecentChatsSummaryFrequencySection extends StatelessWidget {
                         Expanded(
                           child: Text(
                             l10n.assistantEditRecentChatsSummaryFrequencyCustomTitle,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: AppFontWeights.emphasis,
                             ),
                           ),
                         ),
@@ -1284,7 +1284,7 @@ class _FrequencyChipButton extends StatelessWidget {
                     label,
                     style: TextStyle(
                       fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                       color: foregroundColor,
                       height: 1.0,
                     ),

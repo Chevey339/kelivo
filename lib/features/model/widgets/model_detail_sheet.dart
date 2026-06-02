@@ -13,6 +13,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import 'model_edit_state_helper.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 Future<bool?> showModelDetailSheet(
   BuildContext context, {
@@ -345,9 +346,9 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                   widget.isNew
                       ? l10n.modelDetailSheetAddModel
                       : l10n.modelDetailSheetEditModel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
               ),
@@ -631,7 +632,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         child: Text(
           l10n.modelDetailSheetCustomHeadersTitle,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 15, fontWeight: AppFontWeights.semibold),
         ),
       ),
       Padding(
@@ -659,7 +660,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         child: Text(
           l10n.modelDetailSheetCustomBodyTitle,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 15, fontWeight: AppFontWeights.semibold),
         ),
       ),
       Padding(
@@ -1005,7 +1006,7 @@ class _SegmentedSingle extends StatelessWidget {
                         options[i],
                         style: TextStyle(
                           color: cs.onSurface,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                     ],
@@ -1120,7 +1121,7 @@ class _SegmentedMulti extends StatelessWidget {
                               options[i],
                               style: TextStyle(
                                 color: cs.onSurface,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: AppFontWeights.semibold,
                               ),
                             ),
                           ],
@@ -1366,9 +1367,9 @@ class _ToolTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeights.semibold,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1545,7 +1546,7 @@ class _SegTabBar extends StatelessWidget {
                       color: selected
                           ? cs.primary
                           : cs.onSurface.withValues(alpha: 0.82),
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                 ),

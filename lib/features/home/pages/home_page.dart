@@ -12,6 +12,7 @@ import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/loading_dialog_card.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -109,7 +110,7 @@ class _TemporaryConversationEmptyState extends StatelessWidget {
                   fontSize: 15,
                   height: 1.45,
                   color: cs.onSurface.withValues(alpha: 0.68),
-                  fontWeight: FontWeight.w500,
+                  fontWeight: AppFontWeights.medium,
                 ),
               ),
             ],
@@ -208,7 +209,7 @@ class _CompressContextOptionsDialogState
                         l10n.compressContextOptionsTitle,
                         style: TextStyle(
                           fontSize: 17,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                           color: cs.onSurface,
                         ),
                       ),
@@ -255,7 +256,7 @@ class _CompressContextOptionsDialogState
                     style: TextStyle(
                       fontSize: 12,
                       color: cs.error,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeights.medium,
                     ),
                   ),
                 ],
@@ -360,7 +361,7 @@ class _SegmentButton extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w700,
+            fontWeight: AppFontWeights.emphasis,
             color: selected ? cs.primary : cs.onSurface.withValues(alpha: 0.78),
           ),
         ),
@@ -402,7 +403,7 @@ class _DialogActionButton extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w700,
+            fontWeight: AppFontWeights.emphasis,
             color: primary ? cs.onPrimary : cs.onSurface,
           ),
         ),
@@ -1407,9 +1408,9 @@ class _HomePageState extends State<HomePage>
                     ),
                     child: Text(
                       AppLocalizations.of(context)!.homePageDropToUpload,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeights.semibold,
                       ),
                     ),
                   ),
@@ -1665,7 +1666,7 @@ class _HomePageState extends State<HomePage>
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
               l10n.homePageDelete,
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -1724,7 +1725,7 @@ class _HomePageState extends State<HomePage>
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
               l10n.homePageDelete,
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: Colors.red),
             ),
           ),
         ],

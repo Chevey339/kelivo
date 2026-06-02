@@ -4,6 +4,7 @@ import '../../../core/providers/tag_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class TagsManagerPage extends StatefulWidget {
   const TagsManagerPage({super.key, required this.assistantId});
@@ -150,8 +151,7 @@ class _TagsManagerPageState extends State<TagsManagerPage> {
             child: child,
           );
         },
-        onReorder: (oldIndex, newIndex) async {
-          if (newIndex > oldIndex) newIndex -= 1;
+        onReorderItem: (oldIndex, newIndex) async {
           await context.read<TagProvider>().reorderTags(oldIndex, newIndex);
         },
         itemBuilder: (ctx, i) {
@@ -232,9 +232,9 @@ class _MobileTagCard extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),

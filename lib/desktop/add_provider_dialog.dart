@@ -8,6 +8,7 @@ import '../shared/widgets/ios_switch.dart';
 import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart' as lucide;
 import '../core/providers/settings_provider.dart';
+import '../theme/app_font_weights.dart';
 
 Future<String?> showDesktopAddProviderDialog(BuildContext context) async {
   String? result;
@@ -159,7 +160,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
+          Expanded(child: Text(label, style: TextStyle(fontSize: 13))),
           IosSwitch(value: value, onChanged: onChanged),
         ],
       ),
@@ -352,9 +353,9 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
                       Expanded(
                         child: Text(
                           l10n.addProviderSheetTitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -668,7 +669,7 @@ class _SmallSegTabBarState extends State<_SmallSegTabBar> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: fg,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: AppFontWeights.semibold,
                             ),
                           ),
                         ),
@@ -759,7 +760,7 @@ class _PrimaryDeskButtonState extends State<_PrimaryDeskButton> {
                 widget.label,
                 style: TextStyle(
                   color: cs.onPrimary,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ],

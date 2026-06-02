@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../features/settings/pages/debug_page.dart';
+import '../../theme/app_font_weights.dart';
 
 class DesktopAboutPane extends StatefulWidget {
   const DesktopAboutPane({super.key});
@@ -125,7 +126,7 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                     l10n.settingsPageAbout,
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w400,
+                      fontWeight: AppFontWeights.regular,
                       color: cs.onSurface.withValues(alpha: 0.9),
                     ),
                   ),
@@ -287,9 +288,9 @@ class _AppHeaderCardState extends State<_AppHeaderCard> {
                       children: [
                         Text(
                           l10n.aboutPageAppName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -346,7 +347,7 @@ class _DeskCard extends StatelessWidget {
                 title,
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: AppFontWeights.emphasis,
                   color: cs.onSurface,
                 ),
               ),
@@ -613,9 +614,9 @@ Future<void> _showSponsorDesktopDialog(BuildContext context) async {
                     Expanded(
                       child: Text(
                         l10n.settingsPageSponsor,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                     ),

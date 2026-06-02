@@ -12,6 +12,7 @@ import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
+import '../../../theme/app_font_weights.dart';
 
 Future<void> showSearchSettingsSheet(BuildContext context) async {
   await showModalBottomSheet(
@@ -175,9 +176,9 @@ class _SearchSettingsSheet extends StatelessWidget {
                   child: Text(
                     l10n.searchSettingsSheetTitle,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                     ),
                   ),
                 ),
@@ -224,9 +225,9 @@ class _SearchSettingsSheet extends StatelessWidget {
                                 children: [
                                   Text(
                                     l10n.searchSettingsSheetBuiltinSearchTitle,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: AppFontWeights.emphasis,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -300,9 +301,9 @@ class _SearchSettingsSheet extends StatelessWidget {
                                     children: [
                                       Text(
                                         l10n.searchSettingsSheetClaudeDynamicSearchTitle,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 14,
-                                          fontWeight: FontWeight.w700,
+                                          fontWeight: AppFontWeights.emphasis,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -369,9 +370,9 @@ class _SearchSettingsSheet extends StatelessWidget {
                             children: [
                               Text(
                                 l10n.searchSettingsSheetWebSearchTitle,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: AppFontWeights.emphasis,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -439,7 +440,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 15,
-                                    fontWeight: FontWeight.w500,
+                                    fontWeight: AppFontWeights.medium,
                                     color: onColor,
                                   ),
                                 ),
@@ -551,7 +552,7 @@ class _BrandBadge extends StatelessWidget {
         name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
         style: TextStyle(
           color: cs.primary,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           fontSize: size * 0.42,
         ),
       ),

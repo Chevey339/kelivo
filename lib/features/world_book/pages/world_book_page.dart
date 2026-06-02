@@ -16,6 +16,7 @@ import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../theme/app_font_weights.dart';
 
 class WorldBookPage extends StatefulWidget {
   const WorldBookPage({super.key});
@@ -312,7 +313,7 @@ class _WorldBookPageState extends State<WorldBookPage> {
               onPressed: () => Navigator.of(ctx).pop(true),
               child: Text(
                 l10n.worldBookDelete,
-                style: const TextStyle(color: Colors.red),
+                style: TextStyle(color: Colors.red),
               ),
             ),
           ],
@@ -415,8 +416,7 @@ class _WorldBookPageState extends State<WorldBookPage> {
                   },
                 );
               },
-              onReorder: (oldIndex, newIndex) async {
-                if (newIndex > oldIndex) newIndex -= 1;
+              onReorderItem: (oldIndex, newIndex) async {
                 Haptics.light();
                 await context.read<WorldBookProvider>().reorderBooks(
                   oldIndex: oldIndex,
@@ -589,7 +589,7 @@ class _WorldBookSection extends StatelessWidget {
                         label,
                         style: TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                           color: c,
                         ),
                       ),
@@ -718,9 +718,9 @@ class _WorldBookSection extends StatelessWidget {
                                     title,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 16,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: AppFontWeights.emphasis,
                                     ),
                                   ),
                                 ),
@@ -808,7 +808,7 @@ class _WorldBookSection extends StatelessWidget {
               },
             );
           },
-          onReorder: (oldIndex, newIndex) async {
+          onReorderItem: (oldIndex, newIndex) async {
             await onReorderEntries(oldIndex, newIndex);
           },
           itemBuilder: (context, index) {
@@ -931,7 +931,7 @@ class _IosEntryRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 15,
                   color: baseColor,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: AppFontWeights.medium,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1046,7 +1046,7 @@ class _TagPill extends StatelessWidget {
         text,
         style: TextStyle(
           fontSize: 11.5,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           color: cs.onSurface,
         ),
       ),
@@ -1116,7 +1116,7 @@ class _WorldBookEditSheetState extends State<_WorldBookEditSheet> {
                       label,
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeights.semibold,
                         color: cs.onSurface.withValues(alpha: 0.9),
                       ),
                     ),
@@ -1168,9 +1168,9 @@ class _WorldBookEditSheetState extends State<_WorldBookEditSheet> {
             Center(
               child: Text(
                 base == null ? l10n.worldBookAdd : l10n.worldBookConfig,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),
@@ -1394,7 +1394,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                       label,
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeights.semibold,
                         color: cs.onSurface.withValues(alpha: 0.9),
                       ),
                     ),
@@ -1440,7 +1440,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                   label,
                   style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: AppFontWeights.medium,
                     color: cs.onSurface.withValues(alpha: 0.9),
                   ),
                   maxLines: 1,
@@ -1493,7 +1493,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                     color: cs.onSurface.withValues(alpha: 0.9),
                   ),
                 ),
@@ -1544,7 +1544,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                         positionLabel(p),
                         style: TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                           color: localCs.onSurface.withValues(alpha: 0.9),
                         ),
                       ),
@@ -1582,9 +1582,9 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                   Center(
                     child: Text(
                       localL10n.worldBookEntryInjectionPositionLabel,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                   ),
@@ -1639,7 +1639,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                         roleLabel(r),
                         style: TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                           color: localCs.onSurface.withValues(alpha: 0.9),
                         ),
                       ),
@@ -1674,9 +1674,9 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                   Center(
                     child: Text(
                       localL10n.worldBookEntryInjectionRoleLabel,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                   ),
@@ -1726,9 +1726,9 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
             Center(
               child: Text(
                 base == null ? l10n.worldBookAddEntry : l10n.worldBookEditEntry,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),
@@ -1786,7 +1786,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                 l10n.worldBookEntryKeywordsLabel,
                                 style: TextStyle(
                                   fontSize: 13,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: AppFontWeights.emphasis,
                                   color: cs.onSurface.withValues(alpha: 0.85),
                                 ),
                               ),
@@ -1830,7 +1830,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                               TextAlignVertical.center,
                                           style: TextStyle(
                                             fontSize: 15,
-                                            fontWeight: FontWeight.w500,
+                                            fontWeight: AppFontWeights.medium,
                                             color: cs.onSurface.withValues(
                                               alpha: 0.92,
                                             ),
@@ -1843,7 +1843,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                                 .worldBookEntryKeywordInputHint,
                                             hintStyle: TextStyle(
                                               fontSize: 15,
-                                              fontWeight: FontWeight.w500,
+                                              fontWeight: AppFontWeights.medium,
                                               color: cs.onSurface.withValues(
                                                 alpha: isDark ? 0.42 : 0.46,
                                               ),
@@ -2063,7 +2063,7 @@ class _IosOutlineButtonState extends State<_IosOutlineButton> {
           widget.label,
           style: TextStyle(
             fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeights.semibold,
             color: cs.onSurface,
           ),
         ),
@@ -2122,7 +2122,7 @@ class _IosFilledButtonState extends State<_IosFilledButton> {
           widget.label,
           style: TextStyle(
             fontSize: 15,
-            fontWeight: FontWeight.w700,
+            fontWeight: AppFontWeights.emphasis,
             color: cs.onPrimary.withValues(alpha: widget.enabled ? 1 : 0.6),
           ),
         ),

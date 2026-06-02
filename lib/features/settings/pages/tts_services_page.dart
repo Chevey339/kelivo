@@ -11,6 +11,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../core/services/haptics.dart';
 import 'tts_settings_page.dart';
+import '../../../theme/app_font_weights.dart';
 
 class TtsServicesPage extends StatelessWidget {
   const TtsServicesPage({super.key});
@@ -129,7 +130,7 @@ class TtsServicesPage extends StatelessWidget {
                                         style: TextStyle(
                                           fontSize: 15,
                                           color: c,
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight: AppFontWeights.semibold,
                                         ),
                                       ),
                                       const SizedBox(height: 3),
@@ -213,7 +214,7 @@ Widget _header(BuildContext context, String text, {bool first = false}) {
       text,
       style: TextStyle(
         fontSize: 13,
-        fontWeight: FontWeight.w600,
+        fontWeight: AppFontWeights.semibold,
         color: cs.onSurface.withValues(alpha: 0.8),
       ),
     ),
@@ -456,7 +457,7 @@ class _AvatarBadge extends StatelessWidget {
             letter,
             style: TextStyle(
               color: cs.primary,
-              fontWeight: FontWeight.w700,
+              fontWeight: AppFontWeights.emphasis,
               fontSize: 14,
             ),
           ),
@@ -497,7 +498,7 @@ class _AvatarBrandBadge extends StatelessWidget {
                   (name.isEmpty ? '?' : name[0]).toUpperCase(),
                   style: TextStyle(
                     color: cs.primary,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                     fontSize: 14,
                   ),
                 )
@@ -576,7 +577,7 @@ class _NetworkTtsRowMobileState extends State<_NetworkTtsRowMobile> {
                           style: TextStyle(
                             fontSize: 15,
                             color: c,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                       ),
@@ -733,9 +734,9 @@ void _showMobileErrorDetails(BuildContext context, String message) {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Text(
                   l10n.ttsServicesDialogErrorTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
               ),
@@ -1174,7 +1175,7 @@ class _ProviderKindChip extends StatelessWidget {
             networkTtsKindDisplayName(kind),
             style: TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               color: selected ? cs.primary : cs.onSurface,
             ),
           ),
@@ -1222,7 +1223,7 @@ class _TtsEditorTextFieldState extends State<_TtsEditorTextField> {
             widget.label,
             style: TextStyle(
               fontSize: 13,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               color: cs.onSurface.withValues(alpha: 0.72),
             ),
           ),
@@ -1234,7 +1235,7 @@ class _TtsEditorTextFieldState extends State<_TtsEditorTextField> {
             validator: widget.validator,
             style: TextStyle(
               fontSize: 15,
-              fontWeight: FontWeight.w500,
+              fontWeight: AppFontWeights.medium,
               color: cs.onSurface.withValues(alpha: 0.92),
             ),
             decoration: InputDecoration(
@@ -1316,9 +1317,9 @@ Future<void> _showSystemTtsConfig(BuildContext context) async {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Text(
                   l10n.ttsServicesPageSystemTtsSettingsTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
               ),

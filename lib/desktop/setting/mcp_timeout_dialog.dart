@@ -6,6 +6,7 @@ import '../../core/providers/mcp_provider.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/snackbar.dart';
+import '../../theme/app_font_weights.dart';
 
 Future<void> showDesktopMcpTimeoutDialog(BuildContext context) async {
   final cs = Theme.of(context).colorScheme;
@@ -81,9 +82,9 @@ class _DesktopMcpTimeoutDialogState extends State<_DesktopMcpTimeoutDialog> {
                 children: [
                   Text(
                     l10n.mcpTimeoutDialogTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                     ),
                   ),
                   const Spacer(),
@@ -284,7 +285,7 @@ class _ActionBtnState extends State<_ActionBtn> {
             widget.label,
             style: TextStyle(
               color: widget.foreground,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
             ),
           ),
         ),

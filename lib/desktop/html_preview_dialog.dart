@@ -10,6 +10,7 @@ import '../icons/lucide_adapter.dart';
 import '../shared/widgets/snackbar.dart';
 import '../shared/widgets/ios_tactile.dart';
 import 'dart:convert';
+import '../theme/app_font_weights.dart';
 
 Future<void> showHtmlPreviewDesktopDialog(
   BuildContext context, {
@@ -203,9 +204,9 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
                       // Left title
                       Text(
                         l10n.assistantEditPreviewTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                       const Spacer(),
@@ -330,9 +331,9 @@ class _ConsoleDialog extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                       const Spacer(),

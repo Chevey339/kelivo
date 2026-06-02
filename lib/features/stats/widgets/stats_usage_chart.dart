@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../models/stats_models.dart';
+import '../../../theme/app_font_weights.dart';
 
 const double _usageDetailBubbleWidth = 228;
 const double _usageDetailBubbleTop = 8;
@@ -462,7 +463,7 @@ class _UsageDetailBubble extends StatelessWidget {
                   style: TextStyle(
                     color: cs.onSurface.withValues(alpha: 0.82),
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -524,7 +525,7 @@ class _UsageProviderDetailRow extends StatelessWidget {
                 style: TextStyle(
                   color: cs.onSurface.withValues(alpha: 0.86),
                   fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: AppFontWeights.emphasis,
                 ),
               ),
             ),
@@ -534,7 +535,7 @@ class _UsageProviderDetailRow extends StatelessWidget {
               style: TextStyle(
                 color: cs.onSurface.withValues(alpha: 0.7),
                 fontSize: 11,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
               ),
             ),
           ],

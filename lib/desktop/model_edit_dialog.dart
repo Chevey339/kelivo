@@ -12,6 +12,7 @@ import '../core/services/logging/flutter_logger.dart';
 import '../shared/widgets/ios_switch.dart';
 import '../shared/widgets/snackbar.dart';
 import '../features/model/widgets/model_edit_state_helper.dart';
+import '../theme/app_font_weights.dart';
 
 Future<bool?> showDesktopModelEditDialog(
   BuildContext context, {
@@ -361,9 +362,9 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                             widget.isNew
                                 ? l10n.modelDetailSheetAddModel
                                 : l10n.modelDetailSheetEditModel,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: AppFontWeights.emphasis,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -630,9 +631,9 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                 Expanded(
                   child: Text(
                     l10n.modelDetailSheetCustomHeadersTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                 ),
@@ -667,9 +668,9 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                 Expanded(
                   child: Text(
                     l10n.modelDetailSheetCustomBodyTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                 ),
@@ -977,7 +978,7 @@ class _PrimaryDeskButtonState extends State<_PrimaryDeskButton> {
                 widget.label,
                 style: TextStyle(
                   color: cs.onPrimary,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ],
@@ -1037,7 +1038,7 @@ class _SegmentedSingle extends StatelessWidget {
                   color: selected
                       ? cs.primary
                       : cs.onSurface.withValues(alpha: 0.82),
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),
@@ -1099,7 +1100,7 @@ class _SegmentedMulti extends StatelessWidget {
                   color: selected
                       ? cs.primary
                       : cs.onSurface.withValues(alpha: 0.82),
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),
@@ -1453,9 +1454,9 @@ class _ToolTileState extends State<_ToolTile> {
                       children: [
                         Text(
                           widget.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -1590,7 +1591,7 @@ class _SegTabBarState extends State<_SegTabBar> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: fg,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                       ),

@@ -1,16 +1,19 @@
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 
-// CJK/Latin fallback to stabilize fontWeight (w100–w600) on iOS for Chinese
+// CJK/Latin fallback to stabilize fontWeight (w100-w600) on iOS for Chinese
 const List<String> kDefaultFontFamilyFallback = <String>[
   'PingFang SC',
   'Heiti SC',
   'Hiragino Sans GB',
   'Roboto',
 ];
+
+const List<String> kAndroidFontFamilyFallback = <String>['sans-serif'];
 
 // Windows-specific font fallback to fix Chinese font rendering issues
 const List<String> kWindowsFontFamilyFallback = <String>[
@@ -22,6 +25,9 @@ const List<String> kWindowsFontFamilyFallback = <String>[
 
 // Get platform-appropriate font fallback list
 List<String> getPlatformFontFallback() {
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    return kAndroidFontFamilyFallback;
+  }
   if (defaultTargetPlatform == TargetPlatform.windows) {
     return kWindowsFontFamilyFallback;
   }
@@ -165,7 +171,7 @@ ThemeData buildLightTheme(ColorScheme? dynamicScheme) {
       contentTextStyle: TextStyle(
         color: scheme.onInverseSurface,
         fontSize: 14,
-        fontWeight: FontWeight.w500,
+        fontWeight: AppFontWeights.medium,
         fontFamilyFallback: fontFallback,
       ),
       elevation: 0,
@@ -180,10 +186,10 @@ ThemeData buildLightTheme(ColorScheme? dynamicScheme) {
       scrolledUnderElevation: 0,
       centerTitle: false,
       foregroundColor: Colors.black,
-      titleTextStyle: const TextStyle(
+      titleTextStyle: TextStyle(
         color: Colors.black,
         fontSize: 18,
-        fontWeight: FontWeight.w600,
+        fontWeight: AppFontWeights.semibold,
       ).copyWith(fontFamilyFallback: fontFallback),
       iconTheme: const IconThemeData(color: Colors.black),
       actionsIconTheme: const IconThemeData(color: Colors.black),
@@ -229,7 +235,7 @@ ThemeData buildLightThemeForScheme(
       contentTextStyle: TextStyle(
         color: scheme.onInverseSurface,
         fontSize: 14,
-        fontWeight: FontWeight.w500,
+        fontWeight: AppFontWeights.medium,
         fontFamilyFallback: fontFallback,
       ),
       elevation: 0,
@@ -245,10 +251,10 @@ ThemeData buildLightThemeForScheme(
       scrolledUnderElevation: 0,
       centerTitle: false,
       foregroundColor: Colors.black,
-      titleTextStyle: const TextStyle(
+      titleTextStyle: TextStyle(
         color: Colors.black,
         fontSize: 18,
-        fontWeight: FontWeight.w600,
+        fontWeight: AppFontWeights.semibold,
       ).copyWith(fontFamilyFallback: fontFallback),
       iconTheme: const IconThemeData(color: Colors.black),
       actionsIconTheme: const IconThemeData(color: Colors.black),
@@ -315,7 +321,7 @@ ThemeData buildDarkTheme(ColorScheme? dynamicScheme) {
       contentTextStyle: TextStyle(
         color: scheme.onInverseSurface,
         fontSize: 14,
-        fontWeight: FontWeight.w500,
+        fontWeight: AppFontWeights.medium,
         fontFamilyFallback: fontFallback,
       ),
       elevation: 0,
@@ -330,10 +336,10 @@ ThemeData buildDarkTheme(ColorScheme? dynamicScheme) {
       scrolledUnderElevation: 0,
       centerTitle: false,
       foregroundColor: Colors.white,
-      titleTextStyle: const TextStyle(
+      titleTextStyle: TextStyle(
         color: Colors.white,
         fontSize: 18,
-        fontWeight: FontWeight.w600,
+        fontWeight: AppFontWeights.semibold,
       ).copyWith(fontFamilyFallback: fontFallback),
       iconTheme: const IconThemeData(color: Colors.white),
       actionsIconTheme: const IconThemeData(color: Colors.white),
@@ -378,7 +384,7 @@ ThemeData buildDarkThemeForScheme(
       contentTextStyle: TextStyle(
         color: scheme.onInverseSurface,
         fontSize: 14,
-        fontWeight: FontWeight.w500,
+        fontWeight: AppFontWeights.medium,
         fontFamilyFallback: fontFallback,
       ),
       elevation: 0,
@@ -394,10 +400,10 @@ ThemeData buildDarkThemeForScheme(
       scrolledUnderElevation: 0,
       centerTitle: false,
       foregroundColor: Colors.white,
-      titleTextStyle: const TextStyle(
+      titleTextStyle: TextStyle(
         color: Colors.white,
         fontSize: 18,
-        fontWeight: FontWeight.w600,
+        fontWeight: AppFontWeights.semibold,
       ).copyWith(fontFamilyFallback: fontFallback),
       iconTheme: const IconThemeData(color: Colors.white),
       actionsIconTheme: const IconThemeData(color: Colors.white),

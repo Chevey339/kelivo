@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../features/stats/pages/stats_page.dart';
 import '../../l10n/app_localizations.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class DesktopStatsPane extends StatelessWidget {
   const DesktopStatsPane({super.key});
@@ -23,7 +24,7 @@ class DesktopStatsPane extends StatelessWidget {
                 l10n.statsPageTitle,
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w400,
+                  fontWeight: AppFontWeights.regular,
                   color: cs.onSurface.withValues(alpha: 0.9),
                 ),
               ),

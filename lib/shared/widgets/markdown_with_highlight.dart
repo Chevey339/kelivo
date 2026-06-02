@@ -29,6 +29,7 @@ import 'mermaid_image_cache.dart';
 import 'plantuml_block.dart';
 import 'package:path/path.dart' as p;
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -152,6 +153,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     if (cbIdx != -1) components[cbIdx] = ModernCheckBoxMd();
     final rbIdx = components.indexWhere((c) => c is RadioButtonMd);
     if (rbIdx != -1) components[rbIdx] = ModernRadioMd();
+    final tableIdx = components.indexWhere((c) => c is TableMd);
+    if (tableIdx != -1) components[tableIdx] = EscapeAwareTableMd();
     // Prepend custom renderers in priority order (fence first)
     // Temporarily disable custom bold label line transformer to avoid
     // interfering with block parsing for complex documents.
@@ -346,7 +349,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                 ),
                 child: Text(
                   citation.indexText,
-                  style: const TextStyle(fontSize: 12, height: 1.0),
+                  style: TextStyle(fontSize: 12, height: 1.0),
                 ),
               ),
             );
@@ -364,8 +367,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         );
       },
       orderedListBuilder: (ctx, no, child, cfg) {
-        final style = (cfg.style ?? const TextStyle()).copyWith(
-          fontWeight: FontWeight.w400,
+        final style = (cfg.style ?? TextStyle()).copyWith(
+          fontWeight: AppFontWeights.regular,
         );
         // Apply a soft compensation so when chat scale != 100%,
         // list items don't visually feel larger/smaller than body text.
@@ -399,8 +402,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       // Signature in gpt_markdown 1.1.4: (BuildContext ctx, Widget child, GptMarkdownConfig cfg) -> Widget
       // We compose the bullet + content here to control scaling/spacing.
       unOrderedListBuilder: (ctx, child, cfg) {
-        final style = (cfg.style ?? const TextStyle()).copyWith(
-          fontWeight: FontWeight.w400,
+        final style = (cfg.style ?? TextStyle()).copyWith(
+          fontWeight: AppFontWeights.regular,
         );
         final double kListComp =
             MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
@@ -548,7 +551,7 @@ Map<String, TextStyle> _transparentBgTheme(Map<String, TextStyle> base) {
   if (root != null) {
     m['root'] = root.copyWith(backgroundColor: Colors.transparent);
   } else {
-    m['root'] = const TextStyle(backgroundColor: Colors.transparent);
+    m['root'] = TextStyle(backgroundColor: Colors.transparent);
   }
   return m;
 }
@@ -1021,8 +1024,75 @@ String _streamingTableDividerFor(int columnCount) =>
 List<String> _splitMarkdownTableLine(String line) {
   var trimmed = line.trim();
   if (trimmed.startsWith('|')) trimmed = trimmed.substring(1);
-  if (trimmed.endsWith('|')) trimmed = trimmed.substring(0, trimmed.length - 1);
-  return trimmed.split('|');
+  if (trimmed.endsWith('|') && !_isEscaped(trimmed, trimmed.length - 1)) {
+    trimmed = trimmed.substring(0, trimmed.length - 1);
+  }
+
+  final cells = <String>[];
+  final cell = StringBuffer();
+  var dollarMathEnd = -1;
+  var parenMathEnd = -1;
+
+  for (var i = 0; i < trimmed.length; i++) {
+    final ch = trimmed.codeUnitAt(i);
+
+    if (i > dollarMathEnd && i > parenMathEnd) {
+      if (ch == 0x24 && !_isEscaped(trimmed, i)) {
+        final close = _findClosingDollarMathInTableCell(trimmed, i + 1);
+        if (close != -1) dollarMathEnd = close;
+      } else if (ch == 0x5C && i + 1 < trimmed.length) {
+        final next = trimmed.codeUnitAt(i + 1);
+        if (next == 0x28) {
+          final close = _findClosingParenMathInTableCell(trimmed, i + 2);
+          if (close != -1) parenMathEnd = close + 1;
+        }
+      }
+    }
+
+    if (ch == 0x7C &&
+        !_isEscaped(trimmed, i) &&
+        i > dollarMathEnd &&
+        i > parenMathEnd) {
+      cells.add(cell.toString());
+      cell.clear();
+      continue;
+    }
+
+    cell.writeCharCode(ch);
+  }
+  cells.add(cell.toString());
+  return cells;
+}
+
+int _findClosingDollarMathInTableCell(String input, int start) {
+  final end = math.min(input.length, start + _maxInlineMathBodyLength + 1);
+  for (var i = start; i < end; i++) {
+    final ch = input.codeUnitAt(i);
+    if (ch == 0x0A) return -1;
+    if (ch == 0x5C) {
+      i++;
+      continue;
+    }
+    if (ch != 0x24) continue;
+
+    final body = input.substring(start, i);
+    if (_isValidDollarMathBody(body, allowUnescapedPipes: true) &&
+        _canCloseDollarMath(input, i)) {
+      return i;
+    }
+    return -1;
+  }
+  return -1;
+}
+
+int _findClosingParenMathInTableCell(String input, int start) {
+  final end = math.min(input.length, start + _maxInlineMathBodyLength + 2);
+  for (var i = start; i < end - 1; i++) {
+    final ch = input.codeUnitAt(i);
+    if (ch == 0x0A) return -1;
+    if (ch == 0x5C && input.codeUnitAt(i + 1) == 0x29) return i;
+  }
+  return -1;
 }
 
 String _completeStreamingTableRow(String line, int columnCount) {
@@ -1088,7 +1158,7 @@ bool _isValidStreamingDollarMathBody(String body) {
 
 // Safe math renderer that falls back to plain text when parsing fails.
 Widget _renderMath(String tex, {TextStyle? style, bool displayMode = false}) {
-  final resolved = style ?? const TextStyle();
+  final resolved = style ?? TextStyle();
   final normalizedTex = _normalizeMathTex(tex);
   try {
     return Math.tex(
@@ -1103,7 +1173,7 @@ Widget _renderMath(String tex, {TextStyle? style, bool displayMode = false}) {
 }
 
 TextStyle _inlineMathTextStyle(TextStyle? style) {
-  final base = style ?? const TextStyle();
+  final base = style ?? TextStyle();
   final baseSize = base.fontSize ?? 15.5;
   return base.copyWith(fontSize: baseSize * 1.2);
 }
@@ -1774,7 +1844,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeights.medium,
                       color: cs.onSurfaceVariant.withValues(alpha: 0.72),
                       height: 1.0,
                     ),
@@ -2756,7 +2826,7 @@ class _MarkdownTableCell extends StatelessWidget {
     final baseStyle = style.copyWith(
       fontSize: header ? 13.0 : 13.5,
       height: 1.42,
-      fontWeight: header ? FontWeight.w600 : FontWeight.w400,
+      fontWeight: header ? AppFontWeights.semibold : AppFontWeights.regular,
       color: header ? cs.onSurface : cs.onSurface.withValues(alpha: 0.90),
       fontFamily: appFontFamily ?? style.fontFamily,
     );
@@ -2866,7 +2936,7 @@ class _MarkdownTableToolbar extends StatelessWidget {
               style: TextStyle(
                 color: cs.onSurfaceVariant.withValues(alpha: 0.80),
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 height: 1.0,
               ),
             ),
@@ -3374,11 +3444,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
         isDark ? atomOneDarkReasonableTheme : githubTheme,
       ),
       padding: EdgeInsets.zero,
-      textStyle: const TextStyle(
-        fontFamily: 'monospace',
-        fontSize: 13,
-        height: 1.5,
-      ),
+      textStyle: TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
     );
 
     return Padding(
@@ -3820,8 +3886,8 @@ class _MermaidTabButtonState extends State<_MermaidTabButton> {
                   fontSize: 13,
                   height: 1.35,
                   fontWeight: widget.selected
-                      ? FontWeight.w600
-                      : FontWeight.w500,
+                      ? AppFontWeights.semibold
+                      : AppFontWeights.medium,
                   color: widget.selected
                       ? widget.colors.textPrimary
                       : widget.colors.textSecondary,
@@ -4146,7 +4212,7 @@ class AtxHeadingMd extends BlockMd {
     final lvl = hashes.length;
     final level = lvl < 1 ? 1 : (lvl > 6 ? 6 : lvl);
 
-    final innerCfg = config.copyWith(style: const TextStyle());
+    final innerCfg = config.copyWith(style: TextStyle());
     final inner = TextSpan(
       children: MarkdownComponent.generate(context, raw, innerCfg, true),
     );
@@ -4197,28 +4263,28 @@ class AtxHeadingMd extends BlockMd {
     // Explicit sizes ensure visible contrast over the body (16.0)
     switch (level) {
       case 1:
-        base = const TextStyle(fontSize: 24);
+        base = TextStyle(fontSize: 24);
         break;
       case 2:
-        base = const TextStyle(fontSize: 20);
+        base = TextStyle(fontSize: 20);
         break;
       case 3:
-        base = const TextStyle(fontSize: 18);
+        base = TextStyle(fontSize: 18);
         break;
       case 4:
-        base = const TextStyle(fontSize: 16);
+        base = TextStyle(fontSize: 16);
         break;
       case 5:
-        base = const TextStyle(fontSize: 15);
+        base = TextStyle(fontSize: 15);
         break;
       default:
-        base = const TextStyle(fontSize: 14);
+        base = TextStyle(fontSize: 14);
     }
     final weight = switch (level) {
-      1 => FontWeight.w700,
-      2 => FontWeight.w600,
-      3 => FontWeight.w600,
-      _ => FontWeight.w500,
+      1 => AppFontWeights.strong,
+      2 => AppFontWeights.semibold,
+      3 => AppFontWeights.semibold,
+      _ => AppFontWeights.medium,
     };
     final ls = switch (level) {
       1 => isZh ? 0.0 : 0.1,
@@ -4254,7 +4320,7 @@ class SetextHeadingMd extends BlockMd {
     final underline = (m.group(2) ?? '').trim();
     final level = underline.startsWith('=') ? 1 : 2;
 
-    final innerCfg = config.copyWith(style: const TextStyle());
+    final innerCfg = config.copyWith(style: TextStyle());
     final inner = TextSpan(
       children: MarkdownComponent.generate(context, title, innerCfg, true),
     );
@@ -4303,14 +4369,13 @@ class LabelValueLineMd extends InlineMd {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     // 继承基础样式，确保字间距/行高一致
-    final base =
-        (config.style ?? t.bodyMedium ?? const TextStyle(fontSize: 14));
+    final base = (config.style ?? t.bodyMedium ?? TextStyle(fontSize: 14));
     final labelStyle = base.copyWith(
-      fontWeight: FontWeight.w700, // 与 ** 加粗视觉一致
+      fontWeight: AppFontWeights.strong,
       color: cs.onSurface,
     );
     final valueStyle = base.copyWith(
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeights.regular,
       color: cs.onSurface.withValues(alpha: 0.92),
     );
 
@@ -4533,7 +4598,7 @@ class ModernCheckBoxMd extends BlockMd {
     final content = match?[2] ?? '';
     final cs = Theme.of(context).colorScheme;
 
-    final contentStyle = (config.style ?? const TextStyle()).copyWith(
+    final contentStyle = (config.style ?? TextStyle()).copyWith(
       decoration: checked ? TextDecoration.lineThrough : null,
       color: (config.style?.color ?? cs.onSurface).withValues(
         alpha: checked ? 0.75 : 1.0,
@@ -4593,7 +4658,7 @@ class ModernRadioMd extends BlockMd {
     final content = match?[2] ?? '';
     final cs = Theme.of(context).colorScheme;
 
-    final contentStyle = (config.style ?? const TextStyle()).copyWith(
+    final contentStyle = (config.style ?? TextStyle()).copyWith(
       color: (config.style?.color ?? cs.onSurface).withValues(
         alpha: selected ? 0.95 : 1.0,
       ),
@@ -4646,6 +4711,84 @@ class ModernRadioMd extends BlockMd {
   }
 }
 
+class EscapeAwareTableMd extends TableMd {
+  @override
+  Widget build(
+    BuildContext context,
+    String text,
+    final GptMarkdownConfig config,
+  ) {
+    final value = text
+        .trim()
+        .split('\n')
+        .where((line) => line.trim().isNotEmpty)
+        .map<Map<int, String>>(
+          (line) => _splitMarkdownTableLine(line.trim()).asMap(),
+        )
+        .toList();
+
+    if (value.isEmpty) return Text('', style: config.style);
+
+    final hasHeader = value.length >= 2;
+    final columnAlignments = <TextAlign>[];
+
+    if (hasHeader) {
+      final separatorRow = value[1];
+      for (var index = 0; index < separatorRow.length; index++) {
+        final separator = (separatorRow[index] ?? '').trim();
+        final hasLeftColon = separator.startsWith(':');
+        final hasRightColon = separator.endsWith(':');
+
+        if (hasLeftColon && hasRightColon) {
+          columnAlignments.add(TextAlign.center);
+        } else if (hasRightColon) {
+          columnAlignments.add(TextAlign.right);
+        } else {
+          columnAlignments.add(TextAlign.left);
+        }
+      }
+    }
+
+    var maxCol = 0;
+    for (final row in value) {
+      if (maxCol < row.length) maxCol = row.length;
+    }
+    if (maxCol == 0) return Text('', style: config.style);
+
+    while (columnAlignments.length < maxCol) {
+      columnAlignments.add(TextAlign.left);
+    }
+
+    final tableBuilder = config.tableBuilder;
+    if (tableBuilder == null) {
+      return super.build(context, text, config);
+    }
+
+    final customTable = List<CustomTableRow?>.generate(value.length, (
+      rowIndex,
+    ) {
+      if (hasHeader && rowIndex == 1) return null;
+      final row = value[rowIndex];
+      if (row.isEmpty) return null;
+
+      final fields = List<CustomTableField>.generate(maxCol, (fieldIndex) {
+        return CustomTableField(
+          data: row[fieldIndex] ?? '',
+          alignment: columnAlignments[fieldIndex],
+        );
+      });
+      return CustomTableRow(isHeader: rowIndex == 0, fields: fields);
+    }).nonNulls.toList();
+
+    return tableBuilder(
+      context,
+      customTable,
+      config.style ?? const TextStyle(),
+      config,
+    );
+  }
+}
+
 // Prevent link regex from spanning across lines (dotAll=true in engine).
 class LineSafeLinkMd extends ATagMd {
   @override
@@ -4663,6 +4806,25 @@ class EscapeAwareBoldMd extends BoldMd {
   @override
   RegExp get exp =>
       RegExp(r"(?<![\\*])\*\*(?!\s)(.+?)(?<![\s\\])\*\*(?!\*)", dotAll: true);
+
+  @override
+  InlineSpan span(BuildContext context, String text, GptMarkdownConfig config) {
+    final match = exp.firstMatch(text.trim());
+    final conf = config.copyWith(
+      style:
+          config.style?.copyWith(fontWeight: AppFontWeights.strong) ??
+          TextStyle(fontWeight: AppFontWeights.strong),
+    );
+    return TextSpan(
+      children: MarkdownComponent.generate(
+        context,
+        '${match?[1]}',
+        conf,
+        false,
+      ),
+      style: conf.style,
+    );
+  }
 }
 
 class EscapeAwareItalicMd extends ItalicMd {
@@ -4689,7 +4851,7 @@ class BackslashEscapeMd extends InlineMd {
   // CommonMark escape set (subset), excluding parentheses to keep LaTeX intact.
   // Matches a backslash followed by one escapable punctuation character.
   // Include $ so \$ in regular text renders as literal dollar sign.
-  RegExp get exp => RegExp(r"\\([\\`*_{}\[\]#+\-.!$])");
+  RegExp get exp => RegExp(r"\\([\\`*_{}\[\]#+\-.!$|])");
 
   @override
   InlineSpan span(BuildContext context, String text, GptMarkdownConfig config) {
@@ -4790,11 +4952,11 @@ class _DetailsHtmlBlockState extends State<_DetailsHtmlBlock> {
     final borderColor = cs.outlineVariant.withValues(
       alpha: isDark ? 0.18 : 0.30,
     );
-    final summaryStyle = (widget.config.style ?? const TextStyle()).copyWith(
+    final summaryStyle = (widget.config.style ?? TextStyle()).copyWith(
       color: cs.onSurface,
-      fontWeight: FontWeight.w500,
+      fontWeight: AppFontWeights.medium,
     );
-    final bodyStyle = (widget.config.style ?? const TextStyle()).copyWith(
+    final bodyStyle = (widget.config.style ?? TextStyle()).copyWith(
       color: cs.onSurface,
     );
     final bodyConfig = widget.config.copyWith(style: bodyStyle);
@@ -4860,7 +5022,7 @@ class _DetailsHtmlBlockState extends State<_DetailsHtmlBlock> {
                 opacity: animation,
                 child: SizeTransition(
                   sizeFactor: animation,
-                  axisAlignment: -1,
+                  alignment: const AlignmentDirectional(-1.0, -1.0),
                   child: child,
                 ),
               );
@@ -4921,7 +5083,7 @@ class HtmlAnchorMd extends InlineMd {
         onTap: url.isEmpty ? null : () => config.onLinkTap?.call(url, linkText),
         child: Text(
           linkText,
-          style: (config.style ?? const TextStyle()).copyWith(
+          style: (config.style ?? TextStyle()).copyWith(
             color: cs.primary,
             decoration: TextDecoration.none,
           ),

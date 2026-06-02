@@ -8,6 +8,7 @@ import '../../shared/widgets/snackbar.dart';
 import 'mcp_edit_dialog.dart' show showDesktopMcpEditDialog;
 import 'mcp_json_edit_dialog.dart' show showDesktopMcpJsonEditDialog;
 import 'mcp_timeout_dialog.dart' show showDesktopMcpTimeoutDialog;
+import '../../theme/app_font_weights.dart';
 
 class DesktopMcpPane extends StatelessWidget {
   const DesktopMcpPane({super.key});
@@ -39,7 +40,7 @@ class DesktopMcpPane extends StatelessWidget {
                             l10n.mcpAssistantSheetTitle,
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w400,
+                              fontWeight: AppFontWeights.regular,
                               color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
@@ -146,8 +147,7 @@ class DesktopMcpPane extends StatelessWidget {
                       ),
                     );
                   },
-                  onReorder: (oldIndex, newIndex) async {
-                    if (newIndex > oldIndex) newIndex -= 1;
+                  onReorderItem: (oldIndex, newIndex) async {
                     await context.read<McpProvider>().reorderServers(
                       oldIndex,
                       newIndex,
@@ -237,7 +237,11 @@ class _ServerCardState extends State<_ServerCard> {
         ),
         child: Text(
           text,
-          style: TextStyle(fontSize: 11, color: c, fontWeight: FontWeight.w700),
+          style: TextStyle(
+            fontSize: 11,
+            color: c,
+            fontWeight: AppFontWeights.emphasis,
+          ),
         ),
       );
     }
@@ -332,9 +336,9 @@ class _ServerCardState extends State<_ServerCard> {
                       widget.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -370,10 +374,7 @@ class _ServerCardState extends State<_ServerCard> {
                           Expanded(
                             child: Text(
                               l10n.mcpPageConnectionFailed,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.red,
-                              ),
+                              style: TextStyle(fontSize: 12, color: Colors.red),
                             ),
                           ),
                           TextButton(
@@ -480,9 +481,9 @@ Future<void> _showErrorDetails(
                         children: [
                           Text(
                             l10n.mcpPageErrorDialogTitle,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: AppFontWeights.emphasis,
                             ),
                           ),
                           const SizedBox(height: 6),
@@ -519,10 +520,8 @@ Future<void> _showErrorDetails(
                       (message?.isNotEmpty == true
                           ? message!
                           : l10n.mcpPageErrorNoDetails),
-                      style:
-                          (Theme.of(ctx).textTheme.bodyMedium ??
-                                  const TextStyle())
-                              .copyWith(fontSize: 13.0, height: 1.35),
+                      style: (Theme.of(ctx).textTheme.bodyMedium ?? TextStyle())
+                          .copyWith(fontSize: 13.0, height: 1.35),
                     ),
                   ),
                 ),
@@ -569,9 +568,9 @@ Future<bool?> _confirmDelete(BuildContext context) async {
               children: [
                 Text(
                   l10n.mcpPageConfirmDeleteTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
                 const SizedBox(height: 10),

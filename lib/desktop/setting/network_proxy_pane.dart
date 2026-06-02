@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'package:flutter/material.dart';
 import 'package:http/io_client.dart';
@@ -105,7 +106,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                     l10n.settingsPageNetworkProxy,
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w400,
+                      fontWeight: AppFontWeights.regular,
                       color: cs.onSurface.withValues(alpha: 0.9),
                     ),
                   ),
@@ -123,7 +124,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                             l10n.networkProxySettingsHeader,
                             style: TextStyle(
                               fontSize: 15,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: AppFontWeights.semibold,
                               color: cs.onSurface.withValues(alpha: 0.95),
                             ),
                           ),
@@ -172,7 +173,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                       child: TextField(
                         controller: _hostCtl,
                         focusNode: _hostFn,
-                        style: const TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: 14),
                         decoration: _deskInputDecoration(
                           context,
                         ).copyWith(hintText: '127.0.0.1'),
@@ -191,7 +192,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                         controller: _portCtl,
                         focusNode: _portFn,
                         keyboardType: TextInputType.number,
-                        style: const TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: 14),
                         decoration: _deskInputDecoration(
                           context,
                         ).copyWith(hintText: '8080'),
@@ -209,7 +210,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                       child: TextField(
                         controller: _userCtl,
                         focusNode: _userFn,
-                        style: const TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: 14),
                         decoration: _deskInputDecoration(
                           context,
                         ).copyWith(hintText: l10n.networkProxyOptionalHint),
@@ -228,7 +229,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                         controller: _passCtl,
                         focusNode: _passFn,
                         obscureText: true,
-                        style: const TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: 14),
                         decoration: _deskInputDecoration(
                           context,
                         ).copyWith(hintText: '••••••••'),
@@ -248,7 +249,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                         focusNode: _bypassFn,
                         minLines: 1,
                         maxLines: 3,
-                        style: const TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: 14),
                         decoration: _deskInputDecoration(
                           context,
                         ).copyWith(hintText: l10n.networkProxyBypassHint),
@@ -280,7 +281,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                       ),
                       child: TextField(
                         controller: _testUrlCtl,
-                        style: const TextStyle(fontSize: 14),
+                        style: TextStyle(fontSize: 14),
                         decoration: _deskInputDecoration(
                           context,
                         ).copyWith(hintText: l10n.networkProxyTestUrlHint),
@@ -311,7 +312,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                         l10n.networkProxyTestSuccess,
                         style: TextStyle(
                           color: Colors.green.shade600,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                     ),
@@ -498,7 +499,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
               widget.label,
               style: TextStyle(
                 color: textColor,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 fontSize: widget.dense ? 13 : 14,
               ),
             ),
@@ -847,8 +848,8 @@ class _ProxyTypeTileState extends State<_ProxyTypeTile> {
                       fontSize: 14,
                       color: cs.onSurface.withValues(alpha: 0.88),
                       fontWeight: widget.selected
-                          ? FontWeight.w600
-                          : FontWeight.w400,
+                          ? AppFontWeights.semibold
+                          : AppFontWeights.regular,
                     ),
                   ),
                 ),

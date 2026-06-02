@@ -14,6 +14,7 @@ import '../../../core/providers/instruction_injection_group_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../theme/app_font_weights.dart';
 
 class InstructionInjectionPage extends StatefulWidget {
   const InstructionInjectionPage({super.key});
@@ -282,8 +283,7 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                                 },
                               );
                             },
-                            onReorder: (oldIndex, newIndex) {
-                              if (newIndex > oldIndex) newIndex -= 1;
+                            onReorderItem: (oldIndex, newIndex) {
                               context
                                   .read<InstructionInjectionProvider>()
                                   .reorderWithinGroup(
@@ -356,7 +356,8 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                                                       style: TextStyle(
                                                         color: cs.error,
                                                         fontWeight:
-                                                            FontWeight.w700,
+                                                            AppFontWeights
+                                                                .emphasis,
                                                       ),
                                                     ),
                                                   ],
@@ -426,7 +427,7 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
                                                                 overflow:
                                                                     TextOverflow
                                                                         .ellipsis,
-                                                                style: const TextStyle(
+                                                                style: TextStyle(
                                                                   fontSize: 15,
                                                                   fontWeight:
                                                                       FontWeight
@@ -536,7 +537,7 @@ class _GroupHeader extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: AppFontWeights.emphasis,
                   color: textBase,
                 ),
               ),
@@ -615,9 +616,9 @@ class _InstructionInjectionEditSheetState
                 widget.item == null
                     ? l10n.instructionInjectionAddTitle
                     : l10n.instructionInjectionEditTitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),
@@ -880,7 +881,7 @@ class _IosOutlineButtonState extends State<_IosOutlineButton> {
             widget.label,
             style: TextStyle(
               color: cs.onSurface,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               fontSize: 14,
             ),
           ),
@@ -934,7 +935,7 @@ class _IosFilledButtonState extends State<_IosFilledButton> {
             widget.label,
             style: TextStyle(
               color: cs.onPrimary,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               fontSize: 14,
             ),
           ),

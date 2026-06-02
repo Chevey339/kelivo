@@ -8,6 +8,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/dialogs/reasoning_budget_custom_dialog.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 Future<void> showReasoningBudgetSheet(
   BuildContext context, {
@@ -117,7 +118,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
                   title,
                   style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: AppFontWeights.medium,
                     color: onColor,
                   ),
                   maxLines: 1,
@@ -275,7 +276,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
                                     _selected.toString(),
                                     style: TextStyle(
                                       fontSize: 13,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: AppFontWeights.semibold,
                                       color: cs.primary,
                                     ),
                                   ),

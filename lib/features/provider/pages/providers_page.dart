@@ -21,6 +21,7 @@ import '../../../shared/widgets/ios_checkbox.dart';
 import '../widgets/provider_avatar.dart';
 import '../widgets/provider_group_select_sheet.dart';
 import '../../../utils/provider_grouping_logic.dart';
+import '../../../theme/app_font_weights.dart';
 
 class ProvidersPage extends StatefulWidget {
   const ProvidersPage({super.key});
@@ -241,7 +242,6 @@ class _ProvidersPageState extends State<ProvidersPage> {
                         },
                         onReorder: (oldIndex, newIndex) async {
                           if (_searchQuery.isNotEmpty || _selectMode) return;
-                          if (newIndex > oldIndex) newIndex -= 1;
                           final moved = items[oldIndex];
                           final mut = List<_Provider>.of(items);
                           final item = mut.removeAt(oldIndex);
@@ -668,7 +668,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
               l10n.providerDetailPageDeleteButton,
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -812,7 +812,7 @@ class _ProvidersList extends StatelessWidget {
                 bottom: reachesBottom ? bottomGapIfFlush : 4,
               ),
               itemCount: items.length,
-              onReorder: reorderEnabled ? onReorder : (_, __) {},
+              onReorderItem: reorderEnabled ? onReorder : (_, __) {},
               buildDefaultDragHandles: false,
               proxyDecorator: (child, index, animation) => Opacity(
                 opacity: 0.95,
@@ -964,7 +964,7 @@ class _GroupedProvidersList extends StatelessWidget {
                 bottom: reachesBottom ? bottomGapIfFlush : 4,
               ),
               itemCount: rows.length,
-              onReorder: reorderEnabled ? onReorder : (_, __) {},
+              onReorderItem: reorderEnabled ? onReorder : (_, __) {},
               onReorderStart: reorderEnabled ? onReorderStart : null,
               onReorderEnd: reorderEnabled ? onReorderEnd : null,
               buildDefaultDragHandles: false,
@@ -1180,7 +1180,7 @@ class _ProviderGroupHeaderRow extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13.5,
                     color: color,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
               ),
@@ -1303,7 +1303,7 @@ class _ProviderRow extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 15,
                           color: color,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                     ),
@@ -1596,9 +1596,9 @@ Future<void> _showMultiExportSheet(
               Center(
                 child: Text(
                   l10n.providersPageExportSelectedTitle(keys.length),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
               ),
@@ -1637,7 +1637,7 @@ Future<void> _showMultiExportSheet(
                     text,
                     maxLines: 7,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13.5, height: 1.35),
+                    style: TextStyle(fontSize: 13.5, height: 1.35),
                   ),
                 ),
               ),

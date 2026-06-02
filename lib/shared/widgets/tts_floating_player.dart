@@ -8,6 +8,7 @@ import '../../core/providers/tts_provider.dart';
 import '../../core/services/tts/tts_playback_models.dart';
 import '../../l10n/app_localizations.dart';
 import 'ios_tactile.dart';
+import '../../theme/app_font_weights.dart';
 
 const Duration _ttsFloatingSurfaceAnimationDuration = Duration(
   milliseconds: 220,
@@ -393,7 +394,7 @@ class _SpeedButton extends StatelessWidget {
               overflow: TextOverflow.clip,
               style: theme.textTheme.labelSmall?.copyWith(
                 color: cs.onPrimaryContainer,
-                fontWeight: FontWeight.w800,
+                fontWeight: AppFontWeights.heavy,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),

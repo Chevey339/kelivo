@@ -10,6 +10,7 @@ import '../widgets/mcp_timeout_sheet.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
+import '../../../theme/app_font_weights.dart';
 
 class McpPage extends StatelessWidget {
   const McpPage({super.key});
@@ -57,9 +58,9 @@ class McpPage extends StatelessWidget {
                 children: [
                   Text(
                     l10n.mcpPageErrorDialogTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -230,7 +231,7 @@ class McpPage extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       color: color ?? cs.primary,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                     ),
                   ),
                 );
@@ -346,7 +347,7 @@ class McpPage extends StatelessWidget {
                                       Text(
                                         s.name,
                                         style: TextStyle(
-                                          fontWeight: FontWeight.w700,
+                                          fontWeight: AppFontWeights.emphasis,
                                           color: c,
                                         ),
                                         maxLines: 1,
@@ -409,7 +410,7 @@ class McpPage extends StatelessWidget {
                                             Expanded(
                                               child: Text(
                                                 l10n.mcpPageConnectionFailed,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontSize: 12,
                                                   color: Colors.red,
                                                 ),
@@ -486,7 +487,7 @@ class McpPage extends StatelessWidget {
                                     l10n.mcpPageDelete,
                                     style: TextStyle(
                                       color: cs.error,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: AppFontWeights.emphasis,
                                     ),
                                   ),
                                 ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../theme/app_font_weights.dart';
 
 class FileProcessingIndicator extends StatelessWidget {
   const FileProcessingIndicator({super.key});
@@ -38,7 +39,7 @@ class FileProcessingIndicator extends StatelessWidget {
                 l10n.homePageProcessingFiles,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: AppFontWeights.emphasis,
                   color: cs.secondary,
                 ),
               ),

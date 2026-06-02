@@ -10,6 +10,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../theme/app_font_weights.dart';
 
 class SearchServicesPage extends StatefulWidget {
   const SearchServicesPage({super.key});
@@ -201,7 +202,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
           text,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeights.semibold,
             color: cs.onSurface.withValues(alpha: 0.8),
           ),
         ),
@@ -481,7 +482,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
                         style: TextStyle(
                           fontSize: 15,
                           color: c,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                     ),
@@ -638,7 +639,7 @@ class _BrandBadge extends StatelessWidget {
         name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
         style: TextStyle(
           color: cs.primary,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           fontSize: size * 0.42,
         ),
       ),
@@ -713,9 +714,9 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
                       _selectedType == null
                           ? l10n.searchServicesAddDialogTitle
                           : _getServiceName(_selectedType!),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeights.semibold,
                       ),
                     ),
                   ),
@@ -859,9 +860,9 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
                 ),
                 child: Text(
                   l10n.searchServicesAddDialogAdd,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
               ),
@@ -902,7 +903,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
           keyboardType: keyboardType,
           maxLines: obscureText ? 1 : maxLines,
           minLines: obscureText ? null : minLines,
-          style: const TextStyle(fontSize: 16),
+          style: TextStyle(fontSize: 16),
           decoration: InputDecoration(
             labelText: label,
             hintText: hint,
@@ -1325,9 +1326,9 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
               child: Center(
                 child: Text(
                   searchService.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
               ),
@@ -1360,9 +1361,9 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
                 ),
                 child: Text(
                   l10n.searchServicesEditDialogSave,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
               ),
@@ -1403,7 +1404,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
           keyboardType: keyboardType,
           maxLines: obscureText ? 1 : maxLines,
           minLines: obscureText ? null : minLines,
-          style: const TextStyle(fontSize: 16),
+          style: TextStyle(fontSize: 16),
           decoration: InputDecoration(
             labelText: label,
             hintText: hint,
@@ -1759,7 +1760,7 @@ class _ServiceIcon extends StatelessWidget {
       name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
       style: TextStyle(
         color: cs.primary,
-        fontWeight: FontWeight.w700,
+        fontWeight: AppFontWeights.emphasis,
         fontSize: size * 0.42,
       ),
     );

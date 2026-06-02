@@ -4,6 +4,7 @@ import '../models/message_edit_result.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
+import '../../../theme/app_font_weights.dart';
 
 Future<MessageEditResult?> showMessageEditSheet(
   BuildContext context, {
@@ -100,7 +101,7 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                           l10n.messageEditPageSaveAndSend,
                           style: TextStyle(
                             color: cs.primary,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -108,9 +109,9 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                     Center(
                       child: Text(
                         l10n.messageEditPageTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -139,7 +140,7 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                           l10n.messageEditPageSave,
                           style: TextStyle(
                             color: cs.primary,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
