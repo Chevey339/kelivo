@@ -553,16 +553,18 @@ String _openAIImagesOutputMime(
 
 Map<String, dynamic> _decodeOpenAIImagesResponse(http.Response response) {
   if (response.statusCode < 200 || response.statusCode >= 300) {
-    throw HttpException('HTTP ${response.statusCode}: ${response.body}');
+    final responseText = _decodeUtf8Body(response, allowMalformed: true);
+    throw HttpException('HTTP ${response.statusCode}: $responseText');
   }
   final contentType = response.headers[HttpHeaders.contentTypeHeader]
       ?.toLowerCase();
-  final body = response.body.trimLeft();
+  final responseText = _decodeUtf8Body(response);
+  final body = responseText.trimLeft();
   if ((contentType?.contains('text/event-stream') ?? false) ||
       body.startsWith('data:')) {
-    return _decodeOpenAIImagesStreamResponse(response.body);
+    return _decodeOpenAIImagesStreamResponse(responseText);
   }
-  final decoded = jsonDecode(response.body);
+  final decoded = jsonDecode(responseText);
   return _normalizeOpenAIImagesPayload(decoded);
 }
 

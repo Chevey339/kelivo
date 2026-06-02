@@ -1023,7 +1023,7 @@ void main() {
     );
 
     test(
-      'throws useful exception on non-success Images API response',
+      'throws useful UTF-8 exception on non-success Images API response',
       () async {
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
         addTearDown(() async {
@@ -1033,8 +1033,13 @@ void main() {
         server.listen((request) async {
           await request.drain<void>();
           request.response.statusCode = HttpStatus.badRequest;
-          request.response.headers.contentType = ContentType.json;
-          request.response.write(jsonEncode({'error': 'bad image request'}));
+          request.response.headers.set(
+            HttpHeaders.contentTypeHeader,
+            'application/json',
+          );
+          request.response.add(
+            utf8.encode(jsonEncode({'error': '图像请求错误'})),
+          );
           await request.response.close();
         });
 
@@ -1047,11 +1052,9 @@ void main() {
             ],
           ).toList(),
           throwsA(
-            isA<HttpException>().having(
-              (error) => error.message,
-              'message',
-              contains('HTTP 400'),
-            ),
+            isA<HttpException>()
+                .having((error) => error.message, 'message', contains('HTTP 400'))
+                .having((error) => error.message, 'message', contains('图像请求错误')),
           ),
         );
       },
