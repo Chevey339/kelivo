@@ -2444,7 +2444,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             switchOutCurve: Curves.easeInCubic,
             transitionBuilder: (child, anim) => SizeTransition(
               sizeFactor: anim,
-              axisAlignment: -1,
+              alignment: const AlignmentDirectional(-1.0, -1.0),
               child: FadeTransition(opacity: anim, child: child),
             ),
             child: widget.message.isStreaming

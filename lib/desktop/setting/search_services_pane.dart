@@ -130,8 +130,7 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                     ),
                   );
                 },
-                onReorder: (oldIndex, newIndex) async {
-                  if (newIndex > oldIndex) newIndex -= 1;
+                onReorderItem: (oldIndex, newIndex) async {
                   final sp = context.read<SettingsProvider>();
                   final current = List<SearchServiceOptions>.from(
                     sp.searchServices,

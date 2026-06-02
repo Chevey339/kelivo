@@ -1057,9 +1057,8 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               _isSelectionMode ? 160 : 100,
             ),
             itemCount: models.length,
-            onReorder: (oldIndex, newIndex) {
+            onReorderItem: (oldIndex, newIndex) {
               if (_isSelectionMode) return;
-              if (newIndex > oldIndex) newIndex -= 1;
               final list = List<String>.from(models);
               final item = list.removeAt(oldIndex);
               list.insert(newIndex, item);

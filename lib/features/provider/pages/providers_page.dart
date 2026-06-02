@@ -242,7 +242,6 @@ class _ProvidersPageState extends State<ProvidersPage> {
                         },
                         onReorder: (oldIndex, newIndex) async {
                           if (_searchQuery.isNotEmpty || _selectMode) return;
-                          if (newIndex > oldIndex) newIndex -= 1;
                           final moved = items[oldIndex];
                           final mut = List<_Provider>.of(items);
                           final item = mut.removeAt(oldIndex);
@@ -813,7 +812,7 @@ class _ProvidersList extends StatelessWidget {
                 bottom: reachesBottom ? bottomGapIfFlush : 4,
               ),
               itemCount: items.length,
-              onReorder: reorderEnabled ? onReorder : (_, __) {},
+              onReorderItem: reorderEnabled ? onReorder : (_, __) {},
               buildDefaultDragHandles: false,
               proxyDecorator: (child, index, animation) => Opacity(
                 opacity: 0.95,
@@ -965,7 +964,7 @@ class _GroupedProvidersList extends StatelessWidget {
                 bottom: reachesBottom ? bottomGapIfFlush : 4,
               ),
               itemCount: rows.length,
-              onReorder: reorderEnabled ? onReorder : (_, __) {},
+              onReorderItem: reorderEnabled ? onReorder : (_, __) {},
               onReorderStart: reorderEnabled ? onReorderStart : null,
               onReorderEnd: reorderEnabled ? onReorderEnd : null,
               buildDefaultDragHandles: false,

@@ -289,8 +289,7 @@ class _QuickPhraseTab extends StatelessWidget {
               },
             );
           },
-          onReorder: (oldIndex, newIndex) {
-            if (newIndex > oldIndex) newIndex -= 1;
+          onReorderItem: (oldIndex, newIndex) {
             // Update immediately for smooth drop animation
             context.read<QuickPhraseProvider>().reorderPhrases(
               oldIndex: oldIndex,

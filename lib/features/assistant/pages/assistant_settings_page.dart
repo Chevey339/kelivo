@@ -67,8 +67,7 @@ class AssistantSettingsPage extends StatelessWidget {
       body: ReorderableListView.builder(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
         itemCount: assistants.length,
-        onReorder: (oldIndex, newIndex) async {
-          if (newIndex > oldIndex) newIndex -= 1;
+        onReorderItem: (oldIndex, newIndex) async {
           // Immediately update UI for smooth experience
           final assistantProvider = context.read<AssistantProvider>();
           await assistantProvider.reorderAssistants(oldIndex, newIndex);

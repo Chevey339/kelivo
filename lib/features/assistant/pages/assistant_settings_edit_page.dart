@@ -655,8 +655,7 @@ class _AssistantTabLayoutPage extends StatelessWidget {
             child: ReorderableListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 2, 16, 24),
               itemCount: tabs.length,
-              onReorder: (oldIndex, newIndex) async {
-                if (newIndex > oldIndex) newIndex -= 1;
+              onReorderItem: (oldIndex, newIndex) async {
                 final next = tabs.map((tab) => tab.id).toList();
                 final moved = next.removeAt(oldIndex);
                 next.insert(newIndex, moved);

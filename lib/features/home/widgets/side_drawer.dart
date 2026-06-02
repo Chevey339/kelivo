@@ -3180,8 +3180,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
             },
           );
         },
-        onReorder: (oldIndex, newIndex) async {
-          if (newIndex > oldIndex) newIndex -= 1;
+        onReorderItem: (oldIndex, newIndex) async {
           try {
             await context.read<AssistantProvider>().reorderAssistantsWithin(
               subsetIds: subsetIds,

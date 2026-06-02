@@ -610,8 +610,7 @@ class _PromptTabState extends State<_PromptTab> {
                     );
                   },
                   itemCount: items.length,
-                  onReorder: (oldIndex, newIndex) async {
-                    if (newIndex > oldIndex) newIndex -= 1;
+                  onReorderItem: (oldIndex, newIndex) async {
                     final list = List<PresetMessage>.of(a.presetMessages);
                     final item = list.removeAt(oldIndex);
                     list.insert(newIndex, item);

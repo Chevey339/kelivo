@@ -147,8 +147,7 @@ class DesktopMcpPane extends StatelessWidget {
                       ),
                     );
                   },
-                  onReorder: (oldIndex, newIndex) async {
-                    if (newIndex > oldIndex) newIndex -= 1;
+                  onReorderItem: (oldIndex, newIndex) async {
                     await context.read<McpProvider>().reorderServers(
                       oldIndex,
                       newIndex,

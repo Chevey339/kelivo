@@ -203,7 +203,7 @@ class _ProviderGroupsPageState extends State<ProviderGroupsPage> {
                   child: child,
                 );
               },
-              onReorder: (oldIndex, newIndex) async {
+              onReorderItem: (oldIndex, newIndex) async {
                 await context
                     .read<SettingsProvider>()
                     .reorderProviderGroupsWithUngrouped(oldIndex, newIndex);

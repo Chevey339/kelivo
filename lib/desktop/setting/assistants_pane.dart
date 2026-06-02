@@ -49,8 +49,7 @@ class _DesktopAssistantsBody extends StatelessWidget {
                     buildDefaultDragHandles: false,
                     padding: EdgeInsets.zero,
                     itemCount: assistants.length,
-                    onReorder: (oldIndex, newIndex) async {
-                      if (newIndex > oldIndex) newIndex -= 1;
+                    onReorderItem: (oldIndex, newIndex) async {
                       await context.read<AssistantProvider>().reorderAssistants(
                         oldIndex,
                         newIndex,

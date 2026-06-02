@@ -192,8 +192,7 @@ class _DesktopInstructionInjectionPaneState
                           ),
                         );
                       },
-                      onReorder: (oldIndex, newIndex) async {
-                        if (newIndex > oldIndex) newIndex -= 1;
+                      onReorderItem: (oldIndex, newIndex) async {
                         await context
                             .read<InstructionInjectionProvider>()
                             .reorderWithinGroup(

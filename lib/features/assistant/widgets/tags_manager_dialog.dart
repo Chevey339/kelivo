@@ -226,8 +226,7 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
                 child: child,
               );
             },
-            onReorder: (oldIndex, newIndex) async {
-              if (newIndex > oldIndex) newIndex -= 1;
+            onReorderItem: (oldIndex, newIndex) async {
               await context.read<TagProvider>().reorderTags(oldIndex, newIndex);
             },
             itemBuilder: (ctx, i) {

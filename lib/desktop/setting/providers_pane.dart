@@ -410,7 +410,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                                   _groupReorderRestoreStartTimer?.cancel();
                                 }
                               },
-                              onReorder: (oldIndex, newIndex) async {
+                              onReorderItem: (oldIndex, newIndex) async {
                                 if (_searchQuery.isNotEmpty) {
                                   return;
                                 }
@@ -631,9 +631,8 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                               buildDefaultDragHandles: false,
                               padding: EdgeInsets.zero,
                               itemCount: filteredOrdered.length,
-                              onReorder: (oldIndex, newIndex) async {
+                              onReorderItem: (oldIndex, newIndex) async {
                                 if (_searchQuery.isNotEmpty) return;
-                                if (newIndex > oldIndex) newIndex -= 1;
                                 final list =
                                     List<({String name, String key})>.from(
                                       ordered,
@@ -5347,7 +5346,7 @@ class _DesktopProviderGroupsDialogState
                           child: child,
                         );
                       },
-                      onReorder: (oldIndex, newIndex) async {
+                      onReorderItem: (oldIndex, newIndex) async {
                         await context
                             .read<SettingsProvider>()
                             .reorderProviderGroupsWithUngrouped(
