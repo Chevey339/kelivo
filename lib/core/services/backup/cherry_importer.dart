@@ -606,6 +606,25 @@ class CherryImporter {
     return out.length;
   }
 
+  /// Decode a DOS date/time packed value (from ZIP entry's lastModTime) into
+  /// a [DateTime]. Returns null when the date portion is zero (unset).
+  static DateTime? _decodeDosDateTime(int packed) {
+    final dosDate = packed >> 16;
+    final dosTime = packed & 0xFFFF;
+    if (dosDate == 0) return null;
+    final year = ((dosDate >> 9) & 0x7f) + 1980;
+    final month = (dosDate >> 5) & 0x0f;
+    final day = dosDate & 0x1f;
+    final hour = (dosTime >> 11) & 0x1f;
+    final minute = (dosTime >> 5) & 0x3f;
+    final second = (dosTime & 0x1f) * 2;
+    try {
+      return DateTime(year, month, day, hour, minute, second);
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<Map<String, String>> _materializeFiles(
     Map<String, Map<String, dynamic>> filesById,
     Set<String> usedIds, {
@@ -776,6 +795,10 @@ class CherryImporter {
               final entry = filesIndexByRel[key]!;
               final bytes = entry.content as List<int>;
               await File(outPath).writeAsBytes(bytes);
+              final dt = _decodeDosDateTime(entry.lastModTime);
+              if (dt != null) {
+                await File(outPath).setLastModified(dt);
+              }
               result[id] = outPath;
               done = true;
             }
@@ -785,6 +808,7 @@ class CherryImporter {
               final src = diskFilesIndexByRel[key]!;
               final bytes = await File(src).readAsBytes();
               await File(outPath).writeAsBytes(bytes);
+              await File(outPath).setLastModified(await File(src).lastModified());
               result[id] = outPath;
               done = true;
             }
@@ -812,6 +836,10 @@ class CherryImporter {
             final entry = filesIndexByBase[base]!;
             final bytes = entry.content as List<int>;
             await File(outPath).writeAsBytes(bytes);
+            final dt = _decodeDosDateTime(entry.lastModTime);
+            if (dt != null) {
+              await File(outPath).setLastModified(dt);
+            }
             result[id] = outPath;
             done = true;
           }
@@ -821,6 +849,7 @@ class CherryImporter {
             final src = diskFilesIndexByBase[base]!;
             final bytes = await File(src).readAsBytes();
             await File(outPath).writeAsBytes(bytes);
+            await File(outPath).setLastModified(await File(src).lastModified());
             result[id] = outPath;
             done = true;
           }
@@ -843,6 +872,10 @@ class CherryImporter {
           final entry = filesIndexById[id]!;
           final bytes = entry.content as List<int>;
           await File(outPath).writeAsBytes(bytes);
+          final dt = _decodeDosDateTime(entry.lastModTime);
+          if (dt != null) {
+            await File(outPath).setLastModified(dt);
+          }
           result[id] = outPath;
           continue;
         }
@@ -850,6 +883,10 @@ class CherryImporter {
           final entry = filesIndexByBase[idPlus]!;
           final bytes = entry.content as List<int>;
           await File(outPath).writeAsBytes(bytes);
+          final dt = _decodeDosDateTime(entry.lastModTime);
+          if (dt != null) {
+            await File(outPath).setLastModified(dt);
+          }
           result[id] = outPath;
           continue;
         }
@@ -857,6 +894,7 @@ class CherryImporter {
           final src = diskFilesIndexById[id]!;
           final bytes = await File(src).readAsBytes();
           await File(outPath).writeAsBytes(bytes);
+          await File(outPath).setLastModified(await File(src).lastModified());
           result[id] = outPath;
           continue;
         }
@@ -865,6 +903,7 @@ class CherryImporter {
           final src = diskFilesIndexByBase[idPlus]!;
           final bytes = await File(src).readAsBytes();
           await File(outPath).writeAsBytes(bytes);
+          await File(outPath).setLastModified(await File(src).lastModified());
           result[id] = outPath;
           continue;
         }
