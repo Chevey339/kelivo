@@ -1813,6 +1813,54 @@ A-->B
   });
 
   testWidgets(
+    'MarkdownWithCodeHighlight keeps escaped and math pipes inside table cells',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+| 项目 | 左对齐 | 居中 | 右对齐 |
+| :--- | :--- | :---: | ---: |
+| 普通文本 | alpha | beta | 123 |
+| 粗斜代码 | **bold** | *italic* | `code` |
+| 转义竖线 | a \| b | c \| d | 456 |
+| 行内数学 | $a+b$ | $\|x\|=1$ | $P(A\mid B)$ |
+'''),
+      );
+      await tester.pump();
+
+      final table = tester.widget<Table>(find.byType(Table).first);
+      expect(table.children, hasLength(5));
+      expect(table.children.map((row) => row.children.length), everyElement(4));
+      expect(_findMathWidget(), findsNWidgets(3));
+
+      final richTextPlainText = tester
+          .widgetList<RichText>(
+            find.descendant(
+              of: find.byType(Table),
+              matching: find.byType(RichText),
+            ),
+          )
+          .map((widget) => widget.text.toPlainText());
+      final selectablePlainText = tester
+          .widgetList<SelectableText>(
+            find.descendant(
+              of: find.byType(Table),
+              matching: find.byType(SelectableText),
+            ),
+          )
+          .map((widget) => widget.textSpan?.toPlainText() ?? widget.data ?? '');
+      final tableText = [
+        ...richTextPlainText,
+        ...selectablePlainText,
+      ].join('\n');
+
+      expect(tableText, contains('a | b'));
+      expect(tableText, contains('c | d'));
+      expect(tableText, isNot(contains(r'a \| b')));
+      expect(tableText, isNot(contains(r'c \| d')));
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps dollar signs inside table code',
     (tester) async {
       _overrideMarkdownTablePlatform(TargetPlatform.android);

@@ -153,6 +153,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     if (cbIdx != -1) components[cbIdx] = ModernCheckBoxMd();
     final rbIdx = components.indexWhere((c) => c is RadioButtonMd);
     if (rbIdx != -1) components[rbIdx] = ModernRadioMd();
+    final tableIdx = components.indexWhere((c) => c is TableMd);
+    if (tableIdx != -1) components[tableIdx] = EscapeAwareTableMd();
     // Prepend custom renderers in priority order (fence first)
     // Temporarily disable custom bold label line transformer to avoid
     // interfering with block parsing for complex documents.
@@ -1022,8 +1024,75 @@ String _streamingTableDividerFor(int columnCount) =>
 List<String> _splitMarkdownTableLine(String line) {
   var trimmed = line.trim();
   if (trimmed.startsWith('|')) trimmed = trimmed.substring(1);
-  if (trimmed.endsWith('|')) trimmed = trimmed.substring(0, trimmed.length - 1);
-  return trimmed.split('|');
+  if (trimmed.endsWith('|') && !_isEscaped(trimmed, trimmed.length - 1)) {
+    trimmed = trimmed.substring(0, trimmed.length - 1);
+  }
+
+  final cells = <String>[];
+  final cell = StringBuffer();
+  var dollarMathEnd = -1;
+  var parenMathEnd = -1;
+
+  for (var i = 0; i < trimmed.length; i++) {
+    final ch = trimmed.codeUnitAt(i);
+
+    if (i > dollarMathEnd && i > parenMathEnd) {
+      if (ch == 0x24 && !_isEscaped(trimmed, i)) {
+        final close = _findClosingDollarMathInTableCell(trimmed, i + 1);
+        if (close != -1) dollarMathEnd = close;
+      } else if (ch == 0x5C && i + 1 < trimmed.length) {
+        final next = trimmed.codeUnitAt(i + 1);
+        if (next == 0x28) {
+          final close = _findClosingParenMathInTableCell(trimmed, i + 2);
+          if (close != -1) parenMathEnd = close + 1;
+        }
+      }
+    }
+
+    if (ch == 0x7C &&
+        !_isEscaped(trimmed, i) &&
+        i > dollarMathEnd &&
+        i > parenMathEnd) {
+      cells.add(cell.toString());
+      cell.clear();
+      continue;
+    }
+
+    cell.writeCharCode(ch);
+  }
+  cells.add(cell.toString());
+  return cells;
+}
+
+int _findClosingDollarMathInTableCell(String input, int start) {
+  final end = math.min(input.length, start + _maxInlineMathBodyLength + 1);
+  for (var i = start; i < end; i++) {
+    final ch = input.codeUnitAt(i);
+    if (ch == 0x0A) return -1;
+    if (ch == 0x5C) {
+      i++;
+      continue;
+    }
+    if (ch != 0x24) continue;
+
+    final body = input.substring(start, i);
+    if (_isValidDollarMathBody(body, allowUnescapedPipes: true) &&
+        _canCloseDollarMath(input, i)) {
+      return i;
+    }
+    return -1;
+  }
+  return -1;
+}
+
+int _findClosingParenMathInTableCell(String input, int start) {
+  final end = math.min(input.length, start + _maxInlineMathBodyLength + 2);
+  for (var i = start; i < end - 1; i++) {
+    final ch = input.codeUnitAt(i);
+    if (ch == 0x0A) return -1;
+    if (ch == 0x5C && input.codeUnitAt(i + 1) == 0x29) return i;
+  }
+  return -1;
 }
 
 String _completeStreamingTableRow(String line, int columnCount) {
@@ -4642,6 +4711,84 @@ class ModernRadioMd extends BlockMd {
   }
 }
 
+class EscapeAwareTableMd extends TableMd {
+  @override
+  Widget build(
+    BuildContext context,
+    String text,
+    final GptMarkdownConfig config,
+  ) {
+    final value = text
+        .trim()
+        .split('\n')
+        .where((line) => line.trim().isNotEmpty)
+        .map<Map<int, String>>(
+          (line) => _splitMarkdownTableLine(line.trim()).asMap(),
+        )
+        .toList();
+
+    if (value.isEmpty) return Text('', style: config.style);
+
+    final hasHeader = value.length >= 2;
+    final columnAlignments = <TextAlign>[];
+
+    if (hasHeader) {
+      final separatorRow = value[1];
+      for (var index = 0; index < separatorRow.length; index++) {
+        final separator = (separatorRow[index] ?? '').trim();
+        final hasLeftColon = separator.startsWith(':');
+        final hasRightColon = separator.endsWith(':');
+
+        if (hasLeftColon && hasRightColon) {
+          columnAlignments.add(TextAlign.center);
+        } else if (hasRightColon) {
+          columnAlignments.add(TextAlign.right);
+        } else {
+          columnAlignments.add(TextAlign.left);
+        }
+      }
+    }
+
+    var maxCol = 0;
+    for (final row in value) {
+      if (maxCol < row.length) maxCol = row.length;
+    }
+    if (maxCol == 0) return Text('', style: config.style);
+
+    while (columnAlignments.length < maxCol) {
+      columnAlignments.add(TextAlign.left);
+    }
+
+    final tableBuilder = config.tableBuilder;
+    if (tableBuilder == null) {
+      return super.build(context, text, config);
+    }
+
+    final customTable = List<CustomTableRow?>.generate(value.length, (
+      rowIndex,
+    ) {
+      if (hasHeader && rowIndex == 1) return null;
+      final row = value[rowIndex];
+      if (row.isEmpty) return null;
+
+      final fields = List<CustomTableField>.generate(maxCol, (fieldIndex) {
+        return CustomTableField(
+          data: row[fieldIndex] ?? '',
+          alignment: columnAlignments[fieldIndex],
+        );
+      });
+      return CustomTableRow(isHeader: rowIndex == 0, fields: fields);
+    }).nonNulls.toList();
+
+    return tableBuilder(
+      context,
+      customTable,
+      config.style ?? const TextStyle(),
+      config,
+    );
+  }
+}
+
 // Prevent link regex from spanning across lines (dotAll=true in engine).
 class LineSafeLinkMd extends ATagMd {
   @override
@@ -4704,7 +4851,7 @@ class BackslashEscapeMd extends InlineMd {
   // CommonMark escape set (subset), excluding parentheses to keep LaTeX intact.
   // Matches a backslash followed by one escapable punctuation character.
   // Include $ so \$ in regular text renders as literal dollar sign.
-  RegExp get exp => RegExp(r"\\([\\`*_{}\[\]#+\-.!$])");
+  RegExp get exp => RegExp(r"\\([\\`*_{}\[\]#+\-.!$|])");
 
   @override
   InlineSpan span(BuildContext context, String text, GptMarkdownConfig config) {
