@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import '../../../l10n/app_localizations.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/services/haptics.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Toolbar for selection mode with cancel and confirm buttons.
 class SelectionToolbar extends StatelessWidget {
@@ -143,7 +144,7 @@ class _GlassCapsuleButtonState extends State<GlassCapsuleButton> {
                     style: TextStyle(
                       color: widget.color,
                       fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                 ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../theme/app_font_weights.dart';
 
 class StatsSectionCard extends StatelessWidget {
   const StatsSectionCard({
@@ -39,7 +40,7 @@ class StatsSectionCard extends StatelessWidget {
                     style: TextStyle(
                       color: cs.onSurface.withValues(alpha: 0.9),
                       fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                     ),
                   ),
                 ),

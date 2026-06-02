@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
@@ -65,7 +66,7 @@ class ChatSelectionAppBar extends StatelessWidget
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 16,
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFontWeights.semibold,
           color: cs.onSurface,
         ),
       ),
@@ -87,7 +88,7 @@ class ChatSelectionAppBar extends StatelessWidget
                     l10n.modelFetchInvertTooltip,
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeights.medium,
                       color: cs.onSurface.withValues(alpha: 0.9),
                     ),
                   ),
@@ -118,7 +119,7 @@ class ChatSelectionAppBar extends StatelessWidget
                         l10n.storageSpaceSelectAll,
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                           color: cs.onSurface,
                         ),
                       ),

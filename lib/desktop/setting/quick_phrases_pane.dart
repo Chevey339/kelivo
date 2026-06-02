@@ -6,6 +6,7 @@ import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../core/models/quick_phrase.dart';
 import '../../core/providers/quick_phrase_provider.dart';
+import '../../theme/app_font_weights.dart';
 
 class DesktopQuickPhrasesPane extends StatefulWidget {
   const DesktopQuickPhrasesPane({super.key});
@@ -52,7 +53,7 @@ class _DesktopQuickPhrasesPaneState extends State<DesktopQuickPhrasesPane> {
                             l10n.quickPhraseGlobalTitle,
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w400,
+                              fontWeight: AppFontWeights.regular,
                               color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
@@ -229,9 +230,9 @@ class _QuickPhraseCardState extends State<_QuickPhraseCard> {
                       widget.phrase.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -315,9 +316,9 @@ class _QuickPhraseEditDialogState extends State<_QuickPhraseEditDialog> {
                       Expanded(
                         child: Text(
                           widget.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -471,7 +472,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
               widget.label,
               style: TextStyle(
                 color: textColor,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 fontSize: widget.dense ? 13 : 14,
               ),
             ),

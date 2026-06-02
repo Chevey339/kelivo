@@ -12,6 +12,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
+import '../../../theme/app_font_weights.dart';
 
 class AssistantRegexTab extends StatefulWidget {
   const AssistantRegexTab({super.key, required this.assistantId});
@@ -149,7 +150,7 @@ class _AssistantRegexTabState extends State<AssistantRegexTab> {
                         l10n.assistantEditAddRegexButton,
                         style: TextStyle(
                           color: cs.primary,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                     ],
@@ -322,9 +323,9 @@ class _AssistantRegexDesktopPaneState extends State<AssistantRegexDesktopPane> {
                     children: [
                       Text(
                         l10n.assistantEditPageRegexTab,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -358,7 +359,7 @@ class _AssistantRegexDesktopPaneState extends State<AssistantRegexDesktopPane> {
                         l10n.assistantEditAddRegexButton,
                         style: TextStyle(
                           color: cs.primary,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                     ],
@@ -487,9 +488,9 @@ class _RegexRuleCardState extends State<_RegexRuleCard> {
                             : widget.rule.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                     ),
@@ -528,7 +529,7 @@ class _RegexRuleCardState extends State<_RegexRuleCard> {
                             l10n.assistantRegexDeleteButton,
                             style: TextStyle(
                               color: cs.error,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: AppFontWeights.emphasis,
                             ),
                           ),
                         ],
@@ -576,7 +577,7 @@ class _RegexRuleCardState extends State<_RegexRuleCard> {
               p,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 color: cs.primary,
               ),
             ),
@@ -775,9 +776,9 @@ Future<_RegexFormData?> _showRegexBottomSheet(
                                   rule == null
                                       ? l10n.assistantRegexAddTitle
                                       : l10n.assistantRegexEditTitle,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 15,
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: AppFontWeights.emphasis,
                                   ),
                                 ),
                               ),
@@ -797,7 +798,7 @@ Future<_RegexFormData?> _showRegexBottomSheet(
                                     : l10n.assistantRegexSaveAction,
                                 style: TextStyle(
                                   color: cs.primary,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: AppFontWeights.emphasis,
                                 ),
                               ),
                             ),
@@ -829,9 +830,9 @@ Future<_RegexFormData?> _showRegexBottomSheet(
                             const SizedBox(height: 16),
                             Text(
                               l10n.assistantRegexScopeLabel,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: AppFontWeights.emphasis,
                               ),
                             ),
                             const SizedBox(height: 10),
@@ -994,9 +995,9 @@ Future<_RegexFormData?> _showRegexDialog(
                                 rule == null
                                     ? l10n.assistantRegexAddTitle
                                     : l10n.assistantRegexEditTitle,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: AppFontWeights.emphasis,
                                 ),
                               ),
                             ),
@@ -1035,9 +1036,9 @@ Future<_RegexFormData?> _showRegexDialog(
                             const SizedBox(height: 16),
                             Text(
                               l10n.assistantRegexScopeLabel,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: AppFontWeights.emphasis,
                               ),
                             ),
                             const SizedBox(height: 10),
@@ -1131,7 +1132,7 @@ Future<_RegexFormData?> _showRegexDialog(
                               l10n.assistantRegexCancelButton,
                               style: TextStyle(
                                 color: cs.onSurface.withValues(alpha: 0.8),
-                                fontWeight: FontWeight.w600,
+                                fontWeight: AppFontWeights.semibold,
                               ),
                             ),
                           ),
@@ -1151,7 +1152,7 @@ Future<_RegexFormData?> _showRegexDialog(
                                   : l10n.assistantRegexSaveAction,
                               style: TextStyle(
                                 color: cs.primary,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: AppFontWeights.emphasis,
                               ),
                             ),
                           ),
@@ -1274,7 +1275,7 @@ class _ScopeChoiceCardState extends State<_ScopeChoiceCard> {
             widget.label,
             style: TextStyle(
               fontSize: 13,
-              fontWeight: FontWeight.w700,
+              fontWeight: AppFontWeights.emphasis,
               color: fg,
             ),
           ),

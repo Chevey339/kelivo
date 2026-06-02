@@ -9,6 +9,7 @@ import '../../core/providers/mcp_provider.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../theme/app_font_weights.dart';
 
 Future<void> showDesktopMcpJsonEditDialog(BuildContext context) async {
   final cs = Theme.of(context).colorScheme;
@@ -116,9 +117,9 @@ class _DesktopMcpJsonEditDialogState extends State<_DesktopMcpJsonEditDialog> {
                   children: [
                     Text(
                       AppLocalizations.of(context)!.mcpJsonEditTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                     const Spacer(),
@@ -172,10 +173,7 @@ class _DesktopMcpJsonEditDialogState extends State<_DesktopMcpJsonEditDialog> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     _error!,
-                    style: const TextStyle(
-                      color: Colors.redAccent,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.redAccent, fontSize: 12),
                   ),
                 ),
               ),

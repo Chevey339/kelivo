@@ -13,6 +13,7 @@ import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/emoji_text.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../theme/app_font_weights.dart';
 
 // Show an assistant picker for moving a topic.
 // - Mobile: bottom sheet
@@ -71,9 +72,9 @@ Future<String?> showAssistantMoveSelector(
                       child: Text(
                         l10n.sideDrawerChooseAssistantTitle,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                     ),
@@ -143,9 +144,9 @@ Future<String?> showAssistantMoveSelector(
                                     l10n.sideDrawerChooseAssistantTitle,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 13.5,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: AppFontWeights.emphasis,
                                     ),
                                   ),
                                 ),
@@ -272,7 +273,7 @@ Widget _assistantInitial(ColorScheme cs, String name, double size) {
       style: TextStyle(
         color: cs.primary,
         fontSize: size * 0.42,
-        fontWeight: FontWeight.w700,
+        fontWeight: AppFontWeights.emphasis,
       ),
     ),
   );
@@ -300,9 +301,9 @@ Widget _assistantRow(BuildContext context, Assistant a) {
             Expanded(
               child: Text(
                 a.name,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: AppFontWeights.medium,
                 ),
               ),
             ),
@@ -395,9 +396,9 @@ class _DeskAssistantRowState extends State<_DeskAssistantRow> {
                   widget.assistant.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
               ),

@@ -8,6 +8,7 @@ import '../../../icons/lucide_adapter.dart' as lucide;
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
+import '../../../theme/app_font_weights.dart';
 
 String backupReminderFrequencyLabel(AppLocalizations l10n, int days) {
   return switch (days) {
@@ -233,7 +234,7 @@ class _BackupReminderTimeWheelPanelState
                       selectedTime,
                       style: TextStyle(
                         fontSize: widget.isDesktop ? 30 : 28,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                         letterSpacing: 0,
                         color: cs.primary,
                       ),
@@ -269,7 +270,7 @@ class _BackupReminderTimeWheelPanelState
             l10n.backupReminderTimeTitle,
             style: TextStyle(
               fontSize: 17,
-              fontWeight: FontWeight.w700,
+              fontWeight: AppFontWeights.emphasis,
               color: cs.onSurface,
             ),
           ),
@@ -285,7 +286,7 @@ class _BackupReminderTimeWheelPanelState
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 17,
-            fontWeight: FontWeight.w700,
+            fontWeight: AppFontWeights.emphasis,
             color: cs.onSurface.withValues(alpha: 0.92),
           ),
         ),
@@ -334,7 +335,7 @@ class _BackupReminderTimeWheelPanelState
                     style: TextStyle(
                       fontSize: 24,
                       height: 1,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                       color: cs.onSurface.withValues(alpha: 0.62),
                     ),
                   ),
@@ -372,7 +373,7 @@ class _BackupReminderTimeWheelPanelState
           pickerTextStyle: TextStyle(
             color: cs.onSurface,
             fontSize: 22,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeights.semibold,
             letterSpacing: 0,
           ),
         ),
@@ -395,7 +396,9 @@ class _BackupReminderTimeWheelPanelState
               index.toString().padLeft(2, '0'),
               style: TextStyle(
                 fontSize: selected ? 23 : 21,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                fontWeight: selected
+                    ? AppFontWeights.emphasis
+                    : AppFontWeights.medium,
                 color: selected
                     ? cs.primary
                     : cs.onSurface.withValues(alpha: 0.72),
@@ -466,7 +469,7 @@ class _BackupReminderTimeWheelPanelState
                   style: TextStyle(
                     color: cs.onSurface.withValues(alpha: 0.74),
                     fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
               ),
@@ -488,7 +491,7 @@ class _BackupReminderTimeWheelPanelState
                   style: TextStyle(
                     color: cs.onSurface.withValues(alpha: 0.9),
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: AppFontWeights.heavy,
                   ),
                 ),
               ),

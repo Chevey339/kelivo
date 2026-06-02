@@ -8,6 +8,7 @@ import '../../../utils/avatar_cache.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/emoji_text.dart';
+import '../../../theme/app_font_weights.dart';
 
 class ProviderAvatar extends StatelessWidget {
   const ProviderAvatar({
@@ -142,7 +143,7 @@ class ProviderAvatar extends StatelessWidget {
           name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
           style: TextStyle(
             color: cs.primary,
-            fontWeight: FontWeight.w700,
+            fontWeight: AppFontWeights.emphasis,
             fontSize: size * 0.42,
           ),
         ),

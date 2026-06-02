@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -399,8 +400,8 @@ class _DesktopSelectOptionTileState extends State<_DesktopSelectOptionTile> {
                       fontSize: 14,
                       color: cs.onSurface.withValues(alpha: 0.88),
                       fontWeight: widget.selected
-                          ? FontWeight.w600
-                          : FontWeight.w400,
+                          ? AppFontWeights.semibold
+                          : AppFontWeights.regular,
                     ),
                   ),
                 ),

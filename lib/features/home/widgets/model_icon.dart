@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../utils/brand_assets.dart';
+import '../../../theme/app_font_weights.dart';
 
 /// Widget that displays the current model's icon.
 ///
@@ -59,7 +60,7 @@ class CurrentModelIcon extends StatelessWidget {
         modelId!.isNotEmpty ? modelId!.characters.first.toUpperCase() : '?',
         style: TextStyle(
           color: cs.primary,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           fontSize: size * 0.43,
         ),
       );

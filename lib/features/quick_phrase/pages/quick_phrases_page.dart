@@ -7,6 +7,7 @@ import '../../../core/models/quick_phrase.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/services/haptics.dart';
+import '../../../theme/app_font_weights.dart';
 
 class QuickPhrasesPage extends StatefulWidget {
   const QuickPhrasesPage({super.key, this.assistantId});
@@ -211,7 +212,7 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
                                         l10n.quickPhraseDeleteButton,
                                         style: TextStyle(
                                           color: cs.error,
-                                          fontWeight: FontWeight.w700,
+                                          fontWeight: AppFontWeights.emphasis,
                                         ),
                                       ),
                                     ],
@@ -265,9 +266,10 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
                                                   maxLines: 1,
                                                   overflow:
                                                       TextOverflow.ellipsis,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 15,
-                                                    fontWeight: FontWeight.w600,
+                                                    fontWeight:
+                                                        AppFontWeights.semibold,
                                                   ),
                                                 ),
                                               ),
@@ -382,9 +384,9 @@ class _QuickPhraseEditSheetState extends State<_QuickPhraseEditSheet> {
                 widget.phrase == null
                     ? l10n.quickPhraseAddTitle
                     : l10n.quickPhraseEditTitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),
@@ -612,7 +614,10 @@ class _IosOutlineButtonState extends State<_IosOutlineButton> {
           ),
           child: Text(
             widget.label,
-            style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: cs.primary,
+              fontWeight: AppFontWeights.semibold,
+            ),
           ),
         ),
       ),
@@ -660,7 +665,10 @@ class _IosFilledButtonState extends State<_IosFilledButton> {
           ),
           child: Text(
             widget.label,
-            style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: cs.onPrimary,
+              fontWeight: AppFontWeights.semibold,
+            ),
           ),
         ),
       ),

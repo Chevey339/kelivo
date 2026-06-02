@@ -16,6 +16,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/haptics.dart';
 import 'package:file_picker/file_picker.dart';
 import 'google_fonts_picker_page.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 enum _FontTarget { app, code }
 
@@ -715,7 +716,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                               tooltipBackgroundColor: cs.primary,
                               tooltipTextStyle: TextStyle(
                                 color: cs.onPrimary,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: AppFontWeights.semibold,
                               ),
                               activeTickColor: cs.onSurface.withValues(
                                 alpha: isDark ? 0.45 : 0.35,
@@ -872,7 +873,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                               tooltipBackgroundColor: cs.primary,
                               tooltipTextStyle: TextStyle(
                                 color: cs.onPrimary,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: AppFontWeights.semibold,
                               ),
                               activeTickColor: cs.onSurface.withValues(
                                 alpha: isDark ? 0.45 : 0.35,
@@ -1010,7 +1011,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                               tooltipBackgroundColor: cs.primary,
                               tooltipTextStyle: TextStyle(
                                 color: cs.onPrimary,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: AppFontWeights.semibold,
                               ),
                               activeTickColor: cs.onSurface.withValues(
                                 alpha: isDark ? 0.45 : 0.35,
@@ -1153,7 +1154,7 @@ Widget _noticeCard(
                 style: TextStyle(
                   color: cs.onSurface,
                   fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
               const SizedBox(height: 4),

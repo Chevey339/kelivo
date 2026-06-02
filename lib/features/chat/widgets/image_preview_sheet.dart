@@ -17,6 +17,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/clipboard_images.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import 'dart:ui' as ui;
+import '../../../theme/app_font_weights.dart';
 
 const int _previewBlankTrimPreservePadding = 48;
 const int _previewBlankAlphaTolerance = 8;
@@ -303,9 +304,9 @@ class _ImagePreviewDesktopDialogState
                     children: [
                       Text(
                         l10n.assistantEditPreviewTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                       const Spacer(),
@@ -1227,7 +1228,8 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                                               l10n.imagePreviewSheetSaveImage,
                                               style: TextStyle(
                                                 color: cs.onPrimary,
-                                                fontWeight: FontWeight.w600,
+                                                fontWeight:
+                                                    AppFontWeights.semibold,
                                               ),
                                             ),
                                           ],

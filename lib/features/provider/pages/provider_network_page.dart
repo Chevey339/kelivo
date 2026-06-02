@@ -5,6 +5,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class ProviderNetworkPage extends StatefulWidget {
   const ProviderNetworkPage({
@@ -147,7 +148,7 @@ class _ProviderNetworkPageState extends State<ProviderNetworkPage> {
   }) {
     return Row(
       children: [
-        Expanded(child: Text(title, style: const TextStyle(fontSize: 15))),
+        Expanded(child: Text(title, style: TextStyle(fontSize: 15))),
         IosSwitch(value: value, onChanged: onChanged),
       ],
     );
@@ -362,7 +363,9 @@ class _ProxyTypeSheetField extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 15,
                       color: cs.onSurface.withValues(alpha: 0.92),
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      fontWeight: selected
+                          ? AppFontWeights.semibold
+                          : AppFontWeights.medium,
                     ),
                   ),
                 ),

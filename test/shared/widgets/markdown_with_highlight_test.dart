@@ -2824,6 +2824,23 @@ press5
     expect(find.text('链接'), findsOneWidget);
   });
 
+  testWidgets('MarkdownWithCodeHighlight normalizes strong weight on Android', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(_markdownHarness('这是 **粗体** 文本'));
+      await tester.pump();
+
+      final spans = _resolvedTextSpansFromRichText(tester);
+      final strongSpan = spans.singleWhere((span) => span.text == '粗体');
+
+      expect(strongSpan.style.fontWeight, FontWeight.w500);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('MarkdownWithCodeHighlight keeps p tag spacing compact', (
     tester,
   ) async {

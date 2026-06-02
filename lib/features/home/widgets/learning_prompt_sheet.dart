@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/models/instruction_injection.dart';
 import '../../../l10n/app_localizations.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Bottom sheet for editing the active instruction injection prompt.
 ///
@@ -64,7 +65,10 @@ class _LearningPromptSheetState extends State<LearningPromptSheet> {
             const SizedBox(height: 12),
             Text(
               l10n.bottomToolsSheetPrompt,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: AppFontWeights.semibold,
+              ),
             ),
             const SizedBox(height: 8),
             TextField(

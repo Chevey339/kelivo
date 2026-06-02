@@ -13,6 +13,7 @@ import '../shared/widgets/emoji_text.dart';
 import '../shared/widgets/emoji_picker_dialog.dart';
 import '../shared/widgets/snackbar.dart';
 import '../utils/sandbox_path_resolver.dart';
+import '../theme/app_font_weights.dart';
 
 Future<void> showUserProfileDialog(BuildContext context) async {
   await showGeneralDialog<void>(
@@ -227,7 +228,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
         letter,
         style: TextStyle(
           color: cs.primary,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           decoration: TextDecoration.none,
           fontSize: size * 0.44,
         ),
@@ -377,7 +378,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
                       color: valid(value)
                           ? cs.primary
                           : cs.onSurface.withValues(alpha: 0.38),
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                 ),
@@ -539,7 +540,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
                           color: valid(value)
                               ? cs.primary
                               : cs.onSurface.withValues(alpha: 0.38),
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                     ),

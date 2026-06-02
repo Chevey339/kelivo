@@ -20,6 +20,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Mobile layout scaffold for the home page
 /// This widget handles only the structural layout - AppBar, drawer, body structure
@@ -191,7 +192,7 @@ class HomeMobileScaffold extends StatelessWidget {
                         text: title,
                         style: TextStyle(
                           fontSize: isDesktopPlatform ? 14 : 16,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: AppFontWeights.medium,
                         ),
                       ),
                       if (providerName != null && modelDisplay != null)
@@ -207,7 +208,7 @@ class HomeMobileScaffold extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: cs.onSurface.withValues(alpha: 0.6),
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: AppFontWeights.medium,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -228,7 +229,7 @@ class HomeMobileScaffold extends StatelessWidget {
                   text: title,
                   style: TextStyle(
                     fontSize: isDesktopPlatform ? 14 : 16,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: AppFontWeights.medium,
                   ),
                 ),
                 if (providerName != null && modelDisplay != null)
@@ -244,7 +245,7 @@ class HomeMobileScaffold extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 11,
                             color: cs.onSurface.withValues(alpha: 0.6),
-                            fontWeight: FontWeight.w500,
+                            fontWeight: AppFontWeights.medium,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

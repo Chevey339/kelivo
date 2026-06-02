@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -117,9 +118,9 @@ class _NetworkProxyPageState extends State<NetworkProxyPage> {
                     Expanded(
                       child: Text(
                         l10n.networkProxyEnableLabel,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                     ),
@@ -226,7 +227,10 @@ class _NetworkProxyPageState extends State<NetworkProxyPage> {
             padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
             child: Text(
               l10n.networkProxyTestHeader,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: AppFontWeights.semibold,
+              ),
             ),
           ),
           _sectionCard(
@@ -263,7 +267,7 @@ class _NetworkProxyPageState extends State<NetworkProxyPage> {
                 l10n.networkProxyTestSuccess,
                 style: TextStyle(
                   color: Colors.green.shade600,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                 ),
               ),
             ),
@@ -472,9 +476,9 @@ class _ProxyTypeSheetField extends StatelessWidget {
               Expanded(
                 child: Text(
                   text,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: AppFontWeights.medium,
                   ),
                 ),
               ),
@@ -682,7 +686,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
             widget.label,
             style: TextStyle(
               color: textColor,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               fontSize: widget.dense ? 13 : 14,
             ),
           ),

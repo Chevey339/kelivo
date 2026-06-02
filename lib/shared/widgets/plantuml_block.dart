@@ -1,4 +1,5 @@
 import 'dart:ui' show PointerDeviceKind;
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -384,8 +385,8 @@ class _PlantUMLTabButtonState extends State<_PlantUMLTabButton> {
                   fontSize: 13,
                   height: 1.35,
                   fontWeight: widget.selected
-                      ? FontWeight.w600
-                      : FontWeight.w500,
+                      ? AppFontWeights.semibold
+                      : AppFontWeights.medium,
                   color: widget.selected
                       ? widget.colors.textPrimary
                       : widget.colors.textSecondary,

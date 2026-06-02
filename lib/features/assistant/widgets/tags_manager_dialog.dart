@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/tag_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../icons/lucide_adapter.dart';
+import '../../../theme/app_font_weights.dart';
 
 Future<void> showAssistantTagsManagerDialog(
   BuildContext context, {
@@ -195,9 +196,9 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
                     l10n.assistantTagsManageTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                     ),
                   ),
                 ),
@@ -349,9 +350,9 @@ class _TagCardState extends State<_TagCard> {
                   widget.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
               ),

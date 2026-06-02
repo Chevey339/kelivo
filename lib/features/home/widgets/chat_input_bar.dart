@@ -27,6 +27,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/app_directories.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class ChatInputBarController {
   _ChatInputBarState? _state;
@@ -1999,7 +2000,7 @@ class _QueuedInputBanner extends StatelessWidget {
                 Text(
                   label,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
                 if (hasPreview) ...[
@@ -2032,7 +2033,7 @@ class _QueuedInputBanner extends StatelessWidget {
               cancelLabel,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
               ),
             ),
           ),
@@ -2097,7 +2098,7 @@ class _ImageModePill extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: fg,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                             letterSpacing: 0,
                           ),
                         ),

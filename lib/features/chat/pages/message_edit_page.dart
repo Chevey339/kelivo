@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../theme/app_font_weights.dart';
 
 class MessageEditPage extends StatefulWidget {
   const MessageEditPage({super.key, required this.message});
@@ -40,7 +41,10 @@ class _MessageEditPageState extends State<MessageEditPage> {
             },
             child: Text(
               l10n.messageEditPageSave,
-              style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: cs.primary,
+                fontWeight: AppFontWeights.emphasis,
+              ),
             ),
           ),
         ],

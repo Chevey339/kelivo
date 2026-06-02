@@ -9,6 +9,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../widgets/provider_balance_badge.dart';
+import '../../../theme/app_font_weights.dart';
 
 class ProviderBalancePage extends StatefulWidget {
   const ProviderBalancePage({
@@ -170,7 +171,7 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
       key: ValueKey(status),
       style: TextStyle(
         fontSize: 13,
-        fontWeight: FontWeight.w600,
+        fontWeight: AppFontWeights.semibold,
         color: _balanceError != null
             ? cs.error
             : cs.onSurface.withValues(alpha: 0.72),
@@ -187,7 +188,7 @@ class _ProviderBalancePageState extends State<ProviderBalancePage> {
   }) {
     return Row(
       children: [
-        Expanded(child: Text(title, style: const TextStyle(fontSize: 15))),
+        Expanded(child: Text(title, style: TextStyle(fontSize: 15))),
         IosSwitch(value: value, onChanged: onChanged),
       ],
     );
@@ -385,7 +386,7 @@ class _BalanceQueryButtonState extends State<_BalanceQueryButton> {
                 widget.label,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: AppFontWeights.emphasis,
                   color: base,
                 ),
               ),

@@ -18,6 +18,7 @@ import '../widgets/stats_metric_grid.dart';
 import '../widgets/stats_rank_section.dart';
 import '../widgets/stats_section_card.dart';
 import '../widgets/stats_usage_chart.dart';
+import '../../../theme/app_font_weights.dart';
 
 class StatsPage extends StatefulWidget {
   const StatsPage({super.key, this.snapshotOverride, this.showAppBar = true});
@@ -346,7 +347,9 @@ class _RangeButton extends StatelessWidget {
                   ? cs.onSurface.withValues(alpha: 0.9)
                   : cs.onSurface.withValues(alpha: isDark ? 0.7 : 0.62),
               fontSize: 12,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+              fontWeight: selected
+                  ? AppFontWeights.emphasis
+                  : AppFontWeights.semibold,
             ),
           ),
         ),
@@ -411,7 +414,7 @@ class _CustomRangeSheetState extends State<_CustomRangeSheet> {
                   style: TextStyle(
                     color: cs.onSurface.withValues(alpha: 0.92),
                     fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
               ),
@@ -460,7 +463,7 @@ class _CustomRangeSheetState extends State<_CustomRangeSheet> {
                       style: TextStyle(
                         color: cs.onSurface.withValues(alpha: 0.74),
                         fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                   ),
@@ -483,7 +486,7 @@ class _CustomRangeSheetState extends State<_CustomRangeSheet> {
                       style: TextStyle(
                         color: cs.onSurface.withValues(alpha: 0.9),
                         fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: AppFontWeights.heavy,
                       ),
                     ),
                   ),
@@ -640,7 +643,7 @@ class _StatsDatePickerPanelState extends State<_StatsDatePickerPanel> {
                       style: TextStyle(
                         color: cs.onSurface.withValues(alpha: 0.9),
                         fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: AppFontWeights.heavy,
                       ),
                     ),
                   ),
@@ -669,7 +672,7 @@ class _StatsDatePickerPanelState extends State<_StatsDatePickerPanel> {
                         style: TextStyle(
                           color: cs.onSurface.withValues(alpha: 0.42),
                           fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                     ),
@@ -907,7 +910,9 @@ class _MonthCell extends StatelessWidget {
           style: TextStyle(
             color: cs.onSurface.withValues(alpha: enabled ? 0.82 : 0.22),
             fontSize: 12,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+            fontWeight: selected
+                ? AppFontWeights.heavy
+                : AppFontWeights.emphasis,
           ),
         ),
       ),
@@ -956,7 +961,9 @@ class _DateCell extends StatelessWidget {
           style: TextStyle(
             color: cs.onSurface.withValues(alpha: alpha),
             fontSize: 12,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            fontWeight: selected
+                ? AppFontWeights.heavy
+                : AppFontWeights.semibold,
           ),
         ),
       ),
@@ -994,7 +1001,7 @@ class _DateField extends StatelessWidget {
             style: TextStyle(
               color: cs.onSurface.withValues(alpha: 0.52),
               fontSize: 11,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
             ),
           ),
           const SizedBox(height: 5),
@@ -1003,7 +1010,7 @@ class _DateField extends StatelessWidget {
             style: TextStyle(
               color: cs.onSurface.withValues(alpha: 0.9),
               fontSize: 13,
-              fontWeight: FontWeight.w700,
+              fontWeight: AppFontWeights.emphasis,
             ),
           ),
         ],

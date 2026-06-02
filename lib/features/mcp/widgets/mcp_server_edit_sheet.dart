@@ -9,6 +9,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
+import '../../../theme/app_font_weights.dart';
 
 class _HeaderEntry {
   final TextEditingController key;
@@ -105,7 +106,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 14, fontWeight: AppFontWeights.medium),
           ),
         ),
         IosSwitch(value: value, onChanged: onChanged),
@@ -237,16 +238,16 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                   children: [
                     Text(
                       l10n.mcpServerEditSheetNameLabel,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: AppFontWeights.medium,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         _nameCtrl.text,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style: TextStyle(fontWeight: AppFontWeights.semibold),
                       ),
                     ),
                   ],
@@ -263,7 +264,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           const SizedBox(height: 10),
           Text(
             l10n.mcpServerEditSheetTransportLabel,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.medium),
           ),
           const SizedBox(height: 6),
           _transportPicker(),
@@ -290,7 +291,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           const SizedBox(height: 16),
           Text(
             l10n.mcpServerEditSheetCustomHeadersTitle,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.semibold),
           ),
           const SizedBox(height: 8),
           _headersEditor(),
@@ -452,9 +453,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                         isEdit
                             ? l10n.mcpServerEditSheetTitleEdit
                             : l10n.mcpServerEditSheetTitleAdd,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                     ),
@@ -569,9 +570,10 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                                                   children: [
                                                     Text(
                                                       tool.name,
-                                                      style: const TextStyle(
+                                                      style: TextStyle(
                                                         fontWeight:
-                                                            FontWeight.w700,
+                                                            AppFontWeights
+                                                                .emphasis,
                                                       ),
                                                     ),
                                                     if ((tool.description ?? '')
@@ -588,76 +590,67 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                                                         ),
                                                       ),
                                                     ],
-                                                    if (tool.params
+                                                    if (tool
+                                                        .params
                                                         .isNotEmpty) ...[
                                                       const SizedBox(height: 8),
                                                       Wrap(
                                                         spacing: 6,
                                                         runSpacing: 6,
-                                                        children:
-                                                            tool.params.map((
-                                                              p,
-                                                            ) {
-                                                              final color = p
-                                                                      .required
-                                                                  ? cs.primary
-                                                                  : cs.onSurface
-                                                                      .withValues(
-                                                                        alpha:
-                                                                            0.5,
-                                                                      );
-                                                              final bg = p
-                                                                      .required
-                                                                  ? cs.primary
-                                                                      .withValues(
-                                                                        alpha:
-                                                                            0.12,
-                                                                      )
-                                                                  : cs.onSurface
-                                                                      .withValues(
-                                                                        alpha:
-                                                                            0.06,
-                                                                      );
-                                                              return Container(
-                                                                padding:
-                                                                    const EdgeInsets
-                                                                        .symmetric(
+                                                        children: tool.params.map((
+                                                          p,
+                                                        ) {
+                                                          final color =
+                                                              p.required
+                                                              ? cs.primary
+                                                              : cs.onSurface
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.5,
+                                                                    );
+                                                          final bg = p.required
+                                                              ? cs.primary
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.12,
+                                                                    )
+                                                              : cs.onSurface
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.06,
+                                                                    );
+                                                          return Container(
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
                                                                   horizontal: 8,
                                                                   vertical: 2,
                                                                 ),
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  color: bg,
-                                                                  borderRadius:
-                                                                      BorderRadius
-                                                                          .circular(
+                                                            decoration: BoxDecoration(
+                                                              color: bg,
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
                                                                     999,
                                                                   ),
-                                                                  border:
-                                                                      Border
-                                                                          .all(
-                                                                    color: color
-                                                                        .withValues(
+                                                              border: Border.all(
+                                                                color: color
+                                                                    .withValues(
                                                                       alpha:
                                                                           0.5,
                                                                     ),
-                                                                  ),
-                                                                ),
-                                                                child: Text(
-                                                                  p.name,
-                                                                  style:
-                                                                      TextStyle(
-                                                                    fontSize:
-                                                                        11,
-                                                                    color:
-                                                                        color,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                                ),
-                                                              );
-                                                            }).toList(),
+                                                              ),
+                                                            ),
+                                                            child: Text(
+                                                              p.name,
+                                                              style: TextStyle(
+                                                                fontSize: 11,
+                                                                color: color,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                            ),
+                                                          );
+                                                        }).toList(),
                                                       ),
                                                     ],
                                                   ],
@@ -689,9 +682,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                                                     color: tool.needsApproval
                                                         ? cs.primary
                                                         : cs.onSurface
-                                                            .withValues(
-                                                              alpha: 0.4,
-                                                            ),
+                                                              .withValues(
+                                                                alpha: 0.4,
+                                                              ),
                                                   ),
                                                   const SizedBox(width: 6),
                                                   Expanded(
@@ -707,18 +700,14 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                                                     ),
                                                   ),
                                                   IosSwitch(
-                                                    value:
-                                                        tool.needsApproval,
-                                                    onChanged: (v) =>
-                                                        context
-                                                            .read<
-                                                              McpProvider
-                                                            >()
-                                                            .setToolNeedsApproval(
-                                                              server!.id,
-                                                              tool.name,
-                                                              v,
-                                                            ),
+                                                    value: tool.needsApproval,
+                                                    onChanged: (v) => context
+                                                        .read<McpProvider>()
+                                                        .setToolNeedsApproval(
+                                                          server!.id,
+                                                          tool.name,
+                                                          v,
+                                                        ),
                                                   ),
                                                 ],
                                               ),
@@ -941,7 +930,7 @@ class _SegChoiceBar extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: color ?? baseTextColor,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: AppFontWeights.medium,
                             ),
                           );
                         },
@@ -1067,7 +1056,7 @@ class _SegTabBar extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: color ?? baseTextColor,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: AppFontWeights.medium,
                             ),
                           );
                         },

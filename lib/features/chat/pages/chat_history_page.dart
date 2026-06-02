@@ -9,6 +9,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/models/conversation.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../theme/app_font_weights.dart';
 
 class ChatHistoryPage extends StatefulWidget {
   const ChatHistoryPage({super.key, this.assistantId});
@@ -93,7 +94,7 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
                       onPressed: () => Navigator.of(ctx).pop(true),
                       child: Text(
                         l10n.chatHistoryPageDelete,
-                        style: const TextStyle(color: Colors.red),
+                        style: TextStyle(color: Colors.red),
                       ),
                     ),
                   ],
@@ -198,7 +199,7 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
                                   )
                                 : null,
                           ),
-                          style: const TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 14),
                         ),
                       ),
               ),
@@ -223,7 +224,7 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
                               l10n.chatHistoryPagePinnedSection,
                               style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: AppFontWeights.semibold,
                                 color: cs.primary,
                               ),
                             ),
@@ -276,7 +277,7 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
               l10n.chatHistoryPageDelete,
               style: TextStyle(
                 color: cs.onErrorContainer,
-                fontWeight: FontWeight.w700,
+                fontWeight: AppFontWeights.emphasis,
               ),
             ),
             const SizedBox(width: 8),
@@ -352,9 +353,9 @@ class _ConversationCard extends StatelessWidget {
                         conversation.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -442,7 +443,7 @@ class _PinButton extends StatelessWidget {
                   : l10n.chatHistoryPagePin,
               style: TextStyle(
                 fontSize: 12.5,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 color: pinned
                     ? cs.primary
                     : cs.onSurface.withValues(alpha: 0.8),

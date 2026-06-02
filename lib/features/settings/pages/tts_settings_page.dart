@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/tts/tts_text_selection.dart';
@@ -113,7 +114,7 @@ class _SettingsSection extends StatelessWidget {
             title,
             style: TextStyle(
               fontSize: 13,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               color: cs.onSurface.withValues(alpha: 0.8),
             ),
           ),
@@ -243,7 +244,7 @@ class _RowText extends StatelessWidget {
           title,
           style: TextStyle(
             fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeights.semibold,
             color: cs.onSurface.withValues(alpha: 0.9),
           ),
         ),

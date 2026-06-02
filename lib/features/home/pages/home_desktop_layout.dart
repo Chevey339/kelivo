@@ -22,6 +22,7 @@ import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Desktop/Tablet layout scaffold for the home page
 /// Handles the overall structure: left sidebar, main content, optional right sidebar
@@ -392,7 +393,7 @@ class HomeDesktopScaffold extends StatelessWidget {
                       color: isDark
                           ? Colors.white.withValues(alpha: 0.92)
                           : cs.onSurface.withValues(alpha: 0.9),
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeights.medium,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -424,7 +425,7 @@ class HomeDesktopScaffold extends StatelessWidget {
             curve: Curves.easeOutCubic,
             child: AnimatedTextSwap(
               text: title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 16, fontWeight: AppFontWeights.medium),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

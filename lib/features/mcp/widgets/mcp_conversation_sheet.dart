@@ -6,6 +6,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../theme/app_font_weights.dart';
 
 Future<void> showConversationMcpSheet(
   BuildContext context, {
@@ -51,7 +52,7 @@ class _ConversationMcpSheet extends StatelessWidget {
         style: TextStyle(
           fontSize: 11,
           color: cs.primary,
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFontWeights.semibold,
         ),
       ),
     );
@@ -85,9 +86,9 @@ class _ConversationMcpSheet extends StatelessWidget {
                       children: [
                         Text(
                           l10n.mcpConversationSheetTitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -235,9 +236,9 @@ class _ConversationMcpSheet extends StatelessWidget {
                                                 Expanded(
                                                   child: Text(
                                                     s.name,
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w700,
+                                                    style: TextStyle(
+                                                      fontWeight: AppFontWeights
+                                                          .emphasis,
                                                     ),
                                                     maxLines: 1,
                                                     overflow:

@@ -8,6 +8,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../pages/provider_groups_page.dart';
+import '../../../theme/app_font_weights.dart';
 
 Future<void> showProviderGroupPickerSheet(
   BuildContext context, {
@@ -113,7 +114,7 @@ class ProviderGroupPickerSheet extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeights.medium,
                       color: onColor,
                     ),
                   ),
@@ -152,9 +153,9 @@ class ProviderGroupPickerSheet extends StatelessWidget {
                 Expanded(
                   child: Text(
                     l10n.providerGroupsPickerTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                     ),
                   ),
                 ),

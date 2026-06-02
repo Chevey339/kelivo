@@ -7,6 +7,7 @@ import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
 import '../core/providers/mcp_provider.dart';
 import '../core/providers/assistant_provider.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 Future<void> showDesktopMcpServersPopover(
   BuildContext context, {
@@ -339,9 +340,9 @@ class _RowItemState extends State<_RowItem> {
                   widget.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeights.regular,
                     decoration: TextDecoration.none,
                   ).copyWith(color: onColor),
                 ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -118,7 +119,7 @@ class _OptionRow extends StatelessWidget {
                   label,
                   style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                     color: cs.onSurface,
                   ),
                 ),

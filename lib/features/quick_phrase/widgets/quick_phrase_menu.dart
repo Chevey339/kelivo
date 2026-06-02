@@ -5,6 +5,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class QuickPhraseMenu extends StatelessWidget {
   const QuickPhraseMenu({
@@ -84,9 +85,9 @@ class QuickPhraseMenu extends StatelessWidget {
                       //       const SizedBox(width: 8),
                       //       Text(
                       //         l10n.quickPhraseMenuTitle,
-                      //         style: const TextStyle(
+                      //         style: TextStyle(
                       //           fontSize: 15,
-                      //           fontWeight: FontWeight.w600,
+                      //           fontWeight: AppFontWeights.semibold,
                       //         ),
                       //       ),
                       //     ],
@@ -136,9 +137,10 @@ class QuickPhraseMenu extends StatelessWidget {
                                         Expanded(
                                           child: Text(
                                             phrase.title,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 14,
-                                              fontWeight: FontWeight.w600,
+                                              fontWeight:
+                                                  AppFontWeights.semibold,
                                             ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,

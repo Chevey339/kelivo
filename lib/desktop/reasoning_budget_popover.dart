@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui' as ui;
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -295,9 +296,9 @@ class _ReasoningContent extends StatelessWidget {
                 await context.read<SettingsProvider>().setThinkingBudget(value);
                 await onDone();
               },
-          labelStyle: const TextStyle(
+          labelStyle: TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w400,
+            fontWeight: AppFontWeights.regular,
             decoration: TextDecoration.none,
           ).copyWith(color: onColor),
         ),
@@ -376,7 +377,7 @@ class _ReasoningContent extends StatelessWidget {
                       selected.toString(),
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeights.semibold,
                         color: Theme.of(context).colorScheme.primary,
                         decoration: TextDecoration.none,
                       ),
@@ -480,9 +481,9 @@ class _HoverRowState extends State<_HoverRow> {
                   overflow: TextOverflow.ellipsis,
                   style:
                       widget.labelStyle ??
-                      const TextStyle(
+                      TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w400,
+                        fontWeight: AppFontWeights.regular,
                         decoration: TextDecoration.none,
                       ),
                 ),

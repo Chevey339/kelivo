@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../icons/lucide_adapter.dart';
+import '../../theme/app_font_weights.dart';
 import 'ios_tactile.dart';
 
 typedef CustomBottomSheetBuilder =
@@ -508,7 +509,7 @@ class _SheetHeader extends StatelessWidget {
     final titleStyle = TextStyle(
       color: cs.onSurface,
       fontSize: 15,
-      fontWeight: FontWeight.w600,
+      fontWeight: AppFontWeights.emphasis,
       height: 1.2,
     );
 

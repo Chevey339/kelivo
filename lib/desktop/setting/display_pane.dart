@@ -187,7 +187,7 @@ class _SettingsCard extends StatelessWidget {
                 // Align card title with other panes (15, semi-bold)
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: AppFontWeights.semibold,
                   color: cs.onSurface,
                 ),
               ),
@@ -238,7 +238,7 @@ class _LabeledRow extends StatelessWidget {
               // Match other settings row labels (14, normal, slightly dimmed)
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w400,
+                fontWeight: AppFontWeights.regular,
                 color: cs.onSurface.withValues(alpha: 0.9),
                 decoration: TextDecoration.none,
               ),
@@ -358,7 +358,7 @@ class _ThemeModeSegmentedState extends State<_ThemeModeSegmented> {
                         // Reduce segmented labels to 14 for consistency
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeights.regular,
                           color: (mode == items[i].$1)
                               ? cs.primary
                               : cs.onSurface.withValues(alpha: 0.82),
@@ -668,8 +668,8 @@ class _SimpleOptionTileState extends State<_SimpleOptionTile> {
                       fontSize: 14,
                       color: cs.onSurface.withValues(alpha: 0.88),
                       fontWeight: widget.selected
-                          ? FontWeight.w600
-                          : FontWeight.w400,
+                          ? AppFontWeights.semibold
+                          : AppFontWeights.regular,
                     ),
                   ),
                 ),
@@ -716,7 +716,7 @@ class _AppLanguageRowState extends State<_AppLanguageRow> {
         // measure desired content width for centering under trigger
         double measureContentWidth() {
           // Keep measurement consistent with dropdown item text (14)
-          final style = const TextStyle(fontSize: 14);
+          final style = TextStyle(fontSize: 14);
           final labels = <String>[
             '🖥️ ${AppLocalizations.of(ctx)!.settingsPageSystemMode}',
             '🇨🇳 ${AppLocalizations.of(ctx)!.displaySettingsPageLanguageChineseLabel}',
@@ -879,7 +879,7 @@ class _HoverDropdownButton extends StatelessWidget {
                         style: TextStyle(
                           fontSize: fontSize,
                           color: cs.onSurface.withValues(alpha: 0.9),
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeights.regular,
                         ),
                       ),
                     ),
@@ -904,7 +904,7 @@ class _HoverDropdownButton extends StatelessWidget {
                       style: TextStyle(
                         fontSize: fontSize,
                         color: cs.onSurface.withValues(alpha: 0.9),
-                        fontWeight: FontWeight.w400,
+                        fontWeight: AppFontWeights.regular,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -1258,10 +1258,7 @@ class _LanguageDropdownItemState extends State<_LanguageDropdownItem> {
             children: [
               Text(
                 widget.item.flag,
-                style: const TextStyle(
-                  fontSize: 16,
-                  decoration: TextDecoration.none,
-                ),
+                style: TextStyle(fontSize: 16, decoration: TextDecoration.none),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -1681,7 +1678,7 @@ Future<String?> _showDesktopFontChooserDialog(
                   style: TextStyle(
                     color: cs2.onSurface,
                     fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -1730,9 +1727,9 @@ Future<String?> _showDesktopFontChooserDialog(
                         Expanded(
                           child: Text(
                             title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: AppFontWeights.emphasis,
                             ),
                           ),
                         ),
@@ -2286,7 +2283,7 @@ class _ToggleRowRequestLogging extends StatelessWidget {
               l10n.requestLogSettingTitle,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w400,
+                fontWeight: AppFontWeights.regular,
                 color: cs.onSurface.withValues(alpha: 0.9),
                 decoration: TextDecoration.none,
               ),
@@ -2343,7 +2340,7 @@ class _ToggleRowFlutterLogging extends StatelessWidget {
               l10n.flutterLogSettingTitle,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w400,
+                fontWeight: AppFontWeights.regular,
                 color: cs.onSurface.withValues(alpha: 0.9),
                 decoration: TextDecoration.none,
               ),
@@ -2555,7 +2552,7 @@ class _ToggleRow extends StatelessWidget {
                   // Reduce toggle row label size to 14 to match other panes
                   style: TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeights.regular,
                     color: cs.onSurface.withValues(alpha: 0.9),
                     decoration: TextDecoration.none,
                   ),

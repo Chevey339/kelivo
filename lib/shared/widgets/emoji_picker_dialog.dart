@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import 'emoji_text.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// A reusable emoji picker dialog used by both mobile and desktop.
 /// Returns the chosen emoji (single grapheme) or null if cancelled.
@@ -261,7 +262,7 @@ Future<String?> showEmojiPickerDialog(
                     color: validGrapheme(value)
                         ? cs.primary
                         : cs.onSurface.withValues(alpha: 0.38),
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
               ),

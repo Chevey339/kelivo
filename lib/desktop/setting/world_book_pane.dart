@@ -14,6 +14,7 @@ import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../widgets/desktop_select_dropdown.dart';
+import '../../theme/app_font_weights.dart';
 
 class DesktopWorldBookPane extends StatefulWidget {
   const DesktopWorldBookPane({super.key});
@@ -253,7 +254,7 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
               onPressed: () => Navigator.of(ctx).pop(true),
               child: Text(
                 l10n.worldBookDelete,
-                style: const TextStyle(color: Colors.red),
+                style: TextStyle(color: Colors.red),
               ),
             ),
           ],
@@ -304,7 +305,7 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
                             l10n.worldBookTitle,
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w400,
+                              fontWeight: AppFontWeights.regular,
                               color: cs.onSurface.withValues(alpha: 0.9),
                             ),
                           ),
@@ -529,9 +530,9 @@ class _WorldBookCardState extends State<_WorldBookCard> {
                               title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: AppFontWeights.emphasis,
                               ),
                             ),
                           ),
@@ -742,7 +743,7 @@ class _EntryRowState extends State<_EntryRow> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                             color: widget.entry.enabled
                                 ? cs.onSurface
                                 : cs.onSurface.withValues(alpha: 0.55),
@@ -809,7 +810,7 @@ class _TagPill extends StatelessWidget {
         text,
         style: TextStyle(
           fontSize: 11.5,
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFontWeights.semibold,
           color: fg,
           height: 1.0,
         ),
@@ -873,9 +874,9 @@ class _WorldBookEditDialogState extends State<_WorldBookEditDialog> {
                           widget.book == null
                               ? l10n.worldBookAdd
                               : l10n.worldBookConfig,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -909,7 +910,7 @@ class _WorldBookEditDialogState extends State<_WorldBookEditDialog> {
                           style: TextStyle(
                             color: cs.onSurface.withValues(alpha: 0.8),
                             fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                       ),
@@ -1069,7 +1070,7 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
   TextStyle _labelStyle(ColorScheme cs) {
     return TextStyle(
       fontSize: 13,
-      fontWeight: FontWeight.w600,
+      fontWeight: AppFontWeights.semibold,
       color: cs.onSurface.withValues(alpha: 0.82),
     );
   }
@@ -1221,9 +1222,9 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
                           widget.entry == null
                               ? l10n.worldBookAddEntry
                               : l10n.worldBookEditEntry,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -1643,7 +1644,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
               widget.label,
               style: TextStyle(
                 color: textColor,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 fontSize: widget.dense ? 13 : 14,
               ),
             ),

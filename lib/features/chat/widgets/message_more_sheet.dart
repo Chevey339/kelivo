@@ -17,6 +17,7 @@ import '../../../utils/markdown_media_sanitizer.dart';
 import '../../../shared/pages/webview_page.dart';
 import '../../../desktop/html_preview_dialog.dart';
 import 'dart:convert';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 enum MessageMoreAction {
   edit,
@@ -206,7 +207,7 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                   label,
                   style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: AppFontWeights.medium,
                     color: fg,
                   ),
                 ),

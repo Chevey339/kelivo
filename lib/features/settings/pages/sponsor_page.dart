@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/services/haptics.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class SponsorPage extends StatefulWidget {
   const SponsorPage({super.key});
@@ -60,7 +61,7 @@ class _SponsorPageState extends State<SponsorPage> {
         text,
         style: TextStyle(
           fontSize: 13,
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFontWeights.semibold,
           color: cs.onSurface.withValues(alpha: 0.8),
         ),
       ),

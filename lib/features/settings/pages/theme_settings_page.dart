@@ -7,6 +7,7 @@ import '../../../theme/palettes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/services/haptics.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class ThemeSettingsPage extends StatelessWidget {
   const ThemeSettingsPage({super.key});
@@ -23,7 +24,7 @@ class ThemeSettingsPage extends StatelessWidget {
         text,
         style: TextStyle(
           fontSize: 13,
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFontWeights.semibold,
           color: cs.onSurface.withValues(alpha: 0.8),
         ),
       ),

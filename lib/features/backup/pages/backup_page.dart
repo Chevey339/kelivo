@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -87,9 +88,9 @@ class _BackupPageState extends State<BackupPage> {
                 Center(
                   child: Text(
                     l10n.backupPageImportFromCherryStudio,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                 ),
@@ -251,7 +252,7 @@ class _BackupPageState extends State<BackupPage> {
               text,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 color: cs.onSurface.withValues(alpha: 0.8),
               ),
             ),
@@ -1832,7 +1833,7 @@ class _TactileTextButtonState extends State<_TactileTextButton> {
           widget.label,
           style: TextStyle(
             fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeights.semibold,
             color: _pressed ? press : base,
           ),
         ),
@@ -2011,10 +2012,7 @@ Widget _iosNavRow(
                 Expanded(
                   child: Text(
                     label,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: c,
-                    ), //, fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 15, color: c),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -2081,7 +2079,10 @@ class _IosOutlineButtonState extends State<_IosOutlineButton> {
           ),
           child: Text(
             widget.label,
-            style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: cs.primary,
+              fontWeight: AppFontWeights.semibold,
+            ),
           ),
         ),
       ),
@@ -2129,7 +2130,10 @@ class _IosFilledButtonState extends State<_IosFilledButton> {
           ),
           child: Text(
             widget.label,
-            style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: cs.onPrimary,
+              fontWeight: AppFontWeights.semibold,
+            ),
           ),
         ),
       ),
@@ -2164,7 +2168,7 @@ Widget _iosSwitchRow(
                 ],
                 Expanded(
                   child: Text(label, style: TextStyle(fontSize: 15, color: c)),
-                ), //, fontWeight: FontWeight.w500))),
+                ),
                 IosSwitch(value: value, onChanged: onChanged),
               ],
             ),
@@ -2217,9 +2221,9 @@ class _RemoteListSheet extends StatelessWidget {
                   Center(
                     child: Text(
                       l10n.backupPageRemoteBackups,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeights.semibold,
                       ),
                     ),
                   ),
@@ -2283,8 +2287,8 @@ class _RemoteListSheet extends StatelessWidget {
                                           it.displayName,
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
+                                          style: TextStyle(
+                                            fontWeight: AppFontWeights.semibold,
                                           ),
                                         ),
                                         const SizedBox(height: 4),
@@ -2381,7 +2385,7 @@ class _ActionCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      style: TextStyle(fontWeight: AppFontWeights.semibold),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -2489,9 +2493,9 @@ class _WebDavSettingsSheetState extends State<_WebDavSettingsSheet> {
                     child: Center(
                       child: Text(
                         l10n.backupPageWebDavServerSettings,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                     ),
@@ -2650,9 +2654,9 @@ class _S3SettingsSheetState extends State<_S3SettingsSheet> {
                     child: Center(
                       child: Text(
                         l10n.backupPageS3ServerSettings,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                     ),

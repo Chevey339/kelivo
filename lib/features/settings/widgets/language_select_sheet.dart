@@ -7,6 +7,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class LanguageOption {
   final String code;
@@ -243,7 +244,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
                                 l10n.languageSelectSheetClearButton,
                                 style: TextStyle(
                                   fontSize: 15,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: AppFontWeights.medium,
                                   color: Colors.red.shade600,
                                 ),
                               ),
@@ -288,9 +289,9 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
               Expanded(
                 child: Text(
                   _getLanguageDisplayName(l10n, lang.code),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: AppFontWeights.medium,
                   ),
                 ),
               ),

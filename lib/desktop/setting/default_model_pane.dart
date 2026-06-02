@@ -6,6 +6,7 @@ import '../../core/providers/settings_provider.dart';
 import '../../features/model/widgets/model_select_sheet.dart';
 import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../../theme/app_font_weights.dart';
 
 class DesktopDefaultModelPane extends StatelessWidget {
   const DesktopDefaultModelPane({super.key});
@@ -34,7 +35,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                         l10n.defaultModelPageTitle,
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeights.regular,
                           color: cs.onSurface.withValues(alpha: 0.9),
                         ),
                       ),
@@ -268,9 +269,9 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       Expanded(
                         child: Text(
                           l10n.defaultModelPagePromptLabel,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -358,9 +359,9 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       Expanded(
                         child: Text(
                           l10n.defaultModelPagePromptLabel,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -451,9 +452,9 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       Expanded(
                         child: Text(
                           l10n.defaultModelPagePromptLabel,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -533,9 +534,9 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       Expanded(
                         child: Text(
                           l10n.defaultModelPagePromptLabel,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -626,9 +627,9 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       Expanded(
                         child: Text(
                           l10n.defaultModelPagePromptLabel,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -716,9 +717,9 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       Expanded(
                         child: Text(
                           l10n.defaultModelPagePromptLabel,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -883,9 +884,9 @@ class _ModelCardState extends State<_ModelCard> {
                     widget.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                 ),
@@ -945,9 +946,9 @@ class _ModelCardState extends State<_ModelCard> {
                           modelDisplay ?? (providerName ?? '-'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                       ),
@@ -1028,7 +1029,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
               widget.label,
               style: TextStyle(
                 color: textColor,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 fontSize: widget.dense ? 13 : 14,
               ),
             ),
@@ -1094,7 +1095,7 @@ class _BrandCircle extends StatelessWidget {
         name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
         style: TextStyle(
           color: cs.primary,
-          fontWeight: FontWeight.w800,
+          fontWeight: AppFontWeights.heavy,
           fontSize: size * 0.45,
         ),
       );
@@ -1143,7 +1144,7 @@ Widget _promptEditor(
       minLines: null,
       expands: true,
       textAlignVertical: TextAlignVertical.top,
-      style: const TextStyle(fontSize: 14),
+      style: TextStyle(fontSize: 14),
       decoration: _deskInputDecoration(context).copyWith(hintText: hintText),
     ),
   );

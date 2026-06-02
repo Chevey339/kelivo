@@ -14,6 +14,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import 'log_viewer_page.dart';
+import '../../../theme/app_font_weights.dart';
 
 class StorageSpacePage extends StatefulWidget {
   const StorageSpacePage({super.key, this.embedded = false});
@@ -421,7 +422,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
               l10n.storageSpacePageTitle,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 color: cs.onSurface,
                 decoration: TextDecoration.none,
               ),
@@ -550,9 +551,9 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
               children: [
                 Text(
                   l10n.storageSpaceTotalLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -560,7 +561,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                   _fmtBytes(total),
                   style: TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                     color: cs.onSurface,
                   ),
                 ),
@@ -1028,7 +1029,7 @@ class _CategoryMenu extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                           color: c.key == selected
                               ? cs.onSurface.withValues(alpha: 0.92)
                               : cs.onSurface.withValues(alpha: 0.88),
@@ -1147,7 +1148,7 @@ class _CategoryDetail extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            style: TextStyle(fontSize: 16, fontWeight: AppFontWeights.emphasis),
           ),
           const SizedBox(height: 6),
           Text(
@@ -1183,7 +1184,7 @@ class _CategoryDetail extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          style: TextStyle(fontSize: 16, fontWeight: AppFontWeights.emphasis),
         ),
         const SizedBox(height: 6),
         Text(
@@ -1212,9 +1213,9 @@ class _CategoryDetail extends StatelessWidget {
                 if (category.subcategories.isNotEmpty) ...[
                   Text(
                     l10n.storageSpaceBreakdownTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -1237,9 +1238,9 @@ class _CategoryDetail extends StatelessWidget {
                               children: [
                                 Text(
                                   subTitleFor(s.id),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: AppFontWeights.semibold,
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -1748,7 +1749,7 @@ class _FileRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                       color: cs.onSurface.withValues(alpha: 0.88),
                     ),
                   ),
@@ -1817,7 +1818,7 @@ class _MiniActionButton extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeights.semibold,
             color: fg,
           ),
         ),
@@ -1944,7 +1945,7 @@ Widget _iosNavRow(
             style: TextStyle(
               fontSize: 15,
               color: cs.onSurface.withValues(alpha: 0.9),
-              fontWeight: FontWeight.w500,
+              fontWeight: AppFontWeights.medium,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

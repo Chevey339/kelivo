@@ -20,6 +20,7 @@ import '../../../desktop/desktop_home_page.dart' show DesktopHomePage;
 import '../../provider/widgets/provider_avatar.dart';
 import '../../provider/widgets/provider_balance_badge.dart';
 import '../../../core/services/model_override_resolver.dart';
+import '../../../theme/app_font_weights.dart';
 
 class ModelSelection {
   final String providerKey;
@@ -1107,7 +1108,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                           color: cs.onSurface.withValues(alpha: 0.68),
                         ),
                       ),
@@ -1115,9 +1116,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                     ProviderBalanceBadge(
                       providerKey: providerKey,
                       displayName: group.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                       color: cs.primary,
                     ),
@@ -1149,7 +1150,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 color: cs.onSurface.withValues(alpha: 0.6),
               ),
             ),
@@ -1158,7 +1159,10 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
             ProviderBalanceBadge(
               providerKey: providerKey,
               displayName: title,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: AppFontWeights.emphasis,
+              ),
               color: cs.primary,
             ),
         ],
@@ -1217,18 +1221,18 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                           m.info.displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         )
                       else
                         Text.rich(
                           TextSpan(
                             text: m.info.displayName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: AppFontWeights.semibold,
                             ),
                             children: [
                               TextSpan(
@@ -1438,7 +1442,7 @@ class _ProviderChipState extends State<_ProviderChip> {
                 widget.label,
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: AppFontWeights.medium,
                   color: labelColor,
                 ),
               ),
@@ -1540,7 +1544,7 @@ class _BrandAvatar extends StatelessWidget {
         name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
         style: TextStyle(
           color: cs.primary,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           fontSize: size * 0.42,
         ),
       );
@@ -2074,7 +2078,7 @@ class _DesktopModelSelectDialogBodyState
               child: Text.rich(
                 TextSpan(
                   text: m.info.displayName,
-                  style: const TextStyle(fontSize: 12.5),
+                  style: TextStyle(fontSize: 12.5),
                   children: [
                     if (showProviderLabel)
                       TextSpan(
@@ -2147,7 +2151,7 @@ class _DesktopModelSelectDialogBodyState
             title,
             style: TextStyle(
               fontSize: 11.5,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               color: cs.onSurface.withValues(alpha: 0.6),
             ),
           ),
@@ -2172,7 +2176,7 @@ class _DesktopModelSelectDialogBodyState
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 11.5,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               color: cs.onSurface.withValues(alpha: 0.6),
             ),
           ),
@@ -2181,9 +2185,9 @@ class _DesktopModelSelectDialogBodyState
             ProviderBalanceBadge(
               providerKey: providerKey,
               displayName: displayName,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11.5,
-                fontWeight: FontWeight.w700,
+                fontWeight: AppFontWeights.emphasis,
               ),
               color: cs.primary,
             ),

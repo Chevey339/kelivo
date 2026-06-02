@@ -7,6 +7,7 @@ import 'package:Kelivo/features/home/widgets/chat_selection_export_bar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -81,7 +82,7 @@ void main() {
     expect(tester.getSize(find.byType(IosCardPress)).width, closeTo(396, 0.1));
     expect(
       tester.widget<Text>(find.text('Delete')).style?.fontWeight,
-      FontWeight.w500,
+      AppFontWeights.medium,
     );
 
     await tester.tap(find.text('Delete'));

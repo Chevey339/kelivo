@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/widgets/custom_bottom_sheet.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../theme/app_font_weights.dart';
 
 class CitationSourceItem {
   const CitationSourceItem({
@@ -230,7 +231,7 @@ class _CitationSourcesDialogHeader extends StatelessWidget {
     final titleStyle = TextStyle(
       color: cs.onSurface,
       fontSize: 16,
-      fontWeight: FontWeight.w700,
+      fontWeight: AppFontWeights.emphasis,
       height: 1.2,
     );
 
@@ -391,7 +392,7 @@ class CitationSourceCard extends StatelessWidget {
             style: TextStyle(
               color: cs.onSurface,
               fontSize: 14,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               height: 1.32,
             ),
           ),
@@ -404,7 +405,7 @@ class CitationSourceCard extends StatelessWidget {
               style: TextStyle(
                 color: cs.onSurface.withValues(alpha: 0.62),
                 fontSize: 12,
-                fontWeight: FontWeight.w400,
+                fontWeight: AppFontWeights.regular,
                 height: 1.35,
               ),
             ),
@@ -564,7 +565,7 @@ class _IndexBadge extends StatelessWidget {
         style: TextStyle(
           color: cs.primary,
           fontSize: 10,
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFontWeights.semibold,
           height: 1,
         ),
       ),
@@ -587,7 +588,7 @@ class _CitationTag extends StatelessWidget {
       style: TextStyle(
         color: cs.onSurface.withValues(alpha: 0.62),
         fontSize: 11,
-        fontWeight: FontWeight.w500,
+        fontWeight: AppFontWeights.medium,
         height: 1,
       ),
     );

@@ -21,6 +21,7 @@ import '../../../shared/widgets/ios_checkbox.dart';
 import '../widgets/provider_avatar.dart';
 import '../widgets/provider_group_select_sheet.dart';
 import '../../../utils/provider_grouping_logic.dart';
+import '../../../theme/app_font_weights.dart';
 
 class ProvidersPage extends StatefulWidget {
   const ProvidersPage({super.key});
@@ -668,7 +669,7 @@ class _ProvidersPageState extends State<ProvidersPage> {
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
               l10n.providerDetailPageDeleteButton,
-              style: const TextStyle(color: Colors.red),
+              style: TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -1180,7 +1181,7 @@ class _ProviderGroupHeaderRow extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13.5,
                     color: color,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
               ),
@@ -1303,7 +1304,7 @@ class _ProviderRow extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 15,
                           color: color,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                     ),
@@ -1596,9 +1597,9 @@ Future<void> _showMultiExportSheet(
               Center(
                 child: Text(
                   l10n.providersPageExportSelectedTitle(keys.length),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
               ),
@@ -1637,7 +1638,7 @@ Future<void> _showMultiExportSheet(
                     text,
                     maxLines: 7,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13.5, height: 1.35),
+                    style: TextStyle(fontSize: 13.5, height: 1.35),
                   ),
                 ),
               ),

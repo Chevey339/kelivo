@@ -46,6 +46,7 @@ import '../utils/thinking_tag_parser.dart';
 import 'citation_sources_sheet.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
+import '../../../theme/app_font_weights.dart';
 
 final RegExp _urlSchemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
 
@@ -400,9 +401,9 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                                 part.arguments,
                                 isResult: !part.loading,
                               ),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: AppFontWeights.emphasis,
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
@@ -456,7 +457,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                                 ),
                                 child: SelectableText(
                                   argsPretty,
-                                  style: const TextStyle(fontSize: 12),
+                                  style: TextStyle(fontSize: 12),
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -486,7 +487,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                                 ),
                                 child: SelectableText(
                                   resultText,
-                                  style: const TextStyle(fontSize: 12),
+                                  style: TextStyle(fontSize: 12),
                                 ),
                               ),
                               if (images.isNotEmpty) ...[
@@ -568,9 +569,9 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                             part.arguments,
                             isResult: !part.loading,
                           ),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: AppFontWeights.emphasis,
                           ),
                         ),
                       ),
@@ -599,7 +600,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                     ),
                     child: SelectableText(
                       argsPretty,
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -625,7 +626,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                     ),
                     child: SelectableText(
                       resultText,
-                      style: const TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 12),
                     ),
                   ),
                   if (images.isNotEmpty) ...[
@@ -1320,7 +1321,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         userProvider.name,
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: AppFontWeights.medium,
                           color: cs.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
@@ -2140,7 +2141,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: AppFontWeights.medium,
                           color: cs.onSurface.withValues(alpha: 0.7),
                         ),
                       ),
@@ -2320,7 +2321,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               l10n.chatMessageWidgetTranslation,
                               style: TextStyle(
                                 fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: AppFontWeights.emphasis,
                                 color: fg.strong,
                               ),
                             ),
@@ -2918,7 +2919,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       alignment: Alignment.center,
       child: Text(
         ch,
-        style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700),
+        style: TextStyle(
+          color: cs.primary,
+          fontWeight: AppFontWeights.emphasis,
+        ),
       ),
     );
   }
@@ -3176,7 +3180,7 @@ class _BranchSelector extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   color: cs.onSurface.withValues(alpha: 0.8),
-                  fontWeight: FontWeight.w500,
+                  fontWeight: AppFontWeights.medium,
                 ),
                 maxLines: 1,
                 softWrap: false,
@@ -3499,7 +3503,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                               ),
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                           color: fg.strong,
                         ),
                       ),
@@ -3739,7 +3743,7 @@ class _ChainOfThoughtReasoningStepState
             l10n.chatMessageWidgetDeepThinking,
             style: TextStyle(
               fontSize: 13,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               color: fg.strong,
             ),
           ),
@@ -3776,14 +3780,14 @@ class _ChainOfThoughtReasoningStepState
         return RepaintBoundary(
           child: MarkdownWithCodeHighlight(
             text: text.isNotEmpty ? text : '…',
-            baseStyle: const TextStyle(fontSize: 12.5, height: 1.32),
+            baseStyle: TextStyle(fontSize: 12.5, height: 1.32),
             streaming: widget.step.loading,
           ),
         );
       }
       return Text(
         text.isNotEmpty ? text : '…',
-        style: const TextStyle(fontSize: 12.5, height: 1.32),
+        style: TextStyle(fontSize: 12.5, height: 1.32),
       );
     }
 
@@ -4001,7 +4005,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 13,
-          fontWeight: FontWeight.w600,
+          fontWeight: AppFontWeights.semibold,
           color: fg.strong,
         ),
       ),
@@ -4305,7 +4309,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                         ),
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                           color: isPendingApproval ? fg.accent : fg.strong,
                         ),
                       ),
@@ -4316,7 +4320,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                           l10n.toolApprovalPending,
                           style: TextStyle(
                             fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: AppFontWeights.medium,
                             color: fg.medium,
                           ),
                         ),
@@ -4529,9 +4533,9 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   widget.part.arguments,
                                   isResult: !widget.part.loading,
                                 ),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 16,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: AppFontWeights.emphasis,
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -4586,7 +4590,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   ),
                                   child: SelectableText(
                                     argsPretty,
-                                    style: const TextStyle(fontSize: 12),
+                                    style: TextStyle(fontSize: 12),
                                   ),
                                 ),
                                 const SizedBox(height: 12),
@@ -4616,7 +4620,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                   ),
                                   child: SelectableText(
                                     resultText,
-                                    style: const TextStyle(fontSize: 12),
+                                    style: TextStyle(fontSize: 12),
                                   ),
                                 ),
                                 // Show images if available
@@ -4703,9 +4707,9 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                               widget.part.arguments,
                               isResult: !widget.part.loading,
                             ),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: AppFontWeights.emphasis,
                             ),
                           ),
                         ),
@@ -4734,7 +4738,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       ),
                       child: SelectableText(
                         argsPretty,
-                        style: const TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: 12),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -4760,7 +4764,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       ),
                       child: SelectableText(
                         resultText,
-                        style: const TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: 12),
                       ),
                     ),
                     // Show images if available
@@ -4893,7 +4897,7 @@ class _AskUserToolCardState extends State<_AskUserToolCard> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                       color: fg.strong,
                     ),
                   ),
@@ -4904,7 +4908,7 @@ class _AskUserToolCardState extends State<_AskUserToolCard> {
                     l10n.askUserCardAnswered,
                     style: TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                       color: fg.muted,
                     ),
                   ),
@@ -5296,7 +5300,7 @@ class _AskUserAnsweredQuestion extends StatelessWidget {
               fontSize: 12.5,
               height: 1.35,
               color: fg.body,
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
             ),
           ),
           const SizedBox(height: 3),
@@ -5306,7 +5310,7 @@ class _AskUserAnsweredQuestion extends StatelessWidget {
               fontSize: 13,
               height: 1.35,
               color: cs.primary.withValues(alpha: 0.86),
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
             ),
           ),
         ],
@@ -5375,7 +5379,7 @@ class _AskUserOptionRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.25,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: AppFontWeights.medium,
                   color: selected ? cs.primary : fg.strong,
                 ),
               ),
@@ -5490,7 +5494,7 @@ class _AskUserIndexBadge extends StatelessWidget {
         '$index',
         style: TextStyle(
           fontSize: 11,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           color: selected ? cs.primary : fg.muted,
         ),
       ),
@@ -5521,7 +5525,7 @@ class _AskUserSkipPill extends StatelessWidget {
           l10n.askUserCardSkip,
           style: TextStyle(
             fontSize: 11,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeights.semibold,
             color: selected ? cs.primary.withValues(alpha: 0.78) : fg.muted,
           ),
         ),
@@ -5572,7 +5576,7 @@ class _AskUserSubmitButton extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w800,
+                fontWeight: AppFontWeights.heavy,
                 color: enabled
                     ? cs.onPrimary
                     : cs.onSurface.withValues(alpha: 0.38),
@@ -5624,7 +5628,7 @@ class _ApprovalButton extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w600,
+            fontWeight: AppFontWeights.semibold,
             color: enabled ? color : color.withValues(alpha: 0.45),
           ),
         ),
@@ -5675,7 +5679,7 @@ class _SourcesSummaryCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 height: 1,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 color: cs.onSurface.withValues(alpha: isDark ? 0.90 : 0.86),
               ),
             ),
@@ -5913,7 +5917,7 @@ class _ReasoningSectionState extends State<_ReasoningSection>
                 l10n.chatMessageWidgetDeepThinking,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: AppFontWeights.emphasis,
                   color: fg.strong,
                 ),
               ),

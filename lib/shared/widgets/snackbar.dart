@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/services/haptics.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 enum NotificationType { success, error, info, warning }
 
@@ -393,10 +394,10 @@ class _NotificationWidgetState extends State<NotificationWidget>
                       widget.notification.message,
                       style:
                           (Theme.of(context).textTheme.bodyMedium ??
-                                  const TextStyle())
+                                  TextStyle())
                               .copyWith(
                                 fontSize: 15,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: AppFontWeights.medium,
                                 color: cs.onSurface,
                                 height: 1.3,
                                 decoration: TextDecoration.none,
@@ -423,10 +424,10 @@ class _NotificationWidgetState extends State<NotificationWidget>
                         widget.notification.actionLabel!,
                         style:
                             (Theme.of(context).textTheme.labelLarge ??
-                                    const TextStyle())
+                                    TextStyle())
                                 .copyWith(
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: AppFontWeights.semibold,
                                   color: cs.primary,
                                 ),
                       ),

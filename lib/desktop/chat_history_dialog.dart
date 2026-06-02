@@ -8,6 +8,7 @@ import '../shared/animations/widgets.dart';
 import '../shared/widgets/snackbar.dart';
 import '../core/services/chat/chat_service.dart';
 import '../core/models/conversation.dart';
+import '../theme/app_font_weights.dart';
 
 Future<String?> showChatHistoryDesktopDialog(
   BuildContext context, {
@@ -89,9 +90,9 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                     children: [
                       Text(
                         l10n.chatHistoryPageTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                       const Spacer(),
@@ -133,7 +134,7 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                                   onPressed: () => Navigator.of(ctx).pop(true),
                                   child: Text(
                                     l10n.chatHistoryPageDelete,
-                                    style: const TextStyle(color: Colors.red),
+                                    style: TextStyle(color: Colors.red),
                                   ),
                                 ),
                               ],
@@ -235,7 +236,7 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                                     )
                                   : null,
                             ),
-                            style: const TextStyle(fontSize: 14),
+                            style: TextStyle(fontSize: 14),
                             textAlignVertical: TextAlignVertical.center,
                           ),
                         ),
@@ -268,7 +269,7 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                                     l10n.chatHistoryPagePinnedSection,
                                     style: TextStyle(
                                       fontSize: 13,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: AppFontWeights.semibold,
                                       color: cs.primary,
                                     ),
                                   ),
@@ -367,9 +368,9 @@ class _ConversationTileDesktopState extends State<_ConversationTileDesktop> {
                           widget.conversation.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -457,7 +458,7 @@ class _PinButtonDesktop extends StatelessWidget {
                   : l10n.chatHistoryPagePin,
               style: TextStyle(
                 fontSize: 12.5,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 color: pinned
                     ? cs.primary
                     : cs.onSurface.withValues(alpha: 0.8),

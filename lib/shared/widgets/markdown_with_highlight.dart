@@ -29,6 +29,7 @@ import 'mermaid_image_cache.dart';
 import 'plantuml_block.dart';
 import 'package:path/path.dart' as p;
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -346,7 +347,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                 ),
                 child: Text(
                   citation.indexText,
-                  style: const TextStyle(fontSize: 12, height: 1.0),
+                  style: TextStyle(fontSize: 12, height: 1.0),
                 ),
               ),
             );
@@ -364,8 +365,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         );
       },
       orderedListBuilder: (ctx, no, child, cfg) {
-        final style = (cfg.style ?? const TextStyle()).copyWith(
-          fontWeight: FontWeight.w400,
+        final style = (cfg.style ?? TextStyle()).copyWith(
+          fontWeight: AppFontWeights.regular,
         );
         // Apply a soft compensation so when chat scale != 100%,
         // list items don't visually feel larger/smaller than body text.
@@ -399,8 +400,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       // Signature in gpt_markdown 1.1.4: (BuildContext ctx, Widget child, GptMarkdownConfig cfg) -> Widget
       // We compose the bullet + content here to control scaling/spacing.
       unOrderedListBuilder: (ctx, child, cfg) {
-        final style = (cfg.style ?? const TextStyle()).copyWith(
-          fontWeight: FontWeight.w400,
+        final style = (cfg.style ?? TextStyle()).copyWith(
+          fontWeight: AppFontWeights.regular,
         );
         final double kListComp =
             MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
@@ -548,7 +549,7 @@ Map<String, TextStyle> _transparentBgTheme(Map<String, TextStyle> base) {
   if (root != null) {
     m['root'] = root.copyWith(backgroundColor: Colors.transparent);
   } else {
-    m['root'] = const TextStyle(backgroundColor: Colors.transparent);
+    m['root'] = TextStyle(backgroundColor: Colors.transparent);
   }
   return m;
 }
@@ -1088,7 +1089,7 @@ bool _isValidStreamingDollarMathBody(String body) {
 
 // Safe math renderer that falls back to plain text when parsing fails.
 Widget _renderMath(String tex, {TextStyle? style, bool displayMode = false}) {
-  final resolved = style ?? const TextStyle();
+  final resolved = style ?? TextStyle();
   final normalizedTex = _normalizeMathTex(tex);
   try {
     return Math.tex(
@@ -1103,7 +1104,7 @@ Widget _renderMath(String tex, {TextStyle? style, bool displayMode = false}) {
 }
 
 TextStyle _inlineMathTextStyle(TextStyle? style) {
-  final base = style ?? const TextStyle();
+  final base = style ?? TextStyle();
   final baseSize = base.fontSize ?? 15.5;
   return base.copyWith(fontSize: baseSize * 1.2);
 }
@@ -1774,7 +1775,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeights.medium,
                       color: cs.onSurfaceVariant.withValues(alpha: 0.72),
                       height: 1.0,
                     ),
@@ -2756,7 +2757,7 @@ class _MarkdownTableCell extends StatelessWidget {
     final baseStyle = style.copyWith(
       fontSize: header ? 13.0 : 13.5,
       height: 1.42,
-      fontWeight: header ? FontWeight.w600 : FontWeight.w400,
+      fontWeight: header ? AppFontWeights.semibold : AppFontWeights.regular,
       color: header ? cs.onSurface : cs.onSurface.withValues(alpha: 0.90),
       fontFamily: appFontFamily ?? style.fontFamily,
     );
@@ -2866,7 +2867,7 @@ class _MarkdownTableToolbar extends StatelessWidget {
               style: TextStyle(
                 color: cs.onSurfaceVariant.withValues(alpha: 0.80),
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
                 height: 1.0,
               ),
             ),
@@ -3374,11 +3375,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
         isDark ? atomOneDarkReasonableTheme : githubTheme,
       ),
       padding: EdgeInsets.zero,
-      textStyle: const TextStyle(
-        fontFamily: 'monospace',
-        fontSize: 13,
-        height: 1.5,
-      ),
+      textStyle: TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.5),
     );
 
     return Padding(
@@ -3820,8 +3817,8 @@ class _MermaidTabButtonState extends State<_MermaidTabButton> {
                   fontSize: 13,
                   height: 1.35,
                   fontWeight: widget.selected
-                      ? FontWeight.w600
-                      : FontWeight.w500,
+                      ? AppFontWeights.semibold
+                      : AppFontWeights.medium,
                   color: widget.selected
                       ? widget.colors.textPrimary
                       : widget.colors.textSecondary,
@@ -4146,7 +4143,7 @@ class AtxHeadingMd extends BlockMd {
     final lvl = hashes.length;
     final level = lvl < 1 ? 1 : (lvl > 6 ? 6 : lvl);
 
-    final innerCfg = config.copyWith(style: const TextStyle());
+    final innerCfg = config.copyWith(style: TextStyle());
     final inner = TextSpan(
       children: MarkdownComponent.generate(context, raw, innerCfg, true),
     );
@@ -4197,28 +4194,28 @@ class AtxHeadingMd extends BlockMd {
     // Explicit sizes ensure visible contrast over the body (16.0)
     switch (level) {
       case 1:
-        base = const TextStyle(fontSize: 24);
+        base = TextStyle(fontSize: 24);
         break;
       case 2:
-        base = const TextStyle(fontSize: 20);
+        base = TextStyle(fontSize: 20);
         break;
       case 3:
-        base = const TextStyle(fontSize: 18);
+        base = TextStyle(fontSize: 18);
         break;
       case 4:
-        base = const TextStyle(fontSize: 16);
+        base = TextStyle(fontSize: 16);
         break;
       case 5:
-        base = const TextStyle(fontSize: 15);
+        base = TextStyle(fontSize: 15);
         break;
       default:
-        base = const TextStyle(fontSize: 14);
+        base = TextStyle(fontSize: 14);
     }
     final weight = switch (level) {
-      1 => FontWeight.w700,
-      2 => FontWeight.w600,
-      3 => FontWeight.w600,
-      _ => FontWeight.w500,
+      1 => AppFontWeights.strong,
+      2 => AppFontWeights.semibold,
+      3 => AppFontWeights.semibold,
+      _ => AppFontWeights.medium,
     };
     final ls = switch (level) {
       1 => isZh ? 0.0 : 0.1,
@@ -4254,7 +4251,7 @@ class SetextHeadingMd extends BlockMd {
     final underline = (m.group(2) ?? '').trim();
     final level = underline.startsWith('=') ? 1 : 2;
 
-    final innerCfg = config.copyWith(style: const TextStyle());
+    final innerCfg = config.copyWith(style: TextStyle());
     final inner = TextSpan(
       children: MarkdownComponent.generate(context, title, innerCfg, true),
     );
@@ -4303,14 +4300,13 @@ class LabelValueLineMd extends InlineMd {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     // 继承基础样式，确保字间距/行高一致
-    final base =
-        (config.style ?? t.bodyMedium ?? const TextStyle(fontSize: 14));
+    final base = (config.style ?? t.bodyMedium ?? TextStyle(fontSize: 14));
     final labelStyle = base.copyWith(
-      fontWeight: FontWeight.w700, // 与 ** 加粗视觉一致
+      fontWeight: AppFontWeights.strong,
       color: cs.onSurface,
     );
     final valueStyle = base.copyWith(
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeights.regular,
       color: cs.onSurface.withValues(alpha: 0.92),
     );
 
@@ -4533,7 +4529,7 @@ class ModernCheckBoxMd extends BlockMd {
     final content = match?[2] ?? '';
     final cs = Theme.of(context).colorScheme;
 
-    final contentStyle = (config.style ?? const TextStyle()).copyWith(
+    final contentStyle = (config.style ?? TextStyle()).copyWith(
       decoration: checked ? TextDecoration.lineThrough : null,
       color: (config.style?.color ?? cs.onSurface).withValues(
         alpha: checked ? 0.75 : 1.0,
@@ -4593,7 +4589,7 @@ class ModernRadioMd extends BlockMd {
     final content = match?[2] ?? '';
     final cs = Theme.of(context).colorScheme;
 
-    final contentStyle = (config.style ?? const TextStyle()).copyWith(
+    final contentStyle = (config.style ?? TextStyle()).copyWith(
       color: (config.style?.color ?? cs.onSurface).withValues(
         alpha: selected ? 0.95 : 1.0,
       ),
@@ -4663,6 +4659,25 @@ class EscapeAwareBoldMd extends BoldMd {
   @override
   RegExp get exp =>
       RegExp(r"(?<![\\*])\*\*(?!\s)(.+?)(?<![\s\\])\*\*(?!\*)", dotAll: true);
+
+  @override
+  InlineSpan span(BuildContext context, String text, GptMarkdownConfig config) {
+    final match = exp.firstMatch(text.trim());
+    final conf = config.copyWith(
+      style:
+          config.style?.copyWith(fontWeight: AppFontWeights.strong) ??
+          TextStyle(fontWeight: AppFontWeights.strong),
+    );
+    return TextSpan(
+      children: MarkdownComponent.generate(
+        context,
+        '${match?[1]}',
+        conf,
+        false,
+      ),
+      style: conf.style,
+    );
+  }
 }
 
 class EscapeAwareItalicMd extends ItalicMd {
@@ -4790,11 +4805,11 @@ class _DetailsHtmlBlockState extends State<_DetailsHtmlBlock> {
     final borderColor = cs.outlineVariant.withValues(
       alpha: isDark ? 0.18 : 0.30,
     );
-    final summaryStyle = (widget.config.style ?? const TextStyle()).copyWith(
+    final summaryStyle = (widget.config.style ?? TextStyle()).copyWith(
       color: cs.onSurface,
-      fontWeight: FontWeight.w500,
+      fontWeight: AppFontWeights.medium,
     );
-    final bodyStyle = (widget.config.style ?? const TextStyle()).copyWith(
+    final bodyStyle = (widget.config.style ?? TextStyle()).copyWith(
       color: cs.onSurface,
     );
     final bodyConfig = widget.config.copyWith(style: bodyStyle);
@@ -4921,7 +4936,7 @@ class HtmlAnchorMd extends InlineMd {
         onTap: url.isEmpty ? null : () => config.onLinkTap?.call(url, linkText),
         child: Text(
           linkText,
-          style: (config.style ?? const TextStyle()).copyWith(
+          style: (config.style ?? TextStyle()).copyWith(
             color: cs.primary,
             decoration: TextDecoration.none,
           ),

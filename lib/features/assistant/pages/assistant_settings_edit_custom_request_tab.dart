@@ -105,9 +105,9 @@ class _CustomRequestTab extends StatelessWidget {
                   Expanded(
                     child: Text(
                       l10n.assistantEditCustomHeadersTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                   ),
@@ -129,7 +129,7 @@ class _CustomRequestTab extends StatelessWidget {
                               l10n.assistantEditCustomHeadersAdd,
                               style: TextStyle(
                                 color: color,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: AppFontWeights.semibold,
                               ),
                             ),
                           ],
@@ -172,9 +172,9 @@ class _CustomRequestTab extends StatelessWidget {
                   Expanded(
                     child: Text(
                       l10n.assistantEditCustomBodyTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
                     ),
                   ),
@@ -196,7 +196,7 @@ class _CustomRequestTab extends StatelessWidget {
                               l10n.assistantEditCustomBodyAdd,
                               style: TextStyle(
                                 color: color,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: AppFontWeights.semibold,
                               ),
                             ),
                           ],

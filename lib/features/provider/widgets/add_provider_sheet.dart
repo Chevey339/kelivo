@@ -10,6 +10,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 Future<String?> showAddProviderSheet(BuildContext context) async {
   final cs = Theme.of(context).colorScheme;
@@ -155,7 +156,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 14, fontWeight: AppFontWeights.medium),
           ),
         ),
         IosSwitch(value: value, onChanged: onChanged),
@@ -490,9 +491,9 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                       alignment: Alignment.center,
                       child: Text(
                         l10n.addProviderSheetTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeights.semibold,
                         ),
                       ),
                     ),
@@ -729,7 +730,7 @@ class _SegTabBar extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: color ?? baseTextColor,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: AppFontWeights.medium,
                             ),
                           );
                         },

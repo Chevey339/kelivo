@@ -68,7 +68,7 @@ PODS:
     - FlutterMacOS
   - permission_handler_apple (9.3.0):
     - Flutter
-  - restart_app (0.0.1):
+  - restart_app (1.8.3):
     - Flutter
   - SDWebImage (5.21.5):
     - SDWebImage/Core (= 5.21.5)
@@ -179,7 +179,7 @@ SPEC CHECKSUMS:
   flutter_local_notifications: ad39620c743ea4c15127860f4b5641649a988100
   flutter_native_splash: c32d145d68aeda5502d5f543ee38c192065986cf
   flutter_tts: b88dbc8655d3dc961bc4a796e4e16a4cc1795833
-  haptic_feedback: fd1d8509833f58f164fc12122c0357fa9b2750e0
+  haptic_feedback: 1f22d7ad3abb43bb814aa42fdf548dc6d9e8245a
   image_cropper: fca51f94982730acae168c4b5d691e0f11aeb259
   image_gallery_saver_plus: e597bf65a7846979417a3eae0763b71b6dfec6c3
   image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
@@ -189,7 +189,7 @@ SPEC CHECKSUMS:
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   path_provider_foundation: bb55f6dbba17d0dccd6737fe6f7f34fbd0376880
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
-  restart_app: 9cda5378aacc5000e3f66ee76a9201534e7d3ecf
+  restart_app: 7ae91f45705765b4d0042da3a160b72a9927fcd8
   SDWebImage: e9c98383c7572d713c1a0d7dd2783b10599b9838
   share_plus: 50da8cb520a8f0f65671c6c6a99b3617ed10a58a
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb

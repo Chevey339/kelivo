@@ -15,6 +15,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../logs/request_log_parser.dart';
+import '../../../theme/app_font_weights.dart';
 
 /// Mobile log viewer - shows list of log files and allows viewing/exporting
 class LogViewerPage extends StatefulWidget {
@@ -272,7 +273,7 @@ class _LogFilesList extends StatelessWidget {
               emptyText,
               style: TextStyle(
                 color: cs.onSurface.withValues(alpha: 0.62),
-                fontWeight: FontWeight.w500,
+                fontWeight: AppFontWeights.medium,
               ),
             ),
           ],
@@ -330,8 +331,8 @@ class _LogFilesList extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontWeight: isCurrentLog
-                                ? FontWeight.w700
-                                : FontWeight.w600,
+                                ? AppFontWeights.emphasis
+                                : AppFontWeights.semibold,
                             color: cs.onSurface.withValues(alpha: 0.92),
                             letterSpacing: -0.2,
                           ),
@@ -605,7 +606,7 @@ class _RequestLogFilePageState extends State<_RequestLogFilePage> {
                     l10n.logViewerEmpty,
                     style: TextStyle(
                       color: cs.onSurface.withValues(alpha: 0.62),
-                      fontWeight: FontWeight.w500,
+                      fontWeight: AppFontWeights.medium,
                     ),
                   ),
                 ],
@@ -689,7 +690,7 @@ class _RequestLogSummaryBar extends StatelessWidget {
             child: Text(
               l10n.logViewerRequestsCount(total),
               style: TextStyle(
-                fontWeight: FontWeight.w700,
+                fontWeight: AppFontWeights.emphasis,
                 color: cs.onSurface.withValues(alpha: 0.90),
                 letterSpacing: -0.2,
               ),
@@ -745,7 +746,7 @@ class _CountPill extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              fontWeight: FontWeight.w700,
+              fontWeight: AppFontWeights.emphasis,
               color: fg,
               fontSize: 12,
               letterSpacing: -0.1,
@@ -830,7 +831,7 @@ class _RequestLogCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontWeight: FontWeight.w700,
+                      fontWeight: AppFontWeights.emphasis,
                       color: cs.onSurface.withValues(alpha: 0.92),
                       letterSpacing: -0.2,
                       height: 1.18,
@@ -903,7 +904,7 @@ class _InlineErrorPreview extends StatelessWidget {
                 fontSize: 12,
                 color: textColor,
                 height: 1.2,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
               ),
             ),
           ),
@@ -964,7 +965,7 @@ class _MethodPill extends StatelessWidget {
         method,
         style: TextStyle(
           fontSize: 12,
-          fontWeight: FontWeight.w800,
+          fontWeight: AppFontWeights.heavy,
           letterSpacing: 0.2,
           color: _fg(cs, isDark),
         ),
@@ -1042,7 +1043,7 @@ class _StatusPill extends StatelessWidget {
             text,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w800,
+              fontWeight: AppFontWeights.heavy,
               letterSpacing: -0.1,
               color: fg,
             ),
@@ -1301,7 +1302,7 @@ class _RequestLogDetailPage extends StatelessWidget {
                       w,
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeights.semibold,
                         color: cs.onSurface.withValues(alpha: 0.78),
                         height: 1.25,
                       ),
@@ -1358,7 +1359,7 @@ class _ErrorHeroCard extends StatelessWidget {
                 child: Text(
                   l10n.logViewerErrorTitle,
                   style: TextStyle(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: AppFontWeights.heavy,
                     color: titleColor,
                     letterSpacing: -0.2,
                   ),
@@ -1374,7 +1375,7 @@ class _ErrorHeroCard extends StatelessWidget {
                 color: bodyColor,
                 fontSize: 12.5,
                 height: 1.25,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeights.semibold,
               ),
             ),
             const SizedBox(height: 6),
@@ -1385,7 +1386,7 @@ class _ErrorHeroCard extends StatelessWidget {
               style: TextStyle(
                 color: bodyColor.withValues(alpha: 0.72),
                 fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontWeight: AppFontWeights.emphasis,
               ),
             ),
         ],
@@ -1438,7 +1439,7 @@ class _SectionCard extends StatelessWidget {
                 child: Text(
                   title,
                   style: TextStyle(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: AppFontWeights.heavy,
                     color: cs.onSurface.withValues(alpha: 0.90),
                     letterSpacing: -0.2,
                   ),
@@ -1537,7 +1538,7 @@ class _KvGrid extends StatelessWidget {
                   it.k,
                   style: TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                     color: cs.onSurface.withValues(alpha: 0.55),
                   ),
                 ),
@@ -1548,7 +1549,7 @@ class _KvGrid extends StatelessWidget {
                   it.v,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                     color: cs.onSurface.withValues(alpha: 0.86),
                     height: 1.2,
                   ),
@@ -1649,7 +1650,7 @@ class _SegTabBar extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: color ?? baseTextColor,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: AppFontWeights.semibold,
                                   letterSpacing: -0.1,
                                 ),
                               );
@@ -1763,7 +1764,7 @@ class _LogSettingsSheet extends StatelessWidget {
             Text(
               l10n.logSettingsTitle,
               style: TextStyle(
-                fontWeight: FontWeight.w700,
+                fontWeight: AppFontWeights.emphasis,
                 fontSize: 16,
                 color: cs.onSurface,
               ),
@@ -1787,7 +1788,7 @@ class _LogSettingsSheet extends StatelessWidget {
                         Text(
                           l10n.logSettingsSaveOutput,
                           style: TextStyle(
-                            fontWeight: FontWeight.w600,
+                            fontWeight: AppFontWeights.semibold,
                             color: cs.onSurface.withValues(alpha: 0.92),
                             fontSize: 14,
                           ),
@@ -1908,7 +1909,7 @@ class _SettingTile extends StatelessWidget {
           title: Text(
             title,
             style: TextStyle(
-              fontWeight: FontWeight.w600,
+              fontWeight: AppFontWeights.semibold,
               color: cs.onSurface.withValues(alpha: 0.92),
               fontSize: 14,
             ),
@@ -1930,7 +1931,7 @@ class _SettingTile extends StatelessWidget {
               value,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontWeight: AppFontWeights.emphasis,
                 color: cs.primary,
               ),
             ),
@@ -1964,8 +1965,8 @@ class _SettingTile extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
+                            ? AppFontWeights.emphasis
+                            : AppFontWeights.medium,
                         color: selected
                             ? cs.primary
                             : cs.onSurface.withValues(alpha: 0.72),

@@ -8,6 +8,7 @@ import '../core/providers/instruction_injection_group_provider.dart';
 import '../core/providers/instruction_injection_provider.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
+import '../theme/app_font_weights.dart';
 
 Future<void> showDesktopInstructionInjectionPopover(
   BuildContext context, {
@@ -399,7 +400,7 @@ class _GroupHeaderRowState extends State<_GroupHeaderRow> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: AppFontWeights.emphasis,
                     color: cs.onSurface.withValues(alpha: 0.85),
                     decoration: TextDecoration.none,
                   ),
@@ -468,7 +469,7 @@ class _CancelRowState extends State<_CancelRow> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w400,
+                    fontWeight: AppFontWeights.regular,
                     color: cs.onSurface.withValues(alpha: 0.75),
                     decoration: TextDecoration.none,
                   ),
@@ -544,7 +545,7 @@ class _RowItemState extends State<_RowItem> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: AppFontWeights.medium,
                     color: widget.active ? cs.primary : cs.onSurface,
                     decoration: TextDecoration.none,
                   ),
@@ -564,7 +565,7 @@ class _RowItemState extends State<_RowItem> {
                         textAlign: TextAlign.right,
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w400,
+                          fontWeight: AppFontWeights.regular,
                           color: cs.onSurface.withValues(alpha: 0.70),
                           decoration: TextDecoration.none,
                         ),

@@ -8,6 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../core/services/haptics.dart';
+import '../../../theme/app_font_weights.dart';
 
 class DefaultModelPage extends StatelessWidget {
   const DefaultModelPage({super.key});
@@ -221,9 +222,9 @@ class DefaultModelPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -331,9 +332,9 @@ class DefaultModelPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -446,9 +447,9 @@ class DefaultModelPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -559,9 +560,9 @@ class DefaultModelPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -671,9 +672,9 @@ class DefaultModelPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   l10n.defaultModelPagePromptLabel,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeights.semibold,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -841,9 +842,9 @@ class _ModelCard extends StatelessWidget {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: AppFontWeights.semibold,
                     ),
                   ),
                 ),
@@ -912,9 +913,9 @@ class _ModelCard extends StatelessWidget {
                             modelDisplay ?? (providerName ?? '-'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: AppFontWeights.semibold,
                             ),
                           ),
                         ),
@@ -968,7 +969,7 @@ class _BrandAvatar extends StatelessWidget {
         name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
         style: TextStyle(
           color: cs.primary,
-          fontWeight: FontWeight.w700,
+          fontWeight: AppFontWeights.emphasis,
           fontSize: size * 0.42,
         ),
       );
