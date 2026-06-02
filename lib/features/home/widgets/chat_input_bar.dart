@@ -174,6 +174,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
   String? _lastImageDefaultsSignature;
+  bool _restoredUnsupportedImagesApiRouting = false;
   final _imageGenController = ImageGenerationOptionsController();
 
   bool get _composerLocked => widget.hasQueuedInput;
@@ -269,6 +270,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     }
     _imageModeModelKey = nextKey;
     if (supported) {
+      _restoredUnsupportedImagesApiRouting = false;
       _syncImageGenerationDefaults(cfg, modelId, a);
     }
     return supported;
@@ -280,6 +282,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   bool get _allowImagesApiRouting {
+    if (_restoredUnsupportedImagesApiRouting) return false;
     final key = _imageModeModelKey;
     return key == null || key != _dismissedImageModeModelKey;
   }
@@ -329,11 +332,19 @@ class _ChatInputBarState extends State<ChatInputBar>
         ..clear()
         ..addAll(input.documents);
       if (input.allowImagesApiRouting) {
-        if (_dismissedImageModeModelKey == _imageModeModelKey) {
-          _dismissedImageModeModelKey = null;
+        if (_imageModeModelKey == null) {
+          _restoredUnsupportedImagesApiRouting = true;
+        } else {
+          _restoredUnsupportedImagesApiRouting = false;
+          if (_dismissedImageModeModelKey == _imageModeModelKey) {
+            _dismissedImageModeModelKey = null;
+          }
         }
-      } else if (_imageModeModelKey != null) {
-        _dismissedImageModeModelKey = _imageModeModelKey;
+      } else {
+        _restoredUnsupportedImagesApiRouting = false;
+        if (_imageModeModelKey != null) {
+          _dismissedImageModeModelKey = _imageModeModelKey;
+        }
       }
       _imageGenController.restoreFromBody(input.extraBody);
     });

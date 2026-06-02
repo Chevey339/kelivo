@@ -297,6 +297,46 @@ void main() {
     focusNode.dispose();
   });
 
+  testWidgets('恢复队列时不为非绘图模型恢复图片路由', (tester) async {
+    final controller = TextEditingController(text: 'draw a cat');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    ChatInputData? submitted;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        onSend: (input) async {
+          submitted = input;
+          return ChatInputSubmissionResult.rejected;
+        },
+      ),
+    );
+
+    expect(find.text('Image mode'), findsNothing);
+
+    mediaController.restoreInput(
+      const ChatInputData(
+        text: 'draw a cat',
+        allowImagesApiRouting: true,
+        extraBody: {'quality': 'low'},
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(mediaController.allowImagesApiRouting, isFalse);
+
+    await tapSendButton(tester);
+
+    expect(submitted?.allowImagesApiRouting, isFalse);
+    expect(submitted?.extraBody, isEmpty);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
   testWidgets('非绘图模型保持默认路由许可', (tester) async {
     final controller = TextEditingController(text: 'hello');
     final focusNode = FocusNode();
