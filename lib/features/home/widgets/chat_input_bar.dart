@@ -254,6 +254,13 @@ class _ChatInputBarState extends State<ChatInputBar>
       _docs
         ..clear()
         ..addAll(input.documents);
+      if (input.allowImagesApiRouting) {
+        if (_dismissedImageModeModelKey == _imageModeModelKey) {
+          _dismissedImageModeModelKey = null;
+        }
+      } else if (_imageModeModelKey != null) {
+        _dismissedImageModeModelKey = _imageModeModelKey;
+      }
       _imageGenController.restoreFromBody(input.extraBody);
     });
   }

@@ -200,6 +200,52 @@ void main() {
     focusNode.dispose();
   });
 
+  testWidgets('恢复排队输入时会恢复图片路由开关状态', (tester) async {
+    final controller = TextEditingController(text: 'draw a cat');
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    final settings = SettingsProvider();
+    await settings.setProviderConfig(
+      'OpenAITest',
+      ProviderConfig(
+        id: 'OpenAITest',
+        enabled: true,
+        name: 'OpenAITest',
+        apiKey: 'test-key',
+        baseUrl: 'https://example.com/v1',
+        providerType: ProviderKind.openai,
+      ),
+    );
+    await settings.setCurrentModel('OpenAITest', 'gpt-image-2');
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        settingsProvider: settings,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    expect(find.text('Image mode'), findsOneWidget);
+    expect(mediaController.allowImagesApiRouting, isTrue);
+
+    mediaController.restoreInput(
+      const ChatInputData(
+        text: 'draw a cat',
+        allowImagesApiRouting: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Image mode'), findsNothing);
+    expect(mediaController.allowImagesApiRouting, isFalse);
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
   testWidgets('绘图模式关闭后切换对话会重新显示', (tester) async {
     final controller = TextEditingController(text: 'draw a cat');
     final focusNode = FocusNode();
