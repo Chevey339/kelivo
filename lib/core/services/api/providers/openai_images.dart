@@ -577,12 +577,15 @@ String _openAIImagesOutputMime(
 
 Map<String, dynamic> _decodeOpenAIImagesResponse(http.Response response) {
   if (response.statusCode < 200 || response.statusCode >= 300) {
-    final responseText = _decodeUtf8Body(response, allowMalformed: true);
+    final responseText = _decodeOpenAIImagesUtf8Body(
+      response,
+      allowMalformed: true,
+    );
     throw HttpException('HTTP ${response.statusCode}: $responseText');
   }
   final contentType = response.headers[HttpHeaders.contentTypeHeader]
       ?.toLowerCase();
-  final responseText = _decodeUtf8Body(response);
+  final responseText = _decodeOpenAIImagesUtf8Body(response);
   final body = responseText.trimLeft();
   if ((contentType?.contains('text/event-stream') ?? false) ||
       body.startsWith('data:')) {
@@ -590,6 +593,13 @@ Map<String, dynamic> _decodeOpenAIImagesResponse(http.Response response) {
   }
   final decoded = jsonDecode(responseText);
   return _normalizeOpenAIImagesPayload(decoded);
+}
+
+String _decodeOpenAIImagesUtf8Body(
+  http.Response response, {
+  bool allowMalformed = false,
+}) {
+  return utf8.decode(response.bodyBytes, allowMalformed: allowMalformed);
 }
 
 Map<String, dynamic> _decodeOpenAIImagesStreamResponse(String body) {
