@@ -4,6 +4,7 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
+import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart'
     as stream_ctrl;
 import 'package:Kelivo/features/home/controllers/streaming_content_notifier.dart';
@@ -208,6 +209,77 @@ void main() {
     await tester.pump();
 
     expect(reasoning[messageId]!.startAt, startAt);
+
+    scrollController.dispose();
+    isProcessingFiles.dispose();
+    streamingNotifier.dispose();
+  });
+
+  testWidgets('流式 notifier 结束态会隐藏消息内加载指示器', (tester) async {
+    final scrollController = ScrollController();
+    final observerController = ListObserverController(
+      controller: scrollController,
+    );
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    final streamingNotifier = StreamingContentNotifier();
+    const messageId = 'finished-streaming-message';
+    final messages = <ChatMessage>[
+      ChatMessage(
+        id: messageId,
+        role: 'assistant',
+        content: '',
+        conversationId: 'conversation-1',
+        isStreaming: true,
+      ),
+    ];
+    streamingNotifier.getNotifier(messageId);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: SettingsProvider()),
+          ChangeNotifierProvider.value(value: AssistantProvider()),
+          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(value: AskUserInteractionService()),
+          ChangeNotifierProvider.value(value: ToolApprovalService()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: MessageListView(
+              scrollController: scrollController,
+              observerController: observerController,
+              messages: messages,
+              byGroup: const {},
+              versionSelections: const {},
+              reasoning: const {},
+              reasoningSegments: const {},
+              contentSplits: const {},
+              toolParts: const {},
+              translations: const {},
+              selecting: false,
+              selectedItems: const {},
+              dividerPadding: EdgeInsets.zero,
+              isProcessingFiles: isProcessingFiles,
+              bottomContentPadding: 16,
+              streamingContentNotifier: streamingNotifier,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    streamingNotifier.updateContent(
+      messageId,
+      '![image](/tmp/generated.png)',
+      3,
+      isStreaming: false,
+    );
+    await tester.pump();
+
+    expect(find.byType(ChatMessageWidget), findsOneWidget);
+    expect(find.byType(LoadingIndicator), findsNothing);
 
     scrollController.dispose();
     isProcessingFiles.dispose();
