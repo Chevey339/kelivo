@@ -647,6 +647,7 @@
   "messageMoreSheetNotImplemented": "暫未實現",
   "messageMoreSheetEdit": "編輯",
   "messageMoreSheetShare": "分享",
+  "messageMoreSheetSelectMessages": "選擇訊息",
   "messageMoreSheetCreateBranch": "建立分支",
   "messageMoreSheetDelete": "刪除本版本",
   "messageMoreSheetDeleteAllVersions": "刪除全部版本",
@@ -720,6 +721,10 @@
   "chatSelectionExportImage": "圖片",
   "chatSelectionThinkingTools": "思考工具",
   "chatSelectionThinkingContent": "思考內容",
+  "chatSelectionDeleteSelected": "刪除所選",
+  "chatSelectionSelectMessagesToDelete": "請選擇要刪除的訊息",
+  "chatSelectionDeleteSelectedConfirm": "確定要刪除已選擇的{count}個版本嗎？此操作不可撤銷。",
+  "chatSelectionDeleteSelectedAllVersionsConfirm": "確定要刪除已選擇{count}條訊息的全部版本嗎？此操作不可撤銷。",
   "messageExportSheetAssistant": "助理",
   "messageExportSheetDefaultTitle": "新對話",
   "messageExportSheetExporting": "正在匯出…",
@@ -991,7 +996,11 @@
   "providerDetailPageAihubmixAppCodeLabel": "應用 Code（享 10% 優惠）",
   "providerDetailPageAihubmixAppCodeHelp": "為請求附加 APP-Code，可享 10% 優惠，僅對 AIhubmix 生效。",
   "providerDetailPageClaudePromptCachingTitle": "Claude Prompt Caching",
-  "providerDetailPageClaudePromptCachingHelp": "透過 Claude 官方或 OpenRouter 呼叫 Claude 時，為 System Prompt 附加 cache_control。",
+  "providerDetailPageClaudePromptCachingHelp": "透過 Claude 官方或 OpenRouter 呼叫 Claude 時附加 cache_control。",
+  "providerDetailPageClaudePromptCachingTtlTitle": "快取 TTL",
+  "providerDetailPageClaudePromptCachingTtlHelp": "5 分鐘為預設值。1 小時寫入成本更高，但長對話中可減少重複重建快取。",
+  "providerDetailPageClaudePromptCachingTtl5m": "5 分鐘",
+  "providerDetailPageClaudePromptCachingTtl1h": "1 小時",
   "providerDetailPageBalanceTitle": "帳戶餘額",
   "providerDetailPageBalanceInfo": "取得帳戶餘額",
   "providerDetailPageBalanceApiPathLabel": "餘額 API 路徑",
@@ -1668,11 +1677,31 @@
   "messageWebViewNoConsoleMessages": "暫無控制台訊息",
   "messageWebViewRefreshTooltip": "重新整理",
   "messageWebViewForwardTooltip": "前進",
+  "providerDetailPageMultiSelectButton": "多選",
   "providerDetailPageBatchDetectButton": "檢測",
   "providerDetailPageBatchDetecting": "檢測中...",
   "providerDetailPageBatchDetectStart": "開始檢測",
   "providerDetailPageDetectSuccess": "檢測成功",
   "providerDetailPageDetectFailed": "檢測失敗",
+  "providerDetailPageDeleteSelectedModelsButton": "刪除",
+  "providerDetailPageDeleteSelectedModelsTooltip": "刪除所選模型",
+  "providerDetailPageDeleteSelectedModelsConfirm": "確定刪除選中的 {count} 個模型嗎？此操作不可撤回。",
+  "@providerDetailPageDeleteSelectedModelsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "providerDetailPageSelectedModelsDeletedSnackbar": "已刪除 {count} 個模型",
+  "@providerDetailPageSelectedModelsDeletedSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "providerDetailPageDeleteAllModelsTooltip": "刪除全部模型",
   "providerDetailPageDeleteAllModelsWarning": "此操作不可撤回",
   "requestLogSettingTitle": "請求日誌列印",
   "requestLogSettingSubtitle": "開啟後會將請求/回應詳細寫入 logs/logs.txt",

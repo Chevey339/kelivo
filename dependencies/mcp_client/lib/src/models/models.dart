@@ -29,9 +29,86 @@ abstract class Content {
     return switch (type) {
       'text' => TextContent.fromJson(json),
       'image' => ImageContent.fromJson(json),
+      'audio' => AudioContent.fromJson(json),
       'resource' => ResourceContent.fromJson(json),
+      'resource_link' => ResourceLinkContent.fromJson(json),
       _ => throw ArgumentError('Unknown content type: $type'),
     };
+  }
+}
+
+/// Audio content (spec 2025-03-26+).
+@immutable
+class AudioContent extends Content {
+  final String data;
+  final String mimeType;
+  final Map<String, dynamic>? annotations;
+
+  const AudioContent({
+    required this.data,
+    required this.mimeType,
+    this.annotations,
+  });
+
+  @override
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'type': 'audio',
+      'data': data,
+      'mimeType': mimeType,
+    };
+    if (annotations != null) json['annotations'] = annotations!;
+    return json;
+  }
+
+  factory AudioContent.fromJson(Map<String, dynamic> json) {
+    return AudioContent(
+      data: json['data'] as String,
+      mimeType: json['mimeType'] as String,
+      annotations: json['annotations'] as Map<String, dynamic>?,
+    );
+  }
+}
+
+/// Resource link content (spec 2025-06-18+).
+@immutable
+class ResourceLinkContent extends Content {
+  final String uri;
+  final String? name;
+  final String? description;
+  final String? mimeType;
+  final Map<String, dynamic>? annotations;
+  final Map<String, dynamic>? meta;
+
+  const ResourceLinkContent({
+    required this.uri,
+    this.name,
+    this.description,
+    this.mimeType,
+    this.annotations,
+    this.meta,
+  });
+
+  @override
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{'type': 'resource_link', 'uri': uri};
+    if (name != null) json['name'] = name;
+    if (description != null) json['description'] = description;
+    if (mimeType != null) json['mimeType'] = mimeType;
+    if (annotations != null) json['annotations'] = annotations;
+    if (meta != null) json['_meta'] = meta;
+    return json;
+  }
+
+  factory ResourceLinkContent.fromJson(Map<String, dynamic> json) {
+    return ResourceLinkContent(
+      uri: json['uri'] as String,
+      name: json['name'] as String?,
+      description: json['description'] as String?,
+      mimeType: json['mimeType'] as String?,
+      annotations: json['annotations'] as Map<String, dynamic>?,
+      meta: json['_meta'] as Map<String, dynamic>?,
+    );
   }
 }
 
@@ -159,20 +236,42 @@ class ResourceContent extends Content {
   }
 }
 
-/// Tool definition (2025-03-26 compliant)
+/// Tool definition. Spec 2025-06-18+ added `outputSchema`, `_meta`,
+/// and the `title` display name (separate from programmatic `name`).
+/// Spec 2025-11-25+ added `icons`.
 @immutable
 class Tool {
   final String name;
+
+  /// Spec 2025-06-18+: human-readable display name; falls back to [name]
+  /// when null.
+  final String? title;
   final String description;
   final Map<String, dynamic> inputSchema;
+
+  /// Spec 2025-06-18+: optional JSON Schema describing the structured
+  /// result this tool produces.
+  final Map<String, dynamic>? outputSchema;
+
+  /// Spec 2025-11-25+: visual metadata (icon objects with `src`,
+  /// optional `sizes` and `mimeType`).
+  final List<Map<String, dynamic>>? icons;
+
+  /// Spec 2025-06-18+: free-form metadata.
+  final Map<String, dynamic>? meta;
+
   final bool? supportsProgress;
   final bool? supportsCancellation;
   final Map<String, dynamic>? metadata;
 
   const Tool({
     required this.name,
+    this.title,
     required this.description,
     required this.inputSchema,
+    this.outputSchema,
+    this.icons,
+    this.meta,
     this.supportsProgress,
     this.supportsCancellation,
     this.metadata,
@@ -184,6 +283,10 @@ class Tool {
       'description': description,
       'inputSchema': inputSchema,
     };
+    if (title != null) json['title'] = title;
+    if (outputSchema != null) json['outputSchema'] = outputSchema;
+    if (icons != null) json['icons'] = icons;
+    if (meta != null) json['_meta'] = meta;
     if (supportsProgress == true) {
       json['supportsProgress'] = supportsProgress;
     }
@@ -197,8 +300,15 @@ class Tool {
   factory Tool.fromJson(Map<String, dynamic> json) {
     return Tool(
       name: json['name'] as String,
+      title: json['title'] as String?,
       description: json['description'] as String? ?? '',
       inputSchema: json['inputSchema'] as Map<String, dynamic>,
+      outputSchema: json['outputSchema'] as Map<String, dynamic>?,
+      icons:
+          (json['icons'] as List?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList(),
+      meta: json['_meta'] as Map<String, dynamic>?,
       supportsProgress: json['supportsProgress'] as bool?,
       supportsCancellation: json['supportsCancellation'] as bool?,
       metadata: json['metadata'] as Map<String, dynamic>?,
@@ -206,18 +316,26 @@ class Tool {
   }
 }
 
-/// Tool call result
+/// Tool call result. Spec 2025-06-18 added `structuredContent`
+/// (paired with `Tool.outputSchema`).
 @immutable
 class CallToolResult {
   final List<Content> content;
+  final Map<String, dynamic>? structuredContent;
   final bool isStreaming;
   final bool? isError;
 
-  const CallToolResult(this.content, {this.isStreaming = false, this.isError});
+  const CallToolResult(
+    this.content, {
+    this.structuredContent,
+    this.isStreaming = false,
+    this.isError,
+  });
 
   Map<String, dynamic> toJson() {
     return {
       'content': content.map((c) => c.toJson()).toList(),
+      if (structuredContent != null) 'structuredContent': structuredContent,
       'isStreaming': isStreaming,
       if (isError != null) 'isError': isError,
     };
@@ -233,6 +351,7 @@ class CallToolResult {
 
     return CallToolResult(
       contents,
+      structuredContent: json['structuredContent'] as Map<String, dynamic>?,
       isStreaming: json['isStreaming'] as bool? ?? false,
       isError: json['isError'] as bool?,
     );
@@ -244,15 +363,27 @@ class CallToolResult {
 class Resource {
   final String uri;
   final String name;
+
+  /// Spec 2025-06-18+: human-readable display name. Falls back to [name].
+  final String? title;
   final String description;
   final String? mimeType;
+
+  /// Spec 2025-11-25+: visual metadata (icon objects).
+  final List<Map<String, dynamic>>? icons;
+
+  /// Spec 2025-06-18+: free-form `_meta` map.
+  final Map<String, dynamic>? meta;
   final Map<String, dynamic>? metadata;
 
   const Resource({
     required this.uri,
     required this.name,
+    this.title,
     required this.description,
     this.mimeType,
+    this.icons,
+    this.meta,
     this.metadata,
   });
 
@@ -262,7 +393,10 @@ class Resource {
       'name': name,
       'description': description,
     };
+    if (title != null) json['title'] = title;
     if (mimeType != null) json['mimeType'] = mimeType;
+    if (icons != null) json['icons'] = icons;
+    if (meta != null) json['_meta'] = meta;
     if (metadata != null) json['metadata'] = metadata!;
     return json;
   }
@@ -271,8 +405,14 @@ class Resource {
     return Resource(
       uri: json['uri'] as String,
       name: json['name'] as String,
+      title: json['title'] as String?,
       description: json['description'] as String,
       mimeType: json['mimeType'] as String?,
+      icons:
+          (json['icons'] as List?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList(),
+      meta: json['_meta'] as Map<String, dynamic>?,
       metadata: json['metadata'] as Map<String, dynamic>?,
     );
   }
@@ -413,14 +553,26 @@ class PromptArgument {
 @immutable
 class Prompt {
   final String name;
+
+  /// Spec 2025-06-18+: human-readable display name.
+  final String? title;
   final String? description;
   final List<PromptArgument> arguments;
+
+  /// Spec 2025-11-25+: visual metadata.
+  final List<Map<String, dynamic>>? icons;
+
+  /// Spec 2025-06-18+: `_meta` map.
+  final Map<String, dynamic>? meta;
   final Map<String, dynamic>? metadata;
 
   const Prompt({
     required this.name,
+    this.title,
     this.description,
     required this.arguments,
+    this.icons,
+    this.meta,
     this.metadata,
   });
 
@@ -429,7 +581,10 @@ class Prompt {
       'name': name,
       'arguments': arguments.map((arg) => arg.toJson()).toList(),
     };
+    if (title != null) json['title'] = title!;
     if (description != null) json['description'] = description!;
+    if (icons != null) json['icons'] = icons!;
+    if (meta != null) json['_meta'] = meta!;
     if (metadata != null) json['metadata'] = metadata!;
     return json;
   }
@@ -443,8 +598,14 @@ class Prompt {
 
     return Prompt(
       name: json['name'] as String,
+      title: json['title'] as String?,
       description: json['description'] as String?,
       arguments: arguments,
+      icons:
+          (json['icons'] as List?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList(),
+      meta: json['_meta'] as Map<String, dynamic>?,
       metadata: json['metadata'] as Map<String, dynamic>?,
     );
   }
@@ -1099,20 +1260,27 @@ class ClientInfo {
 /// Client capabilities configuration
 @immutable
 class ClientCapabilities {
-  /// Root management support
+  /// Root management support — server may request `roots/list` and the
+  /// client responds with [Client.roots].
   final bool roots;
 
   /// Whether roots list changes are sent as notifications
   final bool rootsListChanged;
 
-  /// Sampling support
+  /// Sampling support — host's LLM is reachable through this client (the
+  /// server can ask for completions via `sampling/createMessage`).
   final bool sampling;
+
+  /// Elicitation support — server can request user input via
+  /// `elicitation/create` (spec 2025-06-18+).
+  final bool elicitation;
 
   /// Create a capabilities object with specified settings
   const ClientCapabilities({
     this.roots = false,
     this.rootsListChanged = false,
     this.sampling = false,
+    this.elicitation = false,
   });
 
   /// Convert capabilities to JSON
@@ -1127,17 +1295,23 @@ class ClientCapabilities {
       result['sampling'] = {};
     }
 
+    if (elicitation) {
+      result['elicitation'] = {};
+    }
+
     return result;
   }
 
   factory ClientCapabilities.fromJson(Map<String, dynamic> json) {
     final rootsConfig = json['roots'] as Map<String, dynamic>?;
     final samplingConfig = json['sampling'] as Map<String, dynamic>?;
+    final elicitationConfig = json['elicitation'] as Map<String, dynamic>?;
 
     return ClientCapabilities(
       roots: rootsConfig != null,
       rootsListChanged: rootsConfig?['listChanged'] as bool? ?? false,
       sampling: samplingConfig != null,
+      elicitation: elicitationConfig != null,
     );
   }
 }
@@ -1636,4 +1810,103 @@ class ProgressNotification {
       total: json['total'] != null ? (json['total'] as num).toDouble() : null,
     );
   }
+}
+
+// ============================================================================
+// Deferred Loading Support (Progressive Tool Disclosure)
+// ============================================================================
+
+/// Lightweight tool metadata (name + description only)
+/// Used for token-efficient LLM context in deferred loading mode
+@immutable
+class ToolMetadata {
+  final String name;
+  final String description;
+
+  const ToolMetadata({required this.name, required this.description});
+
+  /// Create from Tool object
+  factory ToolMetadata.fromTool(Tool tool) =>
+      ToolMetadata(name: tool.name, description: tool.description);
+
+  /// Create from Map (for compatibility with McpClientManager.getTools())
+  factory ToolMetadata.fromMap(Map<String, dynamic> map) => ToolMetadata(
+    name: map['name'] as String,
+    description: map['description'] as String? ?? '',
+  );
+
+  Map<String, dynamic> toJson() => {'name': name, 'description': description};
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ToolMetadata &&
+          name == other.name &&
+          description == other.description;
+
+  @override
+  int get hashCode => Object.hash(name, description);
+
+  @override
+  String toString() => 'ToolMetadata(name: $name, description: $description)';
+}
+
+/// Cache layer for tool definitions
+/// Provides metadata extraction and full schema lookup
+/// LLM-agnostic: can be used without mcp_llm
+class ToolRegistry {
+  final Map<String, ToolMetadata> _metadata = {};
+  final Map<String, Map<String, dynamic>> _schemas = {};
+  bool _initialized = false;
+
+  /// Cache tools from Map list (McpClientManager.getTools() result)
+  void cacheFromMaps(List<Map<String, dynamic>> tools) {
+    _metadata.clear();
+    _schemas.clear();
+    for (final tool in tools) {
+      final name = tool['name'] as String;
+      _metadata[name] = ToolMetadata.fromMap(tool);
+      _schemas[name] = Map<String, dynamic>.from(tool);
+    }
+    _initialized = true;
+  }
+
+  /// Cache tools from Tool list (Client.listTools() result)
+  void cacheFromTools(List<Tool> tools) {
+    _metadata.clear();
+    _schemas.clear();
+    for (final tool in tools) {
+      _metadata[tool.name] = ToolMetadata.fromTool(tool);
+      _schemas[tool.name] = tool.toJson();
+    }
+    _initialized = true;
+  }
+
+  /// Check if registry is initialized
+  bool get isInitialized => _initialized;
+
+  /// Get all metadata (lightweight, for LLM context)
+  List<ToolMetadata> getAllMetadata() => _metadata.values.toList();
+
+  /// Get metadata for specific tool
+  ToolMetadata? getMetadata(String toolName) => _metadata[toolName];
+
+  /// Get full tool schema as Map (for execution/validation)
+  Map<String, dynamic>? getSchema(String toolName) => _schemas[toolName];
+
+  /// Check if tool exists
+  bool hasTool(String toolName) => _schemas.containsKey(toolName);
+
+  /// Get all tool names
+  List<String> get toolNames => _schemas.keys.toList();
+
+  /// Clear cache (call on tools/list_changed notification)
+  void invalidateAll() {
+    _metadata.clear();
+    _schemas.clear();
+    _initialized = false;
+  }
+
+  /// Get tool count
+  int get count => _schemas.length;
 }

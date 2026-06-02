@@ -805,8 +805,9 @@ class NetworkTtsService {
     final outputFmt = (opt.outputFormat.isEmpty)
         ? 'mp3_44100_128'
         : opt.outputFormat;
+    final apiBase = base.toLowerCase().endsWith('/v1') ? base : '$base/v1';
     final uri = Uri.parse(
-      '$base/v1/text-to-speech/${opt.voiceId}?output_format=$outputFmt',
+      '$apiBase/text-to-speech/${opt.voiceId}?output_format=$outputFmt',
     );
     final body = jsonEncode({'text': text, 'model_id': opt.modelId});
     final req = http.Request('POST', uri)

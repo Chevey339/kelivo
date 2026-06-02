@@ -1862,6 +1862,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMoreSheetShare => '分享';
 
   @override
+  String get messageMoreSheetSelectMessages => '选择消息';
+
+  @override
   String get messageMoreSheetCreateBranch => '创建分支';
 
   @override
@@ -2084,6 +2087,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatSelectionThinkingContent => '思考内容';
+
+  @override
+  String get chatSelectionDeleteSelected => '删除所选';
+
+  @override
+  String get chatSelectionSelectMessagesToDelete => '请选择要删除的消息';
+
+  @override
+  String chatSelectionDeleteSelectedConfirm(int count) {
+    return '确定要删除已选择的$count个版本吗？此操作不可撤销。';
+  }
+
+  @override
+  String chatSelectionDeleteSelectedAllVersionsConfirm(int count) {
+    return '确定要删除已选择$count条消息的全部版本吗？此操作不可撤销。';
+  }
 
   @override
   String get messageExportSheetAssistant => '助手';
@@ -2958,7 +2977,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providerDetailPageClaudePromptCachingHelp =>
-      '通过 Claude 官方或 OpenRouter 调用 Claude 时，为 System Prompt 附加 cache_control。';
+      '通过 Claude 官方或 OpenRouter 调用 Claude 时附加 cache_control。';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtlTitle => '缓存 TTL';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtlHelp =>
+      '5 分钟为默认值。1 小时写入成本更高，但长对话中可减少重复重建缓存。';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtl5m => '5 分钟';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtl1h => '1 小时';
 
   @override
   String get providerDetailPageBalanceTitle => '账户余额';
@@ -4675,6 +4707,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarOcrTooltip => 'OCR 文字识别';
 
   @override
+  String get providerDetailPageMultiSelectButton => '多选';
+
+  @override
   String get providerDetailPageBatchDetectButton => '检测';
 
   @override
@@ -4688,6 +4723,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providerDetailPageDetectFailed => '检测失败';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsButton => '删除';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsTooltip => '删除所选模型';
+
+  @override
+  String providerDetailPageDeleteSelectedModelsConfirm(int count) {
+    return '确定删除选中的 $count 个模型吗？此操作不可撤回。';
+  }
+
+  @override
+  String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
+    return '已删除 $count 个模型';
+  }
+
+  @override
+  String get providerDetailPageDeleteAllModelsTooltip => '删除全部模型';
 
   @override
   String get providerDetailPageDeleteAllModelsWarning => '此操作不可撤回';
@@ -7050,6 +7104,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageMoreSheetShare => '分享';
 
   @override
+  String get messageMoreSheetSelectMessages => '选择消息';
+
+  @override
   String get messageMoreSheetCreateBranch => '创建分支';
 
   @override
@@ -7272,6 +7329,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatSelectionThinkingContent => '思考内容';
+
+  @override
+  String get chatSelectionDeleteSelected => '删除所选';
+
+  @override
+  String get chatSelectionSelectMessagesToDelete => '请选择要删除的消息';
+
+  @override
+  String chatSelectionDeleteSelectedConfirm(int count) {
+    return '确定要删除已选择的$count个版本吗？此操作不可撤销。';
+  }
+
+  @override
+  String chatSelectionDeleteSelectedAllVersionsConfirm(int count) {
+    return '确定要删除已选择$count条消息的全部版本吗？此操作不可撤销。';
+  }
 
   @override
   String get messageExportSheetAssistant => '助手';
@@ -8146,7 +8219,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageClaudePromptCachingHelp =>
-      '通过 Claude 官方或 OpenRouter 调用 Claude 时，为 System Prompt 附加 cache_control。';
+      '通过 Claude 官方或 OpenRouter 调用 Claude 时附加 cache_control。';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtlTitle => '缓存 TTL';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtlHelp =>
+      '5 分钟为默认值。1 小时写入成本更高，但长对话中可减少重复重建缓存。';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtl5m => '5 分钟';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtl1h => '1 小时';
 
   @override
   String get providerDetailPageBalanceTitle => '账户余额';
@@ -9863,6 +9949,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarOcrTooltip => 'OCR 文字识别';
 
   @override
+  String get providerDetailPageMultiSelectButton => '多选';
+
+  @override
   String get providerDetailPageBatchDetectButton => '检测';
 
   @override
@@ -9876,6 +9965,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageDetectFailed => '检测失败';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsButton => '删除';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsTooltip => '删除所选模型';
+
+  @override
+  String providerDetailPageDeleteSelectedModelsConfirm(int count) {
+    return '确定删除选中的 $count 个模型吗？此操作不可撤回。';
+  }
+
+  @override
+  String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
+    return '已删除 $count 个模型';
+  }
+
+  @override
+  String get providerDetailPageDeleteAllModelsTooltip => '删除全部模型';
 
   @override
   String get providerDetailPageDeleteAllModelsWarning => '此操作不可撤回';
@@ -12237,6 +12345,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageMoreSheetShare => '分享';
 
   @override
+  String get messageMoreSheetSelectMessages => '選擇訊息';
+
+  @override
   String get messageMoreSheetCreateBranch => '建立分支';
 
   @override
@@ -12459,6 +12570,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatSelectionThinkingContent => '思考內容';
+
+  @override
+  String get chatSelectionDeleteSelected => '刪除所選';
+
+  @override
+  String get chatSelectionSelectMessagesToDelete => '請選擇要刪除的訊息';
+
+  @override
+  String chatSelectionDeleteSelectedConfirm(int count) {
+    return '確定要刪除已選擇的$count個版本嗎？此操作不可撤銷。';
+  }
+
+  @override
+  String chatSelectionDeleteSelectedAllVersionsConfirm(int count) {
+    return '確定要刪除已選擇$count條訊息的全部版本嗎？此操作不可撤銷。';
+  }
 
   @override
   String get messageExportSheetAssistant => '助理';
@@ -13333,7 +13460,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageClaudePromptCachingHelp =>
-      '透過 Claude 官方或 OpenRouter 呼叫 Claude 時，為 System Prompt 附加 cache_control。';
+      '透過 Claude 官方或 OpenRouter 呼叫 Claude 時附加 cache_control。';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtlTitle => '快取 TTL';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtlHelp =>
+      '5 分鐘為預設值。1 小時寫入成本更高，但長對話中可減少重複重建快取。';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtl5m => '5 分鐘';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtl1h => '1 小時';
 
   @override
   String get providerDetailPageBalanceTitle => '帳戶餘額';
@@ -15051,6 +15191,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarOcrTooltip => 'OCR 文字辨識';
 
   @override
+  String get providerDetailPageMultiSelectButton => '多選';
+
+  @override
   String get providerDetailPageBatchDetectButton => '檢測';
 
   @override
@@ -15064,6 +15207,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageDetectFailed => '檢測失敗';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsButton => '刪除';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsTooltip => '刪除所選模型';
+
+  @override
+  String providerDetailPageDeleteSelectedModelsConfirm(int count) {
+    return '確定刪除選中的 $count 個模型嗎？此操作不可撤回。';
+  }
+
+  @override
+  String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
+    return '已刪除 $count 個模型';
+  }
+
+  @override
+  String get providerDetailPageDeleteAllModelsTooltip => '刪除全部模型';
 
   @override
   String get providerDetailPageDeleteAllModelsWarning => '此操作不可撤回';

@@ -157,9 +157,6 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     // interfering with block parsing for complex documents.
     // components.insert(0, LabelValueLineMd());
     components.removeWhere((c) => c is CodeBlockMd);
-    // Ensure backslash-escaped punctuation renders literally (e.g., \*, \`, \[)
-    // Must run before emphasis/links/code parsing to neutralize markers.
-    components.insert(0, BackslashEscapeMd());
     // Conditionally add LaTeX/math renderers
     if (settings.enableMathRendering) {
       // Block-level LaTeX (e.g., $$...$$ or \[...\])
@@ -194,10 +191,31 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       }
     }
 
+    final boldIdxInline = inlineComponents.indexWhere((c) => c is BoldMd);
+    if (boldIdxInline != -1) {
+      inlineComponents[boldIdxInline] = EscapeAwareBoldMd();
+    }
+    final italicIdxInline = inlineComponents.indexWhere((c) => c is ItalicMd);
+    if (italicIdxInline != -1) {
+      inlineComponents[italicIdxInline] = EscapeAwareItalicMd();
+    }
+    final imageIdxInline = inlineComponents.indexWhere((c) => c is ImageMd);
+    if (imageIdxInline != -1) {
+      inlineComponents[imageIdxInline] = EscapeAwareImageMd();
+    }
+    final codeIdxInline = inlineComponents.indexWhere(
+      (c) => c is HighlightedText,
+    );
+    if (codeIdxInline != -1) {
+      inlineComponents[codeIdxInline] = EscapeAwareHighlightedTextMd();
+    }
     final linkIdxInline = inlineComponents.indexWhere((c) => c is ATagMd);
     if (linkIdxInline != -1) {
       inlineComponents[linkIdxInline] = LineSafeLinkMd();
     }
+    // Keep escaped punctuation out of block parsing so it cannot split
+    // \( ... \) math containing \{...\}; inline math is registered ahead of it.
+    inlineComponents.add(BackslashEscapeMd());
     // codeBuilder handles rendering. A custom BlockMd for fences can
     // interfere with block segmentation in some cases.
     // Resolve user preferred code font family (default to monospace)
@@ -603,6 +621,14 @@ String _preprocessFences(
   var out = input.replaceAll('\r\n', '\n');
   out = _maskBlockquoteFenceMarkers(out);
 
+  // Move fenced code from list lines to the next line before masking so list
+  // fences are protected from later inline math normalization.
+  final bulletFence = RegExp(
+    r"^(\s*(?:[*+-]|\d+\.)\s+)```([^\s`]*)\s*$",
+    multiLine: true,
+  );
+  out = out.replaceAllMapped(bulletFence, (m) => "${m[1]}\n```${m[2]}");
+
   // STEP 1: MASKING - Protect code blocks from LaTeX processing
   // This prevents $...$ inside code from being converted to LaTeX
   final Map<String, String> codeMap = {};
@@ -703,13 +729,6 @@ String _preprocessFences(
         : '\n';
     return '$prefix\$\$\n$body\n\$\$$suffix';
   });
-
-  // 1) Move fenced code from list lines to the next line: "* ```lang" -> "*\n```lang"
-  final bulletFence = RegExp(
-    r"^(\s*(?:[*+-]|\d+\.)\s+)```([^\s`]*)\s*$",
-    multiLine: true,
-  );
-  out = out.replaceAllMapped(bulletFence, (m) => "${m[1]}\n```${m[2]}");
 
   // 2) Dedent opening fences: leading spaces before ```lang
   final dedentOpen = RegExp(r"^[ \t]+```([^\n`]*)\s*$", multiLine: true);
@@ -1100,11 +1119,15 @@ WidgetSpan _inlineMathSpan(Widget math) {
 String _replaceInlineDollarMath(String input) {
   final buf = StringBuffer();
   var i = 0;
+  var previousDollarWasInlineClose = false;
   while (i < input.length) {
     if (input.codeUnitAt(i) == 0x24 &&
         !_isEscaped(input, i) &&
-        !_isDoubleDollar(input, i) &&
-        _canOpenDollarMath(input, i)) {
+        _canOpenDollarMath(
+          input,
+          i,
+          allowAdjacentOpen: previousDollarWasInlineClose,
+        )) {
       final close = _findClosingDollarMath(input, i + 1);
       if (close != -1) {
         final body = input.substring(i + 1, close);
@@ -1113,10 +1136,12 @@ String _replaceInlineDollarMath(String input) {
           ..write(body)
           ..write(r'\)');
         i = close + 1;
+        previousDollarWasInlineClose = true;
         continue;
       }
     }
     buf.writeCharCode(input.codeUnitAt(i));
+    previousDollarWasInlineClose = false;
     i++;
   }
   return buf.toString();
@@ -1135,7 +1160,7 @@ int _findClosingDollarMath(String input, int start) {
       i++;
       continue;
     }
-    if (ch != 0x24 || _isDoubleDollar(input, i)) continue;
+    if (ch != 0x24) continue;
 
     final body = input.substring(start, i);
     if (_isValidDollarMathBody(
@@ -1145,6 +1170,7 @@ int _findClosingDollarMath(String input, int start) {
         _canCloseDollarMath(input, i)) {
       return i;
     }
+    return -1;
   }
   return -1;
 }
@@ -1177,25 +1203,62 @@ bool _containsUnescapedPipe(String input) {
   return false;
 }
 
-bool _canOpenDollarMath(String input, int index) {
+bool _canOpenDollarMath(
+  String input,
+  int index, {
+  bool allowAdjacentOpen = false,
+}) {
+  if (index + 1 >= input.length) return false;
+  final next = input.codeUnitAt(index + 1);
+  if (!_canStartDollarMathBody(next)) return false;
   if (index == 0) return true;
   final prev = input.codeUnitAt(index - 1);
-  return _isWhitespaceCodeUnit(prev) || _isDollarMathOpeningBoundary(prev);
-}
-
-bool _isDollarMathOpeningBoundary(int codeUnit) {
-  if (codeUnit == 0x28) return true; // (
-  if (codeUnit == 0x3A) return true; // :
-  if (codeUnit == 0xFF1A) return true; // full-width colon
-  if (codeUnit == 0xFF0C) return true; // full-width comma
-  return false;
+  if (prev == 0x24) {
+    return allowAdjacentOpen && _canStartAdjacentDollarMathBody(next);
+  }
+  return _isWhitespaceCodeUnit(prev) || _isDollarMathBoundary(prev);
 }
 
 bool _canCloseDollarMath(String input, int index) {
+  if (index == 0 || _isWhitespaceCodeUnit(input.codeUnitAt(index - 1))) {
+    return false;
+  }
   final nextIndex = index + 1;
   if (nextIndex >= input.length) return true;
   final next = input.codeUnitAt(nextIndex);
-  return next != 0x24 && !_isAsciiLetterOrDigit(next);
+  if (next == 0x24) return true;
+  return next != 0x24 &&
+      (_isWhitespaceCodeUnit(next) || _isDollarMathBoundary(next));
+}
+
+bool _isDollarMathBoundary(int codeUnit) {
+  return _isAsciiPunctuation(codeUnit) ||
+      _isUnicodePunctuation(codeUnit) ||
+      _isCjkCodeUnit(codeUnit);
+}
+
+bool _canStartDollarMathBody(int codeUnit) {
+  if (_isWhitespaceCodeUnit(codeUnit) || codeUnit == 0x24) return false;
+  if (_isAsciiLetterOrDigit(codeUnit) || codeUnit == 0x5C) return true;
+  if (codeUnit == 0x28 || codeUnit == 0x5B || codeUnit == 0x7B) return true;
+  if (codeUnit == 0x2B || codeUnit == 0x2D) return true;
+  if (codeUnit == 0x7C) return true; // |
+  return !_isClosingOrSentencePunctuation(codeUnit);
+}
+
+bool _canStartAdjacentDollarMathBody(int codeUnit) {
+  if (_isAsciiLetterOrDigit(codeUnit) || codeUnit == 0x5C) return true;
+  if (codeUnit == 0x28 || codeUnit == 0x5B || codeUnit == 0x7B) return true;
+  return codeUnit == 0x2B ||
+      codeUnit == 0x2D ||
+      codeUnit == 0x2A ||
+      codeUnit == 0x2F ||
+      codeUnit == 0x3C ||
+      codeUnit == 0x3D ||
+      codeUnit == 0x3E ||
+      codeUnit == 0x5E ||
+      codeUnit == 0x5F ||
+      codeUnit == 0x7C;
 }
 
 bool _isDoubleDollar(String input, int index) {
@@ -1218,19 +1281,220 @@ bool _isWhitespaceCodeUnit(int codeUnit) {
       codeUnit == 0x0D;
 }
 
+bool _isAsciiDigit(int codeUnit) {
+  return codeUnit >= 0x30 && codeUnit <= 0x39;
+}
+
 bool _isAsciiLetterOrDigit(int codeUnit) {
-  return (codeUnit >= 0x30 && codeUnit <= 0x39) ||
+  return _isAsciiDigit(codeUnit) ||
       (codeUnit >= 0x41 && codeUnit <= 0x5A) ||
       (codeUnit >= 0x61 && codeUnit <= 0x7A);
 }
 
+bool _isClosingOrSentencePunctuation(int codeUnit) {
+  return codeUnit == 0x21 ||
+      codeUnit == 0x22 ||
+      codeUnit == 0x27 ||
+      codeUnit == 0x29 ||
+      codeUnit == 0x2C ||
+      codeUnit == 0x2E ||
+      codeUnit == 0x3A ||
+      codeUnit == 0x3B ||
+      codeUnit == 0x3F ||
+      codeUnit == 0x5D ||
+      codeUnit == 0x7D ||
+      _isUnicodePunctuation(codeUnit);
+}
+
+bool _isAsciiPunctuation(int codeUnit) {
+  return (codeUnit >= 0x21 && codeUnit <= 0x2F) ||
+      (codeUnit >= 0x3A && codeUnit <= 0x40) ||
+      (codeUnit >= 0x5B && codeUnit <= 0x60) ||
+      (codeUnit >= 0x7B && codeUnit <= 0x7E);
+}
+
+bool _isUnicodePunctuation(int codeUnit) {
+  return (codeUnit >= 0x2000 && codeUnit <= 0x206F) ||
+      (codeUnit >= 0x3000 && codeUnit <= 0x303F) ||
+      (codeUnit >= 0xFE10 && codeUnit <= 0xFE1F) ||
+      (codeUnit >= 0xFE30 && codeUnit <= 0xFE4F) ||
+      (codeUnit >= 0xFF01 && codeUnit <= 0xFF0F) ||
+      (codeUnit >= 0xFF1A && codeUnit <= 0xFF20) ||
+      (codeUnit >= 0xFF3B && codeUnit <= 0xFF40) ||
+      (codeUnit >= 0xFF5B && codeUnit <= 0xFF65);
+}
+
+bool _isCjkCodeUnit(int codeUnit) {
+  return (codeUnit >= 0x3400 && codeUnit <= 0x4DBF) ||
+      (codeUnit >= 0x4E00 && codeUnit <= 0x9FFF) ||
+      (codeUnit >= 0xF900 && codeUnit <= 0xFAFF);
+}
+
 String _normalizeMathTex(String tex) {
-  return tex.replaceAllMapped(RegExp(r'\\\|([\s\S]*?)\\\|'), (match) {
+  final escapedSpecials = _escapeInlineMathSpecials(tex);
+  final normalizedBraces = _escapeLikelyLiteralMathBraces(escapedSpecials);
+  return normalizedBraces.replaceAllMapped(RegExp(r'\\\|([\s\S]*?)\\\|'), (
+    match,
+  ) {
     final body = match.group(1) ?? '';
     return r'\lVert '
         '$body'
         r' \rVert';
   });
+}
+
+String _escapeInlineMathSpecials(String tex) {
+  final buf = StringBuffer();
+  for (var i = 0; i < tex.length; i++) {
+    final ch = tex.codeUnitAt(i);
+    if (ch == 0x23 && !_isEscaped(tex, i)) {
+      buf.write(r'\#');
+    } else {
+      buf.writeCharCode(ch);
+    }
+  }
+  return buf.toString();
+}
+
+String _escapeLikelyLiteralMathBraces(String tex) {
+  final escapeOpens = <int>{};
+  final escapeCloses = <int>{};
+  final stack = <int>[];
+
+  for (var i = 0; i < tex.length; i++) {
+    final ch = tex.codeUnitAt(i);
+    if (ch == 0x5C) {
+      i++;
+      continue;
+    }
+    if (ch == 0x7B) {
+      stack.add(i);
+      continue;
+    }
+    if (ch != 0x7D || stack.isEmpty) continue;
+
+    final open = stack.removeLast();
+    if (stack.isNotEmpty) continue;
+    if (_looksLikeLiteralMathBraceGroup(tex, open, i)) {
+      escapeOpens.add(open);
+      escapeCloses.add(i);
+    }
+  }
+
+  if (escapeOpens.isEmpty) return tex;
+  final buf = StringBuffer();
+  for (var i = 0; i < tex.length; i++) {
+    if (escapeOpens.contains(i)) {
+      buf.write(r'\{');
+    } else if (escapeCloses.contains(i)) {
+      buf.write(r'\}');
+    } else {
+      buf.writeCharCode(tex.codeUnitAt(i));
+    }
+  }
+  return buf.toString();
+}
+
+bool _looksLikeLiteralMathBraceGroup(String tex, int open, int close) {
+  if (_isCommandArgumentBrace(tex, open) || _isScriptArgumentBrace(tex, open)) {
+    return false;
+  }
+  if (!_hasLiteralBraceBoundaryBefore(tex, open)) return false;
+
+  final body = tex.substring(open + 1, close).trim();
+  if (body.isEmpty) return true;
+  if (body.startsWith(r'\')) return false;
+  if (_nextNonWhitespaceCodeUnit(tex, close + 1) == 0x5F &&
+      body.contains('_')) {
+    return true;
+  }
+  return body.contains(',') ||
+      body.contains(':') ||
+      body.contains(';') ||
+      body.contains(r'\in') ||
+      body.contains(r'\notin') ||
+      body.contains(r'\mid') ||
+      body.contains('|');
+}
+
+bool _isCommandArgumentBrace(String tex, int open) {
+  final prev = _previousNonWhitespaceIndex(tex, open - 1);
+  if (prev == -1) return false;
+
+  if (tex.codeUnitAt(prev) == 0x5D) {
+    final optionalOpen = _findMatchingOpenBracket(tex, prev);
+    if (optionalOpen != -1) {
+      final beforeOptional = _previousNonWhitespaceIndex(tex, optionalOpen - 1);
+      if (beforeOptional != -1 && _endsControlWordAt(tex, beforeOptional)) {
+        return true;
+      }
+    }
+  }
+
+  return _endsControlWordAt(tex, prev);
+}
+
+bool _isScriptArgumentBrace(String tex, int open) {
+  final prev = _previousNonWhitespaceIndex(tex, open - 1);
+  if (prev == -1) return false;
+  final ch = tex.codeUnitAt(prev);
+  return ch == 0x5E || ch == 0x5F;
+}
+
+bool _hasLiteralBraceBoundaryBefore(String tex, int open) {
+  final prev = _previousNonWhitespaceIndex(tex, open - 1);
+  if (prev == -1) return true;
+  final ch = tex.codeUnitAt(prev);
+  if (ch == 0x5C || ch == 0x5E || ch == 0x5F || ch == 0x7D) return false;
+  if (_isAsciiLetterOrDigit(ch)) return false;
+  return true;
+}
+
+int _previousNonWhitespaceIndex(String input, int index) {
+  for (var i = index; i >= 0; i--) {
+    if (!_isWhitespaceCodeUnit(input.codeUnitAt(i))) return i;
+  }
+  return -1;
+}
+
+int _nextNonWhitespaceCodeUnit(String input, int index) {
+  for (var i = index; i < input.length; i++) {
+    final ch = input.codeUnitAt(i);
+    if (!_isWhitespaceCodeUnit(ch)) return ch;
+  }
+  return -1;
+}
+
+bool _endsControlWordAt(String tex, int index) {
+  if (index < 0 || index >= tex.length) return false;
+  var start = index;
+  while (start >= 0 && _isAsciiLetter(tex.codeUnitAt(start))) {
+    start--;
+  }
+  return start < index && start >= 0 && tex.codeUnitAt(start) == 0x5C;
+}
+
+bool _isAsciiLetter(int codeUnit) {
+  return (codeUnit >= 0x41 && codeUnit <= 0x5A) ||
+      (codeUnit >= 0x61 && codeUnit <= 0x7A);
+}
+
+int _findMatchingOpenBracket(String tex, int close) {
+  var depth = 0;
+  for (var i = close; i >= 0; i--) {
+    final ch = tex.codeUnitAt(i);
+    if (ch == 0x5C) {
+      i--;
+      continue;
+    }
+    if (ch == 0x5D) {
+      depth++;
+    } else if (ch == 0x5B) {
+      depth--;
+      if (depth == 0) return i;
+    }
+  }
+  return -1;
 }
 
 String _softBreakInline(String input) {
@@ -4385,7 +4649,33 @@ class ModernRadioMd extends BlockMd {
 // Prevent link regex from spanning across lines (dotAll=true in engine).
 class LineSafeLinkMd extends ATagMd {
   @override
-  RegExp get exp => RegExp(r"(?<!\!)\[[^\]\n]+\]\([^\s]*\)");
+  RegExp get exp =>
+      RegExp(r"(?<!\\)(?<!\!)\[[^\]\n]+(?<!\\)\]\([^\s\n]*(?<!\\)\)");
+}
+
+class EscapeAwareImageMd extends ImageMd {
+  @override
+  RegExp get exp =>
+      RegExp(r"(?<!\\)\!\[[^\[\]\n]*(?<!\\)\]\([^\s\n]*(?<!\\)\)");
+}
+
+class EscapeAwareBoldMd extends BoldMd {
+  @override
+  RegExp get exp =>
+      RegExp(r"(?<![\\*])\*\*(?!\s)(.+?)(?<![\s\\])\*\*(?!\*)", dotAll: true);
+}
+
+class EscapeAwareItalicMd extends ItalicMd {
+  @override
+  RegExp get exp => RegExp(
+    r"(?<![\\*])\*(?!\*)(?!\s)(.+?)(?<![\s\\*])\*(?!\*)",
+    dotAll: true,
+  );
+}
+
+class EscapeAwareHighlightedTextMd extends HighlightedText {
+  @override
+  RegExp get exp => RegExp(r"(?<!\\)`(?!`)(.+?)(?<![\\`])`(?!`)");
 }
 
 /// Treat backslash-escaped punctuation as a literal character, so that

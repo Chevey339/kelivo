@@ -381,15 +381,9 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       try {
         final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
         if (u != null) {
-          final inTok = (u['input_tokens'] ?? 0) as int? ?? 0;
-          final outTok = (u['output_tokens'] ?? 0) as int? ?? 0;
-          final round = TokenUsage(
-            promptTokens: inTok,
-            completionTokens: outTok,
-            cachedTokens: 0,
-            totalTokens: inTok + outTok,
+          totalUsage = (totalUsage ?? const TokenUsage()).merge(
+            _claudeUsageFromMap(u),
           );
-          totalUsage = (totalUsage ?? const TokenUsage()).merge(round);
         }
       } catch (_) {}
       final content = (obj['content'] as List?) ?? const <dynamic>[];
@@ -851,11 +845,9 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
             }
           } else if (type == 'message_delta') {
             final u = obj['usage'] ?? obj['message']?['usage'];
-            if (u != null) {
-              final inTok = (u['input_tokens'] ?? 0) as int;
-              final outTok = (u['output_tokens'] ?? 0) as int;
+            if (u is Map) {
               usage = (usage ?? const TokenUsage()).merge(
-                TokenUsage(promptTokens: inTok, completionTokens: outTok),
+                _claudeUsageFromMap(u.cast<String, dynamic>()),
               );
               roundTokens = usage.totalTokens;
             }
@@ -882,13 +874,8 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     }
 
     if (anthToolUse.isEmpty) {
-      final hadServerTool =
-          assistantBlocks.any(
-            (b) => b['type'] == 'tool_use' || b['type'] == 'text',
-          ) &&
-          srvIndexToId.isNotEmpty;
       final sr = lastStopReason ?? '';
-      if (sr == 'pause_turn' || hadServerTool) {
+      if (sr == 'pause_turn') {
         // Continue this turn with assistant content only (not fully supported by Vertex streamRawPredict yet, but good for future proofing)
         convo = [
           ...convo,

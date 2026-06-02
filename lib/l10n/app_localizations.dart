@@ -3701,6 +3701,12 @@ abstract class AppLocalizations {
   /// **'Share'**
   String get messageMoreSheetShare;
 
+  /// No description provided for @messageMoreSheetSelectMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Messages'**
+  String get messageMoreSheetSelectMessages;
+
   /// No description provided for @messageMoreSheetCreateBranch.
   ///
   /// In en, this message translates to:
@@ -4096,6 +4102,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Thinking content'**
   String get chatSelectionThinkingContent;
+
+  /// No description provided for @chatSelectionDeleteSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Selected'**
+  String get chatSelectionDeleteSelected;
+
+  /// No description provided for @chatSelectionSelectMessagesToDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select messages to delete'**
+  String get chatSelectionSelectMessagesToDelete;
+
+  /// No description provided for @chatSelectionDeleteSelectedConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count} selected version(s)? This cannot be undone.'**
+  String chatSelectionDeleteSelectedConfirm(int count);
+
+  /// No description provided for @chatSelectionDeleteSelectedAllVersionsConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all versions of {count} selected message(s)? This cannot be undone.'**
+  String chatSelectionDeleteSelectedAllVersionsConfirm(int count);
 
   /// No description provided for @messageExportSheetAssistant.
   ///
@@ -5741,8 +5771,32 @@ abstract class AppLocalizations {
   /// No description provided for @providerDetailPageClaudePromptCachingHelp.
   ///
   /// In en, this message translates to:
-  /// **'Adds cache_control to the system prompt for Claude requests through Anthropic or OpenRouter.'**
+  /// **'Adds cache_control to Claude requests through Anthropic or OpenRouter.'**
   String get providerDetailPageClaudePromptCachingHelp;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingTtlTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache TTL'**
+  String get providerDetailPageClaudePromptCachingTtlTitle;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingTtlHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'5 minutes is the default. 1 hour costs more to write but can reduce rebuilds in long conversations.'**
+  String get providerDetailPageClaudePromptCachingTtlHelp;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingTtl5m.
+  ///
+  /// In en, this message translates to:
+  /// **'5 min'**
+  String get providerDetailPageClaudePromptCachingTtl5m;
+
+  /// No description provided for @providerDetailPageClaudePromptCachingTtl1h.
+  ///
+  /// In en, this message translates to:
+  /// **'1 hour'**
+  String get providerDetailPageClaudePromptCachingTtl1h;
 
   /// No description provided for @providerDetailPageBalanceTitle.
   ///
@@ -9032,6 +9086,12 @@ abstract class AppLocalizations {
   /// **'Image OCR'**
   String get chatInputBarOcrTooltip;
 
+  /// No description provided for @providerDetailPageMultiSelectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-select'**
+  String get providerDetailPageMultiSelectButton;
+
   /// No description provided for @providerDetailPageBatchDetectButton.
   ///
   /// In en, this message translates to:
@@ -9061,6 +9121,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Detection failed'**
   String get providerDetailPageDetectFailed;
+
+  /// No description provided for @providerDetailPageDeleteSelectedModelsButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get providerDetailPageDeleteSelectedModelsButton;
+
+  /// No description provided for @providerDetailPageDeleteSelectedModelsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete selected models'**
+  String get providerDetailPageDeleteSelectedModelsTooltip;
+
+  /// No description provided for @providerDetailPageDeleteSelectedModelsConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count} selected model(s)? This cannot be undone.'**
+  String providerDetailPageDeleteSelectedModelsConfirm(int count);
+
+  /// No description provided for @providerDetailPageSelectedModelsDeletedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {count} model(s)'**
+  String providerDetailPageSelectedModelsDeletedSnackbar(int count);
+
+  /// No description provided for @providerDetailPageDeleteAllModelsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all models'**
+  String get providerDetailPageDeleteAllModelsTooltip;
 
   /// No description provided for @providerDetailPageDeleteAllModelsWarning.
   ///

@@ -644,6 +644,7 @@
   "messageMoreSheetNotImplemented": "暂未实现",
   "messageMoreSheetEdit": "编辑",
   "messageMoreSheetShare": "分享",
+  "messageMoreSheetSelectMessages": "选择消息",
   "messageMoreSheetCreateBranch": "创建分支",
   "messageMoreSheetDelete": "删除本版本",
   "messageMoreSheetDeleteAllVersions": "删除全部版本",
@@ -717,6 +718,10 @@
   "chatSelectionExportImage": "图片",
   "chatSelectionThinkingTools": "思考工具",
   "chatSelectionThinkingContent": "思考内容",
+  "chatSelectionDeleteSelected": "删除所选",
+  "chatSelectionSelectMessagesToDelete": "请选择要删除的消息",
+  "chatSelectionDeleteSelectedConfirm": "确定要删除已选择的{count}个版本吗？此操作不可撤销。",
+  "chatSelectionDeleteSelectedAllVersionsConfirm": "确定要删除已选择{count}条消息的全部版本吗？此操作不可撤销。",
   "messageExportSheetAssistant": "助手",
   "messageExportSheetDefaultTitle": "新对话",
   "messageExportSheetExporting": "正在导出…",
@@ -998,7 +1003,11 @@
   "providerDetailPageAihubmixAppCodeLabel": "应用 Code（享 10% 优惠）",
   "providerDetailPageAihubmixAppCodeHelp": "为请求附加 APP-Code，可享 10% 优惠，仅对 AIhubmix 生效。",
   "providerDetailPageClaudePromptCachingTitle": "Claude Prompt Caching",
-  "providerDetailPageClaudePromptCachingHelp": "通过 Claude 官方或 OpenRouter 调用 Claude 时，为 System Prompt 附加 cache_control。",
+  "providerDetailPageClaudePromptCachingHelp": "通过 Claude 官方或 OpenRouter 调用 Claude 时附加 cache_control。",
+  "providerDetailPageClaudePromptCachingTtlTitle": "缓存 TTL",
+  "providerDetailPageClaudePromptCachingTtlHelp": "5 分钟为默认值。1 小时写入成本更高，但长对话中可减少重复重建缓存。",
+  "providerDetailPageClaudePromptCachingTtl5m": "5 分钟",
+  "providerDetailPageClaudePromptCachingTtl1h": "1 小时",
   "providerDetailPageBalanceTitle": "账户余额",
   "providerDetailPageBalanceInfo": "获取账户余额",
   "providerDetailPageBalanceApiPathLabel": "余额 API 路径",
@@ -1669,11 +1678,31 @@
   "messageWebViewNoConsoleMessages": "暂无控制台消息",
   "messageWebViewRefreshTooltip": "刷新",
   "messageWebViewForwardTooltip": "前进",
+  "providerDetailPageMultiSelectButton": "多选",
   "providerDetailPageBatchDetectButton": "检测",
   "providerDetailPageBatchDetecting": "检测中...",
   "providerDetailPageBatchDetectStart": "开始检测",
   "providerDetailPageDetectSuccess": "检测成功",
   "providerDetailPageDetectFailed": "检测失败",
+  "providerDetailPageDeleteSelectedModelsButton": "删除",
+  "providerDetailPageDeleteSelectedModelsTooltip": "删除所选模型",
+  "providerDetailPageDeleteSelectedModelsConfirm": "确定删除选中的 {count} 个模型吗？此操作不可撤回。",
+  "@providerDetailPageDeleteSelectedModelsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "providerDetailPageSelectedModelsDeletedSnackbar": "已删除 {count} 个模型",
+  "@providerDetailPageSelectedModelsDeletedSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "providerDetailPageDeleteAllModelsTooltip": "删除全部模型",
   "providerDetailPageDeleteAllModelsWarning": "此操作不可撤回",
   "requestLogSettingTitle": "请求日志打印",
   "requestLogSettingSubtitle": "开启后会将请求/响应详情写入 logs/logs.txt",

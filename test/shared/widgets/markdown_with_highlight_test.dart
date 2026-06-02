@@ -11,12 +11,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:flutter_math_fork/tex.dart' show TexEncoderExt;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Finder _findMathWidget() {
   return find.byType(Math);
+}
+
+List<Math> _mathWidgets(WidgetTester tester) {
+  return tester.widgetList<Math>(_findMathWidget()).toList();
+}
+
+List<String> _encodedMathTex(WidgetTester tester) {
+  return _mathWidgets(
+    tester,
+  ).map((widget) => widget.ast?.greenRoot.encodeTeX() ?? '').toList();
 }
 
 List<WidgetSpan> _collectWidgetSpans(InlineSpan span) {
@@ -34,6 +45,43 @@ List<WidgetSpan> _widgetSpansFromRichText(WidgetTester tester) {
   final spans = <WidgetSpan>[];
   for (final richText in tester.widgetList<RichText>(find.byType(RichText))) {
     spans.addAll(_collectWidgetSpans(richText.text));
+  }
+  return spans;
+}
+
+class _ResolvedTextSpan {
+  const _ResolvedTextSpan(this.text, this.style);
+
+  final String text;
+  final TextStyle style;
+}
+
+List<_ResolvedTextSpan> _collectResolvedTextSpans(
+  InlineSpan span, [
+  TextStyle? inheritedStyle,
+]) {
+  if (span is! TextSpan) return const [];
+
+  final effectiveStyle =
+      inheritedStyle?.merge(span.style) ?? span.style ?? const TextStyle();
+  final spans = <_ResolvedTextSpan>[];
+  final text = span.text;
+  if (text != null && text.isNotEmpty) {
+    spans.add(_ResolvedTextSpan(text, effectiveStyle));
+  }
+  final children = span.children;
+  if (children != null) {
+    for (final child in children) {
+      spans.addAll(_collectResolvedTextSpans(child, effectiveStyle));
+    }
+  }
+  return spans;
+}
+
+List<_ResolvedTextSpan> _resolvedTextSpansFromRichText(WidgetTester tester) {
+  final spans = <_ResolvedTextSpan>[];
+  for (final richText in tester.widgetList<RichText>(find.byType(RichText))) {
+    spans.addAll(_collectResolvedTextSpans(richText.text));
   }
   return spans;
 }
@@ -1935,21 +1983,255 @@ A-->B
     (tester) async {
       await tester.pumpWidget(
         _markdownHarness(r'''
-分别$10和$20
+价格 $10 不渲染。
 
-分别 $10和$ 20
+范围$\pm 2$ 有效。
 
-分别$10$和$20$
+标点：$x+y$。
 
-分别 $10$ 和$20$
+空格 $a+b$ 有效。
 '''),
       );
       await tester.pump();
 
+      expect(_findMathWidget(), findsNWidgets(3));
+      expect(find.textContaining(r'$10'), findsOneWidget);
+      expect(find.textContaining(r'$\pm 2$'), findsNothing);
+      expect(find.textContaining(r'$x+y$'), findsNothing);
+      expect(find.textContaining(r'$a+b$'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight renders compact dollar math next to Chinese prose',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'（$PaCO_2$ 降至 30）范围$\pm 2$，目标$SpO_2$。'),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNWidgets(3));
+      expect(find.textContaining(r'$PaCO_2$'), findsNothing);
+      expect(find.textContaining(r'$\pm 2$'), findsNothing);
+      expect(find.textContaining(r'$SpO_2$'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight renders numeric TeX dollar math without spanning prose',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'蕴含的能量高达 $9 \times 10^{16} \, \text{J}$，相当于约 2100 万吨 TNT 炸药的爆炸当量。太阳每秒将约 $4.3 \times 10^9 \, \text{kg}$ 的质量转化为能量',
+        ),
+      );
+      await tester.pump();
+
       expect(_findMathWidget(), findsNWidgets(2));
-      expect(find.textContaining(r'分别$10和$20'), findsOneWidget);
-      expect(find.textContaining(r'分别$10$和$20$'), findsOneWidget);
-      expect(find.textContaining(r'和$20$'), findsOneWidget);
+      expect(find.textContaining(r'$9 \times'), findsNothing);
+      expect(find.textContaining(r'$4.3 \times'), findsNothing);
+      expect(find.textContaining('相当于约 2100 万吨 TNT'), findsOneWidget);
+      expect(
+        find.textContaining(r'，相当于约 2100 万吨 TNT 炸药的爆炸当量。太阳每秒将约 $4.3'),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(r'MarkdownWithCodeHighlight renders paren math with set braces', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness(r'集合\(A = {x \in \mathbb{R} : x^2 < 4}\)等价于开区间。'),
+    );
+    await tester.pump();
+
+    expect(_findMathWidget(), findsOneWidget);
+    expect(find.textContaining(r'\(A ='), findsNothing);
+    expect(find.textContaining('等价于开区间'), findsOneWidget);
+  });
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders dollar math with escaped set braces',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'集合$A = \{x \in \mathbb{R} : x^2 < 4\}$等价于开区间。'),
+      );
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(1));
+      expect(mathWidgets.single.parseError, isNull);
+      final encoded = _encodedMathTex(tester).single;
+      expect(encoded, contains(r'\{'));
+      expect(encoded, contains(r'\}'));
+      expect(encoded, contains(r'\mathbb{R}'));
+      expect(find.textContaining(r'\(A ='), findsNothing);
+      expect(find.textContaining(r'$A ='), findsNothing);
+      expect(find.textContaining('等价于开区间'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight keeps escaped inline delimiters literal',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'*literal\* and **strong\** and `code\` and [label\](https://example.com)',
+        ),
+      );
+      await tester.pump();
+
+      final spans = _resolvedTextSpansFromRichText(tester);
+      final plainText = spans.map((span) => span.text).join();
+
+      expect(
+        plainText,
+        contains(
+          r'*literal* and **strong** and `code` and [label](https://example.com)',
+        ),
+      );
+      expect(
+        spans.where(
+          (span) =>
+              span.text.contains('literal') &&
+              span.style.fontStyle == FontStyle.italic,
+        ),
+        isEmpty,
+      );
+      expect(
+        spans.where(
+          (span) =>
+              span.text.contains('strong') &&
+              span.style.fontWeight == FontWeight.bold,
+        ),
+        isEmpty,
+      );
+    },
+  );
+
+  testWidgets(
+    r'MarkdownWithCodeHighlight renders paren math with literal special characters',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+在Markdown中#表示标题，但在公式中\(#\)是符号。
+集合\({1, 2, 3}\)有三个元素。注意在LaTeX中花括号需要转义\({}\)。
+序列\({a_n}_{n=1}^{\infty}\)收敛。
+集合\(A = {x \in \mathbb{R} : x^2 < 4}\)等价于开区间。
+'''),
+      );
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(5));
+      expect(
+        mathWidgets.map((widget) => widget.parseError),
+        everyElement(isNull),
+      );
+      final encoded = _encodedMathTex(tester);
+      expect(encoded[0], contains(r'\#'));
+      expect(encoded[1], contains(r'\{'));
+      expect(encoded[1], contains(r'\}'));
+      expect(encoded[2], contains(r'\{\}'));
+      expect(encoded[3], contains(r'\{'));
+      expect(encoded[3], contains(r'\}'));
+      expect(encoded[3], contains(r'_{n=1}^{\infty}'));
+      expect(encoded[4], contains(r'\{'));
+      expect(encoded[4], contains(r'\}'));
+      expect(encoded[4], contains(r'\mathbb{R}'));
+      expect(find.textContaining(r'\(#\)'), findsNothing);
+      expect(find.textContaining(r'\({1, 2, 3}\)'), findsNothing);
+      expect(find.textContaining(r'\({}\)'), findsNothing);
+      expect(find.textContaining(r'\({a_n}_{n=1}^{\infty}\)'), findsNothing);
+      expect(find.textContaining(r'\(A = {x \in'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps literal double dollars from spanning prose',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          r'$\&$在LaTeX中需要转义，而$$符号通常用于块级公式。后文$a$$b$$c$。$x$$=$$1$。结束',
+        ),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNWidgets(7));
+      expect(find.textContaining('在LaTeX中需要转义'), findsOneWidget);
+      expect(find.textContaining(r'$$符号通常用于块级公式。后文'), findsOneWidget);
+      expect(find.textContaining(r'b$$c'), findsNothing);
+      expect(find.textContaining(r'x$$=$$1'), findsNothing);
+      expect(find.textContaining('结束'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps long inline math stress document stable',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+集合\(A = {x \in \mathbb{R} : x^2 < 4}\)等价于开区间$(-2, 2)$。
+
+$\&$在LaTeX中需要转义，而$$符号通常用于块级公式。
+
+> 费马大定理指出：当整数$n > 2$时，方程$x^n + y^n = z^n$没有正整数解。
+
+$a$$b$$c$。$x$$=$$1$。
+
+$f((x))$，$g([x])$，$h(\{x\})$，$\langle a, b \rangle$。
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsAtLeastNWidgets(14));
+      expect(find.textContaining(r'\(A ='), findsNothing);
+      expect(find.textContaining(r'$$符号通常用于块级公式'), findsOneWidget);
+      expect(find.textContaining(r'b$$c'), findsNothing);
+      expect(find.textContaining(r'x$$=$$1'), findsNothing);
+      expect(find.textContaining(r'$n > 2$'), findsNothing);
+      expect(find.textContaining(r'$f((x))$'), findsNothing);
+      expect(find.textContaining('费马大定理指出'), findsOneWidget);
+      expect(find.textContaining('在LaTeX中需要转义'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight avoids common dollar math false positives',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+价格是 $50 到 $100。
+开头空格：$ PaCO_2$。
+结尾空格：$PaCO_2 $。
+跨行：$PaCO_2
+$。
+有效：$PaCO_2$。
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsOneWidget);
+      expect(find.textContaining(r'$50 到 $100'), findsOneWidget);
+      expect(find.textContaining(r'$ PaCO_2$'), findsOneWidget);
+      expect(find.textContaining(r'$PaCO_2 $'), findsOneWidget);
+      expect(find.textContaining(r'有效：$PaCO_2$'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight does not span malformed dollar math on one line',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'价格 $10 到 $100；开头空格 $ PaCO_2$；结尾空格 $PaCO_2 $。'),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNothing);
+      expect(find.textContaining(r'$10 到 $100'), findsOneWidget);
+      expect(find.textContaining(r'$ PaCO_2$'), findsOneWidget);
+      expect(find.textContaining(r'$PaCO_2 $'), findsOneWidget);
     },
   );
 

@@ -397,6 +397,13 @@ class ChatApiService {
     return DioHttpClient(cancelToken: cancelToken);
   }
 
+  static String _decodeUtf8Body(
+    http.Response response, {
+    bool allowMalformed = false,
+  }) {
+    return utf8.decode(response.bodyBytes, allowMalformed: allowMalformed);
+  }
+
   static Stream<ChatStreamChunk> sendMessageStream({
     required ProviderConfig config,
     required String modelId,
@@ -756,9 +763,11 @@ class ChatApiService {
           body: jsonEncode(body),
         );
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
-          throw HttpException('HTTP ${resp.statusCode}: ${resp.body}');
+          final responseText = _decodeUtf8Body(resp, allowMalformed: true);
+          throw HttpException('HTTP ${resp.statusCode}: $responseText');
         }
-        final data = jsonDecode(resp.body);
+        final responseText = _decodeUtf8Body(resp);
+        final data = jsonDecode(responseText);
         if (config.useResponseApi == true) {
           // Prefer SDK-style convenience when present
           final ot = data['output_text'];
@@ -844,9 +853,11 @@ class ChatApiService {
           body: jsonEncode(body),
         );
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
-          throw HttpException('HTTP ${resp.statusCode}: ${resp.body}');
+          final responseText = _decodeUtf8Body(resp, allowMalformed: true);
+          throw HttpException('HTTP ${resp.statusCode}: $responseText');
         }
-        final data = jsonDecode(resp.body);
+        final responseText = _decodeUtf8Body(resp);
+        final data = jsonDecode(responseText);
         final content = data['content'] as List?;
         if (content != null && content.isNotEmpty) {
           final text = content.first['text'];
@@ -951,9 +962,11 @@ class ChatApiService {
           body: jsonEncode(body),
         );
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
-          throw HttpException('HTTP ${resp.statusCode}: ${resp.body}');
+          final responseText = _decodeUtf8Body(resp, allowMalformed: true);
+          throw HttpException('HTTP ${resp.statusCode}: $responseText');
         }
-        final data = jsonDecode(resp.body);
+        final responseText = _decodeUtf8Body(resp);
+        final data = jsonDecode(responseText);
         final candidates = data['candidates'] as List?;
         if (candidates != null && candidates.isNotEmpty) {
           final parts = candidates.first['content']?['parts'] as List?;

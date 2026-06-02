@@ -39,6 +39,8 @@ typedef OnDeleteAllVersions =
 typedef OnForkConversation = Future<void> Function(ChatMessage message);
 typedef OnShareMessage =
     void Function(int messageIndex, List<ChatMessage> messages);
+typedef OnSelectMessages =
+    void Function(int messageIndex, List<ChatMessage> messages);
 typedef OnSpeakMessage = Future<void> Function(ChatMessage message);
 typedef OnSuggestionTap = void Function(String suggestion);
 typedef OnRecoveredAskUserAnswer =
@@ -114,6 +116,7 @@ class MessageListView extends StatefulWidget {
     this.onDeleteAllVersions,
     this.onForkConversation,
     this.onShareMessage,
+    this.onSelectMessages,
     this.onSpeakMessage,
     this.suggestions = const <String>[],
     this.onSuggestionTap,
@@ -180,6 +183,7 @@ class MessageListView extends StatefulWidget {
   final OnDeleteAllVersions? onDeleteAllVersions;
   final OnForkConversation? onForkConversation;
   final OnShareMessage? onShareMessage;
+  final OnSelectMessages? onSelectMessages;
   final OnSpeakMessage? onSpeakMessage;
   final List<String> suggestions;
   final OnSuggestionTap? onSuggestionTap;
@@ -824,6 +828,8 @@ class _MessageListViewState extends State<MessageListView> {
           await widget.onForkConversation?.call(message);
         } else if (action == MessageMoreAction.share) {
           widget.onShareMessage?.call(index, widget.messages);
+        } else if (action == MessageMoreAction.selectMessages) {
+          widget.onSelectMessages?.call(index, widget.messages);
         }
       },
       toolParts: message.role == 'assistant'

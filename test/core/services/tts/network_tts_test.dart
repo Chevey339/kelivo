@@ -193,6 +193,76 @@ void main() {
       expect(result.mime, 'audio/mpeg');
     });
 
+    test('synthesizes ElevenLabs response with host-only base url', () async {
+      late HttpRequest captured;
+      late Map<String, dynamic> requestBody;
+      final audioBytes = <int>[1, 3, 5];
+      final server = await _bindServer((request) async {
+        captured = request;
+        requestBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.add(audioBytes);
+        await request.response.close();
+      });
+
+      addTearDown(() async => server.close(force: true));
+
+      final result = await NetworkTtsService.synthesize(
+        options: ElevenLabsTtsOptions(
+          enabled: true,
+          name: 'ElevenLabs',
+          apiKey: 'eleven-key',
+          baseUrl: _hostOnlyBaseUrl(server),
+          modelId: 'eleven_multilingual_v2',
+          voiceId: 'pNInz6obpgDQGcFmaJgB',
+        ),
+        text: 'hello',
+      );
+
+      expect(captured.uri.path, '/v1/text-to-speech/pNInz6obpgDQGcFmaJgB');
+      expect(captured.uri.queryParameters['output_format'], 'mp3_44100_128');
+      expect(captured.headers.value('xi-api-key'), 'eleven-key');
+      expect(requestBody, {
+        'text': 'hello',
+        'model_id': 'eleven_multilingual_v2',
+      });
+      expect(result.bytes, audioBytes);
+      expect(result.mime, 'audio/mpeg');
+    });
+
+    test('synthesizes ElevenLabs response with v1 base url', () async {
+      late HttpRequest captured;
+      final audioBytes = <int>[2, 4, 6];
+      final server = await _bindServer((request) async {
+        captured = request;
+        await utf8.decoder.bind(request).join();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.add(audioBytes);
+        await request.response.close();
+      });
+
+      addTearDown(() async => server.close(force: true));
+
+      final result = await NetworkTtsService.synthesize(
+        options: ElevenLabsTtsOptions(
+          enabled: true,
+          name: 'ElevenLabs',
+          apiKey: 'eleven-key',
+          baseUrl: _baseUrl(server),
+          modelId: 'eleven_multilingual_v2',
+          voiceId: 'pNInz6obpgDQGcFmaJgB',
+        ),
+        text: 'hello',
+      );
+
+      expect(captured.uri.path, '/api/v1/text-to-speech/pNInz6obpgDQGcFmaJgB');
+      expect(captured.uri.queryParameters['output_format'], 'mp3_44100_128');
+      expect(result.bytes, audioBytes);
+      expect(result.mime, 'audio/mpeg');
+    });
+
     test(
       'synthesizes MiMo streaming PCM response as wav with api-key auth',
       () async {
@@ -297,4 +367,8 @@ Future<HttpServer> _bindServer(
 
 String _baseUrl(HttpServer server) {
   return 'http://${server.address.address}:${server.port}/api/v1';
+}
+
+String _hostOnlyBaseUrl(HttpServer server) {
+  return 'http://${server.address.address}:${server.port}';
 }

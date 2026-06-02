@@ -1922,6 +1922,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageMoreSheetShare => 'Share';
 
   @override
+  String get messageMoreSheetSelectMessages => 'Select Messages';
+
+  @override
   String get messageMoreSheetCreateBranch => 'Create Branch';
 
   @override
@@ -2151,6 +2154,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatSelectionThinkingContent => 'Thinking content';
+
+  @override
+  String get chatSelectionDeleteSelected => 'Delete Selected';
+
+  @override
+  String get chatSelectionSelectMessagesToDelete =>
+      'Please select messages to delete';
+
+  @override
+  String chatSelectionDeleteSelectedConfirm(int count) {
+    return 'Delete $count selected version(s)? This cannot be undone.';
+  }
+
+  @override
+  String chatSelectionDeleteSelectedAllVersionsConfirm(int count) {
+    return 'Delete all versions of $count selected message(s)? This cannot be undone.';
+  }
 
   @override
   String get messageExportSheetAssistant => 'Assistant';
@@ -3070,7 +3090,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerDetailPageClaudePromptCachingHelp =>
-      'Adds cache_control to the system prompt for Claude requests through Anthropic or OpenRouter.';
+      'Adds cache_control to Claude requests through Anthropic or OpenRouter.';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtlTitle => 'Cache TTL';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtlHelp =>
+      '5 minutes is the default. 1 hour costs more to write but can reduce rebuilds in long conversations.';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtl5m => '5 min';
+
+  @override
+  String get providerDetailPageClaudePromptCachingTtl1h => '1 hour';
 
   @override
   String get providerDetailPageBalanceTitle => 'Account Balance';
@@ -4865,6 +4898,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarOcrTooltip => 'Image OCR';
 
   @override
+  String get providerDetailPageMultiSelectButton => 'Multi-select';
+
+  @override
   String get providerDetailPageBatchDetectButton => 'Detect';
 
   @override
@@ -4878,6 +4914,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providerDetailPageDetectFailed => 'Detection failed';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsButton => 'Delete';
+
+  @override
+  String get providerDetailPageDeleteSelectedModelsTooltip =>
+      'Delete selected models';
+
+  @override
+  String providerDetailPageDeleteSelectedModelsConfirm(int count) {
+    return 'Delete $count selected model(s)? This cannot be undone.';
+  }
+
+  @override
+  String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
+    return 'Deleted $count model(s)';
+  }
+
+  @override
+  String get providerDetailPageDeleteAllModelsTooltip => 'Delete all models';
 
   @override
   String get providerDetailPageDeleteAllModelsWarning =>

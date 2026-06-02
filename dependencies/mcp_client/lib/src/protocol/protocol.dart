@@ -3,17 +3,49 @@ library;
 
 /// MCP protocol versions and constants
 class McpProtocol {
-  /// Protocol version for 2025-03-26
-  static const String v2025_03_26 = "2025-03-26";
-
-  /// Protocol version for 2024-11-05
+  /// Protocol version 2024-11-05
   static const String v2024_11_05 = "2024-11-05";
 
-  /// Supported protocol versions in order of preference
-  static const List<String> supportedVersions = [v2025_03_26, v2024_11_05];
+  /// Protocol version 2025-03-26
+  static const String v2025_03_26 = "2025-03-26";
 
-  /// Default protocol version
-  static const String defaultVersion = v2025_03_26;
+  /// Protocol version 2025-06-18 — adds elicitation, structured tool
+  /// output, resource_link, OAuth Resource Server, MCP-Protocol-Version
+  /// header. Removes JSON-RPC batching.
+  static const String v2025_06_18 = "2025-06-18";
+
+  /// Protocol version 2025-11-25 — adds icons, sampling tool calling
+  /// (`tools` / `toolChoice`), URL-mode elicitation, OIDC Discovery,
+  /// Client ID Metadata Documents, default values in elicitation
+  /// primitives.
+  static const String v2025_11_25 = "2025-11-25";
+
+  /// Supported protocol versions in order of preference (newest first).
+  static const List<String> supportedVersions = [
+    v2025_11_25,
+    v2025_06_18,
+    v2025_03_26,
+    v2024_11_05,
+  ];
+
+  /// Default protocol version (latest supported).
+  static const String defaultVersion = v2025_11_25;
+
+  /// Whether the negotiated [version] supports JSON-RPC batching.
+  /// Removed in 2025-06-18.
+  static bool supportsBatching(String version) =>
+      version == v2024_11_05 || version == v2025_03_26;
+
+  /// Whether the negotiated [version] understands `elicitation/create`
+  /// (introduced 2025-06-18).
+  static bool supportsElicitation(String version) =>
+      version == v2025_06_18 || version == v2025_11_25;
+
+  /// Whether the negotiated [version] requires the
+  /// `MCP-Protocol-Version` HTTP header on every post-handshake request
+  /// (mandatory from 2025-06-18).
+  static bool requiresProtocolHeader(String version) =>
+      version == v2025_06_18 || version == v2025_11_25;
 
   /// JSON-RPC version
   static const String jsonRpcVersion = "2.0";
@@ -34,12 +66,8 @@ class McpProtocol {
   static const String methodGetPrompt = "prompts/get";
   static const String methodComplete = "completion/complete";
   static const String methodListRoots = "roots/list";
-  static const String methodAddRoot = "roots/add";
-  static const String methodRemoveRoot = "roots/remove";
 
   /// 2025-03-26 New methods
-  static const String methodBatch = "batch";
-  static const String methodHealthCheck = "health/check";
   static const String methodCapabilitiesUpdate = "capabilities/update";
 
   /// Notifications
