@@ -161,7 +161,7 @@ void main() {
       ),
     );
     await settings.setCurrentModel('OpenAITest', 'gpt-image-2');
-    ChatInputData? submitted;
+    final submissions = <ChatInputData>[];
 
     await tester.pumpWidget(
       buildHarness(
@@ -170,13 +170,19 @@ void main() {
         mediaController: mediaController,
         settingsProvider: settings,
         onSend: (input) async {
-          submitted = input;
+          submissions.add(input);
           return ChatInputSubmissionResult.rejected;
         },
       ),
     );
 
     expect(find.text('Image mode'), findsOneWidget);
+
+    await tapSendButton(tester);
+
+    expect(submissions.single.text, 'draw a cat');
+    expect(submissions.single.allowImagesApiRouting, isTrue);
+    expect(submissions.single.extraBody, isEmpty);
 
     await tester.tap(find.byIcon(Lucide.X));
     await tester.pumpAndSettle();
@@ -186,8 +192,9 @@ void main() {
 
     await tapSendButton(tester);
 
-    expect(submitted?.text, 'draw a cat');
-    expect(submitted?.allowImagesApiRouting, isFalse);
+    expect(submissions.last.text, 'draw a cat');
+    expect(submissions.last.allowImagesApiRouting, isFalse);
+    expect(submissions.last.extraBody, isEmpty);
 
     controller.dispose();
     focusNode.dispose();

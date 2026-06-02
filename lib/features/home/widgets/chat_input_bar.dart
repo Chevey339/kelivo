@@ -216,7 +216,9 @@ class _ChatInputBarState extends State<ChatInputBar>
       _imageGenController.summary(AppLocalizations.of(context)!);
 
   Map<String, dynamic> _imageGenerationExtraBody() {
-    if (!_imageModeActive || !_allowImagesApiRouting) {
+    if (!_imageModeActive ||
+        !_allowImagesApiRouting ||
+        !_imageParamsCustomized) {
       return const <String, dynamic>{};
     }
     return _imageGenController.toExtraBody();
