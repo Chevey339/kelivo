@@ -244,6 +244,8 @@ class MessageGenerationService {
       conversationId: conversationId,
       role: 'user',
       content: processedUserText + imageMarkers + docMarkers,
+      requestAllowImagesApiRouting: input.allowImagesApiRouting,
+      requestExtraBody: input.extraBody,
     );
   }
 

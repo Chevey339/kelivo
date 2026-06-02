@@ -229,6 +229,29 @@ class ChatActions {
     return messageGenerationService.isReasoningEnabled(budget);
   }
 
+  ({bool allowImagesApiRouting, Map<String, dynamic>? requestExtraBody})
+  _resolveRequestOptionsFromMessages(
+    List<ChatMessage> messages, {
+    required bool fallbackAllowImagesApiRouting,
+  }) {
+    for (int i = messages.length - 1; i >= 0; i--) {
+      final message = messages[i];
+      if (message.role != 'user') continue;
+      final requestExtraBody = message.requestExtraBody;
+      return (
+        allowImagesApiRouting:
+            message.requestAllowImagesApiRouting ??
+            fallbackAllowImagesApiRouting,
+        requestExtraBody:
+            requestExtraBody.isEmpty ? null : requestExtraBody,
+      );
+    }
+    return (
+      allowImagesApiRouting: fallbackAllowImagesApiRouting,
+      requestExtraBody: null,
+    );
+  }
+
   Conversation _conversationForMessageContext(
     Conversation conversation,
     List<ChatMessage> messages, {
@@ -765,13 +788,17 @@ class ChatActions {
       providerKey: providerKey,
       modelId: modelId,
     );
+    final requestOptions = _resolveRequestOptionsFromMessages(
+      regenerationMessages,
+      fallbackAllowImagesApiRouting: allowImagesApiRouting,
+    );
 
     // Execute generation
     final ctx = messageGenerationService.buildGenerationContext(
       assistantMessage: assistantMessage,
       prepared: prepared,
       userImagePaths: userImagePaths,
-      allowImagesApiRouting: allowImagesApiRouting,
+      allowImagesApiRouting: requestOptions.allowImagesApiRouting,
       providerKey: providerKey,
       modelId: modelId,
       assistant: assistant,
@@ -779,6 +806,7 @@ class ChatActions {
       supportsReasoning: supportsReasoning,
       enableReasoning: enableReasoning,
       generateTitleOnFinish: false,
+      requestExtraBody: requestOptions.requestExtraBody,
     );
 
     await _executeGeneration(ctx);
@@ -871,12 +899,16 @@ class ChatActions {
         providerKey: providerKey,
         modelId: modelId,
       );
+      final requestOptions = _resolveRequestOptionsFromMessages(
+        apiContextMessages,
+        fallbackAllowImagesApiRouting: allowImagesApiRouting,
+      );
 
       final ctx = messageGenerationService.buildGenerationContext(
         assistantMessage: streamingMessage,
         prepared: prepared,
         userImagePaths: userImagePaths,
-        allowImagesApiRouting: allowImagesApiRouting,
+        allowImagesApiRouting: requestOptions.allowImagesApiRouting,
         providerKey: providerKey,
         modelId: modelId,
         assistant: assistant,
@@ -884,6 +916,7 @@ class ChatActions {
         supportsReasoning: supportsReasoning,
         enableReasoning: enableReasoning,
         generateTitleOnFinish: false,
+        requestExtraBody: requestOptions.requestExtraBody,
       );
 
       await _executeGeneration(ctx);
