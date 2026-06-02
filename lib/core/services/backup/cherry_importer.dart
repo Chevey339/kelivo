@@ -110,10 +110,17 @@ class CherryImporter {
         if (t is Map && t['id'] != null) {
           final id = t['id'].toString();
           topicMeta[id] = t.map((k, v) => MapEntry(k.toString(), v));
-          // Ensure assistantId is present (avoid null index warning by using local var)
           final tm = topicMeta[id]!;
-          final dynamic cand = t['assistantId'] ?? a['id'];
-          if (cand != null) tm['assistantId'] = cand.toString();
+          final parentAssistantId = (a['id'] ?? '').toString();
+          final topicAssistantId = (t['assistantId'] ?? '').toString();
+          // Cherry may keep a stale topic.assistantId; the parent assistant's
+          // topic list is the reliable ownership source.
+          final ownerAssistantId = parentAssistantId.isNotEmpty
+              ? parentAssistantId
+              : topicAssistantId;
+          if (ownerAssistantId.isNotEmpty) {
+            tm['assistantId'] = ownerAssistantId;
+          }
         }
       }
     }

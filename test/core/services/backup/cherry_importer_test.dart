@@ -108,6 +108,7 @@ void main() {
       expect(conversations['topic-1'].title, 'Topic One');
       expect(conversations['topic-1'].assistantId, 'assistant-1');
       expect(conversations['topic-2'].title, 'Topic From LDB');
+      expect(conversations['topic-2'].assistantId, 'assistant-1');
       expect(conversations['topic-empty'].title, 'Empty Topic');
       expect(conversations['topic-standalone'].title, 'Standalone Topic');
       expect(chatService.getMessages('topic-empty'), isEmpty);
@@ -249,7 +250,7 @@ String _persistStateJson({bool includeAdditionalTopics = false}) {
     topics.addAll(<Map<String, dynamic>>[
       <String, dynamic>{
         'id': 'topic-2',
-        'assistantId': 'assistant-1',
+        'assistantId': 'default',
         'createdAt': '2026-01-01T00:00:02.000Z',
         'updatedAt': '2026-01-01T00:00:03.000Z',
         'name': 'Topic From LDB',
