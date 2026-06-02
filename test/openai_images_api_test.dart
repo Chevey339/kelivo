@@ -137,6 +137,7 @@ void main() {
       ).toList();
 
       expect(requestBody['quality'], 'high');
+      expect(requestBody.containsKey('size'), isFalse);
       expect(requestBody['output_format'], 'png');
     });
 
