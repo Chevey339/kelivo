@@ -188,6 +188,7 @@ Future<Map<String, dynamic>> _sendOpenAIImageGeneration(
     'prompt': prompt,
   };
   _applyOpenAIImagesExtraBody(body, config, modelId, extraBody);
+  body.removeWhere((_, value) => value == null);
   final response = await client.post(
     _openAIImagesUrl(config, '/images/generations'),
     headers: _openAIImagesJsonHeaders(

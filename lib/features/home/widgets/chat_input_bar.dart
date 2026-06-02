@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 import '../../../theme/design_tokens.dart';
@@ -15,6 +16,7 @@ import 'package:path/path.dart' as p;
 import '../../../shared/responsive/breakpoints.dart';
 import 'dart:async';
 import 'dart:io';
+import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../utils/clipboard_images.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -22,6 +24,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/model_override_payload_parser.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -170,9 +173,77 @@ class _ChatInputBarState extends State<ChatInputBar>
   String? _imageModeModelKey;
   String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
+  String? _lastImageDefaultsSignature;
   final _imageGenController = ImageGenerationOptionsController();
 
   bool get _composerLocked => widget.hasQueuedInput;
+
+  Map<String, dynamic> _filterImageOptionBody(Map<String, dynamic> body) {
+    const allowedKeys = <String>{
+      'quality',
+      'size',
+      'output_format',
+      'output_compression',
+      'n',
+    };
+    return <String, dynamic>{
+      for (final entry in body.entries)
+        if (allowedKeys.contains(entry.key) && entry.value != null)
+          entry.key: entry.value,
+    };
+  }
+
+  Map<String, dynamic> _assistantImageOptionDefaults(Assistant? assistant) {
+    if (assistant == null || assistant.customBody.isEmpty) {
+      return const <String, dynamic>{};
+    }
+    final body = <String, dynamic>{
+      for (final entry in assistant.customBody)
+        if ((entry['key'] ?? '').trim().isNotEmpty)
+          (entry['key']!.trim()): ModelOverridePayloadParser.parseOverrideValue(
+            (entry['value'] ?? '').trim(),
+          ),
+    };
+    return _filterImageOptionBody(body);
+  }
+
+  Map<String, dynamic> _effectiveImageOptionDefaults(
+    ProviderConfig? cfg,
+    String modelId,
+    Assistant? assistant,
+  ) {
+    if (cfg == null) return const <String, dynamic>{};
+    final ov = ModelOverridePayloadParser.modelOverride(cfg.modelOverrides, modelId);
+    final rawApiModelId =
+        (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+    final upstreamModelId =
+        rawApiModelId == null || rawApiModelId.isEmpty
+            ? modelId
+            : rawApiModelId;
+
+    final body = <String, dynamic>{};
+    final normalized = upstreamModelId.toLowerCase();
+    if (normalized.startsWith('gpt-image-') ||
+        normalized.startsWith('chatgpt-image-')) {
+      body['quality'] = 'high';
+      body['output_format'] = 'png';
+    }
+    body.addAll(_filterImageOptionBody(ModelOverridePayloadParser.customBody(ov)));
+    body.addAll(_assistantImageOptionDefaults(assistant));
+    return body;
+  }
+
+  void _syncImageGenerationDefaults(
+    ProviderConfig? cfg,
+    String modelId,
+    Assistant? assistant,
+  ) {
+    final defaults = _effectiveImageOptionDefaults(cfg, modelId, assistant);
+    final signature = jsonEncode(defaults);
+    if (signature == _lastImageDefaultsSignature) return;
+    _lastImageDefaultsSignature = signature;
+    _imageGenController.applyDefaultsFromBody(defaults);
+  }
 
   bool _supportsImagesApiRouting(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
@@ -197,6 +268,9 @@ class _ChatInputBarState extends State<ChatInputBar>
       _lastImageModeModelKey = nextKey;
     }
     _imageModeModelKey = nextKey;
+    if (supported) {
+      _syncImageGenerationDefaults(cfg, modelId, a);
+    }
     return supported;
   }
 

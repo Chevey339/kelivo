@@ -16,6 +16,14 @@ class ImageGenerationOptionsController {
   int? outputCompression;
   int count = 1;
 
+  String _defaultQuality = 'high';
+  String _defaultSizeTier = 'auto';
+  String _defaultAspectRatio = 'auto';
+  String _defaultCustomAspectRatio = '16:9';
+  String _defaultOutputFormat = 'png';
+  int? _defaultOutputCompression;
+  int _defaultCount = 1;
+
   static const Map<String, Map<String, String>> sizePresets = {
     '1K': {
       '1:1': '1024x1024',
@@ -77,44 +85,83 @@ class ImageGenerationOptionsController {
   };
 
   bool get customized {
-    return quality != 'high' ||
-        sizeTier != 'auto' ||
-        aspectRatio != 'auto' ||
-        outputFormat != 'png' ||
-        outputCompression != null ||
-        count != 1;
+    return quality != _defaultQuality ||
+        sizeTier != _defaultSizeTier ||
+        aspectRatio != _defaultAspectRatio ||
+        customAspectRatio.trim() != _defaultCustomAspectRatio.trim() ||
+        outputFormat != _defaultOutputFormat ||
+        outputCompression != _defaultOutputCompression ||
+        count != _defaultCount;
   }
 
-  String get resolvedSize {
-    if (sizeTier == 'auto') return 'auto';
-    final ratio = _resolvedAspectRatio;
-    if (ratio.isEmpty) return 'auto';
-    return _calculateImageSize(sizeTier, ratio) ?? 'auto';
-  }
+  String get resolvedSize => _resolveSize(
+    sizeTier: sizeTier,
+    aspectRatio: aspectRatio,
+    customAspectRatio: customAspectRatio,
+  );
 
-  String get _resolvedAspectRatio {
-    if (aspectRatio == 'custom') return customAspectRatio.trim();
-    if (aspectRatio == 'auto') {
-      final fallback = customAspectRatio.trim();
-      return fallback.isEmpty ? '16:9' : fallback;
-    }
-    return aspectRatio;
-  }
+  String get _defaultResolvedSize => _resolveSize(
+    sizeTier: _defaultSizeTier,
+    aspectRatio: _defaultAspectRatio,
+    customAspectRatio: _defaultCustomAspectRatio,
+  );
+
+  String get _resolvedAspectRatio => _resolveAspectRatio(
+    aspectRatio: aspectRatio,
+    customAspectRatio: customAspectRatio,
+  );
 
   Map<String, dynamic> toExtraBody() {
     final size = resolvedSize;
     return <String, dynamic>{
-      if (quality != 'high') 'quality': quality,
-      if (size != 'auto') 'size': size,
-      if (outputFormat != 'png') 'output_format': outputFormat,
-      if (outputFormat != 'png' && outputCompression != null)
-        'output_compression': outputCompression,
-      if (count > 1) 'n': count,
+      if (quality != _defaultQuality) 'quality': quality,
+      if (size != _defaultResolvedSize)
+        'size': size == 'auto' ? null : size,
+      if (outputFormat != _defaultOutputFormat) 'output_format': outputFormat,
+      if (outputFormat != 'png')
+        if (outputCompression != _defaultOutputCompression)
+          'output_compression': outputCompression,
+      if (outputFormat == 'png' && _defaultOutputCompression != null)
+        'output_compression': null,
+      if (count != _defaultCount) 'n': count,
     };
+  }
+
+  void applyDefaultsFromBody(Map<String, dynamic> body) {
+    final wasCustomized = customized;
+    _resetDefaultState();
+    _applyBodyToDefaults(body);
+    if (!wasCustomized) {
+      reset();
+    }
   }
 
   void restoreFromBody(Map<String, dynamic> body) {
     reset();
+    _applyBodyToCurrent(body);
+  }
+
+  void reset() {
+    quality = _defaultQuality;
+    sizeTier = _defaultSizeTier;
+    aspectRatio = _defaultAspectRatio;
+    customAspectRatio = _defaultCustomAspectRatio;
+    outputFormat = _defaultOutputFormat;
+    outputCompression = _defaultOutputCompression;
+    count = _defaultCount;
+  }
+
+  void _resetDefaultState() {
+    _defaultQuality = 'high';
+    _defaultSizeTier = 'auto';
+    _defaultAspectRatio = 'auto';
+    _defaultCustomAspectRatio = '16:9';
+    _defaultOutputFormat = 'png';
+    _defaultOutputCompression = null;
+    _defaultCount = 1;
+  }
+
+  void _applyBodyToCurrent(Map<String, dynamic> body) {
     final q = body['quality']?.toString();
     final size = body['size']?.toString();
     final format = body['output_format']?.toString();
@@ -136,14 +183,52 @@ class ImageGenerationOptionsController {
     }
   }
 
-  void reset() {
-    quality = 'high';
-    sizeTier = 'auto';
-    aspectRatio = 'auto';
-    customAspectRatio = '16:9';
-    outputFormat = 'png';
-    outputCompression = null;
-    count = 1;
+  void _applyBodyToDefaults(Map<String, dynamic> body) {
+    final q = body['quality']?.toString();
+    final size = body['size']?.toString();
+    final format = body['output_format']?.toString();
+    final compression = body['output_compression'];
+    final n = body['n'];
+    if (q == 'auto' || q == 'low' || q == 'medium' || q == 'high') {
+      _defaultQuality = q!;
+    }
+    _restoreDefaultSize(size);
+    if (format == 'png' || format == 'jpeg' || format == 'webp') {
+      _defaultOutputFormat = format!;
+    }
+    _defaultOutputCompression = compression is int
+        ? compression
+        : int.tryParse(compression?.toString() ?? '');
+    final parsedN = n is int ? n : int.tryParse(n?.toString() ?? '');
+    if (parsedN != null && parsedN >= 1 && parsedN <= 4) {
+      _defaultCount = parsedN;
+    }
+  }
+
+  String _resolveSize({
+    required String sizeTier,
+    required String aspectRatio,
+    required String customAspectRatio,
+  }) {
+    if (sizeTier == 'auto') return 'auto';
+    final ratio = _resolveAspectRatio(
+      aspectRatio: aspectRatio,
+      customAspectRatio: customAspectRatio,
+    );
+    if (ratio.isEmpty) return 'auto';
+    return _calculateImageSize(sizeTier, ratio) ?? 'auto';
+  }
+
+  String _resolveAspectRatio({
+    required String aspectRatio,
+    required String customAspectRatio,
+  }) {
+    if (aspectRatio == 'custom') return customAspectRatio.trim();
+    if (aspectRatio == 'auto') {
+      final fallback = customAspectRatio.trim();
+      return fallback.isEmpty ? '16:9' : fallback;
+    }
+    return aspectRatio;
   }
 
   String summary(AppLocalizations l10n) {
@@ -189,6 +274,29 @@ class ImageGenerationOptionsController {
     sizeTier = closestTier(parsed.width * parsed.height);
     aspectRatio = 'custom';
     customAspectRatio = _formatAspectRatio(parsed.width, parsed.height);
+  }
+
+  void _restoreDefaultSize(String? size) {
+    final normalized = _normalizeSize(size ?? '');
+    if (normalized == null || normalized == 'auto') {
+      _defaultSizeTier = 'auto';
+      _defaultAspectRatio = 'auto';
+      return;
+    }
+    for (final tierEntry in sizePresets.entries) {
+      for (final ratioEntry in tierEntry.value.entries) {
+        if (ratioEntry.value == normalized) {
+          _defaultSizeTier = tierEntry.key;
+          _defaultAspectRatio = ratioEntry.key;
+          return;
+        }
+      }
+    }
+    final parsed = _parseSize(normalized);
+    if (parsed == null) return;
+    _defaultSizeTier = closestTier(parsed.width * parsed.height);
+    _defaultAspectRatio = 'custom';
+    _defaultCustomAspectRatio = _formatAspectRatio(parsed.width, parsed.height);
   }
 
   // ---------------------------------------------------------------------------

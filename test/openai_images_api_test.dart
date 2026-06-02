@@ -186,6 +186,58 @@ void main() {
       expect(requestBody['output_format'], 'webp');
     });
 
+    test('omits null-cleared image fields from generation requests', () async {
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/generated.png'},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      await ChatApiService.sendMessageStream(
+        config: _openAiConfig(
+          _baseUrl(server),
+          modelOverrides: const {
+            'gpt-image-2': {
+              'body': [
+                {'key': 'size', 'value': '3840x2160'},
+                {'key': 'output_format', 'value': 'webp'},
+                {'key': 'output_compression', 'value': '80'},
+              ],
+            },
+          },
+        ),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw a reset test image'},
+        ],
+        extraBody: const {
+          'size': null,
+          'output_format': 'png',
+          'output_compression': null,
+        },
+      ).toList();
+
+      expect(requestBody.containsKey('size'), isFalse);
+      expect(requestBody['output_format'], 'png');
+      expect(requestBody.containsKey('output_compression'), isFalse);
+    });
+
     test(
       'routes image models to Images API even when Responses is enabled',
       () async {
