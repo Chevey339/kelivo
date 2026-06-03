@@ -1494,7 +1494,6 @@ class ChatActions {
       messageId,
       processedContent,
       state.totalTokens,
-      isStreaming: false,
       contentSplitOffsets: state.contentSplitOffsets,
       reasoningCountAtSplit: state.reasoningCountAtSplit,
       toolCountAtSplit: state.toolCountAtSplit,

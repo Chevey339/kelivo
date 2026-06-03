@@ -36,7 +36,6 @@ class StreamingContentNotifier {
     String messageId,
     String content,
     int totalTokens, {
-    bool? isStreaming,
     List<int>? contentSplitOffsets,
     List<int>? reasoningCountAtSplit,
     List<int>? toolCountAtSplit,
@@ -51,7 +50,6 @@ class StreamingContentNotifier {
       notifier.value = StreamingContentData(
         content: content,
         totalTokens: totalTokens,
-        isStreaming: isStreaming ?? current.isStreaming,
         reasoningText: current.reasoningText,
         reasoningStartAt: current.reasoningStartAt,
         reasoningFinishedAt: current.reasoningFinishedAt,
@@ -85,7 +83,6 @@ class StreamingContentNotifier {
       notifier.value = StreamingContentData(
         content: current.content,
         totalTokens: current.totalTokens,
-        isStreaming: current.isStreaming,
         reasoningText: reasoningText ?? current.reasoningText,
         reasoningStartAt: reasoningStartAt ?? current.reasoningStartAt,
         reasoningFinishedAt: reasoningFinishedAt ?? current.reasoningFinishedAt,
@@ -117,7 +114,6 @@ class StreamingContentNotifier {
       notifier.value = StreamingContentData(
         content: current.content,
         totalTokens: current.totalTokens,
-        isStreaming: current.isStreaming,
         reasoningText: current.reasoningText,
         reasoningStartAt: current.reasoningStartAt,
         reasoningFinishedAt: current.reasoningFinishedAt,
@@ -144,7 +140,6 @@ class StreamingContentNotifier {
       notifier.value = StreamingContentData(
         content: current.content,
         totalTokens: current.totalTokens,
-        isStreaming: current.isStreaming,
         reasoningText: current.reasoningText,
         reasoningStartAt: current.reasoningStartAt,
         reasoningFinishedAt: current.reasoningFinishedAt,
@@ -184,7 +179,6 @@ class StreamingContentData {
   const StreamingContentData({
     required this.content,
     required this.totalTokens,
-    this.isStreaming = true,
     this.reasoningText,
     this.reasoningStartAt,
     this.reasoningFinishedAt,
@@ -201,7 +195,6 @@ class StreamingContentData {
 
   final String content;
   final int totalTokens;
-  final bool isStreaming;
   final String? reasoningText;
   final DateTime? reasoningStartAt;
   final DateTime? reasoningFinishedAt;
@@ -228,7 +221,6 @@ class StreamingContentData {
           runtimeType == other.runtimeType &&
           content == other.content &&
           totalTokens == other.totalTokens &&
-          isStreaming == other.isStreaming &&
           reasoningText == other.reasoningText &&
           reasoningStartAt == other.reasoningStartAt &&
           reasoningFinishedAt == other.reasoningFinishedAt &&
@@ -246,7 +238,6 @@ class StreamingContentData {
   int get hashCode =>
       content.hashCode ^
       totalTokens.hashCode ^
-      isStreaming.hashCode ^
       reasoningText.hashCode ^
       reasoningStartAt.hashCode ^
       reasoningFinishedAt.hashCode ^
