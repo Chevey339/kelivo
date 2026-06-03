@@ -123,6 +123,11 @@ void main() {
         ),
       );
       expect(capsule.borderRadius, BorderRadius.circular(20));
+      expect(capsule.baseColor, Colors.transparent);
+      expect(
+        capsule.border,
+        Border.all(color: Colors.black.withValues(alpha: 0.10), width: 0.8),
+      );
       expect(
         capsule.padding,
         const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -150,6 +155,54 @@ void main() {
 
       expect(find.text('搜索结果'), findsOneWidget);
       expect(find.text('Four'), findsOneWidget);
+    });
+
+    testWidgets('search citations summarize all search results in one reply', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          locale: const Locale('zh'),
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: 'Answer with multiple search calls.',
+              conversationId: 'conversation-search-capsule-multiple',
+            ),
+            showModelIcon: false,
+            toolParts: const [
+              ToolUIPart(
+                id: 'builtin-search-first',
+                toolName: 'builtin_search',
+                arguments: {},
+                content:
+                    '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"},{"title":"Second source","url":"https://two.example.com/b","text":"B"}]}',
+              ),
+              ToolUIPart(
+                id: 'search-web-second',
+                toolName: 'search_web',
+                arguments: {'query': 'Kelivo release'},
+                content:
+                    '{"items":[{"title":"Third source","url":"https://three.example.com/c","text":"C"}]}',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('3个引用'), findsOneWidget);
+
+      await tester.tap(find.text('3个引用'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('搜索结果'), findsOneWidget);
+      expect(find.text('First source'), findsOneWidget);
+      expect(find.text('Second source'), findsOneWidget);
+      expect(find.text('Third source'), findsOneWidget);
     });
 
     testWidgets('search citation capsule falls back when source url is invalid', (

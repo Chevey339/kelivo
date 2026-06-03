@@ -418,13 +418,27 @@ class StreamController {
 
   /// Deduplicate tool UI parts by id or by name+args when id is empty.
   List<ToolUIPart> dedupeToolPartsList(List<ToolUIPart> parts) {
+    final completedNoIdBases = <String>{
+      for (final p in parts)
+        if (p.id.trim().isEmpty && _hasToolContent(p.content))
+          _toolDedupeBase(p.toolName, p.arguments),
+    };
     final seen = <String>{};
     final out = <ToolUIPart>[];
     for (final p in parts) {
-      final id = (p.id).trim();
-      final key = id.isNotEmpty
-          ? 'id:$id'
-          : 'name:${p.toolName}|args:${_encodeJson(p.arguments)}';
+      if (p.id.trim().isEmpty &&
+          !_hasToolContent(p.content) &&
+          completedNoIdBases.contains(
+            _toolDedupeBase(p.toolName, p.arguments),
+          )) {
+        continue;
+      }
+      final key = _toolDedupeKey(
+        id: p.id,
+        name: p.toolName,
+        arguments: p.arguments,
+        content: p.content,
+      );
       if (seen.add(key)) out.add(p);
     }
     return out;
@@ -434,6 +448,16 @@ class StreamController {
   List<Map<String, dynamic>> dedupeToolEvents(
     List<Map<String, dynamic>> events,
   ) {
+    final completedNoIdBases = <String>{
+      for (final e in events)
+        if ((e['id']?.toString() ?? '').trim().isEmpty &&
+            _hasToolContent(e['content']?.toString()))
+          _toolDedupeBase(
+            e['name']?.toString() ?? '',
+            (e['arguments'] as Map?)?.cast<String, dynamic>() ??
+                const <String, dynamic>{},
+          ),
+    };
     final seen = <String>{};
     final out = <Map<String, dynamic>>[];
     for (final e in events) {
@@ -442,12 +466,41 @@ class StreamController {
       final args =
           ((e['arguments'] as Map?)?.cast<String, dynamic>() ??
           const <String, dynamic>{});
-      final key = id.isNotEmpty
-          ? 'id:$id'
-          : 'name:$name|args:${_encodeJson(args)}';
+      if (id.isEmpty &&
+          !_hasToolContent(e['content']?.toString()) &&
+          completedNoIdBases.contains(_toolDedupeBase(name, args))) {
+        continue;
+      }
+      final key = _toolDedupeKey(
+        id: id,
+        name: name,
+        arguments: args,
+        content: e['content']?.toString(),
+      );
       if (seen.add(key)) out.add(e.map((k, v) => MapEntry(k.toString(), v)));
     }
     return out;
+  }
+
+  String _toolDedupeBase(String name, Map<String, dynamic> arguments) {
+    return 'name:$name|args:${_encodeJson(arguments)}';
+  }
+
+  bool _hasToolContent(String? content) => content?.trim().isNotEmpty == true;
+
+  String _toolDedupeKey({
+    required String id,
+    required String name,
+    required Map<String, dynamic> arguments,
+    String? content,
+  }) {
+    final trimmedId = id.trim();
+    if (trimmedId.isNotEmpty) return 'id:$trimmedId';
+
+    final base = _toolDedupeBase(name, arguments);
+    final trimmedContent = content?.trim();
+    if (trimmedContent == null || trimmedContent.isEmpty) return base;
+    return '$base|content:$trimmedContent';
   }
 
   // ============================================================================
