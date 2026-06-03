@@ -105,7 +105,7 @@ void main() {
       expect(chunks.single.usage?.totalTokens, 8);
     });
 
-    test('uses high-quality lossless defaults for modern image models', () async {
+    test('does not force optional image parameters by default', () async {
       late Map<String, dynamic> requestBody;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {
@@ -141,7 +141,7 @@ void main() {
       expect(requestBody['output_format'], 'png');
     });
 
-    test('allows image quality defaults to be overridden', () async {
+    test('allows image quality and format to be configured', () async {
       late Map<String, dynamic> requestBody;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {
