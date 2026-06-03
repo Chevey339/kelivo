@@ -404,6 +404,7 @@ class ChatApiService {
       }
       final text = (part['text'] ?? part['content'] ?? '').toString();
       if (text.isEmpty) continue;
+      if (buffer.isNotEmpty) buffer.write('\n');
       buffer.write(text);
     }
     return buffer.toString().trim();
