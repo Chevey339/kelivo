@@ -533,11 +533,20 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
   for (int i = 0; i < messages.length; i++) {
     final m = messages[i];
     final isLast = i == messages.length - 1;
-    final raw = (m['content'] ?? '').toString();
+    final originalContent = m['content'];
+    final raw = originalContent is List
+        ? ChatApiService._textFromContentParts(originalContent)
+        : (originalContent ?? '').toString();
     final role = (m['role'] ?? 'user').toString();
     final outMsg = Map<String, dynamic>.from(m);
     outMsg.remove(multimodalInternalMediaPathsKey);
     outMsg['role'] = role;
+
+    if (originalContent is List) {
+      outMsg['content'] = canImageInput ? originalContent : raw;
+      out.add(outMsg);
+      continue;
+    }
 
     if (role == 'system') {
       outMsg['content'] = raw;
@@ -557,7 +566,10 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
     final hasMarkdownImages = raw.contains('![') && raw.contains('](');
     final hasCustomImages = raw.contains('[image:');
     final hasAttachedImages =
-        isLast && (userMediaPaths?.isNotEmpty == true) && (role == 'user');
+        canImageInput &&
+        isLast &&
+        (userMediaPaths?.isNotEmpty == true) &&
+        (role == 'user');
 
     if (!hasMarkdownImages && !hasCustomImages && !hasAttachedImages) {
       outMsg['content'] = raw;
@@ -568,9 +580,17 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
     final parsed = await _parseTextAndImages(
       raw,
       allowRemoteImages: canImageInput,
-      allowLocalImages: true,
+      allowLocalImages: canImageInput,
+      allowDataImages: canImageInput,
       keepRemoteMarkdownText: true,
+      keepDisallowedImageText: canImageInput,
     );
+    if (!canImageInput) {
+      outMsg['content'] = parsed.text;
+      out.add(outMsg);
+      continue;
+    }
+
     final parts = <Map<String, dynamic>>[];
     final seenSources = <String>{};
     final seenImageUrls = <String>{};
@@ -840,7 +860,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     for (int i = 0; i < messages.length; i++) {
       final m = messages[i];
       final isLast = i == messages.length - 1;
-      final raw = (m['content'] ?? '').toString();
+      final originalContent = m['content'];
+      final raw = originalContent is List
+          ? ChatApiService._textFromContentParts(originalContent)
+          : (originalContent ?? '').toString();
       final roleRaw = (m['role'] ?? 'user').toString();
 
       // Responses API supports a top-level `instructions` field that has higher priority
@@ -894,12 +917,16 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       final hasMarkdownImages = raw.contains('![') && raw.contains('](');
       final hasCustomImages = raw.contains('[image:');
       final hasAttachedImages =
+          canImageInput &&
           isLast &&
           (userImagePaths?.isNotEmpty == true) &&
           (m['role'] == 'user');
       // For the last user message, also attach the last assistant image if available
       final shouldAttachAssistantImage =
-          isLast && (m['role'] == 'user') && lastAssistantImageUrl != null;
+          canImageInput &&
+          isLast &&
+          (m['role'] == 'user') &&
+          lastAssistantImageUrl != null;
 
       if (hasMarkdownImages ||
           hasCustomImages ||
@@ -908,9 +935,27 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         final parsed = await _parseTextAndImages(
           raw,
           allowRemoteImages: canImageInput,
-          allowLocalImages: true,
+          allowLocalImages: canImageInput,
+          allowDataImages: canImageInput,
           keepRemoteMarkdownText: true,
+          keepDisallowedImageText: canImageInput,
         );
+        if (!canImageInput) {
+          if (isAssistant) {
+            input.add({
+              'type': 'message',
+              'role': 'assistant',
+              'status': 'completed',
+              'content': [
+                {'type': 'output_text', 'text': parsed.text},
+              ],
+            });
+          } else {
+            input.add({'role': roleRaw, 'content': parsed.text});
+          }
+          continue;
+        }
+
         final parts = <Map<String, dynamic>>[];
         final seenImageSources = <String>{};
         final seenImageUrls = <String>{};

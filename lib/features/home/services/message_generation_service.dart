@@ -296,6 +296,11 @@ class MessageGenerationService {
     required bool enableReasoning,
     required bool generateTitleOnFinish,
   }) {
+    final bool ocrActive =
+        settings.ocrEnabled &&
+        settings.ocrModelProvider != null &&
+        settings.ocrModelId != null;
+
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
       apiMessages: prepared.apiMessages,
@@ -316,6 +321,7 @@ class MessageGenerationService {
       supportsReasoning: supportsReasoning,
       enableReasoning: enableReasoning,
       streamOutput: assistant?.streamOutput ?? true,
+      ocrActive: ocrActive,
       generateTitleOnFinish: generateTitleOnFinish,
     );
   }

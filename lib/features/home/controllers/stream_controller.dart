@@ -1251,6 +1251,7 @@ class GenerationContext {
     required this.supportsReasoning,
     required this.enableReasoning,
     required this.streamOutput,
+    this.ocrActive = false,
     this.generateTitleOnFinish = true,
   });
 
@@ -1270,6 +1271,7 @@ class GenerationContext {
   final bool supportsReasoning;
   final bool enableReasoning;
   final bool streamOutput;
+  final bool ocrActive;
   final bool generateTitleOnFinish;
 }
 

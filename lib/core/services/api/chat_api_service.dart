@@ -230,7 +230,9 @@ class ChatApiService {
     String raw, {
     required bool allowRemoteImages,
     required bool allowLocalImages,
+    bool allowDataImages = true,
     bool keepRemoteMarkdownText = true,
+    bool keepDisallowedImageText = true,
   }) async {
     if (raw.isEmpty) return const _ParsedTextAndImages('', <_ImageRef>[]);
     final mdImg = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
@@ -254,7 +256,11 @@ class ChatApiService {
         }
         // Inline base64 / data URLs: always treat as image but keep them out of text.
         if (url.startsWith('data:')) {
-          images.add(_ImageRef('data', url));
+          if (allowDataImages) {
+            images.add(_ImageRef('data', url));
+          } else if (keepDisallowedImageText) {
+            buf.write(full);
+          }
           i = m1.end;
           continue;
         }
@@ -263,7 +269,7 @@ class ChatApiService {
           if (!allowRemoteImages) {
             // Model does not accept image input (or we intentionally skip http images):
             // keep original markdown so the model can see the template.
-            buf.write(full);
+            if (keepDisallowedImageText) buf.write(full);
             i = m1.end;
             continue;
           }
@@ -284,7 +290,7 @@ class ChatApiService {
         }
         // Local / relative path: only treat as image when the file exists.
         if (!allowLocalImages) {
-          buf.write(full);
+          if (keepDisallowedImageText) buf.write(full);
           i = m1.end;
           continue;
         }
@@ -317,13 +323,17 @@ class ChatApiService {
           continue;
         }
         if (p.startsWith('data:')) {
-          images.add(_ImageRef('data', p));
+          if (allowDataImages) {
+            images.add(_ImageRef('data', p));
+          } else if (keepDisallowedImageText) {
+            buf.write(full);
+          }
           i = m2.end;
           continue;
         }
         if (p.startsWith('http://') || p.startsWith('https://')) {
           if (!allowRemoteImages) {
-            buf.write(full);
+            if (keepDisallowedImageText) buf.write(full);
             i = m2.end;
             continue;
           }
@@ -332,7 +342,7 @@ class ChatApiService {
           continue;
         }
         if (!allowLocalImages) {
-          buf.write(full);
+          if (keepDisallowedImageText) buf.write(full);
           i = m2.end;
           continue;
         }
@@ -372,6 +382,73 @@ class ChatApiService {
       return 'data:$mime;base64,$b64';
     }
     return b64;
+  }
+
+  static String _textFromContentParts(dynamic content) {
+    if (content is String) return content.trim();
+    if (content is! List) return (content ?? '').toString().trim();
+
+    final buffer = StringBuffer();
+    for (final part in content) {
+      if (part is String) {
+        buffer.write(part);
+        continue;
+      }
+      if (part is! Map) continue;
+      final type = (part['type'] ?? '').toString();
+      if (type.isNotEmpty &&
+          type != 'text' &&
+          type != 'input_text' &&
+          type != 'output_text') {
+        continue;
+      }
+      final text = (part['text'] ?? part['content'] ?? '').toString();
+      if (text.isEmpty) continue;
+      buffer.write(text);
+    }
+    return buffer.toString().trim();
+  }
+
+  static Future<String> _stripImageMarkersFromText(String raw) async {
+    final parsed = await _parseTextAndImages(
+      raw,
+      allowRemoteImages: false,
+      allowLocalImages: false,
+      allowDataImages: false,
+      keepRemoteMarkdownText: false,
+      keepDisallowedImageText: false,
+    );
+    return parsed.text;
+  }
+
+  static Future<dynamic> _stripImageInputsFromContent(dynamic content) async {
+    if (content is String) return _stripImageMarkersFromText(content);
+    if (content is List) {
+      return _stripImageMarkersFromText(_textFromContentParts(content));
+    }
+    if (content is Map) {
+      return _stripImageMarkersFromText(_textFromContentParts([content]));
+    }
+    return content;
+  }
+
+  static Future<List<Map<String, dynamic>>> _stripImageInputsFromMessages(
+    List<Map<String, dynamic>> messages,
+  ) async {
+    final out = <Map<String, dynamic>>[];
+    for (final message in messages) {
+      final copy = Map<String, dynamic>.from(message);
+      copy.remove(multimodalInternalMediaPathsKey);
+      if (copy.containsKey('content')) {
+        copy['content'] = await _stripImageInputsFromContent(copy['content']);
+      }
+      out.add(copy);
+    }
+    return out;
+  }
+
+  static bool _supportsImageInput(ProviderConfig config, String modelId) {
+    return _effectiveModelInfo(config, modelId).input.contains(Modality.image);
   }
 
   static http.Client _clientFor(ProviderConfig cfg, CancelToken cancelToken) {
@@ -420,6 +497,7 @@ class ChatApiService {
     bool stream = true,
     String? requestId,
     bool allowImagesApiRouting = true,
+    bool ocrActive = false,
   }) async* {
     final kind = ProviderConfig.classify(
       config.id,
@@ -434,19 +512,32 @@ class ChatApiService {
       } catch (_) {}
       _activeCancelTokens[rid] = cancelToken;
     }
-    final safeMessages = _sanitizeMessages(messages);
+    final useOpenAIImagesApi =
+        kind == ProviderKind.openai &&
+        allowImagesApiRouting &&
+        _shouldUseOpenAIImagesApi(config, modelId);
+    final unicodeSafeMessages = _sanitizeMessages(messages);
+    final stripUnsupportedImageInputs =
+        !ocrActive &&
+        !useOpenAIImagesApi &&
+        !_supportsImageInput(config, modelId);
+    final safeMessages = stripUnsupportedImageInputs
+        ? await _stripImageInputsFromMessages(unicodeSafeMessages)
+        : unicodeSafeMessages;
+    final safeUserImagePaths = stripUnsupportedImageInputs
+        ? const <String>[]
+        : userImagePaths;
     final client = _clientFor(config, cancelToken);
 
     try {
       if (kind == ProviderKind.openai) {
-        if (allowImagesApiRouting &&
-            _shouldUseOpenAIImagesApi(config, modelId)) {
+        if (useOpenAIImagesApi) {
           yield* _sendOpenAIImagesStream(
             client,
             config,
             modelId,
             safeMessages,
-            userImagePaths: userImagePaths,
+            userImagePaths: safeUserImagePaths,
             extraHeaders: extraHeaders,
             extraBody: extraBody,
           );
@@ -456,7 +547,7 @@ class ChatApiService {
             config,
             modelId,
             safeMessages,
-            userImagePaths: userImagePaths,
+            userImagePaths: safeUserImagePaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,
@@ -473,7 +564,7 @@ class ChatApiService {
             config,
             modelId,
             safeMessages,
-            userImagePaths: userImagePaths,
+            userImagePaths: safeUserImagePaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,
@@ -491,7 +582,7 @@ class ChatApiService {
           config,
           modelId,
           safeMessages,
-          userImagePaths: userImagePaths,
+          userImagePaths: safeUserImagePaths,
           thinkingBudget: thinkingBudget,
           temperature: temperature,
           topP: topP,
@@ -512,7 +603,7 @@ class ChatApiService {
             config: config,
             modelId: modelId,
             messages: safeMessages,
-            userImagePaths: userImagePaths,
+            userImagePaths: safeUserImagePaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,
@@ -529,7 +620,7 @@ class ChatApiService {
             config,
             modelId,
             safeMessages,
-            userImagePaths: userImagePaths,
+            userImagePaths: safeUserImagePaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,
@@ -546,7 +637,7 @@ class ChatApiService {
             config,
             modelId,
             safeMessages,
-            userImagePaths: userImagePaths,
+            userImagePaths: safeUserImagePaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,

@@ -221,6 +221,11 @@ class GenerationController {
     required bool streamOutput,
     bool generateTitleOnFinish = true,
   }) {
+    final bool ocrActive =
+        settings.ocrEnabled &&
+        settings.ocrModelProvider != null &&
+        settings.ocrModelId != null;
+
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
       apiMessages: apiMessages,
@@ -238,6 +243,7 @@ class GenerationController {
       supportsReasoning: supportsReasoning,
       enableReasoning: enableReasoning,
       streamOutput: streamOutput,
+      ocrActive: ocrActive,
       generateTitleOnFinish: generateTitleOnFinish,
     );
   }
