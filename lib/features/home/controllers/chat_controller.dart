@@ -13,8 +13,7 @@ import '../../../core/services/chat/chat_service.dart';
 /// - Conversation stream subscriptions
 /// - Message grouping and collapsing logic
 class ChatController extends ChangeNotifier {
-  ChatController({required ChatService chatService})
-    : _chatService = chatService;
+  ChatController({required this._chatService});
 
   final ChatService _chatService;
 

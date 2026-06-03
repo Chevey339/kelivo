@@ -80,14 +80,12 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext {
 /// - Visibility state for navigation buttons
 class ChatScrollController {
   ChatScrollController({
-    required ScrollController scrollController,
-    required VoidCallback onStateChanged,
-    required bool Function() getAutoScrollEnabled,
-    required int Function() getAutoScrollIdleSeconds,
-  }) : _scrollController = scrollController,
-       _onStateChanged = onStateChanged,
-       _getAutoScrollEnabled = getAutoScrollEnabled,
-       _getAutoScrollIdleSeconds = getAutoScrollIdleSeconds {
+    required this._scrollController,
+    required this._onStateChanged,
+    required this._getAutoScrollEnabled,
+    required this._getAutoScrollIdleSeconds,
+  }) {
+    final scrollController = _scrollController;
     _scrollController.addListener(_onScrollControllerChanged);
     _observerController = ListObserverController(controller: scrollController)
       ..cacheJumpIndexOffset = false;

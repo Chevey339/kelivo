@@ -64,22 +64,15 @@ class TranslationData {
 /// - Building the UI tree
 class HomePageController extends ChangeNotifier {
   HomePageController({
-    required BuildContext context,
-    required TickerProvider vsync,
-    required GlobalKey<ScaffoldState> scaffoldKey,
-    required GlobalKey inputBarKey,
-    required FocusNode inputFocus,
-    required TextEditingController inputController,
-    required ChatInputBarController mediaController,
-    required ScrollController scrollController,
-  }) : _context = context,
-       _vsync = vsync,
-       _scaffoldKey = scaffoldKey,
-       _inputBarKey = inputBarKey,
-       _inputFocus = inputFocus,
-       _inputController = inputController,
-       _mediaController = mediaController,
-       _scrollController = scrollController {
+    required this._context,
+    required this._vsync,
+    required this._scaffoldKey,
+    required this._inputBarKey,
+    required this._inputFocus,
+    required this._inputController,
+    required this._mediaController,
+    required this._scrollController,
+  }) {
     _initialize();
   }
 

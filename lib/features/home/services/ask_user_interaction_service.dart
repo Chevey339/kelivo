@@ -116,8 +116,8 @@ class AskUserRequest {
   AskUserRequest({
     required this.toolCallId,
     required this.questions,
-    required Completer<AskUserResult> completer,
-  }) : _completer = completer;
+    required this._completer,
+  });
 
   final String toolCallId;
   final List<AskUserQuestion> questions;

@@ -25,12 +25,12 @@ export 'streaming_content_notifier.dart';
 /// by the home page to handle streaming generation without cluttering the UI code.
 class StreamController {
   StreamController({
-    required ChatService chatService,
+    required this._chatService,
     required this.onStateChanged,
     required this.getSettingsProvider,
     required this.getCurrentConversationId,
     this.onStreamTick,
-  }) : _chatService = chatService;
+  });
 
   final ChatService _chatService;
 

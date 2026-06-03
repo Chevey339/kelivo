@@ -25,10 +25,10 @@ import '../widgets/chat_input_bar.dart';
 /// - 文件复制到应用目录
 class FileUploadService {
   FileUploadService({
-    required BuildContext Function() getContext,
+    required this._getContext,
     required this.mediaController,
     required this.onScrollToBottom,
-  }) : _getContext = getContext;
+  });
 
   /// 媒体控制器，用于添加图片和文件到输入栏
   final ChatInputBarController mediaController;
