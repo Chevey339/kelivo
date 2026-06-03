@@ -4423,9 +4423,12 @@ class ModernBlockQuote extends InlineMd {
       }
     }
     final data = _unmaskBlockquoteFenceMarkers(sb.toString().trim());
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final lineColor = cs.outlineVariant.withValues(alpha: isDark ? 0.52 : 0.82);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final lineColor = cs.onSurfaceVariant.withValues(
+      alpha: isDark ? 0.48 : 0.36,
+    );
     final innerComponents =
         (config.components ?? MarkdownComponent.globalComponents)
             .where((component) => component is! CodeBlockMd)

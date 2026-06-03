@@ -6,6 +6,8 @@ import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/theme/palettes.dart';
+import 'package:Kelivo/theme/theme_factory.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -262,6 +264,9 @@ Widget _markdownHarness(
   bool streaming = false,
   Map<String, Object>? preferences,
   void Function(String id)? onCitationTap,
+  ThemeData? theme,
+  ThemeData? darkTheme,
+  ThemeMode? themeMode,
 }) {
   SharedPreferences.setMockInitialValues(preferences ?? {});
   return ChangeNotifierProvider(
@@ -269,6 +274,9 @@ Widget _markdownHarness(
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      theme: theme,
+      darkTheme: darkTheme,
+      themeMode: themeMode,
       home: Scaffold(
         body: width == null
             ? MarkdownWithCodeHighlight(
@@ -1191,9 +1199,15 @@ ${rows.join('\n')}
   );
 
   testWidgets(
-    'MarkdownWithCodeHighlight renders blockquote as neutral leading line',
+    'MarkdownWithCodeHighlight renders light default blockquote line as gray',
     (tester) async {
-      await tester.pumpWidget(_markdownHarness('> 引用内容\n> 第二行', width: 320));
+      await tester.pumpWidget(
+        _markdownHarness(
+          '> 引用内容\n> 第二行',
+          width: 320,
+          theme: buildLightThemeForScheme(ThemePalettes.defaultPalette.light),
+        ),
+      );
       await tester.pump();
 
       final blockquote = find.byKey(const ValueKey('markdown-blockquote'));
@@ -1213,7 +1227,43 @@ ${rows.join('\n')}
       final lineDecoration =
           tester.widget<DecoratedBox>(line).decoration as BoxDecoration;
       final cs = Theme.of(tester.element(blockquote)).colorScheme;
-      expect(lineDecoration.color, cs.outlineVariant.withValues(alpha: 0.82));
+      expect(lineDecoration.color, cs.onSurfaceVariant.withValues(alpha: 0.36));
+      expect(
+        lineDecoration.color,
+        isNot(cs.outlineVariant.withValues(alpha: 0.82)),
+      );
+      expect(lineDecoration.borderRadius, BorderRadius.circular(2));
+      expect(lineDecoration.border, isNull);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps dark default blockquote line gray',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          '> 引用内容\n> 第二行',
+          width: 320,
+          theme: buildLightThemeForScheme(ThemePalettes.defaultPalette.light),
+          darkTheme: buildDarkThemeForScheme(ThemePalettes.defaultPalette.dark),
+          themeMode: ThemeMode.dark,
+        ),
+      );
+      await tester.pump();
+
+      final blockquote = find.byKey(const ValueKey('markdown-blockquote'));
+      expect(blockquote, findsOneWidget);
+
+      final line = find.descendant(
+        of: blockquote,
+        matching: find.byKey(const ValueKey('markdown-blockquote-line')),
+      );
+      expect(line, findsOneWidget);
+
+      final lineDecoration =
+          tester.widget<DecoratedBox>(line).decoration as BoxDecoration;
+      final cs = Theme.of(tester.element(blockquote)).colorScheme;
+      expect(lineDecoration.color, cs.onSurfaceVariant.withValues(alpha: 0.48));
       expect(lineDecoration.borderRadius, BorderRadius.circular(2));
       expect(lineDecoration.border, isNull);
     },
