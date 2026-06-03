@@ -1183,6 +1183,7 @@
   "defaultModelPageTranslateModelSubtitle": "Used for translating message content; prefer fast & accurate models",
   "defaultModelPageOcrModelTitle": "OCR Model",
   "defaultModelPageOcrModelSubtitle": "Used for extracting text and descriptions from images",
+  "defaultModelPageOcrModelRequiresImageInput": "Select a model tagged with image input for OCR",
   "defaultModelPagePromptLabel": "Prompt",
   "defaultModelPageTitlePromptHint": "Enter prompt template for title summarization",
   "defaultModelPageSummaryPromptHint": "Enter prompt template for summary generation",

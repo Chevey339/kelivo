@@ -5165,6 +5165,12 @@ abstract class AppLocalizations {
   /// **'Used for extracting text and descriptions from images'**
   String get defaultModelPageOcrModelSubtitle;
 
+  /// No description provided for @defaultModelPageOcrModelRequiresImageInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a model tagged with image input for OCR'**
+  String get defaultModelPageOcrModelRequiresImageInput;
+
   /// No description provided for @defaultModelPagePromptLabel.
   ///
   /// In en, this message translates to:

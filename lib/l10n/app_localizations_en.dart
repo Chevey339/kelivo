@@ -2751,6 +2751,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Used for extracting text and descriptions from images';
 
   @override
+  String get defaultModelPageOcrModelRequiresImageInput =>
+      'Select a model tagged with image input for OCR';
+
+  @override
   String get defaultModelPagePromptLabel => 'Prompt';
 
   @override

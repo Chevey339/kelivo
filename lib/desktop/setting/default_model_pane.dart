@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../shared/widgets/snackbar.dart';
 import '../../features/model/widgets/model_select_sheet.dart';
+import '../../features/model/utils/ocr_model_capability.dart';
 import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../theme/app_font_weights.dart';
@@ -221,6 +223,20 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       final settingsProvider = context.read<SettingsProvider>();
                       final sel = await showModelSelector(context);
                       if (sel != null) {
+                        if (!modelSupportsOcrImageInput(
+                          settingsProvider,
+                          sel.providerKey,
+                          sel.modelId,
+                        )) {
+                          if (!context.mounted) return;
+                          showAppSnackBar(
+                            context,
+                            message:
+                                l10n.defaultModelPageOcrModelRequiresImageInput,
+                            type: NotificationType.error,
+                          );
+                          return;
+                        }
                         await settingsProvider.setOcrModel(
                           sel.providerKey,
                           sel.modelId,

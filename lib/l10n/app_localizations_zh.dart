@@ -2655,6 +2655,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get defaultModelPageOcrModelSubtitle => '用于对图片执行文字识别的模型';
 
   @override
+  String get defaultModelPageOcrModelRequiresImageInput =>
+      '请选择标记为支持图片输入的模型用于 OCR';
+
+  @override
   String get defaultModelPagePromptLabel => '提示词';
 
   @override
@@ -7852,6 +7856,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get defaultModelPageOcrModelSubtitle => '用于对图片执行文字识别的模型';
 
   @override
+  String get defaultModelPageOcrModelRequiresImageInput =>
+      '请选择标记为支持图片输入的模型用于 OCR';
+
+  @override
   String get defaultModelPagePromptLabel => '提示词';
 
   @override
@@ -13046,6 +13054,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageOcrModelSubtitle => '用於對圖片執行文字辨識的模型';
+
+  @override
+  String get defaultModelPageOcrModelRequiresImageInput =>
+      '請選擇標記為支援圖片輸入的模型用於 OCR';
 
   @override
   String get defaultModelPagePromptLabel => '提示詞';

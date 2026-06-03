@@ -905,6 +905,7 @@
   "defaultModelPageTranslateModelSubtitle": "用于翻译消息内容的模型，推荐使用快速且准确的模型",
   "defaultModelPageOcrModelTitle": "OCR 模型",
   "defaultModelPageOcrModelSubtitle": "用于对图片执行文字识别的模型",
+  "defaultModelPageOcrModelRequiresImageInput": "请选择标记为支持图片输入的模型用于 OCR",
   "defaultModelPagePromptLabel": "提示词",
   "defaultModelPageTitlePromptHint": "输入用于标题总结的提示词模板",
   "defaultModelPageTranslatePromptHint": "输入用于翻译的提示词模板",
