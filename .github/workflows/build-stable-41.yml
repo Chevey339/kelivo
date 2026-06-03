@@ -38,16 +38,16 @@ on:
         default: true
         type: boolean
 
-      # 是否发布到 Release（默认不发布）
+      # 是否发布到 Release（默认发布）
       publish_release:
         description: '发布到 Release'
         required: false
-        default: false
+        default: true
         type: boolean
 
-      # Release 标签（只有选择发布时才需要填写）
+      # Release 标签（留空时自动生成）
       release_tag:
-        description: 'Release 标签（如 v1.0.0）'
+        description: 'Release 标签（如 v1.0.0；留空自动生成）'
         required: false
         default: ''
         type: string
@@ -94,16 +94,21 @@ jobs:
           cat > lib/secrets/fallback.dart <<'EOF'
           const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
           EOF
-      - name: 📝 获取版本号
+      - name: 📝 获取版本号和 Release 标签
         id: version
         run: |
-          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
-          if [ "${{ github.event.inputs.publish_release }}" != "true" ]; then
-            SHORT_SHA=$(git rev-parse --short HEAD)
-            VERSION="${VERSION}_${SHORT_SHA}"
+          APP_VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="${APP_VERSION}_${SHORT_SHA}"
+          RELEASE_TAG="${{ github.event.inputs.release_tag }}"
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG="v${APP_VERSION}-${SHORT_SHA}"
           fi
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
           echo "版本号: $VERSION"
+          echo "Release 标签: $RELEASE_TAG"
       # 如果有签名密钥，写入密钥文件
       - name: 🔑 写入签名密钥
         if: ${{ env.SIGN_KEYSTORE_BASE64 != '' }}
@@ -127,12 +132,13 @@ jobs:
             mv "$file" "Kelivo_android_${VERSION}_${abi}.apk"
           done
       - name: 🚀 发布到 Release
-        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
+        if: ${{ github.event.inputs.publish_release == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: ${{ github.event.inputs.release_tag }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
           prerelease: ${{ github.event.inputs.prerelease }}
+          overwrite_files: true
           files: build/app/outputs/flutter-apk/Kelivo_android_*.apk
 
       - name: 📤 上传构建产物 (arm64-v8a)
@@ -180,16 +186,21 @@ jobs:
           cat > lib/secrets/fallback.dart <<'EOF'
           const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
           EOF
-      - name: 📝 获取版本号
+      - name: 📝 获取版本号和 Release 标签
         id: version
         run: |
-          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
-          if [ "${{ github.event.inputs.publish_release }}" != "true" ]; then
-            SHORT_SHA=$(git rev-parse --short HEAD)
-            VERSION="${VERSION}_${SHORT_SHA}"
+          APP_VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="${APP_VERSION}_${SHORT_SHA}"
+          RELEASE_TAG="${{ github.event.inputs.release_tag }}"
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG="v${APP_VERSION}-${SHORT_SHA}"
           fi
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
           echo "版本号: $VERSION"
+          echo "Release 标签: $RELEASE_TAG"
       - name: 🏗️ 构建 iOS (无签名)
         run: |
           flutter build ios --release --no-codesign
@@ -198,12 +209,13 @@ jobs:
           cp -r Runner.app Payload/
           zip -r ../../../Kelivo_ios_${VERSION}.ipa Payload
       - name: 🚀 发布到 Release
-        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
+        if: ${{ github.event.inputs.publish_release == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: ${{ github.event.inputs.release_tag }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
           prerelease: ${{ github.event.inputs.prerelease }}
+          overwrite_files: true
           files: Kelivo_ios_*.ipa
 
       - name: 📤 上传构建产物
@@ -239,14 +251,20 @@ jobs:
           cat > lib/secrets/fallback.dart <<'EOF'
           const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
           EOF
-      - name: 📝 获取版本号
+      - name: 📝 获取版本号和 Release 标签
         run: |
-          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
-          if [ "${{ github.event.inputs.publish_release }}" != "true" ]; then
-            SHORT_SHA=$(git rev-parse --short HEAD)
-            VERSION="${VERSION}_${SHORT_SHA}"
+          APP_VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="${APP_VERSION}_${SHORT_SHA}"
+          RELEASE_TAG="${{ github.event.inputs.release_tag }}"
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG="v${APP_VERSION}-${SHORT_SHA}"
           fi
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+          echo "版本号: $VERSION"
+          echo "Release 标签: $RELEASE_TAG"
       - name: 🏗️ 构建 macOS
         run: flutter build macos --release
 
@@ -266,12 +284,13 @@ jobs:
             hdiutil create -volname Kelivo -srcfolder build/macos/Build/Products/Release/kelivo.app -ov -format UDZO Kelivo_macos_${VERSION}.dmg
           fi
       - name: 🚀 发布到 Release
-        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
+        if: ${{ github.event.inputs.publish_release == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: ${{ github.event.inputs.release_tag }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
           prerelease: ${{ github.event.inputs.prerelease }}
+          overwrite_files: true
           files: Kelivo_macos_*.dmg
 
       - name: 📤 上传构建产物
@@ -320,16 +339,21 @@ jobs:
           cmake --version
           $cmakeVersion = (cmake --version | Select-String "cmake version" | ForEach-Object { $_.ToString() })
           Write-Host "当前 CMake: $cmakeVersion"
-      - name: 📝 获取版本号
+      - name: 📝 获取版本号和 Release 标签
         shell: pwsh
         run: |
-          $version = (Select-String -Path pubspec.yaml -Pattern "version:" | ForEach-Object { $_.Line.Split(":")[1].Trim() })
-          if ("${{ github.event.inputs.publish_release }}" -ne "true") {
-            $shortSha = git rev-parse --short HEAD
-            $version = "$version`_$shortSha"
+          $appVersion = (Select-String -Path pubspec.yaml -Pattern "version:" | ForEach-Object { $_.Line.Split(":")[1].Trim() })
+          $shortSha = git rev-parse --short HEAD
+          $version = "$appVersion`_$shortSha"
+          $releaseTag = "${{ github.event.inputs.release_tag }}"
+          if ([string]::IsNullOrWhiteSpace($releaseTag)) {
+            $releaseTag = "v$appVersion-$shortSha"
           }
+          echo "APP_VERSION=$appVersion" >> $env:GITHUB_ENV
           echo "VERSION=$version" >> $env:GITHUB_ENV
+          echo "RELEASE_TAG=$releaseTag" >> $env:GITHUB_ENV
           Write-Host "版本号: $version"
+          Write-Host "Release 标签: $releaseTag"
       - name: 🏗️ 构建 Windows
         run: flutter build windows --release
 
@@ -420,12 +444,13 @@ jobs:
           # 编译安装程序
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer.iss"
       - name: 🚀 发布到 Release
-        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
+        if: ${{ github.event.inputs.publish_release == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: ${{ github.event.inputs.release_tag }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
           prerelease: ${{ github.event.inputs.prerelease }}
+          overwrite_files: true
           files: |
             Kelivo_windows_*.zip
             Kelivo_windows_*_setup.exe
@@ -477,16 +502,20 @@ jobs:
           cat > lib/secrets/fallback.dart <<'EOF'
           const String siliconflowFallbackKey = '${{ secrets.SILICONFLOW_KEY }}';
           EOF
-      - name: 📝 获取版本号
+      - name: 📝 获取版本号和 Release 标签
         run: |
           RAW_VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
-          VERSION=$RAW_VERSION
-          if [ "${{ github.event.inputs.publish_release }}" != "true" ]; then
-            SHORT_SHA=$(git rev-parse --short HEAD)
-            VERSION="${VERSION}_${SHORT_SHA}"
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="${RAW_VERSION}_${SHORT_SHA}"
+          RELEASE_TAG="${{ github.event.inputs.release_tag }}"
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG="v${RAW_VERSION}-${SHORT_SHA}"
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
           echo "VERSION_NUMBER=$(echo $RAW_VERSION | cut -d'+' -f1)" >> $GITHUB_ENV
+          echo "版本号: $VERSION"
+          echo "Release 标签: $RELEASE_TAG"
       - name: 🏗️ 构建 Linux
         run: flutter build linux --release
 
@@ -694,12 +723,13 @@ jobs:
           RPM_FILE="Kelivo_linux_${VERSION}.rpm"
           docker run --rm -v "${PWD}:/work" -w /work fedora:43 bash -lc "dnf -y install ./${RPM_FILE}"
       - name: 🚀 发布到 Release
-        if: ${{ github.event.inputs.publish_release == 'true' && github.event.inputs.release_tag != '' }}
+        if: ${{ github.event.inputs.publish_release == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: ${{ github.event.inputs.release_tag }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
           prerelease: ${{ github.event.inputs.prerelease }}
+          overwrite_files: true
           files: |
             Kelivo_linux_*.tar.gz
             Kelivo_linux_*.AppImage

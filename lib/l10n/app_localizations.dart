@@ -9966,6 +9966,51 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.'**
+
+  /// No description provided for @imageGenTitle.
+  String get imageGenTitle;
+  /// No description provided for @imageGenReset.
+  String get imageGenReset;
+  /// No description provided for @imageGenQualityLabel.
+  String get imageGenQualityLabel;
+  /// No description provided for @imageGenSizeLabel.
+  String get imageGenSizeLabel;
+  /// No description provided for @imageGenAspectRatioLabel.
+  String get imageGenAspectRatioLabel;
+  /// No description provided for @imageGenFormatLabel.
+  String get imageGenFormatLabel;
+  /// No description provided for @imageGenCompressionLabel.
+  String get imageGenCompressionLabel;
+  /// No description provided for @imageGenCountLabel.
+  String get imageGenCountLabel;
+  /// No description provided for @imageGenAuto.
+  String get imageGenAuto;
+  /// No description provided for @imageGenLow.
+  String get imageGenLow;
+  /// No description provided for @imageGenMedium.
+  String get imageGenMedium;
+  /// No description provided for @imageGenHigh.
+  String get imageGenHigh;
+  /// No description provided for @imageGenAutoSize.
+  String get imageGenAutoSize;
+  /// No description provided for @imageGenAutoRatio.
+  String get imageGenAutoRatio;
+  /// No description provided for @imageGenCustomRatio.
+  String get imageGenCustomRatio;
+  /// No description provided for @imageGenCustomRatioLabel.
+  String get imageGenCustomRatioLabel;
+  /// No description provided for @imageGenCustomRatioHint.
+  String get imageGenCustomRatioHint;
+  /// No description provided for @imageGenActualSize.
+  String get imageGenActualSize;
+  /// No description provided for @imageGenCurrent.
+  String get imageGenCurrent;
+  /// No description provided for @imageGenPNG.
+  String get imageGenPNG;
+  /// No description provided for @imageGenLossless.
+  String get imageGenLossless;
+  /// No description provided for @imageGenPaletteTooltip.
+  String imageGenPaletteTooltip(String summary);
   String debugPageManyMessagesSeedText(String role, int index);
 }
 

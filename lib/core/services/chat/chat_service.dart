@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:hive_flutter/hive_flutter.dart';
@@ -818,6 +819,8 @@ class ChatService extends ChangeNotifier {
     DateTime? reasoningFinishedAt,
     String? groupId,
     int? version,
+    bool? requestAllowImagesApiRouting,
+    Map<String, dynamic>? requestExtraBody,
   }) async {
     if (!_initialized) await init();
 
@@ -860,6 +863,11 @@ class ChatService extends ChangeNotifier {
       reasoningFinishedAt: reasoningFinishedAt,
       groupId: groupId,
       version: version,
+      requestAllowImagesApiRouting: requestAllowImagesApiRouting,
+      requestExtraBodyJson:
+          requestExtraBody == null || requestExtraBody.isEmpty
+              ? null
+              : jsonEncode(requestExtraBody),
     );
 
     if (!temporary) {

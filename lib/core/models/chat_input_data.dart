@@ -15,12 +15,14 @@ class ChatInputData {
   final List<String> imagePaths; // absolute file paths or data URLs
   final List<DocumentAttachment> documents; // selected files
   final bool allowImagesApiRouting;
+  final Map<String, dynamic> extraBody; // per-send API body overrides
 
   const ChatInputData({
     required this.text,
     this.imagePaths = const [],
     this.documents = const [],
     this.allowImagesApiRouting = true,
+    this.extraBody = const {},
   });
 }
 

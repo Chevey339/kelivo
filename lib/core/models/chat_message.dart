@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 
@@ -70,6 +72,25 @@ class ChatMessage extends HiveObject {
   @HiveField(19)
   final int? durationMs;
 
+  // Per-request routing/body metadata persisted on the originating user message.
+  @HiveField(20)
+  final bool? requestAllowImagesApiRouting;
+
+  @HiveField(21)
+  final String? requestExtraBodyJson;
+
+  Map<String, dynamic> get requestExtraBody {
+    final raw = requestExtraBodyJson?.trim();
+    if (raw == null || raw.isEmpty) return const <String, dynamic>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return decoded.cast<String, dynamic>();
+      }
+    } catch (_) {}
+    return const <String, dynamic>{};
+  }
+
   ChatMessage({
     String? id,
     required this.role,
@@ -91,6 +112,8 @@ class ChatMessage extends HiveObject {
     this.completionTokens,
     this.cachedTokens,
     this.durationMs,
+    this.requestAllowImagesApiRouting,
+    this.requestExtraBodyJson,
   }) : id = id ?? const Uuid().v4(),
        timestamp = timestamp ?? DateTime.now(),
        groupId = groupId ?? id,
@@ -117,6 +140,8 @@ class ChatMessage extends HiveObject {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    bool? requestAllowImagesApiRouting,
+    String? requestExtraBodyJson,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -140,6 +165,9 @@ class ChatMessage extends HiveObject {
       completionTokens: completionTokens ?? this.completionTokens,
       cachedTokens: cachedTokens ?? this.cachedTokens,
       durationMs: durationMs ?? this.durationMs,
+      requestAllowImagesApiRouting:
+          requestAllowImagesApiRouting ?? this.requestAllowImagesApiRouting,
+      requestExtraBodyJson: requestExtraBodyJson ?? this.requestExtraBodyJson,
     );
   }
 
@@ -165,6 +193,8 @@ class ChatMessage extends HiveObject {
       'completionTokens': completionTokens,
       'cachedTokens': cachedTokens,
       'durationMs': durationMs,
+      'requestAllowImagesApiRouting': requestAllowImagesApiRouting,
+      'requestExtraBodyJson': requestExtraBodyJson,
     };
   }
 
@@ -194,6 +224,9 @@ class ChatMessage extends HiveObject {
       completionTokens: json['completionTokens'] as int?,
       cachedTokens: json['cachedTokens'] as int?,
       durationMs: json['durationMs'] as int?,
+      requestAllowImagesApiRouting:
+          json['requestAllowImagesApiRouting'] as bool?,
+      requestExtraBodyJson: json['requestExtraBodyJson'] as String?,
     );
   }
 }

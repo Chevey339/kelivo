@@ -1911,5 +1911,34 @@
         "type": "int"
       }
     }
+  },
+  "imageGenTitle": "生圖參數",
+  "imageGenReset": "重置",
+  "imageGenQualityLabel": "畫質",
+  "imageGenSizeLabel": "清晰度",
+  "imageGenAspectRatioLabel": "圖像比例",
+  "imageGenFormatLabel": "輸出格式",
+  "imageGenCompressionLabel": "壓縮品質",
+  "imageGenCountLabel": "數量",
+  "imageGenAuto": "自動",
+  "imageGenLow": "低",
+  "imageGenMedium": "中",
+  "imageGenHigh": "高",
+  "imageGenAutoSize": "自動尺寸",
+  "imageGenAutoRatio": "自動比例",
+  "imageGenCustomRatio": "自定義",
+  "imageGenCustomRatioLabel": "自定義比例",
+  "imageGenCustomRatioHint": "例如 7:5、2.39:1",
+  "imageGenActualSize": "實際尺寸",
+  "imageGenCurrent": "當前",
+  "imageGenPNG": "PNG",
+  "imageGenLossless": "無損",
+  "imageGenPaletteTooltip": "生圖參數：{summary}",
+  "@imageGenPaletteTooltip": {
+    "placeholders": {
+      "summary": {
+        "type": "String"
+      }
+    }
   }
 }

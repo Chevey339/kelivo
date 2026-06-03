@@ -244,6 +244,8 @@ class MessageGenerationService {
       conversationId: conversationId,
       role: 'user',
       content: processedUserText + imageMarkers + docMarkers,
+      requestAllowImagesApiRouting: input.allowImagesApiRouting,
+      requestExtraBody: input.extraBody,
     );
   }
 
@@ -295,7 +297,14 @@ class MessageGenerationService {
     required bool supportsReasoning,
     required bool enableReasoning,
     required bool generateTitleOnFinish,
+    Map<String, dynamic>? requestExtraBody,
   }) {
+    final assistantBody = generationController.buildCustomBody(assistant);
+    final mergedExtraBody = <String, dynamic>{
+      if (assistantBody != null) ...assistantBody,
+      if (requestExtraBody != null) ...requestExtraBody,
+    };
+
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
       apiMessages: prepared.apiMessages,
@@ -312,7 +321,7 @@ class MessageGenerationService {
         conversationId: assistantMessage.conversationId,
         customHeaders: generationController.buildCustomHeaders(assistant),
       ),
-      extraBody: generationController.buildCustomBody(assistant),
+      extraBody: mergedExtraBody.isEmpty ? null : mergedExtraBody,
       supportsReasoning: supportsReasoning,
       enableReasoning: enableReasoning,
       streamOutput: assistant?.streamOutput ?? true,
