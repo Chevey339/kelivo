@@ -1486,22 +1486,9 @@ class ChatActions {
     final finalCompletionTokens = state.usage?.completionTokens;
     final finalCachedTokens = state.usage?.cachedTokens;
 
-    // Flush final content to the streaming notifier before async operations.
-    // This ensures any intermediate rebuild (e.g., from isProcessingFiles change
-    // or onDone firing concurrently) still shows the correct content via the
-    // notifier-based streaming path.
-    streamController.streamingContentNotifier.updateContent(
-      messageId,
-      processedContent,
-      state.totalTokens,
-      contentSplitOffsets: state.contentSplitOffsets,
-      reasoningCountAtSplit: state.reasoningCountAtSplit,
-      toolCountAtSplit: state.toolCountAtSplit,
-      promptTokens: finalPromptTokens,
-      completionTokens: finalCompletionTokens,
-      cachedTokens: finalCachedTokens,
-      durationMs: finalDurationMs,
-    );
+    // Remove notifier before final persistence so the streaming widget does not
+    // rebuild with isStreaming:true + large final content on mobile.
+    streamController.removeStreamingNotifier(messageId);
 
     final sanitizedContent =
         await MarkdownMediaSanitizer.replaceInlineBase64Images(
@@ -1533,9 +1520,6 @@ class ChatActions {
       _messages[index] = finalizedMessage;
       onMessagesChanged?.call();
     }
-
-    // Remove notifier AFTER onMessagesChanged so the UI rebuild sees final content
-    streamController.removeStreamingNotifier(messageId);
 
     _setConversationLoading(conversationId, false);
     onAssistantMessageFinished?.call(finalizedMessage);
