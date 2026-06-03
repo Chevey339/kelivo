@@ -143,6 +143,32 @@ class ChatService extends ChangeNotifier {
     return result;
   }
 
+  List<ChatMessage> getMessagesForGroups(
+    String conversationId,
+    Iterable<String> groupIds,
+  ) {
+    final remaining = groupIds.where((id) => id.isNotEmpty).toSet();
+    if (remaining.isEmpty) return const <ChatMessage>[];
+
+    final result = <ChatMessage>[];
+    final count = getMessageCount(conversationId);
+    for (var start = 0; start < count; start += defaultLoadedWindowMax) {
+      final range = getMessagesRange(
+        conversationId,
+        start: start,
+        limit: defaultLoadedWindowMax,
+      );
+      for (final message in range) {
+        final groupId = message.groupId ?? message.id;
+        if (remaining.contains(groupId)) {
+          result.add(message);
+        }
+      }
+    }
+
+    return result;
+  }
+
   ChatMessage? _messageForConversation(
     String conversationId,
     String messageId,
