@@ -327,10 +327,10 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       topP,
     );
     final thinking = isReasoning
-        ? _claudeThinkingConfig(upstreamModelId, thinkingBudget)
+        ? _claudeThinkingConfig(upstreamModelId, thinkingBudget, config: config)
         : null;
     final outputConfig = isReasoning
-        ? _claudeOutputConfig(upstreamModelId, thinkingBudget)
+        ? _claudeOutputConfig(upstreamModelId, thinkingBudget, config: config)
         : null;
 
     // Prepare request body per round

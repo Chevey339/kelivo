@@ -222,6 +222,55 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
   return requestBody;
 }
 
+Future<Map<String, dynamic>> _captureClaudeProviderBody({
+  required String modelId,
+  required ProviderConfig config,
+  int? thinkingBudget,
+  double? temperature,
+  double? topP,
+}) async {
+  late Map<String, dynamic> requestBody;
+  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  addTearDown(() async {
+    await server.close(force: true);
+  });
+
+  server.listen((request) async {
+    requestBody = (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+        .cast<String, dynamic>();
+    request.response.statusCode = HttpStatus.ok;
+    request.response.headers.contentType = ContentType.json;
+    request.response.write(
+      jsonEncode({
+        'id': 'msg_1',
+        'content': [
+          {'type': 'text', 'text': 'ok'},
+        ],
+        'usage': {'input_tokens': 1, 'output_tokens': 1},
+      }),
+    );
+    await request.response.close();
+  });
+
+  final effectiveConfig = config.copyWith(
+    baseUrl: 'http://${server.address.address}:${server.port}',
+  );
+  final chunks = await ChatApiService.sendMessageStream(
+    config: effectiveConfig,
+    modelId: modelId,
+    messages: const [
+      {'role': 'user', 'content': 'hello'},
+    ],
+    thinkingBudget: thinkingBudget,
+    temperature: temperature,
+    topP: topP,
+    stream: false,
+  ).toList();
+
+  expect(chunks.last.isDone, isTrue);
+  return requestBody;
+}
+
 void main() {
   group('Claude thinking compatibility', () {
     test(
@@ -594,6 +643,50 @@ data: {"type":"message_stop"}
         expect(requestBodies, hasLength(1));
       },
     );
+
+    test('DeepSeek Claude-compatible auto thinking stays enabled', () async {
+      final body = await _captureClaudeProviderBody(
+        modelId: 'deepseek-v4-pro',
+        config: _deepSeekClaudeConfig(),
+        thinkingBudget: -1,
+      );
+
+      expect(body['thinking'], {'type': 'enabled'});
+      expect(body.containsKey('output_config'), isFalse);
+    });
+
+    test('DeepSeek Claude-compatible explicit thinking uses effort', () async {
+      final mediumBody = await _captureClaudeProviderBody(
+        modelId: 'deepseek-v4-pro',
+        config: _deepSeekClaudeConfig(),
+        thinkingBudget: 16000,
+      );
+      final maxBody = await _captureClaudeProviderBody(
+        modelId: 'deepseek-v4-pro',
+        config: _deepSeekClaudeConfig(),
+        thinkingBudget: 64000,
+      );
+
+      expect(mediumBody['thinking'], {'type': 'enabled'});
+      expect(mediumBody['output_config'], {'effort': 'high'});
+      expect(maxBody['thinking'], {'type': 'enabled'});
+      expect(maxBody['output_config'], {'effort': 'max'});
+    });
+
+    test('DeepSeek Claude-compatible off thinking stays disabled', () async {
+      final body = await _captureClaudeProviderBody(
+        modelId: 'deepseek-v4-pro',
+        config: _deepSeekClaudeConfig(),
+        thinkingBudget: 0,
+        temperature: 0.7,
+        topP: 0.8,
+      );
+
+      expect(body['thinking'], {'type': 'disabled'});
+      expect(body.containsKey('output_config'), isFalse);
+      expect(body['temperature'], 0.7);
+      expect(body['top_p'], 0.8);
+    });
 
     test(
       'Vertex Claude keeps old search tool selection even with new flag',

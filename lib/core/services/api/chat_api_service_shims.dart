@@ -57,11 +57,17 @@ String _effortForBudget(int? budget) => ChatApiService._effortForBudget(budget);
 bool _isClaudeReasoningEnabled(int? budget) =>
     ChatApiService._isClaudeReasoningEnabled(budget);
 
-Map<String, dynamic>? _claudeThinkingConfig(String modelId, int? budget) =>
-    ChatApiService._claudeThinkingConfig(modelId, budget);
+Map<String, dynamic>? _claudeThinkingConfig(
+  String modelId,
+  int? budget, {
+  ProviderConfig? config,
+}) => ChatApiService._claudeThinkingConfig(modelId, budget, config: config);
 
-Map<String, dynamic>? _claudeOutputConfig(String modelId, int? budget) =>
-    ChatApiService._claudeOutputConfig(modelId, budget);
+Map<String, dynamic>? _claudeOutputConfig(
+  String modelId,
+  int? budget, {
+  ProviderConfig? config,
+}) => ChatApiService._claudeOutputConfig(modelId, budget, config: config);
 
 bool _claudeShouldOmitSamplingParams(String modelId, int? budget) =>
     ChatApiService._claudeShouldOmitSamplingParams(modelId, budget);

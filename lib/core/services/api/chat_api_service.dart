@@ -907,10 +907,18 @@ class ChatApiService {
           thinkingBudget,
         );
         final thinking = isReasoning
-            ? _claudeThinkingConfig(upstreamModelId, thinkingBudget)
+            ? _claudeThinkingConfig(
+                upstreamModelId,
+                thinkingBudget,
+                config: config,
+              )
             : null;
         final outputConfig = isReasoning
-            ? _claudeOutputConfig(upstreamModelId, thinkingBudget)
+            ? _claudeOutputConfig(
+                upstreamModelId,
+                thinkingBudget,
+                config: config,
+              )
             : null;
         final body = <String, dynamic>{
           'model': upstreamModelId,
@@ -1109,6 +1117,21 @@ class ChatApiService {
 
   static bool _isClaudeReasoningEnabled(int? budget) => budget != 0;
 
+  static bool _isDeepSeekClaudeCompatible(
+    String modelId, {
+    ProviderConfig? config,
+  }) {
+    final lowerModelId = modelId.trim().toLowerCase();
+    if (lowerModelId.contains('deepseek')) return true;
+    if (config == null) return false;
+    final baseUrl = config.baseUrl.trim().toLowerCase();
+    final providerId = config.id.trim().toLowerCase();
+    final providerName = config.name.trim().toLowerCase();
+    return baseUrl.contains('api.deepseek.com') ||
+        providerId.contains('deepseek') ||
+        providerName.contains('deepseek');
+  }
+
   static bool _supportsClaudeAdaptiveThinking(String modelId) {
     final lower = modelId.trim().toLowerCase();
     if (!lower.contains('claude-')) return false;
@@ -1189,10 +1212,14 @@ class ChatApiService {
 
   static Map<String, dynamic>? _claudeThinkingConfig(
     String modelId,
-    int? budget,
-  ) {
+    int? budget, {
+    ProviderConfig? config,
+  }) {
     if (!_isClaudeReasoningEnabled(budget)) {
       return <String, dynamic>{'type': 'disabled'};
+    }
+    if (_isDeepSeekClaudeCompatible(modelId, config: config)) {
+      return <String, dynamic>{'type': 'enabled'};
     }
     if (_supportsClaudeAdaptiveThinking(modelId)) {
       return <String, dynamic>{'type': 'adaptive', 'display': 'summarized'};
@@ -1205,8 +1232,17 @@ class ChatApiService {
 
   static Map<String, dynamic>? _claudeOutputConfig(
     String modelId,
-    int? budget,
-  ) {
+    int? budget, {
+    ProviderConfig? config,
+  }) {
+    if (_isDeepSeekClaudeCompatible(modelId, config: config)) {
+      if (!_isClaudeReasoningEnabled(budget)) return null;
+      final effort = _claudeEffortForBudget(budget);
+      if (effort == 'auto' || effort == 'off') return null;
+      return <String, dynamic>{
+        'effort': (effort == 'xhigh' || effort == 'max') ? 'max' : 'high',
+      };
+    }
     if (!_supportsClaudeAdaptiveThinking(modelId) ||
         !_isClaudeReasoningEnabled(budget)) {
       return null;
