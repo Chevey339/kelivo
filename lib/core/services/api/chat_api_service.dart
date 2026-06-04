@@ -960,8 +960,16 @@ class ChatApiService {
         final data = jsonDecode(responseText);
         final content = data['content'] as List?;
         if (content != null && content.isNotEmpty) {
-          final text = content.first['text'];
-          return (text ?? '').toString();
+          final buf = StringBuffer();
+          for (final item in content) {
+            if (item is! Map) continue;
+            if ((item['type'] ?? '').toString() != 'text') continue;
+            final text = item['text'];
+            if (text is String && text.isNotEmpty) {
+              buf.write(text);
+            }
+          }
+          return buf.toString();
         }
         return '';
       } else {

@@ -125,6 +125,9 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
 Future<Map<String, dynamic>> _captureClaudeGenerateTextBody({
   required String modelId,
   int? thinkingBudget,
+  List<Map<String, dynamic>> responseContent = const [
+    {'type': 'text', 'text': 'ok'},
+  ],
 }) async {
   late Map<String, dynamic> requestBody;
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -140,9 +143,7 @@ Future<Map<String, dynamic>> _captureClaudeGenerateTextBody({
     request.response.write(
       jsonEncode({
         'id': 'msg_1',
-        'content': [
-          {'type': 'text', 'text': 'ok'},
-        ],
+        'content': responseContent,
         'usage': {'input_tokens': 1, 'output_tokens': 1},
       }),
     );
@@ -438,6 +439,17 @@ void main() {
       expect(
         (body['thinking'] as Map<String, dynamic>).containsKey('budget_tokens'),
         isFalse,
+      );
+    });
+
+    test('generateText Claude path reads text after thinking block', () async {
+      await _captureClaudeGenerateTextBody(
+        modelId: 'deepseek-v4-pro',
+        thinkingBudget: -1,
+        responseContent: const [
+          {'type': 'thinking', 'thinking': '先思考。'},
+          {'type': 'text', 'text': 'ok'},
+        ],
       );
     });
 

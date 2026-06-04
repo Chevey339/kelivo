@@ -405,7 +405,10 @@ class SettingsProvider extends ChangeNotifier {
         );
         return openAISupportsXhighReasoning(modelForCheck);
       case ProviderKind.claude:
-        return _isDeepSeekClaudeCompatible(cfg, modelId);
+        final rawOv = cfg.modelOverrides[modelId];
+        final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
+        final modelForCheck = resolveApiModelIdOverride(ov, modelId);
+        return _isDeepSeekClaudeCompatible(cfg, modelForCheck);
       case ProviderKind.google:
         return false;
     }
