@@ -130,7 +130,10 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => McpProvider()),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
-        ChangeNotifierProvider(create: (_) => AssistantProvider()),
+        ChangeNotifierProvider(
+          create: (ctx) =>
+              AssistantProvider(chatService: ctx.read<ChatService>()),
+        ),
         ChangeNotifierProvider(create: (_) => TagProvider()),
         ChangeNotifierProvider(create: (_) => TtsProvider()),
         ChangeNotifierProvider(create: (_) => UpdateProvider()),

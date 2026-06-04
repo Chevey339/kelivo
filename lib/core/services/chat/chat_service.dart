@@ -422,6 +422,22 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteConversationsForAssistant(String assistantId) async {
+    if (!_initialized) await init();
+
+    final targetId = assistantId.trim();
+    if (targetId.isEmpty) return;
+
+    final conversationIds = getAllConversations()
+        .where((conversation) => conversation.assistantId == targetId)
+        .map((conversation) => conversation.id)
+        .toList(growable: false);
+
+    for (final conversationId in conversationIds) {
+      await deleteConversation(conversationId);
+    }
+  }
+
   Set<String> _extractAttachmentPaths(String content) {
     final out = <String>{};
     final imgRe = RegExp(r"\[image:(.+?)\]");

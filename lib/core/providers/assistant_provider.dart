@@ -6,6 +6,7 @@ import '../../utils/sandbox_path_resolver.dart';
 import '../models/assistant.dart';
 import '../models/assistant_regex.dart';
 import '../models/preset_message.dart';
+import '../services/chat/chat_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/avatar_cache.dart';
 import '../../utils/app_directories.dart';
@@ -16,6 +17,7 @@ class AssistantProvider extends ChangeNotifier {
 
   final List<Assistant> _assistants = <Assistant>[];
   String? _currentAssistantId;
+  final ChatService? chatService;
 
   List<Assistant> get assistants => List.unmodifiable(_assistants);
   String? get currentAssistantId => _currentAssistantId;
@@ -26,7 +28,7 @@ class AssistantProvider extends ChangeNotifier {
     return null;
   }
 
-  AssistantProvider() {
+  AssistantProvider({this.chatService}) {
     _load();
   }
 
@@ -441,6 +443,9 @@ class AssistantProvider extends ChangeNotifier {
     if (idx == -1) return false;
     // Do not allow deleting the last remaining assistant
     if (_assistants.length <= 1) return false;
+
+    await chatService?.deleteConversationsForAssistant(id);
+
     final removingCurrent = _assistants[idx].id == _currentAssistantId;
     _assistants.removeAt(idx);
     if (removingCurrent) {
