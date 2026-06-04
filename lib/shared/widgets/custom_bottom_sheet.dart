@@ -74,7 +74,7 @@ class CustomBottomSheet extends StatefulWidget {
 class _CustomBottomSheetState extends State<CustomBottomSheet>
     with SingleTickerProviderStateMixin {
   static const double _flingVelocityThreshold = 400;
-  static const double _dismissDistanceThreshold = 200;
+  static const double _dismissDistanceThreshold = 150;
   static const double _dismissExtentGapPx = 10;
 
   late final AnimationController _sheetAnimationController;

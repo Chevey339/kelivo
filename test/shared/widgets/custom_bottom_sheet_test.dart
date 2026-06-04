@@ -287,7 +287,7 @@ void main() {
   });
 
   testWidgets(
-    'handle drag follows below partial and dismisses only after a long pull',
+    'handle drag follows below partial and dismisses after a moderate pull',
     (tester) async {
       setTallTestWindow(tester);
       var dismissed = false;
@@ -322,13 +322,13 @@ void main() {
       expect(tester.getTopLeft(panel).dy, partialTop);
       expect(dismissed, isFalse);
 
-      final longDrag = await tester.startGesture(
+      final moderateDrag = await tester.startGesture(
         tester.getCenter(find.byKey(CustomBottomSheet.dragHandleKey)),
       );
-      await longDrag.moveBy(const Offset(0, 260));
+      await moderateDrag.moveBy(const Offset(0, 160));
       await tester.pump();
       expect(tester.getTopLeft(panel).dy, greaterThan(partialTop));
-      await longDrag.up();
+      await moderateDrag.up();
       await tester.pumpAndSettle();
       expect(dismissed, isTrue);
     },
