@@ -9,6 +9,8 @@ class _FakeLazyChatService extends ChatService {
   _FakeLazyChatService(this._messages);
 
   final List<ChatMessage> _messages;
+  final Set<String> knownConversationIds = <String>{};
+  final Set<String> deletedConversationIds = <String>{};
   int fullLoadCalls = 0;
   int recentLoadCalls = 0;
   int rangeLoadCalls = 0;
@@ -56,6 +58,17 @@ class _FakeLazyChatService extends ChatService {
   @override
   Map<String, int> getVersionSelections(String conversationId) =>
       const <String, int>{};
+
+  @override
+  Conversation? getConversation(String id) {
+    if (deletedConversationIds.contains(id)) return null;
+    if (!knownConversationIds.contains(id)) return null;
+    return Conversation(
+      id: id,
+      title: 'Conversation',
+      messageIds: _messages.map((message) => message.id).toList(),
+    );
+  }
 
   ChatMessage appendPersistedMessage(ChatMessage message) {
     _messages.add(message);
@@ -128,6 +141,22 @@ void main() {
       expect(controller.loadedStartIndex, 80);
       expect(controller.totalMessageCount, 100);
       expect(controller.hasMoreBefore, isTrue);
+    });
+
+    test('clears current conversation when the service deletes it', () async {
+      chatService.knownConversationIds.add(conversation.id);
+      controller.setCurrentConversation(conversation);
+
+      chatService.deletedConversationIds.add(conversation.id);
+      chatService.notifyListeners();
+
+      expect(controller.currentConversation, isNull);
+      expect(controller.messages, isEmpty);
+      expect(controller.totalMessageCount, 0);
+      await expectLater(
+        controller.addMessage(role: 'user', content: 'stale send'),
+        throwsStateError,
+      );
     });
 
     test('opening a 5000-message conversation keeps only the tail window', () {

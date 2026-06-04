@@ -13,7 +13,13 @@ import '../../../core/services/chat/chat_service.dart';
 /// - Conversation stream subscriptions
 /// - Message grouping and collapsing logic
 class ChatController extends ChangeNotifier {
-  ChatController({required this._chatService});
+  factory ChatController({required ChatService chatService}) {
+    return ChatController._(chatService);
+  }
+
+  ChatController._(this._chatService) {
+    _chatService.addListener(_syncCurrentConversationWithService);
+  }
 
   final ChatService _chatService;
 
@@ -74,6 +80,14 @@ class ChatController extends ChangeNotifier {
 
   /// Get the ChatService instance.
   ChatService get chatService => _chatService;
+
+  void _syncCurrentConversationWithService() {
+    final conversation = _currentConversation;
+    if (conversation == null) return;
+    if (_chatService.getConversation(conversation.id) != null) return;
+    _clearCurrentConversationState();
+    notifyListeners();
+  }
 
   // ============================================================================
   // Conversation Management
@@ -154,12 +168,16 @@ class ChatController extends ChangeNotifier {
 
   /// Clear the current conversation state.
   void clearCurrentConversation() {
+    _clearCurrentConversationState();
+    notifyListeners();
+  }
+
+  void _clearCurrentConversationState() {
     _currentConversation = null;
     _messages = [];
     _loadedStartIndex = 0;
     _totalMessageCount = 0;
-    _versionSelections.clear();
-    notifyListeners();
+    _versionSelections = <String, int>{};
   }
 
   void _loadInitialMessageWindow(String conversationId) {
@@ -386,6 +404,11 @@ class ChatController extends ChangeNotifier {
     int? version,
   }) async {
     if (_currentConversation == null) {
+      throw StateError('No current conversation');
+    }
+    if (_chatService.getConversation(_currentConversation!.id) == null) {
+      _clearCurrentConversationState();
+      notifyListeners();
       throw StateError('No current conversation');
     }
 
@@ -822,6 +845,7 @@ class ChatController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _chatService.removeListener(_syncCurrentConversationWithService);
     cancelAllStreams();
     super.dispose();
   }

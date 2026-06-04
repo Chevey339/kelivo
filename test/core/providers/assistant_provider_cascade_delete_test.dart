@@ -129,6 +129,76 @@ void main() {
     );
 
     test(
+      'deletes draft conversations owned by the deleted assistant',
+      () async {
+        final chatService = ChatService();
+        await chatService.init();
+        final provider = await _createLoadedAssistantProvider(
+          chatService: chatService,
+        );
+
+        final draft = await chatService.createDraftConversation(
+          title: 'Draft assistant chat',
+          assistantId: 'assistant-delete',
+        );
+        final keptDraft = await chatService.createDraftConversation(
+          title: 'Kept draft chat',
+          assistantId: 'assistant-keep',
+        );
+
+        expect(chatService.getConversation(draft.id), isNotNull);
+
+        expect(await provider.deleteAssistant('assistant-delete'), isTrue);
+
+        expect(chatService.getConversation(draft.id), isNull);
+        expect(chatService.getConversation(keptDraft.id), isNotNull);
+      },
+    );
+
+    test(
+      'notifies once when deleting multiple assistant conversations',
+      () async {
+        final chatService = ChatService();
+        await chatService.init();
+
+        final first = await chatService.createConversation(
+          title: 'First deleted chat',
+          assistantId: 'assistant-delete',
+        );
+        await chatService.addMessage(
+          conversationId: first.id,
+          role: 'user',
+          content: 'first-delete-keyword',
+        );
+        final second = await chatService.createConversation(
+          title: 'Second deleted chat',
+          assistantId: 'assistant-delete',
+        );
+        await chatService.addMessage(
+          conversationId: second.id,
+          role: 'user',
+          content: 'second-delete-keyword',
+        );
+        final kept = await chatService.createConversation(
+          title: 'Kept chat',
+          assistantId: 'assistant-keep',
+        );
+
+        var notifications = 0;
+        chatService.addListener(() {
+          notifications++;
+        });
+
+        await chatService.deleteConversationsForAssistant('assistant-delete');
+
+        expect(notifications, 1);
+        expect(chatService.getConversation(first.id), isNull);
+        expect(chatService.getConversation(second.id), isNull);
+        expect(chatService.getConversation(kept.id), isNotNull);
+      },
+    );
+
+    test(
       'keeps conversations when deleting the last assistant is rejected',
       () async {
         final chatService = ChatService();
