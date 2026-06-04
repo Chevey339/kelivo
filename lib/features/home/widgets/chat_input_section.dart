@@ -133,9 +133,11 @@ class ChatInputSection extends StatelessWidget {
     return ChatInputBar(
       key: inputBarKey,
       onMore: onMore,
-      searchEnabled: settings.searchEnabled || builtinSearchActive,
+      searchEnabled: (a?.searchEnabled == true) || builtinSearchActive,
       onToggleSearch: (enabled) {
-        context.read<SettingsProvider>().setSearchEnabled(enabled);
+        context.read<AssistantProvider>().setSearchEnabledForCurrentAssistant(
+          enabled,
+        );
       },
       onSelectModel: onSelectModel,
       onLongPressSelectModel: onLongPressSelectModel,

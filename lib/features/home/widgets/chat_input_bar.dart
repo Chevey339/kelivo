@@ -922,7 +922,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           modelId: currentModelId,
         );
         final builtinSearchActive = toolsState.searchActive;
-        final appSearchEnabled = settings.searchEnabled;
+        final appSearchEnabled = ap.currentSearchEnabled;
         final brandAsset = (() {
           if (!appSearchEnabled || builtinSearchActive) return null;
           final services = settings.searchServices;

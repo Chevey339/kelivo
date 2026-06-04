@@ -111,13 +111,14 @@ class _SearchSettingsSheet extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     final settingsNotifier = context.read<SettingsProvider>();
     final ap = context.watch<AssistantProvider>();
+    final assistantNotifier = context.read<AssistantProvider>();
     final a = ap.currentAssistant;
     final services = settings.searchServices;
     final selected = settings.searchServiceSelected.clamp(
       0,
       services.isNotEmpty ? services.length - 1 : 0,
     );
-    final enabled = settings.searchEnabled;
+    final enabled = ap.currentSearchEnabled;
 
     // Determine if current selected model supports built-in search
     final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
@@ -207,7 +208,8 @@ class _SearchSettingsSheet extends StatelessWidget {
                             enabled: v,
                           );
                           if (v) {
-                            await settingsNotifier.setSearchEnabled(false);
+                            await assistantNotifier
+                                .setSearchEnabledForCurrentAssistant(false);
                           }
                         },
                         padding: const EdgeInsets.symmetric(
@@ -248,9 +250,10 @@ class _SearchSettingsSheet extends StatelessWidget {
                                   enabled: v,
                                 );
                                 if (v) {
-                                  await settingsNotifier.setSearchEnabled(
-                                    false,
-                                  );
+                                  await assistantNotifier
+                                      .setSearchEnabledForCurrentAssistant(
+                                        false,
+                                      );
                                 }
                               },
                             ),
@@ -351,9 +354,9 @@ class _SearchSettingsSheet extends StatelessWidget {
                     duration: const Duration(milliseconds: 260),
                     onTap: () {
                       Haptics.light();
-                      context.read<SettingsProvider>().setSearchEnabled(
-                        !enabled,
-                      );
+                      context
+                          .read<AssistantProvider>()
+                          .setSearchEnabledForCurrentAssistant(!enabled);
                     },
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -396,8 +399,8 @@ class _SearchSettingsSheet extends StatelessWidget {
                         IosSwitch(
                           value: enabled,
                           onChanged: (v) => context
-                              .read<SettingsProvider>()
-                              .setSearchEnabled(v),
+                              .read<AssistantProvider>()
+                              .setSearchEnabledForCurrentAssistant(v),
                         ),
                       ],
                     ),
