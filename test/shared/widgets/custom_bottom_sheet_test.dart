@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
@@ -176,6 +177,70 @@ void main() {
       await gesture.up();
       await tester.pumpAndSettle();
       expect(dismissed, isTrue);
+    },
+  );
+
+  testWidgets(
+    'iOS list stays pinned at top while content drag changes sheet height',
+    (tester) async {
+      setTallTestWindow(tester);
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      late ScrollController listController;
+
+      try {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: CustomBottomSheet(
+                title: '搜索结果',
+                count: 12,
+                closeSemanticLabel: '关闭',
+                onDismiss: () {},
+                builder: (context, controller) {
+                  listController = controller;
+                  return ListView.builder(
+                    controller: controller,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: 40,
+                    itemBuilder: (context, index) =>
+                        SizedBox(height: 44, child: Text('Source $index')),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final panel = find.byKey(CustomBottomSheet.panelKey);
+        final partialTop = tester.getTopLeft(panel).dy;
+
+        final partialGesture = await tester.startGesture(
+          tester.getCenter(find.text('Source 0')),
+        );
+        await partialGesture.moveBy(const Offset(0, 80));
+        await tester.pump();
+        expect(tester.getTopLeft(panel).dy, greaterThan(partialTop));
+        expect(listController.offset, 0);
+        await partialGesture.up();
+        await tester.pumpAndSettle();
+
+        await tester.drag(find.text('Source 0'), const Offset(0, -260));
+        await tester.pumpAndSettle();
+        final expandedTop = tester.getTopLeft(panel).dy;
+        expect(expandedTop, lessThan(partialTop));
+
+        final expandedGesture = await tester.startGesture(
+          tester.getCenter(find.text('Source 0')),
+        );
+        await expandedGesture.moveBy(const Offset(0, 80));
+        await tester.pump();
+        expect(tester.getTopLeft(panel).dy, greaterThan(expandedTop));
+        expect(listController.offset, 0);
+        await expandedGesture.up();
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     },
   );
 
