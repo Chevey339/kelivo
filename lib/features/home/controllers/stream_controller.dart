@@ -418,19 +418,25 @@ class StreamController {
 
   /// Deduplicate tool UI parts by id or by name+args when id is empty.
   List<ToolUIPart> dedupeToolPartsList(List<ToolUIPart> parts) {
+    final completedIds = <String>{
+      for (final p in parts)
+        if (p.id.trim().isNotEmpty && _hasToolContent(p.content)) p.id.trim(),
+    };
     final completedNoIdBases = <String>{
       for (final p in parts)
         if (p.id.trim().isEmpty && _hasToolContent(p.content))
           _toolDedupeBase(p.toolName, p.arguments),
     };
-    final seen = <String>{};
+    final indexByKey = <String, int>{};
     final out = <ToolUIPart>[];
     for (final p in parts) {
-      if (p.id.trim().isEmpty &&
-          !_hasToolContent(p.content) &&
-          completedNoIdBases.contains(
-            _toolDedupeBase(p.toolName, p.arguments),
-          )) {
+      final id = p.id.trim();
+      if (!_hasToolContent(p.content) &&
+          ((id.isNotEmpty && completedIds.contains(id)) ||
+              (id.isEmpty &&
+                  completedNoIdBases.contains(
+                    _toolDedupeBase(p.toolName, p.arguments),
+                  )))) {
         continue;
       }
       final key = _toolDedupeKey(
@@ -439,7 +445,13 @@ class StreamController {
         arguments: p.arguments,
         content: p.content,
       );
-      if (seen.add(key)) out.add(p);
+      final existingIndex = indexByKey[key];
+      if (existingIndex != null) {
+        if (id.isNotEmpty) out[existingIndex] = p;
+        continue;
+      }
+      indexByKey[key] = out.length;
+      out.add(p);
     }
     return out;
   }
@@ -448,6 +460,12 @@ class StreamController {
   List<Map<String, dynamic>> dedupeToolEvents(
     List<Map<String, dynamic>> events,
   ) {
+    final completedIds = <String>{
+      for (final e in events)
+        if ((e['id']?.toString() ?? '').trim().isNotEmpty &&
+            _hasToolContent(e['content']?.toString()))
+          (e['id']?.toString() ?? '').trim(),
+    };
     final completedNoIdBases = <String>{
       for (final e in events)
         if ((e['id']?.toString() ?? '').trim().isEmpty &&
@@ -458,7 +476,7 @@ class StreamController {
                 const <String, dynamic>{},
           ),
     };
-    final seen = <String>{};
+    final indexByKey = <String, int>{};
     final out = <Map<String, dynamic>>[];
     for (final e in events) {
       final id = (e['id']?.toString() ?? '').trim();
@@ -466,9 +484,10 @@ class StreamController {
       final args =
           ((e['arguments'] as Map?)?.cast<String, dynamic>() ??
           const <String, dynamic>{});
-      if (id.isEmpty &&
-          !_hasToolContent(e['content']?.toString()) &&
-          completedNoIdBases.contains(_toolDedupeBase(name, args))) {
+      if (!_hasToolContent(e['content']?.toString()) &&
+          ((id.isNotEmpty && completedIds.contains(id)) ||
+              (id.isEmpty &&
+                  completedNoIdBases.contains(_toolDedupeBase(name, args))))) {
         continue;
       }
       final key = _toolDedupeKey(
@@ -477,7 +496,14 @@ class StreamController {
         arguments: args,
         content: e['content']?.toString(),
       );
-      if (seen.add(key)) out.add(e.map((k, v) => MapEntry(k.toString(), v)));
+      final normalizedEvent = e.map((k, v) => MapEntry(k.toString(), v));
+      final existingIndex = indexByKey[key];
+      if (existingIndex != null) {
+        if (id.isNotEmpty) out[existingIndex] = normalizedEvent;
+        continue;
+      }
+      indexByKey[key] = out.length;
+      out.add(normalizedEvent);
     }
     return out;
   }
