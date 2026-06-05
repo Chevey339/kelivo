@@ -4055,6 +4055,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsServicesCloseButton => '关闭';
 
   @override
+  String get ttsServicesLinkedProviderLabel => '链接到提供商';
+
+  @override
+  String get ttsServicesLinkedProviderNone => '无（手动输入）';
+
+  @override
+  String get ttsServicesLinkedProviderSelect => '选择提供商';
+
+  @override
+  String get ttsServicesLinkedProviderInherit => '继承自';
+
+  @override
+  String get ttsServicesLinkedProviderNoCompatible => '没有兼容的提供商';
+
+  @override
   String get ttsSettingsPageTitle => 'TTS 设置';
 
   @override
@@ -9264,6 +9279,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsServicesCloseButton => '关闭';
 
   @override
+  String get ttsServicesLinkedProviderLabel => '链接到提供商';
+
+  @override
+  String get ttsServicesLinkedProviderNone => '无（手动输入）';
+
+  @override
+  String get ttsServicesLinkedProviderSelect => '选择提供商';
+
+  @override
+  String get ttsServicesLinkedProviderInherit => '继承自';
+
+  @override
+  String get ttsServicesLinkedProviderNoCompatible => '没有兼容的提供商';
+
+  @override
   String get ttsSettingsPageTitle => 'TTS 设置';
 
   @override
@@ -14469,6 +14499,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get ttsServicesCloseButton => '關閉';
+
+  @override
+  String get ttsServicesLinkedProviderLabel => '連結到提供者';
+
+  @override
+  String get ttsServicesLinkedProviderNone => '無（手動輸入）';
+
+  @override
+  String get ttsServicesLinkedProviderSelect => '選擇提供者';
+
+  @override
+  String get ttsServicesLinkedProviderInherit => '繼承自';
+
+  @override
+  String get ttsServicesLinkedProviderNoCompatible => '沒有相容的提供者';
 
   @override
   String get ttsSettingsPageTitle => 'TTS 設定';

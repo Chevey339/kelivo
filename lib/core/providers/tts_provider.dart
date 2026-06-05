@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'settings_provider.dart';
 import '../services/tts/network_tts.dart';
 import '../services/tts/tts_playback_models.dart';
 import '../services/tts/tts_text_chunker.dart';
@@ -56,6 +57,8 @@ class TtsProvider extends ChangeNotifier {
   String? _engineId;
   String? _languageTag;
 
+  final SettingsProvider? _settingsProvider;
+
   int _sessionId = 0;
   int _currentChunkIndex = 0;
   int _currentChunkTextOffset = 0;
@@ -82,7 +85,7 @@ class TtsProvider extends ChangeNotifier {
   TtsPlaybackState get playbackState => _playbackState;
   Duration get seekStep => _seekStep;
 
-  TtsProvider() {
+  TtsProvider({this._settingsProvider}) {
     _init();
   }
 
@@ -553,15 +556,128 @@ class TtsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  TtsServiceOptions _resolveService(TtsServiceOptions service) {
+    if (service.linkedProviderId == null || _settingsProvider == null) {
+      return service;
+    }
+    final config = _settingsProvider!.providerConfigs[service.linkedProviderId];
+    if (config == null) return service;
+    final apiKey = config.apiKey;
+    final baseUrl = config.baseUrl;
+    switch (service.kind) {
+      case NetworkTtsKind.openai:
+        final s = service as OpenAiTtsOptions;
+        return OpenAiTtsOptions(
+          id: s.id,
+          enabled: s.enabled,
+          name: s.name,
+          linkedProviderId: s.linkedProviderId,
+          apiKey: apiKey,
+          baseUrl: baseUrl,
+          model: s.model,
+          voice: s.voice,
+        );
+      case NetworkTtsKind.gemini:
+        final s = service as GeminiTtsOptions;
+        return GeminiTtsOptions(
+          id: s.id,
+          enabled: s.enabled,
+          name: s.name,
+          linkedProviderId: s.linkedProviderId,
+          apiKey: apiKey,
+          baseUrl: baseUrl,
+          model: s.model,
+          voiceName: s.voiceName,
+        );
+      case NetworkTtsKind.minimax:
+        final s = service as MiniMaxTtsOptions;
+        return MiniMaxTtsOptions(
+          id: s.id,
+          enabled: s.enabled,
+          name: s.name,
+          linkedProviderId: s.linkedProviderId,
+          apiKey: apiKey,
+          baseUrl: baseUrl,
+          model: s.model,
+          voiceId: s.voiceId,
+          emotion: s.emotion,
+          speed: s.speed,
+        );
+      case NetworkTtsKind.qwen:
+        final s = service as QwenTtsOptions;
+        return QwenTtsOptions(
+          id: s.id,
+          enabled: s.enabled,
+          name: s.name,
+          linkedProviderId: s.linkedProviderId,
+          apiKey: apiKey,
+          baseUrl: baseUrl,
+          model: s.model,
+          voice: s.voice,
+          languageType: s.languageType,
+        );
+      case NetworkTtsKind.groq:
+        final s = service as GroqTtsOptions;
+        return GroqTtsOptions(
+          id: s.id,
+          enabled: s.enabled,
+          name: s.name,
+          linkedProviderId: s.linkedProviderId,
+          apiKey: apiKey,
+          baseUrl: baseUrl,
+          model: s.model,
+          voice: s.voice,
+        );
+      case NetworkTtsKind.xai:
+        final s = service as XaiTtsOptions;
+        return XaiTtsOptions(
+          id: s.id,
+          enabled: s.enabled,
+          name: s.name,
+          linkedProviderId: s.linkedProviderId,
+          apiKey: apiKey,
+          baseUrl: baseUrl,
+          voiceId: s.voiceId,
+          language: s.language,
+        );
+      case NetworkTtsKind.elevenlabs:
+        final s = service as ElevenLabsTtsOptions;
+        return ElevenLabsTtsOptions(
+          id: s.id,
+          enabled: s.enabled,
+          name: s.name,
+          linkedProviderId: s.linkedProviderId,
+          apiKey: apiKey,
+          baseUrl: baseUrl,
+          modelId: s.modelId,
+          voiceId: s.voiceId,
+          outputFormat: s.outputFormat,
+        );
+      case NetworkTtsKind.mimo:
+        final s = service as MimoTtsOptions;
+        return MimoTtsOptions(
+          id: s.id,
+          enabled: s.enabled,
+          name: s.name,
+          linkedProviderId: s.linkedProviderId,
+          apiKey: apiKey,
+          baseUrl: baseUrl,
+          model: s.model,
+          voice: s.voice,
+        );
+    }
+  }
+
   Future<String?> testNetworkService(
     TtsServiceOptions service,
     String text,
   ) async {
     final content = _stripMarkdown(text).trim();
     if (content.isEmpty) return null;
+    final resolved = _resolveService(service);
     try {
       final res = await NetworkTtsService.synthesize(
-        options: service,
+        options: resolved,
         text: content,
       );
       try {
@@ -989,7 +1105,8 @@ class TtsProvider extends ChangeNotifier {
       final map = obj is Map<String, dynamic>
           ? obj
           : Map<String, dynamic>.from(obj as Map);
-      return TtsServiceOptions.fromJson(map);
+      final service = TtsServiceOptions.fromJson(map);
+      return _resolveService(service);
     } catch (_) {
       return null;
     }

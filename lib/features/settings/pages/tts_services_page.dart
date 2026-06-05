@@ -795,6 +795,7 @@ class _NetworkTtsEditorPage extends StatefulWidget {
 class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
   final _formKey = GlobalKey<FormState>();
   late NetworkTtsKind _kind;
+  String? _linkedProviderId;
   late final TextEditingController _nameCtl;
   late final TextEditingController _apiKeyCtl;
   late final TextEditingController _baseCtl;
@@ -810,6 +811,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
     super.initState();
     final initial = widget.initial;
     _kind = initial?.kind ?? NetworkTtsKind.openai;
+    _linkedProviderId = initial?.linkedProviderId;
     _nameCtl = TextEditingController(text: initial?.name ?? '');
     _apiKeyCtl = TextEditingController(text: _apiKeyOf(initial));
     _baseCtl = TextEditingController(text: _baseUrlOf(initial));
@@ -901,7 +903,10 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
                           child: _ProviderKindWrap(
                             value: _kind,
                             onChanged: (kind) {
-                              setState(() => _kind = kind);
+                              setState(() {
+                                _kind = kind;
+                                _linkedProviderId = null;
+                              });
                             },
                           ),
                         ),
@@ -915,20 +920,37 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
                           controller: _nameCtl,
                           hint: networkTtsKindDisplayName(_kind),
                         ),
-                        _TtsEditorTextField(
-                          label: l10n.ttsServicesFieldApiKeyLabel,
-                          controller: _apiKeyCtl,
-                          obscure: true,
-                          validator: (value) =>
-                              (value == null || value.trim().isEmpty)
-                              ? l10n.ttsServicesValidationApiKeyRequired
-                              : null,
+                        _LinkedProviderSelector(
+                          linkedProviderId: _linkedProviderId,
+                          ttsKind: _kind,
+                          onChanged: (providerId, apiKey, baseUrl) {
+                            setState(() {
+                              _linkedProviderId = providerId;
+                              if (providerId != null) {
+                                _apiKeyCtl.text = apiKey;
+                                _baseCtl.text = baseUrl;
+                              }
+                            });
+                          },
                         ),
-                        _TtsEditorTextField(
-                          label: l10n.ttsServicesFieldBaseUrlLabel,
-                          controller: _baseCtl,
-                          hint: _defaultBaseUrl(_kind),
-                        ),
+                        if (_linkedProviderId == null) ...[
+                          _TtsEditorTextField(
+                            label: l10n.ttsServicesFieldApiKeyLabel,
+                            controller: _apiKeyCtl,
+                            obscure: true,
+                            validator: (value) =>
+                                (value == null || value.trim().isEmpty)
+                                ? l10n.ttsServicesValidationApiKeyRequired
+                                : null,
+                          ),
+                        ],
+                        if (_linkedProviderId == null) ...[
+                          _TtsEditorTextField(
+                            label: l10n.ttsServicesFieldBaseUrlLabel,
+                            controller: _baseCtl,
+                            hint: _defaultBaseUrl(_kind),
+                          ),
+                        ],
                         if (_kind != NetworkTtsKind.xai) ...[
                           _TtsEditorTextField(
                             label: l10n.ttsServicesFieldModelLabel,
@@ -1025,6 +1047,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
           id: initial?.id,
           enabled: true,
           name: name,
+          linkedProviderId: _linkedProviderId,
           apiKey: apiKey,
           baseUrl: base,
           model: model,
@@ -1035,6 +1058,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
           id: initial?.id,
           enabled: true,
           name: name,
+          linkedProviderId: _linkedProviderId,
           apiKey: apiKey,
           baseUrl: base,
           model: model,
@@ -1045,6 +1069,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
           id: initial?.id,
           enabled: true,
           name: name,
+          linkedProviderId: _linkedProviderId,
           apiKey: apiKey,
           baseUrl: base,
           model: model,
@@ -1059,6 +1084,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
           id: initial?.id,
           enabled: true,
           name: name,
+          linkedProviderId: _linkedProviderId,
           apiKey: apiKey,
           baseUrl: base,
           model: model,
@@ -1072,6 +1098,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
           id: initial?.id,
           enabled: true,
           name: name,
+          linkedProviderId: _linkedProviderId,
           apiKey: apiKey,
           baseUrl: base,
           model: model,
@@ -1082,6 +1109,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
           id: initial?.id,
           enabled: true,
           name: name,
+          linkedProviderId: _linkedProviderId,
           apiKey: apiKey,
           baseUrl: base,
           voiceId: voice,
@@ -1094,6 +1122,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
           id: initial?.id,
           enabled: true,
           name: name,
+          linkedProviderId: _linkedProviderId,
           apiKey: apiKey,
           baseUrl: base,
           modelId: model,
@@ -1104,6 +1133,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
           id: initial?.id,
           enabled: true,
           name: name,
+          linkedProviderId: _linkedProviderId,
           apiKey: apiKey,
           baseUrl: base,
           model: model,
@@ -1181,6 +1211,241 @@ class _ProviderKindChip extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _LinkedProviderSelector extends StatelessWidget {
+  const _LinkedProviderSelector({
+    required this.linkedProviderId,
+    required this.ttsKind,
+    required this.onChanged,
+  });
+
+  final String? linkedProviderId;
+  final NetworkTtsKind ttsKind;
+  final void Function(String? providerId, String apiKey, String baseUrl)
+  onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.read<SettingsProvider>();
+    final allConfigs = sp.providerConfigs;
+    final linked = (linkedProviderId != null)
+        ? allConfigs[linkedProviderId]
+        : null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.ttsServicesLinkedProviderLabel,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: () => _showPicker(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              decoration: BoxDecoration(
+                color: cs.onSurface.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      linked != null
+                          ? linked.name
+                          : l10n.ttsServicesLinkedProviderNone,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: cs.onSurface.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Lucide.ChevronRight,
+                    size: 16,
+                    color: cs.onSurface.withValues(alpha: 0.4),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (linked != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '${l10n.ttsServicesLinkedProviderInherit}: ${linked.baseUrl}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: cs.primary.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showPicker(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.read<SettingsProvider>();
+    final allConfigs = sp.providerConfigs;
+
+    final compatible = <MapEntry<String, ProviderConfig>>[];
+    for (final entry in allConfigs.entries) {
+      if (_isProviderCompatible(entry.value, ttsKind)) {
+        compatible.add(entry);
+      }
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                child: Row(
+                  children: [
+                    Text(
+                      l10n.ttsServicesLinkedProviderSelect,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: AppFontWeights.emphasis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (compatible.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    l10n.ttsServicesLinkedProviderNoCompatible,
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      // "None" option
+                      _ProviderOptionRow(
+                        name: l10n.ttsServicesLinkedProviderNone,
+                        selected: linkedProviderId == null,
+                        onTap: () {
+                          onChanged(null, '', '');
+                          Navigator.of(ctx).maybePop();
+                        },
+                      ),
+                      for (final entry in compatible)
+                        _ProviderOptionRow(
+                          name: entry.value.name,
+                          subtitle: entry.value.baseUrl,
+                          selected: linkedProviderId == entry.key,
+                          onTap: () {
+                            onChanged(
+                              entry.key,
+                              entry.value.apiKey,
+                              entry.value.baseUrl,
+                            );
+                            Navigator.of(ctx).maybePop();
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ProviderOptionRow extends StatelessWidget {
+  const _ProviderOptionRow({
+    required this.name,
+    this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String name;
+  final String? subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: cs.onSurface.withValues(alpha: 0.9),
+                      fontWeight: selected
+                          ? AppFontWeights.emphasis
+                          : AppFontWeights.regular,
+                    ),
+                  ),
+                  if (subtitle != null && subtitle!.isNotEmpty)
+                    Text(
+                      subtitle!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: cs.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (selected) Icon(Lucide.Check, size: 16, color: cs.primary),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1582,6 +1847,23 @@ const List<NetworkTtsKind> _networkTtsKinds = [
   NetworkTtsKind.elevenlabs,
   NetworkTtsKind.mimo,
 ];
+
+bool _isProviderCompatible(ProviderConfig provider, NetworkTtsKind ttsKind) {
+  switch (ttsKind) {
+    case NetworkTtsKind.openai:
+    case NetworkTtsKind.groq:
+    case NetworkTtsKind.xai:
+      return provider.providerType != ProviderKind.google &&
+          provider.providerType != ProviderKind.claude;
+    case NetworkTtsKind.gemini:
+      return provider.providerType == ProviderKind.google;
+    case NetworkTtsKind.minimax:
+    case NetworkTtsKind.qwen:
+    case NetworkTtsKind.elevenlabs:
+    case NetworkTtsKind.mimo:
+      return false;
+  }
+}
 
 String _apiKeyOf(TtsServiceOptions? option) {
   if (option is OpenAiTtsOptions) return option.apiKey;
