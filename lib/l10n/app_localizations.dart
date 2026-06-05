@@ -3179,6 +3179,18 @@ abstract class AppLocalizations {
   /// **'Path-style addressing'**
   String get backupPageS3PathStyle;
 
+  /// No description provided for @backupPageUserAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'User-Agent'**
+  String get backupPageUserAgent;
+
+  /// No description provided for @backupPageUserAgentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get backupPageUserAgentHint;
+
   /// No description provided for @backupPageSave.
   ///
   /// In en, this message translates to:

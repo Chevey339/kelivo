@@ -416,6 +416,9 @@ class S3BackupClient {
     if (cfg.sessionToken.trim().isNotEmpty) {
       reqHeaders['x-amz-security-token'] = cfg.sessionToken.trim();
     }
+    if (cfg.userAgent.trim().isNotEmpty) {
+      reqHeaders['User-Agent'] = cfg.userAgent.trim();
+    }
 
     final canonHeaders = _canonicalHeaders(reqHeaders);
     final signedHeaders = _signedHeaders(reqHeaders);

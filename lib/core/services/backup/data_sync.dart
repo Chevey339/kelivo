@@ -80,7 +80,13 @@ class DataSync {
         if (res.statusCode == 404) {
           // create this level
           final mk = await client
-              .send(http.Request('MKCOL', u)..headers.addAll({..._authHeaders(cfg), ..._extraHeaders(cfg)}))
+              .send(
+                http.Request('MKCOL', u)
+                  ..headers.addAll({
+                    ..._authHeaders(cfg),
+                    ..._extraHeaders(cfg),
+                  }),
+              )
               .then(http.Response.fromStream);
           if (mk.statusCode != 201 &&
               mk.statusCode != 200 &&
