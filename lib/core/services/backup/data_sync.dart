@@ -335,7 +335,9 @@ class DataSync {
             }
             final dt = _decodeDosDateTime(entry.lastModTime);
             if (dt != null) {
-              File(outPath).setLastModifiedSync(dt);
+              try {
+                File(outPath).setLastModifiedSync(dt);
+              } catch (_) {}
             }
           } else {
             Directory(outPath).createSync(recursive: true);
@@ -1116,7 +1118,9 @@ class DataSync {
                 final target = File(p.join(dst.path, rel));
                 await target.parent.create(recursive: true);
                 await ent.copy(target.path);
-                await target.setLastModified(await ent.lastModified());
+                try {
+                  await target.setLastModified(await ent.lastModified());
+                } catch (_) {}
               }
             }
           }
@@ -1137,7 +1141,9 @@ class DataSync {
                 final target = File(p.join(dst.path, rel));
                 await target.parent.create(recursive: true);
                 await ent.copy(target.path);
-                await target.setLastModified(await ent.lastModified());
+                try {
+                  await target.setLastModified(await ent.lastModified());
+                } catch (_) {}
               }
             }
           }
@@ -1158,7 +1164,9 @@ class DataSync {
                 final target = File(p.join(dst.path, rel));
                 await target.parent.create(recursive: true);
                 await ent.copy(target.path);
-                await target.setLastModified(await ent.lastModified());
+                try {
+                  await target.setLastModified(await ent.lastModified());
+                } catch (_) {}
               }
             }
           }
@@ -1178,7 +1186,9 @@ class DataSync {
                 if (!await target.exists()) {
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
-                  await target.setLastModified(await ent.lastModified());
+                  try {
+                    await target.setLastModified(await ent.lastModified());
+                  } catch (_) {}
                 }
               }
             }
@@ -1198,7 +1208,9 @@ class DataSync {
                 if (!await target.exists()) {
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
-                  await target.setLastModified(await ent.lastModified());
+                  try {
+                    await target.setLastModified(await ent.lastModified());
+                  } catch (_) {}
                 }
               }
             }
@@ -1218,7 +1230,9 @@ class DataSync {
                 if (!await target.exists()) {
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
-                  await target.setLastModified(await ent.lastModified());
+                  try {
+                    await target.setLastModified(await ent.lastModified());
+                  } catch (_) {}
                 }
               }
             }
