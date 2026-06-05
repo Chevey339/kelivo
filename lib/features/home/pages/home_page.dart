@@ -1321,8 +1321,15 @@ class _HomePageState extends State<HomePage>
               return const SizedBox.shrink();
           }
         } else {
-          if (!settings.showMessageNavButtons) {
-            return const SizedBox.shrink();
+          switch (settings.mobileMessageNavButtonsMode) {
+            case MobileMessageNavButtonsMode.always:
+              visible = true;
+              break;
+            case MobileMessageNavButtonsMode.scroll:
+              visible = _controller.scrollCtrl.showNavButtons;
+              break;
+            case MobileMessageNavButtonsMode.never:
+              return const SizedBox.shrink();
           }
         }
         return ScrollNavButtonsPanel(

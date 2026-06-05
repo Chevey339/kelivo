@@ -38,6 +38,9 @@ enum DesktopMessageNavButtonsMode {
   never,
 }
 
+// Mobile: message navigation buttons visibility mode
+enum MobileMessageNavButtonsMode { always, scroll, never }
+
 enum _MigrationResult { noChange, applied, failed }
 
 class SettingsProvider extends ChangeNotifier {
@@ -127,6 +130,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowMessageNavKey = 'display_show_message_nav_v1';
   static const String _displayDesktopMessageNavButtonsModeKey =
       'display_desktop_message_nav_buttons_mode_v1';
+  static const String _displayMobileMessageNavButtonsModeKey =
+      'display_mobile_message_nav_buttons_mode_v1';
   static const String _displayUseNewAssistantAvatarUxKey =
       'display_use_new_assistant_avatar_ux_v1';
   static const String _displayShowProviderInModelCapsuleKey =
@@ -856,6 +861,10 @@ class SettingsProvider extends ChangeNotifier {
     _showRegenerateConfirmDialog =
         prefs.getBool(_displayShowRegenerateConfirmDialogKey) ?? true;
     _showMessageNavButtons = prefs.getBool(_displayShowMessageNavKey) ?? true;
+    _mobileMessageNavButtonsMode = _parseMobileMessageNavButtonsMode(
+      prefs.getString(_displayMobileMessageNavButtonsModeKey),
+      legacyEnabled: _showMessageNavButtons,
+    );
     _desktopMessageNavButtonsMode = _parseDesktopMessageNavButtonsMode(
       prefs.getString(_displayDesktopMessageNavButtonsModeKey),
       legacyEnabled: _showMessageNavButtons,
@@ -3351,6 +3360,56 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     }
   }
 
+  // Mobile: message navigation buttons visibility mode
+  MobileMessageNavButtonsMode _mobileMessageNavButtonsMode =
+      MobileMessageNavButtonsMode.scroll;
+  MobileMessageNavButtonsMode get mobileMessageNavButtonsMode =>
+      _mobileMessageNavButtonsMode;
+
+  Future<void> setMobileMessageNavButtonsMode(
+    MobileMessageNavButtonsMode mode,
+  ) async {
+    if (_mobileMessageNavButtonsMode == mode) return;
+    _mobileMessageNavButtonsMode = mode;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _displayMobileMessageNavButtonsModeKey,
+      _mobileMessageNavButtonsModeToString(mode),
+    );
+  }
+
+  MobileMessageNavButtonsMode _parseMobileMessageNavButtonsMode(
+    String? raw, {
+    required bool legacyEnabled,
+  }) {
+    switch (raw) {
+      case 'always':
+        return MobileMessageNavButtonsMode.always;
+      case 'scroll':
+        return MobileMessageNavButtonsMode.scroll;
+      case 'never':
+        return MobileMessageNavButtonsMode.never;
+      default:
+        return legacyEnabled
+            ? MobileMessageNavButtonsMode.scroll
+            : MobileMessageNavButtonsMode.never;
+    }
+  }
+
+  String _mobileMessageNavButtonsModeToString(
+    MobileMessageNavButtonsMode mode,
+  ) {
+    switch (mode) {
+      case MobileMessageNavButtonsMode.always:
+        return 'always';
+      case MobileMessageNavButtonsMode.scroll:
+        return 'scroll';
+      case MobileMessageNavButtonsMode.never:
+        return 'never';
+    }
+  }
+
   // Display: chat font scale (0.5 - 1.5, default 1.0)
   double _chatFontScale = 1.0;
   double get chatFontScale => _chatFontScale;
@@ -3871,6 +3930,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._regenerateDeleteTrailingMessages = _regenerateDeleteTrailingMessages;
     copy._showRegenerateConfirmDialog = _showRegenerateConfirmDialog;
     copy._showMessageNavButtons = _showMessageNavButtons;
+    copy._mobileMessageNavButtonsMode = _mobileMessageNavButtonsMode;
     copy._useNewAssistantAvatarUx = _useNewAssistantAvatarUx;
     copy._showProviderInModelCapsule = _showProviderInModelCapsule;
     copy._showProviderInChatMessage = _showProviderInChatMessage;
