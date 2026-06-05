@@ -9815,7 +9815,7 @@ abstract class AppLocalizations {
   /// No description provided for @askUserCardQuestionCount.
   ///
   /// In en, this message translates to:
-  /// **'Ask {count} questions'**
+  /// **'{count, plural, =1{Ask 1 question} other{Ask {count} questions}}'**
   String askUserCardQuestionCount(int count);
 
   /// No description provided for @tokenDetailPromptTokens.

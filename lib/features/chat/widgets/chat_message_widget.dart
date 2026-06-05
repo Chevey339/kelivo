@@ -232,8 +232,7 @@ Widget _buildTextToSpeechReplayRow(
 
 String _askUserToolTitleFor(AppLocalizations l10n, Map<String, dynamic> args) {
   final questions = AskUserInteractionService.normalizeQuestions(args);
-  if (questions.length == 1) return questions.first.question;
-  if (questions.length > 1) {
+  if (questions.isNotEmpty) {
     return l10n.askUserCardQuestionCount(questions.length);
   }
   return l10n.assistantEditLocalToolAskUserTitle;

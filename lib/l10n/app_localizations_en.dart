@@ -5295,7 +5295,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String askUserCardQuestionCount(int count) {
-    return 'Ask $count questions';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Ask $count questions',
+      one: 'Ask 1 question',
+    );
+    return '$_temp0';
   }
 
   @override

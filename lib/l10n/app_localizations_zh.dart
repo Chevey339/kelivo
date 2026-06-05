@@ -5093,7 +5093,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String askUserCardQuestionCount(int count) {
-    return '询问 $count 个问题';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '询问 $count 个问题',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -10294,7 +10299,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String askUserCardQuestionCount(int count) {
-    return '询问 $count 个问题';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '询问 $count 个问题',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -15495,7 +15505,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String askUserCardQuestionCount(int count) {
-    return '詢問 $count 個問題';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '詢問 $count 個問題',
+    );
+    return '$_temp0';
   }
 
   @override

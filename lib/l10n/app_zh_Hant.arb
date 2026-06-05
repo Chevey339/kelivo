@@ -1834,7 +1834,7 @@
   "askUserCardAnswered": "已回答",
   "askUserCardInactive": "這個問題已不再活動。請重新生成或繼續對話。",
   "askUserCardCancelled": "問題已取消",
-  "askUserCardQuestionCount": "詢問 {count} 個問題",
+  "askUserCardQuestionCount": "{count, plural, other{詢問 {count} 個問題}}",
   "tokenDetailPromptTokens": "{count} tokens",
   "tokenDetailPromptTokensWithCache": "{count} tokens ({cached} cached)",
   "tokenDetailCompletionTokens": "{count} tokens",
