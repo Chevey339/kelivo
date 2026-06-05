@@ -37,10 +37,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageColorMode => 'Color Mode';
 
   @override
-  String get settingsPageDisplay => 'Display';
+  String get settingsPageDisplay => 'Preferences';
 
   @override
-  String get settingsPageDisplaySubtitle => 'Appearance and text size';
+  String get settingsPageDisplaySubtitle =>
+      'Appearance, behavior, and interaction preferences';
 
   @override
   String get settingsPageAssistant => 'Assistant';

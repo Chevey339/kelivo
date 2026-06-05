@@ -36,10 +36,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPageColorMode => '颜色模式';
 
   @override
-  String get settingsPageDisplay => '显示设置';
+  String get settingsPageDisplay => '偏好设置';
 
   @override
-  String get settingsPageDisplaySubtitle => '界面主题与字号等外观设置';
+  String get settingsPageDisplaySubtitle => '外观、行为与交互偏好';
 
   @override
   String get settingsPageAssistant => '助手';
@@ -5237,10 +5237,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get settingsPageColorMode => '颜色模式';
 
   @override
-  String get settingsPageDisplay => '显示设置';
+  String get settingsPageDisplay => '偏好设置';
 
   @override
-  String get settingsPageDisplaySubtitle => '界面主题与字号等外观设置';
+  String get settingsPageDisplaySubtitle => '外观、行为与交互偏好';
 
   @override
   String get settingsPageAssistant => '助手';
@@ -10438,10 +10438,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get settingsPageColorMode => '顏色模式';
 
   @override
-  String get settingsPageDisplay => '顯示設定';
+  String get settingsPageDisplay => '偏好設定';
 
   @override
-  String get settingsPageDisplaySubtitle => '介面主題與字號等外觀設定';
+  String get settingsPageDisplaySubtitle => '外觀、行為與互動偏好';
 
   @override
   String get settingsPageAssistant => '助理';

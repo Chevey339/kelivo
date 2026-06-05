@@ -157,13 +157,13 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPageDisplay.
   ///
   /// In en, this message translates to:
-  /// **'Display'**
+  /// **'Preferences'**
   String get settingsPageDisplay;
 
   /// No description provided for @settingsPageDisplaySubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Appearance and text size'**
+  /// **'Appearance, behavior, and interaction preferences'**
   String get settingsPageDisplaySubtitle;
 
   /// No description provided for @settingsPageAssistant.
