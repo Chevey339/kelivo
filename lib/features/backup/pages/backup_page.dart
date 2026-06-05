@@ -2427,6 +2427,7 @@ class _WebDavSettingsSheetState extends State<_WebDavSettingsSheet> {
   late final TextEditingController _userCtrl;
   late final TextEditingController _passCtrl;
   late final TextEditingController _pathCtrl;
+  late final TextEditingController _userAgentCtrl;
   bool _showPassword = false;
 
   @override
@@ -2438,6 +2439,7 @@ class _WebDavSettingsSheetState extends State<_WebDavSettingsSheet> {
     _pathCtrl = TextEditingController(
       text: widget.cfg.path.isEmpty ? 'kelivo_backups' : widget.cfg.path,
     );
+    _userAgentCtrl = TextEditingController(text: widget.cfg.userAgent);
   }
 
   @override
@@ -2446,6 +2448,7 @@ class _WebDavSettingsSheetState extends State<_WebDavSettingsSheet> {
     _userCtrl.dispose();
     _passCtrl.dispose();
     _pathCtrl.dispose();
+    _userAgentCtrl.dispose();
     super.dispose();
   }
 
@@ -2511,6 +2514,7 @@ class _WebDavSettingsSheetState extends State<_WebDavSettingsSheet> {
                         path: _pathCtrl.text.trim().isEmpty
                             ? 'kelivo_backups'
                             : _pathCtrl.text.trim(),
+                        userAgent: _userAgentCtrl.text.trim(),
                       );
                       await widget.settings.setWebDavConfig(newCfg);
                       widget.vm.updateConfig(newCfg);
@@ -2548,6 +2552,12 @@ class _WebDavSettingsSheetState extends State<_WebDavSettingsSheet> {
                 controller: _pathCtrl,
                 hint: 'kelivo_backups',
               ),
+              const SizedBox(height: 12),
+              _InputRow(
+                label: l10n.backupPageUserAgent,
+                controller: _userAgentCtrl,
+                hint: l10n.backupPageUserAgentHint,
+              ),
               const SizedBox(height: 16),
             ],
           ),
@@ -2580,6 +2590,7 @@ class _S3SettingsSheetState extends State<_S3SettingsSheet> {
   late final TextEditingController _secretKeyCtrl;
   late final TextEditingController _sessionTokenCtrl;
   late final TextEditingController _prefixCtrl;
+  late final TextEditingController _userAgentCtrl;
 
   bool _showSecret = false;
   bool _showToken = false;
@@ -2597,6 +2608,7 @@ class _S3SettingsSheetState extends State<_S3SettingsSheet> {
     _prefixCtrl = TextEditingController(
       text: widget.cfg.prefix.isEmpty ? 'kelivo_backups' : widget.cfg.prefix,
     );
+    _userAgentCtrl = TextEditingController(text: widget.cfg.userAgent);
     _pathStyle = widget.cfg.pathStyle;
   }
 
@@ -2609,6 +2621,7 @@ class _S3SettingsSheetState extends State<_S3SettingsSheet> {
     _secretKeyCtrl.dispose();
     _sessionTokenCtrl.dispose();
     _prefixCtrl.dispose();
+    _userAgentCtrl.dispose();
     super.dispose();
   }
 
@@ -2678,6 +2691,7 @@ class _S3SettingsSheetState extends State<_S3SettingsSheet> {
                             ? 'kelivo_backups'
                             : _prefixCtrl.text.trim(),
                         pathStyle: _pathStyle,
+                        userAgent: _userAgentCtrl.text.trim(),
                       );
                       await widget.settings.setS3Config(newCfg);
                       widget.vm.updateConfig(newCfg);
@@ -2736,6 +2750,12 @@ class _S3SettingsSheetState extends State<_S3SettingsSheet> {
                 label: l10n.backupPageS3Prefix,
                 controller: _prefixCtrl,
                 hint: 'kelivo_backups',
+              ),
+              const SizedBox(height: 12),
+              _InputRow(
+                label: l10n.backupPageUserAgent,
+                controller: _userAgentCtrl,
+                hint: l10n.backupPageUserAgentHint,
               ),
               const SizedBox(height: 12),
               Container(

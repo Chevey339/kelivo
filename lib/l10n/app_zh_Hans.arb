@@ -573,6 +573,8 @@
   "backupPageS3SessionToken": "Session Token（可选）",
   "backupPageS3Prefix": "前缀（目录）",
   "backupPageS3PathStyle": "路径风格（Path-style）",
+  "backupPageUserAgent": "User-Agent",
+  "backupPageUserAgentHint": "可选",
   "backupPageSave": "保存",
   "backupPageBackupNow": "立即备份",
   "backupPageLocalBackup": "本地备份",

@@ -46,6 +46,13 @@ class DataSync {
     return {'Authorization': 'Basic $token'};
   }
 
+  Map<String, String> _extraHeaders(WebDavConfig cfg) {
+    final h = <String, String>{};
+    final ua = cfg.userAgent.trim();
+    if (ua.isNotEmpty) h['User-Agent'] = ua;
+    return h;
+  }
+
   Future<void> _ensureCollection(WebDavConfig cfg) async {
     final client = http.Client();
     try {
@@ -65,6 +72,7 @@ class DataSync {
           'Depth': '0',
           'Content-Type': 'application/xml; charset=utf-8',
           ..._authHeaders(cfg),
+          ..._extraHeaders(cfg),
         });
         req.body =
             '<?xml version="1.0" encoding="utf-8" ?><d:propfind xmlns:d="DAV:"><d:prop><d:displayname/></d:prop></d:propfind>';
@@ -72,7 +80,7 @@ class DataSync {
         if (res.statusCode == 404) {
           // create this level
           final mk = await client
-              .send(http.Request('MKCOL', u)..headers.addAll(_authHeaders(cfg)))
+              .send(http.Request('MKCOL', u)..headers.addAll({..._authHeaders(cfg), ..._extraHeaders(cfg)}))
               .then(http.Response.fromStream);
           if (mk.statusCode != 201 &&
               mk.statusCode != 200 &&
@@ -101,6 +109,7 @@ class DataSync {
       'Depth': '1',
       'Content-Type': 'application/xml; charset=utf-8',
       ..._authHeaders(cfg),
+      ..._extraHeaders(cfg),
     });
     req.body =
         '<?xml version="1.0" encoding="utf-8" ?>\n'
@@ -338,6 +347,7 @@ class DataSync {
         'content-type': 'application/zip',
         'content-length': fileLen.toString(),
         ..._authHeaders(cfg),
+        ..._extraHeaders(cfg),
       });
       // Pipe the file stream into the request body.
       file.openRead().listen(
@@ -367,6 +377,7 @@ class DataSync {
       'Depth': '1',
       'Content-Type': 'application/xml; charset=utf-8',
       ..._authHeaders(cfg),
+      ..._extraHeaders(cfg),
     });
     req.body =
         '<?xml version="1.0" encoding="utf-8" ?>\n'
@@ -466,7 +477,7 @@ class DataSync {
     File? file;
     try {
       final req = http.Request('GET', item.href);
-      req.headers.addAll(_authHeaders(cfg));
+      req.headers.addAll({..._authHeaders(cfg), ..._extraHeaders(cfg)});
       final streamed = await client.send(req);
       if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
         // Drain the response body to allow the client to close cleanly.
@@ -489,7 +500,7 @@ class DataSync {
     BackupFileItem item,
   ) async {
     final req = http.Request('DELETE', item.href);
-    req.headers.addAll(_authHeaders(cfg));
+    req.headers.addAll({..._authHeaders(cfg), ..._extraHeaders(cfg)});
     final res = await http.Client().send(req).then(http.Response.fromStream);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('Delete failed: ${res.statusCode}');
