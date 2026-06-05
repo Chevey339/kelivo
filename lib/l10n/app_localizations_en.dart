@@ -2105,6 +2105,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatMessageWidgetWriteClipboard => 'Write Clipboard';
 
   @override
+  String get chatMessageWidgetSpeakingTitle => 'Speaking:';
+
+  @override
   String chatMessageWidgetSpeakText(String text) {
     return 'Speaking: $text';
   }

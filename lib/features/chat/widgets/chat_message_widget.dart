@@ -145,18 +145,9 @@ String? _localToolTitleFor(
       'write' => l10n.chatMessageWidgetWriteClipboard,
       _ => l10n.assistantEditLocalToolClipboardTitle,
     },
-    LocalToolNames.textToSpeech => _textToSpeechToolTitleFor(l10n, args),
+    LocalToolNames.textToSpeech => l10n.chatMessageWidgetSpeakingTitle,
     _ => null,
   };
-}
-
-String _textToSpeechToolTitleFor(
-  AppLocalizations l10n,
-  Map<String, dynamic> args,
-) {
-  final text = _textToSpeechToolText(args);
-  if (text.isEmpty) return l10n.assistantEditLocalToolTextToSpeechTitle;
-  return l10n.chatMessageWidgetSpeakText(text);
 }
 
 String _textToSpeechToolText(Map<String, dynamic> args) {

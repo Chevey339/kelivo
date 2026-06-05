@@ -2037,6 +2037,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatMessageWidgetWriteClipboard => '写入剪切板';
 
   @override
+  String get chatMessageWidgetSpeakingTitle => '正在朗读:';
+
+  @override
   String chatMessageWidgetSpeakText(String text) {
     return '正在朗读: $text';
   }
@@ -7243,6 +7246,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatMessageWidgetWriteClipboard => '写入剪切板';
 
   @override
+  String get chatMessageWidgetSpeakingTitle => '正在朗读:';
+
+  @override
   String chatMessageWidgetSpeakText(String text) {
     return '正在朗读: $text';
   }
@@ -12446,6 +12452,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetWriteClipboard => '寫入剪貼簿';
+
+  @override
+  String get chatMessageWidgetSpeakingTitle => '正在朗讀:';
 
   @override
   String chatMessageWidgetSpeakText(String text) {

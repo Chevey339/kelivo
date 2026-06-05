@@ -864,6 +864,7 @@
   "chatMessageWidgetBuiltinSearch": "Built-in Search",
   "chatMessageWidgetReadClipboard": "Read Clipboard",
   "chatMessageWidgetWriteClipboard": "Write Clipboard",
+  "chatMessageWidgetSpeakingTitle": "Speaking:",
   "chatMessageWidgetSpeakText": "Speaking: {text}",
   "@chatMessageWidgetSpeakText": {
     "placeholders": {

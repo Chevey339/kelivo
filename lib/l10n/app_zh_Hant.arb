@@ -700,6 +700,7 @@
   "chatMessageWidgetBuiltinSearch": "模型內建搜尋",
   "chatMessageWidgetReadClipboard": "讀取剪貼簿",
   "chatMessageWidgetWriteClipboard": "寫入剪貼簿",
+  "chatMessageWidgetSpeakingTitle": "正在朗讀:",
   "chatMessageWidgetSpeakText": "正在朗讀: {text}",
   "@chatMessageWidgetSpeakText": {
     "placeholders": {

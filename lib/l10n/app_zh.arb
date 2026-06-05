@@ -697,6 +697,7 @@
   "chatMessageWidgetBuiltinSearch": "模型内置搜索",
   "chatMessageWidgetReadClipboard": "读取剪切板",
   "chatMessageWidgetWriteClipboard": "写入剪切板",
+  "chatMessageWidgetSpeakingTitle": "正在朗读:",
   "chatMessageWidgetSpeakText": "正在朗读: {text}",
   "@chatMessageWidgetSpeakText": {
     "placeholders": {

@@ -4019,6 +4019,12 @@ abstract class AppLocalizations {
   /// **'Write Clipboard'**
   String get chatMessageWidgetWriteClipboard;
 
+  /// No description provided for @chatMessageWidgetSpeakingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Speaking:'**
+  String get chatMessageWidgetSpeakingTitle;
+
   /// No description provided for @chatMessageWidgetSpeakText.
   ///
   /// In en, this message translates to:
