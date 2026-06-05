@@ -243,6 +243,72 @@ class ChatApiService {
     final buf = StringBuffer();
     int i = 0;
     while (i < raw.length) {
+      // Skip fenced code blocks (``` or ~~~): content inside is never an image.
+      if ((raw.startsWith('```', i) || raw.startsWith('~~~', i)) &&
+          (i == 0 || raw[i - 1] == '\n')) {
+        final fence = raw.substring(i, i + 3);
+        buf.write(fence);
+        i += 3;
+        // Skip the rest of the opening fence line (language tag, etc.)
+        while (i < raw.length && raw[i] != '\n') {
+          buf.write(raw[i]);
+          i++;
+        }
+        // Advance until the matching closing fence at the start of a line.
+        bool closed = false;
+        while (i < raw.length) {
+          if (raw[i] == '\n') {
+            buf.write(raw[i]);
+            i++;
+            if (raw.startsWith(fence, i)) {
+              buf.write(fence);
+              i += 3;
+              // Skip trailing content on the closing fence line.
+              while (i < raw.length && raw[i] != '\n') {
+                buf.write(raw[i]);
+                i++;
+              }
+              closed = true;
+              break;
+            }
+          } else {
+            buf.write(raw[i]);
+            i++;
+          }
+        }
+        if (!closed) {
+          // Unclosed fence: rest of text was written as-is already.
+        }
+        continue;
+      }
+      // Skip inline code spans (backtick sequences).
+      if (raw[i] == '`') {
+        // Determine the length of the opening backtick sequence.
+        int tickLen = 0;
+        while (i + tickLen < raw.length && raw[i + tickLen] == '`') {
+          tickLen++;
+        }
+        final openTicks = raw.substring(i, i + tickLen);
+        buf.write(openTicks);
+        i += tickLen;
+        // Advance until the matching closing backtick sequence.
+        bool closedTick = false;
+        while (i < raw.length) {
+          if (raw.startsWith(openTicks, i)) {
+            buf.write(openTicks);
+            i += tickLen;
+            closedTick = true;
+            break;
+          }
+          buf.write(raw[i]);
+          i++;
+        }
+        if (!closedTick) {
+          // Unclosed inline code: content was already written.
+        }
+        continue;
+      }
+
       final m1 = mdImg.matchAsPrefix(raw, i);
       final m2 = customImg.matchAsPrefix(raw, i);
       if (m1 != null) {
