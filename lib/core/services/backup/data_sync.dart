@@ -289,6 +289,25 @@ class DataSync {
     return name.replaceAll('\\', '/').replaceAll(RegExp(r'^/+'), '');
   }
 
+  /// Decode a DOS date/time packed value (from ZIP entry's lastModTime) into
+  /// a [DateTime]. Returns null when the date portion is zero (unset).
+  static DateTime? _decodeDosDateTime(int packed) {
+    final dosDate = packed >> 16;
+    final dosTime = packed & 0xFFFF;
+    if (dosDate == 0) return null;
+    final year = ((dosDate >> 9) & 0x7f) + 1980;
+    final month = (dosDate >> 5) & 0x0f;
+    final day = dosDate & 0x1f;
+    final hour = (dosTime >> 11) & 0x1f;
+    final minute = (dosTime >> 5) & 0x3f;
+    final second = (dosTime & 0x1f) * 2;
+    try {
+      return DateTime(year, month, day, hour, minute, second);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Synchronous ZIP extraction — runs inside an Isolate.
   /// Uses InputFileStream so the ZIP bytes are read from disk on demand rather
   /// than loading the entire archive into a single byte array.
@@ -313,6 +332,12 @@ class DataSync {
               entry.writeContent(output);
             } finally {
               output.closeSync();
+            }
+            final dt = _decodeDosDateTime(entry.lastModTime);
+            if (dt != null) {
+              try {
+                File(outPath).setLastModifiedSync(dt);
+              } catch (_) {}
             }
           } else {
             Directory(outPath).createSync(recursive: true);
@@ -1093,6 +1118,9 @@ class DataSync {
                 final target = File(p.join(dst.path, rel));
                 await target.parent.create(recursive: true);
                 await ent.copy(target.path);
+                try {
+                  await target.setLastModified(await ent.lastModified());
+                } catch (_) {}
               }
             }
           }
@@ -1113,6 +1141,9 @@ class DataSync {
                 final target = File(p.join(dst.path, rel));
                 await target.parent.create(recursive: true);
                 await ent.copy(target.path);
+                try {
+                  await target.setLastModified(await ent.lastModified());
+                } catch (_) {}
               }
             }
           }
@@ -1133,6 +1164,9 @@ class DataSync {
                 final target = File(p.join(dst.path, rel));
                 await target.parent.create(recursive: true);
                 await ent.copy(target.path);
+                try {
+                  await target.setLastModified(await ent.lastModified());
+                } catch (_) {}
               }
             }
           }
@@ -1152,6 +1186,9 @@ class DataSync {
                 if (!await target.exists()) {
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
+                  try {
+                    await target.setLastModified(await ent.lastModified());
+                  } catch (_) {}
                 }
               }
             }
@@ -1171,6 +1208,9 @@ class DataSync {
                 if (!await target.exists()) {
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
+                  try {
+                    await target.setLastModified(await ent.lastModified());
+                  } catch (_) {}
                 }
               }
             }
@@ -1190,6 +1230,9 @@ class DataSync {
                 if (!await target.exists()) {
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
+                  try {
+                    await target.setLastModified(await ent.lastModified());
+                  } catch (_) {}
                 }
               }
             }
