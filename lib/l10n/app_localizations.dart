@@ -157,13 +157,13 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPageDisplay.
   ///
   /// In en, this message translates to:
-  /// **'Display'**
+  /// **'Preferences'**
   String get settingsPageDisplay;
 
   /// No description provided for @settingsPageDisplaySubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Appearance and text size'**
+  /// **'Appearance, behavior, and interaction preferences'**
   String get settingsPageDisplaySubtitle;
 
   /// No description provided for @settingsPageAssistant.
@@ -4042,6 +4042,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Write Clipboard'**
   String get chatMessageWidgetWriteClipboard;
+
+  /// No description provided for @chatMessageWidgetSpeakingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Speaking:'**
+  String get chatMessageWidgetSpeakingTitle;
 
   /// No description provided for @chatMessageWidgetSpeakText.
   ///
@@ -9839,7 +9845,7 @@ abstract class AppLocalizations {
   /// No description provided for @askUserCardQuestionCount.
   ///
   /// In en, this message translates to:
-  /// **'Ask {count} questions'**
+  /// **'{count, plural, =1{Ask 1 question} other{Ask {count} questions}}'**
   String askUserCardQuestionCount(int count);
 
   /// No description provided for @tokenDetailPromptTokens.

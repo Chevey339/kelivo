@@ -8,7 +8,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
+import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
+import 'package:Kelivo/features/home/controllers/stream_controller.dart'
+    as home_stream;
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
@@ -204,6 +208,112 @@ void main() {
       expect(find.text('Second source'), findsOneWidget);
       expect(find.text('Third source'), findsOneWidget);
     });
+
+    testWidgets(
+      'search citation capsule uses latest streaming result for the same id',
+      (tester) async {
+        final settings = _createSettings(
+          ChatMessageBackgroundStyle.defaultStyle,
+        );
+        final controller = home_stream.StreamController(
+          chatService: ChatService(),
+          onStateChanged: () {},
+          getSettingsProvider: () => settings,
+          getCurrentConversationId: () => 'conversation-search-same-id',
+        );
+        final message = ChatMessage(
+          id: 'assistant-search-same-id',
+          role: 'assistant',
+          content: 'Answer with incremental search citations.',
+          conversationId: 'conversation-search-same-id',
+          isStreaming: true,
+        );
+        final state = home_stream.StreamingState(
+          home_stream.GenerationContext(
+            assistantMessage: message,
+            apiMessages: const [],
+            userImagePaths: const [],
+            allowImagesApiRouting: false,
+            providerKey: 'test',
+            modelId: 'test-model',
+            assistant: null,
+            settings: settings,
+            config: ProviderConfig(
+              id: 'test',
+              enabled: true,
+              name: 'Test',
+              apiKey: '',
+              baseUrl: '',
+            ),
+            toolDefs: const [],
+            supportsReasoning: true,
+            enableReasoning: true,
+            streamOutput: true,
+          ),
+        );
+
+        Future<void> upsertToolEventInDb(
+          String messageId, {
+          required String id,
+          required String name,
+          required Map<String, dynamic> arguments,
+          String? content,
+          Map<String, dynamic>? metadata,
+        }) async {}
+
+        await controller.handleToolResultsChunk(
+          ChatStreamChunk(
+            content: '',
+            isDone: false,
+            totalTokens: 0,
+            toolResults: [
+              ToolResultInfo(
+                id: 'builtin_search',
+                name: 'builtin_search',
+                arguments: const <String, dynamic>{},
+                content:
+                    '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"}]}',
+              ),
+            ],
+          ),
+          state,
+          upsertToolEventInDb: upsertToolEventInDb,
+        );
+        await controller.handleToolResultsChunk(
+          ChatStreamChunk(
+            content: '',
+            isDone: false,
+            totalTokens: 0,
+            toolResults: [
+              ToolResultInfo(
+                id: 'builtin_search',
+                name: 'builtin_search',
+                arguments: const <String, dynamic>{},
+                content:
+                    '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"},{"title":"Second source","url":"https://two.example.com/b","text":"B"}]}',
+              ),
+            ],
+          ),
+          state,
+          upsertToolEventInDb: upsertToolEventInDb,
+        );
+
+        await tester.pumpWidget(
+          _buildHarness(
+            settings: settings,
+            locale: const Locale('zh'),
+            child: ChatMessageWidget(
+              message: message,
+              showModelIcon: false,
+              toolParts: controller.toolParts[message.id],
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('2个引用'), findsOneWidget);
+      },
+    );
 
     testWidgets('search citation capsule falls back when source url is invalid', (
       tester,

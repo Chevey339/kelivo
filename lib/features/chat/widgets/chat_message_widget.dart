@@ -145,18 +145,9 @@ String? _localToolTitleFor(
       'write' => l10n.chatMessageWidgetWriteClipboard,
       _ => l10n.assistantEditLocalToolClipboardTitle,
     },
-    LocalToolNames.textToSpeech => _textToSpeechToolTitleFor(l10n, args),
+    LocalToolNames.textToSpeech => l10n.chatMessageWidgetSpeakingTitle,
     _ => null,
   };
-}
-
-String _textToSpeechToolTitleFor(
-  AppLocalizations l10n,
-  Map<String, dynamic> args,
-) {
-  final text = _textToSpeechToolText(args);
-  if (text.isEmpty) return l10n.assistantEditLocalToolTextToSpeechTitle;
-  return l10n.chatMessageWidgetSpeakText(text);
 }
 
 String _textToSpeechToolText(Map<String, dynamic> args) {
@@ -232,8 +223,7 @@ Widget _buildTextToSpeechReplayRow(
 
 String _askUserToolTitleFor(AppLocalizations l10n, Map<String, dynamic> args) {
   final questions = AskUserInteractionService.normalizeQuestions(args);
-  if (questions.length == 1) return questions.first.question;
-  if (questions.length > 1) {
+  if (questions.isNotEmpty) {
     return l10n.askUserCardQuestionCount(questions.length);
   }
   return l10n.assistantEditLocalToolAskUserTitle;

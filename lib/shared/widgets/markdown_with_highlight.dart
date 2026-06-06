@@ -1838,15 +1838,29 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    _displayLanguage(context, widget.language),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: AppFontWeights.medium,
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.72),
-                      height: 1.0,
+                  child: _CodeBlockHeaderToggle(
+                    expanded: isEffectivelyExpanded,
+                    onTap: () => _toggleExpanded(settings),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _displayLanguage(context, widget.language),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: AppFontWeights.medium,
+                              color: cs.onSurfaceVariant.withValues(
+                                alpha: 0.72,
+                              ),
+                              height: 1.0,
+                            ),
+                          ),
+                        ),
+                        _CodeBlockCollapseIcon(collapsed: isCollapsed),
+                      ],
                     ),
                   ),
                 ),
@@ -1902,14 +1916,6 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
                         : _trimTrailingNewlines(widget.code),
                   ),
                 ),
-                if (_shouldShowFoldControl(settings)) ...[
-                  const SizedBox(height: 4),
-                  _CodeBlockFoldControl(
-                    expanded: isEffectivelyExpanded,
-                    onTap: () => _toggleExpanded(settings),
-                    textStyle: codeTextStyle,
-                  ),
-                ],
               ],
             ),
           ),
@@ -1919,8 +1925,8 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
   }
 
   bool _isEffectivelyExpanded(SettingsProvider settings) {
-    if (!settings.autoCollapseCodeBlock) return true;
     if (_manuallyToggled) return _expanded;
+    if (!settings.autoCollapseCodeBlock) return true;
     return !_exceedsLineThreshold(
       widget.code,
       settings.autoCollapseCodeBlockLines,
@@ -2029,14 +2035,6 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
     } else {
       showHtmlPreviewDesktopDialog(context, html: widget.code);
     }
-  }
-
-  bool _shouldShowFoldControl(SettingsProvider settings) {
-    if (!settings.autoCollapseCodeBlock) return false;
-    return _exceedsLineThreshold(
-      widget.code,
-      settings.autoCollapseCodeBlockLines,
-    );
   }
 
   String _collapsedHighlightedCode(SettingsProvider settings) {
@@ -2167,6 +2165,88 @@ typedef MermaidBitmapRenderOverride =
 @visibleForTesting
 MermaidBitmapRenderOverride? debugMermaidBitmapRenderOverride;
 
+class _CodeBlockHeaderToggle extends StatelessWidget {
+  const _CodeBlockHeaderToggle({
+    required this.expanded,
+    required this.onTap,
+    required this.child,
+  });
+
+  final bool expanded;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final label = expanded
+        ? l10n.codeBlockCollapseButton
+        : l10n.codeBlockExpandButton;
+
+    return SelectionContainer.disabled(
+      child: Semantics(
+        button: true,
+        label: label,
+        onTap: onTap,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: (_) => onTap(),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CodeBlockCollapseIcon extends StatelessWidget {
+  const _CodeBlockCollapseIcon({required this.collapsed});
+
+  final bool collapsed;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.maybeOf(context);
+    final reduceMotion =
+        (media?.disableAnimations ?? false) ||
+        (media?.accessibleNavigation ?? false);
+    final duration = reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 160);
+    final cs = Theme.of(context).colorScheme;
+
+    return AnimatedSwitcher(
+      key: const ValueKey('code-block-collapse-icon-switcher'),
+      duration: duration,
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+      child: collapsed
+          ? Row(
+              key: const ValueKey('code-block-collapse-icon-visible'),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(width: 4),
+                Icon(
+                  Lucide.ChevronRight,
+                  size: 14,
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.56),
+                ),
+              ],
+            )
+          : const SizedBox(
+              key: ValueKey('code-block-collapse-icon-hidden'),
+              width: 0,
+              height: 14,
+            ),
+    );
+  }
+}
+
 class _CodeBlockIconAction extends StatelessWidget {
   const _CodeBlockIconAction({
     required this.icon,
@@ -2194,57 +2274,6 @@ class _CodeBlockIconAction extends StatelessWidget {
           size: 16,
           padding: const EdgeInsets.all(4),
           color: color,
-        ),
-      ),
-    );
-  }
-}
-
-class _CodeBlockFoldControl extends StatelessWidget {
-  const _CodeBlockFoldControl({
-    required this.expanded,
-    required this.onTap,
-    required this.textStyle,
-  });
-
-  final bool expanded;
-  final VoidCallback onTap;
-  final TextStyle textStyle;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final label = expanded
-        ? l10n.codeBlockCollapseButton
-        : l10n.codeBlockExpandButton;
-
-    return SelectionContainer.disabled(
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Listener(
-          behavior: HitTestBehavior.opaque,
-          onPointerDown: (_) => onTap(),
-          child: SizedBox(
-            width: double.infinity,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      expanded ? Lucide.ChevronUp : Lucide.ChevronDown,
-                      size: (textStyle.fontSize ?? 13) * 1.18,
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(label, style: textStyle.copyWith(color: cs.onSurface)),
-                  ],
-                ),
-              ),
-            ),
-          ),
         ),
       ),
     );

@@ -391,15 +391,42 @@ class SettingsProvider extends ChangeNotifier {
     return resolveApiModelIdOverride(ov, modelId);
   }
 
-  bool supportsOpenAIXhighReasoning(String providerKey, String modelId) {
+  bool supportsXhighReasoning(String providerKey, String modelId) {
     final cfg = getProviderConfig(providerKey);
     final kind = ProviderConfig.classify(
       cfg.id,
       explicitType: cfg.providerType,
     );
-    if (kind != ProviderKind.openai) return false;
-    final modelForCheck = resolveOpenAIUpstreamModelId(providerKey, modelId);
-    return openAISupportsXhighReasoning(modelForCheck);
+    switch (kind) {
+      case ProviderKind.openai:
+        final modelForCheck = resolveOpenAIUpstreamModelId(
+          providerKey,
+          modelId,
+        );
+        return openAISupportsXhighReasoning(modelForCheck);
+      case ProviderKind.claude:
+        final rawOv = cfg.modelOverrides[modelId];
+        final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
+        final modelForCheck = resolveApiModelIdOverride(ov, modelId);
+        return _isDeepSeekClaudeCompatible(cfg, modelForCheck);
+      case ProviderKind.google:
+        return false;
+    }
+  }
+
+  bool supportsOpenAIXhighReasoning(String providerKey, String modelId) {
+    return supportsXhighReasoning(providerKey, modelId);
+  }
+
+  bool _isDeepSeekClaudeCompatible(ProviderConfig cfg, String modelId) {
+    final lowerModelId = modelId.trim().toLowerCase();
+    if (lowerModelId.contains('deepseek')) return true;
+    final baseUrl = cfg.baseUrl.trim().toLowerCase();
+    final providerId = cfg.id.trim().toLowerCase();
+    final providerName = cfg.name.trim().toLowerCase();
+    return baseUrl.contains('api.deepseek.com') ||
+        providerId.contains('deepseek') ||
+        providerName.contains('deepseek');
   }
 
   // Explicitly ensure a provider config exists in memory (without persisting to storage).

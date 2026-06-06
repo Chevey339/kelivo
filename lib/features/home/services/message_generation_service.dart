@@ -180,6 +180,7 @@ class MessageGenerationService {
     messageBuilderService.injectSearchPrompt(
       apiMessages,
       settings,
+      assistant,
       hasBuiltInSearch,
     );
     await messageBuilderService.injectInstructionPrompts(

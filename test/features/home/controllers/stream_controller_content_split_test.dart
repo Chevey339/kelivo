@@ -18,13 +18,16 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues(const {});
 
-  StreamController buildController({SettingsProvider? settings}) {
+  StreamController buildController({
+    SettingsProvider? settings,
+    String? currentConversationId,
+  }) {
     final settingsProvider = settings ?? SettingsProvider();
     return StreamController(
       chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () => settingsProvider,
-      getCurrentConversationId: () => null,
+      getCurrentConversationId: () => currentConversationId,
     );
   }
 
@@ -317,6 +320,126 @@ void main() {
         '{"items":[{"title":"First"}]}',
         '{"items":[{"title":"Second"}]}',
       ]);
+    },
+  );
+
+  test(
+    'dedupeToolPartsList keeps latest completed result for the same non-empty id',
+    () {
+      final controller = buildController();
+
+      final parts = controller.dedupeToolPartsList(const [
+        ToolUIPart(
+          id: 'builtin_search',
+          toolName: 'builtin_search',
+          arguments: {},
+          content: '{"items":[{"title":"First"}]}',
+        ),
+        ToolUIPart(
+          id: 'builtin_search',
+          toolName: 'builtin_search',
+          arguments: {},
+          content: '{"items":[{"title":"First"},{"title":"Second"}]}',
+        ),
+      ]);
+
+      expect(parts, hasLength(1));
+      expect(
+        parts.single.content,
+        '{"items":[{"title":"First"},{"title":"Second"}]}',
+      );
+    },
+  );
+
+  test(
+    'dedupeToolEvents keeps latest completed result for the same non-empty id',
+    () {
+      final controller = buildController();
+
+      final events = controller.dedupeToolEvents(const [
+        {
+          'id': 'builtin_search',
+          'name': 'builtin_search',
+          'arguments': <String, dynamic>{},
+          'content': '{"items":[{"title":"First"}]}',
+        },
+        {
+          'id': 'builtin_search',
+          'name': 'builtin_search',
+          'arguments': <String, dynamic>{},
+          'content': '{"items":[{"title":"First"},{"title":"Second"}]}',
+        },
+      ]);
+
+      expect(events, hasLength(1));
+      expect(
+        events.single['content'],
+        '{"items":[{"title":"First"},{"title":"Second"}]}',
+      );
+    },
+  );
+
+  test(
+    'handleToolResultsChunk keeps latest completed result for the same non-empty id',
+    () async {
+      final settings = SettingsProvider();
+      final controller = buildController(
+        settings: settings,
+        currentConversationId: 'conversation-1',
+      );
+      final state = buildStreamingState(settings);
+
+      Future<void> upsertToolEventInDb(
+        String messageId, {
+        required String id,
+        required String name,
+        required Map<String, dynamic> arguments,
+        String? content,
+        Map<String, dynamic>? metadata,
+      }) async {}
+
+      await controller.handleToolResultsChunk(
+        ChatStreamChunk(
+          content: '',
+          isDone: false,
+          totalTokens: 0,
+          toolResults: [
+            ToolResultInfo(
+              id: 'builtin_search',
+              name: 'builtin_search',
+              arguments: const <String, dynamic>{},
+              content: '{"items":[{"title":"First"}]}',
+            ),
+          ],
+        ),
+        state,
+        upsertToolEventInDb: upsertToolEventInDb,
+      );
+
+      await controller.handleToolResultsChunk(
+        ChatStreamChunk(
+          content: '',
+          isDone: false,
+          totalTokens: 0,
+          toolResults: [
+            ToolResultInfo(
+              id: 'builtin_search',
+              name: 'builtin_search',
+              arguments: const <String, dynamic>{},
+              content: '{"items":[{"title":"First"},{"title":"Second"}]}',
+            ),
+          ],
+        ),
+        state,
+        upsertToolEventInDb: upsertToolEventInDb,
+      );
+
+      final parts = controller.toolParts[state.messageId]!;
+      expect(parts, hasLength(1));
+      expect(
+        parts.single.content,
+        '{"items":[{"title":"First"},{"title":"Second"}]}',
+      );
     },
   );
 

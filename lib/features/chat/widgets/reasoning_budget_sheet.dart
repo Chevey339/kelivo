@@ -145,10 +145,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
     final currentModelId =
         widget.modelId ?? assistant?.chatModelId ?? settings.currentModelId;
     if (currentProvider == null || currentModelId == null) return false;
-    return settings.supportsOpenAIXhighReasoning(
-      currentProvider,
-      currentModelId,
-    );
+    return settings.supportsXhighReasoning(currentProvider, currentModelId);
   }
 
   @override

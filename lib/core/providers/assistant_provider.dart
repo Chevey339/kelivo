@@ -1,11 +1,14 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
-import 'dart:io';
 import '../../utils/sandbox_path_resolver.dart';
 import '../models/assistant.dart';
 import '../models/assistant_regex.dart';
 import '../models/preset_message.dart';
+import '../services/chat/chat_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/avatar_cache.dart';
 import '../../utils/app_directories.dart';
@@ -13,9 +16,11 @@ import '../../utils/app_directories.dart';
 class AssistantProvider extends ChangeNotifier {
   static const String _assistantsKey = 'assistants_v1';
   static const String _currentAssistantKey = 'current_assistant_id_v1';
+  static const String _legacySearchEnabledKey = 'search_enabled_v1';
 
   final List<Assistant> _assistants = <Assistant>[];
   String? _currentAssistantId;
+  final ChatService? chatService;
 
   List<Assistant> get assistants => List.unmodifiable(_assistants);
   String? get currentAssistantId => _currentAssistantId;
@@ -26,7 +31,9 @@ class AssistantProvider extends ChangeNotifier {
     return null;
   }
 
-  AssistantProvider() {
+  bool get currentSearchEnabled => currentAssistant?.searchEnabled ?? false;
+
+  AssistantProvider({this.chatService}) {
     _load();
   }
 
@@ -34,11 +41,18 @@ class AssistantProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_assistantsKey);
     if (raw != null && raw.isNotEmpty) {
+      final legacySearchEnabled = prefs.getBool(_legacySearchEnabledKey);
+      final migrated = _decodeAssistantsWithLegacySearch(
+        raw,
+        legacySearchEnabled: legacySearchEnabled,
+      );
+      bool migratedSearchEnabled = false;
       _assistants
         ..clear()
-        ..addAll(Assistant.decodeList(raw));
+        ..addAll(migrated.assistants);
+      migratedSearchEnabled = migrated.didApplyLegacySearch;
       // Fix any sandboxed local paths (avatars/backgrounds) imported from other platforms
-      bool changed = false;
+      bool changed = migratedSearchEnabled;
       for (int i = 0; i < _assistants.length; i++) {
         final a = _assistants[i];
         String? av = a.avatar;
@@ -83,6 +97,38 @@ class AssistantProvider extends ChangeNotifier {
       _currentAssistantId = null;
     }
     notifyListeners();
+  }
+
+  _AssistantDecodeResult _decodeAssistantsWithLegacySearch(
+    String raw, {
+    required bool? legacySearchEnabled,
+  }) {
+    try {
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      bool didApplyLegacySearch = false;
+      final assistants = [
+        for (final e in decoded)
+          if (e is Map)
+            (() {
+              final json = e.cast<String, dynamic>();
+              if (legacySearchEnabled != null &&
+                  !json.containsKey('searchEnabled')) {
+                json['searchEnabled'] = legacySearchEnabled;
+                didApplyLegacySearch = true;
+              }
+              return Assistant.fromJson(json);
+            })(),
+      ];
+      return _AssistantDecodeResult(
+        assistants: assistants,
+        didApplyLegacySearch: didApplyLegacySearch,
+      );
+    } catch (_) {
+      return const _AssistantDecodeResult(
+        assistants: <Assistant>[],
+        didApplyLegacySearch: false,
+      );
+    }
   }
 
   Assistant _defaultAssistant(AppLocalizations l10n) => Assistant(
@@ -419,6 +465,12 @@ class AssistantProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setSearchEnabledForCurrentAssistant(bool enabled) async {
+    final a = currentAssistant;
+    if (a == null || a.searchEnabled == enabled) return;
+    await updateAssistant(a.copyWith(searchEnabled: enabled));
+  }
+
   Future<void> reorderAssistantRegex({
     required String assistantId,
     required int oldIndex,
@@ -441,6 +493,9 @@ class AssistantProvider extends ChangeNotifier {
     if (idx == -1) return false;
     // Do not allow deleting the last remaining assistant
     if (_assistants.length <= 1) return false;
+
+    await chatService?.deleteConversationsForAssistant(id);
+
     final removingCurrent = _assistants[idx].id == _currentAssistantId;
     _assistants.removeAt(idx);
     if (removingCurrent) {
@@ -519,4 +574,14 @@ class AssistantProvider extends ChangeNotifier {
     notifyListeners();
     await _persist();
   }
+}
+
+class _AssistantDecodeResult {
+  const _AssistantDecodeResult({
+    required this.assistants,
+    required this.didApplyLegacySearch,
+  });
+
+  final List<Assistant> assistants;
+  final bool didApplyLegacySearch;
 }

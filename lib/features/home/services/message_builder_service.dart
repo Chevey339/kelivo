@@ -616,9 +616,10 @@ class MessageBuilderService {
   void injectSearchPrompt(
     List<Map<String, dynamic>> apiMessages,
     SettingsProvider settings,
+    Assistant? assistant,
     bool hasBuiltInSearch,
   ) {
-    if (settings.searchEnabled && !hasBuiltInSearch) {
+    if (assistant?.searchEnabled == true && !hasBuiltInSearch) {
       final prompt = SearchToolService.getSystemPrompt();
       _appendToSystemMessage(apiMessages, prompt);
     }

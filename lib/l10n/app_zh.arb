@@ -8,8 +8,8 @@
   "settingsPageWarningMessage": "部分服务未配置，某些功能可能不可用",
   "settingsPageGeneralSection": "通用设置",
   "settingsPageColorMode": "颜色模式",
-  "settingsPageDisplay": "显示设置",
-  "settingsPageDisplaySubtitle": "界面主题与字号等外观设置",
+  "settingsPageDisplay": "偏好设置",
+  "settingsPageDisplaySubtitle": "外观、行为与交互偏好",
   "settingsPageAssistant": "助手",
   "settingsPageAssistantSubtitle": "默认助手与对话风格",
   "settingsPageModelsServicesSection": "模型与服务",
@@ -701,6 +701,7 @@
   "chatMessageWidgetBuiltinSearch": "模型内置搜索",
   "chatMessageWidgetReadClipboard": "读取剪切板",
   "chatMessageWidgetWriteClipboard": "写入剪切板",
+  "chatMessageWidgetSpeakingTitle": "正在朗读:",
   "chatMessageWidgetSpeakText": "正在朗读: {text}",
   "@chatMessageWidgetSpeakText": {
     "placeholders": {
@@ -1838,7 +1839,7 @@
   "askUserCardAnswered": "已回答",
   "askUserCardInactive": "这个问题已不再活动。请重新生成或继续对话。",
   "askUserCardCancelled": "问题已取消",
-  "askUserCardQuestionCount": "询问 {count} 个问题",
+  "askUserCardQuestionCount": "{count, plural, other{询问 {count} 个问题}}",
   "tokenDetailPromptTokens": "{count} tokens",
   "tokenDetailPromptTokensWithCache": "{count} tokens ({cached} cached)",
   "tokenDetailCompletionTokens": "{count} tokens",

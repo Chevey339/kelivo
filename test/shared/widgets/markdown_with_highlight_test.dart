@@ -5,6 +5,7 @@ import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/theme/palettes.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
@@ -2629,37 +2630,50 @@ void main() {}
     expect(find.text('dart'), findsOneWidget);
   });
 
-  testWidgets('MarkdownWithCodeHighlight toggles auto-collapsed code block', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _markdownHarness(
-        '''
+  testWidgets(
+    'MarkdownWithCodeHighlight toggles auto-collapsed code block from header',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          '''
 ```dart
 line1
 line2
 line3
 ```
 ''',
-        preferences: const {
-          'display_auto_collapse_code_block_v1': true,
-          'display_auto_collapse_code_block_lines_v1': 2,
-        },
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.pumpAndSettle();
+          preferences: const {
+            'display_auto_collapse_code_block_v1': true,
+            'display_auto_collapse_code_block_lines_v1': 2,
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
 
-    expect(find.text('Expand'), findsOneWidget);
-    expect(find.textContaining('line3'), findsNothing);
-    expect(find.textContaining('folded'), findsNothing);
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('code-block-collapse-icon-switcher')),
+        findsOneWidget,
+      );
+      expect(find.byIcon(Lucide.ChevronRight), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('dart')).dx,
+        lessThan(tester.getTopLeft(find.byIcon(Lucide.ChevronRight)).dx),
+      );
+      expect(find.textContaining('line3'), findsNothing);
+      expect(find.textContaining('folded'), findsNothing);
 
-    await tester.tap(find.text('Expand'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Collapse'), findsOneWidget);
-    expect(find.textContaining('line3'), findsOneWidget);
-  });
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
+      expect(find.byIcon(Lucide.ChevronRight), findsNothing);
+      expect(find.textContaining('line3'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'MarkdownWithCodeHighlight shows full code after auto-collapse is disabled',
@@ -2688,7 +2702,8 @@ disable3
       await settings.setAutoCollapseCodeBlock(true);
       await tester.pumpAndSettle();
 
-      expect(find.text('Expand'), findsOneWidget);
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
       expect(find.textContaining('disable3'), findsNothing);
 
       await settings.setAutoCollapseCodeBlock(false);
@@ -2696,6 +2711,18 @@ disable3
 
       expect(find.text('Expand'), findsNothing);
       expect(find.text('Collapse'), findsNothing);
+      expect(find.textContaining('disable3'), findsOneWidget);
+
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Lucide.ChevronRight), findsOneWidget);
+      expect(find.textContaining('disable3'), findsNothing);
+
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Lucide.ChevronRight), findsNothing);
       expect(find.textContaining('disable3'), findsOneWidget);
     },
   );
@@ -2723,10 +2750,11 @@ alpha3
     await tester.pumpAndSettle();
     await tester.pumpAndSettle();
 
-    expect(find.text('Expand'), findsOneWidget);
+    expect(find.text('Expand'), findsNothing);
+    expect(find.text('Collapse'), findsNothing);
     expect(find.textContaining('alpha3'), findsNothing);
 
-    await tester.tap(find.text('Expand'));
+    await tester.tap(find.text('dart'));
     await tester.pumpAndSettle();
 
     streamText.value = '''
@@ -2739,10 +2767,11 @@ alpha4
 ''';
     await tester.pumpAndSettle();
 
-    expect(find.text('Collapse'), findsOneWidget);
+    expect(find.text('Expand'), findsNothing);
+    expect(find.text('Collapse'), findsNothing);
     expect(find.textContaining('alpha4'), findsOneWidget);
 
-    await tester.tap(find.text('Collapse'));
+    await tester.tap(find.text('dart'));
     await tester.pumpAndSettle();
 
     streamText.value = '''
@@ -2756,7 +2785,8 @@ alpha5
 ''';
     await tester.pumpAndSettle();
 
-    expect(find.text('Expand'), findsOneWidget);
+    expect(find.text('Expand'), findsNothing);
+    expect(find.text('Collapse'), findsNothing);
     expect(find.textContaining('alpha5'), findsNothing);
   });
 
@@ -2784,7 +2814,7 @@ press3
       await tester.pumpAndSettle();
 
       final expandGesture = await tester.startGesture(
-        tester.getCenter(find.text('Expand')),
+        tester.getCenter(find.text('dart')),
       );
       streamText.value = '''
 ```dart
@@ -2798,11 +2828,12 @@ press4
       await expandGesture.up();
       await tester.pumpAndSettle();
 
-      expect(find.text('Collapse'), findsOneWidget);
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
       expect(find.textContaining('press4'), findsOneWidget);
 
       final collapseGesture = await tester.startGesture(
-        tester.getCenter(find.text('Collapse')),
+        tester.getCenter(find.text('dart')),
       );
       streamText.value = '''
 ```dart
@@ -2817,7 +2848,8 @@ press5
       await collapseGesture.up();
       await tester.pumpAndSettle();
 
-      expect(find.text('Expand'), findsOneWidget);
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
       expect(find.textContaining('press5'), findsNothing);
     },
   );

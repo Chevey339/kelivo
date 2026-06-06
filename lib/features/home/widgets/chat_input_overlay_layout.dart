@@ -13,7 +13,7 @@ class ChatInputOverlayLayout extends StatelessWidget {
   });
 
   static const double _topOverlayTailHeight = 16;
-  static const double _bottomOverlayFadeHeight = 120;
+  static const double _bottomOverlayFadeHeight = 180;
 
   final double topInset;
   final Widget content;

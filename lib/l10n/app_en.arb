@@ -8,8 +8,8 @@
   "settingsPageWarningMessage": "Some services are not configured; features may be limited.",
   "settingsPageGeneralSection": "General",
   "settingsPageColorMode": "Color Mode",
-  "settingsPageDisplay": "Display",
-  "settingsPageDisplaySubtitle": "Appearance and text size",
+  "settingsPageDisplay": "Preferences",
+  "settingsPageDisplaySubtitle": "Appearance, behavior, and interaction preferences",
   "settingsPageAssistant": "Assistant",
   "settingsPageAssistantSubtitle": "Default assistant and style",
   "settingsPageModelsServicesSection": "Models & Services",
@@ -868,6 +868,7 @@
   "chatMessageWidgetBuiltinSearch": "Built-in Search",
   "chatMessageWidgetReadClipboard": "Read Clipboard",
   "chatMessageWidgetWriteClipboard": "Write Clipboard",
+  "chatMessageWidgetSpeakingTitle": "Speaking:",
   "chatMessageWidgetSpeakText": "Speaking: {text}",
   "@chatMessageWidgetSpeakText": {
     "placeholders": {
@@ -2209,7 +2210,7 @@
   "askUserCardAnswered": "Answered",
   "askUserCardInactive": "This question is no longer active. Regenerate or continue the conversation.",
   "askUserCardCancelled": "Question cancelled",
-  "askUserCardQuestionCount": "Ask {count} questions",
+  "askUserCardQuestionCount": "{count, plural, =1{Ask 1 question} other{Ask {count} questions}}",
   "@askUserCardQuestionCount": {
     "placeholders": {
       "count": {

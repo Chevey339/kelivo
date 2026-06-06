@@ -243,6 +243,72 @@ class ChatApiService {
     final buf = StringBuffer();
     int i = 0;
     while (i < raw.length) {
+      // Skip fenced code blocks (``` or ~~~): content inside is never an image.
+      if ((raw.startsWith('```', i) || raw.startsWith('~~~', i)) &&
+          (i == 0 || raw[i - 1] == '\n')) {
+        final fence = raw.substring(i, i + 3);
+        buf.write(fence);
+        i += 3;
+        // Skip the rest of the opening fence line (language tag, etc.)
+        while (i < raw.length && raw[i] != '\n') {
+          buf.write(raw[i]);
+          i++;
+        }
+        // Advance until the matching closing fence at the start of a line.
+        bool closed = false;
+        while (i < raw.length) {
+          if (raw[i] == '\n') {
+            buf.write(raw[i]);
+            i++;
+            if (raw.startsWith(fence, i)) {
+              buf.write(fence);
+              i += 3;
+              // Skip trailing content on the closing fence line.
+              while (i < raw.length && raw[i] != '\n') {
+                buf.write(raw[i]);
+                i++;
+              }
+              closed = true;
+              break;
+            }
+          } else {
+            buf.write(raw[i]);
+            i++;
+          }
+        }
+        if (!closed) {
+          // Unclosed fence: rest of text was written as-is already.
+        }
+        continue;
+      }
+      // Skip inline code spans (backtick sequences).
+      if (raw[i] == '`') {
+        // Determine the length of the opening backtick sequence.
+        int tickLen = 0;
+        while (i + tickLen < raw.length && raw[i + tickLen] == '`') {
+          tickLen++;
+        }
+        final openTicks = raw.substring(i, i + tickLen);
+        buf.write(openTicks);
+        i += tickLen;
+        // Advance until the matching closing backtick sequence.
+        bool closedTick = false;
+        while (i < raw.length) {
+          if (raw.startsWith(openTicks, i)) {
+            buf.write(openTicks);
+            i += tickLen;
+            closedTick = true;
+            break;
+          }
+          buf.write(raw[i]);
+          i++;
+        }
+        if (!closedTick) {
+          // Unclosed inline code: content was already written.
+        }
+        continue;
+      }
+
       final m1 = mdImg.matchAsPrefix(raw, i);
       final m2 = customImg.matchAsPrefix(raw, i);
       if (m1 != null) {
@@ -907,10 +973,18 @@ class ChatApiService {
           thinkingBudget,
         );
         final thinking = isReasoning
-            ? _claudeThinkingConfig(upstreamModelId, thinkingBudget)
+            ? _claudeThinkingConfig(
+                upstreamModelId,
+                thinkingBudget,
+                config: config,
+              )
             : null;
         final outputConfig = isReasoning
-            ? _claudeOutputConfig(upstreamModelId, thinkingBudget)
+            ? _claudeOutputConfig(
+                upstreamModelId,
+                thinkingBudget,
+                config: config,
+              )
             : null;
         final body = <String, dynamic>{
           'model': upstreamModelId,
@@ -952,8 +1026,16 @@ class ChatApiService {
         final data = jsonDecode(responseText);
         final content = data['content'] as List?;
         if (content != null && content.isNotEmpty) {
-          final text = content.first['text'];
-          return (text ?? '').toString();
+          final buf = StringBuffer();
+          for (final item in content) {
+            if (item is! Map) continue;
+            if ((item['type'] ?? '').toString() != 'text') continue;
+            final text = item['text'];
+            if (text is String && text.isNotEmpty) {
+              buf.write(text);
+            }
+          }
+          return buf.toString();
         }
         return '';
       } else {
@@ -1109,6 +1191,21 @@ class ChatApiService {
 
   static bool _isClaudeReasoningEnabled(int? budget) => budget != 0;
 
+  static bool _isDeepSeekClaudeCompatible(
+    String modelId, {
+    ProviderConfig? config,
+  }) {
+    final lowerModelId = modelId.trim().toLowerCase();
+    if (lowerModelId.contains('deepseek')) return true;
+    if (config == null) return false;
+    final baseUrl = config.baseUrl.trim().toLowerCase();
+    final providerId = config.id.trim().toLowerCase();
+    final providerName = config.name.trim().toLowerCase();
+    return baseUrl.contains('api.deepseek.com') ||
+        providerId.contains('deepseek') ||
+        providerName.contains('deepseek');
+  }
+
   static bool _supportsClaudeAdaptiveThinking(String modelId) {
     final lower = modelId.trim().toLowerCase();
     if (!lower.contains('claude-')) return false;
@@ -1189,10 +1286,14 @@ class ChatApiService {
 
   static Map<String, dynamic>? _claudeThinkingConfig(
     String modelId,
-    int? budget,
-  ) {
+    int? budget, {
+    ProviderConfig? config,
+  }) {
     if (!_isClaudeReasoningEnabled(budget)) {
       return <String, dynamic>{'type': 'disabled'};
+    }
+    if (_isDeepSeekClaudeCompatible(modelId, config: config)) {
+      return <String, dynamic>{'type': 'enabled'};
     }
     if (_supportsClaudeAdaptiveThinking(modelId)) {
       return <String, dynamic>{'type': 'adaptive', 'display': 'summarized'};
@@ -1205,8 +1306,17 @@ class ChatApiService {
 
   static Map<String, dynamic>? _claudeOutputConfig(
     String modelId,
-    int? budget,
-  ) {
+    int? budget, {
+    ProviderConfig? config,
+  }) {
+    if (_isDeepSeekClaudeCompatible(modelId, config: config)) {
+      if (!_isClaudeReasoningEnabled(budget)) return null;
+      final effort = _claudeEffortForBudget(budget);
+      if (effort == 'auto' || effort == 'off') return null;
+      return <String, dynamic>{
+        'effort': (effort == 'xhigh' || effort == 'max') ? 'max' : 'high',
+      };
+    }
     if (!_supportsClaudeAdaptiveThinking(modelId) ||
         !_isClaudeReasoningEnabled(budget)) {
       return null;

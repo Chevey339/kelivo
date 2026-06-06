@@ -58,7 +58,6 @@ class ChatInputBar extends StatefulWidget {
     this.onLongPressSelectModel,
     this.onOpenMcp,
     this.onLongPressMcp,
-    this.onToggleSearch,
     this.onOpenSearch,
     this.onMore,
     this.onConfigureReasoning,
@@ -76,7 +75,6 @@ class ChatInputBar extends StatefulWidget {
     this.supportsReasoning = true,
     this.showMcpButton = false,
     this.mcpActive = false,
-    this.searchEnabled = false,
     this.showMiniMapButton = false,
     this.onOpenMiniMap,
     this.onPickCamera,
@@ -107,7 +105,6 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onLongPressSelectModel;
   final VoidCallback? onOpenMcp;
   final VoidCallback? onLongPressMcp;
-  final ValueChanged<bool>? onToggleSearch;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onMore;
   final VoidCallback? onConfigureReasoning;
@@ -125,7 +122,6 @@ class ChatInputBar extends StatefulWidget {
   final bool supportsReasoning;
   final bool showMcpButton;
   final bool mcpActive;
-  final bool searchEnabled;
   final bool showMiniMapButton;
   final VoidCallback? onOpenMiniMap;
   final VoidCallback? onPickCamera;
@@ -947,7 +943,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           modelId: currentModelId,
         );
         final builtinSearchActive = toolsState.searchActive;
-        final appSearchEnabled = settings.searchEnabled;
+        final appSearchEnabled = ap.currentSearchEnabled;
         final brandAsset = (() {
           if (!appSearchEnabled || builtinSearchActive) return null;
           final services = settings.searchServices;
