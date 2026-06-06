@@ -27,6 +27,7 @@ void main() {
     String? queuedPreviewText,
     VoidCallback? onCancelQueuedInput,
     String? conversationId,
+    String? sendButtonTooltip,
     ThemeData? theme,
     bool backgroundImageActive = false,
   }) {
@@ -54,6 +55,7 @@ void main() {
             queuedPreviewText: queuedPreviewText,
             onCancelQueuedInput: onCancelQueuedInput,
             conversationId: conversationId,
+            sendButtonTooltip: sendButtonTooltip,
             backgroundImageActive: backgroundImageActive,
           ),
         ),
@@ -101,6 +103,25 @@ void main() {
     await tapSendButton(tester);
 
     expect(controller.text, 'keep me');
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
+  testWidgets('发送按钮可显示编辑态保存并发送提示', (tester) async {
+    final controller = TextEditingController(text: 'edited message');
+    final focusNode = FocusNode();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        sendButtonTooltip: 'Save & Send',
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    expect(find.byTooltip('Save & Send'), findsOneWidget);
 
     controller.dispose();
     focusNode.dispose();

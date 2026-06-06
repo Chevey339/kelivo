@@ -1802,6 +1802,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageEditPageHint => 'Enter message…';
 
   @override
+  String get userMessageEditSaveOnly => 'Save Only';
+
+  @override
+  String get userMessageEditUnsupportedSnackbar =>
+      'This content does not support editing';
+
+  @override
+  String get userMessageEditOverwriteTitle => 'Notice';
+
+  @override
+  String get userMessageEditOverwriteContent =>
+      'Editing will overwrite the existing input. Overwrite it?';
+
+  @override
   String get selectCopyPageTitle => 'Select & Copy';
 
   @override

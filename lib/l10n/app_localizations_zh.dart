@@ -1745,6 +1745,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageEditPageHint => '输入消息内容…';
 
   @override
+  String get userMessageEditSaveOnly => '仅保存';
+
+  @override
+  String get userMessageEditUnsupportedSnackbar => '该内容不支持编辑';
+
+  @override
+  String get userMessageEditOverwriteTitle => '提示';
+
+  @override
+  String get userMessageEditOverwriteContent => '修改将覆盖输入框已有内容，是否覆盖？';
+
+  @override
   String get selectCopyPageTitle => '选择复制';
 
   @override
@@ -6946,6 +6958,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageEditPageHint => '输入消息内容…';
 
   @override
+  String get userMessageEditSaveOnly => '仅保存';
+
+  @override
+  String get userMessageEditUnsupportedSnackbar => '该内容不支持编辑';
+
+  @override
+  String get userMessageEditOverwriteTitle => '提示';
+
+  @override
+  String get userMessageEditOverwriteContent => '修改将覆盖输入框已有内容，是否覆盖？';
+
+  @override
   String get selectCopyPageTitle => '选择复制';
 
   @override
@@ -12144,6 +12168,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageEditPageHint => '輸入訊息內容…';
+
+  @override
+  String get userMessageEditSaveOnly => '僅儲存';
+
+  @override
+  String get userMessageEditUnsupportedSnackbar => '該內容不支援編輯';
+
+  @override
+  String get userMessageEditOverwriteTitle => '提示';
+
+  @override
+  String get userMessageEditOverwriteContent => '修改將覆蓋輸入框已有內容，是否覆蓋？';
 
   @override
   String get selectCopyPageTitle => '選擇複製';

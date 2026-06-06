@@ -1150,14 +1150,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                   }
                                 },
                               ),
-                              _MenuItem(
-                                icon: Lucide.Pencil,
-                                label: l10n.messageMoreSheetEdit,
-                                onTap: () {
-                                  Navigator.of(ctx).pop();
-                                  (widget.onEdit ?? widget.onMore)?.call();
-                                },
-                              ),
+                              if (widget.onEdit != null)
+                                _MenuItem(
+                                  icon: Lucide.Pencil,
+                                  label: l10n.messageMoreSheetEdit,
+                                  onTap: () {
+                                    Navigator.of(ctx).pop();
+                                    widget.onEdit?.call();
+                                  },
+                                ),
                               _MenuItem(
                                 icon: Lucide.Trash2,
                                 danger: true,
@@ -1766,11 +1767,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             }
           },
         ),
-        DesktopContextMenuItem(
-          icon: Lucide.Pencil,
-          label: l10n.messageMoreSheetEdit,
-          onTap: () => (widget.onEdit ?? widget.onMore)?.call(),
-        ),
+        if (widget.onEdit != null)
+          DesktopContextMenuItem(
+            icon: Lucide.Pencil,
+            label: l10n.messageMoreSheetEdit,
+            onTap: () => widget.onEdit?.call(),
+          ),
         DesktopContextMenuItem(
           icon: Lucide.Trash2,
           label: l10n.messageMoreSheetDelete,

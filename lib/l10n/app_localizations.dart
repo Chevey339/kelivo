@@ -3467,6 +3467,30 @@ abstract class AppLocalizations {
   /// **'Enter message…'**
   String get messageEditPageHint;
 
+  /// No description provided for @userMessageEditSaveOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Only'**
+  String get userMessageEditSaveOnly;
+
+  /// No description provided for @userMessageEditUnsupportedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'This content does not support editing'**
+  String get userMessageEditUnsupportedSnackbar;
+
+  /// No description provided for @userMessageEditOverwriteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notice'**
+  String get userMessageEditOverwriteTitle;
+
+  /// No description provided for @userMessageEditOverwriteContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Editing will overwrite the existing input. Overwrite it?'**
+  String get userMessageEditOverwriteContent;
+
   /// No description provided for @selectCopyPageTitle.
   ///
   /// In en, this message translates to:

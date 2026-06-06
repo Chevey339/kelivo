@@ -107,6 +107,7 @@ class MessageListView extends StatefulWidget {
     this.streamingContentNotifier,
     this.spotlightMessageId,
     this.spotlightToken = 0,
+    this.editableUserMessageId,
     this.onVersionChange,
     this.onRegenerateMessage,
     this.onResendMessage,
@@ -172,6 +173,7 @@ class MessageListView extends StatefulWidget {
   /// Incremented each time a new spotlight is triggered. Used as an animation key
   /// so re-selecting the same message re-triggers the pulse.
   final int spotlightToken;
+  final String? editableUserMessageId;
 
   // Callbacks
   final OnVersionChange? onVersionChange;
@@ -806,7 +808,10 @@ class _MessageListViewState extends State<MessageListView> {
       onSpeak: message.role == 'assistant'
           ? () => widget.onSpeakMessage?.call(message)
           : null,
-      onEdit: (message.role == 'user' || message.role == 'assistant')
+      onEdit:
+          (message.role == 'assistant' ||
+              (message.role == 'user' &&
+                  message.id == widget.editableUserMessageId))
           ? () => widget.onEditMessage?.call(message)
           : null,
       onDelete: message.role == 'user'

@@ -37,12 +37,16 @@ class ChatInputBarController {
   }
 
   bool get allowImagesApiRouting => _state?._allowImagesApiRouting ?? true;
+  bool get hasDraftMedia => _state?._hasDraftMedia ?? false;
 
   void addImages(List<String> paths) => _state?._addImages(paths);
   void clearImages() => _state?._clearImages();
   void addFiles(List<DocumentAttachment> docs) => _state?._addFiles(docs);
   void clearFiles() => _state?._clearFiles();
   void restoreInput(ChatInputData input) => _state?._restoreInput(input);
+  ChatInputData snapshotInput(String text) =>
+      _state?._snapshotInput(text) ?? ChatInputData(text: text.trim());
+  void clearDraft() => _state?._clearDraft();
 }
 
 class ChatInputBar extends StatefulWidget {
@@ -93,6 +97,7 @@ class ChatInputBar extends StatefulWidget {
     this.ocrActive = false,
     this.onToggleOcr,
     this.conversationId,
+    this.sendButtonTooltip,
     this.backgroundImageActive = false,
   });
 
@@ -141,6 +146,7 @@ class ChatInputBar extends StatefulWidget {
   final bool ocrActive;
   final VoidCallback? onToggleOcr;
   final String? conversationId;
+  final String? sendButtonTooltip;
   final bool backgroundImageActive;
 
   @override
@@ -209,6 +215,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     return key == null || key != _dismissedImageModeModelKey;
   }
 
+  bool get _hasDraftMedia => _images.isNotEmpty || _docs.isNotEmpty;
+
   // Instance method for onChanged to avoid recreating the callback on every build
   void _onTextChanged(String _) => setState(() {});
 
@@ -238,6 +246,23 @@ class _ChatInputBarState extends State<ChatInputBar>
       _docs
         ..clear()
         ..addAll(input.documents);
+    });
+  }
+
+  ChatInputData _snapshotInput(String text) {
+    return ChatInputData(
+      text: text.trim(),
+      imagePaths: List<String>.of(_images),
+      documents: List<DocumentAttachment>.of(_docs),
+      allowImagesApiRouting: _allowImagesApiRouting,
+    );
+  }
+
+  void _clearDraft() {
+    setState(() {
+      _controller.clear();
+      _images.clear();
+      _docs.clear();
     });
   }
 
@@ -1904,6 +1929,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                           : null,
                                       color: theme.colorScheme.primary,
                                       icon: Lucide.ArrowUp,
+                                      tooltip: widget.sendButtonTooltip,
                                     ),
                                   ],
                                 ),
@@ -2232,6 +2258,7 @@ class _CompactSendButton extends StatelessWidget {
     required this.icon,
     this.loading = false,
     this.onStop,
+    this.tooltip,
   });
 
   final bool enabled;
@@ -2240,6 +2267,7 @@ class _CompactSendButton extends StatelessWidget {
   final VoidCallback? onStop;
   final Color color;
   final IconData icon;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -2253,7 +2281,7 @@ class _CompactSendButton extends StatelessWidget {
         ? (isDark ? Colors.black : Colors.white)
         : (isDark ? Colors.white70 : Colors.grey.shade600);
 
-    return Material(
+    final button = Material(
       color: bg,
       shape: const CircleBorder(),
       child: InkWell(
@@ -2279,6 +2307,12 @@ class _CompactSendButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+    if (tooltip == null) return button;
+    return Tooltip(
+      message: tooltip!,
+      waitDuration: const Duration(milliseconds: 350),
+      child: Semantics(tooltip: tooltip!, child: button),
     );
   }
 }
