@@ -14,6 +14,8 @@ void main() {
 
   Widget buildHarness({
     required bool visible,
+    String previewText = 'original prompt',
+    double bottomInset = 88,
     VoidCallback? onCancel,
     VoidCallback? onSaveOnly,
     VoidCallback? onPreviewTap,
@@ -29,9 +31,9 @@ void main() {
             children: [
               UserMessageEditOverlay(
                 visible: visible,
-                previewText: 'original prompt',
+                previewText: previewText,
                 topInset: 56,
-                bottomInset: 88,
+                bottomInset: bottomInset,
                 onCancel: onCancel ?? () {},
                 onSaveOnly: onSaveOnly ?? () {},
                 onPreviewTap: onPreviewTap ?? () {},
@@ -123,5 +125,20 @@ void main() {
     await tester.pump();
 
     expect(cancelled, 0);
+  });
+
+  testWidgets('long preview fits when expanded input leaves little height', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      buildHarness(
+        visible: true,
+        bottomInset: 394,
+        previewText: List.filled(24, 'long original prompt').join(' '),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Save Only'), findsOneWidget);
   });
 }

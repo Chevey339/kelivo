@@ -75,75 +75,111 @@ class UserMessageEditOverlay extends StatelessWidget {
                 top: topInset,
                 right: 0,
                 bottom: 0,
-                child: Column(
-                  children: [
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 10, right: 18),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IosCardPress(
-                              onTap: onSaveOnly,
-                              borderRadius: BorderRadius.circular(18),
-                              baseColor: cs.primary.withValues(
-                                alpha: isDark ? 0.18 : 0.12,
-                              ),
-                              pressedBlendStrength: isDark ? 0.18 : 0.12,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 13,
-                                vertical: 8,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Lucide.Check,
-                                    size: 16,
-                                    color: cs.primary,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    l10n.userMessageEditSaveOnly,
-                                    style: TextStyle(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const actionTop = 10.0;
+                    const actionRight = 18.0;
+                    const actionHeight = 36.0;
+                    const actionPreviewGap = 12.0;
+                    const previewLeft = 69.0;
+                    const previewRight = 24.0;
+                    const previewBottom = 14.0;
+                    const previewVerticalPadding = 20.0;
+                    const previewLineHeight = 21.75;
+                    const minPreviewHeight = 44.0;
+
+                    final availablePreviewHeight =
+                        constraints.maxHeight -
+                        actionTop -
+                        actionHeight -
+                        actionPreviewGap -
+                        previewBottom;
+                    var previewMaxLines =
+                        ((availablePreviewHeight - previewVerticalPadding) /
+                                previewLineHeight)
+                            .floor();
+                    if (previewMaxLines < 1) {
+                      previewMaxLines = 1;
+                    } else if (previewMaxLines > 6) {
+                      previewMaxLines = 6;
+                    }
+                    final showPreview =
+                        previewText.trim().isNotEmpty &&
+                        availablePreviewHeight >= minPreviewHeight;
+
+                    return Stack(
+                      clipBehavior: Clip.hardEdge,
+                      children: [
+                        Positioned(
+                          top: actionTop,
+                          right: actionRight,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IosCardPress(
+                                onTap: onSaveOnly,
+                                borderRadius: BorderRadius.circular(18),
+                                baseColor: cs.primary.withValues(
+                                  alpha: isDark ? 0.18 : 0.12,
+                                ),
+                                pressedBlendStrength: isDark ? 0.18 : 0.12,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 13,
+                                  vertical: 8,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Lucide.Check,
+                                      size: 16,
                                       color: cs.primary,
-                                      fontSize: 13,
-                                      fontWeight: AppFontWeights.semibold,
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      l10n.userMessageEditSaveOnly,
+                                      style: TextStyle(
+                                        color: cs.primary,
+                                        fontSize: 13,
+                                        fontWeight: AppFontWeights.semibold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IosCardPress(
+                                onTap: onCancel,
+                                borderRadius: BorderRadius.circular(18),
+                                baseColor: cs.surface.withValues(alpha: 0.56),
+                                pressedBlendStrength: isDark ? 0.18 : 0.10,
+                                padding: const EdgeInsets.all(8),
+                                child: Icon(
+                                  Lucide.X,
+                                  size: 18,
+                                  color: cs.onSurface.withValues(alpha: 0.78),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (showPreview)
+                          Positioned(
+                            left: previewLeft,
+                            right: previewRight,
+                            bottom: previewBottom,
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: _PreviewBubble(
+                                text: previewText,
+                                maxLines: previewMaxLines,
+                                onTap: onPreviewTap,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            IosCardPress(
-                              onTap: onCancel,
-                              borderRadius: BorderRadius.circular(18),
-                              baseColor: cs.surface.withValues(alpha: 0.56),
-                              pressedBlendStrength: isDark ? 0.18 : 0.10,
-                              padding: const EdgeInsets.all(8),
-                              child: Icon(
-                                Lucide.X,
-                                size: 18,
-                                color: cs.onSurface.withValues(alpha: 0.78),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(69, 40, 24, 14),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: _PreviewBubble(
-                          text: previewText,
-                          onTap: onPreviewTap,
-                        ),
-                      ),
-                    ),
-                  ],
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -155,9 +191,14 @@ class UserMessageEditOverlay extends StatelessWidget {
 }
 
 class _PreviewBubble extends StatelessWidget {
-  const _PreviewBubble({required this.text, required this.onTap});
+  const _PreviewBubble({
+    required this.text,
+    required this.maxLines,
+    required this.onTap,
+  });
 
   final String text;
+  final int maxLines;
   final VoidCallback onTap;
 
   @override
@@ -186,7 +227,7 @@ class _PreviewBubble extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Text(
           text,
-          maxLines: 6,
+          maxLines: maxLines,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: cs.onSurface,
