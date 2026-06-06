@@ -1158,7 +1158,6 @@ class _HomePageState extends State<HomePage>
         onVersionChange: (groupId, version) async {
           await _controller.setSelectedVersion(groupId, version);
         },
-        editableUserMessageId: _controller.editableUserMessageId,
         onRegenerateMessage: (message) =>
             _controller.regenerateAtMessage(message),
         onResendMessage: (message) => _controller.regenerateAtMessage(message),

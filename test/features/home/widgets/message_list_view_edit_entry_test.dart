@@ -21,71 +21,67 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets(
-    'only the latest user message exposes edit from long press menu',
-    (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      try {
-        final editedMessages = <String>[];
-        final messages = <ChatMessage>[
-          ChatMessage(
-            id: 'user-old',
-            role: 'user',
-            content: 'old question',
-            conversationId: 'conversation-1',
-          ),
-          ChatMessage(
-            id: 'assistant-answer',
-            role: 'assistant',
-            content: 'answer',
-            conversationId: 'conversation-1',
-          ),
-          ChatMessage(
-            id: 'user-latest',
-            role: 'user',
-            content: 'latest question',
-            conversationId: 'conversation-1',
-          ),
-        ];
+  testWidgets('all user messages expose edit from long press menu', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      final editedMessages = <String>[];
+      final messages = <ChatMessage>[
+        ChatMessage(
+          id: 'user-old',
+          role: 'user',
+          content: 'old question',
+          conversationId: 'conversation-1',
+        ),
+        ChatMessage(
+          id: 'assistant-answer',
+          role: 'assistant',
+          content: 'answer',
+          conversationId: 'conversation-1',
+        ),
+        ChatMessage(
+          id: 'user-latest',
+          role: 'user',
+          content: 'latest question',
+          conversationId: 'conversation-1',
+        ),
+      ];
 
-        await tester.pumpWidget(
-          _MessageListHarness(
-            messages: messages,
-            editableUserMessageId: 'user-latest',
-            onEditMessage: (message) => editedMessages.add(message.id),
-          ),
-        );
+      await tester.pumpWidget(
+        _MessageListHarness(
+          messages: messages,
+          onEditMessage: (message) => editedMessages.add(message.id),
+        ),
+      );
 
-        await tester.longPress(find.text('old question'));
-        await tester.pumpAndSettle();
-        expect(find.text('Edit'), findsNothing);
-        await tester.tapAt(const Offset(8, 8));
-        await tester.pumpAndSettle();
+      await tester.longPress(find.text('old question'));
+      await tester.pumpAndSettle();
+      expect(find.text('Edit'), findsOneWidget);
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
 
-        await tester.longPress(find.text('latest question'));
-        await tester.pumpAndSettle();
-        expect(find.text('Edit'), findsOneWidget);
+      await tester.longPress(find.text('latest question'));
+      await tester.pumpAndSettle();
+      expect(find.text('Edit'), findsOneWidget);
 
-        await tester.tap(find.text('Edit'));
-        await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
 
-        expect(editedMessages, <String>['user-latest']);
-      } finally {
-        debugDefaultTargetPlatformOverride = null;
-      }
-    },
-  );
+      expect(editedMessages, <String>['user-old', 'user-latest']);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 }
 
 class _MessageListHarness extends StatefulWidget {
   const _MessageListHarness({
     required this.messages,
-    required this.editableUserMessageId,
     required this.onEditMessage,
   });
 
   final List<ChatMessage> messages;
-  final String? editableUserMessageId;
   final ValueChanged<ChatMessage> onEditMessage;
 
   @override
@@ -143,7 +139,6 @@ class _MessageListHarnessState extends State<_MessageListHarness> {
             selectedItems: const {},
             dividerPadding: EdgeInsets.zero,
             isProcessingFiles: isProcessingFiles,
-            editableUserMessageId: widget.editableUserMessageId,
             onEditMessage: widget.onEditMessage,
           ),
         ),

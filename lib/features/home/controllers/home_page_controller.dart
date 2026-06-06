@@ -232,15 +232,6 @@ class HomePageController extends ChangeNotifier {
   int get spotlightToken => _spotlightToken;
   UserMessageEditState? get userMessageEditState => _userMessageEditState;
   bool get isUserMessageEditActive => _userMessageEditState != null;
-  String? get editableUserMessageId {
-    final allMessages = _chatController
-        .allCollapsedMessagesForCurrentConversation();
-    for (int i = allMessages.length - 1; i >= 0; i--) {
-      final message = allMessages[i];
-      if (message.role == 'user') return message.id;
-    }
-    return null;
-  }
 
   static double get sidebarMinWidth => _sidebarMinWidth;
   static double get sidebarMaxWidth => _sidebarMaxWidth;
@@ -347,7 +338,7 @@ class HomePageController extends ChangeNotifier {
     _fileUploadService = FileUploadService(
       getContext: () => _context,
       mediaController: _mediaController,
-      onScrollToBottom: () => _scrollToBottomSoon(),
+      onScrollToBottom: _scrollToBottomAfterFileUpload,
     );
     _messageBuilderService = MessageBuilderService(
       chatService: _chatService,
@@ -1011,7 +1002,7 @@ class HomePageController extends ChangeNotifier {
   Future<void> startUserMessageEdit(ChatMessage message) async {
     final ctx = _context;
     if (!ctx.mounted) return;
-    if (message.role != 'user' || message.id != editableUserMessageId) {
+    if (message.role != 'user') {
       final l10n = AppLocalizations.of(ctx)!;
       showAppSnackBar(
         ctx,
@@ -1075,7 +1066,6 @@ class HomePageController extends ChangeNotifier {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_context.mounted) return;
       _inputFocus.requestFocus();
-      _scrollToBottomSoon(animate: false);
     });
   }
 
@@ -1773,6 +1763,11 @@ class HomePageController extends ChangeNotifier {
   Future<void> onPickFiles() => _fileUploadService.onPickFiles();
   Future<void> onFilesDroppedDesktop(List<XFile> files) =>
       _fileUploadService.onFilesDroppedDesktop(files);
+
+  void _scrollToBottomAfterFileUpload() {
+    if (_userMessageEditState != null) return;
+    _scrollToBottomSoon();
+  }
 
   // ============================================================================
   // Public Methods - Scroll
