@@ -1052,6 +1052,7 @@ class HomePageController extends ChangeNotifier {
 
   void _enterUserMessageEdit(ChatMessage message) {
     final input = _messageBuilderService.parseInputFromRaw(message.content);
+    final messageId = message.id;
     _inputController.value = TextEditingValue(
       text: input.text,
       selection: TextSelection.collapsed(offset: input.text.length),
@@ -1065,6 +1066,7 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_context.mounted) return;
+      if (_userMessageEditState?.messageId != messageId) return;
       _inputFocus.requestFocus();
     });
   }
@@ -1076,6 +1078,9 @@ class HomePageController extends ChangeNotifier {
       _mediaController.clearDraft();
     }
     notifyListeners();
+    if (PlatformUtils.isMobileTarget) {
+      dismissKeyboard();
+    }
   }
 
   Future<ChatMessage?> _saveEditedUserMessageVersion(
