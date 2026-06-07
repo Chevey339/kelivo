@@ -1050,7 +1050,10 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _enterUserMessageEdit(ChatMessage message) {
-    final input = _messageBuilderService.parseInputFromRaw(message.content);
+    final input = _messageBuilderService.parseInputFromRaw(
+      message.content,
+      includeMediaFilePathsAsImages: false,
+    );
     final messageId = message.id;
     _inputController.value = TextEditingValue(
       text: input.text,

@@ -52,6 +52,50 @@ ChatMessage _message({
 }
 
 void main() {
+  group('MessageBuilderService.parseInputFromRaw', () {
+    test('默认将视频和音频文件路径纳入媒体路径供 API 使用', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+
+      final input = service.parseInputFromRaw(
+        'media\n'
+        '[file:C:/tmp/clip.mp4|clip.mp4|video/mp4]\n'
+        '[file:C:/tmp/audio.wav|audio.wav|audio/wav]',
+      );
+
+      expect(input.text, 'media');
+      expect(input.imagePaths, ['C:/tmp/clip.mp4', 'C:/tmp/audio.wav']);
+      expect(input.documents.map((document) => document.fileName), [
+        'clip.mp4',
+        'audio.wav',
+      ]);
+    });
+
+    test('编辑恢复草稿时不把视频和音频文件伪装成图片', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+
+      final input = service.parseInputFromRaw(
+        'media\n'
+        '[image:C:/tmp/photo.png]\n'
+        '[file:C:/tmp/clip.mp4|clip.mp4|video/mp4]\n'
+        '[file:C:/tmp/audio.wav|audio.wav|audio/wav]',
+        includeMediaFilePathsAsImages: false,
+      );
+
+      expect(input.text, 'media');
+      expect(input.imagePaths, ['C:/tmp/photo.png']);
+      expect(input.documents.map((document) => document.fileName), [
+        'clip.mp4',
+        'audio.wav',
+      ]);
+    });
+  });
+
   group('MessageBuilderService.buildApiMessages', () {
     test('有工具调用时会把 reasoning_content 回填到 assistant tool 消息', () {
       final service = MessageBuilderService(

@@ -254,7 +254,10 @@ class MessageBuilderService {
   }
 
   /// Parse input data from raw message content (extracts images and documents).
-  ChatInputData parseInputFromRaw(String raw) {
+  ChatInputData parseInputFromRaw(
+    String raw, {
+    bool includeMediaFilePathsAsImages = true,
+  }) {
     final imgRe = RegExp(r"\[image:(.+?)\]");
     final fileRe = RegExp(r"\[file:(.+?)\|(.+?)\|(.+?)\]");
     final images = <String>[];
@@ -278,7 +281,8 @@ class MessageBuilderService {
         docs.add(doc);
         // Treat media attachments as image-style attachments for downstream API builders.
         final effectiveMime = _effectiveAttachmentMime(doc);
-        if ((isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) &&
+        if (includeMediaFilePathsAsImages &&
+            (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) &&
             path.isNotEmpty) {
           images.add(path);
         }
