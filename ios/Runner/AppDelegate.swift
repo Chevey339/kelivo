@@ -8,7 +8,7 @@ private let backgroundRefreshIdentifier = "psyche.kelivo.background-generation.r
 private let backgroundProcessingIdentifier = "psyche.kelivo.background-generation.processing"
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private let fileSaveHandler = NativeFileSaveHandler()
   private let backgroundGenerationHandler = IosBackgroundGenerationHandler()
 
@@ -16,52 +16,59 @@ private let backgroundProcessingIdentifier = "psyche.kelivo.background-generatio
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    GeneratedPluginRegistrant.register(with: self)
     backgroundGenerationHandler.registerBackgroundTasks()
-    if let controller = window?.rootViewController as? FlutterViewController {
-      let clipboardChannel = FlutterMethodChannel(name: "app.clipboard", binaryMessenger: controller.binaryMessenger)
-      clipboardChannel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
-        if call.method == "getClipboardImages" {
-          var paths: [String] = []
-          if let image = UIPasteboard.general.image {
-            if let data = image.pngData() ?? image.jpegData(compressionQuality: 0.95) {
-              let tmp = NSTemporaryDirectory()
-              let filename = "pasted_\(Int(Date().timeIntervalSince1970 * 1000)).png"
-              let url = URL(fileURLWithPath: tmp).appendingPathComponent(filename)
-              do {
-                try data.write(to: url)
-                paths.append(url.path)
-              } catch {
-                // ignore write error
-              }
-            }
-          }
-          result(paths)
-        } else {
-          result(FlutterMethodNotImplemented)
-        }
-      }
-
-      let fileSaveChannel = FlutterMethodChannel(name: "app.file_save", binaryMessenger: controller.binaryMessenger)
-      fileSaveHandler.presentingViewController = controller
-      fileSaveChannel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
-        guard call.method == "saveFileFromPath" else {
-          result(FlutterMethodNotImplemented)
-          return
-        }
-        self?.fileSaveHandler.handle(call: call, result: result)
-      }
-
-      let iosBackgroundChannel = FlutterMethodChannel(name: "app.ios_background_generation", binaryMessenger: controller.binaryMessenger)
-      iosBackgroundChannel.setMethodCallHandler { [weak self] call, result in
-        self?.backgroundGenerationHandler.handle(call: call, result: result)
-      }
-    }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
-  override func applicationDidBecomeActive(_ application: UIApplication) {
-    super.applicationDidBecomeActive(application)
+  // Under the UIScene lifecycle the root FlutterViewController is no longer
+  // available during `didFinishLaunchingWithOptions`. Plugin registration and
+  // method channel setup must happen here, against the implicit engine bridge.
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+
+    let messenger = engineBridge.applicationRegistrar.messenger()
+
+    let clipboardChannel = FlutterMethodChannel(name: "app.clipboard", binaryMessenger: messenger)
+    clipboardChannel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
+      if call.method == "getClipboardImages" {
+        var paths: [String] = []
+        if let image = UIPasteboard.general.image {
+          if let data = image.pngData() ?? image.jpegData(compressionQuality: 0.95) {
+            let tmp = NSTemporaryDirectory()
+            let filename = "pasted_\(Int(Date().timeIntervalSince1970 * 1000)).png"
+            let url = URL(fileURLWithPath: tmp).appendingPathComponent(filename)
+            do {
+              try data.write(to: url)
+              paths.append(url.path)
+            } catch {
+              // ignore write error
+            }
+          }
+        }
+        result(paths)
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
+    let fileSaveChannel = FlutterMethodChannel(name: "app.file_save", binaryMessenger: messenger)
+    fileSaveChannel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
+      guard call.method == "saveFileFromPath" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      self?.fileSaveHandler.handle(call: call, result: result)
+    }
+
+    let iosBackgroundChannel = FlutterMethodChannel(name: "app.ios_background_generation", binaryMessenger: messenger)
+    iosBackgroundChannel.setMethodCallHandler { [weak self] call, result in
+      self?.backgroundGenerationHandler.handle(call: call, result: result)
+    }
+  }
+
+  // Invoked by SceneDelegate.sceneDidBecomeActive since UIKit no longer calls
+  // applicationDidBecomeActive once the UIScene lifecycle is adopted.
+  func handleSceneDidBecomeActive() {
     backgroundGenerationHandler.dismissFinishedLiveActivityIfNeeded()
   }
 }
@@ -462,7 +469,6 @@ private final class IosBackgroundGenerationHandler {
 }
 
 private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
-  weak var presentingViewController: UIViewController?
   private var pendingResult: FlutterResult?
 
   func handle(call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -488,7 +494,7 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
       return
     }
 
-    guard let presenter = topViewController(from: presentingViewController) else {
+    guard let presenter = topViewController(from: activeRootViewController()) else {
       result(FlutterError(code: "unavailable", message: "Unable to present document picker.", details: nil))
       return
     }
@@ -533,6 +539,25 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
     let result = pendingResult
     pendingResult = nil
     result?(value)
+  }
+
+  private func activeRootViewController() -> UIViewController? {
+    let scenes = UIApplication.shared.connectedScenes
+    for scene in scenes {
+      guard let windowScene = scene as? UIWindowScene,
+            windowScene.activationState == .foregroundActive else { continue }
+      let window = windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first
+      if let root = window?.rootViewController {
+        return root
+      }
+    }
+    for scene in scenes {
+      if let windowScene = scene as? UIWindowScene,
+         let root = windowScene.windows.first?.rootViewController {
+        return root
+      }
+    }
+    return nil
   }
 
   private func topViewController(from controller: UIViewController?) -> UIViewController? {
