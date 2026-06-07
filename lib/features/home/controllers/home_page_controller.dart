@@ -338,7 +338,6 @@ class HomePageController extends ChangeNotifier {
     _fileUploadService = FileUploadService(
       getContext: () => _context,
       mediaController: _mediaController,
-      onScrollToBottom: _scrollToBottomAfterFileUpload,
     );
     _messageBuilderService = MessageBuilderService(
       chatService: _chatService,
@@ -1768,11 +1767,6 @@ class HomePageController extends ChangeNotifier {
   Future<void> onPickFiles() => _fileUploadService.onPickFiles();
   Future<void> onFilesDroppedDesktop(List<XFile> files) =>
       _fileUploadService.onFilesDroppedDesktop(files);
-
-  void _scrollToBottomAfterFileUpload() {
-    if (_userMessageEditState != null) return;
-    _scrollToBottomSoon();
-  }
 
   // ============================================================================
   // Public Methods - Scroll

@@ -166,6 +166,9 @@ class _ChatInputBarState extends State<ChatInputBar>
   final GlobalKey _contextMgmtAnchorKey = GlobalKey(
     debugLabel: 'context-mgmt-anchor',
   );
+  static const double _documentPreviewHeight = 48;
+  static const double _imagePreviewHeight = 64;
+  static const double _imageRemoveButtonSize = 18;
   // Suppress context menu briefly after app resume to avoid flickering
   bool _suppressContextMenu = false;
   bool _isSubmitting = false;
@@ -270,6 +273,18 @@ class _ChatInputBarState extends State<ChatInputBar>
       final f = File(path);
       if (await f.exists()) {
         await f.delete();
+      }
+    } catch (_) {}
+  }
+
+  void _removeDocumentAt(int index) {
+    final path = _docs[index].path;
+    setState(() => _docs.removeAt(index));
+    // best-effort delete persisted attachment
+    try {
+      final f = File(path);
+      if (f.existsSync()) {
+        f.deleteSync();
       }
     } catch (_) {}
   }
@@ -1473,6 +1488,155 @@ class _ChatInputBarState extends State<ChatInputBar>
     setState(() {});
   }
 
+  Widget _buildInlineAttachmentPreviews(BuildContext context, bool isDark) {
+    final theme = Theme.of(context);
+    final previewFill = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : theme.colorScheme.onSurface.withValues(alpha: 0.045);
+    final previewBorder = isDark
+        ? Colors.white.withValues(alpha: 0.10)
+        : theme.colorScheme.outline.withValues(alpha: 0.13);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.sm,
+        AppSpacing.sm,
+        AppSpacing.sm,
+        AppSpacing.xxs,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_docs.isNotEmpty) ...[
+            SizedBox(
+              height: _documentPreviewHeight,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _docs.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, idx) {
+                  final d = _docs[idx];
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: previewFill,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: previewBorder, width: 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.insert_drive_file,
+                          size: 18,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.72,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 180),
+                          child: Text(
+                            d.fileName,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurface,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: () => _removeDocumentAt(idx),
+                          child: Icon(
+                            Icons.close,
+                            size: 16,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.58,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
+          if (_images.isNotEmpty)
+            SizedBox(
+              height: _imagePreviewHeight,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _images.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, idx) {
+                  final path = _images[idx];
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: previewBorder, width: 1),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(9),
+                          child: Image.file(
+                            File(path),
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 64,
+                              height: 64,
+                              color: previewFill,
+                              child: Icon(
+                                Icons.broken_image,
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.45,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 4,
+                        top: 4,
+                        child: GestureDetector(
+                          onTap: () => _removeImageAt(idx),
+                          child: Container(
+                            width: _imageRemoveButtonSize,
+                            height: _imageRemoveButtonSize,
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.black.withValues(alpha: 0.50)
+                                  : Colors.black.withValues(alpha: 0.46),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              size: 11,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1501,14 +1665,17 @@ class _ChatInputBarState extends State<ChatInputBar>
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final bool isMobileLayout = size.width < AppBreakpoints.tablet;
     final double visibleHeight = size.height - viewInsets.bottom;
-    final double attachmentsHeight =
-        (hasDocs ? 48 + AppSpacing.xs : 0) +
-        (hasImages ? 64 + AppSpacing.xs : 0);
+    final double attachmentPreviewHeight = (hasDocs || hasImages)
+        ? AppSpacing.sm +
+              (hasDocs ? _documentPreviewHeight + AppSpacing.xs : 0) +
+              (hasImages ? _imagePreviewHeight : 0) +
+              AppSpacing.xxs
+        : 0;
     const double baseChromeHeight = 120; // padding + action row + chrome buffer
     double maxInputHeight = double.infinity;
     if (isMobileLayout) {
       final double available =
-          visibleHeight - attachmentsHeight - baseChromeHeight;
+          visibleHeight - attachmentPreviewHeight - baseChromeHeight;
       final double softCap = visibleHeight * 0.45;
       if (available > 0) {
         maxInputHeight = math.min(softCap, available);
@@ -1549,118 +1716,6 @@ class _ChatInputBarState extends State<ChatInputBar>
               ),
               const SizedBox(height: AppSpacing.xs),
             ],
-            // File attachments (if any)
-            if (hasDocs) ...[
-              SizedBox(
-                height: 48,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _docs.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, idx) {
-                    final d = _docs[idx];
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.white12
-                            : theme.colorScheme.surface,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: isDark ? [] : AppShadows.soft,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.insert_drive_file, size: 18),
-                          const SizedBox(width: 6),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 180),
-                            child: Text(
-                              d.fileName,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          GestureDetector(
-                            onTap: () {
-                              setState(() => _docs.removeAt(idx));
-                              // best-effort delete persisted attachment
-                              try {
-                                final f = File(d.path);
-                                if (f.existsSync()) {
-                                  f.deleteSync();
-                                }
-                              } catch (_) {}
-                            },
-                            child: const Icon(Icons.close, size: 16),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-            ],
-            // Image previews (if any)
-            if (hasImages) ...[
-              SizedBox(
-                height: 64,
-                child: ListView.separated(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _images.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, idx) {
-                    final path = _images[idx];
-                    return Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.file(
-                            File(path),
-                            width: 64,
-                            height: 64,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              width: 64,
-                              height: 64,
-                              color: Colors.black12,
-                              child: const Icon(Icons.broken_image),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          right: -6,
-                          top: -6,
-                          child: GestureDetector(
-                            onTap: () => _removeImageAt(idx),
-                            child: Container(
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.6),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                size: 14,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-            ],
             Stack(
               clipBehavior: Clip.none,
               children: [
@@ -1686,6 +1741,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                       ),
                       child: Column(
                         children: [
+                          if (hasDocs || hasImages)
+                            _buildInlineAttachmentPreviews(context, isDark),
                           // Input field with expand/collapse button
                           Stack(
                             children: [

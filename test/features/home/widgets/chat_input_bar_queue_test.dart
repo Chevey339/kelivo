@@ -352,6 +352,57 @@ void main() {
     focusNode.dispose();
   });
 
+  testWidgets('图片和文件预览显示在主输入框内部顶部', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+      ),
+    );
+
+    mediaController
+      ..addFiles(const [
+        DocumentAttachment(
+          path: '/tmp/draft.pdf',
+          fileName: 'draft.pdf',
+          mime: 'application/pdf',
+        ),
+      ])
+      ..addImages(['missing-draft-image.png']);
+    await tester.pump();
+
+    final surfaceFinder = _mainInputSurfaceFinder();
+    expect(surfaceFinder, findsOneWidget);
+    expect(
+      find.descendant(of: surfaceFinder, matching: find.text('draft.pdf')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: surfaceFinder, matching: find.byType(Image)),
+      findsOneWidget,
+    );
+    final imageRect = tester.getRect(find.byType(Image));
+    final removeButtonRect = tester.getRect(
+      find.ancestor(
+        of: find.byIcon(Icons.close).last,
+        matching: find.byType(GestureDetector),
+      ),
+    );
+    expect(imageRect.contains(removeButtonRect.topLeft), isTrue);
+    expect(imageRect.contains(removeButtonRect.bottomRight), isTrue);
+    expect(removeButtonRect.width, lessThan(22));
+    expect(removeButtonRect.height, lessThan(22));
+
+    controller.dispose();
+    focusNode.dispose();
+  });
+
   testWidgets('输入框外层底部留白只下移一点', (tester) async {
     final controller = TextEditingController();
     final focusNode = FocusNode();
@@ -383,14 +434,21 @@ Future<void> tapSendButton(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Finder _mainInputSurfaceFinder() {
+  return find.byWidgetPredicate(
+    (widget) =>
+        widget is Container &&
+        widget.decoration is BoxDecoration &&
+        (widget.decoration! as BoxDecoration).borderRadius ==
+            BorderRadius.circular(20),
+  );
+}
+
 BoxDecoration _mainInputDecoration(WidgetTester tester) {
   final candidates = tester
-      .widgetList<Container>(find.byType(Container))
+      .widgetList<Container>(_mainInputSurfaceFinder())
       .map((widget) => widget.decoration)
       .whereType<BoxDecoration>()
-      .where(
-        (decoration) => decoration.borderRadius == BorderRadius.circular(20),
-      )
       .toList();
 
   expect(candidates, hasLength(1));

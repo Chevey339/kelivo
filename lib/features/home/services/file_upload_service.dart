@@ -24,20 +24,13 @@ import '../widgets/chat_input_bar.dart';
 /// - 桌面拖放处理
 /// - 文件复制到应用目录
 class FileUploadService {
-  FileUploadService({
-    required this._getContext,
-    required this.mediaController,
-    required this.onScrollToBottom,
-  });
+  FileUploadService({required this.getContext, required this.mediaController});
 
   /// 媒体控制器，用于添加图片和文件到输入栏
   final ChatInputBarController mediaController;
 
   /// Context provider callback to avoid storing stale context
-  final BuildContext Function() _getContext;
-
-  /// 滚动到底部的回调
-  final VoidCallback onScrollToBottom;
+  final BuildContext Function() getContext;
 
   static const String _imageCropperEnabledKey = 'image_cropper_enabled_v1';
 
@@ -48,7 +41,7 @@ class FileUploadService {
   Future<List<String>> copyPickedFiles(List<XFile> files) async {
     final dir = await AppDirectories.getUploadDirectory();
     final out = <String>[];
-    final context = _getContext();
+    final context = getContext();
     if (!context.mounted) return out;
     for (final f in files) {
       final savedPath = await FileImportHelper.copyXFile(f, dir, context);
@@ -91,7 +84,6 @@ class FileUploadService {
         final paths = await copyPickedFiles(croppedFiles);
         if (paths.isNotEmpty) {
           mediaController.addImages(paths);
-          onScrollToBottom();
         }
         return;
       }
@@ -104,7 +96,6 @@ class FileUploadService {
       final paths = await copyPickedFiles(croppedFiles);
       if (paths.isNotEmpty) {
         mediaController.addImages(paths);
-        onScrollToBottom();
       }
     } catch (_) {}
   }
@@ -148,7 +139,6 @@ class FileUploadService {
       if (paths.isNotEmpty) {
         if (!context.mounted) return;
         mediaController.addImages(paths);
-        onScrollToBottom();
       }
     } catch (e) {
       try {
@@ -169,7 +159,7 @@ class FileUploadService {
     final enabled = prefs.getBool(_imageCropperEnabledKey) ?? false;
     if (!enabled) return files;
 
-    final context = _getContext();
+    final context = getContext();
     if (!context.mounted) return files;
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
@@ -321,9 +311,6 @@ class FileUploadService {
       if (docs.isNotEmpty) {
         mediaController.addFiles(docs);
       }
-      if (images.isNotEmpty || docs.isNotEmpty) {
-        onScrollToBottom();
-      }
     } catch (_) {}
   }
 
@@ -366,7 +353,6 @@ class FileUploadService {
       }
       if (images.isNotEmpty) mediaController.addImages(images);
       if (docs.isNotEmpty) mediaController.addFiles(docs);
-      if (images.isNotEmpty || docs.isNotEmpty) onScrollToBottom();
     } catch (_) {}
   }
 }
