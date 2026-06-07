@@ -1507,68 +1507,9 @@ class _ChatInputBarState extends State<ChatInputBar>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (_docs.isNotEmpty) ...[
-            SizedBox(
-              height: _documentPreviewHeight,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _docs.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, idx) {
-                  final d = _docs[idx];
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: previewFill,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: previewBorder, width: 1),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.insert_drive_file,
-                          size: 18,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.72,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 180),
-                          child: Text(
-                            d.fileName,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: theme.colorScheme.onSurface,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        GestureDetector(
-                          onTap: () => _removeDocumentAt(idx),
-                          child: Icon(
-                            Icons.close,
-                            size: 16,
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.58,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-          ],
           if (_images.isNotEmpty)
             SizedBox(
+              key: const ValueKey('chat-input-image-previews'),
               height: _imagePreviewHeight,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
@@ -1608,18 +1549,23 @@ class _ChatInputBarState extends State<ChatInputBar>
                       Positioned(
                         right: 4,
                         top: 4,
-                        child: GestureDetector(
+                        child: IosCardPress(
+                          key: ValueKey('chat-input-image-remove:$idx'),
+                          haptics: false,
+                          baseColor: isDark
+                              ? Colors.black.withValues(alpha: 0.50)
+                              : Colors.black.withValues(alpha: 0.46),
+                          pressedScale: 0.94,
+                          borderRadius: BorderRadius.circular(
+                            _imageRemoveButtonSize / 2,
+                          ),
+                          padding: EdgeInsets.zero,
+                          duration: const Duration(milliseconds: 140),
                           onTap: () => _removeImageAt(idx),
-                          child: Container(
+                          child: const SizedBox(
                             width: _imageRemoveButtonSize,
                             height: _imageRemoveButtonSize,
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.black.withValues(alpha: 0.50)
-                                  : Colors.black.withValues(alpha: 0.46),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.close,
                               size: 11,
                               color: Colors.white,
@@ -1628,6 +1574,67 @@ class _ChatInputBarState extends State<ChatInputBar>
                         ),
                       ),
                     ],
+                  );
+                },
+              ),
+            ),
+          if (_images.isNotEmpty && _docs.isNotEmpty)
+            const SizedBox(height: AppSpacing.xs),
+          if (_docs.isNotEmpty)
+            SizedBox(
+              key: const ValueKey('chat-input-document-previews'),
+              height: _documentPreviewHeight,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _docs.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, idx) {
+                  final d = _docs[idx];
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: previewFill,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: previewBorder, width: 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.insert_drive_file,
+                          size: 18,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.72,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 180),
+                          child: Text(
+                            d.fileName,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurface,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        IosIconButton(
+                          key: ValueKey('chat-input-document-remove:$idx'),
+                          icon: Icons.close,
+                          size: 16,
+                          padding: const EdgeInsets.all(3),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.58,
+                          ),
+                          onTap: () => _removeDocumentAt(idx),
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),
@@ -1667,8 +1674,9 @@ class _ChatInputBarState extends State<ChatInputBar>
     final double visibleHeight = size.height - viewInsets.bottom;
     final double attachmentPreviewHeight = (hasDocs || hasImages)
         ? AppSpacing.sm +
-              (hasDocs ? _documentPreviewHeight + AppSpacing.xs : 0) +
               (hasImages ? _imagePreviewHeight : 0) +
+              (hasImages && hasDocs ? AppSpacing.xs : 0) +
+              (hasDocs ? _documentPreviewHeight : 0) +
               AppSpacing.xxs
         : 0;
     const double baseChromeHeight = 120; // padding + action row + chrome buffer

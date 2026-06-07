@@ -1293,6 +1293,21 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     );
     final showUserActions = settings.showUserMessageActions;
     final showVersionSwitcher = (widget.versionCount ?? 1) > 1;
+    final mediaPreview = _buildUserAttachmentPreview(
+      context,
+      parsed: parsed,
+      isDark: isDark,
+    );
+    final textBubble = visualText.isNotEmpty
+        ? Container(
+            key: ValueKey('user-message-text-bubble:${widget.message.id}'),
+            child: _buildBubbleContainer(
+              context: context,
+              isUser: true,
+              child: _buildUserTextContent(context, visualText, settings, cs),
+            ),
+          )
+        : null;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1360,237 +1375,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               constraints: BoxConstraints(
                 maxWidth: MediaQuery.sizeOf(context).width * 0.75,
               ),
-              child: _buildBubbleContainer(
-                context: context,
-                isUser: true,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (visualText.isNotEmpty)
-                      Builder(
-                        builder: (context) {
-                          final bool isDesktop =
-                              defaultTargetPlatform == TargetPlatform.macOS ||
-                              defaultTargetPlatform == TargetPlatform.windows ||
-                              defaultTargetPlatform == TargetPlatform.linux;
-                          final double baseUser = isDesktop ? 14.0 : 15.5;
-
-                          Widget content;
-                          if (settings.enableUserMarkdown) {
-                            content = DefaultTextStyle.merge(
-                              style: TextStyle(
-                                fontSize: baseUser,
-                                height: 1.45,
-                              ),
-                              child: MarkdownWithCodeHighlight(
-                                text: visualText,
-                                baseStyle: TextStyle(
-                                  fontSize: baseUser,
-                                  height: 1.45,
-                                ),
-                              ),
-                            );
-                          } else {
-                            content = Text(
-                              visualText,
-                              style: TextStyle(
-                                fontSize:
-                                    baseUser, // slightly smaller on desktop for readability
-                                height: 1.4,
-                                color: cs.onSurface,
-                              ),
-                            );
-                          }
-
-                          // Enable desktop selection/copy for user messages
-                          return isDesktop
-                              ? SelectionArea(
-                                  key: ValueKey('user_${widget.message.id}'),
-                                  child: content,
-                                )
-                              : content;
-                        },
-                      ),
-                    if (parsed.images.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Builder(
-                        builder: (context) {
-                          final imgs = parsed.images;
-                          return Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: imgs.asMap().entries.map((entry) {
-                              final idx = entry.key;
-                              final p = entry.value;
-                              return Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: () {
-                                    Navigator.of(context).push(
-                                      PageRouteBuilder(
-                                        pageBuilder: (_, __, ___) =>
-                                            ImageViewerPage(
-                                              images: imgs,
-                                              initialIndex: idx,
-                                            ),
-                                        transitionDuration: const Duration(
-                                          milliseconds: 360,
-                                        ),
-                                        reverseTransitionDuration:
-                                            const Duration(milliseconds: 280),
-                                        transitionsBuilder:
-                                            (context, anim, sec, child) {
-                                              final curved = CurvedAnimation(
-                                                parent: anim,
-                                                curve: Curves.easeOutCubic,
-                                                reverseCurve:
-                                                    Curves.easeInCubic,
-                                              );
-                                              return FadeTransition(
-                                                opacity: curved,
-                                                child: SlideTransition(
-                                                  position: Tween<Offset>(
-                                                    begin: const Offset(
-                                                      0,
-                                                      0.02,
-                                                    ), // subtle upward drift
-                                                    end: Offset.zero,
-                                                  ).animate(curved),
-                                                  child: child,
-                                                ),
-                                              );
-                                            },
-                                      ),
-                                    );
-                                  },
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Hero(
-                                      tag: 'img:$p',
-                                      child: Image.file(
-                                        File(SandboxPathResolver.fix(p)),
-                                        width: 96,
-                                        height: 96,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Container(
-                                          width: 96,
-                                          height: 96,
-                                          color: Colors.black12,
-                                          child: const Icon(Icons.broken_image),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          );
-                        },
-                      ),
-                    ],
-                    if (parsed.docs.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: parsed.docs.map((d) {
-                          return Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(10),
-                              overlayColor: WidgetStateProperty.resolveWith(
-                                (states) => cs.primary.withValues(
-                                  alpha: states.contains(WidgetState.pressed)
-                                      ? 0.14
-                                      : 0.08,
-                                ),
-                              ),
-                              splashColor: cs.primary.withValues(alpha: 0.18),
-                              onTap: () async {
-                                try {
-                                  final fixed = SandboxPathResolver.fix(d.path);
-                                  final f = File(fixed);
-                                  if (!(await f.exists())) {
-                                    if (!mounted) return;
-                                    showAppSnackBar(
-                                      context,
-                                      message: l10n
-                                          .chatMessageWidgetFileNotFound(
-                                            d.fileName,
-                                          ),
-                                      type: NotificationType.error,
-                                    );
-                                    return;
-                                  }
-                                  final res = await OpenFilex.open(
-                                    fixed,
-                                    type: d.mime,
-                                  );
-                                  if (res.type != ResultType.done) {
-                                    if (!mounted) return;
-                                    final openMessage = res.message;
-                                    showAppSnackBar(
-                                      context,
-                                      message: l10n
-                                          .chatMessageWidgetCannotOpenFile(
-                                            openMessage.isNotEmpty
-                                                ? openMessage
-                                                : res.type.toString(),
-                                          ),
-                                      type: NotificationType.error,
-                                    );
-                                  }
-                                } catch (e) {
-                                  if (!mounted) return;
-                                  showAppSnackBar(
-                                    context,
-                                    message: l10n
-                                        .chatMessageWidgetOpenFileError(
-                                          e.toString(),
-                                        ),
-                                    type: NotificationType.error,
-                                  );
-                                }
-                              },
-                              child: Ink(
-                                decoration: BoxDecoration(
-                                  color: isDark ? Colors.white12 : cs.surface,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 8,
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.insert_drive_file,
-                                        size: 16,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      ConstrainedBox(
-                                        constraints: const BoxConstraints(
-                                          maxWidth: 180,
-                                        ),
-                                        child: Text(
-                                          d.fileName,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ],
-                ),
+              child: Column(
+                key: ValueKey('user-message-content:${widget.message.id}'),
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (mediaPreview != null) mediaPreview,
+                  if (mediaPreview != null && textBubble != null)
+                    const SizedBox(height: 8),
+                  if (textBubble != null) textBubble,
+                ],
               ),
             ),
           ),
@@ -1782,6 +1575,225 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       );
       DesktopMenuAnchor.setPosition(center);
     } catch (_) {}
+  }
+
+  Widget _buildUserTextContent(
+    BuildContext context,
+    String visualText,
+    SettingsProvider settings,
+    ColorScheme cs,
+  ) {
+    final bool isDesktop =
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.linux;
+    final double baseUser = isDesktop ? 14.0 : 15.5;
+
+    Widget content;
+    if (settings.enableUserMarkdown) {
+      content = DefaultTextStyle.merge(
+        style: TextStyle(fontSize: baseUser, height: 1.45),
+        child: MarkdownWithCodeHighlight(
+          text: visualText,
+          baseStyle: TextStyle(fontSize: baseUser, height: 1.45),
+        ),
+      );
+    } else {
+      content = Text(
+        visualText,
+        style: TextStyle(fontSize: baseUser, height: 1.4, color: cs.onSurface),
+      );
+    }
+
+    return isDesktop
+        ? SelectionArea(
+            key: ValueKey('user_${widget.message.id}'),
+            child: content,
+          )
+        : content;
+  }
+
+  Widget? _buildUserAttachmentPreview(
+    BuildContext context, {
+    required _ParsedUserContent parsed,
+    required bool isDark,
+  }) {
+    if (parsed.images.isEmpty && parsed.docs.isEmpty) return null;
+
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final imageItems = <Widget>[];
+    final docItems = <Widget>[];
+
+    if (parsed.images.isNotEmpty) {
+      final imgs = parsed.images;
+      imageItems.addAll(
+        imgs.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final p = entry.value;
+          return IosCardPress(
+            baseColor: Colors.transparent,
+            pressedScale: 0.985,
+            borderRadius: BorderRadius.circular(10),
+            padding: EdgeInsets.zero,
+            onTap: () {
+              Navigator.of(context).push(
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) =>
+                      ImageViewerPage(images: imgs, initialIndex: idx),
+                  transitionDuration: const Duration(milliseconds: 360),
+                  reverseTransitionDuration: const Duration(milliseconds: 280),
+                  transitionsBuilder: (context, anim, sec, child) {
+                    final curved = CurvedAnimation(
+                      parent: anim,
+                      curve: Curves.easeOutCubic,
+                      reverseCurve: Curves.easeInCubic,
+                    );
+                    return FadeTransition(
+                      opacity: curved,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.02),
+                          end: Offset.zero,
+                        ).animate(curved),
+                        child: child,
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Hero(
+                tag: 'img:$p',
+                child: Image.file(
+                  File(SandboxPathResolver.fix(p)),
+                  width: 112,
+                  height: 112,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 112,
+                    height: 112,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : Colors.black.withValues(alpha: 0.06),
+                    child: Icon(
+                      Icons.broken_image,
+                      color: cs.onSurface.withValues(alpha: 0.45),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      );
+    }
+
+    if (parsed.docs.isNotEmpty) {
+      docItems.addAll(
+        parsed.docs.map((d) {
+          return IosCardPress(
+            baseColor: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : cs.surface.withValues(alpha: 0.92),
+            pressedScale: 0.99,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: cs.outlineVariant.withValues(alpha: 0.18),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            onTap: () async {
+              try {
+                final fixed = SandboxPathResolver.fix(d.path);
+                final f = File(fixed);
+                if (!(await f.exists())) {
+                  if (!context.mounted) return;
+                  showAppSnackBar(
+                    context,
+                    message: l10n.chatMessageWidgetFileNotFound(d.fileName),
+                    type: NotificationType.error,
+                  );
+                  return;
+                }
+                final res = await OpenFilex.open(fixed, type: d.mime);
+                if (res.type != ResultType.done) {
+                  if (!context.mounted) return;
+                  final openMessage = res.message;
+                  showAppSnackBar(
+                    context,
+                    message: l10n.chatMessageWidgetCannotOpenFile(
+                      openMessage.isNotEmpty
+                          ? openMessage
+                          : res.type.toString(),
+                    ),
+                    type: NotificationType.error,
+                  );
+                }
+              } catch (e) {
+                if (!context.mounted) return;
+                showAppSnackBar(
+                  context,
+                  message: l10n.chatMessageWidgetOpenFileError(e.toString()),
+                  type: NotificationType.error,
+                );
+              }
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.insert_drive_file,
+                  size: 16,
+                  color: cs.onSurface.withValues(alpha: 0.72),
+                ),
+                const SizedBox(width: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: Text(
+                    d.fileName,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: cs.onSurface.withValues(alpha: 0.86),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      );
+    }
+
+    return Align(
+      key: ValueKey('user-message-attachments:${widget.message.id}'),
+      alignment: Alignment.centerRight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (imageItems.isNotEmpty)
+            Wrap(
+              key: ValueKey('user-message-images:${widget.message.id}'),
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: imageItems,
+            ),
+          if (imageItems.isNotEmpty && docItems.isNotEmpty)
+            const SizedBox(height: 8),
+          if (docItems.isNotEmpty)
+            Wrap(
+              key: ValueKey('user-message-docs:${widget.message.id}'),
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: docItems,
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _buildBubbleContainer({

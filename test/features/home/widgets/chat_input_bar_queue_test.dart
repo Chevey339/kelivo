@@ -387,17 +387,41 @@ void main() {
       find.descendant(of: surfaceFinder, matching: find.byType(Image)),
       findsOneWidget,
     );
+    final imagePreviewsFinder = find.byKey(
+      const ValueKey('chat-input-image-previews'),
+    );
+    final documentPreviewsFinder = find.byKey(
+      const ValueKey('chat-input-document-previews'),
+    );
+    expect(imagePreviewsFinder, findsOneWidget);
+    expect(documentPreviewsFinder, findsOneWidget);
+
+    final imagePreviewsRect = tester.getRect(imagePreviewsFinder);
+    final documentPreviewsRect = tester.getRect(documentPreviewsFinder);
+    expect(
+      imagePreviewsRect.bottom,
+      lessThanOrEqualTo(documentPreviewsRect.top),
+    );
+
     final imageRect = tester.getRect(find.byType(Image));
     final removeButtonRect = tester.getRect(
-      find.ancestor(
-        of: find.byIcon(Icons.close).last,
-        matching: find.byType(GestureDetector),
-      ),
+      find.byKey(const ValueKey('chat-input-image-remove:0')),
     );
     expect(imageRect.contains(removeButtonRect.topLeft), isTrue);
     expect(imageRect.contains(removeButtonRect.bottomRight), isTrue);
     expect(removeButtonRect.width, lessThan(22));
     expect(removeButtonRect.height, lessThan(22));
+    expect(
+      find.descendant(of: imagePreviewsFinder, matching: find.byType(InkWell)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: documentPreviewsFinder,
+        matching: find.byType(InkWell),
+      ),
+      findsNothing,
+    );
 
     controller.dispose();
     focusNode.dispose();
