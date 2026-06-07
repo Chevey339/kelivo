@@ -234,9 +234,6 @@ class TtsProvider extends ChangeNotifier {
       await _tts.awaitSpeakCompletion(true);
     } catch (_) {}
     try {
-      await _tts.awaitSynthCompletion(true);
-    } catch (_) {}
-    try {
       await _tts.setQueueMode(1);
     } catch (_) {}
   }

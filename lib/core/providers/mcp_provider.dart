@@ -49,6 +49,7 @@ class McpToolConfig {
   final List<McpParamSpec> params;
   // Raw JSON schema for parameters, if provided by the server
   final Map<String, dynamic>? schema;
+
   /// Whether this tool requires user approval before execution.
   final bool needsApproval;
 
@@ -712,8 +713,10 @@ class McpProvider extends ChangeNotifier {
     if (idx < 0) return;
     final server = _servers[idx];
     final tools = server.tools
-        .map((t) =>
-            t.name == toolName ? t.copyWith(needsApproval: needsApproval) : t)
+        .map(
+          (t) =>
+              t.name == toolName ? t.copyWith(needsApproval: needsApproval) : t,
+        )
         .toList();
     _servers[idx] = server.copyWith(tools: tools);
     await _persist();

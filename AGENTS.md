@@ -9,7 +9,6 @@
 - Main code lives in `lib/`, tests in `test/`. Local path dependencies exist:
   - `dependencies/mcp_client`
   - `dependencies/tray_manager/packages/tray_manager`
-  - `dependencies/flutter_tts`
   - `dependencies/flutter-permission-handler/permission_handler_windows`
 - Localization is driven by `l10n.yaml`:
   - `arb-dir: lib/l10n`

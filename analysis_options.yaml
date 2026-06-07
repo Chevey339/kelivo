@@ -25,9 +25,3 @@ linter:
     # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
     # Repo constraint: package name is `Kelivo` (imports use `package:Kelivo/...`).
     package_names: false
-
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
-analyzer:
-  exclude:
-    - dependencies/flutter_tts/**

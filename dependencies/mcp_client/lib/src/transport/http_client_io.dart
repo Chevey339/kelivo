@@ -20,17 +20,17 @@ class PlatformHttpClient implements stub.PlatformHttpClient {
     Object? body,
   }) async {
     final request = await _client.postUrl(url);
-    
+
     // Set headers
     headers?.forEach((key, value) {
       request.headers.set(key, value);
     });
-    
+
     // Set content type if not specified
     if (!request.headers.contentType.toString().contains('application/json')) {
       request.headers.contentType = io.ContentType.json;
     }
-    
+
     // Write body
     if (body != null) {
       if (body is String) {
@@ -39,7 +39,7 @@ class PlatformHttpClient implements stub.PlatformHttpClient {
         request.write(jsonEncode(body));
       }
     }
-    
+
     final response = await request.close();
     return IoHttpResponse(response);
   }
@@ -50,12 +50,12 @@ class PlatformHttpClient implements stub.PlatformHttpClient {
     Map<String, String>? headers,
   }) async {
     final request = await _client.getUrl(url);
-    
+
     // Set headers
     headers?.forEach((key, value) {
       request.headers.set(key, value);
     });
-    
+
     final response = await request.close();
     return IoHttpResponse(response);
   }

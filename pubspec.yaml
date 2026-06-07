@@ -102,8 +102,7 @@ dependencies:
   google_fonts: ^6.3.2
   super_clipboard: ^0.9.1
   permission_handler: ^12.0.3
-  flutter_tts:
-    path: ./dependencies/flutter_tts
+  flutter_tts: ^4.2.3
   flutter_background: ^1.3.0+1
   flutter_local_notifications: ^17.2.3
   image: ^4.8.0

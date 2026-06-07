@@ -24,18 +24,18 @@ class PlatformHttpClient implements stub.PlatformHttpClient {
       'Content-Type': 'application/json',
       ...?headers,
     };
-    
+
     String? bodyString;
     if (body != null) {
       bodyString = body is String ? body : jsonEncode(body);
     }
-    
+
     final response = await _client.post(
       url,
       headers: requestHeaders,
       body: bodyString,
     );
-    
+
     return WebHttpResponse(response);
   }
 
@@ -44,11 +44,8 @@ class PlatformHttpClient implements stub.PlatformHttpClient {
     Uri url, {
     Map<String, String>? headers,
   }) async {
-    final response = await _client.get(
-      url,
-      headers: headers,
-    );
-    
+    final response = await _client.get(url, headers: headers);
+
     return WebHttpResponse(response);
   }
 

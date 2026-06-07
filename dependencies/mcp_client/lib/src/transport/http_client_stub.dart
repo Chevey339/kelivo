@@ -21,10 +21,7 @@ abstract class PlatformHttpClient {
   });
 
   /// Send a GET request
-  Future<PlatformHttpResponse> get(
-    Uri url, {
-    Map<String, String>? headers,
-  });
+  Future<PlatformHttpResponse> get(Uri url, {Map<String, String>? headers});
 
   /// Close the client
   void close();

@@ -156,7 +156,9 @@ class EventSource implements stub.EventSource {
         _logger.debug('Received message data: $eventData');
 
         // Check if it's an endpoint URL without event type
-        if (eventType == null && (eventData.startsWith('http://') || eventData.startsWith('https://'))) {
+        if (eventType == null &&
+            (eventData.startsWith('http://') ||
+                eventData.startsWith('https://'))) {
           _logger.debug('Detected endpoint URL: $eventData');
           if (onEndpoint != null) {
             onEndpoint(eventData);
