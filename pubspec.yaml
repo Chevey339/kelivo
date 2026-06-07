@@ -155,6 +155,9 @@ flutter:
     - assets/html/mark.html
   #   - images/a_dot_ham.jpeg
 
+  config:
+    enable-swift-package-manager: false
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
