@@ -617,7 +617,7 @@ void main() {
       expect(find.text('Time Info'), findsOneWidget);
       expect(find.text('Read Clipboard'), findsOneWidget);
       expect(find.text('Write Clipboard'), findsOneWidget);
-      expect(find.text('Speaking: Replay this line'), findsOneWidget);
+      expect(find.text('Speaking:'), findsOneWidget);
       expect(find.text('Replay this line'), findsOneWidget);
       expect(find.byTooltip('Replay'), findsOneWidget);
       final replayButton = tester.widget<IosIconButton>(
@@ -729,7 +729,7 @@ void main() {
 
       expect(find.byTooltip('Replay'), findsOneWidget);
 
-      await tester.tap(find.text('Speaking: Replay this line'));
+      await tester.tap(find.text('Speaking:'));
       await tester.pumpAndSettle();
 
       expect(find.text('Arguments'), findsOneWidget);
@@ -877,7 +877,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.text('Choose scope?'), findsNWidgets(2));
+      expect(find.text('Choose scope?'), findsOneWidget);
       expect(find.text('Ask User'), findsNothing);
       expect(find.text('Needs your answer'), findsNothing);
       expect(find.text('Minimal'), findsOneWidget);
@@ -948,14 +948,14 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Choose scope?'), findsNWidgets(2));
+      expect(find.text('Choose scope?'), findsOneWidget);
       expect(find.text('Complete'), findsOneWidget);
 
       await tester.tap(find.byIcon(Lucide.ChevronUp).last);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
 
-      expect(find.text('Choose scope?'), findsOneWidget);
+      expect(find.text('Choose scope?'), findsNothing);
       expect(find.text('Complete'), findsNothing);
     });
 
