@@ -75,6 +75,7 @@ class BrandAssets {
         MapEntry(RegExp(r'jina'), 'jina-color.svg'),
         MapEntry(RegExp(r'searxng'), 'searxng-color.svg'),
         MapEntry(RegExp(r'serper'), 'serper.svg'),
+        MapEntry(RegExp(r'querit'), 'querit-color.svg'),
         MapEntry(RegExp(r'bocha|博查'), 'bocha-color.svg'),
         MapEntry(RegExp(r'kat'), 'katkwaipilot-color.svg'),
         MapEntry(RegExp(r'duckduckgo'), 'duckduckgo-color.svg'),

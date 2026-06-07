@@ -586,6 +586,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is PerplexityOptions) return 'perplexity';
     if (s is BochaOptions) return 'bocha';
     if (s is SerperOptions) return 'serper';
+    if (s is QueritOptions) return 'querit';
     if (s is GrokOptions) return 'grok';
     return 'search';
   }
@@ -759,6 +760,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
       {'type': 'perplexity', 'name': l10n.searchServiceNamePerplexity},
       {'type': 'bocha', 'name': l10n.searchServiceNameBocha},
       {'type': 'serper', 'name': l10n.searchServiceNameSerper},
+      {'type': 'querit', 'name': l10n.searchServiceNameQuerit},
       {'type': 'grok', 'name': l10n.searchServiceNameGrok},
     ];
     return ListView.builder(
@@ -822,6 +824,8 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
         return l10n.searchServiceNameBocha;
       case 'serper':
         return l10n.searchServiceNameSerper;
+      case 'querit':
+        return l10n.searchServiceNameQuerit;
       case 'grok':
         return l10n.searchServiceNameGrok;
       default:
@@ -1063,6 +1067,49 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
             },
           ),
         ];
+      case 'querit':
+        return [
+          buildTextField(
+            key: 'apiKey',
+            label: l10n.searchServicesDialogApiKey,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return l10n.searchServicesAddDialogApiKeyRequired;
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          buildTextField(
+            key: 'sitesInclude',
+            label: l10n.searchServicesDialogSitesIncludeOptional,
+            hint: l10n.searchServicesDialogSitesHint,
+          ),
+          const SizedBox(height: 12),
+          buildTextField(
+            key: 'sitesExclude',
+            label: l10n.searchServicesDialogSitesExcludeOptional,
+            hint: l10n.searchServicesDialogSitesHint,
+          ),
+          const SizedBox(height: 12),
+          buildTextField(
+            key: 'timeRange',
+            label: l10n.searchServicesDialogTimeRangeOptional,
+            hint: l10n.searchServicesDialogTimeRangeHint,
+          ),
+          const SizedBox(height: 12),
+          buildTextField(
+            key: 'countries',
+            label: l10n.searchServicesDialogCountriesOptional,
+            hint: l10n.searchServicesDialogCountriesHint,
+          ),
+          const SizedBox(height: 12),
+          buildTextField(
+            key: 'languages',
+            label: l10n.searchServicesDialogLanguagesOptional,
+            hint: l10n.searchServicesDialogLanguagesHint,
+          ),
+        ];
       case 'grok':
         return [
           buildTextField(
@@ -1199,6 +1246,16 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
           tbs: (_controllers['tbs']?.text ?? '').trim(),
           page: pageText.isEmpty ? 1 : int.parse(pageText),
         );
+      case 'querit':
+        return QueritOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          sitesInclude: (_controllers['sitesInclude']?.text ?? '').trim(),
+          sitesExclude: (_controllers['sitesExclude']?.text ?? '').trim(),
+          timeRange: (_controllers['timeRange']?.text ?? '').trim(),
+          countries: (_controllers['countries']?.text ?? '').trim(),
+          languages: (_controllers['languages']?.text ?? '').trim(),
+        );
       case 'grok':
         return GrokOptions(
           id: id,
@@ -1271,6 +1328,23 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       _controllers['tbs'] = TextEditingController(text: service.tbs);
       _controllers['page'] = TextEditingController(
         text: service.page == 1 ? '' : service.page.toString(),
+      );
+    } else if (service is QueritOptions) {
+      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
+      _controllers['sitesInclude'] = TextEditingController(
+        text: service.sitesInclude,
+      );
+      _controllers['sitesExclude'] = TextEditingController(
+        text: service.sitesExclude,
+      );
+      _controllers['timeRange'] = TextEditingController(
+        text: service.timeRange,
+      );
+      _controllers['countries'] = TextEditingController(
+        text: service.countries,
+      );
+      _controllers['languages'] = TextEditingController(
+        text: service.languages,
       );
     } else if (service is GrokOptions) {
       _controllers['apiKey'] = TextEditingController(text: service.apiKey);
@@ -1536,6 +1610,49 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
           },
         ),
       ];
+    } else if (service is QueritOptions) {
+      return [
+        buildTextField(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKey,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return l10n.searchServicesEditDialogApiKeyRequired;
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 12),
+        buildTextField(
+          key: 'sitesInclude',
+          label: l10n.searchServicesDialogSitesIncludeOptional,
+          hint: l10n.searchServicesDialogSitesHint,
+        ),
+        const SizedBox(height: 12),
+        buildTextField(
+          key: 'sitesExclude',
+          label: l10n.searchServicesDialogSitesExcludeOptional,
+          hint: l10n.searchServicesDialogSitesHint,
+        ),
+        const SizedBox(height: 12),
+        buildTextField(
+          key: 'timeRange',
+          label: l10n.searchServicesDialogTimeRangeOptional,
+          hint: l10n.searchServicesDialogTimeRangeHint,
+        ),
+        const SizedBox(height: 12),
+        buildTextField(
+          key: 'countries',
+          label: l10n.searchServicesDialogCountriesOptional,
+          hint: l10n.searchServicesDialogCountriesHint,
+        ),
+        const SizedBox(height: 12),
+        buildTextField(
+          key: 'languages',
+          label: l10n.searchServicesDialogLanguagesOptional,
+          hint: l10n.searchServicesDialogLanguagesHint,
+        ),
+      ];
     } else if (service is GrokOptions) {
       return [
         buildTextField(
@@ -1687,6 +1804,16 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
         tbs: (_controllers['tbs']?.text ?? '').trim(),
         page: pageText.isEmpty ? 1 : int.parse(pageText),
       );
+    } else if (service is QueritOptions) {
+      return QueritOptions(
+        id: service.id,
+        apiKey: _controllers['apiKey']!.text,
+        sitesInclude: (_controllers['sitesInclude']?.text ?? '').trim(),
+        sitesExclude: (_controllers['sitesExclude']?.text ?? '').trim(),
+        timeRange: (_controllers['timeRange']?.text ?? '').trim(),
+        countries: (_controllers['countries']?.text ?? '').trim(),
+        languages: (_controllers['languages']?.text ?? '').trim(),
+      );
     } else if (service is GrokOptions) {
       return GrokOptions(
         id: service.id,
@@ -1793,6 +1920,8 @@ class _ServiceIcon extends StatelessWidget {
         return 'bocha';
       case 'serper':
         return 'serper';
+      case 'querit':
+        return 'querit';
       default:
         return type;
     }

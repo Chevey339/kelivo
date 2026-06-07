@@ -15,6 +15,7 @@ import 'providers/perplexity_search_service.dart';
 import 'providers/duckduckgo_search_service.dart';
 import 'providers/serper_search_service.dart';
 import 'providers/grok_search_service.dart';
+import 'providers/querit_search_service.dart';
 
 // Base interface for all search services
 abstract class SearchService<T extends SearchServiceOptions> {
@@ -61,6 +62,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return SerperSearchService() as SearchService;
       case GrokOptions _:
         return GrokSearchService() as SearchService;
+      case QueritOptions _:
+        return QueritSearchService() as SearchService;
       default:
         return BingSearchService() as SearchService;
     }
@@ -180,6 +183,8 @@ abstract class SearchServiceOptions {
         return SerperOptions.fromJson(json);
       case 'grok':
         return GrokOptions.fromJson(json);
+      case 'querit':
+        return QueritOptions.fromJson(json);
       default:
         return BingLocalOptions(id: json['id']);
     }
@@ -581,5 +586,46 @@ class GrokOptions extends SearchServiceOptions {
     model: json['model'] ?? defaultModel,
     customUrl: json['customUrl'] ?? defaultUrl,
     systemPrompt: json['systemPrompt'] ?? defaultSystemPrompt,
+  );
+}
+
+class QueritOptions extends SearchServiceOptions {
+  final String apiKey;
+  final String sitesInclude;
+  final String sitesExclude;
+  final String timeRange;
+  final String countries;
+  final String languages;
+
+  QueritOptions({
+    required super.id,
+    required this.apiKey,
+    this.sitesInclude = '',
+    this.sitesExclude = '',
+    this.timeRange = '',
+    this.countries = '',
+    this.languages = '',
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'querit',
+    'id': id,
+    'apiKey': apiKey,
+    'sitesInclude': sitesInclude.trim(),
+    'sitesExclude': sitesExclude.trim(),
+    'timeRange': timeRange.trim(),
+    'countries': countries.trim(),
+    'languages': languages.trim(),
+  };
+
+  factory QueritOptions.fromJson(Map<String, dynamic> json) => QueritOptions(
+    id: json['id'],
+    apiKey: json['apiKey'] ?? '',
+    sitesInclude: json['sitesInclude'] ?? '',
+    sitesExclude: json['sitesExclude'] ?? '',
+    timeRange: json['timeRange'] ?? '',
+    countries: json['countries'] ?? '',
+    languages: json['languages'] ?? '',
   );
 }

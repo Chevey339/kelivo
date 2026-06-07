@@ -4315,6 +4315,13 @@ class AppLocalizationsZh extends AppLocalizations {
       'Serper Google 搜索 API。响应快速，支持国家/地区、语言、时间和页码过滤。';
 
   @override
+  String get searchServiceNameQuerit => 'Querit';
+
+  @override
+  String get searchProviderQueritDescription =>
+      '面向 LLM 应用的 Querit 搜索 API。返回实时网页结果，并支持站点、时间、国家和语言过滤。';
+
+  @override
   String get searchServiceNameGrok => 'Grok';
 
   @override
@@ -4335,6 +4342,33 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchServicesDialogPageInvalid => '页码必须是正整数。';
+
+  @override
+  String get searchServicesDialogSitesIncludeOptional => '包含站点（可选）';
+
+  @override
+  String get searchServicesDialogSitesExcludeOptional => '排除站点（可选）';
+
+  @override
+  String get searchServicesDialogTimeRangeOptional => '时间范围（可选）';
+
+  @override
+  String get searchServicesDialogCountriesOptional => '国家（可选）';
+
+  @override
+  String get searchServicesDialogLanguagesOptional => '语言（可选）';
+
+  @override
+  String get searchServicesDialogSitesHint => 'example.com, docs.example.com';
+
+  @override
+  String get searchServicesDialogTimeRangeHint => 'd7';
+
+  @override
+  String get searchServicesDialogCountriesHint => 'united states, japan';
+
+  @override
+  String get searchServicesDialogLanguagesHint => 'english, japanese';
 
   @override
   String get generationInterrupted => '生成已中断';
@@ -9536,6 +9570,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'Serper Google 搜索 API。响应快速，支持国家/地区、语言、时间和页码过滤。';
 
   @override
+  String get searchServiceNameQuerit => 'Querit';
+
+  @override
+  String get searchProviderQueritDescription =>
+      '面向 LLM 应用的 Querit 搜索 API。返回实时网页结果，并支持站点、时间、国家和语言过滤。';
+
+  @override
   String get searchServiceNameGrok => 'Grok';
 
   @override
@@ -9556,6 +9597,33 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchServicesDialogPageInvalid => '页码必须是正整数。';
+
+  @override
+  String get searchServicesDialogSitesIncludeOptional => '包含站点（可选）';
+
+  @override
+  String get searchServicesDialogSitesExcludeOptional => '排除站点（可选）';
+
+  @override
+  String get searchServicesDialogTimeRangeOptional => '时间范围（可选）';
+
+  @override
+  String get searchServicesDialogCountriesOptional => '国家（可选）';
+
+  @override
+  String get searchServicesDialogLanguagesOptional => '语言（可选）';
+
+  @override
+  String get searchServicesDialogSitesHint => 'example.com, docs.example.com';
+
+  @override
+  String get searchServicesDialogTimeRangeHint => 'd7';
+
+  @override
+  String get searchServicesDialogCountriesHint => 'united states, japan';
+
+  @override
+  String get searchServicesDialogLanguagesHint => 'english, japanese';
 
   @override
   String get generationInterrupted => '生成已中断';
@@ -14756,6 +14824,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       'Serper Google 搜尋 API。回應快速，支援國家/地區、語言、時間和頁碼過濾。';
 
   @override
+  String get searchServiceNameQuerit => 'Querit';
+
+  @override
+  String get searchProviderQueritDescription =>
+      '面向 LLM 應用的 Querit 搜尋 API。返回即時網頁結果，並支援站點、時間、國家和語言過濾。';
+
+  @override
   String get searchServiceNameGrok => 'Grok';
 
   @override
@@ -14776,6 +14851,33 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchServicesDialogPageInvalid => '頁碼必須是正整數。';
+
+  @override
+  String get searchServicesDialogSitesIncludeOptional => '包含站點（可選）';
+
+  @override
+  String get searchServicesDialogSitesExcludeOptional => '排除站點（可選）';
+
+  @override
+  String get searchServicesDialogTimeRangeOptional => '時間範圍（可選）';
+
+  @override
+  String get searchServicesDialogCountriesOptional => '國家（可選）';
+
+  @override
+  String get searchServicesDialogLanguagesOptional => '語言（可選）';
+
+  @override
+  String get searchServicesDialogSitesHint => 'example.com, docs.example.com';
+
+  @override
+  String get searchServicesDialogTimeRangeHint => 'd7';
+
+  @override
+  String get searchServicesDialogCountriesHint => 'united states, japan';
+
+  @override
+  String get searchServicesDialogLanguagesHint => 'english, japanese';
 
   @override
   String get generationInterrupted => '生成已中斷';
