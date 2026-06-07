@@ -265,28 +265,12 @@ class _ChatInputBarState extends State<ChatInputBar>
     });
   }
 
-  void _removeImageAt(int index) async {
-    final path = _images[index];
+  void _removeImageAt(int index) {
     setState(() => _images.removeAt(index));
-    // best-effort delete
-    try {
-      final f = File(path);
-      if (await f.exists()) {
-        await f.delete();
-      }
-    } catch (_) {}
   }
 
   void _removeDocumentAt(int index) {
-    final path = _docs[index].path;
     setState(() => _docs.removeAt(index));
-    // best-effort delete persisted attachment
-    try {
-      final f = File(path);
-      if (f.existsSync()) {
-        f.deleteSync();
-      }
-    } catch (_) {}
   }
 
   @override

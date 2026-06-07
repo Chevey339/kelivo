@@ -36,7 +36,7 @@ class UserMessageEditOverlay extends StatelessWidget {
       left: 0,
       top: 0,
       right: 0,
-      bottom: bottomInset + 8,
+      bottom: 0,
       child: IgnorePointer(
         ignoring: !visible,
         child: AnimatedOpacity(
@@ -62,7 +62,7 @@ class UserMessageEditOverlay extends StatelessWidget {
                           colors: [
                             cs.surface.withValues(alpha: isDark ? 0.86 : 0.90),
                             cs.surface.withValues(alpha: isDark ? 0.80 : 0.84),
-                            cs.surface.withValues(alpha: 0),
+                            cs.surface.withValues(alpha: isDark ? 0.78 : 0.82),
                           ],
                         ),
                       ),
@@ -74,7 +74,7 @@ class UserMessageEditOverlay extends StatelessWidget {
                 left: 0,
                 top: topInset,
                 right: 0,
-                bottom: 0,
+                bottom: bottomInset,
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     const actionTop = 10.0;

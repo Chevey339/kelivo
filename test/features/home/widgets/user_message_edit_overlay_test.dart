@@ -112,7 +112,7 @@ void main() {
     expect(saveLeft, lessThan(closeLeft));
   });
 
-  testWidgets('input-adjacent area stays outside the cancel overlay', (
+  testWidgets('overlay background fills the area behind the input', (
     tester,
   ) async {
     var cancelled = 0;
@@ -121,10 +121,10 @@ void main() {
       buildHarness(visible: true, onCancel: () => cancelled++),
     );
 
-    await tester.tapAt(const Offset(20, 520));
+    await tester.tapAt(const Offset(20, 560));
     await tester.pump();
 
-    expect(cancelled, 0);
+    expect(cancelled, 1);
   });
 
   testWidgets('long preview fits when expanded input leaves little height', (

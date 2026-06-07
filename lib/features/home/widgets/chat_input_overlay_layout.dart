@@ -78,18 +78,18 @@ class ChatInputOverlayLayout extends StatelessWidget {
                   height: _bottomOverlayFadeHeight,
                   child: _BottomOverlayFade(),
                 ),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: UnconstrainedBox(
-                  constrainedAxis: Axis.horizontal,
-                  alignment: Alignment.bottomCenter,
-                  child: bottomOverlay,
-                ),
-              ),
+              if (foreground != null) Positioned.fill(child: foreground!),
             ],
           ),
         ),
-        if (foreground != null) Positioned.fill(child: foreground!),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: UnconstrainedBox(
+            constrainedAxis: Axis.horizontal,
+            alignment: Alignment.bottomCenter,
+            child: bottomOverlay,
+          ),
+        ),
       ],
     );
   }
