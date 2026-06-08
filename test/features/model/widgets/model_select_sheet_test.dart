@@ -9,6 +9,7 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/model/widgets/model_select_sheet.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 
 ProviderConfig _providerConfig(String key, String name, List<String> models) {
   return ProviderConfig(
@@ -49,6 +50,7 @@ Future<SettingsProvider> _settingsWithProviders(WidgetTester tester) async {
 Future<void> _pumpModelSelector(
   WidgetTester tester, {
   required SettingsProvider settings,
+  String? limitProviderKey,
 }) async {
   await tester.pumpWidget(
     MultiProvider(
@@ -67,7 +69,10 @@ Future<void> _pumpModelSelector(
               return TextButton(
                 key: const ValueKey('open-model-selector'),
                 onPressed: () {
-                  showModelSelector(context);
+                  showModelSelector(
+                    context,
+                    limitProviderKey: limitProviderKey,
+                  );
                 },
                 child: const Text('open'),
               );
@@ -95,6 +100,13 @@ bool _providerTabSelected(WidgetTester tester, String providerKey) {
     ),
   );
   return semantics.properties.selected ?? false;
+}
+
+Future<void> _dismissModelSelector(WidgetTester tester) async {
+  final bottomSheet = find.byType(BottomSheet);
+  if (bottomSheet.evaluate().isEmpty) return;
+  Navigator.of(tester.element(bottomSheet)).pop();
+  await tester.pumpAndSettle(const Duration(milliseconds: 100));
 }
 
 void main() {
@@ -150,6 +162,78 @@ void main() {
           isFalse,
         );
       } finally {
+        await _dismissModelSelector(tester);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
+
+  testWidgets(
+    'mobile model selector auto-scroll keeps current model below sticky provider header',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      try {
+        final settings = await _settingsWithProviders(tester);
+        await settings.setCurrentModel('provider-6', 'provider-6-model-02');
+        await _pumpModelSelector(tester, settings: settings);
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        final stickyRect = tester.getRect(
+          find.byKey(const ValueKey('model-selector-sticky-provider')),
+        );
+        final modelText = find.text('provider-6-model-02');
+        expect(modelText, findsOneWidget);
+
+        final modelTile = find.ancestor(
+          of: modelText,
+          matching: find.byType(IosCardPress),
+        );
+        expect(modelTile, findsOneWidget);
+        final modelRect = tester.getRect(modelTile);
+
+        expect(
+          modelRect.top,
+          greaterThanOrEqualTo(stickyRect.bottom),
+          reason: 'Current model should not be hidden by the sticky provider.',
+        );
+      } finally {
+        await _dismissModelSelector(tester);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
+
+  testWidgets(
+    'mobile model selector omits sticky provider header when limited to one provider',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      try {
+        final settings = await _settingsWithProviders(tester);
+        await settings.setCurrentModel('provider-6', 'provider-6-model-02');
+        await _pumpModelSelector(
+          tester,
+          settings: settings,
+          limitProviderKey: 'provider-6',
+        );
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        expect(
+          find.byKey(const ValueKey('model-selector-sticky-provider')),
+          findsNothing,
+        );
+        expect(find.text('provider-6-model-02'), findsOneWidget);
+      } finally {
+        await _dismissModelSelector(tester);
         debugDefaultTargetPlatformOverride = null;
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();

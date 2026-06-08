@@ -274,10 +274,12 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   static const double _initialSize = 0.8;
   static const double _maxSize = 0.8;
   static const double _stickyProviderHeaderHeight = 38;
+  // static const double _currentSelectionScrollMargin = 10;
   String _lastQuery = '';
   String? _activeProviderKey;
   int _stickySwitchDirection = 1;
   bool _activeProviderUpdateScheduled = false;
+  double _listViewportHeight = 0;
   // ScrollablePositionedList controllers
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener =
@@ -516,9 +518,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     targetIndex ??= _headerIndexMap[pk];
 
     if (targetIndex != null) {
+      final alignment = _currentSelectionScrollAlignment();
       try {
         await _itemScrollController.scrollTo(
           index: targetIndex,
+          alignment: alignment,
           duration: const Duration(milliseconds: 360),
           curve: Curves.easeOutCubic,
         );
@@ -530,6 +534,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           try {
             await _itemScrollController.scrollTo(
               index: targetIndex!,
+              alignment: alignment,
               duration: const Duration(milliseconds: 360),
               curve: Curves.easeOutCubic,
             );
@@ -538,6 +543,15 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         });
       }
     }
+  }
+
+  double _currentSelectionScrollAlignment() {
+    if (widget.limitProviderKey != null || _listViewportHeight <= 0) {
+      return 0;
+    }
+    return ((_stickyProviderHeaderHeight) /
+            _listViewportHeight)
+        .clamp(0.0, 0.3);
   }
 
   // Scroll to the first matching provider group when searching.
@@ -977,33 +991,38 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
     _scheduleActiveProviderUpdate();
 
-    return Stack(
-      children: [
-        ScrollablePositionedList.builder(
-          itemCount: _rows.length,
-          itemScrollController: _itemScrollController,
-          itemPositionsListener: _itemPositionsListener,
-          padding: const EdgeInsets.only(bottom: 12),
-          itemBuilder: (context, index) {
-            final row = _rows[index];
-            if (row is _HeaderRow) {
-              return _sectionHeader(
-                context,
-                row.title,
-                providerKey: row.providerKey,
-              );
-            } else if (row is _ModelRow) {
-              return _modelTile(
-                context,
-                row.item,
-                showProviderLabel: row.showProviderLabel,
-              );
-            }
-            return const SizedBox.shrink();
-          },
-        ),
-        _stickyProviderHeader(context),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _listViewportHeight = constraints.maxHeight;
+        return Stack(
+          children: [
+            ScrollablePositionedList.builder(
+              itemCount: _rows.length,
+              itemScrollController: _itemScrollController,
+              itemPositionsListener: _itemPositionsListener,
+              padding: const EdgeInsets.only(bottom: 12),
+              itemBuilder: (context, index) {
+                final row = _rows[index];
+                if (row is _HeaderRow) {
+                  return _sectionHeader(
+                    context,
+                    row.title,
+                    providerKey: row.providerKey,
+                  );
+                } else if (row is _ModelRow) {
+                  return _modelTile(
+                    context,
+                    row.item,
+                    showProviderLabel: row.showProviderLabel,
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+            _stickyProviderHeader(context),
+          ],
+        );
+      },
     );
   }
 
