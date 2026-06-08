@@ -1182,8 +1182,152 @@ WidgetSpan _inlineMathSpan(Widget math) {
   return WidgetSpan(
     alignment: PlaceholderAlignment.baseline,
     baseline: TextBaseline.alphabetic,
-    child: SelectionContainer.disabled(child: math),
+    child: SelectionContainer.disabled(
+      child: _InlineMathScrollable(child: math),
+    ),
   );
+}
+
+/// Horizontally scrollable inline math that preserves baseline alignment.
+///
+/// [SingleChildScrollView] breaks baseline forwarding because its internal
+/// [RenderViewport] does not implement [computeDistanceToActualBaseline].
+/// This widget uses a custom [RenderObject] that lays out the child
+/// unconstrained in width, reports correct baseline, and paints with a
+/// horizontal scroll offset driven by a [GestureDetector].
+class _InlineMathScrollable extends StatefulWidget {
+  const _InlineMathScrollable({required this.child});
+  final Widget child;
+
+  @override
+  State<_InlineMathScrollable> createState() => _InlineMathScrollableState();
+}
+
+class _InlineMathScrollableState extends State<_InlineMathScrollable> {
+  double _scrollOffset = 0.0;
+  double _maxScroll = 0.0;
+
+  void _onHorizontalDragUpdate(DragUpdateDetails d) {
+    setState(() {
+      _scrollOffset = (_scrollOffset - d.delta.dx).clamp(0.0, _maxScroll);
+    });
+  }
+
+  void _updateMaxScroll(double childWidth, double viewportWidth) {
+    _maxScroll = (childWidth - viewportWidth).clamp(0.0, double.infinity);
+    // Ensure current offset stays valid after relayout.
+    if (_scrollOffset > _maxScroll) {
+      _scrollOffset = _maxScroll;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragUpdate: _onHorizontalDragUpdate,
+      child: _InlineMathScrollableRenderWidget(
+        scrollOffset: _scrollOffset,
+        onMetrics: _updateMaxScroll,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class _InlineMathScrollableRenderWidget extends SingleChildRenderObjectWidget {
+  const _InlineMathScrollableRenderWidget({
+    required this.scrollOffset,
+    required this.onMetrics,
+    required Widget child,
+  }) : super(child: child);
+
+  final double scrollOffset;
+  final void Function(double childWidth, double viewportWidth) onMetrics;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderInlineMathScrollable(
+        initialScrollOffset: scrollOffset,
+        onMetrics: onMetrics,
+      );
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderInlineMathScrollable renderObject,
+  ) {
+    renderObject
+      ..scrollOffset = scrollOffset
+      ..onMetrics = onMetrics;
+  }
+}
+
+class _RenderInlineMathScrollable extends RenderProxyBox {
+  _RenderInlineMathScrollable({
+    required double initialScrollOffset,
+    required this.onMetrics,
+  }) : _scrollOffset = initialScrollOffset;
+
+  double _scrollOffset;
+  set scrollOffset(double value) {
+    if (_scrollOffset == value) return;
+    _scrollOffset = value;
+    markNeedsPaint();
+  }
+
+  void Function(double childWidth, double viewportWidth) onMetrics;
+
+  @override
+  void performLayout() {
+    final child = this.child;
+    if (child == null) {
+      size = constraints.smallest;
+      return;
+    }
+    child.layout(
+      constraints.copyWith(maxWidth: double.infinity),
+      parentUsesSize: true,
+    );
+    size = constraints.constrain(child.size);
+    // Notify stateful widget of the scrollable extent.
+    if (child.size.width > size.width) {
+      onMetrics(child.size.width, size.width);
+    }
+  }
+
+  @override
+  double? computeDistanceToActualBaseline(TextBaseline baseline) {
+    return child?.getDistanceToActualBaseline(baseline);
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final child = this.child;
+    if (child == null) return;
+    if (child.size.width <= size.width) {
+      context.paintChild(child, offset);
+      return;
+    }
+    context.pushClipRect(needsCompositing, offset, Offset.zero & size, (
+      context,
+      clipOffset,
+    ) {
+      context.paintChild(child, clipOffset - Offset(_scrollOffset, 0));
+    });
+  }
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    final child = this.child;
+    if (child == null) return false;
+    return result.addWithPaintOffset(
+      offset: Offset(-_scrollOffset, 0),
+      position: position,
+      hitTest: (result, transformed) =>
+          child.hitTest(result, position: transformed),
+    );
+  }
 }
 
 String _replaceInlineDollarMath(String input) {
