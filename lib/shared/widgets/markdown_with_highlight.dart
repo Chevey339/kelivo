@@ -1957,6 +1957,8 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
     final borderColor = _codeBlockBorderColor(cs, isDark);
     final isEffectivelyExpanded = _isEffectivelyExpanded(settings);
     final isCollapsed = !isEffectivelyExpanded;
+    final showCollapsedTailFade =
+        isCollapsed && _hasCollapsedHiddenLines(settings);
 
     return Container(
       width: double.infinity,
@@ -2045,27 +2047,49 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
             width: double.infinity,
             color: bodyBg,
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+            child: Stack(
               children: [
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  alignment: Alignment.topLeft,
-                  clipBehavior: Clip.hardEdge,
-                  child: buildCodeView(
-                    isCollapsed
-                        ? _collapsedHighlightedCode(settings)
-                        : _trimTrailingNewlines(widget.code),
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.topLeft,
+                      clipBehavior: Clip.hardEdge,
+                      child: buildCodeView(
+                        isCollapsed
+                            ? _collapsedHighlightedCode(settings)
+                            : _trimTrailingNewlines(widget.code),
+                      ),
+                    ),
+                  ],
                 ),
+                if (showCollapsedTailFade)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _CodeBlockCollapsedTailFade(color: bodyBg),
+                  ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  bool _hasCollapsedHiddenLines(SettingsProvider settings) {
+    return _exceedsLineThreshold(
+      widget.code,
+      _collapsedVisibleLineCount(settings),
+    );
+  }
+
+  int _collapsedVisibleLineCount(SettingsProvider settings) {
+    return settings.autoCollapseCodeBlockLines.clamp(1, 999999);
   }
 
   bool _isEffectivelyExpanded(SettingsProvider settings) {
@@ -2182,7 +2206,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
   }
 
   String _collapsedHighlightedCode(SettingsProvider settings) {
-    final visibleLines = settings.autoCollapseCodeBlockLines.clamp(1, 999999);
+    final visibleLines = _collapsedVisibleLineCount(settings);
     final trimmed = _trimTrailingNewlines(widget.code);
     if (trimmed.isEmpty) return trimmed;
     return trimmed.split(RegExp(r'\r\n|\r|\n')).take(visibleLines).join('\n');
@@ -2239,6 +2263,35 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
     if (s.isEmpty) return s;
     final end = _trimTrailingNewlinesEndIndex(s);
     return end == s.length ? s : s.substring(0, end);
+  }
+}
+
+class _CodeBlockCollapsedTailFade extends StatelessWidget {
+  const _CodeBlockCollapsedTailFade({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: SizedBox(
+        key: const ValueKey('code-block-collapsed-tail-fade'),
+        height: 24,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                color.withValues(alpha: 0),
+                color.withValues(alpha: 0.72),
+                color,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

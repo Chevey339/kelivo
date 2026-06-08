@@ -2676,6 +2676,69 @@ line3
   );
 
   testWidgets(
+    'MarkdownWithCodeHighlight shows collapsed code tail fade when hidden lines exist',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          '''
+```dart
+fade1
+fade2
+fade3
+```
+''',
+          preferences: const {
+            'display_auto_collapse_code_block_v1': true,
+            'display_auto_collapse_code_block_lines_v1': 2,
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('code-block-collapsed-tail-fade')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('fade3'), findsNothing);
+
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('code-block-collapsed-tail-fade')),
+        findsNothing,
+      );
+      expect(find.textContaining('fade3'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight omits collapsed code tail fade without hidden lines',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('''
+```dart
+exact1
+exact2
+```
+'''),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Lucide.ChevronRight), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('code-block-collapsed-tail-fade')),
+        findsNothing,
+      );
+      expect(find.textContaining('exact2'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight shows full code after auto-collapse is disabled',
     (tester) async {
       late SettingsProvider settings;
