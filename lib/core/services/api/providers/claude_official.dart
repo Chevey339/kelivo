@@ -47,6 +47,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     config,
     modelId,
   ).abilities.contains(ModelAbility.reasoning);
+  final skipRedactedThinkingBlocks = BuiltInToolsHelper.isOpenRouterProvider(
+    config,
+  );
 
   // Extract system prompt (Anthropic uses top-level `system`)
   String systemPrompt = '';
@@ -102,6 +105,24 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         .toSet();
   }
 
+  Map<String, dynamic>? assistantBlockForClaudeRequest(Map block) {
+    final type = (block['type'] ?? '').toString();
+    if (skipRedactedThinkingBlocks && type == 'redacted_thinking') {
+      return null;
+    }
+    return block.map((key, value) => MapEntry(key.toString(), value));
+  }
+
+  List<Map<String, dynamic>> assistantBlocksForClaudeRequest(
+    Iterable<Map> blocks,
+  ) {
+    return [
+      for (final block in blocks)
+        if (assistantBlockForClaudeRequest(block) case final sanitized?)
+          sanitized,
+    ];
+  }
+
   List<Map<String, dynamic>>? anthropicBlocksFromToolCallMetadata(
     List toolCalls,
   ) {
@@ -121,10 +142,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       if (anthropic is! Map) continue;
       final blocks = anthropic['assistant_blocks'];
       if (blocks is! List || blocks.isEmpty) continue;
-      final candidate = blocks
-          .whereType<Map>()
-          .map((e) => e.cast<String, dynamic>())
-          .toList();
+      final candidate = assistantBlocksForClaudeRequest(
+        blocks.whereType<Map>(),
+      );
       final matchCount = toolUseIdsInBlocks(
         candidate,
       ).where(expectedIds.contains).length;
@@ -402,7 +422,8 @@ Stream<ChatStreamChunk> _sendClaudeStream(
             assistantBlocks.add({'type': 'text', 'text': t});
             buf.write(t);
           }
-        } else if (type == 'thinking' || type == 'redacted_thinking') {
+        } else if (type == 'thinking' ||
+            (type == 'redacted_thinking' && !skipRedactedThinkingBlocks)) {
           // Preserve thinking blocks unmodified for tool-use continuation.
           // When thinking is enabled, the next request must include the last assistant
           // message starting with a thinking/redacted_thinking block.
@@ -574,7 +595,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
               }
             } else if (cb is Map && (cb['type'] == 'redacted_thinking')) {
               flushTextBlock();
-              if (idx != null) {
+              if (!skipRedactedThinkingBlocks && idx != null) {
                 assistantBlocks.add({'type': 'redacted_thinking', 'data': ''});
                 redactedThinkingIndexToAssistantBlock[idx] =
                     assistantBlocks.length - 1;
