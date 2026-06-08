@@ -9,6 +9,7 @@ class _FakeLazyChatService extends ChatService {
   _FakeLazyChatService(this._messages);
 
   final List<ChatMessage> _messages;
+  Map<String, int> versionSelections = const <String, int>{};
   final Set<String> knownConversationIds = <String>{};
   final Set<String> deletedConversationIds = <String>{};
   int fullLoadCalls = 0;
@@ -57,7 +58,7 @@ class _FakeLazyChatService extends ChatService {
 
   @override
   Map<String, int> getVersionSelections(String conversationId) =>
-      const <String, int>{};
+      Map<String, int>.from(versionSelections);
 
   @override
   Conversation? getConversation(String id) {
@@ -252,6 +253,43 @@ void main() {
         expect(collapsedIds, contains('message-99-v1'));
         expect(collapsedIds, isNot(contains('message-99-v0')));
         expect(controller.collapsedMessages.last.id, 'message-99-v1');
+      },
+    );
+
+    test(
+      'collapsed tail window loads selected version when recent window starts inside final version group',
+      () {
+        final finalVersions = List<ChatMessage>.generate(
+          21,
+          (index) => _versionedMessage(
+            id: 'final-v$index',
+            role: 'assistant',
+            groupId: 'final-group',
+            version: index,
+          ),
+        );
+        messages = <ChatMessage>[
+          ...List<ChatMessage>.generate(100, _message),
+          ...finalVersions,
+        ];
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Long chat with a long multi-version final message',
+          messageIds: messages.map((message) => message.id).toList(),
+          versionSelections: const <String, int>{'final-group': 0},
+        );
+        chatService = _FakeLazyChatService(messages)
+          ..versionSelections = const <String, int>{'final-group': 0};
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+
+        controller.setCurrentConversation(conversation);
+
+        expect(controller.messages.first.id, 'final-v1');
+        expect(controller.loadedStartIndex, 101);
+        expect(controller.collapsedMessages.map((message) => message.id), [
+          'final-v0',
+        ]);
       },
     );
 

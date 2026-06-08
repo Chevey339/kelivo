@@ -756,6 +756,12 @@ class ChatController extends ChangeNotifier {
         versionedGroupIds,
       );
     }
+    final firstLoadedGroupId = _messages.isEmpty
+        ? null
+        : (_messages.first.groupId ?? _messages.first.id);
+    final previousLoadedGroupId = _previousLoadedMessageGroupId(
+      conversation.id,
+    );
 
     final result = <ChatMessage>[];
     final emitted = <String>{};
@@ -763,7 +769,11 @@ class ChatController extends ChangeNotifier {
       final groupId = message.groupId ?? message.id;
       final groupMessages = byGroup[groupId] ?? <ChatMessage>[message];
       final groupAnchorIndex = firstIndices[groupId] ?? _loadedStartIndex;
-      if (groupAnchorIndex < _loadedStartIndex && message.version > 0) {
+      final startsInsideGroup =
+          groupId == firstLoadedGroupId && groupId == previousLoadedGroupId;
+      if (groupAnchorIndex < _loadedStartIndex &&
+          message.version > 0 &&
+          !startsInsideGroup) {
         continue;
       }
       if (emitted.add(groupId)) {
@@ -777,6 +787,20 @@ class ChatController extends ChangeNotifier {
     }
 
     return _messagesWithVisibleGroupsCache = result;
+  }
+
+  String? _previousLoadedMessageGroupId(String conversationId) {
+    if (_loadedStartIndex <= 0) return null;
+
+    final previous = _chatService.getMessagesRange(
+      conversationId,
+      start: _loadedStartIndex - 1,
+      limit: 1,
+    );
+    if (previous.isEmpty) return null;
+
+    final message = previous.single;
+    return message.groupId ?? message.id;
   }
 
   /// O(1) lookup of a message's index in the collapsed list.
