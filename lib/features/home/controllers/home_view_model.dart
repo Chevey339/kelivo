@@ -1013,16 +1013,16 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool loadMoreBefore() {
-    final loaded = _chatController.loadMoreBefore();
+  bool loadMoreBefore({String? keepMessageId}) {
+    final loaded = _chatController.loadMoreBefore(keepMessageId: keepMessageId);
     if (!loaded) return false;
     _restoreMessageUiState();
     notifyListeners();
     return true;
   }
 
-  bool loadMoreAfter() {
-    final loaded = _chatController.loadMoreAfter();
+  bool loadMoreAfter({String? keepMessageId}) {
+    final loaded = _chatController.loadMoreAfter(keepMessageId: keepMessageId);
     if (!loaded) return false;
     _restoreMessageUiState();
     notifyListeners();

@@ -3,7 +3,9 @@ import 'dart:ui';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
+import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart'
     as stream_ctrl;
 import 'package:Kelivo/features/home/controllers/streaming_content_notifier.dart';
@@ -560,5 +562,441 @@ void main() {
     scrollController.dispose();
     isProcessingFiles.dispose();
     streamingNotifier.dispose();
+  });
+
+  testWidgets('向上懒加载超长消息时保留当前可见锚点', (tester) async {
+    final scrollController = ChatAutoFollowScrollController();
+    final observerController = ListObserverController(
+      controller: scrollController,
+    );
+    final isProcessingFiles = ValueNotifier<bool>(false);
+
+    ChatMessage longMessage(int index) {
+      return ChatMessage(
+        id: 'message-$index',
+        role: index.isEven ? 'user' : 'assistant',
+        content: [
+          'debug-message-index: $index',
+          for (var block = 0; block < 80; block++)
+            '这是一段用于复现超大对话渲染卡顿的长调试文本。index=$index block=$block',
+        ].join('\n'),
+        conversationId: 'conversation-1',
+      );
+    }
+
+    var messages = <ChatMessage>[for (var i = 20; i < 60; i++) longMessage(i)];
+    var loadCalls = 0;
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: SettingsProvider()),
+          ChangeNotifierProvider.value(value: AssistantProvider()),
+          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(value: UserProvider()),
+          ChangeNotifierProvider.value(value: AskUserInteractionService()),
+          ChangeNotifierProvider.value(value: ToolApprovalService()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              return Scaffold(
+                body: MessageListView(
+                  scrollController: scrollController,
+                  observerController: observerController,
+                  messages: messages,
+                  byGroup: const {},
+                  versionSelections: const {},
+                  reasoning: const {},
+                  reasoningSegments: const {},
+                  contentSplits: const {},
+                  toolParts: const {},
+                  translations: const {},
+                  selecting: false,
+                  selectedItems: const {},
+                  dividerPadding: EdgeInsets.zero,
+                  isProcessingFiles: isProcessingFiles,
+                  hasMoreBefore: true,
+                  onLoadMoreBefore: ({String? keepMessageId}) {
+                    expect(keepMessageId, 'message-20');
+                    setState(() {
+                      messages = <ChatMessage>[
+                        for (var i = 0; i < 20; i++) longMessage(i),
+                        ...messages,
+                      ];
+                    });
+                    loadCalls++;
+                    return true;
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    scrollController.jumpTo(40);
+    await tester.pump();
+
+    ScrollUpdateNotification(
+      metrics: scrollController.position,
+      context: tester.element(find.byType(ListView)),
+      scrollDelta: -80,
+      dragDetails: DragUpdateDetails(
+        globalPosition: tester.getCenter(find.byType(ListView)),
+        delta: const Offset(0, 80),
+        primaryDelta: 80,
+      ),
+    ).dispatch(tester.element(find.byType(ListView)));
+    await tester.pump();
+    await tester.pump();
+
+    expect(loadCalls, 1);
+    expect(scrollController.offset, greaterThan(1200));
+
+    final restoredOffset = scrollController.offset;
+    await tester.pump();
+    expect(scrollController.offset, restoredOffset);
+
+    scrollController.dispose();
+    isProcessingFiles.dispose();
+  });
+
+  testWidgets('向上懒加载估算少补偿时不做二次可见跳动', (tester) async {
+    final scrollController = ChatAutoFollowScrollController();
+    final observerController = ListObserverController(
+      controller: scrollController,
+    );
+    final isProcessingFiles = ValueNotifier<bool>(false);
+
+    ChatMessage message(String id, String content) {
+      return ChatMessage(
+        id: id,
+        role: 'assistant',
+        content: content,
+        conversationId: 'conversation-1',
+      );
+    }
+
+    final tallPreviousContent = List<String>.generate(
+      120,
+      (index) => '短行 $index',
+    ).join('\n');
+    final compactAnchorContent = List<String>.filled(
+      12,
+      '这是一行用于作为锚点的长文本。',
+    ).join();
+    var messages = <ChatMessage>[
+      message('anchor', compactAnchorContent),
+      for (var i = 0; i < 40; i++) message('after-$i', compactAnchorContent),
+    ];
+    var loadCalls = 0;
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: SettingsProvider()),
+          ChangeNotifierProvider.value(value: AssistantProvider()),
+          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(value: UserProvider()),
+          ChangeNotifierProvider.value(value: AskUserInteractionService()),
+          ChangeNotifierProvider.value(value: ToolApprovalService()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              return Scaffold(
+                body: MessageListView(
+                  scrollController: scrollController,
+                  observerController: observerController,
+                  messages: messages,
+                  byGroup: const {},
+                  versionSelections: const {},
+                  reasoning: const {},
+                  reasoningSegments: const {},
+                  contentSplits: const {},
+                  toolParts: const {},
+                  translations: const {},
+                  selecting: false,
+                  selectedItems: const {},
+                  dividerPadding: EdgeInsets.zero,
+                  isProcessingFiles: isProcessingFiles,
+                  hasMoreBefore: true,
+                  onLoadMoreBefore: ({String? keepMessageId}) {
+                    expect(keepMessageId, 'anchor');
+                    setState(() {
+                      messages = <ChatMessage>[
+                        message('previous', tallPreviousContent),
+                        ...messages,
+                      ];
+                    });
+                    loadCalls++;
+                    return true;
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    scrollController.jumpTo(40);
+    await tester.pump();
+    final anchorFinder = find.byKey(const ValueKey('anchor')).first;
+    final originalAnchorTop = tester.getTopLeft(anchorFinder).dy;
+
+    ScrollUpdateNotification(
+      metrics: scrollController.position,
+      context: tester.element(find.byType(ListView)),
+      scrollDelta: -80,
+      dragDetails: DragUpdateDetails(
+        globalPosition: tester.getCenter(find.byType(ListView)),
+        delta: const Offset(0, 80),
+        primaryDelta: 80,
+      ),
+    ).dispatch(tester.element(find.byType(ListView)));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    expect(loadCalls, 1);
+    final restoredAnchorTop = tester.getTopLeft(anchorFinder).dy;
+    expect((restoredAnchorTop - originalAnchorTop).abs(), lessThan(600));
+    final restoredOffset = scrollController.offset;
+    await tester.pump();
+    expect(scrollController.offset, restoredOffset);
+
+    scrollController.dispose();
+    isProcessingFiles.dispose();
+  });
+
+  testWidgets('向上懒加载锚点前已有消息时按真实 prepend 前缀补偿', (tester) async {
+    final scrollController = ChatAutoFollowScrollController();
+    final observerController = ListObserverController(
+      controller: scrollController,
+    );
+    final isProcessingFiles = ValueNotifier<bool>(false);
+
+    ChatMessage message(String id, String content) {
+      return ChatMessage(
+        id: id,
+        role: 'assistant',
+        content: content,
+        conversationId: 'conversation-1',
+      );
+    }
+
+    final tallPrependedContent = List<String>.generate(
+      120,
+      (index) => '新增历史长消息 block=$index 这是一段长调试文本。',
+    ).join('\n');
+    final shortExistingContent = 'old-before';
+    final anchorContent = List<String>.generate(
+      90,
+      (index) => 'debug-message-index: 1104 block=$index 这是一段长调试文本。',
+    ).join('\n');
+    var messages = <ChatMessage>[
+      message('old-before', shortExistingContent),
+      message('anchor', anchorContent),
+      for (var i = 0; i < 40; i++) message('after-$i', anchorContent),
+    ];
+    var loadCalls = 0;
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: SettingsProvider()),
+          ChangeNotifierProvider.value(value: AssistantProvider()),
+          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(value: UserProvider()),
+          ChangeNotifierProvider.value(value: AskUserInteractionService()),
+          ChangeNotifierProvider.value(value: ToolApprovalService()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              return Scaffold(
+                body: MessageListView(
+                  scrollController: scrollController,
+                  observerController: observerController,
+                  messages: messages,
+                  byGroup: const {},
+                  versionSelections: const {},
+                  reasoning: const {},
+                  reasoningSegments: const {},
+                  contentSplits: const {},
+                  toolParts: const {},
+                  translations: const {},
+                  selecting: false,
+                  selectedItems: const {},
+                  dividerPadding: EdgeInsets.zero,
+                  isProcessingFiles: isProcessingFiles,
+                  hasMoreBefore: true,
+                  onLoadMoreBefore: ({String? keepMessageId}) {
+                    expect(keepMessageId, 'old-before');
+                    setState(() {
+                      messages = <ChatMessage>[
+                        message('new-history', tallPrependedContent),
+                        ...messages,
+                      ];
+                    });
+                    loadCalls++;
+                    return true;
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    scrollController.jumpTo(40);
+    await tester.pump();
+    final oldBeforeTop = tester
+        .getTopLeft(find.byKey(const ValueKey('old-before')).first)
+        .dy;
+
+    ScrollUpdateNotification(
+      metrics: scrollController.position,
+      context: tester.element(find.byType(ListView)),
+      scrollDelta: -80,
+      dragDetails: DragUpdateDetails(
+        globalPosition: tester.getCenter(find.byType(ListView)),
+        delta: const Offset(0, 80),
+        primaryDelta: 80,
+      ),
+    ).dispatch(tester.element(find.byType(ListView)));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    expect(loadCalls, 1);
+    final restoredOldBeforeTop = tester
+        .getTopLeft(find.byKey(const ValueKey('old-before')).first)
+        .dy;
+    expect((restoredOldBeforeTop - oldBeforeTop).abs(), lessThan(600));
+
+    scrollController.dispose();
+    isProcessingFiles.dispose();
+  });
+  testWidgets('向上懒加载版本组锚点 id 变化时按 group 保持位置', (tester) async {
+    final scrollController = ChatAutoFollowScrollController();
+    final observerController = ListObserverController(
+      controller: scrollController,
+    );
+    final isProcessingFiles = ValueNotifier<bool>(false);
+
+    ChatMessage versioned(String id, int version, String content) {
+      return ChatMessage(
+        id: id,
+        role: 'assistant',
+        content: content,
+        conversationId: 'conversation-1',
+        groupId: 'anchor-group',
+        version: version,
+      );
+    }
+
+    ChatMessage regular(String id, String content) {
+      return ChatMessage(
+        id: id,
+        role: 'assistant',
+        content: content,
+        conversationId: 'conversation-1',
+      );
+    }
+
+    final longContent = List<String>.generate(
+      90,
+      (index) => 'debug-message-index: 1103 block=$index 这是一段长调试文本。',
+    ).join('\n');
+    var messages = <ChatMessage>[
+      versioned('anchor-v2', 2, longContent),
+      regular('after', longContent),
+    ];
+    var loadCalls = 0;
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: SettingsProvider()),
+          ChangeNotifierProvider.value(value: AssistantProvider()),
+          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(value: UserProvider()),
+          ChangeNotifierProvider.value(value: AskUserInteractionService()),
+          ChangeNotifierProvider.value(value: ToolApprovalService()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              return Scaffold(
+                body: MessageListView(
+                  scrollController: scrollController,
+                  observerController: observerController,
+                  messages: messages,
+                  byGroup: const {},
+                  versionSelections: const {'anchor-group': 2},
+                  reasoning: const {},
+                  reasoningSegments: const {},
+                  contentSplits: const {},
+                  toolParts: const {},
+                  translations: const {},
+                  selecting: false,
+                  selectedItems: const {},
+                  dividerPadding: EdgeInsets.zero,
+                  isProcessingFiles: isProcessingFiles,
+                  hasMoreBefore: true,
+                  onLoadMoreBefore: ({String? keepMessageId}) {
+                    expect(keepMessageId, 'anchor-v2');
+                    setState(() {
+                      messages = <ChatMessage>[
+                        regular('previous', longContent),
+                        versioned('anchor-v0', 0, longContent),
+                        regular('after', longContent),
+                      ];
+                    });
+                    loadCalls++;
+                    return true;
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    scrollController.jumpTo(40);
+    await tester.pump();
+
+    ScrollUpdateNotification(
+      metrics: scrollController.position,
+      context: tester.element(find.byType(ListView)),
+      scrollDelta: -80,
+      dragDetails: DragUpdateDetails(
+        globalPosition: tester.getCenter(find.byType(ListView)),
+        delta: const Offset(0, 80),
+        primaryDelta: 80,
+      ),
+    ).dispatch(tester.element(find.byType(ListView)));
+    await tester.pump();
+    await tester.pump();
+
+    expect(loadCalls, 1);
+    expect(scrollController.offset, greaterThan(1000));
+
+    scrollController.dispose();
+    isProcessingFiles.dispose();
   });
 }

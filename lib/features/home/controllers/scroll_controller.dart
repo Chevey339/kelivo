@@ -18,6 +18,20 @@ class ChatAutoFollowScrollController extends ScrollController {
   /// Callback checked during layout to decide whether to auto-follow bottom.
   bool Function() shouldAutoFollow = () => false;
 
+  double? _pendingHistoryOffsetCorrection;
+
+  void correctNextLayoutBy(double correction) {
+    if (correction.abs() <= 0.5) return;
+    _pendingHistoryOffsetCorrection =
+        (_pendingHistoryOffsetCorrection ?? 0) + correction;
+  }
+
+  double? _takeHistoryOffsetCorrection() {
+    final correction = _pendingHistoryOffsetCorrection;
+    _pendingHistoryOffsetCorrection = null;
+    return correction;
+  }
+
   @override
   ScrollPosition createScrollPosition(
     ScrollPhysics physics,
@@ -49,6 +63,10 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext {
       minScrollExtent,
       maxScrollExtent,
     );
+
+    final historyCorrection = controller._takeHistoryOffsetCorrection();
+    if (_applyCorrection(historyCorrection)) return false;
+
     // Also guard on userScrollDirection here in the layout phase, because it
     // updates immediately via the scroll activity — earlier than the scroll-
     // controller listener that sets _isUserScrolling.  Without this check,
@@ -63,6 +81,16 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext {
       }
     }
     return result;
+  }
+
+  bool _applyCorrection(double? correction) {
+    if (correction == null || correction.abs() <= 0.5) return false;
+    final target = (pixels + correction)
+        .clamp(minScrollExtent, maxScrollExtent)
+        .toDouble();
+    if ((target - pixels).abs() <= 0.5) return false;
+    correctPixels(target);
+    return true;
   }
 }
 

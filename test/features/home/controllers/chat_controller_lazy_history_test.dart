@@ -407,6 +407,105 @@ void main() {
       expect(controller.hasMoreBefore, isTrue);
       expect(controller.hasMoreAfter, isTrue);
     });
+    test(
+      'loading newer history preserves requested visible anchor when trimming',
+      () {
+        messages = List<ChatMessage>.generate(5000, _message);
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Very long chat',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        controller.setCurrentConversation(conversation);
+        controller.loadUntilMessageVisible('message-2500');
+
+        final loaded = controller.loadMoreAfter(keepMessageId: 'message-2485');
+
+        expect(loaded, isTrue);
+        expect(controller.messages.length, ChatService.defaultLoadedWindowMax);
+        expect(
+          controller.messages.any((message) => message.id == 'message-2485'),
+          isTrue,
+        );
+        expect(controller.loadedStartIndex, 2480);
+      },
+    );
+
+    test(
+      'loading older history preserves requested visible anchor when trimming',
+      () {
+        messages = List<ChatMessage>.generate(5000, _message);
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Very long chat',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        controller.setCurrentConversation(conversation);
+        controller.loadUntilMessageVisible('message-2500');
+
+        final loaded = controller.loadMoreBefore(keepMessageId: 'message-2835');
+
+        expect(loaded, isTrue);
+        expect(controller.messages.length, ChatService.defaultLoadedWindowMax);
+        expect(
+          controller.messages.any((message) => message.id == 'message-2835'),
+          isTrue,
+        );
+        expect(controller.loadedStartIndex, 2480);
+      },
+    );
+
+    test(
+      'loading newer history preserves selected version anchor by group',
+      () {
+        final anchorVersions = List<ChatMessage>.generate(
+          24,
+          (index) => _versionedMessage(
+            id: 'anchor-v$index',
+            role: 'assistant',
+            groupId: 'anchor-group',
+            version: index,
+          ),
+        );
+        messages = <ChatMessage>[
+          ...List<ChatMessage>.generate(2480, _message),
+          ...anchorVersions,
+          ...List<ChatMessage>.generate(
+            2600,
+            (index) => _message(2504 + index),
+          ),
+        ];
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Very long chat with versions',
+          messageIds: messages.map((message) => message.id).toList(),
+          versionSelections: const <String, int>{'anchor-group': 0},
+        );
+        chatService = _FakeLazyChatService(messages)
+          ..versionSelections = const <String, int>{'anchor-group': 0};
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        controller.setCurrentConversation(conversation);
+        controller.loadWindowAroundMessage('anchor-v20', leadingContext: 0);
+
+        expect(controller.messages.first.id, 'anchor-v20');
+        expect(controller.collapsedMessages.first.id, 'anchor-v0');
+
+        final loaded = controller.loadMoreAfter(keepMessageId: 'anchor-v0');
+
+        expect(loaded, isTrue);
+        expect(controller.messages.length, ChatService.defaultLoadedWindowMax);
+        expect(controller.loadedStartIndex, 2500);
+        expect(controller.messages.first.id, 'anchor-v20');
+        expect(controller.collapsedMessages.first.id, 'anchor-v0');
+      },
+    );
 
     test(
       'appending a persisted tail message from a middle window loads the tail',

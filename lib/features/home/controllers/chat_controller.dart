@@ -12,6 +12,13 @@ import '../../../core/services/chat/chat_service.dart';
 /// - Conversation loading states (for streaming)
 /// - Conversation stream subscriptions
 /// - Message grouping and collapsing logic
+class _WindowSlice {
+  const _WindowSlice({required this.messages, required this.startIndex});
+
+  final List<ChatMessage> messages;
+  final int startIndex;
+}
+
 class ChatController extends ChangeNotifier {
   factory ChatController({required ChatService chatService}) {
     return ChatController._(chatService);
@@ -199,7 +206,10 @@ class ChatController extends ChangeNotifier {
     _loadedStartIndex = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
   }
 
-  bool loadMoreBefore({int limit = ChatService.defaultHistoryPageSize}) {
+  bool loadMoreBefore({
+    int limit = ChatService.defaultHistoryPageSize,
+    String? keepMessageId,
+  }) {
     final conversation = _currentConversation;
     if (conversation == null || _loadedStartIndex <= 0 || limit <= 0) {
       return false;
@@ -219,13 +229,22 @@ class ChatController extends ChangeNotifier {
     }
 
     final merged = <ChatMessage>[...older, ..._messages];
-    _messages = _trimWindowEnd(merged);
-    _loadedStartIndex = newStart;
+    final slice = _trimWindow(
+      merged: merged,
+      mergedStartIndex: newStart,
+      keepMessageId: keepMessageId,
+      keepHeadWhenNoAnchor: true,
+    );
+    _messages = slice.messages;
+    _loadedStartIndex = slice.startIndex;
     notifyListeners();
     return true;
   }
 
-  bool loadMoreAfter({int limit = ChatService.defaultHistoryPageSize}) {
+  bool loadMoreAfter({
+    int limit = ChatService.defaultHistoryPageSize,
+    String? keepMessageId,
+  }) {
     final conversation = _currentConversation;
     if (conversation == null || !hasMoreAfter || limit <= 0) {
       return false;
@@ -240,13 +259,14 @@ class ChatController extends ChangeNotifier {
     if (newer.isEmpty) return false;
 
     final merged = <ChatMessage>[..._messages, ...newer];
-    final overflow = merged.length - ChatService.defaultLoadedWindowMax;
-    if (overflow > 0) {
-      _messages = merged.sublist(overflow);
-      _loadedStartIndex += overflow;
-    } else {
-      _messages = merged;
-    }
+    final slice = _trimWindow(
+      merged: merged,
+      mergedStartIndex: _loadedStartIndex,
+      keepMessageId: keepMessageId,
+      keepHeadWhenNoAnchor: false,
+    );
+    _messages = slice.messages;
+    _loadedStartIndex = slice.startIndex;
     notifyListeners();
     return true;
   }
@@ -365,9 +385,62 @@ class ChatController extends ChangeNotifier {
     return _chatService.getConversation(conversation.id) ?? conversation;
   }
 
-  List<ChatMessage> _trimWindowEnd(List<ChatMessage> messages) {
-    if (messages.length <= ChatService.defaultLoadedWindowMax) return messages;
-    return messages.sublist(0, ChatService.defaultLoadedWindowMax);
+  _WindowSlice _trimWindow({
+    required List<ChatMessage> merged,
+    required int mergedStartIndex,
+    required String? keepMessageId,
+    required bool keepHeadWhenNoAnchor,
+  }) {
+    const max = ChatService.defaultLoadedWindowMax;
+    if (merged.length <= max) {
+      return _WindowSlice(messages: merged, startIndex: mergedStartIndex);
+    }
+
+    final anchorLocalIndex = _anchorLocalIndex(merged, keepMessageId);
+    if (anchorLocalIndex < 0) {
+      if (keepHeadWhenNoAnchor) {
+        return _WindowSlice(
+          messages: merged.sublist(0, max),
+          startIndex: mergedStartIndex,
+        );
+      }
+      final startLocal = merged.length - max;
+      return _WindowSlice(
+        messages: merged.sublist(startLocal),
+        startIndex: mergedStartIndex + startLocal,
+      );
+    }
+
+    final maxStartLocal = merged.length - max;
+    final startLocal = (anchorLocalIndex - ChatService.defaultHistoryPageSize)
+        .clamp(0, maxStartLocal)
+        .toInt();
+    return _WindowSlice(
+      messages: merged.sublist(startLocal, startLocal + max),
+      startIndex: mergedStartIndex + startLocal,
+    );
+  }
+
+  int _anchorLocalIndex(List<ChatMessage> merged, String? keepMessageId) {
+    if (keepMessageId == null) return -1;
+
+    final exactIndex = merged.indexWhere(
+      (message) => message.id == keepMessageId,
+    );
+    if (exactIndex >= 0) return exactIndex;
+
+    final keepGroupId = _groupIdForVisibleMessage(keepMessageId);
+    if (keepGroupId == null) return -1;
+    return merged.indexWhere(
+      (message) => (message.groupId ?? message.id) == keepGroupId,
+    );
+  }
+
+  String? _groupIdForVisibleMessage(String messageId) {
+    for (final message in _messagesWithVisibleGroups()) {
+      if (message.id == messageId) return message.groupId ?? message.id;
+    }
+    return null;
   }
 
   bool _loadWindow({required int start, required int limit}) {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
@@ -15,6 +16,7 @@ import '../../../shared/widgets/ios_checkbox.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../chat/widgets/message_more_sheet.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
+import '../controllers/scroll_controller.dart';
 import '../controllers/streaming_content_notifier.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../utils/chat_layout_constants.dart';
@@ -195,16 +197,41 @@ class MessageListView extends StatefulWidget {
   onToggleReasoningSegment;
   final Widget Function()? buildPinnedStreamingIndicator;
   final bool hasMoreBefore;
-  final bool Function()? onLoadMoreBefore;
+  final bool Function({String? keepMessageId})? onLoadMoreBefore;
   final bool hasMoreAfter;
-  final bool Function()? onLoadMoreAfter;
+  final bool Function({String? keepMessageId})? onLoadMoreAfter;
 
   @override
   State<MessageListView> createState() => _MessageListViewState();
 }
 
+class _VisibleAnchor {
+  const _VisibleAnchor({
+    required this.messageId,
+    required this.groupId,
+    required this.dyFromViewportTop,
+    required this.itemExtent,
+    required this.itemContentLength,
+    required this.estimatedVisualLineCount,
+  });
+
+  final String messageId;
+  final String groupId;
+  final double dyFromViewportTop;
+  final double itemExtent;
+  final int itemContentLength;
+  final int estimatedVisualLineCount;
+}
+
+enum _HistoryLoadDirection { before, after }
+
 class _MessageListViewState extends State<MessageListView> {
   static const double _streamingUpdateDeferBottomTolerance = 24.0;
+  static const double _historyLoadTopTriggerExtent = 48.0;
+  static const double _historyLoadMinPrefetchExtent = 360.0;
+  static const double _historyLoadViewportFraction = 0.75;
+
+  final Map<String, GlobalKey> _messageItemKeys = <String, GlobalKey>{};
 
   bool _historyLoadScheduled = false;
   final ValueNotifier<bool> _deferStreamingMessageUpdates = ValueNotifier<bool>(
@@ -213,12 +240,115 @@ class _MessageListViewState extends State<MessageListView> {
   DateTime? _lastHistoryLoadAt;
   Timer? _scrollIdleTimer;
   bool _pointerScrollActivityCheckScheduled = false;
+  _VisibleAnchor? _pendingPrependAnchor;
+
+  @override
+  void didUpdateWidget(covariant MessageListView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _schedulePrependLayoutCorrection(oldWidget);
+  }
 
   @override
   void dispose() {
     _scrollIdleTimer?.cancel();
     _deferStreamingMessageUpdates.dispose();
     super.dispose();
+  }
+
+  void _schedulePrependLayoutCorrection(MessageListView oldWidget) {
+    final anchor = _pendingPrependAnchor;
+    if (anchor == null) return;
+    _pendingPrependAnchor = null;
+
+    final insertedEnd = _indexOfExistingFirstMessage(oldWidget.messages);
+    if (insertedEnd <= 0) return;
+
+    final insertedMessages = widget.messages.sublist(0, insertedEnd);
+    final correction = _estimatePrependedExtent(
+      insertedMessages: insertedMessages,
+      oldMessages: oldWidget.messages,
+      anchor: anchor,
+    );
+
+    final controller = widget.scrollController;
+    if (controller is ChatAutoFollowScrollController) {
+      controller.correctNextLayoutBy(correction);
+    }
+  }
+
+  int _indexOfExistingFirstMessage(List<ChatMessage> oldMessages) {
+    if (oldMessages.isEmpty) return -1;
+    final first = oldMessages.first;
+    final exactIndex = widget.messages.indexWhere(
+      (message) => message.id == first.id,
+    );
+    if (exactIndex >= 0) return exactIndex;
+
+    final firstGroupId = first.groupId ?? first.id;
+    return widget.messages.indexWhere(
+      (message) => (message.groupId ?? message.id) == firstGroupId,
+    );
+  }
+
+  double _estimatePrependedExtent({
+    required List<ChatMessage> insertedMessages,
+    required List<ChatMessage> oldMessages,
+    required _VisibleAnchor anchor,
+  }) {
+    if (insertedMessages.isEmpty) return 0;
+    final anchorMessage = oldMessages.cast<ChatMessage?>().firstWhere(
+      (message) => message?.id == anchor.messageId,
+      orElse: () => null,
+    );
+    final anchorContentLength = math.max(anchorMessage?.content.length ?? 0, 1);
+    var total = 0.0;
+    for (final message in insertedMessages) {
+      total += _estimateMessageExtent(
+        message: message,
+        anchor: anchor,
+        anchorContentLength: anchorContentLength,
+      );
+    }
+    return total * 1.06;
+  }
+
+  double _estimateMessageExtent({
+    required ChatMessage message,
+    required _VisibleAnchor anchor,
+    int? anchorContentLength,
+  }) {
+    final insertedLineCount = _estimatedVisualLineCount(message.content);
+    final safeAnchorLineCount = math.max(anchor.estimatedVisualLineCount, 1);
+    const estimatedChromeExtent = 96.0;
+    final dynamicAnchorExtent = math.max(
+      anchor.itemExtent - estimatedChromeExtent,
+      anchor.itemExtent * 0.35,
+    );
+    final estimatedLineExtent = math.max(
+      dynamicAnchorExtent / safeAnchorLineCount,
+      24.0,
+    );
+    final lineBasedExtent =
+        estimatedChromeExtent + estimatedLineExtent * insertedLineCount;
+
+    final safeAnchorContentLength =
+        anchorContentLength ?? math.max(anchor.itemContentLength, 1);
+    final contentRatio =
+        math.max(message.content.length, 1) / safeAnchorContentLength;
+    final lengthBasedExtent = anchor.itemExtent * contentRatio.clamp(0.35, 8.0);
+
+    return math.max(lineBasedExtent, lengthBasedExtent);
+  }
+
+  int _estimatedVisualLineCount(String content) {
+    if (content.isEmpty) return 1;
+    const charsPerVisualLine = 42;
+    var count = 0;
+    for (final line in content.split('\n')) {
+      final length = math.max(line.runes.length, 1);
+      count += (length / charsPerVisualLine).ceil();
+    }
+    return math.max(count, 1);
   }
 
   /// Build the context divider widget shown at truncate position.
@@ -264,6 +394,12 @@ class _MessageListViewState extends State<MessageListView> {
             ((constraints.maxWidth - ChatLayoutConstants.maxContentWidth) / 2)
                 .clamp(0.0, double.infinity);
 
+        _pruneMessageKeys();
+        final indexByMessageId = <String, int>{
+          for (var i = 0; i < widget.messages.length; i++)
+            widget.messages[i].id: i,
+        };
+
         return ValueListenableBuilder<bool>(
           valueListenable: widget.isProcessingFiles,
           builder: (context, isProcessing, child) {
@@ -277,15 +413,29 @@ class _MessageListViewState extends State<MessageListView> {
                     (widget.isPinnedIndicatorActive ? 12 : 0),
               ),
               itemCount: widget.messages.length,
+              scrollCacheExtent: const ScrollCacheExtent.pixels(1200),
+              findChildIndexCallback: (key) {
+                if (key is ValueKey<String>) {
+                  return indexByMessageId[key.value];
+                }
+                return null;
+              },
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               itemBuilder: (context, index) {
                 if (index < 0 || index >= widget.messages.length) {
                   return const SizedBox.shrink();
                 }
-                return _buildMessageItem(
-                  context,
-                  index: index,
-                  isProcessingFiles: isProcessing,
+                final message = widget.messages[index];
+                return KeyedSubtree(
+                  key: ValueKey<String>(message.id),
+                  child: KeyedSubtree(
+                    key: _keyForMessage(message.id),
+                    child: _buildMessageItem(
+                      context,
+                      index: index,
+                      isProcessingFiles: isProcessing,
+                    ),
+                  ),
                 );
               },
             );
@@ -355,34 +505,46 @@ class _MessageListViewState extends State<MessageListView> {
     if (notification is ScrollEndNotification) {
       _scheduleStreamingUpdateResume();
     }
-    if (_historyLoadScheduled) return false;
+    _maybeScheduleHistoryLoad(notification);
+    return false;
+  }
+
+  void _maybeScheduleHistoryLoad(ScrollNotification notification) {
+    if (_historyLoadScheduled) return;
     final now = DateTime.now();
     final last = _lastHistoryLoadAt;
     if (last != null &&
         now.difference(last) < const Duration(milliseconds: 120)) {
-      return false;
+      return;
     }
 
-    final isNearTop = notification.metrics.pixels <= 96;
-    final isNearBottom =
-        notification.metrics.maxScrollExtent - notification.metrics.pixels <=
-        96;
-    if (isNearTop && widget.hasMoreBefore && widget.onLoadMoreBefore != null) {
-      _scheduleHistoryLoad(
-        keepAnchorFromTop: true,
-        beforeExtent: notification.metrics.maxScrollExtent,
-        load: widget.onLoadMoreBefore!,
-      );
-    } else if (isNearBottom &&
+    final metrics = notification.metrics;
+    final bottomPrefetchExtent = math.max(
+      _historyLoadMinPrefetchExtent,
+      metrics.viewportDimension * _historyLoadViewportFraction,
+    );
+    final nearTop = metrics.extentBefore <= _historyLoadTopTriggerExtent;
+    final nearBottom = metrics.extentAfter <= bottomPrefetchExtent;
+
+    double? scrollDelta;
+    if (notification is ScrollUpdateNotification) {
+      scrollDelta = notification.scrollDelta;
+    } else if (notification is OverscrollNotification) {
+      scrollDelta = notification.overscroll;
+    }
+    if (scrollDelta == null || scrollDelta == 0) return;
+
+    if (scrollDelta < 0 &&
+        nearTop &&
+        widget.hasMoreBefore &&
+        widget.onLoadMoreBefore != null) {
+      _scheduleHistoryLoad(direction: _HistoryLoadDirection.before);
+    } else if (scrollDelta > 0 &&
+        nearBottom &&
         widget.hasMoreAfter &&
         widget.onLoadMoreAfter != null) {
-      _scheduleHistoryLoad(
-        keepAnchorFromTop: false,
-        beforeExtent: notification.metrics.maxScrollExtent,
-        load: widget.onLoadMoreAfter!,
-      );
+      _scheduleHistoryLoad(direction: _HistoryLoadDirection.after);
     }
-    return false;
   }
 
   void _schedulePointerScrollActivityCheck() {
@@ -435,37 +597,219 @@ class _MessageListViewState extends State<MessageListView> {
     _deferStreamingMessageUpdates.value = false;
   }
 
-  void _scheduleHistoryLoad({
-    required bool keepAnchorFromTop,
-    required double beforeExtent,
-    required bool Function() load,
+  GlobalKey _keyForMessage(String id) {
+    return _messageItemKeys.putIfAbsent(id, () => GlobalKey());
+  }
+
+  void _pruneMessageKeys() {
+    final aliveIds = widget.messages.map((message) => message.id).toSet();
+    _messageItemKeys.removeWhere((id, _) => !aliveIds.contains(id));
+  }
+
+  _VisibleAnchor? _captureVisibleAnchor() {
+    if (!widget.scrollController.hasClients) return null;
+
+    final viewportRender = context.findRenderObject();
+    if (viewportRender is! RenderBox || !viewportRender.hasSize) {
+      return null;
+    }
+
+    final viewportTop = viewportRender.localToGlobal(Offset.zero).dy;
+    final viewportBottom = viewportTop + viewportRender.size.height;
+
+    for (final message in widget.messages) {
+      final itemContext = _messageItemKeys[message.id]?.currentContext;
+      final itemRender = itemContext?.findRenderObject();
+      if (itemRender is! RenderBox || !itemRender.hasSize) continue;
+
+      final itemTop = itemRender.localToGlobal(Offset.zero).dy;
+      final itemBottom = itemTop + itemRender.size.height;
+      final intersectsViewport =
+          itemBottom >= viewportTop + 8 && itemTop <= viewportBottom - 8;
+      if (!intersectsViewport) continue;
+
+      return _VisibleAnchor(
+        messageId: message.id,
+        groupId: message.groupId ?? message.id,
+        dyFromViewportTop: itemTop - viewportTop,
+        itemExtent: itemRender.size.height,
+        itemContentLength: message.content.length,
+        estimatedVisualLineCount: _estimatedVisualLineCount(message.content),
+      );
+    }
+
+    return null;
+  }
+
+  Future<bool> _restoreVisibleAnchor(
+    _VisibleAnchor? anchor, {
+    required bool allowObserverFallback,
+  }) async {
+    if (anchor == null || !widget.scrollController.hasClients) return false;
+
+    final correction = _calculateAnchorCorrection(anchor);
+    if (correction != null) {
+      _applyAnchorCorrection(correction);
+      return true;
+    }
+
+    if (!allowObserverFallback) return false;
+
+    final anchorIndex = widget.messages.indexWhere(
+      (message) => message.id == anchor.messageId,
+    );
+    if (anchorIndex < 0) return false;
+
+    await widget.observerController.jumpTo(
+      index: anchorIndex,
+      offset: (_) => anchor.dyFromViewportTop,
+    );
+    return true;
+  }
+
+  double? _calculateAnchorCorrection(_VisibleAnchor anchor) {
+    final anchorTop = _currentAnchorTop(anchor);
+    if (anchorTop != null) {
+      return _correctionForAnchorTop(
+        currentAnchorTop: anchorTop,
+        anchor: anchor,
+      );
+    }
+
+    final neighborAnchorTop = _inferredAnchorTopFromNeighbor(anchor);
+    if (neighborAnchorTop != null) {
+      return _correctionForAnchorTop(
+        currentAnchorTop: neighborAnchorTop,
+        anchor: anchor,
+      );
+    }
+
+    return null;
+  }
+
+  double? _currentAnchorTop(_VisibleAnchor anchor) {
+    final render = _renderBoxForMessage(anchor.messageId);
+    return render?.localToGlobal(Offset.zero).dy;
+  }
+
+  double? _inferredAnchorTopFromNeighbor(_VisibleAnchor anchor) {
+    final anchorIndex = widget.messages.indexWhere(
+      (message) => message.id == anchor.messageId,
+    );
+    if (anchorIndex < 0) return null;
+
+    for (var index = anchorIndex - 1; index >= 0; index--) {
+      final render = _renderBoxForMessage(widget.messages[index].id);
+      if (render == null) continue;
+      var inferredAnchorTop =
+          render.localToGlobal(Offset.zero).dy + render.size.height;
+      for (var gap = index + 1; gap < anchorIndex; gap++) {
+        inferredAnchorTop += _estimateMessageExtent(
+          message: widget.messages[gap],
+          anchor: anchor,
+        );
+      }
+      return inferredAnchorTop;
+    }
+
+    for (var index = anchorIndex + 1; index < widget.messages.length; index++) {
+      final render = _renderBoxForMessage(widget.messages[index].id);
+      if (render == null) continue;
+      var inferredAnchorTop = render.localToGlobal(Offset.zero).dy;
+      for (var gap = anchorIndex + 1; gap < index; gap++) {
+        inferredAnchorTop -= _estimateMessageExtent(
+          message: widget.messages[gap],
+          anchor: anchor,
+        );
+      }
+      return inferredAnchorTop - anchor.itemExtent;
+    }
+
+    return null;
+  }
+
+  double? _correctionForAnchorTop({
+    required double currentAnchorTop,
+    required _VisibleAnchor anchor,
   }) {
+    final viewportRender = context.findRenderObject();
+    if (viewportRender is! RenderBox || !viewportRender.hasSize) return null;
+
+    final viewportTop = viewportRender.localToGlobal(Offset.zero).dy;
+    final currentDy = currentAnchorTop - viewportTop;
+    final correction = currentDy - anchor.dyFromViewportTop;
+    if (correction.abs() < 0.5) return 0;
+    return correction;
+  }
+
+  void _applyAnchorCorrection(double correction) {
+    if (correction.abs() < 0.5 || !widget.scrollController.hasClients) return;
+    final position = widget.scrollController.position;
+    final target = (position.pixels + correction)
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    if ((target - position.pixels).abs() <= 0.5) return;
+    widget.scrollController.jumpTo(target);
+  }
+
+  RenderBox? _renderBoxForMessage(String messageId) {
+    final itemContext = _messageItemKeys[messageId]?.currentContext;
+    final itemRender = itemContext?.findRenderObject();
+    if (itemRender is RenderBox && itemRender.hasSize) return itemRender;
+    return null;
+  }
+
+  Future<void> _restoreAfterHistoryLoad(
+    _VisibleAnchor? anchor, {
+    required _HistoryLoadDirection direction,
+  }) async {
+    try {
+      if (mounted) {
+        await _restoreVisibleAnchor(
+          anchor,
+          allowObserverFallback: direction == _HistoryLoadDirection.after,
+        );
+      }
+    } finally {
+      if (mounted) {
+        _historyLoadScheduled = false;
+      }
+    }
+  }
+
+  void _scheduleHistoryLoad({required _HistoryLoadDirection direction}) {
     _historyLoadScheduled = true;
     _lastHistoryLoadAt = DateTime.now();
+    final anchor = _captureVisibleAnchor();
+    if (direction == _HistoryLoadDirection.before) {
+      _pendingPrependAnchor = anchor;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         _historyLoadScheduled = false;
         return;
       }
 
-      final loaded = load();
+      final loaded = switch (direction) {
+        _HistoryLoadDirection.before => widget.onLoadMoreBefore!(
+          keepMessageId: anchor?.messageId,
+        ),
+        _HistoryLoadDirection.after => widget.onLoadMoreAfter!(
+          keepMessageId: anchor?.messageId,
+        ),
+      };
       if (!loaded) {
+        _pendingPrependAnchor = null;
         _historyLoadScheduled = false;
         return;
       }
-
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _historyLoadScheduled = false;
-        if (!mounted || !widget.scrollController.hasClients) return;
-        if (!keepAnchorFromTop) return;
-        final after = widget.scrollController.position.maxScrollExtent;
-        final delta = after - beforeExtent;
-        if (delta <= 0) return;
-        final target = (widget.scrollController.offset + delta).clamp(
-          widget.scrollController.position.minScrollExtent,
-          widget.scrollController.position.maxScrollExtent,
-        );
-        widget.scrollController.jumpTo(target);
+        if (!mounted) {
+          _historyLoadScheduled = false;
+          return;
+        }
+        unawaited(_restoreAfterHistoryLoad(anchor, direction: direction));
       });
     });
   }

@@ -1783,9 +1783,11 @@ class HomePageController extends ChangeNotifier {
         postSwitchDelay: _postSwitchScrollDelay,
       );
 
-  bool loadMoreBefore() => _viewModel.loadMoreBefore();
+  bool loadMoreBefore({String? keepMessageId}) =>
+      _viewModel.loadMoreBefore(keepMessageId: keepMessageId);
 
-  bool loadMoreAfter() => _viewModel.loadMoreAfter();
+  bool loadMoreAfter({String? keepMessageId}) =>
+      _viewModel.loadMoreAfter(keepMessageId: keepMessageId);
 
   List<ChatMessage> allCollapsedMessagesForCurrentConversation() =>
       _chatController.allCollapsedMessagesForCurrentConversation();
