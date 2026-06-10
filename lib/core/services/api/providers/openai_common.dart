@@ -122,7 +122,9 @@ bool _isKimiK25Model(String upstreamModelId) {
 
 bool _isKimiThinkingModel(String upstreamModelId) {
   final lower = upstreamModelId.toLowerCase();
-  return lower.contains('kimi-k2-thinking') || lower.contains('kimi-k2.5');
+  return lower.contains('kimi-k2-thinking') ||
+      lower.contains('kimi-k2.5') ||
+      lower.contains('kimi-k2.6');
 }
 
 void _normalizeMoonshotKimiChatBody(
@@ -159,6 +161,7 @@ Map<String, dynamic> _buildAssistantToolCallMessage({
   dynamic content,
   String? reasoningContent,
   dynamic reasoningDetails,
+  bool includeEmptyReasoningContent = false,
 }) {
   final normalizedContent = switch (content) {
     String value when value.isNotEmpty => value,
@@ -171,7 +174,8 @@ Map<String, dynamic> _buildAssistantToolCallMessage({
     'content': normalizedContent,
     'tool_calls': calls,
   };
-  if (reasoningContent != null && reasoningContent.isNotEmpty) {
+  if (reasoningContent != null &&
+      (reasoningContent.isNotEmpty || includeEmptyReasoningContent)) {
     msg['reasoning_content'] = reasoningContent;
   }
   if (reasoningDetails is List && reasoningDetails.isNotEmpty) {
@@ -1515,6 +1519,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             calls: calls,
             content: msg['content'],
             reasoningContent: needsReasoningEcho ? reasoningForTools : null,
+            includeEmptyReasoningContent: needsReasoningEcho,
             reasoningDetails: preserveReasoningDetails
                 ? reasoningDetailsForTools
                 : null,
@@ -1716,6 +1721,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             calls: calls,
             content: assistantContentBuffer,
             reasoningContent: needsReasoningEcho ? reasoningBuffer : null,
+            includeEmptyReasoningContent: needsReasoningEcho,
             reasoningDetails: preserveReasoningDetails
                 ? reasoningDetailsBuffer
                 : null,
@@ -2178,6 +2184,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 calls: calls2,
                 content: contentAccum,
                 reasoningContent: needsReasoningEcho ? reasoningAccum : null,
+                includeEmptyReasoningContent: needsReasoningEcho,
                 reasoningDetails: preserveReasoningDetails
                     ? reasoningDetailsAccum
                     : null,
@@ -3193,6 +3200,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             calls: calls,
             content: assistantContentBuffer,
             reasoningContent: needsReasoningEcho ? reasoningBuffer : null,
+            includeEmptyReasoningContent: needsReasoningEcho,
             reasoningDetails: preserveReasoningDetails
                 ? reasoningDetailsBuffer
                 : null,
@@ -3666,6 +3674,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 calls: calls2,
                 content: contentAccum,
                 reasoningContent: needsReasoningEcho ? reasoningAccum : null,
+                includeEmptyReasoningContent: needsReasoningEcho,
                 reasoningDetails: preserveReasoningDetails
                     ? reasoningDetailsAccum
                     : null,
@@ -3782,6 +3791,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 calls: calls,
                 content: assistantContentBuffer,
                 reasoningContent: needsReasoningEcho ? reasoningBuffer : null,
+                includeEmptyReasoningContent: needsReasoningEcho,
                 reasoningDetails: preserveReasoningDetails
                     ? reasoningDetailsBuffer
                     : null,
@@ -4227,6 +4237,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     reasoningContent: needsReasoningEcho
                         ? reasoningAccum
                         : null,
+                    includeEmptyReasoningContent: needsReasoningEcho,
                     reasoningDetails: preserveReasoningDetails
                         ? reasoningDetailsAccum
                         : null,

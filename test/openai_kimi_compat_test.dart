@@ -314,5 +314,130 @@ void main() {
       expect(chunks.last.isDone, isTrue);
       expect(toolCallIds.single, isNotEmpty);
     });
+
+    test(
+      'kimi-k2.6 tool continuation includes empty reasoning_content when missing from stream',
+      () async {
+        final secondRequestCompleter = Completer<Map<String, dynamic>>();
+        var requestCount = 0;
+
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requestCount += 1;
+          final body =
+              jsonDecode(await utf8.decoder.bind(request).join())
+                  as Map<String, dynamic>;
+
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+            charset: 'utf-8',
+          );
+
+          if (requestCount == 1) {
+            request.response.write(
+              'data: ${jsonEncode({
+                'id': 'cmpl-k26-tool',
+                'object': 'chat.completion.chunk',
+                'created': 0,
+                'model': 'kimi-k2.6',
+                'choices': [
+                  {
+                    'index': 0,
+                    'delta': {
+                      'role': 'assistant',
+                      'content': '我来帮您查看当前时间。',
+                      'tool_calls': [
+                        {
+                          'index': 0,
+                          'id': 'get_time_info:0',
+                          'type': 'function',
+                          'function': {'name': 'get_time_info', 'arguments': '{}'},
+                        },
+                      ],
+                    },
+                    'finish_reason': 'tool_calls',
+                  },
+                ],
+              })}\n\n',
+            );
+          } else {
+            if (!secondRequestCompleter.isCompleted) {
+              secondRequestCompleter.complete(body);
+            }
+            request.response.write(
+              'data: ${jsonEncode({
+                'id': 'cmpl-k26-final',
+                'object': 'chat.completion.chunk',
+                'created': 0,
+                'model': 'kimi-k2.6',
+                'choices': [
+                  {
+                    'index': 0,
+                    'delta': {'role': 'assistant', 'content': '现在是 15:43'},
+                    'finish_reason': 'stop',
+                  },
+                ],
+              })}\n\n',
+            );
+          }
+
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+        });
+
+        final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _moonshotConfig(baseUrl),
+          modelId: 'kimi-k2.6',
+          messages: const [
+            {'role': 'user', 'content': '现在几点了'},
+          ],
+          tools: const [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'get_time_info',
+                'description': 'Get the current local date and time info',
+                'parameters': {
+                  'type': 'object',
+                  'properties': <String, dynamic>{},
+                },
+              },
+            },
+          ],
+          onToolCall: (name, args, {toolCallId}) async {
+            return '{"time":"15:43:49"}';
+          },
+        ).toList();
+
+        final secondBody = await secondRequestCompleter.future;
+        final messages = (secondBody['messages'] as List)
+            .cast<Map>()
+            .map((e) => e.cast<String, dynamic>())
+            .toList();
+        final assistantToolMessage = messages.firstWhere(
+          (m) => m['role'] == 'assistant' && m['tool_calls'] is List,
+        );
+
+        expect(chunks.last.isDone, isTrue);
+        expect(secondBody.containsKey('reasoning_effort'), isFalse);
+        expect(secondBody.containsKey('thinking'), isFalse);
+        expect(assistantToolMessage['content'], '我来帮您查看当前时间。');
+        expect(assistantToolMessage['reasoning_content'], '');
+        expect(assistantToolMessage['tool_calls'], [
+          {
+            'id': 'get_time_info:0',
+            'type': 'function',
+            'function': {'name': 'get_time_info', 'arguments': '{}'},
+          },
+        ]);
+      },
+    );
   });
 }
