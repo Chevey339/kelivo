@@ -1495,6 +1495,51 @@ Widget _sheetDividerNoIcon(BuildContext context) {
   );
 }
 
+Future<void> _showMobileMessageNavModeSheet(BuildContext context) async {
+  final cs = Theme.of(context).colorScheme;
+  final l10n = AppLocalizations.of(context)!;
+  final choice = await showModalBottomSheet<MobileMessageNavButtonsMode>(
+    context: context,
+    backgroundColor: cs.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _sheetOption(
+              ctx,
+              label: l10n.displaySettingsPageMessageNavButtonsModeAlways,
+              onTap: () =>
+                  Navigator.of(ctx).pop(MobileMessageNavButtonsMode.always),
+            ),
+            _sheetDividerNoIcon(ctx),
+            _sheetOption(
+              ctx,
+              label: l10n.displaySettingsPageMessageNavButtonsModeScroll,
+              onTap: () =>
+                  Navigator.of(ctx).pop(MobileMessageNavButtonsMode.scroll),
+            ),
+            _sheetDividerNoIcon(ctx),
+            _sheetOption(
+              ctx,
+              label: l10n.displaySettingsPageMessageNavButtonsModeNever,
+              onTap: () =>
+                  Navigator.of(ctx).pop(MobileMessageNavButtonsMode.never),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  if (choice == null) return;
+  if (!context.mounted) return;
+  await context.read<SettingsProvider>().setMobileMessageNavButtonsMode(choice);
+}
+
 // --- Subpages ---
 
 class ChatItemDisplaySettingsPage extends StatelessWidget {
@@ -1950,14 +1995,20 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                     context.read<SettingsProvider>().setShowAppUpdates(v),
               ),
               _iosDivider(context),
-              _iosSwitchRow(
+              _iosNavRow(
                 context,
                 icon: Lucide.ChevronRight,
                 label: l10n.displaySettingsPageMessageNavButtonsTitle,
-                value: sp.showMessageNavButtons,
-                onChanged: (v) => context
-                    .read<SettingsProvider>()
-                    .setShowMessageNavButtons(v),
+                detailBuilder: (_) =>
+                    Text(switch (sp.mobileMessageNavButtonsMode) {
+                      MobileMessageNavButtonsMode.always =>
+                        l10n.displaySettingsPageMessageNavButtonsModeAlways,
+                      MobileMessageNavButtonsMode.scroll =>
+                        l10n.displaySettingsPageMessageNavButtonsModeScroll,
+                      MobileMessageNavButtonsMode.never =>
+                        l10n.displaySettingsPageMessageNavButtonsModeNever,
+                    }),
+                onTap: () => _showMobileMessageNavModeSheet(context),
               ),
               _iosDivider(context),
               _iosSwitchRow(
