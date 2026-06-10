@@ -10,6 +10,7 @@ class WebDavConfig {
   final String username;
   final String password;
   final String path;
+  final String userAgent;
   final bool includeChats; // Hive boxes
   final bool includeFiles; // uploads/
 
@@ -18,6 +19,7 @@ class WebDavConfig {
     this.username = '',
     this.password = '',
     this.path = 'kelivo_backups',
+    this.userAgent = '',
     this.includeChats = true,
     this.includeFiles = true,
   });
@@ -27,6 +29,7 @@ class WebDavConfig {
     String? username,
     String? password,
     String? path,
+    String? userAgent,
     bool? includeChats,
     bool? includeFiles,
   }) {
@@ -35,6 +38,7 @@ class WebDavConfig {
       username: username ?? this.username,
       password: password ?? this.password,
       path: path ?? this.path,
+      userAgent: userAgent ?? this.userAgent,
       includeChats: includeChats ?? this.includeChats,
       includeFiles: includeFiles ?? this.includeFiles,
     );
@@ -45,6 +49,7 @@ class WebDavConfig {
     'username': username,
     'password': password,
     'path': path,
+    'userAgent': userAgent,
     'includeChats': includeChats,
     'includeFiles': includeFiles,
   };
@@ -57,6 +62,7 @@ class WebDavConfig {
       path: (json['path'] as String?)?.trim().isNotEmpty == true
           ? (json['path'] as String).trim()
           : 'kelivo_backups',
+      userAgent: (json['userAgent'] as String?) ?? '',
       includeChats: json['includeChats'] as bool? ?? true,
       includeFiles: json['includeFiles'] as bool? ?? true,
     );
@@ -86,6 +92,7 @@ class S3Config {
   final String prefix; // object key prefix/folder
   final bool
   pathStyle; // safer for custom endpoints (no bucket subdomain TLS mismatch)
+  final String userAgent;
   final bool includeChats;
   final bool includeFiles;
 
@@ -98,6 +105,7 @@ class S3Config {
     this.sessionToken = '',
     this.prefix = 'kelivo_backups',
     this.pathStyle = true,
+    this.userAgent = '',
     this.includeChats = true,
     this.includeFiles = true,
   });
@@ -111,6 +119,7 @@ class S3Config {
     String? sessionToken,
     String? prefix,
     bool? pathStyle,
+    String? userAgent,
     bool? includeChats,
     bool? includeFiles,
   }) {
@@ -123,6 +132,7 @@ class S3Config {
       sessionToken: sessionToken ?? this.sessionToken,
       prefix: prefix ?? this.prefix,
       pathStyle: pathStyle ?? this.pathStyle,
+      userAgent: userAgent ?? this.userAgent,
       includeChats: includeChats ?? this.includeChats,
       includeFiles: includeFiles ?? this.includeFiles,
     );
@@ -137,6 +147,7 @@ class S3Config {
     'sessionToken': sessionToken,
     'prefix': prefix,
     'pathStyle': pathStyle,
+    'userAgent': userAgent,
     'includeChats': includeChats,
     'includeFiles': includeFiles,
   };
@@ -155,6 +166,7 @@ class S3Config {
           ? (json['prefix'] as String).trim()
           : 'kelivo_backups',
       pathStyle: json['pathStyle'] as bool? ?? true,
+      userAgent: (json['userAgent'] as String?) ?? '',
       includeChats: json['includeChats'] as bool? ?? true,
       includeFiles: json['includeFiles'] as bool? ?? true,
     );

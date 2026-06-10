@@ -540,6 +540,8 @@
   "backupPageS3SessionToken": "Session Token（可選）",
   "backupPageS3Prefix": "前綴（目錄）",
   "backupPageS3PathStyle": "路徑風格（Path-style）",
+  "backupPageUserAgent": "User-Agent",
+  "backupPageUserAgentHint": "可選",
   "backupPageSave": "儲存",
   "backupPageBackupNow": "立即備份",
   "backupPageLocalBackup": "本機備份",

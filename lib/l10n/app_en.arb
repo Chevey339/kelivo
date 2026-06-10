@@ -668,6 +668,8 @@
   "backupPageS3SessionToken": "Session Token (Optional)",
   "backupPageS3Prefix": "Prefix",
   "backupPageS3PathStyle": "Path-style addressing",
+  "backupPageUserAgent": "User-Agent",
+  "backupPageUserAgentHint": "Optional",
   "backupPageSave": "Save",
   "backupPageBackupNow": "Backup Now",
   "backupPageLocalBackup": "Local Backup",
