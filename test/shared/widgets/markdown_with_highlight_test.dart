@@ -259,6 +259,10 @@ List<int> _displayedImageBytes(WidgetTester tester) {
   return (provider as MemoryImage).bytes;
 }
 
+Finder _findSoftHorizontalRule() {
+  return find.byKey(const ValueKey('markdown-soft-horizontal-rule'));
+}
+
 Widget _markdownHarness(
   String text, {
   double? width,
@@ -391,6 +395,60 @@ void main() {
       '| Bob \\| Jr. | said "hello" |  |',
     );
   });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight renders markdown horizontal rule markers',
+    (tester) async {
+      for (final marker in ['---', '***', '___']) {
+        await tester.pumpWidget(
+          _markdownHarness('Before\n\n$marker\n\nAfter', width: 360),
+        );
+        await tester.pump();
+
+        expect(
+          _findSoftHorizontalRule(),
+          findsOneWidget,
+          reason: '$marker should render as a horizontal rule',
+        );
+        expect(
+          find.textContaining(marker),
+          findsNothing,
+          reason: '$marker should not remain as visible marker text',
+        );
+        expect(find.textContaining('Before'), findsOneWidget);
+        expect(find.textContaining('After'), findsOneWidget);
+      }
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps non-hr asterisks out of horizontal rules',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('''
+* list item
+
+Inline ***strong emphasis*** text.
+
+```markdown
+***
+```
+''', width: 360),
+      );
+      await tester.pump();
+
+      expect(_findSoftHorizontalRule(), findsNothing);
+      expect(find.textContaining('list item'), findsOneWidget);
+      expect(find.textContaining('strong emphasis'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(SelectableHighlightView),
+          matching: find.textContaining('***'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'MarkdownWithCodeHighlight renders grouped raw citation metadata as separate capsules',

@@ -4389,13 +4389,14 @@ class _MermaidErrorView extends StatelessWidget {
 // Full-width horizontal rule with softer color
 class SoftHrLine extends BlockMd {
   @override
-  String get expString => (r"^\s*(?:-{3,}|⸻)\s*$");
+  String get expString => (r"^\s*(?:-{3,}|\*{3,}|_{3,}|⸻)\s*$");
 
   @override
   Widget build(BuildContext context, String text, GptMarkdownConfig config) {
     final cs = Theme.of(context).colorScheme;
     final color = cs.outlineVariant.withValues(alpha: 0.4);
     return Padding(
+      key: const ValueKey('markdown-soft-horizontal-rule'),
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Container(
         width: double.infinity,
