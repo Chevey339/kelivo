@@ -1561,13 +1561,151 @@ String _escapeInlineMathSpecials(String tex) {
   final buf = StringBuffer();
   for (var i = 0; i < tex.length; i++) {
     final ch = tex.codeUnitAt(i);
-    if (ch == 0x23 && !_isEscaped(tex, i)) {
+    if (ch == 0x23 &&
+        !_isEscaped(tex, i) &&
+        !_isTexColorHexArgumentPrefix(tex, i)) {
       buf.write(r'\#');
     } else {
       buf.writeCharCode(ch);
     }
   }
   return buf.toString();
+}
+
+bool _isTexColorHexArgumentPrefix(String tex, int index) {
+  final open = _findContainingBraceOpen(tex, index);
+  if (open == -1) return false;
+
+  final close = _findMatchingCloseBrace(tex, open);
+  if (close == -1 || index >= close) return false;
+  if (!_isExactHexColorArgument(tex, open, index, close)) return false;
+
+  return _isTexColorArgumentGroup(tex, open);
+}
+
+bool _isExactHexColorArgument(String tex, int open, int hash, int close) {
+  if (hash != open + 1) return false;
+  final hexDigits = close - hash - 1;
+  if (hexDigits != 3 && hexDigits != 6) return false;
+
+  for (var i = hash + 1; i < close; i++) {
+    if (!_isAsciiHexDigit(tex.codeUnitAt(i))) return false;
+  }
+  return true;
+}
+
+bool _isAsciiHexDigit(int codeUnit) {
+  return _isAsciiDigit(codeUnit) ||
+      (codeUnit >= 0x41 && codeUnit <= 0x46) ||
+      (codeUnit >= 0x61 && codeUnit <= 0x66);
+}
+
+int _findContainingBraceOpen(String tex, int index) {
+  final stack = <int>[];
+
+  for (var i = 0; i < index; i++) {
+    final ch = tex.codeUnitAt(i);
+    if (ch == 0x5C) {
+      i++;
+      continue;
+    }
+    if (ch == 0x7B) {
+      stack.add(i);
+    } else if (ch == 0x7D && stack.isNotEmpty) {
+      stack.removeLast();
+    }
+  }
+
+  return stack.isEmpty ? -1 : stack.last;
+}
+
+int _findMatchingCloseBrace(String tex, int open) {
+  var depth = 0;
+  for (var i = open; i < tex.length; i++) {
+    final ch = tex.codeUnitAt(i);
+    if (ch == 0x5C) {
+      i++;
+      continue;
+    }
+    if (ch == 0x7B) {
+      depth++;
+    } else if (ch == 0x7D) {
+      depth--;
+      if (depth == 0) return i;
+    }
+  }
+  return -1;
+}
+
+int _findMatchingOpenBrace(String tex, int close) {
+  var depth = 0;
+  for (var i = close; i >= 0; i--) {
+    final ch = tex.codeUnitAt(i);
+    if (_isEscaped(tex, i)) continue;
+    if (ch == 0x7D) {
+      depth++;
+    } else if (ch == 0x7B) {
+      depth--;
+      if (depth == 0) return i;
+    }
+  }
+  return -1;
+}
+
+String? _controlWordEndingAt(String tex, int index) {
+  if (index < 0 ||
+      index >= tex.length ||
+      !_isAsciiLetter(tex.codeUnitAt(index))) {
+    return null;
+  }
+
+  var start = index;
+  while (start >= 0 && _isAsciiLetter(tex.codeUnitAt(start))) {
+    start--;
+  }
+  if (start < 0 || tex.codeUnitAt(start) != 0x5C) return null;
+  return tex.substring(start, index + 1);
+}
+
+bool _isTexColorArgumentGroup(String tex, int open) {
+  var argOpen = open;
+  var argumentIndex = 0;
+
+  while (true) {
+    var prev = _previousNonWhitespaceIndex(tex, argOpen - 1);
+    if (prev == -1) return false;
+
+    if (tex.codeUnitAt(prev) == 0x5D) {
+      final optionalOpen = _findMatchingOpenBracket(tex, prev);
+      if (optionalOpen == -1) return false;
+      prev = _previousNonWhitespaceIndex(tex, optionalOpen - 1);
+      if (prev == -1) return false;
+    }
+
+    if (tex.codeUnitAt(prev) == 0x7D && !_isEscaped(tex, prev)) {
+      final previousArgOpen = _findMatchingOpenBrace(tex, prev);
+      if (previousArgOpen == -1) return false;
+      argumentIndex++;
+      argOpen = previousArgOpen;
+      continue;
+    }
+
+    final command = _controlWordEndingAt(tex, prev);
+    if (command == null) return false;
+    return _isTexColorCommandArgument(command, argumentIndex);
+  }
+}
+
+bool _isTexColorCommandArgument(String command, int argumentIndex) {
+  switch (command) {
+    case r'\color':
+    case r'\textcolor':
+    case r'\colorbox':
+      return argumentIndex == 0;
+    case r'\fcolorbox':
+      return argumentIndex == 0 || argumentIndex == 1;
+  }
+  return false;
 }
 
 String _escapeLikelyLiteralMathBraces(String tex) {

@@ -2248,6 +2248,33 @@ A-->B
   );
 
   testWidgets(
+    r'MarkdownWithCodeHighlight keeps hex colors in inline math color commands',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+颜色\(\color{#FF5733}{A}\)，文字色\(\textcolor{#228B22}{B}\)，背景\(\colorbox{#197}{C}\)，符号\(#\)。
+'''),
+      );
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(4));
+      expect(
+        mathWidgets.map((widget) => widget.parseError),
+        everyElement(isNull),
+      );
+      final encoded = _encodedMathTex(tester);
+      expect(encoded[0].toLowerCase(), contains('ff5733'));
+      expect(encoded[0], isNot(contains(r'\#FF5733')));
+      expect(encoded[1].toLowerCase(), contains('228b22'));
+      expect(encoded[1], isNot(contains(r'\#228B22')));
+      expect(encoded[2], isNot(contains(r'\#197')));
+      expect(encoded[3], contains(r'\#'));
+      expect(find.textContaining(r'\(\color{#FF5733}{A}\)'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps literal double dollars from spanning prose',
     (tester) async {
       await tester.pumpWidget(
