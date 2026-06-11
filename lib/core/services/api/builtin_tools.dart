@@ -168,6 +168,8 @@ abstract class BuiltInToolsHelper {
     final normalized = _normalizedModelId(modelId);
     if (normalized.contains('mythos')) return true;
     const supported = <String>{
+      'claude-fable-5',
+      'claude-opus-4-8',
       'claude-opus-4-7',
       'claude-opus-4-6',
       'claude-sonnet-4-5-20250929',
@@ -185,6 +187,8 @@ abstract class BuiltInToolsHelper {
   static bool isClaudeDynamicWebSearchSupportedModel(String? modelId) {
     final normalized = _normalizedModelId(modelId);
     return normalized.contains('mythos') ||
+        normalized == 'claude-fable-5' ||
+        normalized == 'claude-opus-4-8' ||
         normalized == 'claude-opus-4-7' ||
         normalized == 'claude-opus-4-6' ||
         normalized == 'claude-sonnet-4-6';

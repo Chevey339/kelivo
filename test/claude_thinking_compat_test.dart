@@ -367,6 +367,99 @@ void main() {
     );
 
     test(
+      'Opus 4.8 uses adaptive thinking with xhigh effort and strips sampling',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-opus-4-8',
+          thinkingBudget: 64000,
+          temperature: 0.7,
+          topP: 0.8,
+        );
+
+        expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+        expect(body['output_config'], {'effort': 'xhigh'});
+        expect(body.containsKey('temperature'), isFalse);
+        expect(body.containsKey('top_p'), isFalse);
+      },
+    );
+
+    test('Fable 5 never sends unsupported disabled thinking', () async {
+      final offBody = await _captureClaudeRequestBody(
+        modelId: 'claude-fable-5',
+        thinkingBudget: 0,
+        temperature: 0.7,
+        topP: 0.8,
+      );
+      final mediumBody = await _captureClaudeRequestBody(
+        modelId: 'claude-fable-5',
+        thinkingBudget: 16000,
+      );
+
+      expect(offBody.containsKey('thinking'), isFalse);
+      expect(offBody.containsKey('output_config'), isFalse);
+      expect(offBody.containsKey('temperature'), isFalse);
+      expect(offBody.containsKey('top_p'), isFalse);
+      expect(mediumBody['thinking'], {
+        'type': 'adaptive',
+        'display': 'summarized',
+      });
+      expect(mediumBody['output_config'], {'effort': 'medium'});
+    });
+
+    test('OpenRouter Anthropic format uses Claude messages path', () async {
+      late Uri requestUri;
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestUri = request.uri;
+        requestBody =
+            (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                .cast<String, dynamic>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'id': 'msg_1',
+            'content': [
+              {'type': 'text', 'text': 'ok'},
+            ],
+            'usage': {'input_tokens': 1, 'output_tokens': 1},
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: ProviderConfig(
+          id: 'OpenRouterAnthropic',
+          enabled: true,
+          name: 'OpenRouter Anthropic',
+          apiKey: 'test-key',
+          baseUrl: 'http://${server.address.address}:${server.port}',
+          providerType: ProviderKind.claude,
+        ),
+        modelId: 'anthropic/claude-fable-5',
+        messages: const [
+          {'role': 'user', 'content': 'hello'},
+        ],
+        thinkingBudget: 16000,
+        stream: false,
+      ).toList();
+
+      expect(chunks.last.isDone, isTrue);
+      expect(requestUri.path, '/messages');
+      expect(requestBody['thinking'], {
+        'type': 'adaptive',
+        'display': 'summarized',
+      });
+      expect(requestBody['output_config'], {'effort': 'medium'});
+    });
+
+    test(
       'Opus 4.7 off keeps sampling params and omits output config',
       () async {
         final body = await _captureClaudeRequestBody(
@@ -453,14 +546,23 @@ void main() {
       );
     });
 
-    test('Claude built-in search support list includes Opus 4.7', () {
-      expect(
-        BuiltInToolsHelper.isClaudeBuiltInSearchSupportedModel(
-          'claude-opus-4-7',
-        ),
-        isTrue,
-      );
-    });
+    test(
+      'Claude built-in search support list includes Opus 4.8 and Fable 5',
+      () {
+        expect(
+          BuiltInToolsHelper.isClaudeBuiltInSearchSupportedModel(
+            'claude-opus-4-8',
+          ),
+          isTrue,
+        );
+        expect(
+          BuiltInToolsHelper.isClaudeBuiltInSearchSupportedModel(
+            'claude-fable-5',
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('Claude dynamic web search support matrix is official-only', () {
       final official = _claudeConfig(
@@ -472,7 +574,14 @@ void main() {
       expect(
         BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
           cfg: official,
-          modelId: 'claude-opus-4-7',
+          modelId: 'claude-opus-4-8',
+        ),
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
+          cfg: official,
+          modelId: 'claude-fable-5',
         ),
         isTrue,
       );
