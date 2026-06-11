@@ -7472,6 +7472,12 @@ abstract class AppLocalizations {
   /// **'Chat Background Overlay Opacity'**
   String get displaySettingsPageChatBackgroundMaskTitle;
 
+  /// No description provided for @displaySettingsPageChatInputBackgroundOpacityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Input Box Background Opacity'**
+  String get displaySettingsPageChatInputBackgroundOpacityTitle;
+
   /// No description provided for @displaySettingsPageThemeSettingsTitle.
   ///
   /// In en, this message translates to:

@@ -173,6 +173,10 @@ class SettingsProvider extends ChangeNotifier {
       'display_auto_scroll_idle_seconds_v1';
   static const String _displayChatBackgroundMaskStrengthKey =
       'display_chat_background_mask_strength_v1';
+  static const String _displayChatInputBackgroundOpacityLightKey =
+      'display_chat_input_background_opacity_light_v1';
+  static const String _displayChatInputBackgroundOpacityDarkKey =
+      'display_chat_input_background_opacity_dark_v1';
   static const String _displayEnableDollarLatexKey =
       'display_enable_dollar_latex_v1';
   static const String _displayEnableMathRenderingKey =
@@ -935,6 +939,14 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getInt(_displayAutoScrollIdleSecondsKey) ?? 8;
     _chatBackgroundMaskStrength =
         prefs.getDouble(_displayChatBackgroundMaskStrengthKey) ?? 1.0;
+    _chatInputBackgroundOpacityLight =
+        (prefs.getDouble(_displayChatInputBackgroundOpacityLightKey) ??
+                defaultChatInputBackgroundOpacityLight)
+            .clamp(0.0, 1.0);
+    _chatInputBackgroundOpacityDark =
+        (prefs.getDouble(_displayChatInputBackgroundOpacityDarkKey) ??
+                defaultChatInputBackgroundOpacityDark)
+            .clamp(0.0, 1.0);
     final pureBgPref = prefs.getBool(_displayUsePureBackgroundKey);
     if (pureBgPref == null) {
       final isDesktop =
@@ -3460,6 +3472,45 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setDouble(
       _displayChatBackgroundMaskStrengthKey,
       _chatBackgroundMaskStrength,
+    );
+  }
+
+  // Display: chat input background opacity by theme brightness.
+  static const double defaultChatInputBackgroundOpacityLight = 0.8236;
+  static const double defaultChatInputBackgroundOpacityDark = 0.7396;
+  double _chatInputBackgroundOpacityLight =
+      defaultChatInputBackgroundOpacityLight;
+  double _chatInputBackgroundOpacityDark =
+      defaultChatInputBackgroundOpacityDark;
+  double get chatInputBackgroundOpacityLight =>
+      _chatInputBackgroundOpacityLight;
+  double get chatInputBackgroundOpacityDark => _chatInputBackgroundOpacityDark;
+
+  double chatInputBackgroundOpacityFor(Brightness brightness) {
+    return brightness == Brightness.dark
+        ? _chatInputBackgroundOpacityDark
+        : _chatInputBackgroundOpacityLight;
+  }
+
+  Future<void> setChatInputBackgroundOpacity(
+    Brightness brightness,
+    double opacity,
+  ) async {
+    final v = opacity.clamp(0.0, 1.0);
+    if (brightness == Brightness.dark) {
+      if (_chatInputBackgroundOpacityDark == v) return;
+      _chatInputBackgroundOpacityDark = v;
+    } else {
+      if (_chatInputBackgroundOpacityLight == v) return;
+      _chatInputBackgroundOpacityLight = v;
+    }
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(
+      brightness == Brightness.dark
+          ? _displayChatInputBackgroundOpacityDarkKey
+          : _displayChatInputBackgroundOpacityLightKey,
+      v,
     );
   }
 

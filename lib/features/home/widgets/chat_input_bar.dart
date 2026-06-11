@@ -97,6 +97,10 @@ class ChatInputBar extends StatefulWidget {
     this.conversationId,
     this.sendButtonTooltip,
     this.backgroundImageActive = false,
+    this.inputBackgroundOpacityLight =
+        SettingsProvider.defaultChatInputBackgroundOpacityLight,
+    this.inputBackgroundOpacityDark =
+        SettingsProvider.defaultChatInputBackgroundOpacityDark,
   });
 
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
@@ -144,6 +148,8 @@ class ChatInputBar extends StatefulWidget {
   final String? conversationId;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
+  final double inputBackgroundOpacityLight;
+  final double inputBackgroundOpacityDark;
 
   @override
   State<ChatInputBar> createState() => _ChatInputBarState();
@@ -177,6 +183,33 @@ class _ChatInputBarState extends State<ChatInputBar>
   String? _dismissedImageModeModelKey;
 
   bool get _composerLocked => widget.hasQueuedInput;
+
+  Color _inputFillColor({
+    required ThemeData theme,
+    required bool backgroundImageActive,
+    required double lightOpacity,
+    required double darkOpacity,
+  }) {
+    final isDark = theme.brightness == Brightness.dark;
+    final configuredOpacity = (isDark ? darkOpacity : lightOpacity)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final backgroundRatio = isDark
+        ? 0.545 / SettingsProvider.defaultChatInputBackgroundOpacityDark
+        : 0.5296 / SettingsProvider.defaultChatInputBackgroundOpacityLight;
+    final targetOpacity = backgroundImageActive
+        ? configuredOpacity * backgroundRatio
+        : configuredOpacity;
+    final overlayAlpha = isDark ? (backgroundImageActive ? 0.09 : 0.07) : 0.02;
+    final overlayTint = isDark
+        ? Colors.white.withValues(alpha: overlayAlpha)
+        : theme.colorScheme.primary.withValues(alpha: overlayAlpha);
+    final baseAlpha = ((targetOpacity - overlayAlpha) / (1.0 - overlayAlpha))
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final base = theme.colorScheme.surface.withValues(alpha: baseAlpha);
+    return Color.alphaBlend(overlayTint, base).withValues(alpha: targetOpacity);
+  }
 
   bool _supportsImagesApiRouting(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
@@ -1632,22 +1665,12 @@ class _ChatInputBarState extends State<ChatInputBar>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final inputFillBase = theme.colorScheme.surface.withValues(
-      alpha: widget.backgroundImageActive
-          ? (isDark ? 0.50 : 0.52)
-          : (isDark ? 0.72 : 0.82),
+    final inputFillColor = _inputFillColor(
+      theme: theme,
+      backgroundImageActive: widget.backgroundImageActive,
+      lightOpacity: widget.inputBackgroundOpacityLight,
+      darkOpacity: widget.inputBackgroundOpacityDark,
     );
-    final inputFillColor = isDark
-        ? Color.alphaBlend(
-            Colors.white.withValues(
-              alpha: widget.backgroundImageActive ? 0.09 : 0.07,
-            ),
-            inputFillBase,
-          )
-        : Color.alphaBlend(
-            theme.colorScheme.primary.withValues(alpha: 0.02),
-            inputFillBase,
-          );
     final hasText = _controller.text.trim().isNotEmpty;
     final hasImages = _images.isNotEmpty;
     final hasDocs = _docs.isNotEmpty;

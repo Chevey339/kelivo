@@ -1353,6 +1353,7 @@
   "displaySettingsPageAutoScrollDisabledLabel": "已关闭",
   "displaySettingsPageChatFontSampleText": "这是一个示例的聊天文本",
   "displaySettingsPageChatBackgroundMaskTitle": "背景图片遮罩透明度",
+  "displaySettingsPageChatInputBackgroundOpacityTitle": "输入框背景透明度",
   "displaySettingsPageThemeSettingsTitle": "主题设置",
   "displaySettingsPageThemeColorTitle": "主题颜色",
   "desktopSettingsFontsTitle": "字体设置",

@@ -4028,6 +4028,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Chat Background Overlay Opacity';
 
   @override
+  String get displaySettingsPageChatInputBackgroundOpacityTitle =>
+      'Input Box Background Opacity';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => 'Theme Settings';
 
   @override

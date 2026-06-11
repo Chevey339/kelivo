@@ -3861,6 +3861,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageChatBackgroundMaskTitle => '背景图片遮罩透明度';
 
   @override
+  String get displaySettingsPageChatInputBackgroundOpacityTitle => '输入框背景透明度';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => '主题设置';
 
   @override
@@ -9122,6 +9125,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageChatBackgroundMaskTitle => '背景图片遮罩透明度';
 
   @override
+  String get displaySettingsPageChatInputBackgroundOpacityTitle => '输入框背景透明度';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => '主题设置';
 
   @override
@@ -14379,6 +14385,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageChatBackgroundMaskTitle => '聊天背景遮罩透明度';
+
+  @override
+  String get displaySettingsPageChatInputBackgroundOpacityTitle => '輸入框背景透明度';
 
   @override
   String get displaySettingsPageThemeSettingsTitle => '主題設定';
