@@ -3797,6 +3797,12 @@ abstract class AppLocalizations {
   /// **'Extreme Reasoning'**
   String get reasoningBudgetSheetXhigh;
 
+  /// No description provided for @reasoningBudgetSheetMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum Reasoning'**
+  String get reasoningBudgetSheetMax;
+
   /// No description provided for @reasoningBudgetSheetTitle.
   ///
   /// In en, this message translates to:

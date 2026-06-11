@@ -660,6 +660,7 @@
   "reasoningBudgetSheetMedium": "中度推理",
   "reasoningBudgetSheetHeavy": "重度推理",
   "reasoningBudgetSheetXhigh": "极限推理",
+  "reasoningBudgetSheetMax": "全力推理",
   "reasoningBudgetSheetTitle": "思维链强度",
   "reasoningBudgetSheetCurrentLevel": "当前档位：{level}",
   "reasoningBudgetSheetOffSubtitle": "关闭推理功能，直接回答",

@@ -1973,6 +1973,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reasoningBudgetSheetXhigh => 'Extreme Reasoning';
 
   @override
+  String get reasoningBudgetSheetMax => 'Maximum Reasoning';
+
+  @override
   String get reasoningBudgetSheetTitle => 'Reasoning Chain Strength';
 
   @override

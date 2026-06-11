@@ -663,6 +663,7 @@
   "reasoningBudgetSheetMedium": "中度推理",
   "reasoningBudgetSheetHeavy": "重度推理",
   "reasoningBudgetSheetXhigh": "極限推理",
+  "reasoningBudgetSheetMax": "全力推理",
   "reasoningBudgetSheetTitle": "思維鏈強度",
   "reasoningBudgetSheetCurrentLevel": "目前檔位：{level}",
   "reasoningBudgetSheetOffSubtitle": "關閉推理功能，直接回答",

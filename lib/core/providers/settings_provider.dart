@@ -417,14 +417,87 @@ class SettingsProvider extends ChangeNotifier {
         final rawOv = cfg.modelOverrides[modelId];
         final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
         final modelForCheck = resolveApiModelIdOverride(ov, modelId);
-        return _isDeepSeekClaudeCompatible(cfg, modelForCheck);
+        return _isDeepSeekClaudeCompatible(cfg, modelForCheck) ||
+            _claudeSupportsXhighReasoning(modelForCheck);
       case ProviderKind.google:
         return false;
     }
   }
 
+  bool supportsMaxReasoning(String providerKey, String modelId) {
+    final cfg = getProviderConfig(providerKey);
+    final kind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
+    switch (kind) {
+      case ProviderKind.openai:
+      case ProviderKind.google:
+        return false;
+      case ProviderKind.claude:
+        final rawOv = cfg.modelOverrides[modelId];
+        final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
+        final modelForCheck = resolveApiModelIdOverride(ov, modelId);
+        return _isDeepSeekClaudeCompatible(cfg, modelForCheck) ||
+            _claudeSupportsMaxReasoning(modelForCheck);
+    }
+  }
+
   bool supportsOpenAIXhighReasoning(String providerKey, String modelId) {
     return supportsXhighReasoning(providerKey, modelId);
+  }
+
+  bool _claudeSupportsXhighReasoning(String modelId) {
+    final lower = modelId.trim().toLowerCase();
+    if (!lower.contains('claude-')) return false;
+    if (lower.contains('fable') || lower.contains('mythos')) return true;
+    final m = RegExp(
+      r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
+      caseSensitive: false,
+    ).firstMatch(lower);
+    if (m == null) {
+      return lower.contains('claude-opus-4-7') ||
+          lower.contains('claude-opus-4.7') ||
+          lower.contains('claude-opus-4-8') ||
+          lower.contains('claude-opus-4.8');
+    }
+    final family = (m.group(1) ?? '').toLowerCase();
+    final major = int.tryParse(m.group(2) ?? '');
+    final minor = int.tryParse(m.group(3) ?? '');
+    if (major == null || minor == null) return false;
+    if (family == 'opus' && (major > 4 || (major == 4 && minor >= 7))) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _claudeSupportsMaxReasoning(String modelId) {
+    final lower = modelId.trim().toLowerCase();
+    if (!lower.contains('claude-')) return false;
+    if (lower.contains('fable') || lower.contains('mythos')) return true;
+    final m = RegExp(
+      r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
+      caseSensitive: false,
+    ).firstMatch(lower);
+    if (m == null) {
+      return lower.contains('claude-opus-4-7') ||
+          lower.contains('claude-opus-4.7') ||
+          lower.contains('claude-opus-4-8') ||
+          lower.contains('claude-opus-4.8') ||
+          lower.contains('claude-opus-4-6') ||
+          lower.contains('claude-opus-4.6') ||
+          lower.contains('claude-sonnet-4-6') ||
+          lower.contains('claude-sonnet-4.6');
+    }
+    final family = (m.group(1) ?? '').toLowerCase();
+    final major = int.tryParse(m.group(2) ?? '');
+    final minor = int.tryParse(m.group(3) ?? '');
+    if (major == null || minor == null) return false;
+    if (family == 'opus' && (major > 4 || (major == 4 && minor >= 7))) {
+      return true;
+    }
+    if (major == 4 && minor == 6) return true;
+    return false;
   }
 
   bool _isDeepSeekClaudeCompatible(ProviderConfig cfg, String modelId) {

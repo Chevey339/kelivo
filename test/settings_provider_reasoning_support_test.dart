@@ -75,5 +75,70 @@ void main() {
         );
       },
     );
+
+    test(
+      'Claude latest models expose xhigh and max reasoning without presets',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final settings = SettingsProvider();
+
+        await _waitForSettingsLoad();
+        await settings.setProviderConfig(
+          'Claude',
+          ProviderConfig(
+            id: 'Claude',
+            enabled: true,
+            name: 'Claude',
+            apiKey: 'test-key',
+            baseUrl: 'https://api.anthropic.com/v1',
+            providerType: ProviderKind.claude,
+            models: const ['claude-fable-5', 'claude-opus-4-8'],
+          ),
+        );
+
+        for (final model in const ['claude-fable-5', 'claude-opus-4-8']) {
+          expect(settings.supportsXhighReasoning('Claude', model), isTrue);
+          expect(settings.supportsMaxReasoning('Claude', model), isTrue);
+        }
+        expect(settings.getProviderConfig('Claude').models, [
+          'claude-fable-5',
+          'claude-opus-4-8',
+        ]);
+      },
+    );
+
+    test('OpenRouter Anthropic format exposes Claude max reasoning', () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = SettingsProvider();
+
+      await _waitForSettingsLoad();
+      await settings.setProviderConfig(
+        'OpenRouterAnthropic',
+        ProviderConfig(
+          id: 'OpenRouterAnthropic',
+          enabled: true,
+          name: 'OpenRouter Anthropic',
+          apiKey: 'test-key',
+          baseUrl: 'https://openrouter.ai/api/v1',
+          providerType: ProviderKind.claude,
+          models: const ['anthropic/claude-fable-5'],
+        ),
+      );
+
+      expect(
+        settings.supportsXhighReasoning(
+          'OpenRouterAnthropic',
+          'anthropic/claude-fable-5',
+        ),
+        isTrue,
+      );
+      expect(
+        settings.supportsMaxReasoning(
+          'OpenRouterAnthropic',
+          'anthropic/claude-fable-5',
+        ),
+        isTrue,
+      );
+    });
   });
 }

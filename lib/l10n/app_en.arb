@@ -778,6 +778,7 @@
   "reasoningBudgetSheetMedium": "Medium Reasoning",
   "reasoningBudgetSheetHeavy": "Heavy Reasoning",
   "reasoningBudgetSheetXhigh": "Extreme Reasoning",
+  "reasoningBudgetSheetMax": "Maximum Reasoning",
   "reasoningBudgetSheetTitle": "Reasoning Chain Strength",
   "reasoningBudgetSheetCurrentLevel": "Current Level: {level}",
   "@reasoningBudgetSheetCurrentLevel": {

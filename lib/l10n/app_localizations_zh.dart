@@ -1910,6 +1910,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reasoningBudgetSheetXhigh => '极限推理';
 
   @override
+  String get reasoningBudgetSheetMax => '全力推理';
+
+  @override
   String get reasoningBudgetSheetTitle => '思维链强度';
 
   @override
@@ -7174,6 +7177,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get reasoningBudgetSheetXhigh => '极限推理';
 
   @override
+  String get reasoningBudgetSheetMax => '全力推理';
+
+  @override
   String get reasoningBudgetSheetTitle => '思维链强度';
 
   @override
@@ -12435,6 +12441,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get reasoningBudgetSheetXhigh => '極限推理';
+
+  @override
+  String get reasoningBudgetSheetMax => '全力推理';
 
   @override
   String get reasoningBudgetSheetTitle => '思維鏈強度';

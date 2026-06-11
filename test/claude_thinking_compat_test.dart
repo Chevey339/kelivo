@@ -383,6 +383,16 @@ void main() {
       },
     );
 
+    test('Opus 4.8 maps max reasoning to max effort', () async {
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-opus-4.8',
+        thinkingBudget: 128000,
+      );
+
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'max'});
+    });
+
     test('Fable 5 never sends unsupported disabled thinking', () async {
       final offBody = await _captureClaudeRequestBody(
         modelId: 'claude-fable-5',
@@ -404,6 +414,16 @@ void main() {
         'display': 'summarized',
       });
       expect(mediumBody['output_config'], {'effort': 'medium'});
+    });
+
+    test('Fable 5 maps max reasoning to max effort', () async {
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-fable-5',
+        thinkingBudget: 128000,
+      );
+
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'max'});
     });
 
     test('OpenRouter Anthropic format uses Claude messages path', () async {
