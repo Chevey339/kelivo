@@ -214,6 +214,18 @@ class _MessageListViewState extends State<MessageListView> {
   Timer? _scrollIdleTimer;
   bool _pointerScrollActivityCheckScheduled = false;
 
+  bool get _isDesktopPlatform =>
+      defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.linux;
+
+  ScrollViewKeyboardDismissBehavior get _keyboardDismissBehavior {
+    if (_isDesktopPlatform) {
+      return ScrollViewKeyboardDismissBehavior.manual;
+    }
+    return ScrollViewKeyboardDismissBehavior.onDrag;
+  }
+
   @override
   void dispose() {
     _scrollIdleTimer?.cancel();
@@ -277,7 +289,7 @@ class _MessageListViewState extends State<MessageListView> {
                     (widget.isPinnedIndicatorActive ? 12 : 0),
               ),
               itemCount: widget.messages.length,
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              keyboardDismissBehavior: _keyboardDismissBehavior,
               itemBuilder: (context, index) {
                 if (index < 0 || index >= widget.messages.length) {
                   return const SizedBox.shrink();
