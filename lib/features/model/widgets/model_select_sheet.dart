@@ -274,6 +274,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   static const double _initialSize = 0.8;
   static const double _maxSize = 0.8;
   static const double _stickyProviderHeaderHeight = 30;
+  static const double _estimatedHeaderExtent = 39;
+  static const double _estimatedModelExtent = 79;
+  static const double _listBottomPadding = 12;
   // static const double _currentSelectionScrollMargin = 10;
   String _lastQuery = '';
   String? _activeProviderKey;
@@ -479,25 +482,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       return;
     }
 
-    final settings = context.read<SettingsProvider>();
-    final assistant = context.read<AssistantProvider>().currentAssistant;
-
-    // Use assistant's model if set, otherwise fall back to global default
-    final pk = assistant?.chatModelProvider ?? settings.currentModelProvider;
-    final mid = assistant?.chatModelId ?? settings.currentModelId;
-    if (pk == null || mid == null) return;
-
     // Optionally expand a bit for better context
     await _expandSheetIfNeeded(
       _initialSize.clamp(0.0, _maxSize),
       duration: const Duration(milliseconds: 200),
     );
-
-    // If current model is pinned and favorites section is visible, jump there first
-    final currentKey = '$pk::$mid';
-    final bool showFavorites =
-        widget.limitProviderKey == null && (_search.text.isEmpty);
-    final bool isPinned = settings.pinnedModels.contains(currentKey);
 
     // Ensure the list is attached before attempting to scroll
     if (!_itemScrollController.isAttached) {
@@ -510,15 +499,10 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       return;
     }
 
-    int? targetIndex;
-    if (showFavorites && isPinned) {
-      targetIndex = _favModelIndexMap[currentKey];
-    }
-    targetIndex ??= _modelIndexMap[currentKey];
-    targetIndex ??= _headerIndexMap[pk];
+    final targetIndex = _currentSelectionTargetIndex();
 
     if (targetIndex != null) {
-      final alignment = _currentSelectionScrollAlignment();
+      final alignment = _currentSelectionScrollAlignment(targetIndex);
       try {
         await _itemScrollController.scrollTo(
           index: targetIndex,
@@ -533,7 +517,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           if (!mounted || _autoScrolled) return;
           try {
             await _itemScrollController.scrollTo(
-              index: targetIndex!,
+              index: targetIndex,
               alignment: alignment,
               duration: const Duration(milliseconds: 360),
               curve: Curves.easeOutCubic,
@@ -545,11 +529,52 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     }
   }
 
-  double _currentSelectionScrollAlignment() {
-    if (widget.limitProviderKey != null || _listViewportHeight <= 0) {
+  int? _currentSelectionTargetIndex() {
+    if (_search.text.trim().isNotEmpty) return null;
+
+    final settings = context.read<SettingsProvider>();
+    final assistant = context.read<AssistantProvider>().currentAssistant;
+
+    final pk = assistant?.chatModelProvider ?? settings.currentModelProvider;
+    final mid = assistant?.chatModelId ?? settings.currentModelId;
+    if (pk == null || mid == null) return null;
+
+    final currentKey = '$pk::$mid';
+    if (widget.limitProviderKey == null &&
+        settings.pinnedModels.contains(currentKey)) {
+      final favIndex = _favModelIndexMap[currentKey];
+      if (favIndex != null) return favIndex;
+    }
+
+    return _modelIndexMap[currentKey] ?? _headerIndexMap[pk];
+  }
+
+  double _currentSelectionScrollAlignment(int targetIndex) {
+    if (_listViewportHeight <= 0) {
       return 0;
     }
-    return (_stickyProviderHeaderHeight / _listViewportHeight).clamp(0.0, 0.3);
+    final topAlignment = widget.limitProviderKey == null
+        ? (_stickyProviderHeaderHeight / _listViewportHeight).clamp(0.0, 0.3)
+        : 0.0;
+    if (_rows.length <= 1) return topAlignment;
+
+    final remainingExtent = _estimatedRemainingExtentFrom(targetIndex);
+    final topAlignedRequiredExtent = _listViewportHeight * (1 - topAlignment);
+    if (remainingExtent >= topAlignedRequiredExtent) return topAlignment;
+
+    final tailAlignment = 1.0 - (remainingExtent / _listViewportHeight);
+    return tailAlignment.clamp(topAlignment, 0.72);
+  }
+
+  double _estimatedRemainingExtentFrom(int targetIndex) {
+    var extent = _listBottomPadding;
+    for (var i = targetIndex; i < _rows.length; i++) {
+      final row = _rows[i];
+      extent += row is _HeaderRow
+          ? _estimatedHeaderExtent
+          : _estimatedModelExtent;
+    }
+    return extent;
   }
 
   // Scroll to the first matching provider group when searching.

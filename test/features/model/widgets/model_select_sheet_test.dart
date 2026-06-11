@@ -48,6 +48,40 @@ Future<SettingsProvider> _settingsWithProviders(WidgetTester tester) async {
   return settings;
 }
 
+Future<SettingsProvider> _settingsWithOnlyTestProviders(
+  WidgetTester tester,
+) async {
+  final settings = await _settingsWithProviders(tester);
+  for (final key in settings.providerConfigs.keys.toList()) {
+    if (!key.startsWith('provider-')) {
+      await settings.removeProviderConfig(key);
+    }
+  }
+  return settings;
+}
+
+Future<SettingsProvider> _settingsWithLongSingleProvider(
+  WidgetTester tester,
+) async {
+  SharedPreferences.setMockInitialValues({});
+  final settings = SettingsProvider();
+  await tester.pump(const Duration(milliseconds: 300));
+  await tester.pump();
+
+  const key = 'provider-long';
+  final models = [
+    for (var model = 0; model < 20; model++)
+      '$key-model-${model.toString().padLeft(2, '0')}',
+  ];
+  await settings.setProviderConfig(
+    key,
+    _providerConfig(key, 'Provider Long Name', models),
+  );
+  await settings.setProvidersOrder(const [key]);
+  await settings.setCurrentModel(key, '$key-model-19');
+  return settings;
+}
+
 Future<void> _pumpModelSelector(
   WidgetTester tester, {
   required SettingsProvider settings,
@@ -216,6 +250,94 @@ void main() {
           modelRect.top,
           greaterThanOrEqualTo(stickyRect.bottom),
           reason: 'Current model should not be hidden by the sticky provider.',
+        );
+      } finally {
+        await _dismissModelSelector(tester);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
+
+  testWidgets(
+    'mobile model selector keeps bottom current model fully visible without top alignment',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      try {
+        final settings = await _settingsWithLongSingleProvider(tester);
+        await _pumpModelSelector(
+          tester,
+          settings: settings,
+          limitProviderKey: 'provider-long',
+        );
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        final listRect = tester.getRect(find.byType(ScrollablePositionedList));
+        final modelText = find.text('provider-long-model-19');
+        expect(modelText, findsOneWidget);
+
+        final modelTile = find.ancestor(
+          of: modelText,
+          matching: find.byType(IosCardPress),
+        );
+        expect(modelTile, findsOneWidget);
+        final modelRect = tester.getRect(modelTile);
+
+        expect(
+          modelRect.top,
+          greaterThan(listRect.top + listRect.height * 0.45),
+          reason:
+              'Bottom current model should settle near the reachable bottom '
+              'instead of being forced toward the top edge.',
+        );
+        expect(
+          modelRect.bottom,
+          lessThanOrEqualTo(listRect.bottom),
+          reason: 'Bottom current model should remain fully visible.',
+        );
+      } finally {
+        await _dismissModelSelector(tester);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
+
+  testWidgets(
+    'mobile model selector keeps reachable current model near the top',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      try {
+        final settings = await _settingsWithOnlyTestProviders(tester);
+        await settings.setCurrentModel('provider-6', 'provider-6-model-03');
+        await _pumpModelSelector(tester, settings: settings);
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        final listRect = tester.getRect(find.byType(ScrollablePositionedList));
+        final modelText = find.text('provider-6-model-03');
+        expect(modelText, findsOneWidget);
+
+        final modelTile = find.ancestor(
+          of: modelText,
+          matching: find.byType(IosCardPress),
+        );
+        expect(modelTile, findsOneWidget);
+        final modelRect = tester.getRect(modelTile);
+
+        expect(
+          modelRect.top,
+          lessThan(listRect.top + listRect.height * 0.25),
+          reason:
+              'Reachable current model should keep the original top-biased '
+              'auto-scroll position.',
         );
       } finally {
         await _dismissModelSelector(tester);
