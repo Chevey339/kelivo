@@ -273,7 +273,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   final Map<String, GlobalKey> _providerTabKeys = <String, GlobalKey>{};
   static const double _initialSize = 0.8;
   static const double _maxSize = 0.8;
-  static const double _stickyProviderHeaderHeight = 38;
+  static const double _stickyProviderHeaderHeight = 30;
   // static const double _currentSelectionScrollMargin = 10;
   String _lastQuery = '';
   String? _activeProviderKey;
@@ -549,9 +549,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     if (widget.limitProviderKey != null || _listViewportHeight <= 0) {
       return 0;
     }
-    return ((_stickyProviderHeaderHeight) /
-            _listViewportHeight)
-        .clamp(0.0, 0.3);
+    return (_stickyProviderHeaderHeight / _listViewportHeight).clamp(0.0, 0.3);
   }
 
   // Scroll to the first matching provider group when searching.
@@ -682,7 +680,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       }
       _activeProviderKey = nextKey;
     });
-    if (nextKey != null) _scrollProviderTabIntoView(nextKey);
+    if (nextKey != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _scrollProviderTabIntoView(nextKey);
+      });
+    }
   }
 
   void _scrollProviderTabIntoView(String providerKey) {
@@ -1019,7 +1021,18 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                 return const SizedBox.shrink();
               },
             ),
-            _stickyProviderHeader(context),
+            if (widget.limitProviderKey == null)
+              Positioned(
+                top: -1,
+                left: 0,
+                right: 0,
+                child: ColoredBox(
+                  key: const ValueKey('model-selector-top-seam-cover'),
+                  color: Theme.of(context).colorScheme.surface,
+                  child: const SizedBox(height: 1),
+                ),
+              ),
+            if (_activeProviderKey != null) _stickyProviderHeader(context),
           ],
         );
       },
@@ -1076,14 +1089,14 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
     final cs = Theme.of(context).colorScheme;
     return Positioned(
-      top: 0,
+      top: -1,
       left: 0,
       right: 0,
       child: DecoratedBox(
         key: const ValueKey('model-selector-sticky-provider'),
         decoration: BoxDecoration(color: cs.surface),
         child: SizedBox(
-          height: _stickyProviderHeaderHeight,
+          height: _stickyProviderHeaderHeight + 1,
           child: ClipRect(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
@@ -1117,7 +1130,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
               },
               child: Padding(
                 key: ValueKey('sticky-provider-$providerKey'),
-                padding: const EdgeInsets.fromLTRB(16, 9, 16, 7),
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 5),
                 child: Row(
                   children: [
                     Expanded(

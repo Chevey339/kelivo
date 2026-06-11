@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/model/widgets/model_select_sheet.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 
@@ -102,6 +103,19 @@ bool _providerTabSelected(WidgetTester tester, String providerKey) {
   return semantics.properties.selected ?? false;
 }
 
+bool _hasInvisibleAncestor(WidgetTester tester, Finder finder) {
+  final element = tester.element(finder);
+  var hidden = false;
+  element.visitAncestorElements((ancestor) {
+    final widget = ancestor.widget;
+    if (widget is Visibility && !widget.visible) hidden = true;
+    if (widget is Offstage && widget.offstage) hidden = true;
+    if (widget is Opacity && widget.opacity == 0) hidden = true;
+    return !hidden;
+  });
+  return hidden;
+}
+
 Future<void> _dismissModelSelector(WidgetTester tester) async {
   final bottomSheet = find.byType(BottomSheet);
   if (bottomSheet.evaluate().isEmpty) return;
@@ -131,6 +145,8 @@ void main() {
           await tester.pump(const Duration(milliseconds: 120));
         }
         await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
         final stickyTextFinder = find.descendant(
           of: find.byKey(const ValueKey('model-selector-sticky-provider')),
@@ -201,6 +217,107 @@ void main() {
           greaterThanOrEqualTo(stickyRect.bottom),
           reason: 'Current model should not be hidden by the sticky provider.',
         );
+      } finally {
+        await _dismissModelSelector(tester);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
+
+  testWidgets(
+    'mobile model selector keeps provider headers visible with compact overlay',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      try {
+        final settings = await _settingsWithProviders(tester);
+        await _pumpModelSelector(tester, settings: settings);
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        final stickyRect = tester.getRect(
+          find.byKey(const ValueKey('model-selector-sticky-provider')),
+        );
+        final seamCoverRect = tester.getRect(
+          find.byKey(const ValueKey('model-selector-top-seam-cover')),
+        );
+
+        expect(stickyRect.height, lessThan(38));
+        expect(seamCoverRect.height, 1);
+
+        final currentProviderHeaderInList = find.descendant(
+          of: find.byType(ScrollablePositionedList),
+          matching: find.text('Provider 0 Long Name'),
+        );
+        expect(currentProviderHeaderInList, findsOneWidget);
+        expect(
+          _hasInvisibleAncestor(tester, currentProviderHeaderInList),
+          isFalse,
+        );
+
+        final nextProviderHeaderInList = find.descendant(
+          of: find.byType(ScrollablePositionedList),
+          matching: find.text('Provider 1 Long Name'),
+        );
+        expect(nextProviderHeaderInList, findsOneWidget);
+        expect(
+          _hasInvisibleAncestor(tester, nextProviderHeaderInList),
+          isFalse,
+        );
+
+        final listRect = tester.getRect(find.byType(ScrollablePositionedList));
+        final nextHeaderRect = tester.getRect(nextProviderHeaderInList);
+        expect(nextHeaderRect.top, greaterThanOrEqualTo(listRect.top));
+        expect(nextHeaderRect.bottom, lessThanOrEqualTo(listRect.bottom));
+      } finally {
+        await _dismissModelSelector(tester);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
+
+  testWidgets(
+    'mobile model selector does not reserve sticky space above favorites',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      try {
+        final settings = await _settingsWithProviders(tester);
+        await settings.togglePinModel('provider-0', 'provider-0-model-00');
+        await _pumpModelSelector(tester, settings: settings);
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        await tester.tap(find.byIcon(Lucide.Bookmark));
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        expect(
+          find.byKey(const ValueKey('model-selector-sticky-provider')),
+          findsNothing,
+        );
+        final seamCoverRect = tester.getRect(
+          find.byKey(const ValueKey('model-selector-top-seam-cover')),
+        );
+        expect(seamCoverRect.height, 1);
+
+        final favoritesHeader = find.descendant(
+          of: find.byType(ScrollablePositionedList),
+          matching: find.text('Favorites'),
+        );
+        expect(favoritesHeader, findsOneWidget);
+        expect(_hasInvisibleAncestor(tester, favoritesHeader), isFalse);
+
+        final listRect = tester.getRect(find.byType(ScrollablePositionedList));
+        final favoritesRect = tester.getRect(favoritesHeader);
+        expect(favoritesRect.top, lessThan(listRect.top + 20));
+        expect(favoritesRect.bottom, greaterThan(listRect.top));
       } finally {
         await _dismissModelSelector(tester);
         debugDefaultTargetPlatformOverride = null;
