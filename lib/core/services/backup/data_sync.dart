@@ -163,6 +163,7 @@ class DataSync {
       final uploadDirPath = (await _getUploadDir()).path;
       final avatarsDirPath = (await _getAvatarsDir()).path;
       final imagesDirPath = (await _getImagesDir()).path;
+      final fontsDirPath = (await _getFontsDir()).path;
       final settingsPath = settingsTmp.path;
       final chatsPath = chatsTmp?.path;
       final includeFiles = cfg.includeFiles;
@@ -177,6 +178,7 @@ class DataSync {
           uploadDirPath: uploadDirPath,
           avatarsDirPath: avatarsDirPath,
           imagesDirPath: imagesDirPath,
+          fontsDirPath: fontsDirPath,
         );
       });
 
@@ -247,6 +249,7 @@ class DataSync {
     required String uploadDirPath,
     required String avatarsDirPath,
     required String imagesDirPath,
+    required String fontsDirPath,
   }) {
     final writer = _StreamingZipWriter(outPath);
     try {
@@ -263,6 +266,7 @@ class DataSync {
         _addDirectoryToZip(writer, uploadDirPath, 'upload');
         _addDirectoryToZip(writer, avatarsDirPath, 'avatars');
         _addDirectoryToZip(writer, imagesDirPath, 'images');
+        _addDirectoryToZip(writer, fontsDirPath, 'fonts');
       }
 
       writer.closeSync();
@@ -584,6 +588,10 @@ class DataSync {
 
   Future<Directory> _getAvatarsDir() async {
     return await AppDirectories.getAvatarsDirectory();
+  }
+
+  Future<Directory> _getFontsDir() async {
+    return await AppDirectories.getFontsDirectory();
   }
 
   Future<String> _exportSettingsJson() async {
@@ -1187,6 +1195,29 @@ class DataSync {
               }
             }
           }
+
+          // Restore managed local fonts directory
+          final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
+          if (await fontsSrc.exists()) {
+            final dst = await _getFontsDir();
+            if (await dst.exists()) {
+              try {
+                await dst.delete(recursive: true);
+              } catch (_) {}
+            }
+            await dst.create(recursive: true);
+            for (final ent in fontsSrc.listSync(recursive: true)) {
+              if (ent is File) {
+                final rel = p.relative(ent.path, from: fontsSrc.path);
+                final target = File(p.join(dst.path, rel));
+                await target.parent.create(recursive: true);
+                await ent.copy(target.path);
+                try {
+                  await target.setLastModified(await ent.lastModified());
+                } catch (_) {}
+              }
+            }
+          }
         } else {
           // Merge mode: Only copy non-existing files
           // Merge upload directory
@@ -1243,6 +1274,28 @@ class DataSync {
             for (final ent in avatarsSrc.listSync(recursive: true)) {
               if (ent is File) {
                 final rel = p.relative(ent.path, from: avatarsSrc.path);
+                final target = File(p.join(dst.path, rel));
+                if (!await target.exists()) {
+                  await target.parent.create(recursive: true);
+                  await ent.copy(target.path);
+                  try {
+                    await target.setLastModified(await ent.lastModified());
+                  } catch (_) {}
+                }
+              }
+            }
+          }
+
+          // Merge managed local fonts directory
+          final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
+          if (await fontsSrc.exists()) {
+            final dst = await _getFontsDir();
+            if (!await dst.exists()) {
+              await dst.create(recursive: true);
+            }
+            for (final ent in fontsSrc.listSync(recursive: true)) {
+              if (ent is File) {
+                final rel = p.relative(ent.path, from: fontsSrc.path);
                 final target = File(p.join(dst.path, rel));
                 if (!await target.exists()) {
                   await target.parent.create(recursive: true);

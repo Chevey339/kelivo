@@ -51,6 +51,10 @@ void main() {
         await uploadDir.create(recursive: true);
         final uploadFile = File('${uploadDir.path}/large.bin');
         await uploadFile.writeAsBytes(List<int>.filled(1024 * 1024, 7));
+        final fontsDir = Directory('${root.path}/fonts');
+        await fontsDir.create(recursive: true);
+        final fontFile = File('${fontsDir.path}/custom.ttf');
+        await fontFile.writeAsBytes(List<int>.filled(256, 9));
 
         final tmpDir = Directory('${root.path}/tmp');
         final staleWorkDir = Directory('${tmpDir.path}/kelivo_backup_stale');
@@ -77,12 +81,16 @@ void main() {
           archive = ZipDecoder().decodeStream(input);
           final settingsEntry = archive.findFile('settings.json');
           final uploadEntry = archive.findFile('upload/large.bin');
+          final fontEntry = archive.findFile('fonts/custom.ttf');
 
           expect(settingsEntry, isNotNull);
           expect(uploadEntry, isNotNull);
+          expect(fontEntry, isNotNull);
           expect(settingsEntry!.compression, CompressionType.deflate);
           expect(uploadEntry!.compression, CompressionType.deflate);
+          expect(fontEntry!.compression, CompressionType.deflate);
           expect(uploadEntry.readBytes(), List<int>.filled(1024 * 1024, 7));
+          expect(fontEntry.readBytes(), List<int>.filled(256, 9));
         } finally {
           archive?.clearSync();
           input.closeSync();
@@ -99,6 +107,49 @@ void main() {
         expect(await backupFile.parent.exists(), isFalse);
       },
     );
+
+    test('restores managed font files in overwrite and merge modes', () async {
+      final sourceDir = Directory('${root.path}/source_fonts');
+      await sourceDir.create(recursive: true);
+      final sourceFile = File('${sourceDir.path}/custom.ttf');
+      await sourceFile.writeAsBytes(List<int>.filled(128, 5));
+
+      final zipFile = File('${root.path}/fonts_backup.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+      encoder.addFileSync(sourceFile, 'fonts/custom.ttf');
+      encoder.closeSync();
+
+      final fontsDir = Directory('${root.path}/fonts');
+      await fontsDir.create(recursive: true);
+      final existingFile = File('${fontsDir.path}/existing.ttf');
+      await existingFile.writeAsBytes(List<int>.filled(64, 3));
+
+      final sync = DataSync(chatService: ChatService());
+      await sync.restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: false, includeFiles: true),
+        mode: RestoreMode.merge,
+      );
+
+      expect(await existingFile.exists(), isTrue);
+      expect(
+        await File('${fontsDir.path}/custom.ttf').readAsBytes(),
+        List<int>.filled(128, 5),
+      );
+
+      await sync.restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: false, includeFiles: true),
+        mode: RestoreMode.overwrite,
+      );
+
+      expect(await existingFile.exists(), isFalse);
+      expect(
+        await File('${fontsDir.path}/custom.ttf').readAsBytes(),
+        List<int>.filled(128, 5),
+      );
+    });
 
     test('cleans temporary restore files when WebDAV restore fails', () async {
       final sourceDir = Directory('${root.path}/source_upload');
