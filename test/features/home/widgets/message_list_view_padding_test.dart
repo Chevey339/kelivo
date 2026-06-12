@@ -11,6 +11,7 @@ import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart'
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/widgets/message_list_view.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -20,6 +21,94 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets('macOS 消息列表滚动不主动清除文本选区焦点', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    final scrollController = ScrollController();
+    final observerController = ListObserverController(
+      controller: scrollController,
+    );
+    final isProcessingFiles = ValueNotifier<bool>(false);
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: MessageListView(
+              scrollController: scrollController,
+              observerController: observerController,
+              messages: const [],
+              byGroup: const {},
+              versionSelections: const {},
+              reasoning: const {},
+              reasoningSegments: const {},
+              contentSplits: const {},
+              toolParts: const {},
+              translations: const {},
+              selecting: false,
+              selectedItems: const {},
+              dividerPadding: EdgeInsets.zero,
+              isProcessingFiles: isProcessingFiles,
+            ),
+          ),
+        ),
+      );
+
+      final listView = tester.widget<ListView>(find.byType(ListView));
+      expect(
+        listView.keyboardDismissBehavior,
+        ScrollViewKeyboardDismissBehavior.manual,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+      scrollController.dispose();
+      isProcessingFiles.dispose();
+    }
+  });
+
+  testWidgets('Android 消息列表滚动仍然收起键盘', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    final scrollController = ScrollController();
+    final observerController = ListObserverController(
+      controller: scrollController,
+    );
+    final isProcessingFiles = ValueNotifier<bool>(false);
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: MessageListView(
+              scrollController: scrollController,
+              observerController: observerController,
+              messages: const [],
+              byGroup: const {},
+              versionSelections: const {},
+              reasoning: const {},
+              reasoningSegments: const {},
+              contentSplits: const {},
+              toolParts: const {},
+              translations: const {},
+              selecting: false,
+              selectedItems: const {},
+              dividerPadding: EdgeInsets.zero,
+              isProcessingFiles: isProcessingFiles,
+            ),
+          ),
+        ),
+      );
+
+      final listView = tester.widget<ListView>(find.byType(ListView));
+      expect(
+        listView.keyboardDismissBehavior,
+        ScrollViewKeyboardDismissBehavior.onDrag,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+      scrollController.dispose();
+      isProcessingFiles.dispose();
+    }
   });
 
   testWidgets('消息列表底部留白使用传入的输入框覆盖高度', (tester) async {
