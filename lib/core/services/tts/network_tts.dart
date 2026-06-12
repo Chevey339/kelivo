@@ -42,12 +42,14 @@ abstract class TtsServiceOptions {
   final bool enabled;
   final String name;
   final NetworkTtsKind kind;
+  final String? linkedProviderId;
 
   TtsServiceOptions({
     String? id,
     required this.enabled,
     required this.name,
     required this.kind,
+    this.linkedProviderId,
   }) : id = id ?? const Uuid().v4();
 
   Map<String, dynamic> toJson();
@@ -57,12 +59,17 @@ abstract class TtsServiceOptions {
     final enabled = json['enabled'] == true;
     final name = (json['name'] ?? '').toString();
     final id = (json['id'] ?? '').toString();
+    final linkedId = json['linkedProviderId'];
+    final linkedProviderId = (linkedId is String && linkedId.isNotEmpty)
+        ? linkedId
+        : null;
     switch (type) {
       case 'openai':
         return OpenAiTtsOptions(
           id: id.isEmpty ? null : id,
           enabled: enabled,
           name: name.isEmpty ? 'OpenAI TTS' : name,
+          linkedProviderId: linkedProviderId,
           apiKey: (json['apiKey'] ?? '').toString(),
           baseUrl: (json['baseUrl'] ?? 'https://api.openai.com/v1').toString(),
           model: (json['model'] ?? 'gpt-4o-mini-tts').toString(),
@@ -73,6 +80,7 @@ abstract class TtsServiceOptions {
           id: id.isEmpty ? null : id,
           enabled: enabled,
           name: name.isEmpty ? 'Gemini TTS' : name,
+          linkedProviderId: linkedProviderId,
           apiKey: (json['apiKey'] ?? '').toString(),
           baseUrl:
               (json['baseUrl'] ??
@@ -86,6 +94,7 @@ abstract class TtsServiceOptions {
           id: id.isEmpty ? null : id,
           enabled: enabled,
           name: name.isEmpty ? 'MiniMax TTS' : name,
+          linkedProviderId: linkedProviderId,
           apiKey: (json['apiKey'] ?? '').toString(),
           baseUrl: (json['baseUrl'] ?? 'https://api.minimaxi.com/v1')
               .toString(),
@@ -99,6 +108,7 @@ abstract class TtsServiceOptions {
           id: id.isEmpty ? null : id,
           enabled: enabled,
           name: name.isEmpty ? 'Qwen TTS' : name,
+          linkedProviderId: linkedProviderId,
           apiKey: (json['apiKey'] ?? '').toString(),
           baseUrl: (json['baseUrl'] ?? 'https://dashscope.aliyuncs.com/api/v1')
               .toString(),
@@ -111,6 +121,7 @@ abstract class TtsServiceOptions {
           id: id.isEmpty ? null : id,
           enabled: enabled,
           name: name.isEmpty ? 'Groq TTS' : name,
+          linkedProviderId: linkedProviderId,
           apiKey: (json['apiKey'] ?? '').toString(),
           baseUrl: (json['baseUrl'] ?? 'https://api.groq.com/openai/v1')
               .toString(),
@@ -122,6 +133,7 @@ abstract class TtsServiceOptions {
           id: id.isEmpty ? null : id,
           enabled: enabled,
           name: name.isEmpty ? 'xAI TTS' : name,
+          linkedProviderId: linkedProviderId,
           apiKey: (json['apiKey'] ?? '').toString(),
           baseUrl: (json['baseUrl'] ?? 'https://api.x.ai/v1').toString(),
           voiceId: (json['voiceId'] ?? 'eve').toString(),
@@ -132,6 +144,7 @@ abstract class TtsServiceOptions {
           id: id.isEmpty ? null : id,
           enabled: enabled,
           name: name.isEmpty ? 'ElevenLabs TTS' : name,
+          linkedProviderId: linkedProviderId,
           apiKey: (json['apiKey'] ?? '').toString(),
           baseUrl: (json['baseUrl'] ?? 'https://api.elevenlabs.io').toString(),
           modelId: (json['modelId'] ?? 'eleven_multilingual_v2').toString(),
@@ -143,6 +156,7 @@ abstract class TtsServiceOptions {
           id: id.isEmpty ? null : id,
           enabled: enabled,
           name: name.isEmpty ? 'MiMo TTS' : name,
+          linkedProviderId: linkedProviderId,
           apiKey: (json['apiKey'] ?? '').toString(),
           baseUrl: (json['baseUrl'] ?? 'https://api.xiaomimimo.com/v1')
               .toString(),
@@ -155,6 +169,7 @@ abstract class TtsServiceOptions {
           id: id.isEmpty ? null : id,
           enabled: enabled,
           name: name.isEmpty ? 'OpenAI TTS' : name,
+          linkedProviderId: linkedProviderId,
           apiKey: (json['apiKey'] ?? '').toString(),
           baseUrl: (json['baseUrl'] ?? 'https://api.openai.com/v1').toString(),
           model: (json['model'] ?? 'gpt-4o-mini-tts').toString(),
@@ -183,6 +198,7 @@ class OpenAiTtsOptions extends TtsServiceOptions {
     super.id,
     required super.enabled,
     required super.name,
+    super.linkedProviderId,
     required this.apiKey,
     required this.baseUrl,
     required this.model,
@@ -195,6 +211,7 @@ class OpenAiTtsOptions extends TtsServiceOptions {
     'enabled': enabled,
     'name': name,
     'kind': 'openai',
+    if (linkedProviderId != null) 'linkedProviderId': linkedProviderId,
     'apiKey': apiKey,
     'baseUrl': baseUrl,
     'model': model,
@@ -211,6 +228,7 @@ class GeminiTtsOptions extends TtsServiceOptions {
     super.id,
     required super.enabled,
     required super.name,
+    super.linkedProviderId,
     required this.apiKey,
     required this.baseUrl,
     required this.model,
@@ -223,6 +241,7 @@ class GeminiTtsOptions extends TtsServiceOptions {
     'enabled': enabled,
     'name': name,
     'kind': 'gemini',
+    if (linkedProviderId != null) 'linkedProviderId': linkedProviderId,
     'apiKey': apiKey,
     'baseUrl': baseUrl,
     'model': model,
@@ -241,6 +260,7 @@ class MiniMaxTtsOptions extends TtsServiceOptions {
     super.id,
     required super.enabled,
     required super.name,
+    super.linkedProviderId,
     required this.apiKey,
     required this.baseUrl,
     required this.model,
@@ -255,6 +275,7 @@ class MiniMaxTtsOptions extends TtsServiceOptions {
     'enabled': enabled,
     'name': name,
     'kind': 'minimax',
+    if (linkedProviderId != null) 'linkedProviderId': linkedProviderId,
     'apiKey': apiKey,
     'baseUrl': baseUrl,
     'model': model,
@@ -275,6 +296,7 @@ class QwenTtsOptions extends TtsServiceOptions {
     super.id,
     required super.enabled,
     required super.name,
+    super.linkedProviderId,
     required this.apiKey,
     required this.baseUrl,
     required this.model,
@@ -288,6 +310,7 @@ class QwenTtsOptions extends TtsServiceOptions {
     'enabled': enabled,
     'name': name,
     'kind': 'qwen',
+    if (linkedProviderId != null) 'linkedProviderId': linkedProviderId,
     'apiKey': apiKey,
     'baseUrl': baseUrl,
     'model': model,
@@ -306,6 +329,7 @@ class GroqTtsOptions extends TtsServiceOptions {
     super.id,
     required super.enabled,
     required super.name,
+    super.linkedProviderId,
     required this.apiKey,
     required this.baseUrl,
     required this.model,
@@ -318,6 +342,7 @@ class GroqTtsOptions extends TtsServiceOptions {
     'enabled': enabled,
     'name': name,
     'kind': 'groq',
+    if (linkedProviderId != null) 'linkedProviderId': linkedProviderId,
     'apiKey': apiKey,
     'baseUrl': baseUrl,
     'model': model,
@@ -335,6 +360,7 @@ class XaiTtsOptions extends TtsServiceOptions {
     super.id,
     required super.enabled,
     required super.name,
+    super.linkedProviderId,
     required this.apiKey,
     required this.baseUrl,
     required this.voiceId,
@@ -347,6 +373,7 @@ class XaiTtsOptions extends TtsServiceOptions {
     'enabled': enabled,
     'name': name,
     'kind': 'xai',
+    if (linkedProviderId != null) 'linkedProviderId': linkedProviderId,
     'apiKey': apiKey,
     'baseUrl': baseUrl,
     'voiceId': voiceId,
@@ -365,6 +392,7 @@ class ElevenLabsTtsOptions extends TtsServiceOptions {
     super.id,
     required super.enabled,
     required super.name,
+    super.linkedProviderId,
     required this.apiKey,
     required this.baseUrl,
     required this.modelId,
@@ -378,6 +406,7 @@ class ElevenLabsTtsOptions extends TtsServiceOptions {
     'enabled': enabled,
     'name': name,
     'kind': 'elevenlabs',
+    if (linkedProviderId != null) 'linkedProviderId': linkedProviderId,
     'apiKey': apiKey,
     'baseUrl': baseUrl,
     'modelId': modelId,
@@ -396,6 +425,7 @@ class MimoTtsOptions extends TtsServiceOptions {
     super.id,
     required super.enabled,
     required super.name,
+    super.linkedProviderId,
     required this.apiKey,
     required this.baseUrl,
     required this.model,
@@ -408,6 +438,7 @@ class MimoTtsOptions extends TtsServiceOptions {
     'enabled': enabled,
     'name': name,
     'kind': 'mimo',
+    if (linkedProviderId != null) 'linkedProviderId': linkedProviderId,
     'apiKey': apiKey,
     'baseUrl': baseUrl,
     'model': model,

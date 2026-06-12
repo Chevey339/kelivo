@@ -1041,6 +1041,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
   final cs = Theme.of(context).colorScheme;
   final l10n = AppLocalizations.of(context)!;
   NetworkTtsKind kind = initial?.kind ?? NetworkTtsKind.openai;
+  String? linkedProviderId = initial?.linkedProviderId;
   final nameCtl = TextEditingController(text: initial?.name ?? '');
   // Common fields
   final apiKeyCtl = TextEditingController(
@@ -1201,6 +1202,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                               ],
                               onSelected: (picked) {
                                 setState(() {
+                                  linkedProviderId = null;
                                   if (picked ==
                                       networkTtsKindDisplayName(
                                         NetworkTtsKind.openai,
@@ -1259,17 +1261,35 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                               hint: networkTtsKindDisplayName(kind),
                             ),
                             const SizedBox(height: 6),
-                            _InputRow(
-                              label: l10n.ttsServicesFieldApiKeyLabel,
-                              controller: apiKeyCtl,
-                              obscure: true,
+                            _DesktopLinkedProviderSelector(
+                              linkedProviderId: linkedProviderId,
+                              ttsKind: kind,
+                              onChanged: (providerId, apiKey, baseUrl) {
+                                setState(() {
+                                  linkedProviderId = providerId;
+                                  if (providerId != null) {
+                                    apiKeyCtl.text = apiKey;
+                                    baseCtl.text = baseUrl;
+                                  }
+                                });
+                              },
                             ),
-                            const SizedBox(height: 6),
-                            _InputRow(
-                              label: l10n.ttsServicesFieldBaseUrlLabel,
-                              controller: baseCtl,
-                              hint: _defaultBaseUrl(kind),
-                            ),
+                            if (linkedProviderId == null) ...[
+                              const SizedBox(height: 6),
+                              _InputRow(
+                                label: l10n.ttsServicesFieldApiKeyLabel,
+                                controller: apiKeyCtl,
+                                obscure: true,
+                              ),
+                            ],
+                            if (linkedProviderId == null) ...[
+                              const SizedBox(height: 6),
+                              _InputRow(
+                                label: l10n.ttsServicesFieldBaseUrlLabel,
+                                controller: baseCtl,
+                                hint: _defaultBaseUrl(kind),
+                              ),
+                            ],
                             const SizedBox(height: 6),
                             if (kind != NetworkTtsKind.xai) ...[
                               _InputRow(
@@ -1354,11 +1374,14 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                               final voice = voiceCtl.text.trim().isEmpty
                                   ? _defaultVoice(kind)
                                   : voiceCtl.text.trim();
-                              if (apiKey.isEmpty) return; // guard
+                              if (apiKey.isEmpty && linkedProviderId == null) {
+                                return;
+                              } // guard
                               if (kind == NetworkTtsKind.openai) {
                                 result = OpenAiTtsOptions(
                                   enabled: true,
                                   name: name,
+                                  linkedProviderId: linkedProviderId,
                                   apiKey: apiKey,
                                   baseUrl: base,
                                   model: model,
@@ -1368,6 +1391,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                 result = GeminiTtsOptions(
                                   enabled: true,
                                   name: name,
+                                  linkedProviderId: linkedProviderId,
                                   apiKey: apiKey,
                                   baseUrl: base,
                                   model: model,
@@ -1380,6 +1404,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                 result = MiniMaxTtsOptions(
                                   enabled: true,
                                   name: name,
+                                  linkedProviderId: linkedProviderId,
                                   apiKey: apiKey,
                                   baseUrl: base,
                                   model: model,
@@ -1393,6 +1418,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                 result = QwenTtsOptions(
                                   enabled: true,
                                   name: name,
+                                  linkedProviderId: linkedProviderId,
                                   apiKey: apiKey,
                                   baseUrl: base,
                                   model: model,
@@ -1406,6 +1432,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                 result = GroqTtsOptions(
                                   enabled: true,
                                   name: name,
+                                  linkedProviderId: linkedProviderId,
                                   apiKey: apiKey,
                                   baseUrl: base,
                                   model: model,
@@ -1415,6 +1442,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                 result = XaiTtsOptions(
                                   enabled: true,
                                   name: name,
+                                  linkedProviderId: linkedProviderId,
                                   apiKey: apiKey,
                                   baseUrl: base,
                                   voiceId: voice,
@@ -1426,6 +1454,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                 result = ElevenLabsTtsOptions(
                                   enabled: true,
                                   name: name,
+                                  linkedProviderId: linkedProviderId,
                                   apiKey: apiKey,
                                   baseUrl: base,
                                   modelId: model.isEmpty
@@ -1437,6 +1466,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
                                 result = MimoTtsOptions(
                                   enabled: true,
                                   name: name,
+                                  linkedProviderId: linkedProviderId,
                                   apiKey: apiKey,
                                   baseUrl: base,
                                   model: model,
@@ -1556,6 +1586,207 @@ String _voiceLabelFor(NetworkTtsKind k, AppLocalizations l10n) {
       return l10n.ttsServicesFieldVoiceIdLabel;
     case NetworkTtsKind.mimo:
       return l10n.ttsServicesFieldVoiceLabel;
+  }
+}
+
+bool _isProviderCompatible(ProviderConfig provider, NetworkTtsKind ttsKind) {
+  switch (ttsKind) {
+    case NetworkTtsKind.openai:
+    case NetworkTtsKind.groq:
+    case NetworkTtsKind.xai:
+      return provider.providerType != ProviderKind.google &&
+          provider.providerType != ProviderKind.claude;
+    case NetworkTtsKind.gemini:
+      return provider.providerType == ProviderKind.google;
+    case NetworkTtsKind.minimax:
+    case NetworkTtsKind.qwen:
+    case NetworkTtsKind.elevenlabs:
+    case NetworkTtsKind.mimo:
+      return false;
+  }
+}
+
+class _DesktopLinkedProviderSelector extends StatelessWidget {
+  const _DesktopLinkedProviderSelector({
+    required this.linkedProviderId,
+    required this.ttsKind,
+    required this.onChanged,
+  });
+
+  final String? linkedProviderId;
+  final NetworkTtsKind ttsKind;
+  final void Function(String? providerId, String apiKey, String baseUrl)
+  onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.read<SettingsProvider>();
+    final allConfigs = sp.providerConfigs;
+    final linked = (linkedProviderId != null)
+        ? allConfigs[linkedProviderId]
+        : null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.ttsServicesLinkedProviderLabel,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: () => _showPicker(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                border: Border.all(color: cs.outlineVariant),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      linked != null
+                          ? linked.name
+                          : l10n.ttsServicesLinkedProviderNone,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '▼',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: cs.onSurface.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (linked != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '${l10n.ttsServicesLinkedProviderInherit}: ${linked.baseUrl}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: cs.primary.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showPicker(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.read<SettingsProvider>();
+    final allConfigs = sp.providerConfigs;
+
+    final compatible = <MapEntry<String, ProviderConfig>>[];
+    for (final entry in allConfigs.entries) {
+      if (_isProviderCompatible(entry.value, ttsKind)) {
+        compatible.add(entry);
+      }
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return SimpleDialog(
+          backgroundColor: cs.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            l10n.ttsServicesLinkedProviderSelect,
+            style: TextStyle(fontSize: 14, fontWeight: AppFontWeights.emphasis),
+          ),
+          children: [
+            if (compatible.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  l10n.ttsServicesLinkedProviderNoCompatible,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.5)),
+                ),
+              )
+            else ...[
+              SimpleDialogOption(
+                onPressed: () {
+                  onChanged(null, '', '');
+                  Navigator.of(ctx).pop();
+                },
+                child: Text(
+                  l10n.ttsServicesLinkedProviderNone,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: linkedProviderId == null
+                        ? AppFontWeights.emphasis
+                        : AppFontWeights.regular,
+                    color: cs.onSurface,
+                  ),
+                ),
+              ),
+              for (final entry in compatible)
+                SimpleDialogOption(
+                  onPressed: () {
+                    onChanged(
+                      entry.key,
+                      entry.value.apiKey,
+                      entry.value.baseUrl,
+                    );
+                    Navigator.of(ctx).pop();
+                  },
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              entry.value.name,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: linkedProviderId == entry.key
+                                    ? AppFontWeights.emphasis
+                                    : AppFontWeights.regular,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            Text(
+                              entry.value.baseUrl,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurface.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (linkedProviderId == entry.key)
+                        Icon(lucide.Lucide.Check, size: 14, color: cs.primary),
+                    ],
+                  ),
+                ),
+            ],
+          ],
+        );
+      },
+    );
   }
 }
 

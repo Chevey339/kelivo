@@ -4253,6 +4253,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ttsServicesCloseButton => 'Close';
 
   @override
+  String get ttsServicesLinkedProviderLabel => 'Link to Provider';
+
+  @override
+  String get ttsServicesLinkedProviderNone => 'None (manual entry)';
+
+  @override
+  String get ttsServicesLinkedProviderSelect => 'Select Provider';
+
+  @override
+  String get ttsServicesLinkedProviderInherit => 'Inherited from';
+
+  @override
+  String get ttsServicesLinkedProviderNoCompatible => 'No compatible provider';
+
+  @override
   String get ttsSettingsPageTitle => 'TTS Settings';
 
   @override

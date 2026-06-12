@@ -7904,6 +7904,36 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get ttsServicesCloseButton;
 
+  /// No description provided for @ttsServicesLinkedProviderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Link to Provider'**
+  String get ttsServicesLinkedProviderLabel;
+
+  /// No description provided for @ttsServicesLinkedProviderNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None (manual entry)'**
+  String get ttsServicesLinkedProviderNone;
+
+  /// No description provided for @ttsServicesLinkedProviderSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Provider'**
+  String get ttsServicesLinkedProviderSelect;
+
+  /// No description provided for @ttsServicesLinkedProviderInherit.
+  ///
+  /// In en, this message translates to:
+  /// **'Inherited from'**
+  String get ttsServicesLinkedProviderInherit;
+
+  /// No description provided for @ttsServicesLinkedProviderNoCompatible.
+  ///
+  /// In en, this message translates to:
+  /// **'No compatible provider'**
+  String get ttsServicesLinkedProviderNoCompatible;
+
   /// No description provided for @ttsSettingsPageTitle.
   ///
   /// In en, this message translates to:
