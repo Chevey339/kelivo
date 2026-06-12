@@ -1845,9 +1845,32 @@ class _DesktopProviderDetailPaneState
                       );
                     },
                     style: TextStyle(fontSize: 14),
-                    decoration: _inputDecoration(
-                      context,
-                    ).copyWith(hintText: '/chat/completions'),
+                    decoration: _inputDecoration(context).copyWith(
+                      hintText: '/chat/completions',
+                      suffixIcon: _apiPathCtrl.text != '/chat/completions'
+                          ? IconButton(
+                              icon: Icon(lucide.Lucide.RotateCcw, size: 16),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              onPressed: () {
+                                _apiPathCtrl.text = '/chat/completions';
+                                if (!context.mounted) return;
+                                final sp = context.read<SettingsProvider>();
+                                final old = sp.getProviderConfig(
+                                  widget.providerKey,
+                                  defaultName: widget.displayName,
+                                );
+                                sp.setProviderConfig(
+                                  widget.providerKey,
+                                  old.copyWith(chatPath: '/chat/completions'),
+                                );
+                              },
+                            )
+                          : null,
+                    ),
                   ),
                 ),
               ],

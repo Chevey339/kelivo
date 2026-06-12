@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/chat_input_data.dart';
@@ -10,6 +11,8 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/ios_background_generation.dart';
+import '../../../core/services/troubleshoot/error_analyzer.dart';
+import '../../../core/services/troubleshoot/troubleshoot_store.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
@@ -1603,9 +1606,59 @@ class ChatActions {
     );
 
     await _conversationStreams.remove(conversationId)?.cancel();
+
+    _runTroubleshootAnalysis(e, errorText, state);
     onStreamError?.call(errorText);
     onStreamFinished?.call();
     await _finishIosBackgroundGeneration(success: false, detail: errorText);
+  }
+
+  void _runTroubleshootAnalysis(
+    dynamic e,
+    String errorText,
+    stream_ctrl.StreamingState state,
+  ) {
+    int? statusCode;
+    String errorBody = '';
+
+    if (e is HttpException) {
+      final msg = e.message;
+      final statusMatch = RegExp(r'HTTP\s+(\d+)').firstMatch(msg);
+      if (statusMatch != null) {
+        statusCode = int.tryParse(statusMatch.group(1)!);
+      }
+      final colonIdx = msg.indexOf(':');
+      if (colonIdx != -1 && colonIdx + 1 < msg.length) {
+        errorBody = msg.substring(colonIdx + 1).trim();
+      }
+    }
+
+    if (statusCode == null && errorText.isNotEmpty) {
+      final statusMatch = RegExp(r'HTTP\s+(\d+)').firstMatch(errorText);
+      if (statusMatch != null) {
+        statusCode = int.tryParse(statusMatch.group(1)!);
+      }
+      final colonIdx = errorText.indexOf(':');
+      if (colonIdx != -1 && colonIdx + 1 < errorText.length) {
+        errorBody = errorText.substring(colonIdx + 1).trim();
+      } else {
+        errorBody = errorText;
+      }
+    }
+
+    final result = ErrorAnalyzer.analyze(
+      statusCode: statusCode ?? 0,
+      errorBody: errorBody,
+      config: state.ctx.config,
+      modelId: state.ctx.modelId,
+    );
+
+    TroubleshootStore.set(
+      state.messageId,
+      result ?? ErrorAnalyzer.unknownError(),
+    );
+
+    onMessagesChanged?.call();
   }
 
   /// Handle stream done callback.

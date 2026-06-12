@@ -37,7 +37,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
   bool _globalSearchActive = false;
   StreamSubscription<HotkeyAction>? _hotkeySub;
   StreamSubscription<ChatAction>? _chatActionSub;
-  StreamSubscription<DesktopSettingsNavigationTarget>? _settingsNavSub;
+  StreamSubscription<SettingsNavigationEvent>? _settingsNavSub;
 
   @override
   void initState() {
@@ -139,11 +139,17 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
       }
     });
     _settingsNavSub = DesktopSettingsNavigationBus.instance.stream.listen((
-      target,
+      event,
     ) {
       if (!mounted) return;
-      switch (target) {
+      switch (event.target) {
         case DesktopSettingsNavigationTarget.backup:
+        case DesktopSettingsNavigationTarget.troubleshoot:
+        case DesktopSettingsNavigationTarget.providers:
+        case DesktopSettingsNavigationTarget.defaultModel:
+        case DesktopSettingsNavigationTarget.search:
+        case DesktopSettingsNavigationTarget.assistant:
+        case DesktopSettingsNavigationTarget.about:
           setState(() {
             _tabIndex = 3;
             _globalSearchActive = false;

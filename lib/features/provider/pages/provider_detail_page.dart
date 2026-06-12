@@ -949,6 +949,20 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 widget.keyName.toLowerCase() != 'tensdaq',
             hint: '/chat/completions',
             onChanged: (_) => _save(),
+            suffix: _pathCtrl.text != '/chat/completions'
+                ? IconButton(
+                    icon: Icon(Lucide.RotateCcw, size: 16),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                    onPressed: () {
+                      _pathCtrl.text = '/chat/completions';
+                      _save();
+                    },
+                  )
+                : null,
           ),
         ],
         if (_kind == ProviderKind.google) ...[

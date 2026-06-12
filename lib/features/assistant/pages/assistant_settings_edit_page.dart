@@ -50,6 +50,7 @@ import '../../../utils/brand_assets.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../utils/assistant_edit_tab_layout.dart';
 import 'assistant_regex_tab.dart';
+import '../../troubleshoot/troubleshoot_page.dart';
 
 part 'assistant_settings_edit_basic_tab.dart';
 part 'assistant_settings_edit_prompt_tab.dart';

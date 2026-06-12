@@ -10093,6 +10093,234 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.'**
   String debugPageManyMessagesSeedText(String role, int index);
+
+  /// No description provided for @troubleshootPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'FAQ'**
+  String get troubleshootPageTitle;
+
+  /// No description provided for @troubleshootSectionCommonErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Common Errors'**
+  String get troubleshootSectionCommonErrors;
+
+  /// No description provided for @troubleshootViewGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'View troubleshooting guide'**
+  String get troubleshootViewGuide;
+
+  /// No description provided for @troubleshootDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Error Troubleshooting'**
+  String get troubleshootDialogTitle;
+
+  /// No description provided for @troubleshootDialogDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get troubleshootDialogDismiss;
+
+  /// No description provided for @troubleshootEntryResponseApiTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider does not support Response API'**
+  String get troubleshootEntryResponseApiTitle;
+
+  /// No description provided for @troubleshootEntryResponseApiSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Your provider uses an older protocol. Response API is not supported by all providers. Go to provider settings and turn off the Response API toggle.'**
+  String get troubleshootEntryResponseApiSummary;
+
+  /// No description provided for @troubleshootEntryGeminiTypeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider type may be incorrect'**
+  String get troubleshootEntryGeminiTypeTitle;
+
+  /// No description provided for @troubleshootEntryGeminiTypeSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'The \'Provider Type\' setting only indicates API compatibility, not actual model selection. If you\'re using a generic API, try changing it back to \'OpenAI\' in provider settings.'**
+  String get troubleshootEntryGeminiTypeSummary;
+
+  /// No description provided for @troubleshootEntryEmptyPathTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'API path is empty'**
+  String get troubleshootEntryEmptyPathTitle;
+
+  /// No description provided for @troubleshootEntryEmptyPathSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'The API path has been cleared. Please go to provider settings and reset it to the default value.'**
+  String get troubleshootEntryEmptyPathSummary;
+
+  /// No description provided for @troubleshootEntryBalanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Insufficient balance'**
+  String get troubleshootEntryBalanceTitle;
+
+  /// No description provided for @troubleshootEntryBalanceSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Your API provider returned an insufficient balance error. Please top up at the provider\'s official platform, then check the balance in the provider settings.'**
+  String get troubleshootEntryBalanceSummary;
+
+  /// No description provided for @troubleshootEntryNoVisionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Model does not support image input'**
+  String get troubleshootEntryNoVisionTitle;
+
+  /// No description provided for @troubleshootEntryNoVisionSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'The current model does not support image recognition. Please switch to a vision-capable model, or configure an OCR model in Default Model settings.'**
+  String get troubleshootEntryNoVisionSummary;
+
+  /// No description provided for @troubleshootEntrySearchQualityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search quality is poor'**
+  String get troubleshootEntrySearchQualityTitle;
+
+  /// No description provided for @troubleshootEntrySearchQualitySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'The built-in Bing search has limited quality. Consider switching to Tavily or Exa for better search results.'**
+  String get troubleshootEntrySearchQualitySummary;
+
+  /// No description provided for @troubleshootEntryCacheHitrateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Low cache hit rate'**
+  String get troubleshootEntryCacheHitrateTitle;
+
+  /// No description provided for @troubleshootEntryCacheHitrateSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'To improve cache performance: (1) Disable assistant memory in assistant settings. (2) Remove frequently changing variables like cur_time from system prompts. (3) Avoid using the built-in sample assistant which includes dynamic variables.'**
+  String get troubleshootEntryCacheHitrateSummary;
+
+  /// No description provided for @troubleshootEntryBackupSyncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How to backup and sync'**
+  String get troubleshootEntryBackupSyncTitle;
+
+  /// No description provided for @troubleshootEntryBackupSyncSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Local backup: simply export a backup file. Cross-device sync: use WebDAV or S3 (recommend Nutstore or Cloudflare R2). Upload on one device, then restore on the other device with Smart Merge (not Full Overwrite).'**
+  String get troubleshootEntryBackupSyncSummary;
+
+  /// No description provided for @troubleshootEntryChatSuggestionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How to enable/disable chat suggestions'**
+  String get troubleshootEntryChatSuggestionsTitle;
+
+  /// No description provided for @troubleshootEntryChatSuggestionsSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Default Model settings and select a Chat Suggestion Model to enable suggestions. Tap the reset button in the top-right to disable.'**
+  String get troubleshootEntryChatSuggestionsSummary;
+
+  /// No description provided for @troubleshootEntryMultiBillingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why does one conversation have multiple billing records'**
+  String get troubleshootEntryMultiBillingTitle;
+
+  /// No description provided for @troubleshootEntryMultiBillingSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'(1) Tool calls need to return context, which consumes additional tokens. (2) The title generation model in Default Model settings may be set to your main chat model. Switch it to a cheaper model to avoid extra charges.'**
+  String get troubleshootEntryMultiBillingSummary;
+
+  /// No description provided for @troubleshootUnknownErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown error'**
+  String get troubleshootUnknownErrorTitle;
+
+  /// No description provided for @troubleshootUnknownErrorSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to automatically identify this error. Try using translation software to understand the error message, then provide feedback through the About page community channels.'**
+  String get troubleshootUnknownErrorSummary;
+
+  /// No description provided for @troubleshootActionProviderSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to provider settings'**
+  String get troubleshootActionProviderSettings;
+
+  /// No description provided for @troubleshootActionProviderBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Check balance'**
+  String get troubleshootActionProviderBalance;
+
+  /// No description provided for @troubleshootActionDefaultModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch default model'**
+  String get troubleshootActionDefaultModel;
+
+  /// No description provided for @troubleshootActionSearchServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure search service'**
+  String get troubleshootActionSearchServices;
+
+  /// No description provided for @troubleshootActionAssistantSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to assistant settings'**
+  String get troubleshootActionAssistantSettings;
+
+  /// No description provided for @troubleshootActionBackupSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to backup settings'**
+  String get troubleshootActionBackupSettings;
+
+  /// No description provided for @troubleshootActionOpenAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'View About page & community'**
+  String get troubleshootActionOpenAbout;
+
+  /// No description provided for @troubleshootViewAll.
+  ///
+  /// In en, this message translates to:
+  /// **'View all {count} guides'**
+  String troubleshootViewAll(int count);
+
+  /// No description provided for @troubleshootCacheWarningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System prompt contains dynamic variables'**
+  String get troubleshootCacheWarningTitle;
+
+  /// No description provided for @troubleshootCacheWarningDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'changes every request and may reduce cache hit rate.'**
+  String get troubleshootCacheWarningDesc;
+
+  /// No description provided for @troubleshootCacheWarningAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Learn more'**
+  String get troubleshootCacheWarningAction;
 }
 
 class _AppLocalizationsDelegate
