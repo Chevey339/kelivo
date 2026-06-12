@@ -41,6 +41,7 @@ import 'package:Kelivo/desktop/html_preview_dialog.dart';
 // line with many unmatched openers cannot trigger repeated whole-line scans.
 const int _maxInlineMathBodyLength = 512;
 const String _codeDollarMask = '___CODE_DOLLAR_MASK___';
+const String _fencedHtmlTagStartMask = '\uE002';
 
 /// gpt_markdown with custom code block highlight and inline code styling.
 class MarkdownWithCodeHighlight extends StatefulWidget {
@@ -155,7 +156,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     if (rbIdx != -1) components[rbIdx] = ModernRadioMd();
     final tableIdx = components.indexWhere((c) => c is TableMd);
     if (tableIdx != -1) components[tableIdx] = EscapeAwareTableMd();
-    // Prepend custom renderers in priority order (fence first)
+    // Prepend custom renderers in priority order.
     // Temporarily disable custom bold label line transformer to avoid
     // interfering with block parsing for complex documents.
     // components.insert(0, LabelValueLineMd());
@@ -476,17 +477,18 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       // Fenced code block styling via codeBuilder (with collapse/expand)
       codeBuilder: (ctx, name, code, closed) {
         final lang = name.trim();
+        final restoredCode = _unmaskHtmlTagStartsInsideFencedCode(code);
         if (lang.toLowerCase() == 'mermaid') {
           return _MermaidBlock(
-            code: code,
+            code: restoredCode,
             streaming: widget.streaming && !closed,
           );
         } else if (lang.toLowerCase() == 'plantuml') {
-          return PlantUMLBlock(code: code);
+          return PlantUMLBlock(code: restoredCode);
         }
         return _CollapsibleCodeBlock(
           language: lang,
-          code: code,
+          code: restoredCode,
           streaming: widget.streaming,
           closed: closed,
         );
@@ -662,6 +664,8 @@ String _preprocessFences(
         RegExp(r'\$'),
         (m) => _codeDollarMask,
       );
+    } else {
+      codeContent = _maskHtmlTagStartsInsideFencedCode(codeContent);
     }
 
     codeMap[key] = codeContent;
@@ -800,6 +804,17 @@ String _preprocessFences(
   });
 
   return out;
+}
+
+String _maskHtmlTagStartsInsideFencedCode(String input) {
+  return input.replaceAllMapped(
+    RegExp(r'</?(?:details|summary)\b', caseSensitive: false),
+    (match) => '$_fencedHtmlTagStartMask${match[0]!.substring(1)}',
+  );
+}
+
+String _unmaskHtmlTagStartsInsideFencedCode(String input) {
+  return input.replaceAll(_fencedHtmlTagStartMask, '<');
 }
 
 String _normalizeRawCitationMetadata(String input) {
@@ -4433,7 +4448,9 @@ class FencedCodeBlockMd extends BlockMd {
     final m = exp.firstMatch(text);
     if (m == null) return const SizedBox.shrink();
     final lang = (m.group(3) ?? '').trim();
-    final code = (m.group(4) ?? m.group(5) ?? '');
+    final code = _unmaskHtmlTagStartsInsideFencedCode(
+      m.group(4) ?? m.group(5) ?? '',
+    );
     final closed = m.group(4) != null;
     final langLower = lang.toLowerCase();
     final isStreamingFence = streaming && !closed;

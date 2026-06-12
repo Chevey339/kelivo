@@ -2716,6 +2716,47 @@ void main() {}
   });
 
   testWidgets(
+    'MarkdownWithCodeHighlight keeps details tags literal in html code blocks',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('''
+```html
+<!DOCTYPE html>
+<html>
+<body>
+<details>
+  <summary>点击展开/折叠内容</summary>
+  <p>这里是可以折叠的内容。</p>
+</details>
+</body>
+</html>
+```
+'''),
+      );
+      await tester.pump();
+
+      expect(find.text('html'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(SelectableHighlightView),
+          matching: find.textContaining('<details>'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(SelectableHighlightView),
+          matching: find.textContaining('<summary>点击展开/折叠内容</summary>'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('点击展开/折叠内容'), findsNothing);
+      expect(find.byKey(const ValueKey('details-collapsed')), findsNothing);
+      expect(find.byKey(const ValueKey('details-expanded')), findsNothing);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight toggles auto-collapsed code block from header',
     (tester) async {
       await tester.pumpWidget(
