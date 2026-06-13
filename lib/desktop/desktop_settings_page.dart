@@ -58,6 +58,8 @@ import 'setting/about_pane.dart';
 import 'setting/stats_pane.dart';
 import 'setting/troubleshoot_pane.dart';
 import '../core/services/troubleshoot/troubleshoot_data.dart';
+import '../core/services/troubleshoot/error_analyzer.dart';
+import '../features/troubleshoot/troubleshoot_content.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';

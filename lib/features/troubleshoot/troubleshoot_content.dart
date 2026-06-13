@@ -147,6 +147,7 @@ class _TroubleshootContentState extends State<TroubleshootContent> {
               secondChild: Padding(
                 padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -333,12 +334,14 @@ class TroubleshootCard extends StatelessWidget {
   final ErrorAnalysisResult result;
   final VoidCallback? onTapAction;
   final VoidCallback? onDismiss;
+  final bool isDialog;
 
   const TroubleshootCard({
     super.key,
     required this.result,
     this.onTapAction,
     this.onDismiss,
+    this.isDialog = false,
   });
 
   @override
@@ -347,7 +350,7 @@ class TroubleshootCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     return Container(
-      margin: const EdgeInsets.only(top: 8),
+      margin: isDialog ? EdgeInsets.zero : const EdgeInsets.only(top: 8),
       decoration: BoxDecoration(
         color: cs.errorContainer.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
@@ -356,6 +359,7 @@ class TroubleshootCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
+          mainAxisSize: isDialog ? MainAxisSize.min : MainAxisSize.max,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
