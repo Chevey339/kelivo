@@ -2460,6 +2460,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sideDrawerReset => 'Reset';
 
   @override
+  String get providerAvatarChooseBuiltInIcon => 'Choose Built-in Icon';
+
+  @override
+  String get providerAvatarIconDialogTitle => 'Choose Built-in Icon';
+
+  @override
+  String get providerAvatarIconSearchHint => 'Search icons';
+
+  @override
+  String get providerAvatarIconNoResults => 'No icons found';
+
+  @override
   String get sideDrawerEmojiDialogTitle => 'Choose Emoji';
 
   @override

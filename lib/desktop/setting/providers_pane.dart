@@ -2470,6 +2470,17 @@ class _DesktopProviderDetailPaneState
                                     },
                                   ),
                                   DesktopContextMenuItem(
+                                    icon: lucide.Lucide.Bot,
+                                    label:
+                                        l10n2.providerAvatarChooseBuiltInIcon,
+                                    onTap: () async {
+                                      await _pickProviderBuiltinIcon(
+                                        context,
+                                        widget.providerKey,
+                                      );
+                                    },
+                                  ),
+                                  DesktopContextMenuItem(
                                     icon: lucide.Lucide.Link,
                                     label: l10n2.sideDrawerEnterLink,
                                     onTap: () async {
@@ -3504,6 +3515,87 @@ class _DesktopProviderDetailPaneState
         await settings.setProviderAvatarUrl(providerKey, url);
       }
     }
+  }
+
+  Future<void> _pickProviderBuiltinIcon(
+    BuildContext context,
+    String providerKey,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final settings = context.read<SettingsProvider>();
+    final icons = BrandAssets.selectableIcons;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: cs.surface,
+          title: Text(l10n.providerAvatarIconDialogTitle),
+          content: SizedBox(
+            width: 360,
+            height: 400,
+            child: GridView.builder(
+              itemCount: icons.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 5,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1,
+              ),
+              itemBuilder: (ctx, i) {
+                final opt = icons[i];
+                final isSvg = opt.asset.endsWith('.svg');
+                final needsMono =
+                    isDark &&
+                    (opt.asset.contains('openai') ||
+                        opt.asset.contains('grok') ||
+                        opt.asset.contains('xai') ||
+                        opt.asset.contains('openrouter'));
+                return Semantics(
+                  label: opt.label,
+                  child: Tooltip(
+                    message: opt.label,
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        Future.microtask(() async {
+                          await settings.setProviderAvatarIcon(
+                            providerKey,
+                            opt.asset,
+                          );
+                        });
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.all(4),
+                        child: isSvg
+                            ? SvgPicture.asset(
+                                opt.asset,
+                                colorFilter: needsMono
+                                    ? const ColorFilter.mode(
+                                        Colors.white,
+                                        BlendMode.srcIn,
+                                      )
+                                    : null,
+                              )
+                            : Image.asset(opt.asset, fit: BoxFit.contain),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(l10n.sideDrawerCancel),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   bool _isAihubmix(ProviderConfig cfg) {
