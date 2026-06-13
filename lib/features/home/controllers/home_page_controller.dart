@@ -1,4 +1,8 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'dart:isolate' show ReceivePort;
+import 'dart:ui' show IsolateNameServer;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -16,6 +20,8 @@ import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/logging/flutter_logger.dart';
+import '../../../core/services/proactive_care_alarm_service.dart';
 import '../../../core/services/tts/tts_text_selection.dart';
 import '../../../core/services/haptics.dart';
 import '../../../l10n/app_localizations.dart';
@@ -137,6 +143,10 @@ class HomePageController extends ChangeNotifier {
 
   McpProvider? _mcpProvider;
   StreamSubscription<ChatAction>? _chatActionSub;
+
+  /// Main-isolate port receiving proactive care triggers from the alarm
+  /// background isolate (Android only).
+  ReceivePort? _proactiveCarePort;
 
   // ============================================================================
   // Animation Controllers
@@ -302,6 +312,50 @@ class HomePageController extends ChangeNotifier {
     _initializeProviders();
     _setupKeyboardListeners();
     _setupDesktopFeatures();
+    _registerProactiveCarePort();
+  }
+
+  /// Registers the main-isolate port that receives proactive care triggers
+  /// from the alarm background isolate while the app process is alive.
+  void _registerProactiveCarePort() {
+    if (kIsWeb || !Platform.isAndroid) return;
+    try {
+      // A stale mapping can survive a hot restart; replace it.
+      IsolateNameServer.removePortNameMapping(proactiveCareMainPortName);
+      final port = ReceivePort();
+      final registered = IsolateNameServer.registerPortWithName(
+        port.sendPort,
+        proactiveCareMainPortName,
+      );
+      if (!registered) {
+        port.close();
+        FlutterLogger.log(
+          'Proactive care port registration failed',
+          tag: 'HomePageController',
+        );
+        return;
+      }
+      _proactiveCarePort = port;
+      port.listen((message) {
+        final assistantId = message?.toString() ?? '';
+        if (assistantId.isEmpty) return;
+        unawaited(_viewModel.handleProactiveCareTrigger(assistantId));
+      });
+    } catch (e) {
+      FlutterLogger.log(
+        'Proactive care port setup failed: $e',
+        tag: 'HomePageController',
+      );
+    }
+  }
+
+  void _disposeProactiveCarePort() {
+    if (_proactiveCarePort == null) return;
+    try {
+      IsolateNameServer.removePortNameMapping(proactiveCareMainPortName);
+    } catch (_) {}
+    _proactiveCarePort?.close();
+    _proactiveCarePort = null;
   }
 
   void _initializeAnimations() {
@@ -2029,6 +2083,7 @@ class HomePageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposeProactiveCarePort();
     _convoFadeController.dispose();
     _mcpProvider?.removeListener(_onMcpChanged);
     _scrollCtrl.dispose();
