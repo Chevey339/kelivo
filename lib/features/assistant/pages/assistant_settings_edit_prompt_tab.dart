@@ -300,6 +300,98 @@ class _PromptTabState extends State<_PromptTab> {
                 contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
               ),
             ),
+            // Cache-sensitive variable warning
+            () {
+              final text = _sysCtrl.text;
+              final hasTime = text.contains('{cur_time}');
+              final hasDatetime = text.contains('{cur_datetime}');
+              if (!hasTime && !hasDatetime) return const SizedBox.shrink();
+              final vars = [
+                if (hasTime) '{cur_time}',
+                if (hasDatetime) '{cur_datetime}',
+              ].join(', ');
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Lucide.MessageCircleWarning,
+                        size: 16,
+                        color: const Color(0xFFF59E0B),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            RichText(
+                              text: TextSpan(
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  height: 1.3,
+                                  color: cs.onSurface.withValues(alpha: 0.8),
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: l10n.troubleshootCacheWarningTitle,
+                                    style: TextStyle(
+                                      fontWeight: AppFontWeights.medium,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: ' $vars ',
+                                    style: TextStyle(
+                                      fontWeight: AppFontWeights.semibold,
+                                      color: const Color(0xFFF59E0B),
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: l10n.troubleshootCacheWarningDesc,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            GestureDetector(
+                              onTap: () {
+                                try {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const TroubleshootPage(
+                                        initialEntryKey: 'low_cache_hitrate',
+                                      ),
+                                    ),
+                                  );
+                                } catch (_) {}
+                              },
+                              child: Text(
+                                l10n.troubleshootCacheWarningAction,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: AppFontWeights.medium,
+                                  color: cs.primary,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }(),
             const SizedBox(height: 8),
             Text(
               l10n.assistantEditAvailableVariables,

@@ -9,6 +9,7 @@ import 'display_settings_page.dart';
 import '../../mcp/pages/mcp_page.dart';
 import '../../assistant/pages/assistant_settings_page.dart';
 import 'about_page.dart';
+import '../../troubleshoot/troubleshoot_page.dart';
 import 'tts_services_page.dart';
 import 'sponsor_page.dart';
 import 'log_viewer_page.dart';
@@ -338,6 +339,17 @@ class SettingsPage extends StatelessWidget {
                   Navigator.of(
                     context,
                   ).push(MaterialPageRoute(builder: (_) => const AboutPage()));
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.MessageCircleQuestionMark,
+                label: l10n.troubleshootPageTitle,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const TroubleshootPage()),
+                  );
                 },
               ),
               _iosDivider(context),

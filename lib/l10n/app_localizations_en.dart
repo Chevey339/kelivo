@@ -5483,4 +5483,162 @@ class AppLocalizationsEn extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }
+
+  @override
+  String get troubleshootPageTitle => 'FAQ';
+
+  @override
+  String get troubleshootSectionCommonErrors => 'Common Errors';
+
+  @override
+  String get troubleshootViewGuide => 'View troubleshooting guide';
+
+  @override
+  String get troubleshootDialogTitle => 'Error Troubleshooting';
+
+  @override
+  String get troubleshootDialogDismiss => 'Close';
+
+  @override
+  String get troubleshootEntryResponseApiTitle =>
+      'Provider does not support Response API';
+
+  @override
+  String get troubleshootEntryResponseApiSummary =>
+      'Your provider uses an older protocol. Response API is not supported by all providers. Go to provider settings and turn off the Response API toggle.';
+
+  @override
+  String get troubleshootEntryGeminiTypeTitle =>
+      'Provider type may be incorrect';
+
+  @override
+  String get troubleshootEntryGeminiTypeSummary =>
+      'The \'Provider Type\' setting only indicates API compatibility, not actual model selection. If you\'re using a generic API, try changing it back to \'OpenAI\' in provider settings.';
+
+  @override
+  String get troubleshootEntryEmptyPathTitle => 'API path is empty';
+
+  @override
+  String get troubleshootEntryEmptyPathSummary =>
+      'The API path has been cleared. Please go to provider settings and reset it to the default value.';
+
+  @override
+  String get troubleshootEntryBalanceTitle => 'Insufficient balance';
+
+  @override
+  String get troubleshootEntryBalanceSummary =>
+      'Your API provider returned an insufficient balance error. Please top up at the provider\'s official platform, then check the balance in the provider settings.';
+
+  @override
+  String get troubleshootEntryNoVisionTitle =>
+      'Model does not support image input';
+
+  @override
+  String get troubleshootEntryNoVisionSummary =>
+      'The current model does not support image input. This may be because you manually enabled image input in the provider settings for a model that does not support vision. Check the model overrides in your provider configuration and remove \"image\" from input capabilities. If you believe this model actually supports vision (e.g. it is a new or niche model), please provide feedback so we can update our model registry.';
+
+  @override
+  String get troubleshootEntrySearchQualityTitle => 'Search quality is poor';
+
+  @override
+  String get troubleshootEntrySearchQualitySummary =>
+      'The built-in Bing search has limited quality. Consider switching to Tavily or Exa for better search results.';
+
+  @override
+  String get troubleshootEntryCacheHitrateTitle => 'Low cache hit rate';
+
+  @override
+  String get troubleshootEntryCacheHitrateSummary =>
+      'To improve cache performance: (1) Disable assistant memory in assistant settings. (2) Remove frequently changing variables like cur_time from system prompts. (3) Avoid using the built-in sample assistant which includes dynamic variables.';
+
+  @override
+  String get troubleshootEntryBackupSyncTitle => 'How to backup and sync';
+
+  @override
+  String get troubleshootEntryBackupSyncSummary =>
+      'Local backup: simply export a backup file. Cross-device sync: use WebDAV or S3 (recommend Nutstore or Cloudflare R2). Upload on one device, then restore on the other device with Smart Merge (not Full Overwrite).';
+
+  @override
+  String get troubleshootEntryChatSuggestionsTitle =>
+      'How to enable/disable chat suggestions';
+
+  @override
+  String get troubleshootEntryChatSuggestionsSummary =>
+      'Go to Default Model settings and select a Chat Suggestion Model to enable suggestions. Tap the reset button in the top-right to disable.';
+
+  @override
+  String get troubleshootEntryMultiBillingTitle =>
+      'Why does one conversation have multiple billing records';
+
+  @override
+  String get troubleshootEntryMultiBillingSummary =>
+      '(1) Tool calls need to return context, which consumes additional tokens. (2) The title generation model in Default Model settings may be set to your main chat model. Switch it to a cheaper model to avoid extra charges.';
+
+  @override
+  String get troubleshootUnknownErrorTitle => 'Unknown error';
+
+  @override
+  String get troubleshootUnknownErrorSummary =>
+      'Unable to automatically identify this error. Try using translation software to understand the error message, then provide feedback through the About page community channels.';
+
+  @override
+  String get troubleshootActionProviderSettings => 'Go to provider settings';
+
+  @override
+  String get troubleshootActionProviderBalance => 'Check balance';
+
+  @override
+  String get troubleshootActionDefaultModel => 'Switch default model';
+
+  @override
+  String get troubleshootActionSearchServices => 'Configure search service';
+
+  @override
+  String get troubleshootActionAssistantSettings => 'Go to assistant settings';
+
+  @override
+  String get troubleshootActionBackupSettings => 'Go to backup settings';
+
+  @override
+  String get troubleshootActionOpenAbout => 'View About page & community';
+
+  @override
+  String troubleshootViewAll(int count) {
+    return 'View all $count guides';
+  }
+
+  @override
+  String get troubleshootCacheWarningTitle =>
+      'System prompt contains dynamic variables';
+
+  @override
+  String get troubleshootCacheWarningDesc =>
+      'changes every request and may reduce cache hit rate.';
+
+  @override
+  String get troubleshootCacheWarningAction => 'Learn more';
+
+  @override
+  String get troubleshootEntryBillingPrivacyTitle =>
+      'Does Kelivo charge fees or collect data?';
+
+  @override
+  String get troubleshootEntryBillingPrivacySummary =>
+      'Kelivo is open-source and does not charge fees. It has no backend server — your data only flows to the AI provider that processes your requests. In practice, as with all third-party clients, you will most likely need to top up credits to use paid AI services (unless you use locally deployed models or free models from certain providers). Some apps offer free usage primarily to attract end users; paying API fees is the main revenue source for large model companies.';
+
+  @override
+  String get troubleshootEntryAgentSkillsTitle =>
+      'Does Kelivo support Skills or Agents?';
+
+  @override
+  String get troubleshootEntryAgentSkillsSummary =>
+      'As a lightweight client, Kelivo focuses on polished chat and tool calling (including MCP). Skills support may be added in the future. Agent functionality is beyond the intended scope of this project and is unlikely to be implemented. We recommend dedicated agent platforms for that purpose.';
+
+  @override
+  String get troubleshootEntryChatCrashTitle =>
+      'Why does the app crash shortly after entering chat?';
+
+  @override
+  String get troubleshootEntryChatCrashSummary =>
+      'On Windows, install the VC++ 14.0 redistributable from https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist to resolve Flutter environment dependencies. On other platforms, check your storage space — if the chat record size (excluding images and files) has grown abnormally (e.g. plain text >500MB), the data may be corrupted. Restore from a previous backup.';
 }

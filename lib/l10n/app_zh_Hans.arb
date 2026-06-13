@@ -1932,5 +1932,56 @@
         "type": "int"
       }
     }
-  }
+  },
+  "troubleshootPageTitle": "常见疑问",
+  "troubleshootSectionCommonErrors": "常见错误",
+  "troubleshootViewGuide": "查看故障排查指南",
+  "troubleshootViewAll": "查看全部 {count} 条排查指南",
+  "@troubleshootViewAll": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "troubleshootDialogTitle": "错误排查",
+  "troubleshootDialogDismiss": "关闭",
+  "troubleshootEntryResponseApiTitle": "供应商暂不支持 Response API",
+  "troubleshootEntryResponseApiSummary": "你的供应商使用的协议较旧，Response API 并非所有供应商都支持。请前往供应商设置关闭 Response API 开关。",
+  "troubleshootEntryGeminiTypeTitle": "供应商类型设置不正确",
+  "troubleshootEntryGeminiTypeSummary": "「供应商类型」仅表示兼容协议，不代表实际模型选择。如果你使用的是通用 API，建议在供应商设置中将类型改回 OpenAI。",
+  "troubleshootEntryEmptyPathTitle": "API 路径为空",
+  "troubleshootEntryEmptyPathSummary": "API 路径被清空了，请前往供应商设置重置为默认值。",
+  "troubleshootEntryBalanceTitle": "账户余额不足",
+  "troubleshootEntryBalanceSummary": "API 返回了余额不足错误，请前往官方平台充值。之后可在供应商设置的余额页面查看余额。",
+  "troubleshootEntryNoVisionTitle": "当前模型不支持识图",
+  "troubleshootEntryNoVisionSummary": "当前模型不支持图片输入。这可能是因为你在提供商设置中为不支持视觉的模型手动开启了图片输入。请在提供商配置中检查模型覆盖设置，从输入能力中移除\"图片\"。如果你确信该模型实际支持视觉（例如可能是新模型或小众模型），请向我们反馈以便更新模型库。",
+  "troubleshootEntrySearchQualityTitle": "搜索质量不佳",
+  "troubleshootEntrySearchQualitySummary": "内置必应搜索质量有限，建议切换为 Tavily 或 Exa 等专用搜索服务以获得更好的结果。",
+  "troubleshootEntryCacheHitrateTitle": "缓存命中率低",
+  "troubleshootEntryCacheHitrateSummary": "提升缓存性能的建议：(1) 在助手设置中关闭助手记忆。(2) 检查系统提示词，移除 cur_time 等频繁变化的变量。(3) 避免使用内置的「示例助手」（它包含动态变量）。",
+  "troubleshootEntryBackupSyncTitle": "如何备份与同步",
+  "troubleshootEntryBackupSyncSummary": "本机备份：直接导出备份文件即可。跨设备同步：使用 WebDAV 或 S3（推荐坚果云或 Cloudflare R2）。一端上传，另一端恢复时选择「智能合并」而非「完全覆盖」。",
+  "troubleshootEntryChatSuggestionsTitle": "聊天建议如何开启/关闭",
+  "troubleshootEntryChatSuggestionsSummary": "前往默认模型界面选择「聊天建议模型」以开启，点击右上角重置以关闭。",
+  "troubleshootEntryMultiBillingTitle": "为什么一次对话出现多次扣费记录",
+  "troubleshootEntryMultiBillingSummary": "(1) 工具调用需要回传上下文，会额外消耗 tokens。(2) 默认模型中的标题生成模型如果选择了当前聊天模型，建议换为廉价模型。",
+  "troubleshootUnknownErrorTitle": "遇到未知错误",
+  "troubleshootUnknownErrorSummary": "未能自动识别此错误。建议先借助翻译软件理解错误内容，然后通过关于页面的社区渠道反馈。",
+  "troubleshootActionProviderSettings": "前往供应商设置",
+  "troubleshootActionProviderBalance": "查看余额",
+  "troubleshootActionDefaultModel": "更换默认模型",
+  "troubleshootActionSearchServices": "配置搜索服务",
+  "troubleshootActionAssistantSettings": "前往助手设置",
+  "troubleshootActionBackupSettings": "前往备份设置",
+  "troubleshootActionOpenAbout": "查看关于页面与社区",
+  "troubleshootCacheWarningTitle": "提示词含动态变量",
+  "troubleshootCacheWarningDesc": "每次发送都会变化，可能导致缓存命中率降低。",
+  "troubleshootCacheWarningAction": "了解详情",
+  "troubleshootEntryBillingPrivacyTitle": "Kelivo 收费或收集数据吗？",
+  "troubleshootEntryBillingPrivacySummary": "Kelivo 是开源软件，本身不收费。它没有后端服务器，你的数据只流向实际处理你请求的 AI 供应商。实际使用中，和所有第三方客户端一样，多数情况下你需要充值才能使用服务（除非使用本地部署的模型或部分供应商的免费模型）。部分 App 提供免费使用主要是吸引 C 端用户留存的手段，支付 API 费用是大模型公司的主要收入来源。",
+  "troubleshootEntryAgentSkillsTitle": "Kelivo 支持 Skills 或 Agent 吗？",
+  "troubleshootEntryAgentSkillsSummary": "作为轻量软件，Kelivo 专注于打磨基础的聊天和工具调用（含 MCP）功能。Skills 支持在未来随时可能添加。Agent 方向过于重量级，不在本项目的未来规划中，建议使用专门的 Agent 平台。",
+  "troubleshootEntryChatCrashTitle": "进入聊天界面后不久闪退怎么办？",
+  "troubleshootEntryChatCrashSummary": "Windows 电脑请安装 VC++ 14.0 运行库以补齐 Flutter 环境依赖：https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist。其他平台请检查存储空间——若聊天记录大小（不含图片/文件）异常增大（如纯文本超过 500MB），可能是数据损坏，建议从之前的备份恢复。"
 }

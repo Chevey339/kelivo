@@ -47,6 +47,8 @@ import 'citation_sources_sheet.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../core/services/troubleshoot/troubleshoot_store.dart';
+import '../../troubleshoot/troubleshoot_content.dart';
 
 final RegExp _urlSchemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
 
@@ -2285,6 +2287,19 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             }
             return widgets;
           }(),
+          // Troubleshoot card for error messages
+          if (!widget.message.isStreaming) ...[
+            () {
+              final result = TroubleshootStore.get(widget.message.id);
+              if (result == null) return const SizedBox.shrink();
+              return TroubleshootCard(
+                result: result,
+                onTapAction: () => handleTroubleshootCardTap(context, result),
+                onDismiss: () =>
+                    setState(() => TroubleshootStore.remove(widget.message.id)),
+              );
+            }(),
+          ],
           if (hasTranslation) ...[
             const SizedBox(height: 12),
             SizedBox(

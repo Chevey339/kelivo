@@ -5269,6 +5269,153 @@ class AppLocalizationsZh extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get troubleshootPageTitle => '常见疑问';
+
+  @override
+  String get troubleshootSectionCommonErrors => '常见错误';
+
+  @override
+  String get troubleshootViewGuide => '查看故障排查指南';
+
+  @override
+  String get troubleshootDialogTitle => '错误排查';
+
+  @override
+  String get troubleshootDialogDismiss => '关闭';
+
+  @override
+  String get troubleshootEntryResponseApiTitle => '供应商暂不支持 Response API';
+
+  @override
+  String get troubleshootEntryResponseApiSummary =>
+      '你的供应商使用的协议较旧，Response API 并非所有供应商都支持。请前往供应商设置关闭 Response API 开关。';
+
+  @override
+  String get troubleshootEntryGeminiTypeTitle => '供应商类型设置不正确';
+
+  @override
+  String get troubleshootEntryGeminiTypeSummary =>
+      '「供应商类型」仅表示兼容协议，不代表实际模型选择。如果你使用的是通用 API，建议在供应商设置中将类型改回 OpenAI。';
+
+  @override
+  String get troubleshootEntryEmptyPathTitle => 'API 路径为空';
+
+  @override
+  String get troubleshootEntryEmptyPathSummary => 'API 路径被清空了，请前往供应商设置重置为默认值。';
+
+  @override
+  String get troubleshootEntryBalanceTitle => '账户余额不足';
+
+  @override
+  String get troubleshootEntryBalanceSummary =>
+      'API 返回了余额不足错误，请前往官方平台充值。之后可在供应商设置的余额页面查看余额。';
+
+  @override
+  String get troubleshootEntryNoVisionTitle => '当前模型不支持识图';
+
+  @override
+  String get troubleshootEntryNoVisionSummary =>
+      '当前模型不支持图片输入。这可能是因为你在提供商设置中为不支持视觉的模型手动开启了图片输入。请在提供商配置中检查模型覆盖设置，从输入能力中移除\"图片\"。如果你确信该模型实际支持视觉（例如可能是新模型或小众模型），请向我们反馈以便更新模型库。';
+
+  @override
+  String get troubleshootEntrySearchQualityTitle => '搜索质量不佳';
+
+  @override
+  String get troubleshootEntrySearchQualitySummary =>
+      '内置必应搜索质量有限，建议切换为 Tavily 或 Exa 等专用搜索服务以获得更好的结果。';
+
+  @override
+  String get troubleshootEntryCacheHitrateTitle => '缓存命中率低';
+
+  @override
+  String get troubleshootEntryCacheHitrateSummary =>
+      '提升缓存性能的建议：(1) 在助手设置中关闭助手记忆。(2) 检查系统提示词，移除 cur_time 等频繁变化的变量。(3) 避免使用内置的「示例助手」（它包含动态变量）。';
+
+  @override
+  String get troubleshootEntryBackupSyncTitle => '如何备份与同步';
+
+  @override
+  String get troubleshootEntryBackupSyncSummary =>
+      '本机备份：直接导出备份文件即可。跨设备同步：使用 WebDAV 或 S3（推荐坚果云或 Cloudflare R2）。一端上传，另一端恢复时选择「智能合并」而非「完全覆盖」。';
+
+  @override
+  String get troubleshootEntryChatSuggestionsTitle => '聊天建议如何开启/关闭';
+
+  @override
+  String get troubleshootEntryChatSuggestionsSummary =>
+      '前往默认模型界面选择「聊天建议模型」以开启，点击右上角重置以关闭。';
+
+  @override
+  String get troubleshootEntryMultiBillingTitle => '为什么一次对话出现多次扣费记录';
+
+  @override
+  String get troubleshootEntryMultiBillingSummary =>
+      '(1) 工具调用需要回传上下文，会额外消耗 tokens。(2) 默认模型中的标题生成模型如果选择了当前聊天模型，建议换为廉价模型。';
+
+  @override
+  String get troubleshootUnknownErrorTitle => '遇到未知错误';
+
+  @override
+  String get troubleshootUnknownErrorSummary =>
+      '未能自动识别此错误。建议先借助翻译软件理解错误内容，然后通过关于页面的社区渠道反馈。';
+
+  @override
+  String get troubleshootActionProviderSettings => '前往供应商设置';
+
+  @override
+  String get troubleshootActionProviderBalance => '查看余额';
+
+  @override
+  String get troubleshootActionDefaultModel => '更换默认模型';
+
+  @override
+  String get troubleshootActionSearchServices => '配置搜索服务';
+
+  @override
+  String get troubleshootActionAssistantSettings => '前往助手设置';
+
+  @override
+  String get troubleshootActionBackupSettings => '前往备份设置';
+
+  @override
+  String get troubleshootActionOpenAbout => '查看关于页面与社区';
+
+  @override
+  String troubleshootViewAll(int count) {
+    return '查看全部 $count 条排查指南';
+  }
+
+  @override
+  String get troubleshootCacheWarningTitle => '提示词含动态变量';
+
+  @override
+  String get troubleshootCacheWarningDesc => '每次发送都会变化，可能导致缓存命中率降低。';
+
+  @override
+  String get troubleshootCacheWarningAction => '了解详情';
+
+  @override
+  String get troubleshootEntryBillingPrivacyTitle => 'Kelivo 收费或收集数据吗？';
+
+  @override
+  String get troubleshootEntryBillingPrivacySummary =>
+      'Kelivo 是开源软件，本身不收费。它没有后端服务器，你的数据只流向实际处理你请求的 AI 供应商。实际使用中，和所有第三方客户端一样，多数情况下你需要充值才能使用服务（除非使用本地部署的模型或部分供应商的免费模型）。部分 App 提供免费使用主要是吸引 C 端用户留存的手段，支付 API 费用是大模型公司的主要收入来源。';
+
+  @override
+  String get troubleshootEntryAgentSkillsTitle => 'Kelivo 支持 Skills 或 Agent 吗？';
+
+  @override
+  String get troubleshootEntryAgentSkillsSummary =>
+      '作为轻量软件，Kelivo 专注于打磨基础的聊天和工具调用（含 MCP）功能。Skills 支持在未来随时可能添加。Agent 方向过于重量级，不在本项目的未来规划中，建议使用专门的 Agent 平台。';
+
+  @override
+  String get troubleshootEntryChatCrashTitle => '进入聊天界面后不久闪退怎么办？';
+
+  @override
+  String get troubleshootEntryChatCrashSummary =>
+      'Windows 电脑请安装 VC++ 14.0 运行库以补齐 Flutter 环境依赖：https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist。其他平台请检查存储空间——若聊天记录大小（不含图片/文件）异常增大（如纯文本超过 500MB），可能是数据损坏，建议从之前的备份恢复。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10536,6 +10683,153 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get troubleshootPageTitle => '常见疑问';
+
+  @override
+  String get troubleshootSectionCommonErrors => '常见错误';
+
+  @override
+  String get troubleshootViewGuide => '查看故障排查指南';
+
+  @override
+  String get troubleshootDialogTitle => '错误排查';
+
+  @override
+  String get troubleshootDialogDismiss => '关闭';
+
+  @override
+  String get troubleshootEntryResponseApiTitle => '供应商暂不支持 Response API';
+
+  @override
+  String get troubleshootEntryResponseApiSummary =>
+      '你的供应商使用的协议较旧，Response API 并非所有供应商都支持。请前往供应商设置关闭 Response API 开关。';
+
+  @override
+  String get troubleshootEntryGeminiTypeTitle => '供应商类型设置不正确';
+
+  @override
+  String get troubleshootEntryGeminiTypeSummary =>
+      '「供应商类型」仅表示兼容协议，不代表实际模型选择。如果你使用的是通用 API，建议在供应商设置中将类型改回 OpenAI。';
+
+  @override
+  String get troubleshootEntryEmptyPathTitle => 'API 路径为空';
+
+  @override
+  String get troubleshootEntryEmptyPathSummary => 'API 路径被清空了，请前往供应商设置重置为默认值。';
+
+  @override
+  String get troubleshootEntryBalanceTitle => '账户余额不足';
+
+  @override
+  String get troubleshootEntryBalanceSummary =>
+      'API 返回了余额不足错误，请前往官方平台充值。之后可在供应商设置的余额页面查看余额。';
+
+  @override
+  String get troubleshootEntryNoVisionTitle => '当前模型不支持识图';
+
+  @override
+  String get troubleshootEntryNoVisionSummary =>
+      '当前模型不支持图片输入。这可能是因为你在提供商设置中为不支持视觉的模型手动开启了图片输入。请在提供商配置中检查模型覆盖设置，从输入能力中移除\"图片\"。如果你确信该模型实际支持视觉（例如可能是新模型或小众模型），请向我们反馈以便更新模型库。';
+
+  @override
+  String get troubleshootEntrySearchQualityTitle => '搜索质量不佳';
+
+  @override
+  String get troubleshootEntrySearchQualitySummary =>
+      '内置必应搜索质量有限，建议切换为 Tavily 或 Exa 等专用搜索服务以获得更好的结果。';
+
+  @override
+  String get troubleshootEntryCacheHitrateTitle => '缓存命中率低';
+
+  @override
+  String get troubleshootEntryCacheHitrateSummary =>
+      '提升缓存性能的建议：(1) 在助手设置中关闭助手记忆。(2) 检查系统提示词，移除 cur_time 等频繁变化的变量。(3) 避免使用内置的「示例助手」（它包含动态变量）。';
+
+  @override
+  String get troubleshootEntryBackupSyncTitle => '如何备份与同步';
+
+  @override
+  String get troubleshootEntryBackupSyncSummary =>
+      '本机备份：直接导出备份文件即可。跨设备同步：使用 WebDAV 或 S3（推荐坚果云或 Cloudflare R2）。一端上传，另一端恢复时选择「智能合并」而非「完全覆盖」。';
+
+  @override
+  String get troubleshootEntryChatSuggestionsTitle => '聊天建议如何开启/关闭';
+
+  @override
+  String get troubleshootEntryChatSuggestionsSummary =>
+      '前往默认模型界面选择「聊天建议模型」以开启，点击右上角重置以关闭。';
+
+  @override
+  String get troubleshootEntryMultiBillingTitle => '为什么一次对话出现多次扣费记录';
+
+  @override
+  String get troubleshootEntryMultiBillingSummary =>
+      '(1) 工具调用需要回传上下文，会额外消耗 tokens。(2) 默认模型中的标题生成模型如果选择了当前聊天模型，建议换为廉价模型。';
+
+  @override
+  String get troubleshootUnknownErrorTitle => '遇到未知错误';
+
+  @override
+  String get troubleshootUnknownErrorSummary =>
+      '未能自动识别此错误。建议先借助翻译软件理解错误内容，然后通过关于页面的社区渠道反馈。';
+
+  @override
+  String get troubleshootActionProviderSettings => '前往供应商设置';
+
+  @override
+  String get troubleshootActionProviderBalance => '查看余额';
+
+  @override
+  String get troubleshootActionDefaultModel => '更换默认模型';
+
+  @override
+  String get troubleshootActionSearchServices => '配置搜索服务';
+
+  @override
+  String get troubleshootActionAssistantSettings => '前往助手设置';
+
+  @override
+  String get troubleshootActionBackupSettings => '前往备份设置';
+
+  @override
+  String get troubleshootActionOpenAbout => '查看关于页面与社区';
+
+  @override
+  String troubleshootViewAll(int count) {
+    return '查看全部 $count 条排查指南';
+  }
+
+  @override
+  String get troubleshootCacheWarningTitle => '提示词含动态变量';
+
+  @override
+  String get troubleshootCacheWarningDesc => '每次发送都会变化，可能导致缓存命中率降低。';
+
+  @override
+  String get troubleshootCacheWarningAction => '了解详情';
+
+  @override
+  String get troubleshootEntryBillingPrivacyTitle => 'Kelivo 收费或收集数据吗？';
+
+  @override
+  String get troubleshootEntryBillingPrivacySummary =>
+      'Kelivo 是开源软件，本身不收费。它没有后端服务器，你的数据只流向实际处理你请求的 AI 供应商。实际使用中，和所有第三方客户端一样，多数情况下你需要充值才能使用服务（除非使用本地部署的模型或部分供应商的免费模型）。部分 App 提供免费使用主要是吸引 C 端用户留存的手段，支付 API 费用是大模型公司的主要收入来源。';
+
+  @override
+  String get troubleshootEntryAgentSkillsTitle => 'Kelivo 支持 Skills 或 Agent 吗？';
+
+  @override
+  String get troubleshootEntryAgentSkillsSummary =>
+      '作为轻量软件，Kelivo 专注于打磨基础的聊天和工具调用（含 MCP）功能。Skills 支持在未来随时可能添加。Agent 方向过于重量级，不在本项目的未来规划中，建议使用专门的 Agent 平台。';
+
+  @override
+  String get troubleshootEntryChatCrashTitle => '进入聊天界面后不久闪退怎么办？';
+
+  @override
+  String get troubleshootEntryChatCrashSummary =>
+      'Windows 电脑请安装 VC++ 14.0 运行库以补齐 Flutter 环境依赖：https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist。其他平台请检查存储空间——若聊天记录大小（不含图片/文件）异常增大（如纯文本超过 500MB），可能是数据损坏，建议从之前的备份恢复。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -15803,4 +16097,151 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
+
+  @override
+  String get troubleshootPageTitle => '常見疑問';
+
+  @override
+  String get troubleshootSectionCommonErrors => '常見錯誤';
+
+  @override
+  String get troubleshootViewGuide => '查看故障排除指南';
+
+  @override
+  String get troubleshootDialogTitle => '錯誤排除';
+
+  @override
+  String get troubleshootDialogDismiss => '關閉';
+
+  @override
+  String get troubleshootEntryResponseApiTitle => '供應商暫不支援 Response API';
+
+  @override
+  String get troubleshootEntryResponseApiSummary =>
+      '你的供應商使用的協定較舊，Response API 並非所有供應商都支援。請前往供應商設定關閉 Response API 開關。';
+
+  @override
+  String get troubleshootEntryGeminiTypeTitle => '供應商類型設定不正確';
+
+  @override
+  String get troubleshootEntryGeminiTypeSummary =>
+      '「供應商類型」僅表示相容協定，不代表實際模型選擇。如果你使用的是通用 API，建議在供應商設定中將類型改回 OpenAI。';
+
+  @override
+  String get troubleshootEntryEmptyPathTitle => 'API 路徑為空';
+
+  @override
+  String get troubleshootEntryEmptyPathSummary => 'API 路徑被清空了，請前往供應商設定重設為預設值。';
+
+  @override
+  String get troubleshootEntryBalanceTitle => '帳戶餘額不足';
+
+  @override
+  String get troubleshootEntryBalanceSummary =>
+      'API 傳回了餘額不足錯誤，請前往官方平台儲值。之後可在供應商設定的餘額頁面查看餘額。';
+
+  @override
+  String get troubleshootEntryNoVisionTitle => '目前模型不支援辨圖';
+
+  @override
+  String get troubleshootEntryNoVisionSummary =>
+      '目前模型不支援圖片輸入。這可能是因為你在供應商設定中為不支援視覺的模型手動開啟了圖片輸入。請在供應商配置中檢查模型覆蓋設定，從輸入能力中移除「圖片」。如果你確信該模型實際支援視覺（例如可能是新模型或小眾模型），請向我們回饋以便更新模型庫。';
+
+  @override
+  String get troubleshootEntrySearchQualityTitle => '搜尋品質不佳';
+
+  @override
+  String get troubleshootEntrySearchQualitySummary =>
+      '內建 Bing 搜尋品質有限，建議切換為 Tavily 或 Exa 等專用搜尋服務以獲得更好的結果。';
+
+  @override
+  String get troubleshootEntryCacheHitrateTitle => '快取命中率低';
+
+  @override
+  String get troubleshootEntryCacheHitrateSummary =>
+      '提升快取效能的建議：(1) 在助手設定中關閉助手記憶。(2) 檢查系統提示詞，移除 cur_time 等頻繁變化的變數。(3) 避免使用內建的「範例助手」（它包含動態變數）。';
+
+  @override
+  String get troubleshootEntryBackupSyncTitle => '如何備份與同步';
+
+  @override
+  String get troubleshootEntryBackupSyncSummary =>
+      '本機備份：直接匯出備份檔案即可。跨裝置同步：使用 WebDAV 或 S3（推薦坚果云或 Cloudflare R2）。一端上傳，另一端復原時選擇「智慧合併」而非「完全覆蓋」。';
+
+  @override
+  String get troubleshootEntryChatSuggestionsTitle => '聊天建議如何開啟/關閉';
+
+  @override
+  String get troubleshootEntryChatSuggestionsSummary =>
+      '前往預設模型介面選擇「聊天建議模型」以開啟，點選右上角重置以關閉。';
+
+  @override
+  String get troubleshootEntryMultiBillingTitle => '為什麼一次對話出現多次扣費記錄';
+
+  @override
+  String get troubleshootEntryMultiBillingSummary =>
+      '(1) 工具呼叫需要回傳上下文，會額外消耗 tokens。(2) 預設模型中的標題生成模型如果選擇了目前聊天模型，建議換為廉價模型。';
+
+  @override
+  String get troubleshootUnknownErrorTitle => '遇到未知錯誤';
+
+  @override
+  String get troubleshootUnknownErrorSummary =>
+      '未能自動識別此錯誤。建議先借助翻譯軟體理解錯誤內容，然後透過關於頁面的社群管道回饋。';
+
+  @override
+  String get troubleshootActionProviderSettings => '前往供應商設定';
+
+  @override
+  String get troubleshootActionProviderBalance => '查看餘額';
+
+  @override
+  String get troubleshootActionDefaultModel => '更換預設模型';
+
+  @override
+  String get troubleshootActionSearchServices => '設定搜尋服務';
+
+  @override
+  String get troubleshootActionAssistantSettings => '前往助手設定';
+
+  @override
+  String get troubleshootActionBackupSettings => '前往備份設定';
+
+  @override
+  String get troubleshootActionOpenAbout => '查看關於頁面與社群';
+
+  @override
+  String troubleshootViewAll(int count) {
+    return '查看全部 $count 條排除指南';
+  }
+
+  @override
+  String get troubleshootCacheWarningTitle => '提示詞含動態變數';
+
+  @override
+  String get troubleshootCacheWarningDesc => '每次發送都會變化，可能導致快取命中率降低。';
+
+  @override
+  String get troubleshootCacheWarningAction => '瞭解詳情';
+
+  @override
+  String get troubleshootEntryBillingPrivacyTitle => 'Kelivo 收費或收集資料嗎？';
+
+  @override
+  String get troubleshootEntryBillingPrivacySummary =>
+      'Kelivo 是開源軟體，本身不收費。它沒有後端伺服器，你的資料只流向實際處理你請求的 AI 供應商。實際使用中，和所有第三方用戶端一樣，多數情況下你需要儲值才能使用服務（除非使用本地部署的模型或部分供應商的免費模型）。部分 App 提供免費使用主要是吸引 C 端用戶留存的手段，支付 API 費用是大模型公司的主要收入來源。';
+
+  @override
+  String get troubleshootEntryAgentSkillsTitle => 'Kelivo 支援 Skills 或 Agent 嗎？';
+
+  @override
+  String get troubleshootEntryAgentSkillsSummary =>
+      '作為輕量軟體，Kelivo 專注於打磨基礎的聊天和工具呼叫（含 MCP）功能。Skills 支援在未來隨時可能新增。Agent 方向過於重量級，不在本專案的未來規劃中，建議使用專門的 Agent 平台。';
+
+  @override
+  String get troubleshootEntryChatCrashTitle => '進入聊天介面後不久閃退怎麼辦？';
+
+  @override
+  String get troubleshootEntryChatCrashSummary =>
+      'Windows 電腦請安裝 VC++ 14.0 執行庫以補齊 Flutter 環境依賴：https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist。其他平台請檢查儲存空間——若聊天記錄大小（不含圖片/檔案）異常增大（如純文字超過 500MB），可能是資料損壞，建議從之前的備份還原。';
 }

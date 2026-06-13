@@ -56,6 +56,10 @@ import 'setting/hotkeys_pane.dart';
 import 'setting/network_proxy_pane.dart';
 import 'setting/about_pane.dart';
 import 'setting/stats_pane.dart';
+import 'setting/troubleshoot_pane.dart';
+import '../core/services/troubleshoot/troubleshoot_data.dart';
+import '../core/services/troubleshoot/error_analyzer.dart';
+import '../features/troubleshoot/troubleshoot_content.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -99,12 +103,15 @@ enum _SettingsMenuItem {
   backup,
   hotkeys,
   stats,
+  troubleshoot,
   about,
 }
 
 class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   _SettingsMenuItem _selected = _SettingsMenuItem.display;
-  StreamSubscription<DesktopSettingsNavigationTarget>? _settingsNavSub;
+  StreamSubscription<SettingsNavigationEvent>? _settingsNavSub;
+  String? _pendingFaqKey;
+  String? _pendingProviderKey;
 
   @override
   void initState() {
@@ -114,12 +121,36 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
       _selected = _SettingsMenuItem.providers;
     }
     _settingsNavSub = DesktopSettingsNavigationBus.instance.stream.listen((
-      target,
+      event,
     ) {
       if (!mounted) return;
-      switch (target) {
+      switch (event.target) {
         case DesktopSettingsNavigationTarget.backup:
           setState(() => _selected = _SettingsMenuItem.backup);
+          break;
+        case DesktopSettingsNavigationTarget.troubleshoot:
+          setState(() {
+            _selected = _SettingsMenuItem.troubleshoot;
+            _pendingFaqKey = event.faqKey;
+          });
+          break;
+        case DesktopSettingsNavigationTarget.providers:
+          setState(() {
+            _selected = _SettingsMenuItem.providers;
+            _pendingProviderKey = event.providerId ?? widget.initialProviderKey;
+          });
+          break;
+        case DesktopSettingsNavigationTarget.defaultModel:
+          setState(() => _selected = _SettingsMenuItem.defaultModel);
+          break;
+        case DesktopSettingsNavigationTarget.search:
+          setState(() => _selected = _SettingsMenuItem.search);
+          break;
+        case DesktopSettingsNavigationTarget.assistant:
+          setState(() => _selected = _SettingsMenuItem.assistant);
+          break;
+        case DesktopSettingsNavigationTarget.about:
+          setState(() => _selected = _SettingsMenuItem.about);
           break;
       }
     });
@@ -129,6 +160,35 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
   void dispose() {
     _settingsNavSub?.cancel();
     super.dispose();
+  }
+
+  void _handleTroubleshootAction(TroubleshootAction action) {
+    switch (action.type) {
+      case ActionType.openProviderDetail:
+      case ActionType.openProviderBalance:
+        setState(() {
+          _selected = _SettingsMenuItem.providers;
+          _pendingProviderKey = action.providerId ?? widget.initialProviderKey;
+        });
+        break;
+      case ActionType.openDefaultModel:
+        setState(() => _selected = _SettingsMenuItem.defaultModel);
+        break;
+      case ActionType.openSearchServices:
+        setState(() => _selected = _SettingsMenuItem.search);
+        break;
+      case ActionType.openAssistantSettings:
+        setState(() => _selected = _SettingsMenuItem.assistant);
+        break;
+      case ActionType.openBackupSettings:
+        setState(() => _selected = _SettingsMenuItem.backup);
+        break;
+      case ActionType.openAbout:
+        setState(() => _selected = _SettingsMenuItem.about);
+        break;
+      case ActionType.openCommunityLinks:
+        break;
+    }
   }
 
   @override
@@ -192,8 +252,12 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           );
                         case _SettingsMenuItem.providers:
                           return _DesktopProvidersBody(
-                            key: const ValueKey('providers'),
-                            initialSelectedKey: widget.initialProviderKey,
+                            key: ValueKey(
+                              'providers_${_pendingProviderKey ?? "default"}',
+                            ),
+                            initialSelectedKey:
+                                _pendingProviderKey ??
+                                widget.initialProviderKey,
                           );
                         case _SettingsMenuItem.defaultModel:
                           return const DesktopDefaultModelPane(
@@ -235,6 +299,14 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           );
                         case _SettingsMenuItem.stats:
                           return const DesktopStatsPane(key: ValueKey('stats'));
+                        case _SettingsMenuItem.troubleshoot:
+                          return DesktopTroubleshootPane(
+                            key: const ValueKey('troubleshoot'),
+                            initialFaqKey: _pendingFaqKey,
+                            onAction: (action) {
+                              _handleTroubleshootAction(action);
+                            },
+                          );
                         case _SettingsMenuItem.about:
                           return const DesktopAboutPane(key: ValueKey('about'));
                       }
@@ -321,6 +393,11 @@ class _SettingsMenu extends StatelessWidget {
         _SettingsMenuItem.stats,
         lucide.Lucide.ChartColumnBig,
         l10n.settingsPageStatistics,
+      ),
+      (
+        _SettingsMenuItem.troubleshoot,
+        lucide.Lucide.MessageCircleQuestionMark,
+        l10n.troubleshootPageTitle,
       ),
       (
         _SettingsMenuItem.about,

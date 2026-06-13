@@ -29,6 +29,9 @@ import 'multi_key_manager_page.dart';
 import 'provider_balance_page.dart';
 import 'provider_network_page.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/services/troubleshoot/error_analyzer.dart';
+import '../../../core/services/troubleshoot/troubleshoot_data.dart';
+import '../../troubleshoot/troubleshoot_content.dart';
 import '../../provider/widgets/provider_balance_badge.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../../../utils/model_grouping.dart';
@@ -73,6 +76,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   bool _detectUseStream = false;
   final Map<String, bool> _detectionResults = {};
   final Map<String, String> _detectionErrorMessages = {};
+  final Map<String, ErrorAnalysisResult?> _detectionAnalyses = {};
   String? _currentDetectingModel;
   final Set<String> _pendingModels = {};
   bool _aihubmixAppCodeEnabled = false;
@@ -949,6 +953,20 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 widget.keyName.toLowerCase() != 'tensdaq',
             hint: '/chat/completions',
             onChanged: (_) => _save(),
+            suffix: _pathCtrl.text != '/chat/completions'
+                ? IconButton(
+                    icon: Icon(Lucide.RotateCcw, size: 16),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                    onPressed: () {
+                      _pathCtrl.text = '/chat/completions';
+                      _save();
+                    },
+                  )
+                : null,
           ),
         ],
         if (_kind == ProviderKind.google) ...[
@@ -1279,6 +1297,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       },
                       detectionResult: _detectionResults[id],
                       detectionErrorMessage: _detectionErrorMessages[id],
+                      detectionAnalysis: _detectionAnalyses[id],
                       isDetecting: _currentDetectingModel == id,
                       isPending: _pendingModels.contains(id),
                     ),
@@ -2593,6 +2612,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       _detectionErrorMessages.removeWhere(
         (id, _) => modelsToDelete.contains(id),
       );
+      _detectionAnalyses.removeWhere((id, _) => modelsToDelete.contains(id));
       _pendingModels.removeAll(modelsToDelete);
       if (_currentDetectingModel != null &&
           modelsToDelete.contains(_currentDetectingModel)) {
@@ -2620,6 +2640,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       _isDetecting = true;
       _detectionResults.removeWhere((id, _) => modelsToTest.contains(id));
       _detectionErrorMessages.removeWhere((id, _) => modelsToTest.contains(id));
+      _detectionAnalyses.removeWhere((id, _) => modelsToTest.contains(id));
       _pendingModels.clear();
       _pendingModels.addAll(modelsToTest);
       _currentDetectingModel = null;
@@ -2649,13 +2670,27 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           setState(() {
             _detectionResults[modelId] = true;
             _detectionErrorMessages.remove(modelId);
+            _detectionAnalyses.remove(modelId);
           });
         }
       } catch (e) {
         if (mounted) {
+          // Run error analysis to surface known issues (e.g. Response API not supported)
+          ErrorAnalysisResult? analysis;
+          if (e is TestConnectionException) {
+            analysis = ErrorAnalyzer.analyze(
+              statusCode: e.statusCode,
+              errorBody: e.errorBody,
+              config: cfg,
+              modelId: modelId,
+            );
+          }
           setState(() {
             _detectionResults[modelId] = false;
-            _detectionErrorMessages[modelId] = e.toString();
+            _detectionErrorMessages[modelId] = analysis != null
+                ? ''
+                : e.toString();
+            _detectionAnalyses[modelId] = analysis;
           });
         }
       }
@@ -2712,6 +2747,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       _selectedModels.clear();
       _detectionResults.clear();
       _detectionErrorMessages.clear();
+      _detectionAnalyses.clear();
       _pendingModels.clear();
       _currentDetectingModel = null;
       _isSelectionMode = false;
@@ -3428,6 +3464,7 @@ class _ModelCard extends StatelessWidget {
     this.onSelectionChanged,
     this.detectionResult,
     this.detectionErrorMessage,
+    this.detectionAnalysis,
     this.isDetecting = false,
     this.isPending = false,
   });
@@ -3438,6 +3475,7 @@ class _ModelCard extends StatelessWidget {
   final ValueChanged<bool>? onSelectionChanged;
   final bool? detectionResult;
   final String? detectionErrorMessage;
+  final ErrorAnalysisResult? detectionAnalysis;
   final bool isDetecting;
   final bool isPending;
 
@@ -3474,20 +3512,24 @@ class _ModelCard extends StatelessWidget {
             ),
           )
         : detectionResult != null
-        ? MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: Tooltip(
-              message: detectionResult!
-                  ? l10n.providerDetailPageDetectSuccess
-                  : (detectionErrorMessage ??
-                        l10n.providerDetailPageDetectFailed),
-              child: Icon(
-                detectionResult! ? Lucide.CheckCircle : Lucide.XCircle,
-                size: 16,
-                color: detectionResult! ? Colors.green : cs.error,
-              ),
-            ),
-          )
+        ? detectionResult!
+              ? MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Tooltip(
+                    message: l10n.providerDetailPageDetectSuccess,
+                    child: Icon(
+                      Lucide.CheckCircle,
+                      size: 16,
+                      color: Colors.green,
+                    ),
+                  ),
+                )
+              : _DetectionErrorIcon(
+                  errorMessage:
+                      detectionErrorMessage ??
+                      l10n.providerDetailPageDetectFailed,
+                  analysis: detectionAnalysis,
+                )
         : null;
     return _TactileRow(
       pressedScale: 0.98,
@@ -3585,6 +3627,65 @@ class _ModelCard extends StatelessWidget {
   }
 }
 
+/// Error indicator icon for batch detection results.
+/// Shows a clickable X icon when analysis is available, or a Tooltip-only icon otherwise.
+class _DetectionErrorIcon extends StatelessWidget {
+  const _DetectionErrorIcon({required this.errorMessage, this.analysis});
+
+  final String errorMessage;
+  final ErrorAnalysisResult? analysis;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final icon = Icon(Lucide.XCircle, size: 16, color: cs.error);
+
+    if (analysis == null) {
+      return MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Tooltip(message: errorMessage, child: icon),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () => _showDetectionErrorDialog(context, analysis!),
+      child: Tooltip(
+        message: errorMessage.isNotEmpty
+            ? errorMessage
+            : errorMessage /* fallback: empty string means no extra text */,
+        child: icon,
+      ),
+    );
+  }
+}
+
+/// Shows a dialog with troubleshooting guidance for a failed detection.
+void _showDetectionErrorDialog(
+  BuildContext context,
+  ErrorAnalysisResult analysis,
+) {
+  showDialog(
+    context: context,
+    builder: (ctx) => Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide.none,
+      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      child: TroubleshootCard(
+        isDialog: true,
+        result: ErrorAnalysisResult(
+          faqKey: analysis.faqKey,
+          titleKey: analysis.titleKey,
+          summaryKey: analysis.summaryKey,
+          // action omitted — user is already on provider settings page
+        ),
+        onDismiss: () => Navigator.of(ctx).pop(),
+      ),
+    ),
+  );
+}
+
 class _ResolvedModelOverride {
   const _ResolvedModelOverride({
     required this.base,
@@ -3615,6 +3716,7 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
   String? _selectedModelId;
   _TestState _state = _TestState.idle;
   String _errorMessage = '';
+  ErrorAnalysisResult? _errorAnalysis;
   bool _useStream = false;
 
   @override
@@ -3692,6 +3794,23 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
           message: l10n.providerDetailPageTestSuccessMessage,
         );
       case _TestState.error:
+        if (_errorAnalysis != null) {
+          return _buildResult(
+            context,
+            cs,
+            l10n,
+            success: false,
+            message: '',
+            trailing: TroubleshootCard(
+              isDialog: true,
+              result: ErrorAnalysisResult(
+                faqKey: _errorAnalysis!.faqKey,
+                titleKey: _errorAnalysis!.titleKey,
+                summaryKey: _errorAnalysis!.summaryKey,
+              ),
+            ),
+          );
+        }
         return _buildResult(
           context,
           cs,
@@ -3803,6 +3922,7 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
     AppLocalizations l10n, {
     required bool success,
     required String message,
+    Widget? trailing,
   }) {
     final color = success ? Colors.green : cs.error;
     return Column(
@@ -3844,14 +3964,15 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
             },
           ),
         const SizedBox(height: 14),
-        Text(
-          message,
-          style: TextStyle(
-            color: color,
-            fontSize: 14,
-            fontWeight: AppFontWeights.semibold,
-          ),
-        ),
+        trailing ??
+            Text(
+              message,
+              style: TextStyle(
+                color: color,
+                fontSize: 14,
+                fontWeight: AppFontWeights.semibold,
+              ),
+            ),
       ],
     );
   }
@@ -3873,15 +3994,16 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
 
   Future<void> _doTest() async {
     if (_selectedModelId == null) return;
+    final cfg = context.read<SettingsProvider>().getProviderConfig(
+      widget.providerKey,
+      defaultName: widget.providerDisplayName,
+    );
     setState(() {
       _state = _TestState.loading;
       _errorMessage = '';
+      _errorAnalysis = null;
     });
     try {
-      final cfg = context.read<SettingsProvider>().getProviderConfig(
-        widget.providerKey,
-        defaultName: widget.providerDisplayName,
-      );
       await ProviderManager.testConnection(
         cfg,
         _selectedModelId!,
@@ -3891,9 +4013,19 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
       setState(() => _state = _TestState.success);
     } catch (e) {
       if (!mounted) return;
+      ErrorAnalysisResult? analysis;
+      if (e is TestConnectionException) {
+        analysis = ErrorAnalyzer.analyze(
+          statusCode: e.statusCode,
+          errorBody: e.errorBody,
+          config: cfg,
+          modelId: _selectedModelId,
+        );
+      }
       setState(() {
         _state = _TestState.error;
-        _errorMessage = e.toString();
+        _errorAnalysis = analysis;
+        _errorMessage = analysis != null ? '' : e.toString();
       });
     }
   }

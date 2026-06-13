@@ -453,7 +453,11 @@ class ProviderManager {
           body: jsonEncode(body),
         );
         if (res.statusCode < 200 || res.statusCode >= 300) {
-          throw HttpException('HTTP ${res.statusCode}: ${res.body}');
+          throw TestConnectionException(
+            res.statusCode,
+            res.body,
+            'HTTP ${res.statusCode}: ${res.body}',
+          );
         }
         // For streaming, verify the response contains SSE data
         if (useStream) {
@@ -498,7 +502,11 @@ class ProviderManager {
           body: jsonEncode(body),
         );
         if (res.statusCode < 200 || res.statusCode >= 300) {
-          throw HttpException('HTTP ${res.statusCode}: ${res.body}');
+          throw TestConnectionException(
+            res.statusCode,
+            res.body,
+            'HTTP ${res.statusCode}: ${res.body}',
+          );
         }
         // For streaming, verify the response contains SSE data
         if (useStream) {
@@ -611,7 +619,11 @@ class ProviderManager {
           body: jsonEncode(body),
         );
         if (res.statusCode < 200 || res.statusCode >= 300) {
-          throw HttpException('HTTP ${res.statusCode}: ${res.body}');
+          throw TestConnectionException(
+            res.statusCode,
+            res.body,
+            'HTTP ${res.statusCode}: ${res.body}',
+          );
         }
         // For streaming, verify the response is not empty
         if (useStream && res.body.isEmpty) {
@@ -623,4 +635,11 @@ class ProviderManager {
       client.close();
     }
   }
+}
+
+class TestConnectionException extends HttpException {
+  final int statusCode;
+  final String errorBody;
+  TestConnectionException(this.statusCode, this.errorBody, String message)
+    : super(message);
 }

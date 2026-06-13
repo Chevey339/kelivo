@@ -1932,5 +1932,56 @@
         "type": "int"
       }
     }
-  }
+  },
+  "troubleshootPageTitle": "常見疑問",
+  "troubleshootSectionCommonErrors": "常見錯誤",
+  "troubleshootViewGuide": "查看故障排除指南",
+  "troubleshootViewAll": "查看全部 {count} 條排除指南",
+  "@troubleshootViewAll": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "troubleshootDialogTitle": "錯誤排除",
+  "troubleshootDialogDismiss": "關閉",
+  "troubleshootEntryResponseApiTitle": "供應商暫不支援 Response API",
+  "troubleshootEntryResponseApiSummary": "你的供應商使用的協定較舊，Response API 並非所有供應商都支援。請前往供應商設定關閉 Response API 開關。",
+  "troubleshootEntryGeminiTypeTitle": "供應商類型設定不正確",
+  "troubleshootEntryGeminiTypeSummary": "「供應商類型」僅表示相容協定，不代表實際模型選擇。如果你使用的是通用 API，建議在供應商設定中將類型改回 OpenAI。",
+  "troubleshootEntryEmptyPathTitle": "API 路徑為空",
+  "troubleshootEntryEmptyPathSummary": "API 路徑被清空了，請前往供應商設定重設為預設值。",
+  "troubleshootEntryBalanceTitle": "帳戶餘額不足",
+  "troubleshootEntryBalanceSummary": "API 傳回了餘額不足錯誤，請前往官方平台儲值。之後可在供應商設定的餘額頁面查看餘額。",
+  "troubleshootEntryNoVisionTitle": "目前模型不支援辨圖",
+  "troubleshootEntryNoVisionSummary": "目前模型不支援圖片輸入。這可能是因為你在供應商設定中為不支援視覺的模型手動開啟了圖片輸入。請在供應商配置中檢查模型覆蓋設定，從輸入能力中移除「圖片」。如果你確信該模型實際支援視覺（例如可能是新模型或小眾模型），請向我們回饋以便更新模型庫。",
+  "troubleshootEntrySearchQualityTitle": "搜尋品質不佳",
+  "troubleshootEntrySearchQualitySummary": "內建 Bing 搜尋品質有限，建議切換為 Tavily 或 Exa 等專用搜尋服務以獲得更好的結果。",
+  "troubleshootEntryCacheHitrateTitle": "快取命中率低",
+  "troubleshootEntryCacheHitrateSummary": "提升快取效能的建議：(1) 在助手設定中關閉助手記憶。(2) 檢查系統提示詞，移除 cur_time 等頻繁變化的變數。(3) 避免使用內建的「範例助手」（它包含動態變數）。",
+  "troubleshootEntryBackupSyncTitle": "如何備份與同步",
+  "troubleshootEntryBackupSyncSummary": "本機備份：直接匯出備份檔案即可。跨裝置同步：使用 WebDAV 或 S3（推薦坚果云或 Cloudflare R2）。一端上傳，另一端復原時選擇「智慧合併」而非「完全覆蓋」。",
+  "troubleshootEntryChatSuggestionsTitle": "聊天建議如何開啟/關閉",
+  "troubleshootEntryChatSuggestionsSummary": "前往預設模型介面選擇「聊天建議模型」以開啟，點選右上角重置以關閉。",
+  "troubleshootEntryMultiBillingTitle": "為什麼一次對話出現多次扣費記錄",
+  "troubleshootEntryMultiBillingSummary": "(1) 工具呼叫需要回傳上下文，會額外消耗 tokens。(2) 預設模型中的標題生成模型如果選擇了目前聊天模型，建議換為廉價模型。",
+  "troubleshootUnknownErrorTitle": "遇到未知錯誤",
+  "troubleshootUnknownErrorSummary": "未能自動識別此錯誤。建議先借助翻譯軟體理解錯誤內容，然後透過關於頁面的社群管道回饋。",
+  "troubleshootActionProviderSettings": "前往供應商設定",
+  "troubleshootActionProviderBalance": "查看餘額",
+  "troubleshootActionDefaultModel": "更換預設模型",
+  "troubleshootActionSearchServices": "設定搜尋服務",
+  "troubleshootActionAssistantSettings": "前往助手設定",
+  "troubleshootActionBackupSettings": "前往備份設定",
+  "troubleshootActionOpenAbout": "查看關於頁面與社群",
+  "troubleshootCacheWarningTitle": "提示詞含動態變數",
+  "troubleshootCacheWarningDesc": "每次發送都會變化，可能導致快取命中率降低。",
+  "troubleshootCacheWarningAction": "瞭解詳情",
+  "troubleshootEntryBillingPrivacyTitle": "Kelivo 收費或收集資料嗎？",
+  "troubleshootEntryBillingPrivacySummary": "Kelivo 是開源軟體，本身不收費。它沒有後端伺服器，你的資料只流向實際處理你請求的 AI 供應商。實際使用中，和所有第三方用戶端一樣，多數情況下你需要儲值才能使用服務（除非使用本地部署的模型或部分供應商的免費模型）。部分 App 提供免費使用主要是吸引 C 端用戶留存的手段，支付 API 費用是大模型公司的主要收入來源。",
+  "troubleshootEntryAgentSkillsTitle": "Kelivo 支援 Skills 或 Agent 嗎？",
+  "troubleshootEntryAgentSkillsSummary": "作為輕量軟體，Kelivo 專注於打磨基礎的聊天和工具呼叫（含 MCP）功能。Skills 支援在未來隨時可能新增。Agent 方向過於重量級，不在本專案的未來規劃中，建議使用專門的 Agent 平台。",
+  "troubleshootEntryChatCrashTitle": "進入聊天介面後不久閃退怎麼辦？",
+  "troubleshootEntryChatCrashSummary": "Windows 電腦請安裝 VC++ 14.0 執行庫以補齊 Flutter 環境依賴：https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist。其他平台請檢查儲存空間——若聊天記錄大小（不含圖片/檔案）異常增大（如純文字超過 500MB），可能是資料損壞，建議從之前的備份還原。"
 }
