@@ -23,6 +23,7 @@ import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
 import '../utils/openai_model_compat.dart';
 import '../../utils/provider_grouping_logic.dart';
+import '../../utils/brand_assets.dart';
 
 // Desktop: topic list position
 enum DesktopTopicPosition { left, right }
@@ -2575,6 +2576,16 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> setProviderAvatarIcon(String key, String asset) async {
+    final normalized = BrandAssets.selectableAssetOrNull(asset.trim());
+    if (normalized == null) return;
+    final old = getProviderConfig(key);
+    await setProviderConfig(
+      key,
+      old.copyWith(avatarType: 'icon', avatarValue: normalized),
+    );
+  }
+
   Future<void> resetProviderAvatar(String key) async {
     final old = getProviderConfig(key);
     // Attempt to remove old local file if we managed it
@@ -4491,8 +4502,8 @@ class ProviderConfig {
   final String? proxyPort;
   final String? proxyUsername;
   final String? proxyPassword;
-  // Custom provider avatar (same scheme as user: emoji | url | file)
-  final String? avatarType; // 'emoji' | 'url' | 'file'
+  // Custom provider avatar (same scheme as user plus built-in icon: emoji | url | file | icon)
+  final String? avatarType; // 'emoji' | 'url' | 'file' | 'icon'
   final String? avatarValue;
   // Multi-key mode
   final bool? multiKeyEnabled; // default false

@@ -396,6 +396,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
+                    row(l10n.providerAvatarChooseBuiltInIcon, () async {
+                      await _pickProviderIcon();
+                    }),
                     row(l10n.sideDrawerChooseImage, () async {
                       try {
                         final settings = context.read<SettingsProvider>();
@@ -510,6 +513,95 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         await settings.setProviderAvatarUrl(widget.keyName, url);
       }
     }
+  }
+
+  Future<void> _pickProviderIcon() async {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.read<SettingsProvider>();
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final icons = BrandAssets.selectableIcons;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: cs.surface,
+          title: Text(l10n.providerAvatarIconDialogTitle),
+          content: SizedBox(
+            width: MediaQuery.of(ctx).size.width * 0.8,
+            height: MediaQuery.of(ctx).size.height * 0.5,
+            child: GridView.builder(
+              itemCount: icons.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1,
+              ),
+              itemBuilder: (ctx, i) {
+                final opt = icons[i];
+                final selected =
+                    _cfg.avatarType == 'icon' && _cfg.avatarValue == opt.asset;
+                final isSvg = opt.asset.endsWith('.svg');
+                final needsMono =
+                    isDark &&
+                    (opt.asset.contains('openai') ||
+                        opt.asset.contains('grok') ||
+                        opt.asset.contains('xai') ||
+                        opt.asset.contains('openrouter'));
+                return Semantics(
+                  label: opt.label,
+                  child: Tooltip(
+                    message: opt.label,
+                    child: IosCardPress(
+                      borderRadius: BorderRadius.circular(12),
+                      baseColor: cs.surface,
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        Future.microtask(() async {
+                          await settings.setProviderAvatarIcon(
+                            widget.keyName,
+                            opt.asset,
+                          );
+                          if (mounted) setState(() {});
+                        });
+                      },
+                      padding: const EdgeInsets.all(8),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: selected
+                              ? Border.all(color: cs.primary, width: 2)
+                              : null,
+                        ),
+                        child: isSvg
+                            ? SvgPicture.asset(
+                                opt.asset,
+                                colorFilter: needsMono
+                                    ? const ColorFilter.mode(
+                                        Colors.white,
+                                        BlendMode.srcIn,
+                                      )
+                                    : null,
+                              )
+                            : Image.asset(opt.asset, fit: BoxFit.contain),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(l10n.sideDrawerCancel),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildConfigTab(

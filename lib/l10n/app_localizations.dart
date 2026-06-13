@@ -4625,6 +4625,30 @@ abstract class AppLocalizations {
   /// **'Reset'**
   String get sideDrawerReset;
 
+  /// No description provided for @providerAvatarChooseBuiltInIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Built-in Icon'**
+  String get providerAvatarChooseBuiltInIcon;
+
+  /// No description provided for @providerAvatarIconDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Built-in Icon'**
+  String get providerAvatarIconDialogTitle;
+
+  /// No description provided for @providerAvatarIconSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search icons'**
+  String get providerAvatarIconSearchHint;
+
+  /// No description provided for @providerAvatarIconNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No icons found'**
+  String get providerAvatarIconNoResults;
+
   /// No description provided for @sideDrawerEmojiDialogTitle.
   ///
   /// In en, this message translates to:
