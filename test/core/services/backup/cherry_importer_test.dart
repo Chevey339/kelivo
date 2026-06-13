@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,6 +34,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
+  final services = <ChatService>[];
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('kelivo_cherry_test_');
@@ -43,7 +43,10 @@ void main() {
   });
 
   tearDown(() async {
-    await Hive.close();
+    for (final s in services) {
+      await s.close();
+    }
+    services.clear();
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }
@@ -80,6 +83,7 @@ void main() {
       });
 
       final chatService = ChatService();
+      services.add(chatService);
       final result = await CherryImporter.importFromCherryStudio(
         file: backup,
         mode: RestoreMode.overwrite,
@@ -179,6 +183,7 @@ void main() {
       });
 
       final chatService = ChatService();
+      services.add(chatService);
       final result = await CherryImporter.importFromCherryStudio(
         file: backup,
         mode: RestoreMode.overwrite,
@@ -205,12 +210,15 @@ void main() {
         ),
       });
 
+      final chatService = ChatService();
+      services.add(chatService);
+
       await expectLater(
         CherryImporter.importFromCherryStudio(
           file: backup,
           mode: RestoreMode.overwrite,
           settings: SettingsProvider(),
-          chatService: ChatService(),
+          chatService: chatService,
         ),
         throwsA(anything),
       );

@@ -620,9 +620,9 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
   }
 
   Future<void> _openFolder() async {
+    final l10n = AppLocalizations.of(context)!;
     final dir = await AppDirectories.getAppDataDirectory();
     final path = dir.path;
-    final l10n = AppLocalizations.of(context)!;
     try {
       final res = await OpenFilex.open(path);
       if (res.type != ResultType.done) {
@@ -848,9 +848,9 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
   }
 
   Future<void> _openFolder() async {
+    final l10n = AppLocalizations.of(context)!;
     final dir = await AppDirectories.getAppDataDirectory();
     final path = dir.path;
-    final l10n = AppLocalizations.of(context)!;
     try {
       final res = await OpenFilex.open(path);
       if (res.type != ResultType.done) {

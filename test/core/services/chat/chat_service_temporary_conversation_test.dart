@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
@@ -25,10 +24,17 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
   Future<String?> getTemporaryPath() async => '$path/tmp';
 }
 
+ChatService _createService() {
+  final service = ChatService();
+  // setUp is responsible for temp dir and path provider
+  return service;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
+  final services = <ChatService>[];
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp(
@@ -38,7 +44,10 @@ void main() {
   });
 
   tearDown(() async {
-    await Hive.close();
+    for (final s in services) {
+      await s.close();
+    }
+    services.clear();
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }
@@ -46,7 +55,8 @@ void main() {
 
   group('ChatService temporary conversations', () {
     test('ordinary draft persists when its first message is added', () async {
-      final service = ChatService();
+      final service = _createService();
+      services.add(service);
       await service.init();
 
       final conversation = await service.createDraftConversation(title: 'Chat');
@@ -63,7 +73,8 @@ void main() {
     test(
       'temporary draft keeps messages in memory without entering history',
       () async {
-        final service = ChatService();
+        final service = _createService();
+        services.add(service);
         await service.init();
 
         final conversation = await service.createDraftConversation(
@@ -86,7 +97,8 @@ void main() {
     test(
       'temporary conversation supports range and recent message reads',
       () async {
-        final service = ChatService();
+        final service = _createService();
+        services.add(service);
         await service.init();
 
         final conversation = await service.createDraftConversation(
@@ -127,7 +139,8 @@ void main() {
     test(
       'temporary conversation is discarded when current conversation changes',
       () async {
-        final service = ChatService();
+        final service = _createService();
+        services.add(service);
         await service.init();
 
         final temporary = await service.createDraftConversation(
@@ -150,7 +163,8 @@ void main() {
     );
 
     test('temporary message deletion only affects memory', () async {
-      final service = ChatService();
+      final service = _createService();
+      services.add(service);
       await service.init();
 
       final conversation = await service.createDraftConversation(
