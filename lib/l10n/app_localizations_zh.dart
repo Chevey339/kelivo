@@ -158,6 +158,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceSubChatToolEvents => '工具事件';
 
   @override
+  String get storageSpaceSubChatDatabase => '数据库';
+
+  @override
+  String get storageSpaceSubChatOutdated => '(已废弃)';
+
+  @override
+  String get storageSpaceChatDataMigrationNote =>
+      '可能影响聊天记录，请谨慎删除。聊天数据已从 Hive 迁移至 SQLite，旧文件仍然保留在磁盘上。若确认新版本已稳定运行，可前往目录清理 hive 文件。';
+
+  @override
+  String get storageSpaceChatDataOpenFolder => '打开目录';
+
+  @override
   String get storageSpaceSubAssistantAvatars => '头像';
 
   @override
@@ -5269,6 +5282,41 @@ class AppLocalizationsZh extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get migrateTitle => '数据迁移';
+
+  @override
+  String get migrateDescription => '检测到旧版本聊天数据，需要迁移到新存储格式。\n迁移期间请勿关闭应用。';
+
+  @override
+  String get migrateStepReading => '正在读取旧数据…';
+
+  @override
+  String get migrateStepWriting => '正在写入新存储…';
+
+  @override
+  String get migrateStepVerifying => '正在校验数据一致性…';
+
+  @override
+  String get migrateStepComplete => '迁移完成，正在重启…';
+
+  @override
+  String get migrateStepError => '迁移失败';
+
+  @override
+  String get migrateRetry => '重试';
+
+  @override
+  String get migrateButtonStart => '开始迁移';
+
+  @override
+  String migrateConversationCount(int current, int total) {
+    return '正在迁移对话 $current/$total';
+  }
+
+  @override
+  String get migrateConsistencyFailed => '一致性校验失败，请重试';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -5423,6 +5471,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubChatToolEvents => '工具事件';
+
+  @override
+  String get storageSpaceSubChatDatabase => '数据库';
+
+  @override
+  String get storageSpaceSubChatOutdated => '(已废弃)';
+
+  @override
+  String get storageSpaceChatDataMigrationNote =>
+      '可能影响聊天记录，请谨慎删除。聊天数据已从 Hive 迁移至 SQLite，旧文件仍然保留在磁盘上。若确认新版本已稳定运行，可前往目录清理 hive 文件。';
+
+  @override
+  String get storageSpaceChatDataOpenFolder => '打开目录';
 
   @override
   String get storageSpaceSubAssistantAvatars => '头像';
@@ -10536,6 +10597,41 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get migrateTitle => '数据迁移';
+
+  @override
+  String get migrateDescription => '检测到旧版本聊天数据，需要迁移到新存储格式。\n迁移期间请勿关闭应用。';
+
+  @override
+  String get migrateStepReading => '正在读取旧数据…';
+
+  @override
+  String get migrateStepWriting => '正在写入新存储…';
+
+  @override
+  String get migrateStepVerifying => '正在校验数据一致性…';
+
+  @override
+  String get migrateStepComplete => '迁移完成，正在重启…';
+
+  @override
+  String get migrateStepError => '迁移失败';
+
+  @override
+  String get migrateRetry => '重试';
+
+  @override
+  String get migrateButtonStart => '开始迁移';
+
+  @override
+  String migrateConversationCount(int current, int total) {
+    return '正在迁移对话 $current/$total';
+  }
+
+  @override
+  String get migrateConsistencyFailed => '一致性校验失败，请重试';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -10690,6 +10786,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubChatToolEvents => '工具事件';
+
+  @override
+  String get storageSpaceSubChatDatabase => '資料庫';
+
+  @override
+  String get storageSpaceSubChatOutdated => '(已廢棄)';
+
+  @override
+  String get storageSpaceChatDataMigrationNote =>
+      '可能影響聊天記錄，請謹慎刪除。聊天資料已從 Hive 遷移至 SQLite，舊檔案仍然保留在磁碟上。若確認新版本已穩定運行，可前往目錄清理 hive 檔案。';
+
+  @override
+  String get storageSpaceChatDataOpenFolder => '開啟目錄';
 
   @override
   String get storageSpaceSubAssistantAvatars => '頭像';
@@ -15803,4 +15912,39 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
+
+  @override
+  String get migrateTitle => '資料遷移';
+
+  @override
+  String get migrateDescription => '偵測到舊版聊天資料，需要遷移至新儲存格式。\n遷移期間請勿關閉應用程式。';
+
+  @override
+  String get migrateStepReading => '正在讀取舊資料…';
+
+  @override
+  String get migrateStepWriting => '正在寫入新儲存…';
+
+  @override
+  String get migrateStepVerifying => '正在驗證資料一致性…';
+
+  @override
+  String get migrateStepComplete => '遷移完成，正在重新啟動…';
+
+  @override
+  String get migrateStepError => '遷移失敗';
+
+  @override
+  String get migrateRetry => '重試';
+
+  @override
+  String get migrateButtonStart => '開始遷移';
+
+  @override
+  String migrateConversationCount(int current, int total) {
+    return '正在遷移對話 $current/$total';
+  }
+
+  @override
+  String get migrateConsistencyFailed => '一致性驗證失敗，請重試';
 }

@@ -42,10 +42,12 @@ import 'shared/widgets/app_overlays.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'dart:io'
-    show Platform; // kept for global override usage inside provider
+    show Platform, stderr; // kept for global override usage inside provider
 import 'core/services/android_background.dart';
 import 'core/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'core/services/migration/migration_service.dart';
+import 'features/migration/pages/migration_screen.dart';
 
 final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
@@ -53,7 +55,7 @@ bool _didCheckUpdates = false; // one-time update check flag
 bool _didEnsureAssistants = false; // ensure defaults after l10n ready
 
 Future<void> main() async {
-  await runZoned(
+  await runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
       FlutterLogger.installGlobalHandlers();
@@ -81,8 +83,14 @@ Future<void> main() async {
       await SandboxPathResolver.init();
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      // Start app (Flutter log capture is toggleable and off by default)
+
+      // Start app (migration check happens inside app tree)
       runApp(const MyApp());
+    },
+    (Object error, StackTrace stack) {
+      stderr.writeln('=== UNHANDLED ZONE ERROR ===');
+      stderr.writeln(error);
+      stderr.writeln(stack);
     },
     zoneSpecification: ZoneSpecification(
       print: (self, parent, zone, line) {
@@ -365,7 +373,7 @@ class MyApp extends StatelessWidget {
                 darkTheme: themedDark,
                 themeMode: settings.themeMode,
                 navigatorObservers: <NavigatorObserver>[routeObserver],
-                home: _selectHome(),
+                home: const _BootPage(),
                 builder: (ctx, child) {
                   final bright = Theme.of(ctx).brightness;
                   final overlay = bright == Brightness.dark
@@ -451,6 +459,42 @@ class MyApp extends StatelessWidget {
         },
       ),
     );
+  }
+}
+
+// ── Boot page: checks migration before showing normal app ────────────────
+
+class _BootPage extends StatefulWidget {
+  const _BootPage();
+
+  @override
+  State<_BootPage> createState() => _BootPageState();
+}
+
+class _BootPageState extends State<_BootPage> {
+  bool _booted = false;
+  bool _needsMigration = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    final needs = await MigrationService.isMigrationRequired();
+    if (!mounted) return;
+    setState(() {
+      _needsMigration = needs;
+      _booted = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_booted) return const SizedBox.shrink();
+    if (_needsMigration) return const MigrationScreen();
+    return _selectHome();
   }
 }
 

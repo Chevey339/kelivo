@@ -162,6 +162,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceSubChatToolEvents => 'Tool events';
 
   @override
+  String get storageSpaceSubChatDatabase => 'Database';
+
+  @override
+  String get storageSpaceSubChatOutdated => '(outdated)';
+
+  @override
+  String get storageSpaceChatDataMigrationNote =>
+      'May affect your chat history. Please delete with care. Chat data has been migrated from Hive to SQLite, with old files still preserved on disk. If you have confirmed the new version is running stably, you can navigate to the directory below to clean up Hive files.';
+
+  @override
+  String get storageSpaceChatDataOpenFolder => 'Open folder';
+
+  @override
   String get storageSpaceSubAssistantAvatars => 'Avatars';
 
   @override
@@ -5483,4 +5496,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }
+
+  @override
+  String get migrateTitle => 'Data Migration';
+
+  @override
+  String get migrateDescription =>
+      'Your chat data needs to be migrated to a new storage format.\nDo not close the app during migration.';
+
+  @override
+  String get migrateStepReading => 'Reading existing data…';
+
+  @override
+  String get migrateStepWriting => 'Writing to new storage…';
+
+  @override
+  String get migrateStepVerifying => 'Verifying data integrity…';
+
+  @override
+  String get migrateStepComplete => 'Migration complete. Restarting…';
+
+  @override
+  String get migrateStepError => 'Migration failed';
+
+  @override
+  String get migrateRetry => 'Retry';
+
+  @override
+  String get migrateButtonStart => 'Start Migration';
+
+  @override
+  String migrateConversationCount(int current, int total) {
+    return 'Migrating conversation $current of $total';
+  }
+
+  @override
+  String get migrateConsistencyFailed =>
+      'Consistency check failed. Please try again.';
 }

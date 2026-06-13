@@ -11,6 +11,7 @@ import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../utils/app_directories.dart';
 import '../../../utils/platform_utils.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import 'log_viewer_page.dart';
@@ -128,12 +129,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
 
   String _subTitleFor(String id, AppLocalizations l10n) {
     switch (id) {
+      case 'database':
+        return l10n.storageSpaceSubChatDatabase;
       case 'messages':
-        return l10n.storageSpaceSubChatMessages;
+        return '${l10n.storageSpaceSubChatMessages} ${l10n.storageSpaceSubChatOutdated}';
       case 'conversations':
-        return l10n.storageSpaceSubChatConversations;
+        return '${l10n.storageSpaceSubChatConversations} ${l10n.storageSpaceSubChatOutdated}';
       case 'tool_events_v1':
-        return l10n.storageSpaceSubChatToolEvents;
+        return '${l10n.storageSpaceSubChatToolEvents} ${l10n.storageSpaceSubChatOutdated}';
       case 'avatars':
         return l10n.storageSpaceSubAssistantAvatars;
       case 'images':
@@ -509,6 +512,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                             ? null
                             : _doClearSystemCache,
                         onClearLogs: _clearing ? null : _doClearLogs,
+                        onOpenFolder: _openFolder,
                         refreshReport: _refreshReport,
                       ),
                     ),
@@ -613,6 +617,30 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         ),
       ],
     );
+  }
+
+  Future<void> _openFolder() async {
+    final l10n = AppLocalizations.of(context)!;
+    final dir = await AppDirectories.getAppDataDirectory();
+    final path = dir.path;
+    try {
+      final res = await OpenFilex.open(path);
+      if (res.type != ResultType.done) {
+        if (!mounted) return;
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetCannotOpenFile(res.message),
+          type: NotificationType.error,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.chatMessageWidgetOpenFileError(e.toString()),
+        type: NotificationType.error,
+      );
+    }
   }
 }
 
@@ -819,6 +847,30 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
     }
   }
 
+  Future<void> _openFolder() async {
+    final l10n = AppLocalizations.of(context)!;
+    final dir = await AppDirectories.getAppDataDirectory();
+    final path = dir.path;
+    try {
+      final res = await OpenFilex.open(path);
+      if (res.type != ResultType.done) {
+        if (!mounted) return;
+        showAppSnackBar(
+          context,
+          message: l10n.chatMessageWidgetCannotOpenFile(res.message),
+          type: NotificationType.error,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.chatMessageWidgetOpenFileError(e.toString()),
+        type: NotificationType.error,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -867,6 +919,7 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
           onClearLogs: (category.key == StorageUsageCategoryKey.logs)
               ? _clearLogs
               : null,
+          onOpenFolder: _openFolder,
           refreshReport: _refresh,
         ),
       ),
@@ -1065,6 +1118,7 @@ class _CategoryDetail extends StatelessWidget {
     required this.onClearOtherCache,
     required this.onClearSystemCache,
     required this.onClearLogs,
+    required this.onOpenFolder,
     required this.refreshReport,
   });
 
@@ -1077,6 +1131,7 @@ class _CategoryDetail extends StatelessWidget {
   final Future<void> Function()? onClearOtherCache;
   final Future<void> Function()? onClearSystemCache;
   final Future<void> Function()? onClearLogs;
+  final Future<void> Function()? onOpenFolder;
   final Future<void> Function() refreshReport;
 
   @override
@@ -1139,6 +1194,20 @@ class _CategoryDetail extends StatelessWidget {
           ),
         ],
       );
+    } else if (category.key == StorageUsageCategoryKey.chatData) {
+      actions = Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          IosTileButton(
+            label: l10n.storageSpaceChatDataOpenFolder,
+            icon: Lucide.FolderOpen,
+            backgroundColor: cs.primary,
+            enabled: onOpenFolder != null,
+            onTap: () => onOpenFolder?.call(),
+          ),
+        ],
+      );
     }
 
     if (category.key == StorageUsageCategoryKey.images ||
@@ -1196,7 +1265,9 @@ class _CategoryDetail extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          hint,
+          category.key == StorageUsageCategoryKey.chatData
+              ? l10n.storageSpaceChatDataMigrationNote
+              : hint,
           style: TextStyle(
             fontSize: 12.5,
             color: cs.onSurface.withValues(alpha: 0.7),

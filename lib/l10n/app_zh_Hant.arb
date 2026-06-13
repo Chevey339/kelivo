@@ -46,6 +46,10 @@
   "storageSpaceSubChatMessages": "訊息",
   "storageSpaceSubChatConversations": "對話",
   "storageSpaceSubChatToolEvents": "工具事件",
+  "storageSpaceSubChatDatabase": "資料庫",
+  "storageSpaceSubChatOutdated": "(已廢棄)",
+  "storageSpaceChatDataMigrationNote": "可能影響聊天記錄，請謹慎刪除。聊天資料已從 Hive 遷移至 SQLite，舊檔案仍然保留在磁碟上。若確認新版本已穩定運行，可前往目錄清理 hive 檔案。",
+  "storageSpaceChatDataOpenFolder": "開啟目錄",
   "storageSpaceSubAssistantAvatars": "頭像",
   "storageSpaceSubAssistantImages": "圖片",
   "storageSpaceSubCacheAvatars": "頭像快取",
@@ -1932,5 +1936,26 @@
         "type": "int"
       }
     }
-  }
+  },
+  "migrateTitle": "資料遷移",
+  "migrateDescription": "偵測到舊版聊天資料，需要遷移至新儲存格式。\n遷移期間請勿關閉應用程式。",
+  "migrateStepReading": "正在讀取舊資料…",
+  "migrateStepWriting": "正在寫入新儲存…",
+  "migrateStepVerifying": "正在驗證資料一致性…",
+  "migrateStepComplete": "遷移完成，正在重新啟動…",
+  "migrateStepError": "遷移失敗",
+  "migrateRetry": "重試",
+  "migrateButtonStart": "開始遷移",
+  "migrateConversationCount": "正在遷移對話 {current}/{total}",
+  "@migrateConversationCount": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "migrateConsistencyFailed": "一致性驗證失敗，請重試"
 }

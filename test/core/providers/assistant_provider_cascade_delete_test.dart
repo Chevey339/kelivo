@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -54,6 +53,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
+  final services = <ChatService>[];
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp(
@@ -63,7 +63,10 @@ void main() {
   });
 
   tearDown(() async {
-    await Hive.close();
+    for (final s in services) {
+      await s.close();
+    }
+    services.clear();
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }
@@ -74,6 +77,7 @@ void main() {
       'deletes conversations and messages owned by the deleted assistant',
       () async {
         final chatService = ChatService();
+        services.add(chatService);
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
           chatService: chatService,
@@ -132,6 +136,7 @@ void main() {
       'deletes draft conversations owned by the deleted assistant',
       () async {
         final chatService = ChatService();
+        services.add(chatService);
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
           chatService: chatService,
@@ -159,6 +164,7 @@ void main() {
       'notifies once when deleting multiple assistant conversations',
       () async {
         final chatService = ChatService();
+        services.add(chatService);
         await chatService.init();
 
         final first = await chatService.createConversation(
@@ -202,6 +208,7 @@ void main() {
       'keeps conversations when deleting the last assistant is rejected',
       () async {
         final chatService = ChatService();
+        services.add(chatService);
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
           chatService: chatService,

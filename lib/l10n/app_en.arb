@@ -77,6 +77,10 @@
   "storageSpaceSubChatMessages": "Messages",
   "storageSpaceSubChatConversations": "Conversations",
   "storageSpaceSubChatToolEvents": "Tool events",
+  "storageSpaceSubChatDatabase": "Database",
+  "storageSpaceSubChatOutdated": "(outdated)",
+  "storageSpaceChatDataMigrationNote": "May affect your chat history. Please delete with care. Chat data has been migrated from Hive to SQLite, with old files still preserved on disk. If you have confirmed the new version is running stably, you can navigate to the directory below to clean up Hive files.",
+  "storageSpaceChatDataOpenFolder": "Open folder",
   "storageSpaceSubAssistantAvatars": "Avatars",
   "storageSpaceSubAssistantImages": "Images",
   "storageSpaceSubCacheAvatars": "Avatar cache",
@@ -2355,5 +2359,26 @@
         "type": "int"
       }
     }
-  }
+  },
+  "migrateTitle": "Data Migration",
+  "migrateDescription": "Your chat data needs to be migrated to a new storage format.\nDo not close the app during migration.",
+  "migrateStepReading": "Reading existing data…",
+  "migrateStepWriting": "Writing to new storage…",
+  "migrateStepVerifying": "Verifying data integrity…",
+  "migrateStepComplete": "Migration complete. Restarting…",
+  "migrateStepError": "Migration failed",
+  "migrateRetry": "Retry",
+  "migrateButtonStart": "Start Migration",
+  "migrateConversationCount": "Migrating conversation {current} of {total}",
+  "@migrateConversationCount": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "migrateConsistencyFailed": "Consistency check failed. Please try again."
 }

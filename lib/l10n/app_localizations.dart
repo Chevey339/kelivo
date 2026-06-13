@@ -382,6 +382,30 @@ abstract class AppLocalizations {
   /// **'Tool events'**
   String get storageSpaceSubChatToolEvents;
 
+  /// No description provided for @storageSpaceSubChatDatabase.
+  ///
+  /// In en, this message translates to:
+  /// **'Database'**
+  String get storageSpaceSubChatDatabase;
+
+  /// No description provided for @storageSpaceSubChatOutdated.
+  ///
+  /// In en, this message translates to:
+  /// **'(outdated)'**
+  String get storageSpaceSubChatOutdated;
+
+  /// No description provided for @storageSpaceChatDataMigrationNote.
+  ///
+  /// In en, this message translates to:
+  /// **'May affect your chat history. Please delete with care. Chat data has been migrated from Hive to SQLite, with old files still preserved on disk. If you have confirmed the new version is running stably, you can navigate to the directory below to clean up Hive files.'**
+  String get storageSpaceChatDataMigrationNote;
+
+  /// No description provided for @storageSpaceChatDataOpenFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Open folder'**
+  String get storageSpaceChatDataOpenFolder;
+
   /// No description provided for @storageSpaceSubAssistantAvatars.
   ///
   /// In en, this message translates to:
@@ -10093,6 +10117,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.'**
   String debugPageManyMessagesSeedText(String role, int index);
+
+  /// No description provided for @migrateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Data Migration'**
+  String get migrateTitle;
+
+  /// No description provided for @migrateDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Your chat data needs to be migrated to a new storage format.\nDo not close the app during migration.'**
+  String get migrateDescription;
+
+  /// No description provided for @migrateStepReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading existing data…'**
+  String get migrateStepReading;
+
+  /// No description provided for @migrateStepWriting.
+  ///
+  /// In en, this message translates to:
+  /// **'Writing to new storage…'**
+  String get migrateStepWriting;
+
+  /// No description provided for @migrateStepVerifying.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying data integrity…'**
+  String get migrateStepVerifying;
+
+  /// No description provided for @migrateStepComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Migration complete. Restarting…'**
+  String get migrateStepComplete;
+
+  /// No description provided for @migrateStepError.
+  ///
+  /// In en, this message translates to:
+  /// **'Migration failed'**
+  String get migrateStepError;
+
+  /// No description provided for @migrateRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get migrateRetry;
+
+  /// No description provided for @migrateButtonStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Migration'**
+  String get migrateButtonStart;
+
+  /// No description provided for @migrateConversationCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Migrating conversation {current} of {total}'**
+  String migrateConversationCount(int current, int total);
+
+  /// No description provided for @migrateConsistencyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Consistency check failed. Please try again.'**
+  String get migrateConsistencyFailed;
 }
 
 class _AppLocalizationsDelegate

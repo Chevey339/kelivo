@@ -584,6 +584,7 @@ class HomePageController extends ChangeNotifier {
           } catch (_) {}
         }
         _chatService.setCurrentConversation(recent.id);
+        await _chatService.ensureMessagesLoaded(recent.id);
         _chatController.setCurrentConversation(recent);
         _streamController.clearGeminiThoughtSigs();
         _restoreMessageUiState();

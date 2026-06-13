@@ -1,28 +1,25 @@
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
-import 'package:hive_flutter/hive_flutter.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
+import '../../database/kelivo_database.dart';
+import '../../database/mappers/chat_message_mapper.dart';
+import '../../database/mappers/conversation_mapper.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
 
 class ChatService extends ChangeNotifier {
-  static const String _conversationsBoxName = 'conversations';
-  static const String _messagesBoxName = 'messages';
-  static const String _toolEventsBoxName = 'tool_events_v1';
-  static const String _activeStreamingKey = '_active_streaming_ids';
   static const int defaultInitialMessageMin = 2;
   static const int defaultInitialMessageMax = 240;
   static const int defaultInitialTextBudget = 20000;
   static const int defaultHistoryPageSize = 20;
   static const int defaultLoadedWindowMax = 360;
 
-  late Box<Conversation> _conversationsBox;
-  late Box<ChatMessage> _messagesBox;
-  late Box
-  _toolEventsBox; // key: assistantMessageId, value: List<Map<String,dynamic>>
-  String _sigKey(String id) => 'sig_$id';
+  late KelivoDatabase _db;
+  final Map<String, Conversation> _conversationsCache = {};
 
   String? _currentConversationId;
   final Map<String, List<ChatMessage>> _messagesCache = {};
@@ -31,6 +28,9 @@ class ChatService extends ChangeNotifier {
   final Map<String, List<Map<String, dynamic>>> _temporaryToolEvents =
       <String, List<Map<String, dynamic>>>{};
   final Map<String, String> _temporaryGeminiThoughtSigs = <String, String>{};
+  final Map<String, List<Map<String, dynamic>>> _toolEventsCache =
+      <String, List<Map<String, dynamic>>>{};
+  final Map<String, String?> _thoughtSigsCache = <String, String?>{};
 
   // Localized default title for new conversations; set by UI on startup.
   String _defaultConversationTitle = 'New Chat';
@@ -48,31 +48,43 @@ class ChatService extends ChangeNotifier {
     return id != null && _temporaryConversationIds.contains(id);
   }
 
+  bool isDraft(String id) => _draftConversations.containsKey(id);
+
   Future<void> init() async {
     if (_initialized) return;
 
-    // Initialize Hive with platform-specific directory
-    final appDataDir = await AppDirectories.getAppDataDirectory();
-    await Hive.initFlutter(appDataDir.path);
+    _db = KelivoDatabase();
 
-    // Register adapters if not already registered
-    if (!Hive.isAdapterRegistered(0)) {
-      Hive.registerAdapter(ChatMessageAdapter());
-    }
-    if (!Hive.isAdapterRegistered(1)) {
-      Hive.registerAdapter(ConversationAdapter());
+    // Preload all conversations into memory cache
+    final rows = await _db.select(_db.conversations).get();
+    for (final row in rows) {
+      _conversationsCache[row.id] = conversationFromRow(row);
     }
 
-    _conversationsBox = await Hive.openBox<Conversation>(_conversationsBoxName);
-    _messagesBox = await Hive.openBox<ChatMessage>(_messagesBoxName);
-    _toolEventsBox = await Hive.openBox(_toolEventsBoxName);
+    // Preload all messages into memory cache (grouped by conversation)
+    final allMessageRows = await _db.select(_db.messages).get();
+    final grouped = <String, List<ChatMessage>>{};
+    for (final row in allMessageRows) {
+      final msg = chatMessageFromRow(row);
+      grouped.putIfAbsent(msg.conversationId, () => []).add(msg);
+    }
+    _messagesCache.addAll(grouped);
 
     // Migrate any persisted message content that references old iOS sandbox paths
     await _migrateSandboxPaths();
 
-    // Reset any stale isStreaming flags left over from a previous app crash or
-    // force-quit.  After a fresh launch no message can be actively streaming.
-    await _resetStaleStreamingFlags();
+    // Preload tool events and Gemini thought signatures into memory
+    final toolRows = await _db.select(_db.toolEvents).get();
+    for (final row in toolRows) {
+      try {
+        _toolEventsCache[row.messageId] =
+            (jsonDecode(row.data) as List<dynamic>)
+                .cast<Map<String, dynamic>>();
+      } catch (_) {
+        _toolEventsCache[row.messageId] = const <Map<String, dynamic>>[];
+      }
+      _thoughtSigsCache[row.messageId] = row.geminiThoughtSig;
+    }
 
     _initialized = true;
     notifyListeners();
@@ -80,7 +92,7 @@ class ChatService extends ChangeNotifier {
 
   List<Conversation> getAllConversations() {
     if (!_initialized) return [];
-    final conversations = _conversationsBox.values.toList();
+    final conversations = _conversationsCache.values.toList();
     conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return conversations;
   }
@@ -91,12 +103,12 @@ class ChatService extends ChangeNotifier {
 
   Conversation? getConversation(String id) {
     if (!_initialized) return null;
-    return _conversationsBox.get(id) ?? _draftConversations[id];
+    return _conversationsCache[id] ?? _draftConversations[id];
   }
 
   Conversation? _conversationForMessages(String conversationId) {
     if (!_initialized) return _draftConversations[conversationId];
-    return _conversationsBox.get(conversationId) ??
+    return _conversationsCache[conversationId] ??
         _draftConversations[conversationId];
   }
 
@@ -181,7 +193,13 @@ class ChatService extends ChangeNotifier {
       }
       return null;
     }
-    return _messagesBox.get(messageId);
+    final messages = _messagesCache[conversationId];
+    if (messages == null) return null;
+    for (final message in messages) {
+      if (message.id == messageId) return message;
+    }
+
+    return null;
   }
 
   List<ChatMessage> getMessages(String conversationId) {
@@ -194,7 +212,7 @@ class ChatService extends ChangeNotifier {
 
     // Load from storage
     final conversation =
-        _conversationsBox.get(conversationId) ??
+        _conversationsCache[conversationId] ??
         _draftConversations[conversationId];
     if (conversation == null) return [];
 
@@ -277,6 +295,10 @@ class ChatService extends ChangeNotifier {
     );
   }
 
+  Future<void> ensureMessagesLoaded(String conversationId) async {
+    // no-op: all messages are preloaded at init
+  }
+
   int _estimateInitialLoadWeight(ChatMessage message) {
     final len = message.content.length;
     if (message.role == 'user') return len < 200 ? 200 : len;
@@ -296,7 +318,10 @@ class ChatService extends ChangeNotifier {
       assistantId: assistantId,
     );
 
-    await _conversationsBox.put(conversation.id, conversation);
+    _conversationsCache[conversation.id] = conversation;
+    await _db
+        .into(_db.conversations)
+        .insert(conversationToCompanion(conversation));
     _currentConversationId = conversation.id;
     notifyListeners();
     return conversation;
@@ -330,6 +355,8 @@ class ChatService extends ChangeNotifier {
     for (final message in messages) {
       _temporaryToolEvents.remove(message.id);
       _temporaryGeminiThoughtSigs.remove(message.id);
+      _toolEventsCache.remove(message.id);
+      _thoughtSigsCache.remove(message.id);
     }
     _draftConversations.remove(id);
     _messagesCache.remove(id);
@@ -361,8 +388,11 @@ class ChatService extends ChangeNotifier {
     for (final message in messages) {
       _temporaryToolEvents.remove(message.id);
       _temporaryGeminiThoughtSigs.remove(message.id);
+      _toolEventsCache.remove(message.id);
+      _thoughtSigsCache.remove(message.id);
     }
     _messagesCache.remove(id);
+    _conversationsCache.remove(id);
     if (_currentConversationId == id) {
       _currentConversationId = null;
     }
@@ -370,24 +400,19 @@ class ChatService extends ChangeNotifier {
   }
 
   Future<bool> _deletePersistedConversation(String id) async {
-    final conversation = _conversationsBox.get(id);
-    if (conversation == null) return false;
+    if (!_conversationsCache.containsKey(id)) return false;
 
-    for (final messageId in conversation.messageIds) {
-      final msg = _messagesBox.get(messageId);
-      if (msg != null && msg.role == 'assistant') {
-        try {
-          await _toolEventsBox.delete(msg.id);
-        } catch (_) {}
-        try {
-          await _toolEventsBox.delete(_sigKey(msg.id));
-        } catch (_) {}
+    // Cascade delete via SQLite foreign key handles messages + tool_events
+    await (_db.delete(_db.conversations)..where((t) => t.id.equals(id))).go();
+
+    _conversationsCache.remove(id);
+    final msgs = _messagesCache.remove(id);
+    if (msgs != null) {
+      for (final m in msgs) {
+        _toolEventsCache.remove(m.id);
+        _thoughtSigsCache.remove(m.id);
       }
-      await _messagesBox.delete(messageId);
     }
-
-    await _conversationsBox.delete(id);
-    _messagesCache.remove(id);
 
     if (_currentConversationId == id) {
       _currentConversationId = null;
@@ -401,20 +426,20 @@ class ChatService extends ChangeNotifier {
     final targetId = assistantId.trim();
     if (targetId.isEmpty) return;
 
-    final persistedConversationIds = _conversationsBox.values
-        .where((conversation) => conversation.assistantId == targetId)
-        .map((conversation) => conversation.id)
+    final persistedIds = _conversationsCache.values
+        .where((c) => c.assistantId == targetId)
+        .map((c) => c.id)
         .toList(growable: false);
-    final draftConversationIds = _draftConversations.values
-        .where((conversation) => conversation.assistantId == targetId)
-        .map((conversation) => conversation.id)
+    final draftIds = _draftConversations.values
+        .where((c) => c.assistantId == targetId)
+        .map((c) => c.id)
         .toList(growable: false);
 
     var deleted = false;
-    for (final conversationId in draftConversationIds) {
+    for (final conversationId in draftIds) {
       deleted = await _deleteDraftConversation(conversationId) || deleted;
     }
-    for (final conversationId in persistedConversationIds) {
+    for (final conversationId in persistedIds) {
       deleted = await _deletePersistedConversation(conversationId) || deleted;
     }
 
@@ -450,19 +475,17 @@ class ChatService extends ChangeNotifier {
 
   Future<void> _migrateSandboxPaths() async {
     try {
-      // No-op if empty
-      if (_messagesBox.isEmpty) return;
+      final rows = await _db.select(_db.messages).get();
+      if (rows.isEmpty) return;
       final imgRe = RegExp(r"\[image:(.+?)\]");
       final fileRe = RegExp(r"\[file:(.+?)\|(.+?)\|(.+?)\]");
 
-      for (final key in _messagesBox.keys) {
-        final msg = _messagesBox.get(key);
-        if (msg == null) continue;
+      for (final row in rows) {
+        final msg = chatMessageFromRow(row);
         final content = msg.content;
         String updated = content;
         bool changed = false;
 
-        // Rewrite image paths
         updated = updated.replaceAllMapped(imgRe, (m) {
           final raw = (m.group(1) ?? '').trim();
           final fixed = SandboxPathResolver.fix(raw);
@@ -470,7 +493,6 @@ class ChatService extends ChangeNotifier {
           return '[image:$fixed]';
         });
 
-        // Rewrite file attachment paths
         updated = updated.replaceAllMapped(fileRe, (m) {
           final raw = (m.group(1) ?? '').trim();
           final name = (m.group(2) ?? '').trim();
@@ -481,8 +503,9 @@ class ChatService extends ChangeNotifier {
         });
 
         if (changed && updated != content) {
-          final newMsg = msg.copyWith(content: updated);
-          await _messagesBox.put(msg.id, newMsg);
+          await _db
+              .update(_db.messages)
+              .replace(chatMessageToCompanion(msg.copyWith(content: updated)));
         }
       }
     } catch (_) {
@@ -490,83 +513,25 @@ class ChatService extends ChangeNotifier {
     }
   }
 
-  /// Reset stale isStreaming flags left over from a previous app crash or
-  /// force-quit.  After a fresh launch no message can be actively streaming,
-  /// so any persisted `isStreaming: true` is stale and must be cleared to
-  /// avoid stuck loading indicators.
-  ///
-  /// Uses a tracked set of streaming message IDs for O(1) lookup instead of
-  /// scanning every message in the box.
-  Future<void> _resetStaleStreamingFlags() async {
-    try {
-      final raw = _toolEventsBox.get(_activeStreamingKey);
-      if (raw == null) return;
-      final ids = (raw as List).cast<String>();
-      if (ids.isEmpty) return;
-      for (final id in ids) {
-        final msg = _messagesBox.get(id);
-        if (msg != null && msg.isStreaming) {
-          await _messagesBox.put(id, msg.copyWith(isStreaming: false));
-        }
-      }
-      await _toolEventsBox.delete(_activeStreamingKey);
-    } catch (_) {
-      // best-effort; ignore errors
-    }
-  }
-
-  /// Record a message ID as actively streaming.
-  void _trackStreamingId(String messageId) {
-    try {
-      final raw = _toolEventsBox.get(_activeStreamingKey);
-      final ids = raw != null
-          ? (raw as List).cast<String>().toList()
-          : <String>[];
-      if (!ids.contains(messageId)) {
-        ids.add(messageId);
-        _toolEventsBox.put(_activeStreamingKey, ids);
-      }
-    } catch (_) {}
-  }
-
-  /// Remove a message ID from the active streaming set.
-  void _untrackStreamingId(String messageId) {
-    try {
-      final raw = _toolEventsBox.get(_activeStreamingKey);
-      if (raw == null) return;
-      final ids = (raw as List).cast<String>().toList();
-      if (ids.remove(messageId)) {
-        if (ids.isEmpty) {
-          _toolEventsBox.delete(_activeStreamingKey);
-        } else {
-          _toolEventsBox.put(_activeStreamingKey, ids);
-        }
-      }
-    } catch (_) {}
-  }
-
   Future<void> _cleanupOrphanUploads() async {
     try {
       final uploadDir = await AppDirectories.getUploadDirectory();
       if (!await uploadDir.exists()) return;
 
-      // Build the set of all referenced paths across all messages
       String canon(String pth) {
-        // Normalize separators and resolve redundant segments to enable
-        // reliable equality checks across platforms (esp. Windows).
         final normalized = p.normalize(pth);
-        // On Windows, paths are case-insensitive; compare in lowercase.
         return Platform.isWindows ? normalized.toLowerCase() : normalized;
       }
 
       final referenced = <String>{};
-      for (final m in _messagesBox.values) {
-        for (final pth in _extractAttachmentPaths(m.content)) {
+      final msgRows = await _db.select(_db.messages).get();
+      for (final row in msgRows) {
+        final msg = chatMessageFromRow(row);
+        for (final pth in _extractAttachmentPaths(msg.content)) {
           referenced.add(canon(pth));
         }
       }
 
-      // Walk upload directory recursively to consider all files
       final entries = uploadDir.listSync(recursive: true, followLinks: false);
       for (final ent in entries) {
         if (ent is File) {
@@ -586,11 +551,6 @@ class ChatService extends ChangeNotifier {
     List<ChatMessage> messages,
   ) async {
     if (!_initialized) await init();
-    // Restore messages first
-    for (final m in messages) {
-      await _messagesBox.put(m.id, m);
-    }
-    // Ensure messageIds are in the same order
     final ids = messages.map((m) => m.id).toList();
     final restored = Conversation(
       id: conversation.id,
@@ -607,11 +567,16 @@ class ChatService extends ChangeNotifier {
       lastSummarizedMessageCount: conversation.lastSummarizedMessageCount,
       chatSuggestions: List<String>.of(conversation.chatSuggestions),
     );
-    await _conversationsBox.put(restored.id, restored);
-
-    // Update caches
+    _conversationsCache[restored.id] = restored;
+    await _db
+        .into(_db.conversations)
+        .insert(conversationToCompanion(restored), mode: InsertMode.replace);
+    for (final m in messages) {
+      await _db
+          .into(_db.messages)
+          .insert(chatMessageToCompanion(m), mode: InsertMode.replace);
+    }
     _messagesCache[restored.id] = List.of(messages);
-
     notifyListeners();
   }
 
@@ -622,24 +587,25 @@ class ChatService extends ChangeNotifier {
   ) async {
     if (!_initialized) await init();
 
-    // Add message to box
-    await _messagesBox.put(message.id, message);
+    await _db
+        .into(_db.messages)
+        .insert(chatMessageToCompanion(message), mode: InsertMode.replace);
 
-    // Update conversation
-    final conversation = _conversationsBox.get(conversationId);
+    final conversation = _conversationsCache[conversationId];
     if (conversation != null) {
       if (!conversation.messageIds.contains(message.id)) {
         conversation.messageIds.add(message.id);
-        // Keep original updatedAt during restore
-        await conversation.save();
+        await _saveConversation(conversation);
       }
     }
 
     // Update cache
-    if (_messagesCache.containsKey(conversationId)) {
-      if (!_messagesCache[conversationId]!.any((m) => m.id == message.id)) {
-        _messagesCache[conversationId]!.add(message);
-      }
+    final cache = _messagesCache.putIfAbsent(
+      conversationId,
+      () => <ChatMessage>[],
+    );
+    if (!cache.any((m) => m.id == message.id)) {
+      cache.add(message);
     }
 
     notifyListeners();
@@ -649,7 +615,7 @@ class ChatService extends ChangeNotifier {
   List<String> getConversationMcpServers(String conversationId) {
     if (!_initialized) return const <String>[];
     final c =
-        _conversationsBox.get(conversationId) ??
+        _conversationsCache[conversationId] ??
         _draftConversations[conversationId];
     return c?.mcpServerIds ?? const <String>[];
   }
@@ -666,11 +632,11 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final c = _conversationsBox.get(conversationId);
+    final c = _conversationsCache[conversationId];
     if (c == null) return;
     c.mcpServerIds = List.of(serverIds);
     c.updatedAt = DateTime.now();
-    await c.save();
+    await _saveConversation(c);
     notifyListeners();
   }
 
@@ -699,23 +665,84 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final conversation = _conversationsBox.get(id);
-    if (conversation == null) return;
-
-    conversation.title = newTitle;
-    conversation.updatedAt = DateTime.now();
-    await conversation.save();
+    final c = _conversationsCache[id];
+    if (c == null) return;
+    c.title = newTitle;
+    c.updatedAt = DateTime.now();
+    await _saveConversation(c);
     notifyListeners();
   }
 
-  /// Updates the conversation summary generated by LLM.
+  Future<void> setConversationSummary(
+    String conversationId,
+    String summary,
+  ) async {
+    if (!_initialized) return;
+    if (_draftConversations.containsKey(conversationId)) {
+      final draft = _draftConversations[conversationId]!;
+      draft.summary = summary;
+      draft.updatedAt = DateTime.now();
+      notifyListeners();
+      return;
+    }
+    final c = _conversationsCache[conversationId];
+    if (c == null) return;
+    c.summary = summary;
+    c.updatedAt = DateTime.now();
+    await _saveConversation(c);
+    notifyListeners();
+  }
+
+  List<String> getChatSuggestions(String conversationId) {
+    if (!_initialized) return const <String>[];
+    final c =
+        _conversationsCache[conversationId] ??
+        _draftConversations[conversationId];
+    return List<String>.of(c?.chatSuggestions ?? const <String>[]);
+  }
+
+  Future<void> setChatSuggestions(
+    String conversationId,
+    List<String> suggestions,
+  ) async {
+    if (!_initialized) return;
+    if (_draftConversations.containsKey(conversationId)) {
+      final draft = _draftConversations[conversationId]!;
+      draft.chatSuggestions = List.of(suggestions);
+      draft.updatedAt = DateTime.now();
+      notifyListeners();
+      return;
+    }
+    final c = _conversationsCache[conversationId];
+    if (c == null) return;
+    c.chatSuggestions = List.of(suggestions);
+    c.updatedAt = DateTime.now();
+    await _saveConversation(c);
+    notifyListeners();
+  }
+
+  Future<void> clearChatSuggestions(String conversationId) async {
+    if (!_initialized) return;
+    if (_draftConversations.containsKey(conversationId)) {
+      final draft = _draftConversations[conversationId]!;
+      if (draft.chatSuggestions.isEmpty) return;
+      draft.chatSuggestions = <String>[];
+      notifyListeners();
+      return;
+    }
+    final conversation = _conversationsCache[conversationId];
+    if (conversation == null || conversation.chatSuggestions.isEmpty) return;
+    conversation.chatSuggestions = <String>[];
+    await _saveConversation(conversation);
+    notifyListeners();
+  }
+
   Future<void> updateConversationSummary(
     String id,
     String summary,
     int messageCount,
   ) async {
     if (!_initialized) return;
-
     if (_draftConversations.containsKey(id)) {
       final draft = _draftConversations[id]!;
       draft.summary = summary;
@@ -723,17 +750,14 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-
-    final conversation = _conversationsBox.get(id);
-    if (conversation == null) return;
-
-    conversation.summary = summary;
-    conversation.lastSummarizedMessageCount = messageCount;
-    await conversation.save();
+    final c = _conversationsCache[id];
+    if (c == null) return;
+    c.summary = summary;
+    c.lastSummarizedMessageCount = messageCount;
+    await _saveConversation(c);
     notifyListeners();
   }
 
-  /// Gets all conversations with non-empty summaries for a specific assistant.
   List<Conversation> getConversationsWithSummaryForAssistant(
     String assistantId,
   ) {
@@ -748,10 +772,8 @@ class ChatService extends ChangeNotifier {
         .toList();
   }
 
-  /// Clears the summary of a specific conversation.
   Future<void> clearConversationSummary(String conversationId) async {
     if (!_initialized) return;
-
     if (_draftConversations.containsKey(conversationId)) {
       final draft = _draftConversations[conversationId]!;
       draft.summary = null;
@@ -759,13 +781,11 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-
-    final conversation = _conversationsBox.get(conversationId);
-    if (conversation == null) return;
-
-    conversation.summary = null;
-    conversation.lastSummarizedMessageCount = 0;
-    await conversation.save();
+    final c = _conversationsCache[conversationId];
+    if (c == null) return;
+    c.summary = null;
+    c.lastSummarizedMessageCount = 0;
+    await _saveConversation(c);
     notifyListeners();
   }
 
@@ -774,31 +794,26 @@ class ChatService extends ChangeNotifier {
     List<String> suggestions,
   ) async {
     if (!_initialized) return;
-
     final clean = suggestions
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
         .take(3)
         .toList();
-
     if (_draftConversations.containsKey(conversationId)) {
       final draft = _draftConversations[conversationId]!;
       draft.chatSuggestions = clean;
       notifyListeners();
       return;
     }
-
-    final conversation = _conversationsBox.get(conversationId);
-    if (conversation == null) return;
-
-    conversation.chatSuggestions = clean;
-    await conversation.save();
+    final c = _conversationsCache[conversationId];
+    if (c == null) return;
+    c.chatSuggestions = clean;
+    await _saveConversation(c);
     notifyListeners();
   }
 
   Future<void> clearConversationSuggestions(String conversationId) async {
     if (!_initialized) return;
-
     if (_draftConversations.containsKey(conversationId)) {
       final draft = _draftConversations[conversationId]!;
       if (draft.chatSuggestions.isEmpty) return;
@@ -806,12 +821,10 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-
-    final conversation = _conversationsBox.get(conversationId);
-    if (conversation == null || conversation.chatSuggestions.isEmpty) return;
-
-    conversation.chatSuggestions = <String>[];
-    await conversation.save();
+    final c = _conversationsCache[conversationId];
+    if (c == null || c.chatSuggestions.isEmpty) return;
+    c.chatSuggestions = <String>[];
+    await _saveConversation(c);
     notifyListeners();
   }
 
@@ -824,11 +837,10 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final conversation = _conversationsBox.get(id);
+    final conversation = _conversationsCache[id];
     if (conversation == null) return;
-
     conversation.isPinned = !conversation.isPinned;
-    await conversation.save();
+    await _saveConversation(conversation);
     notifyListeners();
   }
 
@@ -848,26 +860,30 @@ class ChatService extends ChangeNotifier {
   }) async {
     if (!_initialized) await init();
 
-    var conversation = _conversationsBox.get(conversationId);
+    var conversation = _conversationsCache[conversationId];
     final temporary = _temporaryConversationIds.contains(conversationId);
-    // If conversation doesn't exist yet, persist draft (if any)
     if (conversation == null) {
       final draft = temporary
           ? _draftConversations[conversationId]
           : _draftConversations.remove(conversationId);
       if (draft != null) {
         if (!temporary) {
-          await _conversationsBox.put(draft.id, draft);
+          _conversationsCache[draft.id] = draft;
+          await _db
+              .into(_db.conversations)
+              .insert(conversationToCompanion(draft));
         }
         conversation = draft;
       } else {
-        // Create a new one on the fly as a fallback
         conversation = Conversation(
           id: conversationId,
           title: _defaultConversationTitle,
         );
         if (!temporary) {
-          await _conversationsBox.put(conversationId, conversation);
+          _conversationsCache[conversationId] = conversation;
+          await _db
+              .into(_db.conversations)
+              .insert(conversationToCompanion(conversation));
         } else {
           _draftConversations[conversationId] = conversation;
         }
@@ -890,12 +906,7 @@ class ChatService extends ChangeNotifier {
     );
 
     if (!temporary) {
-      await _messagesBox.put(message.id, message);
-    }
-
-    // Track streaming state for crash-recovery cleanup
-    if (isStreaming && !temporary) {
-      _trackStreamingId(message.id);
+      await _db.into(_db.messages).insert(chatMessageToCompanion(message));
     }
 
     conversation.messageIds.add(message.id);
@@ -903,13 +914,13 @@ class ChatService extends ChangeNotifier {
     if (temporary) {
       _messagesCache.putIfAbsent(conversationId, () => <ChatMessage>[]);
     } else {
-      await conversation.save();
+      await _saveConversation(conversation);
     }
 
     // Update cache
-    if (_messagesCache.containsKey(conversationId)) {
-      _messagesCache[conversationId]!.add(message);
-    }
+    _messagesCache
+        .putIfAbsent(conversationId, () => <ChatMessage>[])
+        .add(message);
 
     notifyListeners();
     return message;
@@ -956,7 +967,7 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) return;
 
     final message =
-        _messagesBox.get(messageId) ?? _cachedTemporaryMessage(messageId);
+        _cachedTemporaryMessage(messageId) ?? await _messageFromDb(messageId);
     if (message == null) return;
 
     final updatedMessage = message.copyWith(
@@ -981,17 +992,14 @@ class ChatService extends ChangeNotifier {
       return;
     }
 
-    await _messagesBox.put(messageId, updatedMessage);
-
-    // Update streaming tracking for crash-recovery
-    if (isStreaming == false) {
-      _untrackStreamingId(messageId);
-    }
+    await _db
+        .update(_db.messages)
+        .replace(chatMessageToCompanion(updatedMessage));
 
     // Update cache
-    final conversationId = message.conversationId;
-    if (_messagesCache.containsKey(conversationId)) {
-      final messages = _messagesCache[conversationId]!;
+    final convId = message.conversationId;
+    if (_messagesCache.containsKey(convId)) {
+      final messages = _messagesCache[convId]!;
       final index = messages.indexWhere((m) => m.id == messageId);
       if (index != -1) {
         messages[index] = updatedMessage;
@@ -1001,9 +1009,6 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Update message content during streaming without triggering notifyListeners.
-  /// This is used for streaming updates to avoid unnecessary rebuilds of
-  /// widgets watching ChatService (e.g., side_drawer).
   Future<void> updateMessageSilent(
     String messageId, {
     String? content,
@@ -1022,7 +1027,7 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) return;
 
     final message =
-        _messagesBox.get(messageId) ?? _cachedTemporaryMessage(messageId);
+        _cachedTemporaryMessage(messageId) ?? await _messageFromDb(messageId);
     if (message == null) return;
 
     final updatedMessage = message.copyWith(
@@ -1046,17 +1051,14 @@ class ChatService extends ChangeNotifier {
       return;
     }
 
-    await _messagesBox.put(messageId, updatedMessage);
-
-    // Update streaming tracking for crash-recovery
-    if (isStreaming == false) {
-      _untrackStreamingId(messageId);
-    }
+    await _db
+        .update(_db.messages)
+        .replace(chatMessageToCompanion(updatedMessage));
 
     // Update cache
-    final conversationId = message.conversationId;
-    if (_messagesCache.containsKey(conversationId)) {
-      final messages = _messagesCache[conversationId]!;
+    final convId = message.conversationId;
+    if (_messagesCache.containsKey(convId)) {
+      final messages = _messagesCache[convId]!;
       final index = messages.indexWhere((m) => m.id == messageId);
       if (index != -1) {
         messages[index] = updatedMessage;
@@ -1065,18 +1067,28 @@ class ChatService extends ChangeNotifier {
     // NOTE: Do NOT call notifyListeners() here to avoid UI rebuilds during streaming
   }
 
+  Future<ChatMessage?> _messageFromDb(String messageId) async {
+    // Check cache first
+    for (final entry in _messagesCache.entries) {
+      for (final m in entry.value) {
+        if (m.id == messageId) return m;
+      }
+    }
+    // Fallback to PK query
+    final row = await (_db.select(
+      _db.messages,
+    )..where((t) => t.id.equals(messageId))).getSingleOrNull();
+    if (row == null) return null;
+    return chatMessageFromRow(row);
+  }
+
   // Tool events persistence (per assistant message)
   List<Map<String, dynamic>> getToolEvents(String assistantMessageId) {
     if (!_initialized) return const <Map<String, dynamic>>[];
     final temporary = _temporaryToolEvents[assistantMessageId];
     if (temporary != null) return List<Map<String, dynamic>>.of(temporary);
-    final v = _toolEventsBox.get(assistantMessageId);
-    if (v is List) {
-      return v
-          .whereType<Map>()
-          .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
-          .toList();
-    }
+    final cached = _toolEventsCache[assistantMessageId];
+    if (cached != null) return List<Map<String, dynamic>>.of(cached);
     return const <Map<String, dynamic>>[];
   }
 
@@ -1092,7 +1104,19 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    await _toolEventsBox.put(assistantMessageId, events);
+    final jsonStr = jsonEncode(events);
+    await _db
+        .into(_db.toolEvents)
+        .insert(
+          ToolEventsCompanion.insert(
+            messageId: assistantMessageId,
+            data: jsonStr,
+          ),
+          mode: InsertMode.replace,
+        );
+    _toolEventsCache[assistantMessageId] = List<Map<String, dynamic>>.of(
+      events,
+    );
     notifyListeners();
   }
 
@@ -1111,11 +1135,9 @@ class ChatService extends ChangeNotifier {
     final cleanId = (id).toString();
 
     int idx = -1;
-    // Prefer matching by a non-empty id
     if (cleanId.isNotEmpty) {
       idx = list.indexWhere((e) => (e['id']?.toString() ?? '') == cleanId);
     }
-    // If no id or not found, match the first placeholder (no content) with same name
     if (idx < 0) {
       idx = list.indexWhere(
         (e) =>
@@ -1147,7 +1169,17 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    await _toolEventsBox.put(assistantMessageId, list);
+    final jsonStr = jsonEncode(list);
+    await _db
+        .into(_db.toolEvents)
+        .insert(
+          ToolEventsCompanion.insert(
+            messageId: assistantMessageId,
+            data: jsonStr,
+          ),
+          mode: InsertMode.replace,
+        );
+    _toolEventsCache[assistantMessageId] = list;
     notifyListeners();
   }
 
@@ -1156,8 +1188,8 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) return null;
     final temporary = _temporaryGeminiThoughtSigs[assistantMessageId];
     if (temporary != null && temporary.trim().isNotEmpty) return temporary;
-    final v = _toolEventsBox.get(_sigKey(assistantMessageId));
-    if (v is String && v.trim().isNotEmpty) return v;
+    final cached = _thoughtSigsCache[assistantMessageId];
+    if (cached != null && cached.trim().isNotEmpty) return cached;
     return null;
   }
 
@@ -1171,7 +1203,18 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    await _toolEventsBox.put(_sigKey(assistantMessageId), signature);
+    // Store in tool_events table's gemini_thought_sig column
+    await _db
+        .into(_db.toolEvents)
+        .insert(
+          ToolEventsCompanion.insert(
+            messageId: assistantMessageId,
+            data: '[]',
+            geminiThoughtSig: Value(signature),
+          ),
+          mode: InsertMode.replace,
+        );
+    _thoughtSigsCache[assistantMessageId] = signature;
     notifyListeners();
   }
 
@@ -1181,9 +1224,10 @@ class ChatService extends ChangeNotifier {
       _temporaryGeminiThoughtSigs.remove(assistantMessageId);
       return;
     }
-    try {
-      await _toolEventsBox.delete(_sigKey(assistantMessageId));
-    } catch (_) {}
+    await (_db.update(_db.toolEvents)
+          ..where((t) => t.messageId.equals(assistantMessageId)))
+        .write(const ToolEventsCompanion(geminiThoughtSig: Value(null)));
+    _thoughtSigsCache.remove(assistantMessageId);
   }
 
   Future<Conversation> forkConversation({
@@ -1193,7 +1237,6 @@ class ChatService extends ChangeNotifier {
     Map<String, int>? versionSelections,
   }) async {
     if (!_initialized) await init();
-    // Create new conversation first
     final convo = await createConversation(
       title: title,
       assistantId: assistantId,
@@ -1217,11 +1260,10 @@ class ChatService extends ChangeNotifier {
         groupId: src.groupId,
         version: src.version,
       );
-      await _messagesBox.put(clone.id, clone);
+      await _db.into(_db.messages).insert(chatMessageToCompanion(clone));
       ids.add(clone.id);
     }
-    // Attach to conversation in storage
-    final c = _conversationsBox.get(convo.id);
+    final c = _conversationsCache[convo.id];
     if (c != null) {
       c.messageIds
         ..clear()
@@ -1230,12 +1272,18 @@ class ChatService extends ChangeNotifier {
         versionSelections ?? const <String, int>{},
       );
       c.updatedAt = DateTime.now();
-      await c.save();
+      await _saveConversation(c);
     }
-    // Cache
-    _messagesCache[convo.id] = [for (final id in ids) _messagesBox.get(id)!];
+    final loadedMessages = <ChatMessage>[];
+    for (final id in ids) {
+      final row = await (_db.select(
+        _db.messages,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (row != null) loadedMessages.add(chatMessageFromRow(row));
+    }
+    _messagesCache[convo.id] = loadedMessages;
     notifyListeners();
-    return _conversationsBox.get(convo.id)!;
+    return _conversationsCache[convo.id]!;
   }
 
   Future<ChatMessage?> appendMessageVersion({
@@ -1243,18 +1291,17 @@ class ChatService extends ChangeNotifier {
     required String content,
   }) async {
     if (!_initialized) await init();
-    final original = _messagesBox.get(messageId);
+    final original = await _messageFromDb(messageId);
     if (original == null) return null;
 
     final cid = original.conversationId;
-    final convo = _conversationsBox.get(cid) ?? _draftConversations[cid];
+    final convo = _conversationsCache[cid] ?? _draftConversations[cid];
     if (convo == null) return null;
 
     final gid = (original.groupId ?? original.id);
-    // Find current max version within this group in this conversation
     int maxVersion = -1;
     for (final mid in convo.messageIds) {
-      final m = _messagesBox.get(mid);
+      final m = await _messageFromDb(mid);
       if (m == null) continue;
       final mg = (m.groupId ?? m.id);
       if (mg == gid) {
@@ -1274,24 +1321,21 @@ class ChatService extends ChangeNotifier {
       groupId: gid,
       version: nextVersion,
     );
-    await _messagesBox.put(newMsg.id, newMsg);
-    // Append to conversation order at the end (we'll group when rendering)
+    await _db.into(_db.messages).insert(chatMessageToCompanion(newMsg));
     if (_draftConversations.containsKey(cid)) {
       final draft = _draftConversations[cid]!;
       draft.messageIds.add(newMsg.id);
       draft.updatedAt = DateTime.now();
       draft.versionSelections[gid] = nextVersion;
     } else {
-      final c = _conversationsBox.get(cid);
+      final c = _conversationsCache[cid];
       if (c != null) {
         c.messageIds.add(newMsg.id);
         c.updatedAt = DateTime.now();
-        // Persist selection of latest version for this group
         c.versionSelections[gid] = nextVersion;
-        await c.save();
+        await _saveConversation(c);
       }
     }
-    // Update caches
     final arr = _messagesCache[cid];
     if (arr != null) arr.add(newMsg);
     notifyListeners();
@@ -1300,7 +1344,7 @@ class ChatService extends ChangeNotifier {
 
   Map<String, int> getVersionSelections(String conversationId) {
     final c =
-        _conversationsBox.get(conversationId) ??
+        _conversationsCache[conversationId] ??
         _draftConversations[conversationId];
     return Map<String, int>.from(c?.versionSelections ?? const <String, int>{});
   }
@@ -1317,11 +1361,11 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final c = _conversationsBox.get(conversationId);
+    final c = _conversationsCache[conversationId];
     if (c == null) return;
     c.versionSelections[groupId] = version;
     c.updatedAt = DateTime.now();
-    await c.save();
+    await _saveConversation(c);
     notifyListeners();
   }
 
@@ -1336,11 +1380,11 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final c = _conversationsBox.get(conversationId);
+    final c = _conversationsCache[conversationId];
     if (c == null) return;
     c.versionSelections.remove(groupId);
     c.updatedAt = DateTime.now();
-    await c.save();
+    await _saveConversation(c);
     notifyListeners();
   }
 
@@ -1349,10 +1393,9 @@ class ChatService extends ChangeNotifier {
     String? defaultTitle,
   }) async {
     if (!_initialized) await init();
-    // Draft case
     if (_draftConversations.containsKey(conversationId)) {
       final draft = _draftConversations[conversationId]!;
-      final lastIndexPlusOne = draft.messageIds.length; // last index + 1
+      final lastIndexPlusOne = draft.messageIds.length;
       final newValue = (draft.truncateIndex == lastIndexPlusOne)
           ? -1
           : lastIndexPlusOne;
@@ -1362,8 +1405,7 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return draft;
     }
-    // Persisted case
-    final c = _conversationsBox.get(conversationId);
+    final c = _conversationsCache[conversationId];
     if (c == null) return null;
     final lastIndexPlusOne = c.messageIds.length;
     final newValue = (c.truncateIndex == lastIndexPlusOne)
@@ -1372,7 +1414,7 @@ class ChatService extends ChangeNotifier {
     c.truncateIndex = newValue;
     if ((defaultTitle ?? '').isNotEmpty) c.title = defaultTitle!;
     c.updatedAt = DateTime.now();
-    await c.save();
+    await _saveConversation(c);
     notifyListeners();
     return c;
   }
@@ -1381,7 +1423,7 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) return;
 
     final message =
-        _messagesBox.get(messageId) ?? _cachedTemporaryMessage(messageId);
+        await _messageFromDb(messageId) ?? _cachedTemporaryMessage(messageId);
     if (message == null) return;
 
     if (isTemporaryConversation(message.conversationId)) {
@@ -1395,17 +1437,15 @@ class ChatService extends ChangeNotifier {
       return;
     }
 
-    final conversation = _conversationsBox.get(message.conversationId);
+    final conversation = _conversationsCache[message.conversationId];
     if (conversation != null) {
       final gid = message.groupId ?? message.id;
       final ids = conversation.messageIds;
 
-      // Find the earliest position of this message group before removal so we
-      // can keep the group anchored when deleting one of its versions.
       int anchorIndex = -1;
       for (int i = 0; i < ids.length; i++) {
         final mid = ids[i];
-        final m = _messagesBox.get(mid);
+        final m = await _messageFromDb(mid);
         if (m == null) continue;
         final mgid = m.groupId ?? m.id;
         if (mgid == gid) {
@@ -1416,14 +1456,11 @@ class ChatService extends ChangeNotifier {
 
       ids.remove(messageId);
 
-      // If we removed the earliest version but other versions remain, move the
-      // earliest remaining one back to the original anchor index to preserve
-      // the group's relative order in the conversation.
       if (anchorIndex >= 0) {
         int? earliestRemaining;
         for (int i = 0; i < ids.length; i++) {
           final mid = ids[i];
-          final m = _messagesBox.get(mid);
+          final m = await _messageFromDb(mid);
           if (m == null) continue;
           final mgid = m.groupId ?? m.id;
           if (mgid == gid) {
@@ -1439,25 +1476,14 @@ class ChatService extends ChangeNotifier {
         }
       }
 
-      await conversation.save();
+      await _saveConversation(conversation);
     }
 
-    await _messagesBox.delete(messageId);
-    // Remove any tool events linked to this assistant message
-    if (message.role == 'assistant') {
-      try {
-        await _toolEventsBox.delete(message.id);
-      } catch (_) {}
-      try {
-        await _toolEventsBox.delete(_sigKey(message.id));
-      } catch (_) {}
-    }
+    // Delete message + cascade tool_events via FK
+    await (_db.delete(_db.messages)..where((t) => t.id.equals(messageId))).go();
 
-    // Update cache: clear this conversation so that next getMessages()
-    // reloads messages in the updated order from conversation.messageIds.
     _messagesCache.remove(message.conversationId);
 
-    // Clean up orphaned upload files that are no longer referenced by any message
     await _cleanupOrphanUploads();
 
     notifyListeners();
@@ -1474,16 +1500,18 @@ class ChatService extends ChangeNotifier {
   Future<void> clearAllData() async {
     if (!_initialized) return;
 
-    await _messagesBox.clear();
-    await _conversationsBox.clear();
-    await _toolEventsBox.clear();
+    await _db.delete(_db.messages).go();
+    await _db.delete(_db.conversations).go();
+    await _db.delete(_db.toolEvents).go();
     _messagesCache.clear();
+    _conversationsCache.clear();
     _draftConversations.clear();
     _temporaryConversationIds.clear();
     _temporaryToolEvents.clear();
     _temporaryGeminiThoughtSigs.clear();
+    _toolEventsCache.clear();
+    _thoughtSigsCache.clear();
     _currentConversationId = null;
-    // Remove uploads directory completely
     try {
       final uploadDir = await AppDirectories.getUploadDirectory();
       if (await uploadDir.exists()) {
@@ -1526,7 +1554,6 @@ class ChatService extends ChangeNotifier {
   }) async {
     if (!_initialized) await init();
 
-    // Draft conversation case
     if (_draftConversations.containsKey(conversationId)) {
       final draft = _draftConversations[conversationId]!;
       draft.assistantId = assistantId;
@@ -1535,12 +1562,26 @@ class ChatService extends ChangeNotifier {
       return;
     }
 
-    final c = _conversationsBox.get(conversationId);
+    final c = _conversationsCache[conversationId];
     if (c == null) return;
     c.assistantId = assistantId;
     c.updatedAt = DateTime.now();
-    await c.save();
+    await _saveConversation(c);
     notifyListeners();
+  }
+
+  // ── helpers ──────────────────────────────────────────────
+
+  Future<void> _saveConversation(Conversation c) async {
+    if (isDraft(c.id)) return;
+    await _db.update(_db.conversations).replace(conversationToCompanion(c));
+    _conversationsCache[c.id] = c;
+  }
+
+  Future<void> close() async {
+    if (!_initialized) return;
+    await _db.close();
+    _initialized = false;
   }
 }
 

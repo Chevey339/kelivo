@@ -160,6 +160,7 @@ class ChatController extends ChangeNotifier {
     final convo = _chatService.getConversation(id);
     if (convo != null) {
       _currentConversation = convo;
+      await _chatService.ensureMessagesLoaded(id);
       _loadInitialMessageWindow(id);
       _loadVersionSelections();
       notifyListeners();
