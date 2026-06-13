@@ -14,6 +14,7 @@ import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
+import '../../../core/services/chat/world_book_injector.dart';
 import '../../../core/services/instruction_injection_store.dart';
 import '../../../core/services/world_book_store.dart';
 import '../../../core/services/search/search_tool_service.dart';
@@ -538,7 +539,6 @@ class MessageBuilderService {
         final mp = contextProvider.read<MemoryProvider>();
         await mp.initialize();
         final mems = mp.getForAssistant(assistant!.id);
-        final currentHour = _formatCurrentHour(DateTime.now());
         final buf = StringBuffer();
         buf.writeln('## Memories');
         buf.writeln(
@@ -554,26 +554,14 @@ class MessageBuilderService {
         buf.writeln('</memories>');
         buf.writeln('''
 ## Memory Tool
-你是一个无状态的大模型，你无法存储记忆，因此为了记住信息，你需要使用**记忆工具**。
+这是记忆工具的说明
+1.你要确保记录每天的事情；
+2.每次对话时，若发现系统中没有前一天的“记忆”，就要利用记忆工具，增加一条新的记忆，概括上一天发生的事情——以确保每一天都有一条记忆；
+3.记忆中应包含一整天对话的概括；若遇到重要的事情，可以多写几句
 你可以使用 `create_memory`, `edit_memory`, `delete_memory` 工具创建、更新或删除记忆。
-- 如果记忆中没有相关信息，请使用 create_memory 创建一条新的记录。
+- 如果记忆中没有前一天的信息，请使用 create_memory 创建一条新的记录。
 - 如果已有相关记录，请使用 edit_memory 更新内容。
-- 若记忆过时或无用，请使用 delete_memory 删除。
-这些记忆会自动包含在未来的对话上下文中，在<memories>标签内。
-请勿在记忆中存储敏感信息，敏感信息包括：用户的民族、宗教信仰、性取向、政治观点及党派归属、性生活、犯罪记录等。
-在与用户聊天过程中，你可以像一个私人秘书一样**主动的**记录用户相关的信息到记忆里，包括但不限于：
-- 用户昵称/姓名
-- 年龄/性别/兴趣爱好
-- 计划事项等
-- 聊天风格偏好
-- 工作相关
-- 首次聊天时间
-- ...
-请主动调用工具记录，而不是需要用户要求。
-记忆如果包含日期信息，请包含在内，请使用绝对时间格式，并且当前时间是$currentHour。
-无需告知用户你已更改记忆记录，也不要在对话中直接显示记忆内容，除非用户主动要求。
-相似或相关的记忆应合并为一条记录，而不要重复记录，过时记录应删除。
-你可以在和用户闲聊的时候暗示用户你能记住东西。
+- 若记忆过时或无用，请使用 delete_memory 删除（谨慎使用）。
 ''');
         _appendToSystemMessage(apiMessages, buf.toString());
       }
@@ -610,10 +598,6 @@ class MessageBuilderService {
         }
       }
     } catch (_) {}
-  }
-
-  String _formatCurrentHour(DateTime now) {
-    return '${now.year}年${now.month}月${now.day}日的${now.hour}点';
   }
 
   /// Inject search tool usage prompt into apiMessages.
@@ -686,230 +670,11 @@ class MessageBuilderService {
         );
       }
 
-      if (all.isEmpty || activeBookIds.isEmpty) return;
-
-      final activeSet = activeBookIds.toSet();
-      final books = all
-          .where((b) => b.enabled && activeSet.contains(b.id))
-          .toList(growable: false);
-      if (books.isEmpty) return;
-
-      String extractContextForDepth(int scanDepth) {
-        final depth = scanDepth <= 0 ? 1 : scanDepth;
-        final parts = <String>[];
-        for (
-          int i = apiMessages.length - 1;
-          i >= 0 && parts.length < depth;
-          i--
-        ) {
-          final role = (apiMessages[i]['role'] ?? '').toString();
-          if (role != 'user' && role != 'assistant') continue;
-          final content = (apiMessages[i]['content'] ?? '').toString().trim();
-          if (content.isEmpty) continue;
-          parts.add(content);
-        }
-        return parts.reversed.join('\n');
-      }
-
-      bool isTriggered(WorldBookEntry entry, String context) {
-        if (!entry.enabled) return false;
-        if (entry.constantActive) return true;
-        if (entry.keywords.isEmpty) return false;
-
-        for (final raw in entry.keywords) {
-          final keyword = raw.trim();
-          if (keyword.isEmpty) continue;
-
-          if (entry.useRegex) {
-            try {
-              final re = RegExp(keyword, caseSensitive: entry.caseSensitive);
-              if (re.hasMatch(context)) return true;
-            } catch (_) {}
-          } else {
-            if (entry.caseSensitive) {
-              if (context.contains(keyword)) return true;
-            } else {
-              if (context.toLowerCase().contains(keyword.toLowerCase())) {
-                return true;
-              }
-            }
-          }
-        }
-        return false;
-      }
-
-      final contextCache = <int, String>{};
-      final triggered = <({WorldBookEntry entry, int seq})>[];
-      int seq = 0;
-
-      for (final book in books) {
-        for (final entry in book.entries) {
-          final depth = (entry.scanDepth <= 0 ? 1 : entry.scanDepth)
-              .clamp(1, 200)
-              .toInt();
-          final ctx = contextCache.putIfAbsent(
-            depth,
-            () => extractContextForDepth(depth),
-          );
-          if (isTriggered(entry, ctx)) {
-            triggered.add((entry: entry, seq: seq));
-          }
-          seq++;
-        }
-      }
-
-      if (triggered.isEmpty) return;
-
-      triggered.sort((a, b) {
-        final pa = a.entry.priority;
-        final pb = b.entry.priority;
-        if (pb != pa) return pb.compareTo(pa);
-        return a.seq.compareTo(b.seq);
-      });
-
-      String wrapSystemTag(String content) => '<system>\n$content\n</system>';
-
-      String joinContents(Iterable<WorldBookEntry> items) {
-        return items
-            .map((e) => e.content.trim())
-            .where((c) => c.isNotEmpty)
-            .join('\n');
-      }
-
-      List<Map<String, dynamic>> createMergedInjectionMessages(
-        List<WorldBookEntry> injections,
-      ) {
-        final byRole = <WorldBookInjectionRole, List<WorldBookEntry>>{};
-        for (final e in injections) {
-          if (e.content.trim().isEmpty) continue;
-          byRole.putIfAbsent(e.role, () => <WorldBookEntry>[]).add(e);
-        }
-
-        final result = <Map<String, dynamic>>[];
-        for (final role in byRole.keys) {
-          final group = byRole[role]!;
-          final merged = joinContents(group);
-          if (merged.isEmpty) continue;
-          if (role == WorldBookInjectionRole.assistant) {
-            result.add({'role': 'assistant', 'content': merged});
-          } else {
-            result.add({'role': 'user', 'content': wrapSystemTag(merged)});
-          }
-        }
-        return result;
-      }
-
-      int findSafeInsertIndex(List<Map<String, dynamic>> messages, int target) {
-        var index = target.clamp(0, messages.length);
-        while (index > 0 && index < messages.length) {
-          final role = (messages[index]['role'] ?? '').toString();
-          if (role != 'tool') break;
-          index--;
-        }
-        return index;
-      }
-
-      final byPosition = <WorldBookInjectionPosition, List<WorldBookEntry>>{};
-      for (final t in triggered) {
-        byPosition
-            .putIfAbsent(t.entry.position, () => <WorldBookEntry>[])
-            .add(t.entry);
-      }
-
-      // BEFORE/AFTER_SYSTEM_PROMPT: merge into system message.
-      final beforeContent = joinContents(
-        byPosition[WorldBookInjectionPosition.beforeSystemPrompt] ??
-            const <WorldBookEntry>[],
+      applyWorldBookInjections(
+        apiMessages,
+        books: all,
+        activeBookIds: activeBookIds,
       );
-      final afterContent = joinContents(
-        byPosition[WorldBookInjectionPosition.afterSystemPrompt] ??
-            const <WorldBookEntry>[],
-      );
-
-      if (beforeContent.isNotEmpty || afterContent.isNotEmpty) {
-        final systemIndex = apiMessages.indexWhere(
-          (m) => (m['role'] ?? '').toString() == 'system',
-        );
-        if (systemIndex >= 0) {
-          final original = (apiMessages[systemIndex]['content'] ?? '')
-              .toString();
-          final sb = StringBuffer();
-          if (beforeContent.isNotEmpty) {
-            sb.write(beforeContent);
-            sb.write('\n');
-          }
-          sb.write(original);
-          if (afterContent.isNotEmpty) {
-            sb.write('\n');
-            sb.write(afterContent);
-          }
-          apiMessages[systemIndex]['content'] = sb.toString();
-        } else {
-          final sb = StringBuffer();
-          if (beforeContent.isNotEmpty) sb.write(beforeContent);
-          if (afterContent.isNotEmpty) {
-            if (sb.isNotEmpty) sb.write('\n');
-            sb.write(afterContent);
-          }
-          if (sb.isNotEmpty) {
-            apiMessages.insert(0, {'role': 'system', 'content': sb.toString()});
-          }
-        }
-      }
-
-      // TOP_OF_CHAT: insert before first user message.
-      final topInjections = byPosition[WorldBookInjectionPosition.topOfChat];
-      if (topInjections != null && topInjections.isNotEmpty) {
-        var insertIndex = apiMessages.indexWhere(
-          (m) => (m['role'] ?? '').toString() == 'user',
-        );
-        if (insertIndex < 0) insertIndex = apiMessages.length;
-        insertIndex = findSafeInsertIndex(apiMessages, insertIndex);
-        apiMessages.insertAll(
-          insertIndex,
-          createMergedInjectionMessages(topInjections),
-        );
-      }
-
-      // BOTTOM_OF_CHAT: insert before last message.
-      final bottomInjections =
-          byPosition[WorldBookInjectionPosition.bottomOfChat];
-      if (bottomInjections != null && bottomInjections.isNotEmpty) {
-        var insertIndex = apiMessages.isEmpty ? 0 : (apiMessages.length - 1);
-        insertIndex = findSafeInsertIndex(apiMessages, insertIndex);
-        apiMessages.insertAll(
-          insertIndex,
-          createMergedInjectionMessages(bottomInjections),
-        );
-      }
-
-      // AT_DEPTH: insert at depth from end (depth=1 means before last message).
-      final atDepthInjections = byPosition[WorldBookInjectionPosition.atDepth];
-      if (atDepthInjections != null && atDepthInjections.isNotEmpty) {
-        final byDepth = <int, List<WorldBookEntry>>{};
-        for (final e in atDepthInjections) {
-          final depth = (e.injectDepth <= 0 ? 1 : e.injectDepth)
-              .clamp(1, 200)
-              .toInt();
-          byDepth.putIfAbsent(depth, () => <WorldBookEntry>[]).add(e);
-        }
-
-        final depths = byDepth.keys.toList(growable: false)
-          ..sort((a, b) => b.compareTo(a));
-
-        for (final depth in depths) {
-          final injections = byDepth[depth] ?? const <WorldBookEntry>[];
-          var insertIndex = (apiMessages.length - depth).clamp(
-            0,
-            apiMessages.length,
-          );
-          insertIndex = findSafeInsertIndex(apiMessages, insertIndex);
-          apiMessages.insertAll(
-            insertIndex,
-            createMergedInjectionMessages(injections),
-          );
-        }
-      }
     } catch (_) {}
   }
 

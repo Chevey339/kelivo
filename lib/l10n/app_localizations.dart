@@ -8738,6 +8738,84 @@ abstract class AppLocalizations {
   /// **'Memory'**
   String get assistantEditPageMemoryTab;
 
+  /// No description provided for @assistantEditPageProactiveLetterTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Their Letter'**
+  String get assistantEditPageProactiveLetterTab;
+
+  /// No description provided for @assistantEditProactiveCareEnableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Proactive Care'**
+  String get assistantEditProactiveCareEnableTitle;
+
+  /// No description provided for @assistantEditProactiveCareNextMessageTimeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Next proactive message time'**
+  String get assistantEditProactiveCareNextMessageTimeTitle;
+
+  /// No description provided for @assistantEditProactiveCareNextMessageTimeUnset.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get assistantEditProactiveCareNextMessageTimeUnset;
+
+  /// No description provided for @assistantEditProactiveCarePromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Proactive care prompt'**
+  String get assistantEditProactiveCarePromptTitle;
+
+  /// No description provided for @assistantEditProactiveCarePromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt used when the assistant proactively sends a message'**
+  String get assistantEditProactiveCarePromptHint;
+
+  /// No description provided for @assistantEditProactiveCarePromptDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'It is time to proactively message the user. Stay in character, consider the conversation context and the current time, and write one natural, caring message to the user. Output only the message itself.'**
+  String get assistantEditProactiveCarePromptDefault;
+
+  /// No description provided for @assistantEditProactiveCareDecisionPromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Decision time instruction prompt'**
+  String get assistantEditProactiveCareDecisionPromptTitle;
+
+  /// No description provided for @assistantEditProactiveCareDecisionPromptDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'You are in the \"proactive message time decision\" phase. Take on the assistant\'s role and decide when to message the user next.\n\n[Feature description]\n- Proactive messaging: the assistant sends a message at the scheduled time without waiting for the user to ask.\n- First check the next scheduled message time. Keep it if it still fits; otherwise change it.\n- As the assistant, using context and the time of your last reply, consider:\n1. If the user has not messaged you, when would you reach out?\n2. Match timing to personality: clingy or warm personalities message sooner; aloof personalities later.\n3. If context mentions reminders, supervision, or care, message sooner at a fitting time.\n4. If you were sleeping or busy, message when you would wake up or finish.\n5. You may invent a situational event and schedule the message for when it would happen.'**
+  String get assistantEditProactiveCareDecisionPromptDefault;
+
+  /// No description provided for @assistantEditProactiveCareDateTimePickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose date and time'**
+  String get assistantEditProactiveCareDateTimePickerTitle;
+
+  /// No description provided for @assistantEditProactiveCareExactAlarmPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact alarm permission not granted. Proactive care cannot wake the app on time. Please allow \"Alarms & reminders\" in system settings.'**
+  String get assistantEditProactiveCareExactAlarmPermissionDenied;
+
+  /// No description provided for @assistantEditProactiveCareNotificationPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification permission not granted. Proactive care messages cannot notify you. Please enable notifications in system settings.'**
+  String get assistantEditProactiveCareNotificationPermissionDenied;
+
+  /// No description provided for @proactiveCareFailedNotificationBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t generate the proactive care message. Open the app to check the model settings and network.'**
+  String get proactiveCareFailedNotificationBody;
+
   /// No description provided for @assistantEditLocalToolTimeInfoTitle.
   ///
   /// In en, this message translates to:
