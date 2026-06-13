@@ -2712,6 +2712,23 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get defaultModelPageTitleUseSystemDefault => '使用系统默认提示词';
+
+  @override
+  String get defaultModelPageTitleEnableEmoji => '添加 Emoji';
+
+  @override
+  String get defaultModelPageTitleEnableEmojiHint =>
+      '自动选择一个匹配对话内容的 emoji 置于标题前';
+
+  @override
+  String get defaultModelPageTitleDisableThinking => '禁用思考';
+
+  @override
+  String get defaultModelPageTitleDisableThinkingHint =>
+      '禁用模型思考以节省 Token 并提升生成速度，部分模型禁用后可能报错';
+
+  @override
   String defaultModelPageSummaryVars(
     String previousSummaryVar,
     String userMessagesVar,
@@ -7979,6 +7996,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String get defaultModelPageTitleUseSystemDefault => '使用系统默认提示词';
+
+  @override
+  String get defaultModelPageTitleEnableEmoji => '添加 Emoji';
+
+  @override
+  String get defaultModelPageTitleEnableEmojiHint =>
+      '自动选择一个匹配对话内容的 emoji 置于标题前';
+
+  @override
+  String get defaultModelPageTitleDisableThinking => '禁用思考';
+
+  @override
+  String get defaultModelPageTitleDisableThinkingHint =>
+      '禁用模型思考以节省 Token 并提升生成速度，部分模型禁用后可能报错';
+
+  @override
   String defaultModelPageSummaryVars(
     String previousSummaryVar,
     String userMessagesVar,
@@ -13243,6 +13277,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String defaultModelPageTitleVars(String contentVar, String localeVar) {
     return '變數: 對話內容: $contentVar, 語言: $localeVar';
   }
+
+  @override
+  String get defaultModelPageTitleUseSystemDefault => '使用系統預設提示詞';
+
+  @override
+  String get defaultModelPageTitleEnableEmoji => '添加 Emoji';
+
+  @override
+  String get defaultModelPageTitleEnableEmojiHint =>
+      '自動選擇一個匹配對話內容的 emoji 置於標題前';
+
+  @override
+  String get defaultModelPageTitleDisableThinking => '停用思考';
+
+  @override
+  String get defaultModelPageTitleDisableThinkingHint =>
+      '停用模型思考以節省 Token 並提升生成速度，部分模型停用後可能報錯';
 
   @override
   String defaultModelPageSummaryVars(

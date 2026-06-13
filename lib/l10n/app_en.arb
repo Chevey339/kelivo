@@ -1211,6 +1211,11 @@
       }
     }
   },
+  "defaultModelPageTitleUseSystemDefault": "Use system default prompt",
+  "defaultModelPageTitleEnableEmoji": "Add emoji to title",
+  "defaultModelPageTitleEnableEmojiHint": "Adds a matching emoji before the title",
+  "defaultModelPageTitleDisableThinking": "Disable thinking",
+  "defaultModelPageTitleDisableThinkingHint": "Disables model thinking to save tokens and improve speed. Some models may error without thinking.",
   "defaultModelPageSummaryVars": "Variables: previous summary: {previousSummaryVar}, new messages: {userMessagesVar}",
   "@defaultModelPageSummaryVars": {
     "placeholders": {
