@@ -109,6 +109,7 @@ abstract final class StorageUsageService {
     };
 
     final chatSubs = <String, _MutableStats>{
+      'database': _MutableStats(),
       'messages': _MutableStats(),
       'conversations': _MutableStats(),
       'tool_events_v1': _MutableStats(),
@@ -170,9 +171,10 @@ abstract final class StorageUsageService {
           final name = parts.first;
           final lower = name.toLowerCase();
           final isHive = lower.endsWith('.hive') || lower.endsWith('.lock');
-          if (isHive) {
+          final isSqlite = lower.endsWith('.sqlite');
+          if (isHive || isSqlite) {
             byCat[StorageUsageCategoryKey.chatData]!.add(bytes);
-            final box = _basenameNoExt(name);
+            final box = isSqlite ? 'database' : _basenameNoExt(name);
             final sub = chatSubs[box];
             if (sub != null) sub.add(bytes);
           } else {
@@ -283,7 +285,9 @@ abstract final class StorageUsageService {
               StorageUsageSubcategory(
                 id: e.key,
                 stats: e.value.toStats(),
-                path: p.join(root.path, '${e.key}.hive'),
+                path: e.key == 'database'
+                    ? p.join(root.path, 'kelivo.sqlite')
+                    : p.join(root.path, '${e.key}.hive'),
               ),
         ],
       ),
