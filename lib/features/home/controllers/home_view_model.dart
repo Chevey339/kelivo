@@ -787,6 +787,7 @@ class HomeViewModel extends ChangeNotifier {
           assistantProvider.getById(convoAssistantId) != null) {
         await assistantProvider.setCurrentAssistant(convoAssistantId);
       }
+      await _chatService.ensureMessagesLoaded(id);
       _chatController.setCurrentConversation(convo);
       _streamController.clearGeminiThoughtSigs();
       notifyListeners();

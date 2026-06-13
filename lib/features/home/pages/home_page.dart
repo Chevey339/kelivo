@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io' show File;
+import 'dart:io' show File, stderr;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:desktop_drop/desktop_drop.dart';
@@ -466,7 +466,11 @@ class _HomePageState extends State<HomePage>
     _controller.addListener(_onControllerChanged);
     _drawerController.addListener(_onDrawerValueChanged);
 
-    _controller.initChat();
+    _controller.initChat().catchError((e, st) {
+      stderr.writeln('=== initChat ERROR ===');
+      stderr.writeln(e);
+      stderr.writeln(st);
+    });
     _initProcessText();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
