@@ -95,8 +95,8 @@ const List<TroubleshootEntry> troubleshootEntries = [
     key: 'model_no_vision',
     titleKey: 'troubleshootEntryNoVisionTitle',
     summaryKey: 'troubleshootEntryNoVisionSummary',
-    actionType: ActionType.openDefaultModel,
-    actionLabelKey: 'troubleshootActionDefaultModel',
+    actionType: ActionType.openProviderDetail,
+    actionLabelKey: 'troubleshootActionProviderSettings',
     isErrorMatch: true,
   ),
   TroubleshootEntry(
@@ -145,6 +145,24 @@ const List<TroubleshootEntry> troubleshootEntries = [
     summaryKey: 'troubleshootEntryMultiBillingSummary',
     actionType: ActionType.openDefaultModel,
     actionLabelKey: 'troubleshootActionDefaultModel',
+    isErrorMatch: false,
+  ),
+  TroubleshootEntry(
+    key: 'billing_privacy',
+    titleKey: 'troubleshootEntryBillingPrivacyTitle',
+    summaryKey: 'troubleshootEntryBillingPrivacySummary',
+    isErrorMatch: false,
+  ),
+  TroubleshootEntry(
+    key: 'agent_skills',
+    titleKey: 'troubleshootEntryAgentSkillsTitle',
+    summaryKey: 'troubleshootEntryAgentSkillsSummary',
+    isErrorMatch: false,
+  ),
+  TroubleshootEntry(
+    key: 'chat_crash',
+    titleKey: 'troubleshootEntryChatCrashTitle',
+    summaryKey: 'troubleshootEntryChatCrashSummary',
     isErrorMatch: false,
   ),
 ];

@@ -5317,7 +5317,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get troubleshootEntryNoVisionSummary =>
-      '当前模型不支持图片识别，请切换为支持视觉的模型，或在默认模型设置中配置 OCR 模型。';
+      '当前模型不支持图片输入。这可能是因为你在提供商设置中为不支持视觉的模型手动开启了图片输入。请在提供商配置中检查模型覆盖设置，从输入能力中移除\"图片\"。如果你确信该模型实际支持视觉（例如可能是新模型或小众模型），请向我们反馈以便更新模型库。';
 
   @override
   String get troubleshootEntrySearchQualityTitle => '搜索质量不佳';
@@ -5395,6 +5395,27 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get troubleshootCacheWarningAction => '了解详情';
+
+  @override
+  String get troubleshootEntryBillingPrivacyTitle => 'Kelivo 收费或收集数据吗？';
+
+  @override
+  String get troubleshootEntryBillingPrivacySummary =>
+      'Kelivo 是开源软件，本身不收费。它没有后端服务器，你的数据只流向实际处理你请求的 AI 供应商。实际使用中，和所有第三方客户端一样，多数情况下你需要充值才能使用服务（除非使用本地部署的模型或部分供应商的免费模型）。部分 App 提供免费使用主要是吸引 C 端用户留存的手段，支付 API 费用是大模型公司的主要收入来源。';
+
+  @override
+  String get troubleshootEntryAgentSkillsTitle => 'Kelivo 支持 Skills 或 Agent 吗？';
+
+  @override
+  String get troubleshootEntryAgentSkillsSummary =>
+      '作为轻量软件，Kelivo 专注于打磨基础的聊天和工具调用（含 MCP）功能。Skills 支持在未来随时可能添加。Agent 方向过于重量级，不在本项目的未来规划中，建议使用专门的 Agent 平台。';
+
+  @override
+  String get troubleshootEntryChatCrashTitle => '进入聊天界面后不久闪退怎么办？';
+
+  @override
+  String get troubleshootEntryChatCrashSummary =>
+      'Windows 电脑请安装 VC++ 14.0 运行库以补齐 Flutter 环境依赖：https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist。其他平台请检查存储空间——若聊天记录大小（不含图片/文件）异常增大（如纯文本超过 500MB），可能是数据损坏，建议从之前的备份恢复。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10710,7 +10731,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get troubleshootEntryNoVisionSummary =>
-      '当前模型不支持图片识别，请切换为支持视觉的模型，或在默认模型设置中配置 OCR 模型。';
+      '当前模型不支持图片输入。这可能是因为你在提供商设置中为不支持视觉的模型手动开启了图片输入。请在提供商配置中检查模型覆盖设置，从输入能力中移除\"图片\"。如果你确信该模型实际支持视觉（例如可能是新模型或小众模型），请向我们反馈以便更新模型库。';
 
   @override
   String get troubleshootEntrySearchQualityTitle => '搜索质量不佳';
@@ -10788,6 +10809,27 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get troubleshootCacheWarningAction => '了解详情';
+
+  @override
+  String get troubleshootEntryBillingPrivacyTitle => 'Kelivo 收费或收集数据吗？';
+
+  @override
+  String get troubleshootEntryBillingPrivacySummary =>
+      'Kelivo 是开源软件，本身不收费。它没有后端服务器，你的数据只流向实际处理你请求的 AI 供应商。实际使用中，和所有第三方客户端一样，多数情况下你需要充值才能使用服务（除非使用本地部署的模型或部分供应商的免费模型）。部分 App 提供免费使用主要是吸引 C 端用户留存的手段，支付 API 费用是大模型公司的主要收入来源。';
+
+  @override
+  String get troubleshootEntryAgentSkillsTitle => 'Kelivo 支持 Skills 或 Agent 吗？';
+
+  @override
+  String get troubleshootEntryAgentSkillsSummary =>
+      '作为轻量软件，Kelivo 专注于打磨基础的聊天和工具调用（含 MCP）功能。Skills 支持在未来随时可能添加。Agent 方向过于重量级，不在本项目的未来规划中，建议使用专门的 Agent 平台。';
+
+  @override
+  String get troubleshootEntryChatCrashTitle => '进入聊天界面后不久闪退怎么办？';
+
+  @override
+  String get troubleshootEntryChatCrashSummary =>
+      'Windows 电脑请安装 VC++ 14.0 运行库以补齐 Flutter 环境依赖：https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist。其他平台请检查存储空间——若聊天记录大小（不含图片/文件）异常增大（如纯文本超过 500MB），可能是数据损坏，建议从之前的备份恢复。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16103,7 +16145,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get troubleshootEntryNoVisionSummary =>
-      '目前模型不支援圖片辨識，請切換為支援視覺的模型，或在預設模型設定中設定 OCR 模型。';
+      '目前模型不支援圖片輸入。這可能是因為你在供應商設定中為不支援視覺的模型手動開啟了圖片輸入。請在供應商配置中檢查模型覆蓋設定，從輸入能力中移除「圖片」。如果你確信該模型實際支援視覺（例如可能是新模型或小眾模型），請向我們回饋以便更新模型庫。';
 
   @override
   String get troubleshootEntrySearchQualityTitle => '搜尋品質不佳';
@@ -16181,4 +16223,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get troubleshootCacheWarningAction => '瞭解詳情';
+
+  @override
+  String get troubleshootEntryBillingPrivacyTitle => 'Kelivo 收費或收集資料嗎？';
+
+  @override
+  String get troubleshootEntryBillingPrivacySummary =>
+      'Kelivo 是開源軟體，本身不收費。它沒有後端伺服器，你的資料只流向實際處理你請求的 AI 供應商。實際使用中，和所有第三方用戶端一樣，多數情況下你需要儲值才能使用服務（除非使用本地部署的模型或部分供應商的免費模型）。部分 App 提供免費使用主要是吸引 C 端用戶留存的手段，支付 API 費用是大模型公司的主要收入來源。';
+
+  @override
+  String get troubleshootEntryAgentSkillsTitle => 'Kelivo 支援 Skills 或 Agent 嗎？';
+
+  @override
+  String get troubleshootEntryAgentSkillsSummary =>
+      '作為輕量軟體，Kelivo 專注於打磨基礎的聊天和工具呼叫（含 MCP）功能。Skills 支援在未來隨時可能新增。Agent 方向過於重量級，不在本專案的未來規劃中，建議使用專門的 Agent 平台。';
+
+  @override
+  String get troubleshootEntryChatCrashTitle => '進入聊天介面後不久閃退怎麼辦？';
+
+  @override
+  String get troubleshootEntryChatCrashSummary =>
+      'Windows 電腦請安裝 VC++ 14.0 執行庫以補齊 Flutter 環境依賴：https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist。其他平台請檢查儲存空間——若聊天記錄大小（不含圖片/檔案）異常增大（如純文字超過 500MB），可能是資料損壞，建議從之前的備份還原。';
 }

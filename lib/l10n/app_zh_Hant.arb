@@ -1955,7 +1955,7 @@
   "troubleshootEntryBalanceTitle": "帳戶餘額不足",
   "troubleshootEntryBalanceSummary": "API 傳回了餘額不足錯誤，請前往官方平台儲值。之後可在供應商設定的餘額頁面查看餘額。",
   "troubleshootEntryNoVisionTitle": "目前模型不支援辨圖",
-  "troubleshootEntryNoVisionSummary": "目前模型不支援圖片辨識，請切換為支援視覺的模型，或在預設模型設定中設定 OCR 模型。",
+  "troubleshootEntryNoVisionSummary": "目前模型不支援圖片輸入。這可能是因為你在供應商設定中為不支援視覺的模型手動開啟了圖片輸入。請在供應商配置中檢查模型覆蓋設定，從輸入能力中移除「圖片」。如果你確信該模型實際支援視覺（例如可能是新模型或小眾模型），請向我們回饋以便更新模型庫。",
   "troubleshootEntrySearchQualityTitle": "搜尋品質不佳",
   "troubleshootEntrySearchQualitySummary": "內建 Bing 搜尋品質有限，建議切換為 Tavily 或 Exa 等專用搜尋服務以獲得更好的結果。",
   "troubleshootEntryCacheHitrateTitle": "快取命中率低",
@@ -1977,5 +1977,11 @@
   "troubleshootActionOpenAbout": "查看關於頁面與社群",
   "troubleshootCacheWarningTitle": "提示詞含動態變數",
   "troubleshootCacheWarningDesc": "每次發送都會變化，可能導致快取命中率降低。",
-  "troubleshootCacheWarningAction": "瞭解詳情"
+  "troubleshootCacheWarningAction": "瞭解詳情",
+  "troubleshootEntryBillingPrivacyTitle": "Kelivo 收費或收集資料嗎？",
+  "troubleshootEntryBillingPrivacySummary": "Kelivo 是開源軟體，本身不收費。它沒有後端伺服器，你的資料只流向實際處理你請求的 AI 供應商。實際使用中，和所有第三方用戶端一樣，多數情況下你需要儲值才能使用服務（除非使用本地部署的模型或部分供應商的免費模型）。部分 App 提供免費使用主要是吸引 C 端用戶留存的手段，支付 API 費用是大模型公司的主要收入來源。",
+  "troubleshootEntryAgentSkillsTitle": "Kelivo 支援 Skills 或 Agent 嗎？",
+  "troubleshootEntryAgentSkillsSummary": "作為輕量軟體，Kelivo 專注於打磨基礎的聊天和工具呼叫（含 MCP）功能。Skills 支援在未來隨時可能新增。Agent 方向過於重量級，不在本專案的未來規劃中，建議使用專門的 Agent 平台。",
+  "troubleshootEntryChatCrashTitle": "進入聊天介面後不久閃退怎麼辦？",
+  "troubleshootEntryChatCrashSummary": "Windows 電腦請安裝 VC++ 14.0 執行庫以補齊 Flutter 環境依賴：https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist。其他平台請檢查儲存空間——若聊天記錄大小（不含圖片/檔案）異常增大（如純文字超過 500MB），可能是資料損壞，建議從之前的備份還原。"
 }

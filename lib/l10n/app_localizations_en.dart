@@ -5535,7 +5535,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get troubleshootEntryNoVisionSummary =>
-      'The current model does not support image recognition. Please switch to a vision-capable model, or configure an OCR model in Default Model settings.';
+      'The current model does not support image input. This may be because you manually enabled image input in the provider settings for a model that does not support vision. Check the model overrides in your provider configuration and remove \"image\" from input capabilities. If you believe this model actually supports vision (e.g. it is a new or niche model), please provide feedback so we can update our model registry.';
 
   @override
   String get troubleshootEntrySearchQualityTitle => 'Search quality is poor';
@@ -5617,4 +5617,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get troubleshootCacheWarningAction => 'Learn more';
+
+  @override
+  String get troubleshootEntryBillingPrivacyTitle =>
+      'Does Kelivo charge fees or collect data?';
+
+  @override
+  String get troubleshootEntryBillingPrivacySummary =>
+      'Kelivo is open-source and does not charge fees. It has no backend server — your data only flows to the AI provider that processes your requests. In practice, as with all third-party clients, you will most likely need to top up credits to use paid AI services (unless you use locally deployed models or free models from certain providers). Some apps offer free usage primarily to attract end users; paying API fees is the main revenue source for large model companies.';
+
+  @override
+  String get troubleshootEntryAgentSkillsTitle =>
+      'Does Kelivo support Skills or Agents?';
+
+  @override
+  String get troubleshootEntryAgentSkillsSummary =>
+      'As a lightweight client, Kelivo focuses on polished chat and tool calling (including MCP). Skills support may be added in the future. Agent functionality is beyond the intended scope of this project and is unlikely to be implemented. We recommend dedicated agent platforms for that purpose.';
+
+  @override
+  String get troubleshootEntryChatCrashTitle =>
+      'Why does the app crash shortly after entering chat?';
+
+  @override
+  String get troubleshootEntryChatCrashSummary =>
+      'On Windows, install the VC++ 14.0 redistributable from https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist to resolve Flutter environment dependencies. On other platforms, check your storage space — if the chat record size (excluding images and files) has grown abnormally (e.g. plain text >500MB), the data may be corrupted. Restore from a previous backup.';
 }

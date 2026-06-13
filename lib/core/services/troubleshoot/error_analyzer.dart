@@ -30,10 +30,17 @@ class ErrorAnalyzer {
       return _result('insufficient_balance', config);
     }
 
+    // OpenRouter returns this definitively when the model doesn't support images.
+    if (bodyLower.contains('no endpoints found that support image input')) {
+      return _result('model_no_vision', config);
+    }
+
+    // OpenAI-compatible: only check built-in vision regex, NOT modelOverrides,
+    // because users may have incorrectly enabled image input on a non-vision model.
     if (bodyLower.contains('unknown variant `image_url`') &&
         modelId != null &&
         config != null &&
-        !_modelSupportsVision(config, modelId)) {
+        !ModelRegistry.vision.hasMatch(modelId)) {
       return _result('model_no_vision', config);
     }
 
@@ -73,16 +80,5 @@ class ErrorAnalyzer {
             )
           : null,
     );
-  }
-
-  static bool _modelSupportsVision(ProviderConfig config, String modelId) {
-    final ov = config.modelOverrides[modelId];
-    if (ov != null) {
-      final raw = ov['input'];
-      if (raw is List) {
-        return raw.any((m) => m.toString().toLowerCase() == 'image');
-      }
-    }
-    return ModelRegistry.vision.hasMatch(modelId);
   }
 }

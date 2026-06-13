@@ -231,6 +231,12 @@ class _TroubleshootContentState extends State<TroubleshootContent> {
         return Lucide.MessageCircleQuestionMark;
       case 'multiple_billing':
         return Lucide.Coins;
+      case 'billing_privacy':
+        return Lucide.Shield;
+      case 'agent_skills':
+        return Lucide.Bot;
+      case 'chat_crash':
+        return Lucide.MessageCircleWarning;
       default:
         return Lucide.BadgeInfo;
     }
@@ -258,6 +264,12 @@ class _TroubleshootContentState extends State<TroubleshootContent> {
         return l10n.troubleshootEntryChatSuggestionsTitle;
       case 'multiple_billing':
         return l10n.troubleshootEntryMultiBillingTitle;
+      case 'billing_privacy':
+        return l10n.troubleshootEntryBillingPrivacyTitle;
+      case 'agent_skills':
+        return l10n.troubleshootEntryAgentSkillsTitle;
+      case 'chat_crash':
+        return l10n.troubleshootEntryChatCrashTitle;
       default:
         return entry.titleKey;
     }
@@ -285,6 +297,12 @@ class _TroubleshootContentState extends State<TroubleshootContent> {
         return l10n.troubleshootEntryChatSuggestionsSummary;
       case 'multiple_billing':
         return l10n.troubleshootEntryMultiBillingSummary;
+      case 'billing_privacy':
+        return l10n.troubleshootEntryBillingPrivacySummary;
+      case 'agent_skills':
+        return l10n.troubleshootEntryAgentSkillsSummary;
+      case 'chat_crash':
+        return l10n.troubleshootEntryChatCrashSummary;
       default:
         return entry.summaryKey;
     }

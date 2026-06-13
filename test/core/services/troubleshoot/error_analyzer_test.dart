@@ -158,6 +158,9 @@ void main() {
       );
       expect(result, isNotNull);
       expect(result!.faqKey, 'model_no_vision');
+      expect(result!.action, isNotNull);
+      expect(result!.action!.type, ActionType.openProviderDetail);
+      expect(result!.action!.providerId, 'test');
     });
 
     test('unknown variant image_url + vision model → no match', () {
@@ -176,6 +179,59 @@ void main() {
         modelId: 'gpt-4o',
       );
       expect(result, isNull);
+    });
+
+    test(
+      'OpenRouter "no endpoints found that support image input" → model_no_vision (no config needed)',
+      () {
+        final result = ErrorAnalyzer.analyze(
+          statusCode: 400,
+          errorBody:
+              '{"error":{"message":"No endpoints found that support image input"}}',
+        );
+        expect(result, isNotNull);
+        expect(result!.faqKey, 'model_no_vision');
+        expect(result!.action, isNotNull);
+        expect(result!.action!.type, ActionType.openProviderDetail);
+        expect(result!.action!.providerId, isNull);
+      },
+    );
+
+    test('OpenRouter match with config → includes providerId', () {
+      final config = _config();
+      final result = ErrorAnalyzer.analyze(
+        statusCode: 400,
+        errorBody:
+            '{"error":{"message":"No endpoints found that support image input"}}',
+        config: config,
+      );
+      expect(result, isNotNull);
+      expect(result!.faqKey, 'model_no_vision');
+      expect(result!.action, isNotNull);
+      expect(result!.action!.type, ActionType.openProviderDetail);
+      expect(result!.action!.providerId, 'test');
+    });
+
+    test('OpenRouter match regardless of modelOverride enabling image', () {
+      final config = _config(
+        modelOverrides: {
+          'gpt-4o': {
+            'input': ['text', 'image'],
+          },
+        },
+      );
+      final result = ErrorAnalyzer.analyze(
+        statusCode: 400,
+        errorBody:
+            '{"error":{"message":"No endpoints found that support image input"}}',
+        config: config,
+        modelId: 'gpt-4o',
+      );
+      expect(result, isNotNull);
+      expect(result!.faqKey, 'model_no_vision');
+      expect(result!.action, isNotNull);
+      expect(result!.action!.type, ActionType.openProviderDetail);
+      expect(result!.action!.providerId, 'test');
     });
 
     test('body without image_url text → no match on image check', () {

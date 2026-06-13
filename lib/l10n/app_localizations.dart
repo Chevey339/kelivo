@@ -10181,7 +10181,7 @@ abstract class AppLocalizations {
   /// No description provided for @troubleshootEntryNoVisionSummary.
   ///
   /// In en, this message translates to:
-  /// **'The current model does not support image recognition. Please switch to a vision-capable model, or configure an OCR model in Default Model settings.'**
+  /// **'The current model does not support image input. This may be because you manually enabled image input in the provider settings for a model that does not support vision. Check the model overrides in your provider configuration and remove \"image\" from input capabilities. If you believe this model actually supports vision (e.g. it is a new or niche model), please provide feedback so we can update our model registry.'**
   String get troubleshootEntryNoVisionSummary;
 
   /// No description provided for @troubleshootEntrySearchQualityTitle.
@@ -10321,6 +10321,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Learn more'**
   String get troubleshootCacheWarningAction;
+
+  /// No description provided for @troubleshootEntryBillingPrivacyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Does Kelivo charge fees or collect data?'**
+  String get troubleshootEntryBillingPrivacyTitle;
+
+  /// No description provided for @troubleshootEntryBillingPrivacySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo is open-source and does not charge fees. It has no backend server — your data only flows to the AI provider that processes your requests. In practice, as with all third-party clients, you will most likely need to top up credits to use paid AI services (unless you use locally deployed models or free models from certain providers). Some apps offer free usage primarily to attract end users; paying API fees is the main revenue source for large model companies.'**
+  String get troubleshootEntryBillingPrivacySummary;
+
+  /// No description provided for @troubleshootEntryAgentSkillsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Does Kelivo support Skills or Agents?'**
+  String get troubleshootEntryAgentSkillsTitle;
+
+  /// No description provided for @troubleshootEntryAgentSkillsSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'As a lightweight client, Kelivo focuses on polished chat and tool calling (including MCP). Skills support may be added in the future. Agent functionality is beyond the intended scope of this project and is unlikely to be implemented. We recommend dedicated agent platforms for that purpose.'**
+  String get troubleshootEntryAgentSkillsSummary;
+
+  /// No description provided for @troubleshootEntryChatCrashTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why does the app crash shortly after entering chat?'**
+  String get troubleshootEntryChatCrashTitle;
+
+  /// No description provided for @troubleshootEntryChatCrashSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'On Windows, install the VC++ 14.0 redistributable from https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist to resolve Flutter environment dependencies. On other platforms, check your storage space — if the chat record size (excluding images and files) has grown abnormally (e.g. plain text >500MB), the data may be corrupted. Restore from a previous backup.'**
+  String get troubleshootEntryChatCrashSummary;
 }
 
 class _AppLocalizationsDelegate
