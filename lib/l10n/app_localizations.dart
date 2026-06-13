@@ -5273,6 +5273,36 @@ abstract class AppLocalizations {
   /// **'Vars: content: {contentVar}, locale: {localeVar}'**
   String defaultModelPageTitleVars(String contentVar, String localeVar);
 
+  /// No description provided for @defaultModelPageTitleUseSystemDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use system default prompt'**
+  String get defaultModelPageTitleUseSystemDefault;
+
+  /// No description provided for @defaultModelPageTitleEnableEmoji.
+  ///
+  /// In en, this message translates to:
+  /// **'Add emoji to title'**
+  String get defaultModelPageTitleEnableEmoji;
+
+  /// No description provided for @defaultModelPageTitleEnableEmojiHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Adds a matching emoji before the title'**
+  String get defaultModelPageTitleEnableEmojiHint;
+
+  /// No description provided for @defaultModelPageTitleDisableThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable thinking'**
+  String get defaultModelPageTitleDisableThinking;
+
+  /// No description provided for @defaultModelPageTitleDisableThinkingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Disables model thinking to save tokens and improve speed. Some models may error without thinking.'**
+  String get defaultModelPageTitleDisableThinkingHint;
+
   /// No description provided for @defaultModelPageSummaryVars.
   ///
   /// In en, this message translates to:

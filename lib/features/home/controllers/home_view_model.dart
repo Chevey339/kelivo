@@ -1196,7 +1196,7 @@ class HomeViewModel extends ChangeNotifier {
         settings.currentModelId;
     if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
-    final budget = assistant?.thinkingBudget ?? settings.thinkingBudget;
+    final existingBudget = assistant?.thinkingBudget ?? settings.thinkingBudget;
 
     // Build content from messages (truncate to reasonable length)
     final msgs = _chatService.getMessages(convo.id);
@@ -1215,9 +1215,15 @@ class HomeViewModel extends ChangeNotifier {
     final content = joined.length > 3000 ? joined.substring(0, 3000) : joined;
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
 
-    String prompt = settings.titlePrompt
-        .replaceAll('{locale}', locale)
-        .replaceAll('{content}', content);
+    final (prompt, budget) = SettingsProvider.buildTitleGenerationConfig(
+      useSystemPrompt: settings.titleUseSystemPrompt,
+      useEmoji: settings.titleUseEmoji,
+      disableThinking: settings.titleDisableThinking,
+      customPrompt: settings.titlePrompt,
+      existingBudget: existingBudget,
+      locale: locale,
+      content: content,
+    );
 
     try {
       final title = (await ChatApiService.generateText(

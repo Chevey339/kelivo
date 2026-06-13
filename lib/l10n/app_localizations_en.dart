@@ -2816,6 +2816,24 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get defaultModelPageTitleUseSystemDefault =>
+      'Use system default prompt';
+
+  @override
+  String get defaultModelPageTitleEnableEmoji => 'Add emoji to title';
+
+  @override
+  String get defaultModelPageTitleEnableEmojiHint =>
+      'Adds a matching emoji before the title';
+
+  @override
+  String get defaultModelPageTitleDisableThinking => 'Disable thinking';
+
+  @override
+  String get defaultModelPageTitleDisableThinkingHint =>
+      'Disables model thinking to save tokens and improve speed. Some models may error without thinking.';
+
+  @override
   String defaultModelPageSummaryVars(
     String previousSummaryVar,
     String userMessagesVar,

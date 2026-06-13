@@ -4,6 +4,7 @@ import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../shared/widgets/snackbar.dart';
+import '../../shared/widgets/ios_switch.dart';
 import '../../features/model/widgets/model_select_sheet.dart';
 import '../../features/model/utils/ocr_model_capability.dart';
 import '../../utils/brand_assets.dart';
@@ -273,69 +274,177 @@ class DesktopDefaultModelPane extends StatelessWidget {
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
+            constraints: const BoxConstraints(maxWidth: 520),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.defaultModelPagePromptLabel,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: AppFontWeights.emphasis,
+                            ),
+                          ),
+                        ),
+                        _SmallIconBtn(
+                          icon: lucide.Lucide.X,
+                          onTap: () => Navigator.of(ctx).maybePop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // Mode switch
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.defaultModelPageTitleUseSystemDefault,
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        IosSwitch(
+                          value: sp.titleUseSystemPrompt,
+                          onChanged: (v) => sp.setTitleUseSystemPrompt(v),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // Prompt area
+                    if (sp.titleUseSystemPrompt) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest.withValues(
+                            alpha: 0.4,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         child: Text(
-                          l10n.defaultModelPagePromptLabel,
+                          sp.titleUseEmoji
+                              ? SettingsProvider.defaultTitlePromptWithEmoji
+                              : SettingsProvider.defaultTitlePrompt,
+                          maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: AppFontWeights.emphasis,
+                            fontSize: 11.5,
+                            color: cs.onSurface.withValues(alpha: 0.7),
+                            height: 1.4,
                           ),
                         ),
                       ),
-                      _SmallIconBtn(
-                        icon: lucide.Lucide.X,
-                        onTap: () => Navigator.of(ctx).maybePop(),
+                      const SizedBox(height: 4),
+                      Text(
+                        l10n.defaultModelPageTitleVars('{content}', '{locale}'),
+                        style: TextStyle(
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Emoji toggle
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.defaultModelPageTitleEnableEmoji,
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                                Text(
+                                  l10n.defaultModelPageTitleEnableEmojiHint,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onSurface.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IosSwitch(
+                            value: sp.titleUseEmoji,
+                            onChanged: (v) => sp.setTitleUseEmoji(v),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      _promptEditor(
+                        ctx,
+                        controller: ctrl,
+                        hintText: l10n.defaultModelPageTitlePromptHint,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        l10n.defaultModelPageTitleVars('{content}', '{locale}'),
+                        style: TextStyle(
+                          color: cs.onSurface.withValues(alpha: 0.5),
+                          fontSize: 11,
+                        ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 10),
-                  _promptEditor(
-                    ctx,
-                    controller: ctrl,
-                    hintText: l10n.defaultModelPageTitlePromptHint,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _DeskIosButton(
-                        label: l10n.defaultModelPageResetDefault,
-                        filled: false,
-                        dense: true,
-                        onTap: () async {
-                          await sp.resetTitlePrompt();
-                          ctrl.text = sp.titlePrompt;
-                        },
-                      ),
-                      const Spacer(),
-                      _DeskIosButton(
-                        label: l10n.defaultModelPageSave,
-                        filled: true,
-                        dense: true,
-                        onTap: () async {
-                          await sp.setTitlePrompt(ctrl.text.trim());
-                          if (ctx.mounted) Navigator.of(ctx).maybePop();
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    l10n.defaultModelPageTitleVars('{content}', '{locale}'),
-                    style: TextStyle(
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                      fontSize: 12,
+                    const SizedBox(height: 10),
+                    // Disable thinking toggle
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.defaultModelPageTitleDisableThinking,
+                                style: TextStyle(fontSize: 13),
+                              ),
+                              Text(
+                                l10n.defaultModelPageTitleDisableThinkingHint,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: cs.onSurface.withValues(alpha: 0.5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IosSwitch(
+                          value: sp.titleDisableThinking,
+                          onChanged: (v) => sp.setTitleDisableThinking(v),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _DeskIosButton(
+                          label: l10n.defaultModelPageResetDefault,
+                          filled: false,
+                          dense: true,
+                          onTap: () async {
+                            await sp.resetTitlePrompt();
+                            ctrl.text = sp.titlePrompt;
+                          },
+                        ),
+                        const Spacer(),
+                        _DeskIosButton(
+                          label: l10n.defaultModelPageSave,
+                          filled: true,
+                          dense: true,
+                          onTap: () async {
+                            await sp.setTitlePrompt(ctrl.text.trim());
+                            if (ctx.mounted) Navigator.of(ctx).maybePop();
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

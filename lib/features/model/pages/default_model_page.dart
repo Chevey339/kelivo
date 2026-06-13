@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/ios_switch.dart';
 import '../widgets/model_select_sheet.dart';
 import '../widgets/ocr_prompt_sheet.dart';
 import '../utils/ocr_model_capability.dart';
@@ -243,34 +244,148 @@ class DefaultModelPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: controller,
-                  maxLines: 8,
-                  decoration: InputDecoration(
-                    hintText: l10n.defaultModelPageTitlePromptHint,
-                    filled: true,
-                    fillColor: Theme.of(ctx).brightness == Brightness.dark
-                        ? Colors.white10
-                        : const Color(0xFFF2F3F5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: cs.outlineVariant.withValues(alpha: 0.4),
+                // Mode switch
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.defaultModelPageTitleUseSystemDefault,
+                        style: TextStyle(fontSize: 14),
                       ),
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: cs.outlineVariant.withValues(alpha: 0.4),
-                      ),
+                    IosSwitch(
+                      value: settings.titleUseSystemPrompt,
+                      onChanged: (v) => settings.setTitleUseSystemPrompt(v),
                     ),
-                    focusedBorder: OutlineInputBorder(
+                  ],
+                ),
+                const SizedBox(height: 10),
+                // Prompt area
+                if (settings.titleUseSystemPrompt) ...[
+                  // Read-only preview
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: cs.primary.withValues(alpha: 0.5),
+                    ),
+                    child: Text(
+                      settings.titleUseEmoji
+                          ? SettingsProvider.defaultTitlePromptWithEmoji
+                          : SettingsProvider.defaultTitlePrompt,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: 0.7),
+                        height: 1.4,
                       ),
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.defaultModelPageTitleVars('{content}', '{locale}'),
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // Emoji toggle
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.defaultModelPageTitleEnableEmoji,
+                              style: TextStyle(fontSize: 14),
+                            ),
+                            Text(
+                              l10n.defaultModelPageTitleEnableEmojiHint,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurface.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IosSwitch(
+                        value: settings.titleUseEmoji,
+                        onChanged: (v) => settings.setTitleUseEmoji(v),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  // Editable text field
+                  TextField(
+                    controller: controller,
+                    maxLines: 6,
+                    decoration: InputDecoration(
+                      hintText: l10n.defaultModelPageTitlePromptHint,
+                      filled: true,
+                      fillColor: Theme.of(ctx).brightness == Brightness.dark
+                          ? Colors.white10
+                          : const Color(0xFFF2F3F5),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: cs.outlineVariant.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: cs.outlineVariant.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: cs.primary.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.defaultModelPageTitleVars('{content}', '{locale}'),
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                // Disable thinking toggle
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.defaultModelPageTitleDisableThinking,
+                            style: TextStyle(fontSize: 14),
+                          ),
+                          Text(
+                            l10n.defaultModelPageTitleDisableThinkingHint,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: cs.onSurface.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IosSwitch(
+                      value: settings.titleDisableThinking,
+                      onChanged: (v) => settings.setTitleDisableThinking(v),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -291,14 +406,6 @@ class DefaultModelPage extends StatelessWidget {
                       child: Text(l10n.defaultModelPageSave),
                     ),
                   ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  l10n.defaultModelPageTitleVars('{content}', '{locale}'),
-                  style: TextStyle(
-                    color: cs.onSurface.withValues(alpha: 0.6),
-                    fontSize: 12,
-                  ),
                 ),
               ],
             ),

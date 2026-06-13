@@ -658,7 +658,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
 
     if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
-    final budget = assistant?.thinkingBudget ?? settings.thinkingBudget;
+    final existingBudget = assistant?.thinkingBudget ?? settings.thinkingBudget;
 
     // Content
     final msgs = chatService.getMessages(conversationId);
@@ -671,9 +671,15 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         .join('\n\n');
     final content = joined.length > 3000 ? joined.substring(0, 3000) : joined;
     final locale = Localizations.localeOf(context).toLanguageTag();
-    final prompt = settings.titlePrompt
-        .replaceAll('{locale}', locale)
-        .replaceAll('{content}', content);
+    final (prompt, budget) = SettingsProvider.buildTitleGenerationConfig(
+      useSystemPrompt: settings.titleUseSystemPrompt,
+      useEmoji: settings.titleUseEmoji,
+      disableThinking: settings.titleDisableThinking,
+      customPrompt: settings.titlePrompt,
+      existingBudget: existingBudget,
+      locale: locale,
+      content: content,
+    );
     try {
       final title = (await ChatApiService.generateText(
         config: cfg,

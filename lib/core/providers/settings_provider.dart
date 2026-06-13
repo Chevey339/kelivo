@@ -90,6 +90,9 @@ class SettingsProvider extends ChangeNotifier {
   static const String _selectedModelKey = 'selected_model_v1';
   static const String _titleModelKey = 'title_model_v1';
   static const String _titlePromptKey = 'title_prompt_v1';
+  static const String _titleDisableThinkingKey = 'title_disable_thinking_v1';
+  static const String _titleUseSystemPromptKey = 'title_use_system_prompt_v1';
+  static const String _titleUseEmojiKey = 'title_use_emoji_v1';
   static const String _ocrModelKey = 'ocr_model_v1';
   static const String _ocrPromptKey = 'ocr_prompt_v1';
   static const String _summaryModelKey = 'summary_model_v1';
@@ -817,6 +820,12 @@ class SettingsProvider extends ChangeNotifier {
     // load title prompt
     final tp = prefs.getString(_titlePromptKey);
     _titlePrompt = (tp == null || tp.trim().isEmpty) ? defaultTitlePrompt : tp;
+    // load title generation options
+    _titleDisableThinking = prefs.getBool(_titleDisableThinkingKey) ?? false;
+    _titleUseSystemPrompt =
+        prefs.getBool(_titleUseSystemPromptKey) ??
+        (_titlePrompt == defaultTitlePrompt);
+    _titleUseEmoji = prefs.getBool(_titleUseEmojiKey) ?? false;
     // load translate model
     final translateSel = prefs.getString(_translateModelKey);
     if (translateSel != null && translateSel.contains('::')) {
@@ -2845,8 +2854,44 @@ You need to summarize the conversation between user and assistant into a short t
 {content}
 </content>''';
 
+  static const String _emojiRule =
+      '\n6. Start the title with a single appropriate emoji that matches the conversation topic, followed by a space';
+
+  static String get defaultTitlePromptWithEmoji =>
+      '$defaultTitlePrompt$_emojiRule';
+
+  /// Pure function that computes the final prompt and thinking budget
+  /// for title generation based on current settings.
+  static (String prompt, int? budget) buildTitleGenerationConfig({
+    required bool useSystemPrompt,
+    required bool useEmoji,
+    required bool disableThinking,
+    required String customPrompt,
+    required int? existingBudget,
+    required String locale,
+    required String content,
+  }) {
+    final basePrompt = useSystemPrompt
+        ? (useEmoji ? defaultTitlePromptWithEmoji : defaultTitlePrompt)
+        : customPrompt;
+    final prompt = basePrompt
+        .replaceAll('{locale}', locale)
+        .replaceAll('{content}', content);
+    final budget = disableThinking ? 0 : existingBudget;
+    return (prompt, budget);
+  }
+
   String _titlePrompt = defaultTitlePrompt;
   String get titlePrompt => _titlePrompt;
+
+  bool _titleDisableThinking = false;
+  bool get titleDisableThinking => _titleDisableThinking;
+
+  bool _titleUseSystemPrompt = true;
+  bool get titleUseSystemPrompt => _titleUseSystemPrompt;
+
+  bool _titleUseEmoji = false;
+  bool get titleUseEmoji => _titleUseEmoji;
 
   Future<void> setTitleModel(String providerKey, String modelId) async {
     _titleModelProvider = providerKey;
@@ -2872,6 +2917,27 @@ You need to summarize the conversation between user and assistant into a short t
   }
 
   Future<void> resetTitlePrompt() async => setTitlePrompt(defaultTitlePrompt);
+
+  Future<void> setTitleDisableThinking(bool value) async {
+    _titleDisableThinking = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_titleDisableThinkingKey, value);
+  }
+
+  Future<void> setTitleUseSystemPrompt(bool value) async {
+    _titleUseSystemPrompt = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_titleUseSystemPromptKey, value);
+  }
+
+  Future<void> setTitleUseEmoji(bool value) async {
+    _titleUseEmoji = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_titleUseEmojiKey, value);
+  }
 
   // Translate model and prompt
   String? _translateModelProvider;
