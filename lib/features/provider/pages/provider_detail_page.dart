@@ -575,17 +575,22 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                               ? Border.all(color: cs.primary, width: 2)
                               : null,
                         ),
-                        child: isSvg
-                            ? SvgPicture.asset(
-                                opt.asset,
-                                colorFilter: needsMono
-                                    ? const ColorFilter.mode(
-                                        Colors.white,
-                                        BlendMode.srcIn,
-                                      )
-                                    : null,
-                              )
-                            : Image.asset(opt.asset, fit: BoxFit.contain),
+                        clipBehavior: Clip.antiAlias,
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: isSvg
+                              ? SvgPicture.asset(
+                                  opt.asset,
+                                  fit: BoxFit.contain,
+                                  colorFilter: needsMono
+                                      ? const ColorFilter.mode(
+                                          Colors.white,
+                                          BlendMode.srcIn,
+                                        )
+                                      : null,
+                                )
+                              : Image.asset(opt.asset, fit: BoxFit.contain),
+                        ),
                       ),
                     ),
                   ),
