@@ -576,20 +576,26 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                               : null,
                         ),
                         clipBehavior: Clip.antiAlias,
-                        child: Padding(
-                          padding: const EdgeInsets.all(6),
-                          child: isSvg
-                              ? SvgPicture.asset(
-                                  opt.asset,
-                                  fit: BoxFit.contain,
-                                  colorFilter: needsMono
-                                      ? const ColorFilter.mode(
-                                          Colors.white,
-                                          BlendMode.srcIn,
-                                        )
-                                      : null,
-                                )
-                              : Image.asset(opt.asset, fit: BoxFit.contain),
+                        child: Center(
+                          child: FractionallySizedBox(
+                            widthFactor: 0.55,
+                            heightFactor: 0.55,
+                            child: isSvg
+                                ? SvgPicture.asset(
+                                    opt.asset,
+                                    fit: BoxFit.contain,
+                                    colorFilter: needsMono
+                                        ? const ColorFilter.mode(
+                                            Colors.white,
+                                            BlendMode.srcIn,
+                                          )
+                                        : null,
+                                  )
+                                : Image.asset(
+                                    opt.asset,
+                                    fit: BoxFit.contain,
+                                  ),
+                          ),
                         ),
                       ),
                     ),
