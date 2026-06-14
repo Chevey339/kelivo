@@ -32,9 +32,7 @@ class LatexElementBuilder extends MarkdownElementBuilder {
                 scrollDirection: Axis.horizontal,
                 primary: false,
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minWidth: constraints.maxWidth,
-                  ),
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
                   child: Center(child: math),
                 ),
               ),

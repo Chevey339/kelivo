@@ -1,11 +1,7 @@
 import 'package:markdown/markdown.dart' as md;
 
 class LatexInlineSyntax extends md.InlineSyntax {
-  LatexInlineSyntax()
-    : super(
-        r'(?:\\\((.+?)\\\))',
-        startCharacter: 0x5C,
-      );
+  LatexInlineSyntax() : super(r'(?:\\\((.+?)\\\))', startCharacter: 0x5C);
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {

@@ -12,14 +12,12 @@ import 'package:markdown/markdown.dart' as md;
 /// list so it wins for all `**...**` patterns.
 class CjkFriendlyBoldSyntax extends md.InlineSyntax {
   CjkFriendlyBoldSyntax()
-    : super(
-        r'(?<!\*)\*\*(?!\*)(.+?)(?<!\*)\*\*(?!\*)',
-        startCharacter: 0x2A,
-      );
+    : super(r'(?<!\*)\*\*(?!\*)(.+?)(?<!\*)\*\*(?!\*)', startCharacter: 0x2A);
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {
-    parser.addNode(md.Element('strong', [md.Text(match[1]!)]));
+    final children = _splitContentWithMath(match[1] ?? '');
+    parser.addNode(md.Element('strong', children));
     return true;
   }
 }
@@ -31,14 +29,45 @@ class CjkFriendlyBoldSyntax extends md.InlineSyntax {
 /// punctuation characters common in CJK text.
 class CjkFriendlyItalicSyntax extends md.InlineSyntax {
   CjkFriendlyItalicSyntax()
-    : super(
-        r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)',
-        startCharacter: 0x2A,
-      );
+    : super(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', startCharacter: 0x2A);
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {
-    parser.addNode(md.Element('em', [md.Text(match[1]!)]));
+    final children = _splitContentWithMath(match[1] ?? '');
+    parser.addNode(md.Element('em', children));
     return true;
   }
+}
+
+/// Splits [content] at `\(...\)` boundaries so inline math survives
+/// inside bold/italic elements.
+///
+/// Returns a list of [md.Node]s that alternates between [md.Text] and
+/// [md.Element] (`latex`) nodes. When no math is present returns a single
+/// [md.Text] node.
+List<md.Node> _splitContentWithMath(String content) {
+  const mathPattern = r'\\\((.+?)\\\)';
+  final matches = RegExp(mathPattern).allMatches(content).toList();
+  if (matches.isEmpty) return [md.Text(content)];
+
+  final children = <md.Node>[];
+  int lastEnd = 0;
+
+  for (final m in matches) {
+    if (m.start > lastEnd) {
+      children.add(md.Text(content.substring(lastEnd, m.start)));
+    }
+    final tex = (m[1] ?? '').trim();
+    if (tex.isNotEmpty) {
+      final el = md.Element.text('latex', tex);
+      el.attributes['displayMode'] = 'false';
+      children.add(el);
+    }
+    lastEnd = m.end;
+  }
+
+  if (lastEnd < content.length) {
+    children.add(md.Text(content.substring(lastEnd)));
+  }
+  return children;
 }

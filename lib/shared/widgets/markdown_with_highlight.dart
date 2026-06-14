@@ -297,23 +297,26 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                 ),
               ),
               blockquoteDecoration: BoxDecoration(
-                border: Border(
+                border: BorderDirectional(
                   start: BorderSide(
                     color: cs.onSurfaceVariant.withValues(alpha: 0.42),
                     width: 3,
                   ),
                 ),
               ),
-              blockquotePadding: const EdgeInsetsDirectional.only(
-                start: 13,
+              blockquotePadding: const EdgeInsets.only(
+                left: 13,
                 top: 2,
                 bottom: 2,
+              ),
+              blockquote: TextStyle(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.75),
               ),
               blockSpacing: 6,
             ),
         selectable: true,
         extensionSet: md.ExtensionSet(
-          [LatexBlockSyntax()],
+          [...md.ExtensionSet.gitHubFlavored.blockSyntaxes, LatexBlockSyntax()],
           [
             CjkFriendlyBoldSyntax(),
             CjkFriendlyItalicSyntax(),
@@ -878,19 +881,18 @@ String _preprocessFences(
     return '$prefix\$\$\n$body\n\$\$$suffix';
   });
 
-  // 2) Dedent opening fences: leading spaces before ```lang
-  final dedentOpen = RegExp(r"^[ \t]+```([^\n`]*)\s*$", multiLine: true);
-  out = out.replaceAllMapped(dedentOpen, (m) => "```${m[1]}");
-
-  // 3) Dedent closing fences: leading spaces before ```
-  final dedentClose = RegExp(r"^[ \t]+```\s*$", multiLine: true);
-  out = out.replaceAllMapped(dedentClose, (m) => "```");
-
-  // 4) Ensure closing fences are on their own line: transform "} ```" or "}```" into "}\n```"
+  // NOTE: Historically there were fence-dedent steps here (`    ``` → ````).
+  // They were removed because the new flutter_markdown_plus backend uses the
+  // `markdown` package's parser which handles fence indentation natively
+  // (0-3 spaces at document level; list sub-parsers dedent properly).
+  // Dedenting fences broke list-item context and left content indentation
+  // misaligned with the AST, causing extra leading spaces in rendered code.
+  //
+  // 2) Ensure closing fences are on their own line: transform "} ```" or "}```" into "}\n```"
   final inlineClosing = RegExp(r"([^\r\n`])```(?=\s*(?:\r?\n|$))");
   out = out.replaceAllMapped(inlineClosing, (m) => "${m[1]}\n```");
 
-  // 5) Disambiguate Setext vs HR after label-value lines:
+  // 3) Disambiguate Setext vs HR after label-value lines:
   // If a line of only dashes follows a bold label line (e.g., "**作者:** 张三"),
   // insert a blank line so it's treated as an HR, not a Setext heading underline.
   final labelThenDash = RegExp(
@@ -899,19 +901,19 @@ String _preprocessFences(
   );
   out = out.replaceAllMapped(labelThenDash, (m) => "${m[1]}\n\n${m[2]}");
 
-  // 6) Allow ATX headings starting with enumerations like "## 1.引言" or "## 1. 引言"
+  // 4) Allow ATX headings starting with enumerations like "## 1.引言" or "## 1. 引言"
   // Insert a zero-width non-joiner after the dot to prevent list parsing without changing visual text.
   final atxEnum = RegExp(r"^(\s{0,3}#{1,6}\s+\d+)\.(\s*)(\S)", multiLine: true);
   out = out.replaceAllMapped(atxEnum, (m) => "${m[1]}.\u200C${m[2]}${m[3]}");
 
-  // 7) Normalize double-bracket citation links: [[n]](url) → [n](url)
+  // 5) Normalize double-bracket citation links: [[n]](url) → [n](url)
   //    Many LLMs with built-in web search (DashScope, Perplexity, etc.) emit
   //    citations as [[1]](url), where the inner [1] is the display text. The
   //    link regex cannot match nested brackets, so flatten them first.
   final doubleBracketLink = RegExp(r'\[\[([^\]]+)\]\]\(([^\s)]+)\)');
   out = out.replaceAllMapped(doubleBracketLink, (m) => '[${m[1]}](${m[2]})');
 
-  // 8) Fix: when multiple markdown links are placed on separate lines using
+  // 6) Fix: when multiple markdown links are placed on separate lines using
   //    trailing double-spaces (hard line breaks), gpt_markdown may treat them
   //    as a single paragraph and only render the first link correctly.
   //    To avoid this, convert such lines into separate paragraphs by
