@@ -116,12 +116,6 @@ class ImageGenerationOptionsController {
     customAspectRatio: customAspectRatio,
   );
 
-  String get _defaultResolvedSize => _resolveSize(
-    sizeTier: _defaultSizeTier,
-    aspectRatio: _defaultAspectRatio,
-    customAspectRatio: _defaultCustomAspectRatio,
-  );
-
   String get _resolvedAspectRatio => _resolveAspectRatio(
     aspectRatio: aspectRatio,
     customAspectRatio: customAspectRatio,
