@@ -7,7 +7,9 @@ import 'package:gpt_markdown/custom_widgets/markdown_config.dart'
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart' as fmp;
 import 'package:markdown/markdown.dart' as md;
 import 'markdown_plus_extensions/latex_block_syntax.dart';
+import 'markdown_plus_extensions/latex_inline_syntax.dart';
 import 'markdown_plus_extensions/latex_element_builder.dart';
+import 'markdown_plus_extensions/cjk_friendly_syntax.dart';
 import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
 import 'package:flutter/rendering.dart';
@@ -280,7 +282,12 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         selectable: true,
         extensionSet: md.ExtensionSet([
           LatexBlockSyntax(),
-        ], md.ExtensionSet.gitHubFlavored.inlineSyntaxes),
+        ], [
+          CjkFriendlyBoldSyntax(),
+          CjkFriendlyItalicSyntax(),
+          LatexInlineSyntax(),
+          ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+        ]),
         builders: {'latex': LatexElementBuilder()},
         onTapLink: (text, href, title) => _handleLinkTap(context, href ?? ''),
       );
