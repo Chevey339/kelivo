@@ -4,6 +4,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:gpt_markdown/custom_widgets/markdown_config.dart'
     show GptMarkdownConfig;
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart' as fmp;
+import 'package:markdown/markdown.dart' as md;
+import 'markdown_plus_extensions/latex_block_syntax.dart';
+import 'markdown_plus_extensions/latex_element_builder.dart';
 import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
 import 'package:flutter/rendering.dart';
@@ -257,244 +261,271 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
 
     final appFontFamily = resolveAppFont();
 
-    // Force rebuild of the markdown when key theme colors change to avoid stale styles
-    final markdownWidget = GptMarkdown(
-      key: ValueKey(
-        '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${cs.onSurface.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}',
-      ),
-      normalized,
-      style: baseTextStyle,
-      followLinkColor: true,
-      // Disable built-in $...$ LaTeX so our custom scrollable handlers take over
-      useDollarSignsForLatex: false,
-      onLinkTap: (url, title) => _handleLinkTap(context, url),
-      components: components,
-      inlineComponents: inlineComponents,
-      imageBuilder: (ctx, url, width, height) {
-        final imgs = imageUrls.isNotEmpty ? imageUrls : <String>[url];
-        final idx = imgs.indexOf(url);
-        final initial = idx >= 0 ? idx : 0;
-        final provider = _imageProviderFor(url);
-        return GestureDetector(
-          onTap: () {
-            Navigator.of(ctx).push(
-              PageRouteBuilder(
-                pageBuilder: (_, __, ___) =>
-                    ImageViewerPage(images: imgs, initialIndex: initial),
-                transitionDuration: const Duration(milliseconds: 360),
-                reverseTransitionDuration: const Duration(milliseconds: 280),
-                transitionsBuilder: (context, anim, sec, child) {
-                  final curved = CurvedAnimation(
-                    parent: anim,
-                    curve: Curves.easeOutCubic,
-                    reverseCurve: Curves.easeInCubic,
-                  );
-                  return FadeTransition(
-                    opacity: curved,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, 0.02),
-                        end: Offset.zero,
-                      ).animate(curved),
-                      child: child,
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: () {
-                  if (provider == null) {
-                    // Missing or unsupported source: show a broken image indicator
-                    return const Icon(Icons.broken_image);
-                  }
-                  return Image(
-                    image: provider,
-                    width: width ?? constraints.maxWidth,
-                    height: height,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stack) =>
-                        const Icon(Icons.broken_image),
-                  );
-                }(),
+    // ⚠️ Gray switch: flip to false to test new flutter_markdown_plus backend
+    // ignore: no_leading_underscores_for_local_identifiers
+    const bool useNewMarkdown = true;
+
+    Widget markdownWidget;
+
+    // ignore: dead_code
+    if (useNewMarkdown) {
+      // NEW: flutter_markdown_plus backend (Phase 1 — minimal demo)
+      // TODO: Replace with full builder set in later phases
+      markdownWidget = fmp.MarkdownBody(
+        key: ValueKey(
+          '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${cs.onSurface.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}',
+        ),
+        data: normalized,
+        styleSheet: fmp.MarkdownStyleSheet.fromTheme(Theme.of(context)),
+        selectable: true,
+        extensionSet: md.ExtensionSet([
+          LatexBlockSyntax(),
+        ], md.ExtensionSet.gitHubFlavored.inlineSyntaxes),
+        builders: {'latex': LatexElementBuilder()},
+        onTapLink: (text, href, title) => _handleLinkTap(context, href ?? ''),
+      );
+      // ignore: dead_code
+    } else {
+      // LEGACY: gpt_markdown backend
+      // Force rebuild of the markdown when key theme colors change to avoid stale styles
+      markdownWidget = GptMarkdown(
+        key: ValueKey(
+          '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${cs.onSurface.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}',
+        ),
+        normalized,
+        style: baseTextStyle,
+        followLinkColor: true,
+        // Disable built-in $...$ LaTeX so our custom scrollable handlers take over
+        useDollarSignsForLatex: false,
+        onLinkTap: (url, title) => _handleLinkTap(context, url),
+        components: components,
+        inlineComponents: inlineComponents,
+        imageBuilder: (ctx, url, width, height) {
+          final imgs = imageUrls.isNotEmpty ? imageUrls : <String>[url];
+          final idx = imgs.indexOf(url);
+          final initial = idx >= 0 ? idx : 0;
+          final provider = _imageProviderFor(url);
+          return GestureDetector(
+            onTap: () {
+              Navigator.of(ctx).push(
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) =>
+                      ImageViewerPage(images: imgs, initialIndex: initial),
+                  transitionDuration: const Duration(milliseconds: 360),
+                  reverseTransitionDuration: const Duration(milliseconds: 280),
+                  transitionsBuilder: (context, anim, sec, child) {
+                    final curved = CurvedAnimation(
+                      parent: anim,
+                      curve: Curves.easeOutCubic,
+                      reverseCurve: Curves.easeInCubic,
+                    );
+                    return FadeTransition(
+                      opacity: curved,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.02),
+                          end: Offset.zero,
+                        ).animate(curved),
+                        child: child,
+                      ),
+                    );
+                  },
+                ),
               );
             },
-          ),
-        );
-      },
-      linkBuilder: (ctx, span, url, style) {
-        final label = span.toPlainText().trim();
-        // Special handling: [citation](index:id)
-        if (label.toLowerCase() == 'citation') {
-          final citation = _parseCitationRef(url);
-          if (citation != null) {
-            final cs = Theme.of(ctx).colorScheme;
-            return GestureDetector(
-              onTap: () {
-                if (widget.onCitationTap != null && citation.id.isNotEmpty) {
-                  widget.onCitationTap!(citation.id);
-                } else {
-                  // Fallback: do nothing
-                }
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: () {
+                    if (provider == null) {
+                      // Missing or unsupported source: show a broken image indicator
+                      return const Icon(Icons.broken_image);
+                    }
+                    return Image(
+                      image: provider,
+                      width: width ?? constraints.maxWidth,
+                      height: height,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stack) =>
+                          const Icon(Icons.broken_image),
+                    );
+                  }(),
+                );
               },
-              child: Container(
-                width: 20,
-                height: 20,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: cs.primary.withValues(alpha: 0.20),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  citation.indexText,
-                  style: TextStyle(fontSize: 12, height: 1.0),
-                ),
-              ),
-            );
-          }
-        }
-        // Default link appearance
-        final cs = Theme.of(ctx).colorScheme;
-        return Text(
-          span.toPlainText(),
-          style: style.copyWith(
-            color: cs.primary,
-            decoration: TextDecoration.none,
-          ),
-          textAlign: TextAlign.start,
-        );
-      },
-      orderedListBuilder: (ctx, no, child, cfg) {
-        final style = (cfg.style ?? TextStyle()).copyWith(
-          fontWeight: AppFontWeights.regular,
-        );
-        // Apply a soft compensation so when chat scale != 100%,
-        // list items don't visually feel larger/smaller than body text.
-        final double kListComp =
-            MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
-        final mediaQuery = MediaQuery.of(ctx);
-        final double s = mediaQuery.textScaler.scale(1);
-        final double comp = math.pow(s == 0 ? 1.0 : s, -kListComp).toDouble();
-        final double newScale = (s * comp).clamp(0.5, 3.0);
-        return MediaQuery(
-          data: mediaQuery.copyWith(textScaler: TextScaler.linear(newScale)),
-          child: Directionality(
-            textDirection: cfg.textDirection,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              textBaseline: TextBaseline.alphabetic,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              children: [
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 6, end: 6),
-                  child: Text("$no.", style: style),
-                ),
-                // Keep child as-is so it inherits context MediaQuery scaling once
-                Flexible(child: child),
-              ],
             ),
-          ),
-        );
-      },
-      // Note: property name is unOrderedListBuilder (camel-cased with capital O)
-      // Signature in gpt_markdown 1.1.4: (BuildContext ctx, Widget child, GptMarkdownConfig cfg) -> Widget
-      // We compose the bullet + content here to control scaling/spacing.
-      unOrderedListBuilder: (ctx, child, cfg) {
-        final style = (cfg.style ?? TextStyle()).copyWith(
-          fontWeight: AppFontWeights.regular,
-        );
-        final double kListComp =
-            MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
-        final mediaQuery = MediaQuery.of(ctx);
-        final double s = mediaQuery.textScaler.scale(1);
-        final double comp = math.pow(s == 0 ? 1.0 : s, -kListComp).toDouble();
-        final double newScale = (s * comp).clamp(0.5, 3.0);
-        return MediaQuery(
-          data: mediaQuery.copyWith(textScaler: TextScaler.linear(newScale)),
-          child: Directionality(
-            textDirection: cfg.textDirection,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              textBaseline: TextBaseline.alphabetic,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              children: [
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 6, end: 6),
-                  child: Text('•', style: style),
-                ),
-                // Keep child untouched to follow context scaling exactly once
-                Flexible(child: child),
-              ],
-            ),
-          ),
-        );
-      },
-      tableBuilder: (ctx, rows, style, cfg) {
-        return _MarkdownTableBlock(
-          rows: _MarkdownTableData.fromRows(
-            rows,
-            maxBodyRows: widget.streaming
-                ? MarkdownWithCodeHighlight._streamingTableMaxRows
-                : null,
-          ),
-          style: style,
-          config: cfg,
-          appFontFamily: appFontFamily.isEmpty ? null : appFontFamily,
-        );
-      },
-      // Inline `code` styling via highlightBuilder in gpt_markdown
-      highlightBuilder: (ctx, inline, style) {
-        // Unmask dollar signs that were protected during preprocessing
-        String unmasked = inline.replaceAll(_codeDollarMask, r'$');
-        String softened = _softBreakInline(unmasked);
-        final bool isDarkCtx = Theme.of(ctx).brightness == Brightness.dark;
-        final csCtx = Theme.of(ctx).colorScheme;
-        final bg = isDarkCtx ? Colors.white12 : const Color(0xFFF1F3F5);
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: csCtx.outlineVariant.withValues(alpha: 0.22),
-            ),
-          ),
-          child: Text(
-            softened,
-            style: TextStyle(
-              fontFamily: codeFontFamily,
-              fontSize: 13,
-              height: 1.4,
-            ).copyWith(color: csCtx.onSurface),
-            softWrap: true,
-            overflow: TextOverflow.visible,
-          ),
-        );
-      },
-      // Fenced code block styling via codeBuilder (with collapse/expand)
-      codeBuilder: (ctx, name, code, closed) {
-        final lang = name.trim();
-        final restoredCode = _unmaskHtmlTagStartsInsideFencedCode(code);
-        if (lang.toLowerCase() == 'mermaid') {
-          return _MermaidBlock(
-            code: restoredCode,
-            streaming: widget.streaming && !closed,
           );
-        } else if (lang.toLowerCase() == 'plantuml') {
-          return PlantUMLBlock(code: restoredCode);
-        }
-        return _CollapsibleCodeBlock(
-          language: lang,
-          code: restoredCode,
-          streaming: widget.streaming,
-          closed: closed,
-        );
-      },
-    );
+        },
+        linkBuilder: (ctx, span, url, style) {
+          final label = span.toPlainText().trim();
+          // Special handling: [citation](index:id)
+          if (label.toLowerCase() == 'citation') {
+            final citation = _parseCitationRef(url);
+            if (citation != null) {
+              final cs = Theme.of(ctx).colorScheme;
+              return GestureDetector(
+                onTap: () {
+                  if (widget.onCitationTap != null && citation.id.isNotEmpty) {
+                    widget.onCitationTap!(citation.id);
+                  } else {
+                    // Fallback: do nothing
+                  }
+                },
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: cs.primary.withValues(alpha: 0.20),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    citation.indexText,
+                    style: TextStyle(fontSize: 12, height: 1.0),
+                  ),
+                ),
+              );
+            }
+          }
+          // Default link appearance
+          final cs = Theme.of(ctx).colorScheme;
+          return Text(
+            span.toPlainText(),
+            style: style.copyWith(
+              color: cs.primary,
+              decoration: TextDecoration.none,
+            ),
+            textAlign: TextAlign.start,
+          );
+        },
+        orderedListBuilder: (ctx, no, child, cfg) {
+          final style = (cfg.style ?? TextStyle()).copyWith(
+            fontWeight: AppFontWeights.regular,
+          );
+          // Apply a soft compensation so when chat scale != 100%,
+          // list items don't visually feel larger/smaller than body text.
+          final double kListComp =
+              MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
+          final mediaQuery = MediaQuery.of(ctx);
+          final double s = mediaQuery.textScaler.scale(1);
+          final double comp = math.pow(s == 0 ? 1.0 : s, -kListComp).toDouble();
+          final double newScale = (s * comp).clamp(0.5, 3.0);
+          return MediaQuery(
+            data: mediaQuery.copyWith(textScaler: TextScaler.linear(newScale)),
+            child: Directionality(
+              textDirection: cfg.textDirection,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                textBaseline: TextBaseline.alphabetic,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                children: [
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 6, end: 6),
+                    child: Text("$no.", style: style),
+                  ),
+                  // Keep child as-is so it inherits context MediaQuery scaling once
+                  Flexible(child: child),
+                ],
+              ),
+            ),
+          );
+        },
+        // Note: property name is unOrderedListBuilder (camel-cased with capital O)
+        // Signature in gpt_markdown 1.1.4: (BuildContext ctx, Widget child, GptMarkdownConfig cfg) -> Widget
+        // We compose the bullet + content here to control scaling/spacing.
+        unOrderedListBuilder: (ctx, child, cfg) {
+          final style = (cfg.style ?? TextStyle()).copyWith(
+            fontWeight: AppFontWeights.regular,
+          );
+          final double kListComp =
+              MarkdownWithCodeHighlight.kMarkdownListScaleCompensation;
+          final mediaQuery = MediaQuery.of(ctx);
+          final double s = mediaQuery.textScaler.scale(1);
+          final double comp = math.pow(s == 0 ? 1.0 : s, -kListComp).toDouble();
+          final double newScale = (s * comp).clamp(0.5, 3.0);
+          return MediaQuery(
+            data: mediaQuery.copyWith(textScaler: TextScaler.linear(newScale)),
+            child: Directionality(
+              textDirection: cfg.textDirection,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                textBaseline: TextBaseline.alphabetic,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                children: [
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 6, end: 6),
+                    child: Text('•', style: style),
+                  ),
+                  // Keep child untouched to follow context scaling exactly once
+                  Flexible(child: child),
+                ],
+              ),
+            ),
+          );
+        },
+        tableBuilder: (ctx, rows, style, cfg) {
+          return _MarkdownTableBlock(
+            rows: _MarkdownTableData.fromRows(
+              rows,
+              maxBodyRows: widget.streaming
+                  ? MarkdownWithCodeHighlight._streamingTableMaxRows
+                  : null,
+            ),
+            style: style,
+            config: cfg,
+            appFontFamily: appFontFamily.isEmpty ? null : appFontFamily,
+          );
+        },
+        // Inline `code` styling via highlightBuilder in gpt_markdown
+        highlightBuilder: (ctx, inline, style) {
+          // Unmask dollar signs that were protected during preprocessing
+          String unmasked = inline.replaceAll(_codeDollarMask, r'$');
+          String softened = _softBreakInline(unmasked);
+          final bool isDarkCtx = Theme.of(ctx).brightness == Brightness.dark;
+          final csCtx = Theme.of(ctx).colorScheme;
+          final bg = isDarkCtx ? Colors.white12 : const Color(0xFFF1F3F5);
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: csCtx.outlineVariant.withValues(alpha: 0.22),
+              ),
+            ),
+            child: Text(
+              softened,
+              style: TextStyle(
+                fontFamily: codeFontFamily,
+                fontSize: 13,
+                height: 1.4,
+              ).copyWith(color: csCtx.onSurface),
+              softWrap: true,
+              overflow: TextOverflow.visible,
+            ),
+          );
+        },
+        // Fenced code block styling via codeBuilder (with collapse/expand)
+        codeBuilder: (ctx, name, code, closed) {
+          final lang = name.trim();
+          final restoredCode = _unmaskHtmlTagStartsInsideFencedCode(code);
+          if (lang.toLowerCase() == 'mermaid') {
+            return _MermaidBlock(
+              code: restoredCode,
+              streaming: widget.streaming && !closed,
+            );
+          } else if (lang.toLowerCase() == 'plantuml') {
+            return PlantUMLBlock(code: restoredCode);
+          }
+          return _CollapsibleCodeBlock(
+            language: lang,
+            code: restoredCode,
+            streaming: widget.streaming,
+            closed: closed,
+          );
+        },
+      );
+    }
 
     final result = appFontFamily.isEmpty
         ? markdownWidget

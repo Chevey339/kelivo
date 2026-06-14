@@ -65,6 +65,8 @@ dependencies:
   package_info_plus: ^8.3.1
   gpt_markdown: #^1.1.7
     path: ./dependencies/gpt_markdown
+  flutter_markdown_plus:
+    path: ./dependencies/flutter_markdown_plus
   uuid: ^4.5.0
   intl: ^0.20.2
   path: ^1.9.1
@@ -112,6 +114,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   restart_app: ^1.8.3
+  markdown: ^7.3.0
 
 dev_dependencies:
   flutter_test:
