@@ -309,11 +309,6 @@ class MessageGenerationService {
     required bool generateTitleOnFinish,
     Map<String, dynamic>? requestExtraBody,
   }) {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
-
     final assistantBody = generationController.buildCustomBody(assistant);
     final mergedExtraBody = <String, dynamic>{
       if (assistantBody != null) ...assistantBody,
