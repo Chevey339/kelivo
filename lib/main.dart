@@ -414,21 +414,23 @@ class MyApp extends StatelessWidget {
                       } catch (_) {}
                       // Snapshot localized strings for the proactive care
                       // background isolate, which has no AppLocalizations.
-                      try {
-                        final l10nSnap = AppLocalizations.of(ctx)!;
-                        unawaited(
-                          ProactiveCareL10nSnapshot.save(
-                            defaultConversationTitle:
-                                l10nSnap.chatServiceDefaultConversationTitle,
-                            carePromptDefault: l10nSnap
-                                .assistantEditProactiveCarePromptDefault,
-                            decisionPromptDefault: l10nSnap
-                                .assistantEditProactiveCareDecisionPromptDefault,
-                            failureNotificationBody:
-                                l10nSnap.proactiveCareFailedNotificationBody,
-                          ),
-                        );
-                      } catch (_) {}
+                      if (!kIsWeb && Platform.isAndroid) {
+                        try {
+                          final l10nSnap = AppLocalizations.of(ctx)!;
+                          unawaited(
+                            ProactiveCareL10nSnapshot.save(
+                              defaultConversationTitle:
+                                  l10nSnap.chatServiceDefaultConversationTitle,
+                              carePromptDefault: l10nSnap
+                                  .assistantEditProactiveCarePromptDefault,
+                              decisionPromptDefault: l10nSnap
+                                  .assistantEditProactiveCareDecisionPromptDefault,
+                              failureNotificationBody:
+                                  l10nSnap.proactiveCareFailedNotificationBody,
+                            ),
+                          );
+                        } catch (_) {}
+                      }
                     });
                   }
 

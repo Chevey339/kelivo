@@ -1385,6 +1385,8 @@ class HomeViewModel extends ChangeNotifier {
   /// The request (full context + decision prompts) and its reply are never
   /// written to the conversation.
   Future<void> _maybeUpdateProactiveCareFor(String conversationId) async {
+    if (!ProactiveCareAlarmService.isSupported) return;
+
     final convo = _chatService.getConversation(conversationId);
     if (convo == null) return;
 

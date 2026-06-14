@@ -301,7 +301,10 @@ class ProactiveCareAlarmService {
 
   static const String _logTag = 'ProactiveCareAlarm';
 
-  static bool get _isAndroid => !kIsWeb && Platform.isAndroid;
+  /// Whether proactive care (exact alarms + wake-up) is available on this device.
+  static bool get isSupported => !kIsWeb && Platform.isAndroid;
+
+  static bool get _isAndroid => isSupported;
 
   /// Starts the AlarmManager service. Must be called once before scheduling
   /// alarms (done in `main()` before `runApp`).

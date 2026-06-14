@@ -103,12 +103,13 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
       icon: Lucide.Brain,
       child: _MemoryTab(assistantId: assistantId),
     ),
-    _AssistantEditTabSpec(
-      id: assistantEditTabProactiveLetter,
-      label: l10n.assistantEditPageProactiveLetterTab,
-      icon: Lucide.MessageCircle,
-      child: _ProactiveLetterTab(assistantId: assistantId),
-    ),
+    if (ProactiveCareAlarmService.isSupported)
+      _AssistantEditTabSpec(
+        id: assistantEditTabProactiveLetter,
+        label: l10n.assistantEditPageProactiveLetterTab,
+        icon: Lucide.MessageCircle,
+        child: _ProactiveLetterTab(assistantId: assistantId),
+      ),
     _AssistantEditTabSpec(
       id: assistantEditTabLocalTools,
       label: l10n.assistantEditPageLocalToolsTab,
@@ -149,6 +150,9 @@ List<_AssistantEditTabSpec> _orderedAssistantEditTabs(
   final byId = {for (final tab in tabs) tab.id: tab};
   return orderAssistantEditTabIds(
     savedOrder: order,
+    defaultOrder: defaultAssistantEditTabIdsFor(
+      includeProactiveCare: ProactiveCareAlarmService.isSupported,
+    ),
   ).map((id) => byId[id]).nonNulls.toList();
 }
 
@@ -164,6 +168,9 @@ List<_AssistantEditTabSpec> _visibleAssistantEditTabs(
   return visibleAssistantEditTabIds(
     savedOrder: settings.mobileAssistantEditTabOrder,
     hiddenIds: settings.hiddenMobileAssistantEditTabs,
+    defaultOrder: defaultAssistantEditTabIdsFor(
+      includeProactiveCare: ProactiveCareAlarmService.isSupported,
+    ),
   ).map((id) => byId[id]).nonNulls.toList();
 }
 
@@ -1644,10 +1651,11 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
       (_AssistantDesktopMenu.basic, l10n.assistantEditPageBasicTab),
       (_AssistantDesktopMenu.prompts, l10n.assistantEditPagePromptsTab),
       (_AssistantDesktopMenu.memory, l10n.assistantEditPageMemoryTab),
-      (
-        _AssistantDesktopMenu.proactiveLetter,
-        l10n.assistantEditPageProactiveLetterTab,
-      ),
+      if (ProactiveCareAlarmService.isSupported)
+        (
+          _AssistantDesktopMenu.proactiveLetter,
+          l10n.assistantEditPageProactiveLetterTab,
+        ),
       (_AssistantDesktopMenu.localTools, l10n.assistantEditPageLocalToolsTab),
       (_AssistantDesktopMenu.mcp, l10n.assistantEditPageMcpTab),
       (_AssistantDesktopMenu.quick, l10n.assistantEditPageQuickPhraseTab),
