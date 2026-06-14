@@ -148,6 +148,15 @@ class ImageGenerationOptionsController {
     if (wasCustomized) {
       // Restore: fields the user set before are still their responsibility.
       _explicitlySetByUser.addAll(preCustomizedFields);
+    } else {
+      // No prior customization: apply the new defaults to current values.
+      _quality = _defaultQuality;
+      _sizeTier = _defaultSizeTier;
+      _aspectRatio = _defaultAspectRatio;
+      _customAspectRatio = _defaultCustomAspectRatio;
+      _outputFormat = _defaultOutputFormat;
+      _outputCompression = _defaultOutputCompression;
+      _count = _defaultCount;
     }
   }
 
