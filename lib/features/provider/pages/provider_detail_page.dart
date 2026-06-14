@@ -568,33 +568,45 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                         });
                       },
                       padding: const EdgeInsets.all(8),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          border: selected
-                              ? Border.all(color: cs.primary, width: 2)
-                              : null,
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Center(
-                          child: FractionallySizedBox(
-                            widthFactor: 0.55,
-                            heightFactor: 0.55,
-                            child: isSvg
-                                ? SvgPicture.asset(
-                                    opt.asset,
-                                    fit: BoxFit.contain,
-                                    colorFilter: needsMono
-                                        ? const ColorFilter.mode(
-                                            Colors.white,
-                                            BlendMode.srcIn,
-                                          )
-                                        : null,
-                                  )
-                                : Image.asset(
-                                    opt.asset,
-                                    fit: BoxFit.contain,
-                                  ),
+                      child: Center(
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white10
+                                  : cs.primary.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                              border: selected
+                                  ? Border.all(color: cs.primary, width: 2)
+                                  : null,
+                            ),
+                            alignment: Alignment.center,
+                            child: FractionallySizedBox(
+                              widthFactor: 0.65,
+                              heightFactor: 0.65,
+                              child: isSvg
+                                  ? SvgPicture.asset(
+                                      opt.asset,
+                                      fit: BoxFit.contain,
+                                      colorFilter: needsMono
+                                          ? const ColorFilter.mode(
+                                              Colors.white,
+                                              BlendMode.srcIn,
+                                            )
+                                          : null,
+                                    )
+                                  : Image.asset(
+                                      opt.asset,
+                                      fit: BoxFit.contain,
+                                      color: needsMono
+                                          ? Colors.white
+                                          : null,
+                                      colorBlendMode: needsMono
+                                          ? BlendMode.srcIn
+                                          : null,
+                                    ),
+                            ),
                           ),
                         ),
                       ),
