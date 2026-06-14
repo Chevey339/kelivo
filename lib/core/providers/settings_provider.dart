@@ -3141,22 +3141,44 @@ Rules:
       : null;
 
   static const String defaultCompressPrompt =
-      '''Provide a detailed summary of the following conversation for continuing in a new session.
+      '''You are an expert conversation context preservation specialist. Your task is to compress the following chat history into a self-contained summary that enables seamless continuation in a new session — as if no history was lost.
 
-The new session will not have access to the original conversation history, so preserve all context needed to continue seamlessly.
+## PRIORITY PYRAMID (preserve in this order)
 
-Focus on:
-- Key topics discussed and why they matter
-- Important decisions made and their reasoning
-- Current work in progress and its state
-- Next steps or open questions to address
-- Any relevant technical details, code snippets, or configurations mentioned
+1. **MUST KEEP** — Active decisions, current task state, unresolved questions, user's explicit preferences/constraints, pinned reference material (code, config, error messages)
+2. **SHOULD KEEP** — Key facts established, agreed-upon plans, reasoning behind major decisions, user's communication style and tone preferences
+3. **CAN COMPRESS** — Background discussion, exploration dead-ends, already-resolved sub-questions, routine acknowledgments
+4. **CAN DROP** — Greetings, farewells, repeated statements, off-topic tangents unrelated to the main thread
 
-Requirements:
-1. Write in {locale} language, matching the original conversation language
-2. Be concise but complete — do not omit important context
-3. Output the summary directly without prefaces or meta-commentary
-4. Start with a clear indicator (e.g., "[Summary of previous conversation]" or equivalent)
+## OUTPUT STRUCTURE
+
+```
+[Summary of previous conversation]
+
+▸ Active Context: Current task / question / problem being worked on
+▸ Key Decisions: Choices made and why
+▸ Established Facts: Confirmed information, preferences, constraints
+▸ Open Items: Pending questions, next steps, unresolved issues
+▸ Technical Details: Code, config, error messages, or data referenced (if any)
+▸ Tone & Style: How the user prefers to communicate (formal/casual, technical depth, verbosity)
+```
+
+If a section has nothing relevant, omit it entirely.
+
+## COMPRESSION RULES
+
+1. Write in {locale} language, matching the original conversation
+2. Preserve **specifics over summaries** — keep exact numbers, names, paths, versions, error messages; generalize only trivial details
+3. Maintain the user's original intent and goal context — why they started this conversation
+4. For code-heavy conversations: preserve variable names, function signatures, file paths, and error stack traces verbatim where critical
+5. Output only the summary block — no prefaces, no explanations, no meta-commentary
+6. Token budget: aim for 10–20 % of original conversation length
+
+## SELF-CHECK BEFORE OUTPUT
+
+- [ ] Would the user need to re-explain anything after reading this?
+- [ ] Are all active decisions and their rationale captured?
+- [ ] Is the user's current goal obvious from the summary?
 
 <conversation>
 {content}

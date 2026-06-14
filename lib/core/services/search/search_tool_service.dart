@@ -5,7 +5,14 @@ import '../../providers/settings_provider.dart';
 
 class SearchToolService {
   static const String toolName = 'search_web';
-  static const String toolDescription = 'Search the web for information';
+  static const String toolDescription =
+      'Search the web for up-to-date information, news, data, or facts that '
+      'may be beyond the model\'s knowledge cutoff. Use this whenever the user '
+      'asks about current events, recent developments, specific online content, '
+      'or any topic where fresh or verifiable information is needed. When using '
+      'search results, cite sources inline using the format [citation](index:id). '
+      'Each cited fact must be followed immediately by its citation mark. Do not '
+      'collect all citations at the end of the response.';
 
   static final RegExp _schemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
 
@@ -39,7 +46,9 @@ class SearchToolService {
           'properties': {
             'query': {
               'type': 'string',
-              'description': 'The search query to look up online',
+              'description':
+                  'The search query to look up online. After receiving results, '
+                  'cite each piece of information inline with [citation](index:id).',
             },
           },
           'required': ['query'],
@@ -94,37 +103,5 @@ class SearchToolService {
     }
   }
 
-  static String getSystemPrompt() {
-    return '''
-## search_web 工具使用说明
-
-当用户询问需要实时信息或最新数据的问题时，使用 search_web 工具进行搜索。
-
-### 引用格式
-- 搜索结果中会包含index(搜索结果序号)和id(搜索结果唯一标识符)，引用格式为：
-  `具体的引用内容 [citation](index:id)`
-- **引用必须紧跟在相关内容之后**，在标点符号后面，不得延后到回复结尾
-- 正确格式：`... [citation](index:id)` `... [citation](index:id) [citation](index:id)`
-
-### 使用规范
-1. **使用时机**
-   - 用户询问最新新闻、事件、数据
-   - 需要查证事实信息
-   - 需要获取技术文档、API信息等
-   
-2. **引用要求**
-   - 使用搜索结果时必须标注引用来源
-   - 每个引用的事实都要紧跟 [citation](index:id) 标记
-   - 不要将所有引用集中在回答末尾
-
-3. **回答格式示例**
-   ✅ 正确：
-   - 据最新报道，该事件发生在昨天下午。[citation](1:a1b2c3)
-   - 技术文档显示该功能需要版本3.0以上。[citation](2:d4e5f6) 具体配置步骤如下...[citation](3:g7h8i9)
-   
-   ❌ 错误：
-   - 据最新报道，该事件发生在昨天下午。技术文档显示该功能需要版本3.0以上。
-     [citation](1:a1b2c3) [citation](2:d4e5f6)
-''';
-  }
+  static String getSystemPrompt() => '';
 }

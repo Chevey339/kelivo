@@ -625,7 +625,9 @@ class MessageBuilderService {
   ) {
     if (assistant?.searchEnabled == true && !hasBuiltInSearch) {
       final prompt = SearchToolService.getSystemPrompt();
-      _appendToSystemMessage(apiMessages, prompt);
+      if (prompt.isNotEmpty) {
+        _appendToSystemMessage(apiMessages, prompt);
+      }
     }
   }
 

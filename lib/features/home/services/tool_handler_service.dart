@@ -215,7 +215,12 @@ class ToolHandlerService {
         'type': 'function',
         'function': {
           'name': 'create_memory',
-          'description': 'create a memory record',
+          'description':
+              'Save a new piece of information to the assistant\'s long-term '
+              'memory. Use this when the user shares personal preferences, '
+              'facts about themselves, important context, or anything they '
+              'explicitly ask you to remember for future conversations. '
+              'Memories persist across chat sessions.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -232,7 +237,11 @@ class ToolHandlerService {
         'type': 'function',
         'function': {
           'name': 'edit_memory',
-          'description': 'update a memory record',
+          'description':
+              'Update the content of an existing memory record by its id. '
+              'Use this when previously remembered information has changed, '
+              'the user corrects something, or a preference is updated. '
+              'Provide the memory id and the new content to replace the old.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -253,7 +262,10 @@ class ToolHandlerService {
         'type': 'function',
         'function': {
           'name': 'delete_memory',
-          'description': 'delete a memory record',
+          'description':
+              'Remove a memory record permanently by its id. Use this when '
+              'the user asks you to forget something, or when stored '
+              'information is no longer accurate or relevant.',
           'parameters': {
             'type': 'object',
             'properties': {

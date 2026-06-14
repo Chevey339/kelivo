@@ -268,23 +268,39 @@ class KelivoFetchMcpServerEngine {
     return [
       {
         'name': 'fetch_html',
-        'description': 'Fetch a website and return the content as HTML',
+        'description':
+            'Fetch a web page and return its raw HTML content. Use this when '
+            'you need to inspect the full page structure, extract data from '
+            'specific HTML elements, or when other formats lose too much '
+            'information. The response includes the complete HTML document.',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_markdown',
-        'description': 'Fetch a website and return the content as Markdown',
+        'description':
+            'Fetch a web page and convert the content into Markdown format. '
+            'Use this as the default choice for reading articles, blog posts, '
+            'or documentation — it strips away navigation, ads, and other '
+            'clutter while preserving headings, links, and text structure.',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_txt',
         'description':
-            'Fetch a website, return the content as plain text (no HTML)',
+            'Fetch a web page and return the content as plain, unformatted '
+            'text with no HTML tags or markdown syntax. Use this when you '
+            'only need the raw textual content without any formatting, such '
+            'as extracting the main body of an article or reading text from '
+            'a minimally structured page.',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_json',
-        'description': 'Fetch a JSON file from a URL',
+        'description':
+            'Fetch a JSON resource from a URL and return the parsed JSON data. '
+            'Use this for API endpoints, configuration files, or any structured '
+            'data source that returns JSON format. The response preserves the '
+            'original JSON structure.',
         'inputSchema': schema(),
       },
     ];

@@ -33,7 +33,11 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.timeInfo,
           'description':
-              'Get the current local date and time info from the device. Returns year, month, day, weekday, ISO date and time strings, timezone, UTC offset, and timestamp.',
+              'Get the current local date and time from the device. Returns '
+              'detailed time information including year, month, day, weekday, '
+              'ISO-formatted date and time strings, timezone name, UTC offset, '
+              'and millisecond timestamp. Use this when the user asks what time '
+              'it is, the current date, or timezone-related questions.',
           'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
         },
       });
@@ -44,7 +48,11 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.clipboard,
           'description':
-              'Read or write plain text from the device clipboard. Use action: read or write. For write, provide text. Do NOT write to the clipboard unless the user has explicitly requested it.',
+              'Read or write plain text from the device clipboard. Use '
+              'action: "read" to retrieve the current clipboard content, or '
+              'action: "write" with a text field to set new clipboard content. '
+              'Only write to the clipboard when the user explicitly asks for it, '
+              'such as copying a code snippet, a message, or other text.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -70,7 +78,14 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.textToSpeech,
           'description':
-              'Speak text aloud to the user using the configured text-to-speech playback. Use this when the user asks you to read something aloud, or when audio output is appropriate. The tool returns after playback has been requested; audio may continue in the background. Provide natural, readable text without markdown formatting.',
+              'Read text aloud to the user using the device\'s text-to-speech '
+              'engine. Use this when the user asks you to read something aloud, '
+              'listen to content hands-free, or when audio output is more '
+              'convenient than reading. The tool returns immediately after '
+              'playback is requested; audio continues in the background. '
+              'Provide natural, conversational text without markdown syntax, '
+              'code fences, or special formatting — write out symbols and '
+              'abbreviations in full words for natural speech.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -90,7 +105,14 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.askUser,
           'description':
-              'Ask the user one or more short choice questions when you need clarification, additional information, or a decision before continuing. Supports single-choice and multi-choice questions. The UI will provide Other and Skip options automatically, so do not include those options yourself.',
+              'Ask the user one or more short choice questions (1 to 4) when '
+              'you need clarification, additional input, or a decision to '
+              'proceed. Suitable for disambiguating vague requests, confirming '
+              'an action, selecting between options, or gathering preferences. '
+              'Supports both single-choice and multi-choice question types. '
+              'The UI automatically provides "Other" and "Skip" options for '
+              'each question, so do not include those in your suggested options. '
+              'Keep questions concise and options clear.',
           'parameters': {
             'type': 'object',
             'properties': {

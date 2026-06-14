@@ -841,7 +841,24 @@ class HomeViewModel extends ChangeNotifier {
 
   Future<void> toggleTemporaryConversation() async {
     final convo = currentConversation;
-    if (convo == null || messages.isNotEmpty) return;
+    if (convo == null) {
+      // No current conversation — create a temporary one directly.
+      await _chatActions.flushConversationProgress(null);
+      if (!_contextProvider.mounted) return;
+      isProcessingFiles.value = false;
+      final ap = _contextProvider.read<AssistantProvider>();
+      final conversation = await _chatService.createDraftConversation(
+        title: AppLocalizations.of(_contextProvider)!.temporaryChatTitle,
+        assistantId: ap.currentAssistantId,
+        temporary: true,
+      );
+      _chatController.setCurrentConversation(conversation);
+      _streamController.clearAllState();
+      notifyListeners();
+      onScrollToBottom?.call();
+      return;
+    }
+    if (messages.isNotEmpty) return;
 
     await _chatActions.flushConversationProgress(currentConversation);
     if (!_contextProvider.mounted) return;
