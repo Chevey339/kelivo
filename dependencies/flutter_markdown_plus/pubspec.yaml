@@ -1,0 +1,32 @@
+name: flutter_markdown_plus
+description: A Markdown renderer for Flutter. Create rich text output,
+  including text styles, tables, links, and more, from plain text data
+  formatted with simple Markdown tags.
+repository: https://github.com/foresightmobile/flutter_markdown_plus
+issue_tracker: https://github.com/foresightmobile/flutter_markdown_plus/issues
+version: 1.0.7
+
+environment:
+  sdk: ^3.4.0
+  flutter: ">=3.27.1"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  markdown: ^7.3.0
+  meta: ^1.16.0
+  path: ^1.9.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  leak_tracker_flutter_testing: any
+  mockito: ^5.5.0
+  standard_message_codec: ^0.0.1+4
+
+topics:
+  - markdown
+  - widgets
+
+formatter:
+  page_width: 120
