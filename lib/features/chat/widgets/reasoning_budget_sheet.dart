@@ -52,7 +52,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
     context.read<SettingsProvider>().setThinkingBudget(value);
   }
 
-  bool _isCustomSelected({required bool showXhigh}) {
+  bool _isCustomSelected({required bool showXhigh, required bool showMax}) {
     final presets = <int>{
       -1, // auto
       0, // off
@@ -60,6 +60,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
       16000,
       32000,
       if (showXhigh) 64000,
+      if (showMax) 128000,
     };
     return !presets.contains(_selected);
   }
@@ -145,10 +146,19 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
     final currentModelId =
         widget.modelId ?? assistant?.chatModelId ?? settings.currentModelId;
     if (currentProvider == null || currentModelId == null) return false;
-    return settings.supportsOpenAIXhighReasoning(
-      currentProvider,
-      currentModelId,
-    );
+    return settings.supportsXhighReasoning(currentProvider, currentModelId);
+  }
+
+  bool _showMaxOption(SettingsProvider settings) {
+    final assistant = context.read<AssistantProvider>().currentAssistant;
+    final currentProvider =
+        widget.modelProvider ??
+        assistant?.chatModelProvider ??
+        settings.currentModelProvider;
+    final currentModelId =
+        widget.modelId ?? assistant?.chatModelId ?? settings.currentModelId;
+    if (currentProvider == null || currentModelId == null) return false;
+    return settings.supportsMaxReasoning(currentProvider, currentModelId);
   }
 
   @override
@@ -156,7 +166,11 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
     final showXhigh = _showXhighOption(settings);
-    final customActive = _isCustomSelected(showXhigh: showXhigh);
+    final showMax = _showMaxOption(settings);
+    final customActive = _isCustomSelected(
+      showXhigh: showXhigh,
+      showMax: showMax,
+    );
     final cs = Theme.of(context).colorScheme;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.8;
     return SafeArea(
@@ -261,6 +275,19 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
                                 : cs.onSurface.withValues(alpha: 0.7),
                           ),
                           active: _selected == 64000,
+                        ),
+                      if (showMax)
+                        _tile(
+                          l10n.reasoningBudgetSheetMax,
+                          128000,
+                          leading: ReasoningIcons.budgetIcon(
+                            ReasoningIcons.maxBudget,
+                            size: 18,
+                            color: _selected == 128000
+                                ? cs.primary
+                                : cs.onSurface.withValues(alpha: 0.7),
+                          ),
+                          active: _selected == 128000,
                         ),
                       _tile(
                         l10n.reasoningBudgetSheetCustomLabel,

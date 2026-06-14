@@ -8,6 +8,7 @@ class ReasoningIcons {
   static const int mediumBudget = 16000;
   static const int heavyBudget = 32000;
   static const int xhighBudget = 64000;
+  static const int maxBudget = 128000;
 
   static const String offAsset = 'assets/icons/idea-01-no-rays.svg';
   static const String autoAsset = 'assets/icons/idea-01-stroke-rounded.svg';
@@ -15,6 +16,7 @@ class ReasoningIcons {
   static const String mediumAsset = 'assets/icons/idea-01-stroke-rounded.svg';
   static const String heavyAsset = 'assets/icons/idea-01-more-rays.svg';
   static const String xhighAsset = 'assets/icons/idea-01-moremore-rays.svg';
+  static const String maxAsset = xhighAsset;
   static const String thinkingCardAsset = mediumAsset;
 
   static String assetForBudget(int? budget) {
@@ -23,7 +25,8 @@ class ReasoningIcons {
     if (budget <= lightBudget) return lightAsset;
     if (budget <= mediumBudget) return mediumAsset;
     if (budget <= heavyBudget) return heavyAsset;
-    return xhighAsset;
+    if (budget <= xhighBudget) return xhighAsset;
+    return maxAsset;
   }
 
   static Widget budgetIcon(

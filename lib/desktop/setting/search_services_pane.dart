@@ -602,6 +602,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is PerplexityOptions) return 'perplexity';
     if (s is BochaOptions) return 'bocha';
     if (s is SerperOptions) return 'serper';
+    if (s is QueritOptions) return 'querit';
     if (s is GrokOptions) return 'grok';
     return 'search';
   }
@@ -780,6 +781,11 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     'hl': TextEditingController(),
     'tbs': TextEditingController(),
     'page': TextEditingController(),
+    'sitesInclude': TextEditingController(),
+    'sitesExclude': TextEditingController(),
+    'timeRange': TextEditingController(),
+    'countries': TextEditingController(),
+    'languages': TextEditingController(),
     'model': TextEditingController(text: GrokOptions.defaultModel),
     'customUrl': TextEditingController(text: GrokOptions.defaultUrl),
     'systemPrompt': TextEditingController(
@@ -945,6 +951,38 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             keyboardType: TextInputType.number,
           ),
         ];
+      case 'querit':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['sitesInclude'],
+            decoration: deco(l10n.searchServicesDialogSitesIncludeOptional),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['sitesExclude'],
+            decoration: deco(l10n.searchServicesDialogSitesExcludeOptional),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['timeRange'],
+            decoration: deco(l10n.searchServicesDialogTimeRangeOptional),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['countries'],
+            decoration: deco(l10n.searchServicesDialogCountriesOptional),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['languages'],
+            decoration: deco(l10n.searchServicesDialogLanguagesOptional),
+          ),
+        ];
       case 'grok':
         return [
           TextField(
@@ -1065,6 +1103,16 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           tbs: _controllers['tbs']!.text.trim(),
           page: page == null || page < 1 ? 1 : page,
         );
+      case 'querit':
+        return QueritOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          sitesInclude: _controllers['sitesInclude']!.text.trim(),
+          sitesExclude: _controllers['sitesExclude']!.text.trim(),
+          timeRange: _controllers['timeRange']!.text.trim(),
+          countries: _controllers['countries']!.text.trim(),
+          languages: _controllers['languages']!.text.trim(),
+        );
       case 'grok':
         return GrokOptions(
           id: id,
@@ -1135,6 +1183,17 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       _controllers['page'] = TextEditingController(
         text: s.page == 1 ? '' : s.page.toString(),
       );
+    } else if (s is QueritOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+      _controllers['sitesInclude'] = TextEditingController(
+        text: s.sitesInclude,
+      );
+      _controllers['sitesExclude'] = TextEditingController(
+        text: s.sitesExclude,
+      );
+      _controllers['timeRange'] = TextEditingController(text: s.timeRange);
+      _controllers['countries'] = TextEditingController(text: s.countries);
+      _controllers['languages'] = TextEditingController(text: s.languages);
     } else if (s is GrokOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['model'] = TextEditingController(text: s.model);
@@ -1320,6 +1379,38 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           keyboardType: TextInputType.number,
         ),
       ];
+    } else if (s is QueritOptions) {
+      return [
+        TextField(
+          controller: _controllers['apiKey'],
+          decoration: deco(l10n.searchServicesDialogApiKey),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['sitesInclude'],
+          decoration: deco(l10n.searchServicesDialogSitesIncludeOptional),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['sitesExclude'],
+          decoration: deco(l10n.searchServicesDialogSitesExcludeOptional),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['timeRange'],
+          decoration: deco(l10n.searchServicesDialogTimeRangeOptional),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['countries'],
+          decoration: deco(l10n.searchServicesDialogCountriesOptional),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['languages'],
+          decoration: deco(l10n.searchServicesDialogLanguagesOptional),
+        ),
+      ];
     } else if (s is DuckDuckGoOptions) {
       return [
         TextField(
@@ -1427,6 +1518,17 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         page: page == null || page < 1 ? 1 : page,
       );
     }
+    if (s is QueritOptions) {
+      return QueritOptions(
+        id: s.id,
+        apiKey: _controllers['apiKey']!.text,
+        sitesInclude: (_controllers['sitesInclude']?.text ?? '').trim(),
+        sitesExclude: (_controllers['sitesExclude']?.text ?? '').trim(),
+        timeRange: (_controllers['timeRange']?.text ?? '').trim(),
+        countries: (_controllers['countries']?.text ?? '').trim(),
+        languages: (_controllers['languages']?.text ?? '').trim(),
+      );
+    }
     if (s is GrokOptions) {
       return GrokOptions(
         id: s.id,
@@ -1452,22 +1554,23 @@ class _ServiceTypeChips extends StatefulWidget {
 }
 
 class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
-  static const List<({String type, String name, String brand})> _types = [
-    (type: 'bing_local', name: 'Bing (Local)', brand: 'bing'),
-    (type: 'duckduckgo', name: 'DuckDuckGo', brand: 'duckduckgo'),
-    (type: 'tavily', name: 'Tavily', brand: 'tavily'),
-    (type: 'exa', name: 'Exa', brand: 'exa'),
-    (type: 'zhipu', name: 'Zhipu', brand: 'zhipu'),
-    (type: 'searxng', name: 'SearXNG', brand: 'searxng'),
-    (type: 'linkup', name: 'LinkUp', brand: 'linkup'),
-    (type: 'brave', name: 'Brave', brand: 'brave'),
-    (type: 'metaso', name: 'Metaso', brand: 'metaso'),
-    (type: 'jina', name: 'Jina', brand: 'jina'),
-    (type: 'ollama', name: 'Ollama', brand: 'ollama'),
-    (type: 'perplexity', name: 'Perplexity', brand: 'perplexity'),
-    (type: 'bocha', name: 'Bocha', brand: 'bocha'),
-    (type: 'serper', name: 'Serper', brand: 'serper'),
-    (type: 'grok', name: 'Grok', brand: 'grok'),
+  static const List<({String type, String brand})> _types = [
+    (type: 'bing_local', brand: 'bing'),
+    (type: 'duckduckgo', brand: 'duckduckgo'),
+    (type: 'tavily', brand: 'tavily'),
+    (type: 'exa', brand: 'exa'),
+    (type: 'zhipu', brand: 'zhipu'),
+    (type: 'searxng', brand: 'searxng'),
+    (type: 'linkup', brand: 'linkup'),
+    (type: 'brave', brand: 'brave'),
+    (type: 'metaso', brand: 'metaso'),
+    (type: 'jina', brand: 'jina'),
+    (type: 'ollama', brand: 'ollama'),
+    (type: 'perplexity', brand: 'perplexity'),
+    (type: 'bocha', brand: 'bocha'),
+    (type: 'serper', brand: 'serper'),
+    (type: 'querit', brand: 'querit'),
+    (type: 'grok', brand: 'grok'),
   ];
   @override
   Widget build(BuildContext context) {
@@ -1480,6 +1583,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
       itemBuilder: (_, i) {
         final it = _types[i];
         final selected = it.type == widget.selectedType;
+        final name = _serviceTypeName(context, it.type);
         final bg = selected
             ? cs.primary.withValues(alpha: isDark ? 0.18 : 0.12)
             : (isDark ? Colors.white12 : const Color(0xFFF7F7F9));
@@ -1500,7 +1604,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
                 _BrandBadge(name: it.brand, size: 18),
                 const SizedBox(width: 6),
                 Text(
-                  it.name,
+                  name,
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: AppFontWeights.emphasis,
@@ -1513,6 +1617,46 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
         );
       },
     );
+  }
+}
+
+String _serviceTypeName(BuildContext context, String type) {
+  final l10n = AppLocalizations.of(context)!;
+  switch (type) {
+    case 'bing_local':
+      return l10n.searchServiceNameBingLocal;
+    case 'duckduckgo':
+      return l10n.searchServiceNameDuckDuckGo;
+    case 'tavily':
+      return l10n.searchServiceNameTavily;
+    case 'exa':
+      return l10n.searchServiceNameExa;
+    case 'zhipu':
+      return l10n.searchServiceNameZhipu;
+    case 'searxng':
+      return l10n.searchServiceNameSearXNG;
+    case 'linkup':
+      return l10n.searchServiceNameLinkUp;
+    case 'brave':
+      return l10n.searchServiceNameBrave;
+    case 'metaso':
+      return l10n.searchServiceNameMetaso;
+    case 'jina':
+      return l10n.searchServiceNameJina;
+    case 'ollama':
+      return l10n.searchServiceNameOllama;
+    case 'perplexity':
+      return l10n.searchServiceNamePerplexity;
+    case 'bocha':
+      return l10n.searchServiceNameBocha;
+    case 'serper':
+      return l10n.searchServiceNameSerper;
+    case 'querit':
+      return l10n.searchServiceNameQuerit;
+    case 'grok':
+      return l10n.searchServiceNameGrok;
+    default:
+      return type;
   }
 }
 
@@ -1534,7 +1678,7 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
   final LayerLink _link = LayerLink();
   OverlayEntry? _entry;
   final GlobalKey _key = GlobalKey();
-  static const List<({String type, String name, String brand})> _types =
+  static const List<({String type, String brand})> _types =
       _ServiceTypeChipsState._types;
 
   void _toggle() {
@@ -1609,7 +1753,7 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
                                     name: _types[i].brand,
                                     size: 18,
                                   ),
-                                  label: _types[i].name,
+                                  label: _serviceTypeName(ctx, _types[i].type),
                                   selected:
                                       widget.selectedType == _types[i].type,
                                   onTap: () {
@@ -1643,12 +1787,12 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
     if (mounted) setState(() => _open = false);
   }
 
-  String get _currentLabel => _types
+  String get _currentType => _types
       .firstWhere(
         (e) => e.type == widget.selectedType,
         orElse: () => _types.first,
       )
-      .name;
+      .type;
   String get _currentBrand => _types
       .firstWhere(
         (e) => e.type == widget.selectedType,
@@ -1692,7 +1836,7 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
                 _BrandBadge(name: _currentBrand, size: 18),
                 const SizedBox(width: 6),
                 Text(
-                  _currentLabel,
+                  _serviceTypeName(context, _currentType),
                   style: TextStyle(
                     fontSize: 14.5,
                     color: cs.onSurface.withValues(alpha: 0.9),

@@ -37,10 +37,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageColorMode => 'Color Mode';
 
   @override
-  String get settingsPageDisplay => 'Display';
+  String get settingsPageDisplay => 'Preferences';
 
   @override
-  String get settingsPageDisplaySubtitle => 'Appearance and text size';
+  String get settingsPageDisplaySubtitle =>
+      'Appearance, behavior, and interaction preferences';
 
   @override
   String get settingsPageAssistant => 'Assistant';
@@ -1651,6 +1652,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageS3PathStyle => 'Path-style addressing';
 
   @override
+  String get backupPageUserAgent => 'User-Agent';
+
+  @override
+  String get backupPageUserAgentHint => 'Optional';
+
+  @override
   String get backupPageSave => 'Save';
 
   @override
@@ -1800,6 +1807,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get messageEditPageHint => 'Enter message…';
+
+  @override
+  String get userMessageEditSaveOnly => 'Save Only';
+
+  @override
+  String get userMessageEditUnsupportedSnackbar =>
+      'This content does not support editing';
+
+  @override
+  String get userMessageEditOverwriteTitle => 'Notice';
+
+  @override
+  String get userMessageEditOverwriteContent =>
+      'Editing will overwrite the existing input. Overwrite it?';
 
   @override
   String get selectCopyPageTitle => 'Select & Copy';
@@ -1952,6 +1973,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reasoningBudgetSheetXhigh => 'Extreme Reasoning';
 
   @override
+  String get reasoningBudgetSheetMax => 'Maximum Reasoning';
+
+  @override
   String get reasoningBudgetSheetTitle => 'Reasoning Chain Strength';
 
   @override
@@ -2102,6 +2126,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatMessageWidgetWriteClipboard => 'Write Clipboard';
+
+  @override
+  String get chatMessageWidgetSpeakingTitle => 'Speaking:';
 
   @override
   String chatMessageWidgetSpeakText(String text) {
@@ -2749,6 +2776,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get defaultModelPageOcrModelSubtitle =>
       'Used for extracting text and descriptions from images';
+
+  @override
+  String get defaultModelPageOcrModelRequiresImageInput =>
+      'Select a model tagged with image input for OCR';
 
   @override
   String get defaultModelPagePromptLabel => 'Prompt';
@@ -4000,6 +4031,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Chat Background Overlay Opacity';
 
   @override
+  String get displaySettingsPageChatInputBackgroundOpacityTitle =>
+      'Input Box Background Opacity';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => 'Theme Settings';
 
   @override
@@ -4475,6 +4510,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Serper Google Search API. Fast web results with optional country, language, time, and page filters.';
 
   @override
+  String get searchServiceNameQuerit => 'Querit';
+
+  @override
+  String get searchProviderQueritDescription =>
+      'Querit Search API for LLM applications. Returns real-time web results with site, time, country, and language filters.';
+
+  @override
   String get searchServiceNameGrok => 'Grok';
 
   @override
@@ -4496,6 +4538,35 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get searchServicesDialogPageInvalid =>
       'Page must be a positive integer.';
+
+  @override
+  String get searchServicesDialogSitesIncludeOptional =>
+      'Include sites (optional)';
+
+  @override
+  String get searchServicesDialogSitesExcludeOptional =>
+      'Exclude sites (optional)';
+
+  @override
+  String get searchServicesDialogTimeRangeOptional => 'Time range (optional)';
+
+  @override
+  String get searchServicesDialogCountriesOptional => 'Countries (optional)';
+
+  @override
+  String get searchServicesDialogLanguagesOptional => 'Languages (optional)';
+
+  @override
+  String get searchServicesDialogSitesHint => 'example.com, docs.example.com';
+
+  @override
+  String get searchServicesDialogTimeRangeHint => 'd7';
+
+  @override
+  String get searchServicesDialogCountriesHint => 'united states, japan';
+
+  @override
+  String get searchServicesDialogLanguagesHint => 'english, japanese';
 
   @override
   String get generationInterrupted => 'Generation interrupted';
@@ -5290,7 +5361,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String askUserCardQuestionCount(int count) {
-    return 'Ask $count questions';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Ask $count questions',
+      one: 'Ask 1 question',
+    );
+    return '$_temp0';
   }
 
   @override

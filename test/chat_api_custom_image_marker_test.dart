@@ -87,6 +87,224 @@ void main() {
       },
     );
 
+    test('strips historical image markers for text-only models', () async {
+      final body = await _sendAndCaptureRequestBody((baseUrl) async {
+        return ChatApiService.sendMessageStream(
+          config: _openAiConfig(baseUrl),
+          modelId: 'mimo-v2.5-pro',
+          messages: const [
+            {
+              'role': 'user',
+              'content': 'look [image:data:image/png;base64,QUJD]',
+            },
+            {'role': 'assistant', 'content': 'noted'},
+            {'role': 'user', 'content': 'continue'},
+          ],
+          stream: false,
+        ).toList();
+      });
+
+      expect(jsonEncode(body), isNot(contains('image_url')));
+      final messages = (body['messages'] as List)
+          .map((e) => (e as Map).cast<String, dynamic>())
+          .toList(growable: false);
+      expect(messages.first['content'], 'look');
+      expect(messages.last['content'], 'continue');
+    });
+
+    test('strips structured image_url parts for text-only models', () async {
+      final body = await _sendAndCaptureRequestBody((baseUrl) async {
+        return ChatApiService.sendMessageStream(
+          config: _openAiConfig(baseUrl),
+          modelId: 'mimo-v2.5-pro',
+          messages: const [
+            {
+              'role': 'user',
+              'content': [
+                {'type': 'text', 'text': 'look'},
+                {
+                  'type': 'image_url',
+                  'image_url': {'url': 'data:image/png;base64,QUJD'},
+                },
+              ],
+            },
+            {'role': 'user', 'content': 'continue'},
+          ],
+          stream: false,
+        ).toList();
+      });
+
+      expect(jsonEncode(body), isNot(contains('image_url')));
+      final messages = (body['messages'] as List)
+          .map((e) => (e as Map).cast<String, dynamic>())
+          .toList(growable: false);
+      expect(messages.first['content'], 'look');
+      expect(messages.last['content'], 'continue');
+    });
+
+    test(
+      'strips historical local image markers for text-only models',
+      () async {
+        final dir = await Directory.systemTemp.createTemp(
+          'kelivo_text_only_history_img_',
+        );
+        addTearDown(() async {
+          if (await dir.exists()) {
+            await dir.delete(recursive: true);
+          }
+        });
+
+        final file = File('${dir.path}/history.png');
+        await file.writeAsBytes(const [1, 2, 3, 4]);
+
+        final body = await _sendAndCaptureRequestBody((baseUrl) async {
+          return ChatApiService.sendMessageStream(
+            config: _openAiConfig(baseUrl),
+            modelId: 'mimo-v2.5-pro',
+            messages: [
+              {'role': 'user', 'content': 'before [image:${file.path}] after'},
+              {'role': 'user', 'content': 'continue'},
+            ],
+            stream: false,
+          ).toList();
+        });
+
+        final encoded = jsonEncode(body);
+        expect(encoded, isNot(contains('image_url')));
+        expect(encoded, isNot(contains(file.path)));
+        final messages = (body['messages'] as List)
+            .map((e) => (e as Map).cast<String, dynamic>())
+            .toList(growable: false);
+        expect(messages.first['content'], 'before  after');
+        expect(messages.last['content'], 'continue');
+      },
+    );
+
+    test('does not attach current images for text-only models', () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'kelivo_text_only_current_img_',
+      );
+      addTearDown(() async {
+        if (await dir.exists()) {
+          await dir.delete(recursive: true);
+        }
+      });
+
+      final file = File('${dir.path}/current.png');
+      await file.writeAsBytes(const [1, 2, 3, 4]);
+
+      final body = await _sendAndCaptureRequestBody((baseUrl) async {
+        return ChatApiService.sendMessageStream(
+          config: _openAiConfig(baseUrl),
+          modelId: 'mimo-v2.5-pro',
+          messages: const [
+            {'role': 'user', 'content': 'continue'},
+          ],
+          userImagePaths: [file.path],
+          stream: false,
+        ).toList();
+      });
+
+      expect(jsonEncode(body), isNot(contains('image_url')));
+      final messages = (body['messages'] as List)
+          .map((e) => (e as Map).cast<String, dynamic>())
+          .toList(growable: false);
+      expect(messages.single['content'], 'continue');
+    });
+
+    test('keeps historical image markers for image-capable models', () async {
+      final body = await _sendAndCaptureRequestBody((baseUrl) async {
+        return ChatApiService.sendMessageStream(
+          config: _openAiConfig(baseUrl),
+          modelId: 'gpt-4.1',
+          messages: const [
+            {
+              'role': 'user',
+              'content': 'look [image:data:image/png;base64,QUJD]',
+            },
+            {'role': 'user', 'content': 'continue'},
+          ],
+          stream: false,
+        ).toList();
+      });
+
+      final messages = (body['messages'] as List)
+          .map((e) => (e as Map).cast<String, dynamic>())
+          .toList(growable: false);
+      final content = (messages.first['content'] as List)
+          .map((e) => (e as Map).cast<String, dynamic>())
+          .toList(growable: false);
+      expect(content.first['text'], 'look');
+      expect(content.last['type'], 'image_url');
+      expect(
+        (content.last['image_url'] as Map<String, dynamic>)['url'],
+        'data:image/png;base64,QUJD',
+      );
+    });
+
+    test('keeps structured image_url parts for image-capable models', () async {
+      final body = await _sendAndCaptureRequestBody((baseUrl) async {
+        return ChatApiService.sendMessageStream(
+          config: _openAiConfig(baseUrl),
+          modelId: 'gpt-4.1',
+          messages: const [
+            {
+              'role': 'user',
+              'content': [
+                {'type': 'text', 'text': 'look'},
+                {
+                  'type': 'image_url',
+                  'image_url': {'url': 'data:image/png;base64,QUJD'},
+                },
+              ],
+            },
+          ],
+          stream: false,
+        ).toList();
+      });
+
+      final content =
+          ((body['messages'] as List).single as Map<String, dynamic>)['content']
+              as List<dynamic>;
+      final parts = content
+          .map((e) => (e as Map).cast<String, dynamic>())
+          .toList(growable: false);
+      expect(parts.first['text'], 'look');
+      expect(parts.last['type'], 'image_url');
+      expect(
+        (parts.last['image_url'] as Map<String, dynamic>)['url'],
+        'data:image/png;base64,QUJD',
+      );
+    });
+
+    test(
+      'strips historical image markers from Responses input for text-only models',
+      () async {
+        final body = await _sendAndCaptureRequestBody((baseUrl) async {
+          return ChatApiService.sendMessageStream(
+            config: _openAiResponsesConfig(baseUrl),
+            modelId: 'mimo-v2.5-pro',
+            messages: const [
+              {
+                'role': 'user',
+                'content': 'look [image:data:image/png;base64,QUJD]',
+              },
+              {'role': 'user', 'content': 'continue'},
+            ],
+            stream: false,
+          ).toList();
+        });
+
+        expect(jsonEncode(body), isNot(contains('input_image')));
+        expect(jsonEncode(body), isNot(contains('image_url')));
+        final input = (body['input'] as List)
+            .map((e) => (e as Map).cast<String, dynamic>())
+            .toList(growable: false);
+        expect(input.first['content'], 'look');
+        expect(input.last['content'], 'continue');
+      },
+    );
+
     test(
       'keeps missing local custom image markers as text instead of reading files',
       () async {

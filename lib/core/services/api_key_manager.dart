@@ -58,8 +58,6 @@ class ApiKeyManager {
         chosen = available[Random().nextInt(available.length)];
         break;
       case LoadBalanceStrategy.roundRobin:
-        // Stable by id
-        available.sort((a, b) => a.id.compareTo(b.id));
         final cur =
             _roundRobinIndexMap[provider.id] ??
             (provider.keyManagement?.roundRobinIndex ?? 0);

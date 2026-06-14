@@ -140,6 +140,21 @@ class ToolHandlerService {
     return jsonDecode(jsonEncode(input)) as Map<String, dynamic>;
   }
 
+  static String _toolError({
+    required String error,
+    required String message,
+    required String tool,
+    String? instruction,
+  }) {
+    return jsonEncode({
+      'type': 'tool_error',
+      'error': error,
+      'message': message,
+      'tool': tool,
+      if (instruction != null) 'instruction': instruction,
+    });
+  }
+
   // ============================================================================
   // Tool Definitions Builder
   // ============================================================================
@@ -162,7 +177,9 @@ class ToolHandlerService {
     final supportsTools = isToolModel(providerKey, modelId);
 
     // Search tool (skip when Gemini built-in search is active)
-    if (settings.searchEnabled && !hasBuiltInSearch && supportsTools) {
+    if (assistant?.searchEnabled == true &&
+        !hasBuiltInSearch &&
+        supportsTools) {
       toolDefs.add(SearchToolService.getToolDefinition());
     }
 
@@ -335,7 +352,8 @@ class ToolHandlerService {
     return (name, args, {toolCallId}) async {
       try {
         // Search tool
-        if (name == SearchToolService.toolName && settings.searchEnabled) {
+        if (name == SearchToolService.toolName &&
+            assistant?.searchEnabled == true) {
           final q = (args['query'] ?? '').toString();
           return await SearchToolService.executeSearch(q, settings);
         }
@@ -378,12 +396,11 @@ class ToolHandlerService {
             assistant != null &&
             assistant.localToolIds.contains(LocalToolNames.askUser)) {
           if (askUserService == null) {
-            return jsonEncode({
-              'type': 'tool_error',
-              'error': 'ask_user_unavailable',
-              'message': 'Ask user interaction service is unavailable.',
-              'tool': name,
-            });
+            return _toolError(
+              error: 'ask_user_unavailable',
+              message: 'Ask user interaction service is unavailable.',
+              tool: name,
+            );
           }
           try {
             final result = await askUserService.requestAnswer(
@@ -394,12 +411,11 @@ class ToolHandlerService {
             );
             return result.toJsonString();
           } on AskUserInvalidRequestException catch (e) {
-            return jsonEncode({
-              'type': 'tool_error',
-              'error': 'invalid_ask_user_request',
-              'message': e.message,
-              'tool': name,
-            });
+            return _toolError(
+              error: 'invalid_ask_user_request',
+              message: e.message,
+              tool: name,
+            );
           }
         }
 
@@ -413,12 +429,11 @@ class ToolHandlerService {
             arguments: args,
           );
           if (!result.approved) {
-            return jsonEncode({
-              'type': 'tool_error',
-              'error': 'approval_denied',
-              'message': result.denyReason ?? 'User denied the tool call',
-              'tool': name,
-            });
+            return _toolError(
+              error: 'approval_denied',
+              message: result.denyReason ?? 'User denied the tool call',
+              tool: name,
+            );
           }
         }
 
@@ -434,14 +449,13 @@ class ToolHandlerService {
       } catch (e) {
         // Catch unexpected exceptions and return error JSON to LLM
         // This prevents tool failures from terminating the chat flow
-        return jsonEncode({
-          'type': 'tool_error',
-          'error': 'execution_error',
-          'message': e.toString(),
-          'tool': name,
-          'instruction':
+        return _toolError(
+          error: 'execution_error',
+          message: e.toString(),
+          tool: name,
+          instruction:
               'The tool execution failed unexpectedly. You may try again with different parameters or inform the user about the issue.',
-        });
+        );
       }
     };
   }
@@ -455,29 +469,83 @@ class ToolHandlerService {
     Assistant? assistant,
   ) async {
     if (assistant?.enableMemory != true) return null;
+    if (name != 'create_memory' &&
+        name != 'edit_memory' &&
+        name != 'delete_memory') {
+      return null;
+    }
 
     try {
       final mp = contextProvider.read<MemoryProvider>();
 
       if (name == 'create_memory') {
         final content = (args['content'] ?? '').toString();
-        if (content.isEmpty) return '';
+        if (content.isEmpty) {
+          return _toolError(
+            error: 'invalid_memory_content',
+            message: 'Memory content must not be empty.',
+            tool: name,
+          );
+        }
         final m = await mp.add(assistantId: assistant!.id, content: content);
         return m.content;
       } else if (name == 'edit_memory') {
         final id = (args['id'] as num?)?.toInt() ?? -1;
         final content = (args['content'] ?? '').toString();
-        if (id <= 0 || content.isEmpty) return '';
+        if (id <= 0) {
+          return _toolError(
+            error: 'invalid_memory_id',
+            message: 'Memory id must be a positive integer.',
+            tool: name,
+          );
+        }
+        if (content.isEmpty) {
+          return _toolError(
+            error: 'invalid_memory_content',
+            message: 'Memory content must not be empty.',
+            tool: name,
+          );
+        }
         final m = await mp.update(id: id, content: content);
-        return m?.content ?? '';
+        if (m == null) {
+          return _toolError(
+            error: 'memory_not_found',
+            message: 'No memory record was found for id $id.',
+            tool: name,
+            instruction:
+                'Use the available memory records shown in context, or create a new memory instead of editing a missing one.',
+          );
+        }
+        return m.content;
       } else if (name == 'delete_memory') {
         final id = (args['id'] as num?)?.toInt() ?? -1;
-        if (id <= 0) return '';
+        if (id <= 0) {
+          return _toolError(
+            error: 'invalid_memory_id',
+            message: 'Memory id must be a positive integer.',
+            tool: name,
+          );
+        }
         final ok = await mp.delete(id: id);
-        return ok ? 'deleted' : '';
+        if (!ok) {
+          return _toolError(
+            error: 'memory_not_found',
+            message: 'No memory record was found for id $id.',
+            tool: name,
+            instruction:
+                'Use the available memory records shown in context, or skip deleting a missing memory.',
+          );
+        }
+        return 'deleted';
       }
-    } catch (_) {
-      // Ignore memory operation errors
+    } catch (e) {
+      return _toolError(
+        error: 'memory_execution_error',
+        message: e.toString(),
+        tool: name,
+        instruction:
+            'The memory tool failed. Retry only after correcting the parameters, or inform the user about the issue.',
+      );
     }
 
     return null;

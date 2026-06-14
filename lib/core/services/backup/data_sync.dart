@@ -46,6 +46,13 @@ class DataSync {
     return {'Authorization': 'Basic $token'};
   }
 
+  Map<String, String> _extraHeaders(WebDavConfig cfg) {
+    final h = <String, String>{};
+    final ua = cfg.userAgent.trim();
+    if (ua.isNotEmpty) h['User-Agent'] = ua;
+    return h;
+  }
+
   Future<void> _ensureCollection(WebDavConfig cfg) async {
     final client = http.Client();
     try {
@@ -65,6 +72,7 @@ class DataSync {
           'Depth': '0',
           'Content-Type': 'application/xml; charset=utf-8',
           ..._authHeaders(cfg),
+          ..._extraHeaders(cfg),
         });
         req.body =
             '<?xml version="1.0" encoding="utf-8" ?><d:propfind xmlns:d="DAV:"><d:prop><d:displayname/></d:prop></d:propfind>';
@@ -72,7 +80,13 @@ class DataSync {
         if (res.statusCode == 404) {
           // create this level
           final mk = await client
-              .send(http.Request('MKCOL', u)..headers.addAll(_authHeaders(cfg)))
+              .send(
+                http.Request('MKCOL', u)
+                  ..headers.addAll({
+                    ..._authHeaders(cfg),
+                    ..._extraHeaders(cfg),
+                  }),
+              )
               .then(http.Response.fromStream);
           if (mk.statusCode != 201 &&
               mk.statusCode != 200 &&
@@ -101,6 +115,7 @@ class DataSync {
       'Depth': '1',
       'Content-Type': 'application/xml; charset=utf-8',
       ..._authHeaders(cfg),
+      ..._extraHeaders(cfg),
     });
     req.body =
         '<?xml version="1.0" encoding="utf-8" ?>\n'
@@ -148,6 +163,7 @@ class DataSync {
       final uploadDirPath = (await _getUploadDir()).path;
       final avatarsDirPath = (await _getAvatarsDir()).path;
       final imagesDirPath = (await _getImagesDir()).path;
+      final fontsDirPath = (await _getFontsDir()).path;
       final settingsPath = settingsTmp.path;
       final chatsPath = chatsTmp?.path;
       final includeFiles = cfg.includeFiles;
@@ -162,6 +178,7 @@ class DataSync {
           uploadDirPath: uploadDirPath,
           avatarsDirPath: avatarsDirPath,
           imagesDirPath: imagesDirPath,
+          fontsDirPath: fontsDirPath,
         );
       });
 
@@ -232,6 +249,7 @@ class DataSync {
     required String uploadDirPath,
     required String avatarsDirPath,
     required String imagesDirPath,
+    required String fontsDirPath,
   }) {
     final writer = _StreamingZipWriter(outPath);
     try {
@@ -248,6 +266,7 @@ class DataSync {
         _addDirectoryToZip(writer, uploadDirPath, 'upload');
         _addDirectoryToZip(writer, avatarsDirPath, 'avatars');
         _addDirectoryToZip(writer, imagesDirPath, 'images');
+        _addDirectoryToZip(writer, fontsDirPath, 'fonts');
       }
 
       writer.closeSync();
@@ -289,6 +308,25 @@ class DataSync {
     return name.replaceAll('\\', '/').replaceAll(RegExp(r'^/+'), '');
   }
 
+  /// Decode a DOS date/time packed value (from ZIP entry's lastModTime) into
+  /// a [DateTime]. Returns null when the date portion is zero (unset).
+  static DateTime? _decodeDosDateTime(int packed) {
+    final dosDate = packed >> 16;
+    final dosTime = packed & 0xFFFF;
+    if (dosDate == 0) return null;
+    final year = ((dosDate >> 9) & 0x7f) + 1980;
+    final month = (dosDate >> 5) & 0x0f;
+    final day = dosDate & 0x1f;
+    final hour = (dosTime >> 11) & 0x1f;
+    final minute = (dosTime >> 5) & 0x3f;
+    final second = (dosTime & 0x1f) * 2;
+    try {
+      return DateTime(year, month, day, hour, minute, second);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Synchronous ZIP extraction — runs inside an Isolate.
   /// Uses InputFileStream so the ZIP bytes are read from disk on demand rather
   /// than loading the entire archive into a single byte array.
@@ -314,6 +352,12 @@ class DataSync {
             } finally {
               output.closeSync();
             }
+            final dt = _decodeDosDateTime(entry.lastModTime);
+            if (dt != null) {
+              try {
+                File(outPath).setLastModifiedSync(dt);
+              } catch (_) {}
+            }
           } else {
             Directory(outPath).createSync(recursive: true);
           }
@@ -338,6 +382,7 @@ class DataSync {
         'content-type': 'application/zip',
         'content-length': fileLen.toString(),
         ..._authHeaders(cfg),
+        ..._extraHeaders(cfg),
       });
       // Pipe the file stream into the request body.
       file.openRead().listen(
@@ -367,6 +412,7 @@ class DataSync {
       'Depth': '1',
       'Content-Type': 'application/xml; charset=utf-8',
       ..._authHeaders(cfg),
+      ..._extraHeaders(cfg),
     });
     req.body =
         '<?xml version="1.0" encoding="utf-8" ?>\n'
@@ -466,7 +512,7 @@ class DataSync {
     File? file;
     try {
       final req = http.Request('GET', item.href);
-      req.headers.addAll(_authHeaders(cfg));
+      req.headers.addAll({..._authHeaders(cfg), ..._extraHeaders(cfg)});
       final streamed = await client.send(req);
       if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
         // Drain the response body to allow the client to close cleanly.
@@ -489,7 +535,7 @@ class DataSync {
     BackupFileItem item,
   ) async {
     final req = http.Request('DELETE', item.href);
-    req.headers.addAll(_authHeaders(cfg));
+    req.headers.addAll({..._authHeaders(cfg), ..._extraHeaders(cfg)});
     final res = await http.Client().send(req).then(http.Response.fromStream);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('Delete failed: ${res.statusCode}');
@@ -542,6 +588,10 @@ class DataSync {
 
   Future<Directory> _getAvatarsDir() async {
     return await AppDirectories.getAvatarsDirectory();
+  }
+
+  Future<Directory> _getFontsDir() async {
+    return await AppDirectories.getFontsDirectory();
   }
 
   Future<String> _exportSettingsJson() async {
@@ -1093,6 +1143,9 @@ class DataSync {
                 final target = File(p.join(dst.path, rel));
                 await target.parent.create(recursive: true);
                 await ent.copy(target.path);
+                try {
+                  await target.setLastModified(await ent.lastModified());
+                } catch (_) {}
               }
             }
           }
@@ -1113,6 +1166,9 @@ class DataSync {
                 final target = File(p.join(dst.path, rel));
                 await target.parent.create(recursive: true);
                 await ent.copy(target.path);
+                try {
+                  await target.setLastModified(await ent.lastModified());
+                } catch (_) {}
               }
             }
           }
@@ -1133,6 +1189,32 @@ class DataSync {
                 final target = File(p.join(dst.path, rel));
                 await target.parent.create(recursive: true);
                 await ent.copy(target.path);
+                try {
+                  await target.setLastModified(await ent.lastModified());
+                } catch (_) {}
+              }
+            }
+          }
+
+          // Restore managed local fonts directory
+          final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
+          if (await fontsSrc.exists()) {
+            final dst = await _getFontsDir();
+            if (await dst.exists()) {
+              try {
+                await dst.delete(recursive: true);
+              } catch (_) {}
+            }
+            await dst.create(recursive: true);
+            for (final ent in fontsSrc.listSync(recursive: true)) {
+              if (ent is File) {
+                final rel = p.relative(ent.path, from: fontsSrc.path);
+                final target = File(p.join(dst.path, rel));
+                await target.parent.create(recursive: true);
+                await ent.copy(target.path);
+                try {
+                  await target.setLastModified(await ent.lastModified());
+                } catch (_) {}
               }
             }
           }
@@ -1152,6 +1234,9 @@ class DataSync {
                 if (!await target.exists()) {
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
+                  try {
+                    await target.setLastModified(await ent.lastModified());
+                  } catch (_) {}
                 }
               }
             }
@@ -1171,6 +1256,9 @@ class DataSync {
                 if (!await target.exists()) {
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
+                  try {
+                    await target.setLastModified(await ent.lastModified());
+                  } catch (_) {}
                 }
               }
             }
@@ -1190,6 +1278,31 @@ class DataSync {
                 if (!await target.exists()) {
                   await target.parent.create(recursive: true);
                   await ent.copy(target.path);
+                  try {
+                    await target.setLastModified(await ent.lastModified());
+                  } catch (_) {}
+                }
+              }
+            }
+          }
+
+          // Merge managed local fonts directory
+          final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
+          if (await fontsSrc.exists()) {
+            final dst = await _getFontsDir();
+            if (!await dst.exists()) {
+              await dst.create(recursive: true);
+            }
+            for (final ent in fontsSrc.listSync(recursive: true)) {
+              if (ent is File) {
+                final rel = p.relative(ent.path, from: fontsSrc.path);
+                final target = File(p.join(dst.path, rel));
+                if (!await target.exists()) {
+                  await target.parent.create(recursive: true);
+                  await ent.copy(target.path);
+                  try {
+                    await target.setLastModified(await ent.lastModified());
+                  } catch (_) {}
                 }
               }
             }

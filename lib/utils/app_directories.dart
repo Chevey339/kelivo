@@ -46,6 +46,12 @@ class AppDirectories {
     return Directory('${root.path}/avatars');
   }
 
+  /// Gets the directory for user-imported font files.
+  static Future<Directory> getFontsDirectory() async {
+    final root = await getAppDataDirectory();
+    return Directory('${root.path}/fonts');
+  }
+
   /// Gets the directory for cache files.
   static Future<Directory> getCacheDirectory() async {
     final root = await getAppDataDirectory();

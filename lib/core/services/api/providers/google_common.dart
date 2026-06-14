@@ -232,6 +232,20 @@ int? _defaultGeminiMaxOutputTokens(String upstreamModelId) {
   return null;
 }
 
+bool _shouldRequestGoogleThoughts(
+  ProviderConfig config,
+  String modelId,
+  ModelInfo effective,
+) {
+  if (effective.abilities.contains(ModelAbility.reasoning)) return true;
+  final kind = ProviderConfig.classify(
+    config.id,
+    explicitType: config.providerType,
+  );
+  if (kind != ProviderKind.google) return false;
+  return _apiModelId(config, modelId).toLowerCase().contains('gemini');
+}
+
 Stream<ChatStreamChunk> _sendGoogleStream(
   http.Client client,
   ProviderConfig config,
@@ -278,7 +292,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   final enableYoutube = builtIns.contains(BuiltInToolNames.youtube);
   // Effective model features (includes user overrides)
   final effective = _effectiveModelInfo(config, modelId);
-  final isReasoning = effective.abilities.contains(ModelAbility.reasoning);
+  final isReasoning = _shouldRequestGoogleThoughts(config, modelId, effective);
   // Non-streaming path: use generateContent
   if (!stream) {
     final isVertex = config.vertexAI == true;
@@ -675,9 +689,27 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         }
       }
       final buf = StringBuffer();
+      final reasoningBuf = StringBuffer();
       for (final p in parts) {
         if (p is! Map) continue;
-        if (p['text'] is String) buf.write(p['text']);
+        final text = p['text'];
+        if (text is! String || text.isEmpty) continue;
+        final thought = p['thought'] as bool? ?? false;
+        if (thought) {
+          reasoningBuf.write(text);
+        } else {
+          buf.write(text);
+        }
+      }
+      final reasoningStr = reasoningBuf.toString();
+      if (reasoningStr.isNotEmpty) {
+        yield ChatStreamChunk(
+          content: '',
+          reasoning: reasoningStr,
+          isDone: false,
+          totalTokens: totalUsage?.totalTokens ?? 0,
+          usage: totalUsage,
+        );
       }
       var contentStr = buf.toString();
       if (persistGeminiThoughtSigs) {

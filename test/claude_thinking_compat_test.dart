@@ -125,6 +125,9 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
 Future<Map<String, dynamic>> _captureClaudeGenerateTextBody({
   required String modelId,
   int? thinkingBudget,
+  List<Map<String, dynamic>> responseContent = const [
+    {'type': 'text', 'text': 'ok'},
+  ],
 }) async {
   late Map<String, dynamic> requestBody;
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -140,9 +143,7 @@ Future<Map<String, dynamic>> _captureClaudeGenerateTextBody({
     request.response.write(
       jsonEncode({
         'id': 'msg_1',
-        'content': [
-          {'type': 'text', 'text': 'ok'},
-        ],
+        'content': responseContent,
         'usage': {'input_tokens': 1, 'output_tokens': 1},
       }),
     );
@@ -219,6 +220,55 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
     expect(chunks.last.isDone, isTrue);
   }
 
+  return requestBody;
+}
+
+Future<Map<String, dynamic>> _captureClaudeProviderBody({
+  required String modelId,
+  required ProviderConfig config,
+  int? thinkingBudget,
+  double? temperature,
+  double? topP,
+}) async {
+  late Map<String, dynamic> requestBody;
+  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  addTearDown(() async {
+    await server.close(force: true);
+  });
+
+  server.listen((request) async {
+    requestBody = (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+        .cast<String, dynamic>();
+    request.response.statusCode = HttpStatus.ok;
+    request.response.headers.contentType = ContentType.json;
+    request.response.write(
+      jsonEncode({
+        'id': 'msg_1',
+        'content': [
+          {'type': 'text', 'text': 'ok'},
+        ],
+        'usage': {'input_tokens': 1, 'output_tokens': 1},
+      }),
+    );
+    await request.response.close();
+  });
+
+  final effectiveConfig = config.copyWith(
+    baseUrl: 'http://${server.address.address}:${server.port}',
+  );
+  final chunks = await ChatApiService.sendMessageStream(
+    config: effectiveConfig,
+    modelId: modelId,
+    messages: const [
+      {'role': 'user', 'content': 'hello'},
+    ],
+    thinkingBudget: thinkingBudget,
+    temperature: temperature,
+    topP: topP,
+    stream: false,
+  ).toList();
+
+  expect(chunks.last.isDone, isTrue);
   return requestBody;
 }
 
@@ -317,6 +367,119 @@ void main() {
     );
 
     test(
+      'Opus 4.8 uses adaptive thinking with xhigh effort and strips sampling',
+      () async {
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-opus-4-8',
+          thinkingBudget: 64000,
+          temperature: 0.7,
+          topP: 0.8,
+        );
+
+        expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+        expect(body['output_config'], {'effort': 'xhigh'});
+        expect(body.containsKey('temperature'), isFalse);
+        expect(body.containsKey('top_p'), isFalse);
+      },
+    );
+
+    test('Opus 4.8 maps max reasoning to max effort', () async {
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-opus-4.8',
+        thinkingBudget: 128000,
+      );
+
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'max'});
+    });
+
+    test('Fable 5 never sends unsupported disabled thinking', () async {
+      final offBody = await _captureClaudeRequestBody(
+        modelId: 'claude-fable-5',
+        thinkingBudget: 0,
+        temperature: 0.7,
+        topP: 0.8,
+      );
+      final mediumBody = await _captureClaudeRequestBody(
+        modelId: 'claude-fable-5',
+        thinkingBudget: 16000,
+      );
+
+      expect(offBody.containsKey('thinking'), isFalse);
+      expect(offBody.containsKey('output_config'), isFalse);
+      expect(offBody.containsKey('temperature'), isFalse);
+      expect(offBody.containsKey('top_p'), isFalse);
+      expect(mediumBody['thinking'], {
+        'type': 'adaptive',
+        'display': 'summarized',
+      });
+      expect(mediumBody['output_config'], {'effort': 'medium'});
+    });
+
+    test('Fable 5 maps max reasoning to max effort', () async {
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-fable-5',
+        thinkingBudget: 128000,
+      );
+
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'max'});
+    });
+
+    test('OpenRouter Anthropic format uses Claude messages path', () async {
+      late Uri requestUri;
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestUri = request.uri;
+        requestBody =
+            (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                .cast<String, dynamic>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'id': 'msg_1',
+            'content': [
+              {'type': 'text', 'text': 'ok'},
+            ],
+            'usage': {'input_tokens': 1, 'output_tokens': 1},
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: ProviderConfig(
+          id: 'OpenRouterAnthropic',
+          enabled: true,
+          name: 'OpenRouter Anthropic',
+          apiKey: 'test-key',
+          baseUrl: 'http://${server.address.address}:${server.port}',
+          providerType: ProviderKind.claude,
+        ),
+        modelId: 'anthropic/claude-fable-5',
+        messages: const [
+          {'role': 'user', 'content': 'hello'},
+        ],
+        thinkingBudget: 16000,
+        stream: false,
+      ).toList();
+
+      expect(chunks.last.isDone, isTrue);
+      expect(requestUri.path, '/messages');
+      expect(requestBody['thinking'], {
+        'type': 'adaptive',
+        'display': 'summarized',
+      });
+      expect(requestBody['output_config'], {'effort': 'medium'});
+    });
+
+    test(
       'Opus 4.7 off keeps sampling params and omits output config',
       () async {
         final body = await _captureClaudeRequestBody(
@@ -392,14 +555,34 @@ void main() {
       );
     });
 
-    test('Claude built-in search support list includes Opus 4.7', () {
-      expect(
-        BuiltInToolsHelper.isClaudeBuiltInSearchSupportedModel(
-          'claude-opus-4-7',
-        ),
-        isTrue,
+    test('generateText Claude path reads text after thinking block', () async {
+      await _captureClaudeGenerateTextBody(
+        modelId: 'deepseek-v4-pro',
+        thinkingBudget: -1,
+        responseContent: const [
+          {'type': 'thinking', 'thinking': '先思考。'},
+          {'type': 'text', 'text': 'ok'},
+        ],
       );
     });
+
+    test(
+      'Claude built-in search support list includes Opus 4.8 and Fable 5',
+      () {
+        expect(
+          BuiltInToolsHelper.isClaudeBuiltInSearchSupportedModel(
+            'claude-opus-4-8',
+          ),
+          isTrue,
+        );
+        expect(
+          BuiltInToolsHelper.isClaudeBuiltInSearchSupportedModel(
+            'claude-fable-5',
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('Claude dynamic web search support matrix is official-only', () {
       final official = _claudeConfig(
@@ -411,7 +594,14 @@ void main() {
       expect(
         BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
           cfg: official,
-          modelId: 'claude-opus-4-7',
+          modelId: 'claude-opus-4-8',
+        ),
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
+          cfg: official,
+          modelId: 'claude-fable-5',
         ),
         isTrue,
       );
@@ -595,6 +785,50 @@ data: {"type":"message_stop"}
       },
     );
 
+    test('DeepSeek Claude-compatible auto thinking stays enabled', () async {
+      final body = await _captureClaudeProviderBody(
+        modelId: 'deepseek-v4-pro',
+        config: _deepSeekClaudeConfig(),
+        thinkingBudget: -1,
+      );
+
+      expect(body['thinking'], {'type': 'enabled'});
+      expect(body.containsKey('output_config'), isFalse);
+    });
+
+    test('DeepSeek Claude-compatible explicit thinking uses effort', () async {
+      final mediumBody = await _captureClaudeProviderBody(
+        modelId: 'deepseek-v4-pro',
+        config: _deepSeekClaudeConfig(),
+        thinkingBudget: 16000,
+      );
+      final maxBody = await _captureClaudeProviderBody(
+        modelId: 'deepseek-v4-pro',
+        config: _deepSeekClaudeConfig(),
+        thinkingBudget: 64000,
+      );
+
+      expect(mediumBody['thinking'], {'type': 'enabled'});
+      expect(mediumBody['output_config'], {'effort': 'high'});
+      expect(maxBody['thinking'], {'type': 'enabled'});
+      expect(maxBody['output_config'], {'effort': 'max'});
+    });
+
+    test('DeepSeek Claude-compatible off thinking stays disabled', () async {
+      final body = await _captureClaudeProviderBody(
+        modelId: 'deepseek-v4-pro',
+        config: _deepSeekClaudeConfig(),
+        thinkingBudget: 0,
+        temperature: 0.7,
+        topP: 0.8,
+      );
+
+      expect(body['thinking'], {'type': 'disabled'});
+      expect(body.containsKey('output_config'), isFalse);
+      expect(body['temperature'], 0.7);
+      expect(body['top_p'], 0.8);
+    });
+
     test(
       'Vertex Claude keeps old search tool selection even with new flag',
       () {
@@ -706,6 +940,134 @@ data: {"type":"message_stop"}
       expect(toolResultContent.single['type'], 'tool_result');
       expect(toolResultContent.single['tool_use_id'], 'toolu_1');
     });
+
+    test(
+      'OpenRouter Claude tool continuation skips redacted thinking blocks',
+      () async {
+        final requestBodies = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        var requestCount = 0;
+        server.listen((request) async {
+          requestCount += 1;
+          requestBodies.add(
+            (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                .cast<String, dynamic>(),
+          );
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+            charset: 'utf-8',
+          );
+
+          if (requestCount == 1) {
+            request.response.write('''
+event: message_start
+data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","content":[],"model":"claude-opus-4-6","stop_reason":null}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"redacted_thinking","data":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"redacted_thinking_delta","data":"openrouter-redacted-fragment"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_1","name":"lookup","input":{}}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"query\\":\\"Kelivo\\"}"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"input_tokens":1,"output_tokens":1}}
+
+event: message_stop
+data: {"type":"message_stop"}
+
+''');
+          } else {
+            request.response.write('''
+event: message_start
+data: {"type":"message_start","message":{"id":"msg_2","type":"message","role":"assistant","content":[],"model":"claude-opus-4-6","stop_reason":null}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"done"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":1,"output_tokens":1}}
+
+event: message_stop
+data: {"type":"message_stop"}
+
+''');
+          }
+          await request.response.close();
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config:
+              _claudeConfig(
+                'http://${server.address.address}:${server.port}',
+              ).copyWith(
+                id: 'OpenRouter',
+                name: 'OpenRouter',
+                baseUrl: 'http://${server.address.address}:${server.port}',
+              ),
+          modelId: 'claude-opus-4-6',
+          messages: const [
+            {'role': 'user', 'content': '查一下 Kelivo'},
+          ],
+          tools: const [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'lookup',
+                'parameters': {
+                  'type': 'object',
+                  'properties': {
+                    'query': {'type': 'string'},
+                  },
+                },
+              },
+            },
+          ],
+          onToolCall: (name, args, {toolCallId}) async => '{"result":"ok"}',
+        ).toList();
+
+        expect(chunks.last.isDone, isTrue);
+        expect(requestBodies, hasLength(2));
+        final secondMessages = (requestBodies[1]['messages'] as List)
+            .cast<Map>();
+        final assistantContent = (secondMessages[1]['content'] as List)
+            .cast<Map>();
+        final toolResultContent = (secondMessages[2]['content'] as List)
+            .cast<Map>();
+
+        expect(
+          assistantContent.any((block) => block['type'] == 'redacted_thinking'),
+          isFalse,
+        );
+        expect(assistantContent.single['type'], 'tool_use');
+        expect(assistantContent.single['id'], 'toolu_1');
+        expect(toolResultContent.single['type'], 'tool_result');
+        expect(toolResultContent.single['tool_use_id'], 'toolu_1');
+      },
+    );
 
     test(
       'completed memory tool turn remains valid when followed by user text',

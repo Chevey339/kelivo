@@ -54,6 +54,41 @@ void main() {
     expect(tester.getTopLeft(find.byKey(overlayKey)).dy, 550);
   });
 
+  testWidgets('输入框层位于前景遮罩上方', (tester) async {
+    var inputTaps = 0;
+    var foregroundTaps = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 600,
+            child: ChatInputOverlayLayout(
+              topInset: 100,
+              content: const ColoredBox(color: Colors.blue),
+              foreground: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => foregroundTaps++,
+              ),
+              bottomOverlay: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => inputTaps++,
+                child: const SizedBox(width: 400, height: 88),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tapAt(const Offset(200, 560));
+    await tester.pump();
+
+    expect(inputTaps, 1);
+    expect(foregroundTaps, 0);
+  });
+
   testWidgets('底部覆盖层后方有渐变遮罩隔开消息内容', (tester) async {
     const fadeKey = Key('chat-input-overlay-bottom-fade');
 
@@ -75,7 +110,7 @@ void main() {
 
     final fadeFinder = find.byKey(fadeKey);
     expect(fadeFinder, findsOneWidget);
-    expect(tester.getTopLeft(fadeFinder).dy, 480);
+    expect(tester.getTopLeft(fadeFinder).dy, 420);
     expect(tester.getBottomLeft(fadeFinder).dy, 600);
 
     final decoration = tester.widget<DecoratedBox>(
@@ -177,7 +212,7 @@ void main() {
       ),
     );
     final bottomClip = bottomClipRect.clipper!.getClip(const Size(400, 600));
-    expect(bottomClip.top, 480);
-    expect(bottomClip.height, 120);
+    expect(bottomClip.top, 420);
+    expect(bottomClip.height, 180);
   });
 }

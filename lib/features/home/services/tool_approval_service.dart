@@ -25,8 +25,8 @@ class ToolApprovalRequest {
     required this.toolCallId,
     required this.toolName,
     required this.arguments,
-    required Completer<ToolApprovalResult> completer,
-  }) : _completer = completer;
+    required this._completer,
+  });
 }
 
 /// Manages approval state for MCP tool calls that require user confirmation.

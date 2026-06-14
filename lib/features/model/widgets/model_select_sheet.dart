@@ -273,11 +273,16 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   final Map<String, GlobalKey> _providerTabKeys = <String, GlobalKey>{};
   static const double _initialSize = 0.8;
   static const double _maxSize = 0.8;
-  static const double _stickyProviderHeaderHeight = 38;
+  static const double _stickyProviderHeaderHeight = 30;
+  static const double _estimatedHeaderExtent = 39;
+  static const double _estimatedModelExtent = 79;
+  static const double _listBottomPadding = 12;
+  // static const double _currentSelectionScrollMargin = 10;
   String _lastQuery = '';
   String? _activeProviderKey;
   int _stickySwitchDirection = 1;
   bool _activeProviderUpdateScheduled = false;
+  double _listViewportHeight = 0;
   // ScrollablePositionedList controllers
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener =
@@ -477,25 +482,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       return;
     }
 
-    final settings = context.read<SettingsProvider>();
-    final assistant = context.read<AssistantProvider>().currentAssistant;
-
-    // Use assistant's model if set, otherwise fall back to global default
-    final pk = assistant?.chatModelProvider ?? settings.currentModelProvider;
-    final mid = assistant?.chatModelId ?? settings.currentModelId;
-    if (pk == null || mid == null) return;
-
     // Optionally expand a bit for better context
     await _expandSheetIfNeeded(
       _initialSize.clamp(0.0, _maxSize),
       duration: const Duration(milliseconds: 200),
     );
-
-    // If current model is pinned and favorites section is visible, jump there first
-    final currentKey = '$pk::$mid';
-    final bool showFavorites =
-        widget.limitProviderKey == null && (_search.text.isEmpty);
-    final bool isPinned = settings.pinnedModels.contains(currentKey);
 
     // Ensure the list is attached before attempting to scroll
     if (!_itemScrollController.isAttached) {
@@ -508,17 +499,14 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       return;
     }
 
-    int? targetIndex;
-    if (showFavorites && isPinned) {
-      targetIndex = _favModelIndexMap[currentKey];
-    }
-    targetIndex ??= _modelIndexMap[currentKey];
-    targetIndex ??= _headerIndexMap[pk];
+    final targetIndex = _currentSelectionTargetIndex();
 
     if (targetIndex != null) {
+      final alignment = _currentSelectionScrollAlignment(targetIndex);
       try {
         await _itemScrollController.scrollTo(
           index: targetIndex,
+          alignment: alignment,
           duration: const Duration(milliseconds: 360),
           curve: Curves.easeOutCubic,
         );
@@ -529,7 +517,8 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           if (!mounted || _autoScrolled) return;
           try {
             await _itemScrollController.scrollTo(
-              index: targetIndex!,
+              index: targetIndex,
+              alignment: alignment,
               duration: const Duration(milliseconds: 360),
               curve: Curves.easeOutCubic,
             );
@@ -538,6 +527,54 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         });
       }
     }
+  }
+
+  int? _currentSelectionTargetIndex() {
+    if (_search.text.trim().isNotEmpty) return null;
+
+    final settings = context.read<SettingsProvider>();
+    final assistant = context.read<AssistantProvider>().currentAssistant;
+
+    final pk = assistant?.chatModelProvider ?? settings.currentModelProvider;
+    final mid = assistant?.chatModelId ?? settings.currentModelId;
+    if (pk == null || mid == null) return null;
+
+    final currentKey = '$pk::$mid';
+    if (widget.limitProviderKey == null &&
+        settings.pinnedModels.contains(currentKey)) {
+      final favIndex = _favModelIndexMap[currentKey];
+      if (favIndex != null) return favIndex;
+    }
+
+    return _modelIndexMap[currentKey] ?? _headerIndexMap[pk];
+  }
+
+  double _currentSelectionScrollAlignment(int targetIndex) {
+    if (_listViewportHeight <= 0) {
+      return 0;
+    }
+    final topAlignment = widget.limitProviderKey == null
+        ? (_stickyProviderHeaderHeight / _listViewportHeight).clamp(0.0, 0.3)
+        : 0.0;
+    if (_rows.length <= 1) return topAlignment;
+
+    final remainingExtent = _estimatedRemainingExtentFrom(targetIndex);
+    final topAlignedRequiredExtent = _listViewportHeight * (1 - topAlignment);
+    if (remainingExtent >= topAlignedRequiredExtent) return topAlignment;
+
+    final tailAlignment = 1.0 - (remainingExtent / _listViewportHeight);
+    return tailAlignment.clamp(topAlignment, 0.72);
+  }
+
+  double _estimatedRemainingExtentFrom(int targetIndex) {
+    var extent = _listBottomPadding;
+    for (var i = targetIndex; i < _rows.length; i++) {
+      final row = _rows[i];
+      extent += row is _HeaderRow
+          ? _estimatedHeaderExtent
+          : _estimatedModelExtent;
+    }
+    return extent;
   }
 
   // Scroll to the first matching provider group when searching.
@@ -668,7 +705,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       }
       _activeProviderKey = nextKey;
     });
-    if (nextKey != null) _scrollProviderTabIntoView(nextKey);
+    if (nextKey != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _scrollProviderTabIntoView(nextKey);
+      });
+    }
   }
 
   void _scrollProviderTabIntoView(String providerKey) {
@@ -977,33 +1018,49 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
     _scheduleActiveProviderUpdate();
 
-    return Stack(
-      children: [
-        ScrollablePositionedList.builder(
-          itemCount: _rows.length,
-          itemScrollController: _itemScrollController,
-          itemPositionsListener: _itemPositionsListener,
-          padding: const EdgeInsets.only(bottom: 12),
-          itemBuilder: (context, index) {
-            final row = _rows[index];
-            if (row is _HeaderRow) {
-              return _sectionHeader(
-                context,
-                row.title,
-                providerKey: row.providerKey,
-              );
-            } else if (row is _ModelRow) {
-              return _modelTile(
-                context,
-                row.item,
-                showProviderLabel: row.showProviderLabel,
-              );
-            }
-            return const SizedBox.shrink();
-          },
-        ),
-        _stickyProviderHeader(context),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _listViewportHeight = constraints.maxHeight;
+        return Stack(
+          children: [
+            ScrollablePositionedList.builder(
+              itemCount: _rows.length,
+              itemScrollController: _itemScrollController,
+              itemPositionsListener: _itemPositionsListener,
+              padding: const EdgeInsets.only(bottom: 12),
+              itemBuilder: (context, index) {
+                final row = _rows[index];
+                if (row is _HeaderRow) {
+                  return _sectionHeader(
+                    context,
+                    row.title,
+                    providerKey: row.providerKey,
+                  );
+                } else if (row is _ModelRow) {
+                  return _modelTile(
+                    context,
+                    row.item,
+                    showProviderLabel: row.showProviderLabel,
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+            if (widget.limitProviderKey == null)
+              Positioned(
+                top: -1,
+                left: 0,
+                right: 0,
+                child: ColoredBox(
+                  key: const ValueKey('model-selector-top-seam-cover'),
+                  color: Theme.of(context).colorScheme.surface,
+                  child: const SizedBox(height: 1),
+                ),
+              ),
+            if (_activeProviderKey != null) _stickyProviderHeader(context),
+          ],
+        );
+      },
     );
   }
 
@@ -1057,14 +1114,14 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
 
     final cs = Theme.of(context).colorScheme;
     return Positioned(
-      top: 0,
+      top: -1,
       left: 0,
       right: 0,
       child: DecoratedBox(
         key: const ValueKey('model-selector-sticky-provider'),
         decoration: BoxDecoration(color: cs.surface),
         child: SizedBox(
-          height: _stickyProviderHeaderHeight,
+          height: _stickyProviderHeaderHeight + 1,
           child: ClipRect(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
@@ -1098,7 +1155,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
               },
               child: Padding(
                 key: ValueKey('sticky-provider-$providerKey'),
-                padding: const EdgeInsets.fromLTRB(16, 9, 16, 7),
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 5),
                 child: Row(
                   children: [
                     Expanded(

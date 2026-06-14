@@ -4095,7 +4095,7 @@ class _AssistantInlineTileState extends State<_AssistantInlineTile> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: _isDesktop ? 14 : 15,
-                  fontWeight: AppFontWeights.semibold,
+                  fontWeight: AppFontWeights.medium,
                   color: widget.textColor,
                 ),
               ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../icons/lucide_adapter.dart';
@@ -72,7 +74,7 @@ class CustomBottomSheet extends StatefulWidget {
 class _CustomBottomSheetState extends State<CustomBottomSheet>
     with SingleTickerProviderStateMixin {
   static const double _flingVelocityThreshold = 400;
-  static const double _dismissDistanceThreshold = 200;
+  static const double _dismissDistanceThreshold = 150;
   static const double _dismissExtentGapPx = 10;
 
   late final AnimationController _sheetAnimationController;
@@ -318,6 +320,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
     _contentDragChangedSheetTop = true;
     if (shouldExpandSheet) _restoreScrollToTop();
     _dragSheetBy(deltaY, expandedTop: expandedTop, hiddenTop: hiddenTop);
+    _restoreScrollToTopAfterPointerEvent();
   }
 
   void _endContentDrag(
@@ -356,8 +359,16 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
   void _restoreScrollToTop() {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
-    if (position.pixels <= position.minScrollExtent) return;
-    position.jumpTo(position.minScrollExtent);
+    final top = position.minScrollExtent;
+    if ((position.pixels - top).abs() < 0.5) return;
+    position.jumpTo(top);
+  }
+
+  void _restoreScrollToTopAfterPointerEvent() {
+    scheduleMicrotask(() {
+      if (!mounted || !_contentDragChangedSheetTop) return;
+      _restoreScrollToTop();
+    });
   }
 
   void _dragSheetBy(

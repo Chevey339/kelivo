@@ -40,6 +40,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
   late TextEditingController _s3SecretAccessKey;
   late TextEditingController _s3SessionToken;
   late TextEditingController _s3Prefix;
+  late TextEditingController _webDavUserAgent;
+  late TextEditingController _s3UserAgent;
   bool _includeChats = true;
   bool _includeFiles = true;
   bool _s3PathStyle = true;
@@ -53,6 +55,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     _username = TextEditingController(text: cfg.username);
     _password = TextEditingController(text: cfg.password);
     _path = TextEditingController(text: cfg.path);
+    _webDavUserAgent = TextEditingController(text: cfg.userAgent);
     _includeChats = cfg.includeChats;
     _includeFiles = cfg.includeFiles;
 
@@ -64,6 +67,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     _s3SecretAccessKey = TextEditingController(text: s3.secretAccessKey);
     _s3SessionToken = TextEditingController(text: s3.sessionToken);
     _s3Prefix = TextEditingController(text: s3.prefix);
+    _s3UserAgent = TextEditingController(text: s3.userAgent);
     _s3PathStyle = s3.pathStyle;
   }
 
@@ -80,6 +84,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     _s3SecretAccessKey.dispose();
     _s3SessionToken.dispose();
     _s3Prefix.dispose();
+    _webDavUserAgent.dispose();
+    _s3UserAgent.dispose();
     super.dispose();
   }
 
@@ -89,6 +95,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       username: _username.text.trim(),
       password: _password.text,
       path: _path.text.trim().isEmpty ? 'kelivo_backups' : _path.text.trim(),
+      userAgent: _webDavUserAgent.text.trim(),
       includeChats: _includeChats,
       includeFiles: _includeFiles,
     );
@@ -107,6 +114,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     String? username,
     String? password,
     String? path,
+    String? userAgent,
     bool? includeChats,
     bool? includeFiles,
   }) async {
@@ -119,6 +127,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       path:
           path ??
           (_path.text.trim().isEmpty ? 'kelivo_backups' : _path.text.trim()),
+      userAgent: userAgent ?? _webDavUserAgent.text.trim(),
       includeChats: includeChats ?? _includeChats,
       includeFiles: includeFiles ?? _includeFiles,
     );
@@ -140,6 +149,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
           ? 'kelivo_backups'
           : _s3Prefix.text.trim(),
       pathStyle: _s3PathStyle,
+      userAgent: _s3UserAgent.text.trim(),
       includeChats: _includeChats,
       includeFiles: _includeFiles,
     );
@@ -162,6 +172,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     String? sessionToken,
     String? prefix,
     bool? pathStyle,
+    String? userAgent,
     bool? includeChats,
     bool? includeFiles,
   }) async {
@@ -182,6 +193,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               ? 'kelivo_backups'
               : _s3Prefix.text.trim()),
       pathStyle: pathStyle ?? _s3PathStyle,
+      userAgent: userAgent ?? _s3UserAgent.text.trim(),
       includeChats: includeChats ?? _includeChats,
       includeFiles: includeFiles ?? _includeFiles,
     );
@@ -344,6 +356,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
+              _buildLocalBackupSliver(context, l10n, cs),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
               // WebDAV settings card with left label right input, realtime save
               SliverToBoxAdapter(
                 child: _sectionCard(
@@ -427,6 +443,22 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                             context,
                           ).copyWith(hintText: 'kelivo_backups'),
                           onChanged: (v) => _applyPartial(path: v),
+                        ),
+                      ),
+                    ),
+                    _rowDivider(context),
+                    _ItemRow(
+                      label: l10n.backupPageUserAgent,
+                      trailing: SizedBox(
+                        width: 420,
+                        child: TextField(
+                          controller: _webDavUserAgent,
+                          enabled: !busy,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: _deskInputDecoration(
+                            context,
+                          ).copyWith(hintText: l10n.backupPageUserAgentHint),
+                          onChanged: (v) => _applyPartial(userAgent: v),
                         ),
                       ),
                     ),
@@ -669,6 +701,22 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     ),
                     _rowDivider(context),
                     _ItemRow(
+                      label: l10n.backupPageUserAgent,
+                      trailing: SizedBox(
+                        width: 420,
+                        child: TextField(
+                          controller: _s3UserAgent,
+                          enabled: !busy,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: _deskInputDecoration(
+                            context,
+                          ).copyWith(hintText: l10n.backupPageUserAgentHint),
+                          onChanged: (v) => _applyS3Partial(userAgent: v),
+                        ),
+                      ),
+                    ),
+                    _rowDivider(context),
+                    _ItemRow(
                       label: l10n.backupPageS3PathStyle,
                       trailing: IosSwitch(
                         value: _s3PathStyle,
@@ -780,251 +828,245 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                   ],
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-              const SliverToBoxAdapter(child: SizedBox(height: 10)),
-
-              // Local import/export
-              SliverToBoxAdapter(
-                child: _sectionCard(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            l10n.backupPageLocalBackup,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: AppFontWeights.semibold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        _DeskIosButton(
-                          label: l10n.backupPageExportToFile,
-                          filled: false,
-                          dense: true,
-                          onTap: () async {
-                            final backupProvider = context
-                                .read<BackupProvider>();
-                            await _saveConfig();
-                            final file = await backupProvider.exportToFile();
-                            String? savePath = await FilePicker.platform
-                                .saveFile(
-                                  dialogTitle: l10n.backupPageExportToFile,
-                                  fileName: file.uri.pathSegments.last,
-                                  type: FileType.custom,
-                                  allowedExtensions: ['zip'],
-                                );
-                            if (savePath != null) {
-                              try {
-                                await File(
-                                  savePath,
-                                ).parent.create(recursive: true);
-                                await file.copy(savePath);
-                                if (context.mounted) {
-                                  await context
-                                      .read<BackupReminderProvider>()
-                                      .recordBackupCompleted();
-                                }
-                              } catch (_) {}
-                            }
-                          },
-                        ),
-                        _DeskIosButton(
-                          label: l10n.backupPageImportBackupFile,
-                          filled: false,
-                          dense: true,
-                          onTap: () async {
-                            final backupProvider = context
-                                .read<BackupProvider>();
-                            final result = await FilePicker.platform.pickFiles(
-                              type: FileType.any,
-                              allowMultiple: false,
-                            );
-                            final path = result?.files.single.path;
-                            if (path == null) return;
-                            final f = File(path);
-                            await _chooseRestoreModeAndRun((mode) async {
-                              await backupProvider.restoreFromLocalFile(
-                                f,
-                                mode: mode,
-                              );
-                            });
-                          },
-                        ),
-                        _DeskIosButton(
-                          label: l10n.backupPageImportFromCherryStudio,
-                          filled: false,
-                          dense: true,
-                          onTap: () async {
-                            final rootCtx = Navigator.of(
-                              context,
-                              rootNavigator: true,
-                            ).context;
-                            final result = await FilePicker.platform.pickFiles(
-                              type: FileType.any,
-                              allowMultiple: false,
-                            );
-                            final path = result?.files.single.path;
-                            if (path == null) return;
-                            final f = File(path);
-                            if (!context.mounted) return;
-                            final mode = await showDialog<RestoreMode>(
-                              context: context,
-                              builder: (_) => _RestoreModeDialog(),
-                            );
-                            if (mode == null) return;
-                            if (!context.mounted) return;
-                            final settings = context.read<SettingsProvider>();
-                            final chat = context.read<ChatService>();
-                            try {
-                              await CherryImporter.importFromCherryStudio(
-                                file: f,
-                                mode: mode,
-                                settings: settings,
-                                chatService: chat,
-                              );
-                              if (!rootCtx.mounted) return;
-                              await showDialog(
-                                context: rootCtx,
-                                builder: (dctx) => AlertDialog(
-                                  backgroundColor: cs.surface,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  title: Text(l10n.backupPageRestartRequired),
-                                  content: Text(l10n.backupPageRestartContent),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () async {
-                                        Navigator.of(rootCtx).pop();
-                                        PlatformUtils.restartApp();
-                                      },
-                                      child: Text(l10n.backupPageOK),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            } catch (e) {
-                              if (!rootCtx.mounted) return;
-                              await showDialog(
-                                context: rootCtx,
-                                builder: (dctx) => AlertDialog(
-                                  backgroundColor: cs.surface,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  title: Text('Error'),
-                                  content: Text(e.toString()),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.of(dctx).pop(),
-                                      child: Text(l10n.backupPageOK),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                        _DeskIosButton(
-                          label: l10n.backupPageImportFromChatbox,
-                          filled: false,
-                          dense: true,
-                          onTap: () async {
-                            final rootCtx = Navigator.of(
-                              context,
-                              rootNavigator: true,
-                            ).context;
-                            final result = await FilePicker.platform.pickFiles(
-                              type: FileType.custom,
-                              allowedExtensions: ['json'],
-                              allowMultiple: false,
-                            );
-                            final path = result?.files.single.path;
-                            if (path == null) return;
-                            final f = File(path);
-                            if (!context.mounted) return;
-                            final mode = await showDialog<RestoreMode>(
-                              context: context,
-                              builder: (_) => _RestoreModeDialog(),
-                            );
-                            if (mode == null) return;
-                            if (!context.mounted) return;
-                            final settings = context.read<SettingsProvider>();
-                            final chat = context.read<ChatService>();
-                            try {
-                              final res =
-                                  await ChatboxImporter.importFromChatbox(
-                                    file: f,
-                                    mode: mode,
-                                    settings: settings,
-                                    chatService: chat,
-                                  );
-                              if (!rootCtx.mounted) return;
-                              await showDialog(
-                                context: rootCtx,
-                                builder: (dctx) => AlertDialog(
-                                  backgroundColor: cs.surface,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  title: Text(l10n.backupPageRestartRequired),
-                                  content: Text(
-                                    '${l10n.backupPageImportFromChatbox}:\n'
-                                    ' • Providers: ${res.providers}\n'
-                                    ' • Assistants: ${res.assistants}\n'
-                                    ' • Conversations: ${res.conversations}\n'
-                                    ' • Messages: ${res.messages}\n\n'
-                                    '${l10n.backupPageRestartContent}',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () async {
-                                        Navigator.of(rootCtx).pop();
-                                        PlatformUtils.restartApp();
-                                      },
-                                      child: Text(l10n.backupPageOK),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            } catch (e) {
-                              if (!rootCtx.mounted) return;
-                              await showDialog(
-                                context: rootCtx,
-                                builder: (dctx) => AlertDialog(
-                                  backgroundColor: cs.surface,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  title: Text('Error'),
-                                  content: Text(e.toString()),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.of(dctx).pop(),
-                                      child: Text(l10n.backupPageOK),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
+  Widget _buildLocalBackupSliver(
+    BuildContext context,
+    AppLocalizations l10n,
+    ColorScheme cs,
+  ) {
+    return SliverToBoxAdapter(
+      child: _sectionCard(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.backupPageLocalBackup,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: AppFontWeights.semibold,
+                  ),
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _DeskIosButton(
+                label: l10n.backupPageExportToFile,
+                filled: false,
+                dense: true,
+                onTap: () async {
+                  final backupProvider = context.read<BackupProvider>();
+                  await _saveConfig();
+                  final file = await backupProvider.exportToFile();
+                  String? savePath = await FilePicker.platform.saveFile(
+                    dialogTitle: l10n.backupPageExportToFile,
+                    fileName: file.uri.pathSegments.last,
+                    type: FileType.custom,
+                    allowedExtensions: ['zip'],
+                  );
+                  if (savePath != null) {
+                    try {
+                      await File(savePath).parent.create(recursive: true);
+                      await file.copy(savePath);
+                      if (context.mounted) {
+                        await context
+                            .read<BackupReminderProvider>()
+                            .recordBackupCompleted();
+                      }
+                    } catch (_) {}
+                  }
+                },
+              ),
+              _DeskIosButton(
+                label: l10n.backupPageImportBackupFile,
+                filled: false,
+                dense: true,
+                onTap: () async {
+                  final backupProvider = context.read<BackupProvider>();
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.any,
+                    allowMultiple: false,
+                  );
+                  final path = result?.files.single.path;
+                  if (path == null) return;
+                  final f = File(path);
+                  await _chooseRestoreModeAndRun((mode) async {
+                    await backupProvider.restoreFromLocalFile(f, mode: mode);
+                  });
+                },
+              ),
+              _DeskIosButton(
+                label: l10n.backupPageImportFromCherryStudio,
+                filled: false,
+                dense: true,
+                onTap: () async {
+                  final rootCtx = Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).context;
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.any,
+                    allowMultiple: false,
+                  );
+                  final path = result?.files.single.path;
+                  if (path == null) return;
+                  final f = File(path);
+                  if (!context.mounted) return;
+                  final mode = await showDialog<RestoreMode>(
+                    context: context,
+                    builder: (_) => _RestoreModeDialog(),
+                  );
+                  if (mode == null) return;
+                  if (!context.mounted) return;
+                  final settings = context.read<SettingsProvider>();
+                  final chat = context.read<ChatService>();
+                  try {
+                    await CherryImporter.importFromCherryStudio(
+                      file: f,
+                      mode: mode,
+                      settings: settings,
+                      chatService: chat,
+                    );
+                    if (!rootCtx.mounted) return;
+                    await showDialog(
+                      context: rootCtx,
+                      builder: (dctx) => AlertDialog(
+                        backgroundColor: cs.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        title: Text(l10n.backupPageRestartRequired),
+                        content: Text(l10n.backupPageRestartContent),
+                        actions: [
+                          TextButton(
+                            onPressed: () async {
+                              Navigator.of(rootCtx).pop();
+                              PlatformUtils.restartApp();
+                            },
+                            child: Text(l10n.backupPageOK),
+                          ),
+                        ],
+                      ),
+                    );
+                  } catch (e) {
+                    if (!rootCtx.mounted) return;
+                    await showDialog(
+                      context: rootCtx,
+                      builder: (dctx) => AlertDialog(
+                        backgroundColor: cs.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        title: Text(l10n.backupPageImportFromCherryStudio),
+                        content: Text(e.toString()),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(dctx).pop(),
+                            child: Text(l10n.backupPageOK),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
+              ),
+              _DeskIosButton(
+                label: l10n.backupPageImportFromChatbox,
+                filled: false,
+                dense: true,
+                onTap: () async {
+                  final rootCtx = Navigator.of(
+                    context,
+                    rootNavigator: true,
+                  ).context;
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.custom,
+                    allowedExtensions: ['json'],
+                    allowMultiple: false,
+                  );
+                  final path = result?.files.single.path;
+                  if (path == null) return;
+                  final f = File(path);
+                  if (!context.mounted) return;
+                  final mode = await showDialog<RestoreMode>(
+                    context: context,
+                    builder: (_) => _RestoreModeDialog(),
+                  );
+                  if (mode == null) return;
+                  if (!context.mounted) return;
+                  final settings = context.read<SettingsProvider>();
+                  final chat = context.read<ChatService>();
+                  try {
+                    final res = await ChatboxImporter.importFromChatbox(
+                      file: f,
+                      mode: mode,
+                      settings: settings,
+                      chatService: chat,
+                    );
+                    if (!rootCtx.mounted) return;
+                    await showDialog(
+                      context: rootCtx,
+                      builder: (dctx) => AlertDialog(
+                        backgroundColor: cs.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        title: Text(l10n.backupPageRestartRequired),
+                        content: Text(
+                          '${l10n.backupPageImportFromChatbox}:\n'
+                          ' • Providers: ${res.providers}\n'
+                          ' • Assistants: ${res.assistants}\n'
+                          ' • Conversations: ${res.conversations}\n'
+                          ' • Messages: ${res.messages}\n\n'
+                          '${l10n.backupPageRestartContent}',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () async {
+                              Navigator.of(rootCtx).pop();
+                              PlatformUtils.restartApp();
+                            },
+                            child: Text(l10n.backupPageOK),
+                          ),
+                        ],
+                      ),
+                    );
+                  } catch (e) {
+                    if (!rootCtx.mounted) return;
+                    await showDialog(
+                      context: rootCtx,
+                      builder: (dctx) => AlertDialog(
+                        backgroundColor: cs.surface,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        title: Text(l10n.backupPageImportFromChatbox),
+                        content: Text(e.toString()),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(dctx).pop(),
+                            child: Text(l10n.backupPageOK),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

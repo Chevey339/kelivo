@@ -37,6 +37,12 @@ void main() {
       expect(assistant.localToolIds, isEmpty);
     });
 
+    test('assistant defaults to web search disabled', () {
+      const assistant = Assistant(id: 'a1', name: 'Assistant');
+
+      expect(assistant.searchEnabled, isFalse);
+    });
+
     test('assistant json keeps missing local tools disabled', () {
       final assistant = Assistant.fromJson(const {
         'id': 'a1',
@@ -44,6 +50,27 @@ void main() {
       });
 
       expect(assistant.localToolIds, isEmpty);
+    });
+
+    test('assistant json keeps missing web search disabled', () {
+      final assistant = Assistant.fromJson(const {
+        'id': 'a1',
+        'name': 'Assistant',
+      });
+
+      expect(assistant.searchEnabled, isFalse);
+    });
+
+    test('assistant json round trips enabled web search', () {
+      const assistant = Assistant(
+        id: 'a1',
+        name: 'Assistant',
+        searchEnabled: true,
+      );
+
+      final decoded = Assistant.fromJson(assistant.toJson());
+
+      expect(decoded.searchEnabled, isTrue);
     });
 
     test('assistant json round trips enabled local tools', () {

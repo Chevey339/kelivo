@@ -11,6 +11,11 @@ const _transparentPngDataUrl =
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwAD'
     'hgGAWjR9awAAAABJRU5ErkJggg==';
 
+const _widePngDataUrl =
+    'data:image/png;base64,'
+    'iVBORw0KGgoAAAANSUhEUgAAABQAAAAKCAYAAAC0VX7mAAAAF0lEQVR4nGP4z8Dw'
+    'n5qYYdTAUQOHo4EAf0SOgJVcF6MAAAAASUVORK5CYII=';
+
 const _transparentPngBytes = <int>[
   0x89,
   0x50,
@@ -252,6 +257,30 @@ void main() {
         tester.getSize(find.byType(Image)).width,
         moreOrLessEquals(_mobileSize.width, epsilon: 0.1),
       );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('ImageViewerPage hero frame matches the displayed image bounds', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    _setTestViewSize(tester, _mobileSize);
+    try {
+      await tester.pumpWidget(
+        _viewerApp(images: const [_widePngDataUrl], size: _mobileSize),
+      );
+      await tester.pumpAndSettle();
+
+      final heroSize = tester.getSize(find.byType(Hero));
+
+      expect(heroSize.width, moreOrLessEquals(_mobileSize.width, epsilon: 0.1));
+      expect(
+        heroSize.height,
+        moreOrLessEquals(_mobileSize.width / 2, epsilon: 0.1),
+      );
+      expect(heroSize.height, lessThan(_mobileSize.height / 3));
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

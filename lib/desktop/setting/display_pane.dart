@@ -139,6 +139,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _BackgroundMaskRow(),
                   _RowDivider(),
+                  _ChatInputBackgroundOpacityRow(),
+                  _RowDivider(),
                   _ToggleRowRequestLogging(),
                   _RowDivider(),
                   _ToggleRowFlutterLogging(),
@@ -2788,6 +2790,123 @@ class _BackgroundMaskRowState extends State<_BackgroundMaskRow> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ChatInputBackgroundOpacityRow extends StatefulWidget {
+  const _ChatInputBackgroundOpacityRow();
+  @override
+  State<_ChatInputBackgroundOpacityRow> createState() =>
+      _ChatInputBackgroundOpacityRowState();
+}
+
+class _ChatInputBackgroundOpacityRowState
+    extends State<_ChatInputBackgroundOpacityRow> {
+  late final TextEditingController _lightController;
+  late final TextEditingController _darkController;
+  @override
+  void initState() {
+    super.initState();
+    final settings = context.read<SettingsProvider>();
+    _lightController = TextEditingController(
+      text: '${(settings.chatInputBackgroundOpacityLight * 100).round()}',
+    );
+    _darkController = TextEditingController(
+      text: '${(settings.chatInputBackgroundOpacityDark * 100).round()}',
+    );
+  }
+
+  @override
+  void dispose() {
+    _lightController.dispose();
+    _darkController.dispose();
+    super.dispose();
+  }
+
+  void _commit(Brightness brightness, TextEditingController controller) {
+    final text = controller.text;
+    final v = text.trim();
+    final n = double.tryParse(v);
+    if (n == null) return;
+    final clamped = (n / 100.0).clamp(0.0, 1.0);
+    context.read<SettingsProvider>().setChatInputBackgroundOpacity(
+      brightness,
+      clamped,
+    );
+    controller.text = '${(clamped * 100).round()}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return _LabeledRow(
+      label: l10n.displaySettingsPageChatInputBackgroundOpacityTitle,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _OpacityInputGroup(
+            label: l10n.settingsPageLightMode,
+            controller: _lightController,
+            onCommit: () => _commit(Brightness.light, _lightController),
+          ),
+          const SizedBox(width: 12),
+          _OpacityInputGroup(
+            label: l10n.settingsPageDarkMode,
+            controller: _darkController,
+            onCommit: () => _commit(Brightness.dark, _darkController),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OpacityInputGroup extends StatelessWidget {
+  const _OpacityInputGroup({
+    required this.label,
+    required this.controller,
+    required this.onCommit,
+  });
+  final String label;
+  final TextEditingController controller;
+  final VoidCallback onCommit;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: cs.onSurface.withValues(alpha: 0.72),
+            fontSize: 13,
+            decoration: TextDecoration.none,
+          ),
+        ),
+        const SizedBox(width: 6),
+        IntrinsicWidth(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 36, maxWidth: 72),
+            child: _BorderInput(
+              controller: controller,
+              onSubmitted: (_) => onCommit(),
+              onFocusLost: (_) => onCommit(),
+            ),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          '%',
+          style: TextStyle(
+            color: cs.onSurface.withValues(alpha: 0.7),
+            fontSize: 14,
+            decoration: TextDecoration.none,
+          ),
+        ),
+      ],
     );
   }
 }

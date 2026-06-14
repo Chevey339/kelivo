@@ -5,7 +5,10 @@ import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/theme/palettes.dart';
+import 'package:Kelivo/theme/theme_factory.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -256,12 +259,19 @@ List<int> _displayedImageBytes(WidgetTester tester) {
   return (provider as MemoryImage).bytes;
 }
 
+Finder _findSoftHorizontalRule() {
+  return find.byKey(const ValueKey('markdown-soft-horizontal-rule'));
+}
+
 Widget _markdownHarness(
   String text, {
   double? width,
   bool streaming = false,
   Map<String, Object>? preferences,
   void Function(String id)? onCitationTap,
+  ThemeData? theme,
+  ThemeData? darkTheme,
+  ThemeMode? themeMode,
 }) {
   SharedPreferences.setMockInitialValues(preferences ?? {});
   return ChangeNotifierProvider(
@@ -269,6 +279,9 @@ Widget _markdownHarness(
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      theme: theme,
+      darkTheme: darkTheme,
+      themeMode: themeMode,
       home: Scaffold(
         body: width == null
             ? MarkdownWithCodeHighlight(
@@ -382,6 +395,60 @@ void main() {
       '| Bob \\| Jr. | said "hello" |  |',
     );
   });
+
+  testWidgets(
+    'MarkdownWithCodeHighlight renders markdown horizontal rule markers',
+    (tester) async {
+      for (final marker in ['---', '***', '___']) {
+        await tester.pumpWidget(
+          _markdownHarness('Before\n\n$marker\n\nAfter', width: 360),
+        );
+        await tester.pump();
+
+        expect(
+          _findSoftHorizontalRule(),
+          findsOneWidget,
+          reason: '$marker should render as a horizontal rule',
+        );
+        expect(
+          find.textContaining(marker),
+          findsNothing,
+          reason: '$marker should not remain as visible marker text',
+        );
+        expect(find.textContaining('Before'), findsOneWidget);
+        expect(find.textContaining('After'), findsOneWidget);
+      }
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps non-hr asterisks out of horizontal rules',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('''
+* list item
+
+Inline ***strong emphasis*** text.
+
+```markdown
+***
+```
+''', width: 360),
+      );
+      await tester.pump();
+
+      expect(_findSoftHorizontalRule(), findsNothing);
+      expect(find.textContaining('list item'), findsOneWidget);
+      expect(find.textContaining('strong emphasis'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(SelectableHighlightView),
+          matching: find.textContaining('***'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'MarkdownWithCodeHighlight renders grouped raw citation metadata as separate capsules',
@@ -1191,9 +1258,15 @@ ${rows.join('\n')}
   );
 
   testWidgets(
-    'MarkdownWithCodeHighlight renders blockquote as neutral leading line',
+    'MarkdownWithCodeHighlight renders light default blockquote line as gray',
     (tester) async {
-      await tester.pumpWidget(_markdownHarness('> 引用内容\n> 第二行', width: 320));
+      await tester.pumpWidget(
+        _markdownHarness(
+          '> 引用内容\n> 第二行',
+          width: 320,
+          theme: buildLightThemeForScheme(ThemePalettes.defaultPalette.light),
+        ),
+      );
       await tester.pump();
 
       final blockquote = find.byKey(const ValueKey('markdown-blockquote'));
@@ -1213,7 +1286,43 @@ ${rows.join('\n')}
       final lineDecoration =
           tester.widget<DecoratedBox>(line).decoration as BoxDecoration;
       final cs = Theme.of(tester.element(blockquote)).colorScheme;
-      expect(lineDecoration.color, cs.outlineVariant.withValues(alpha: 0.82));
+      expect(lineDecoration.color, cs.onSurfaceVariant.withValues(alpha: 0.36));
+      expect(
+        lineDecoration.color,
+        isNot(cs.outlineVariant.withValues(alpha: 0.82)),
+      );
+      expect(lineDecoration.borderRadius, BorderRadius.circular(2));
+      expect(lineDecoration.border, isNull);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps dark default blockquote line gray',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          '> 引用内容\n> 第二行',
+          width: 320,
+          theme: buildLightThemeForScheme(ThemePalettes.defaultPalette.light),
+          darkTheme: buildDarkThemeForScheme(ThemePalettes.defaultPalette.dark),
+          themeMode: ThemeMode.dark,
+        ),
+      );
+      await tester.pump();
+
+      final blockquote = find.byKey(const ValueKey('markdown-blockquote'));
+      expect(blockquote, findsOneWidget);
+
+      final line = find.descendant(
+        of: blockquote,
+        matching: find.byKey(const ValueKey('markdown-blockquote-line')),
+      );
+      expect(line, findsOneWidget);
+
+      final lineDecoration =
+          tester.widget<DecoratedBox>(line).decoration as BoxDecoration;
+      final cs = Theme.of(tester.element(blockquote)).colorScheme;
+      expect(lineDecoration.color, cs.onSurfaceVariant.withValues(alpha: 0.48));
       expect(lineDecoration.borderRadius, BorderRadius.circular(2));
       expect(lineDecoration.border, isNull);
     },
@@ -2197,6 +2306,33 @@ A-->B
   );
 
   testWidgets(
+    r'MarkdownWithCodeHighlight keeps hex colors in inline math color commands',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+颜色\(\color{#FF5733}{A}\)，文字色\(\textcolor{#228B22}{B}\)，背景\(\colorbox{#197}{C}\)，符号\(#\)。
+'''),
+      );
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(4));
+      expect(
+        mathWidgets.map((widget) => widget.parseError),
+        everyElement(isNull),
+      );
+      final encoded = _encodedMathTex(tester);
+      expect(encoded[0].toLowerCase(), contains('ff5733'));
+      expect(encoded[0], isNot(contains(r'\#FF5733')));
+      expect(encoded[1].toLowerCase(), contains('228b22'));
+      expect(encoded[1], isNot(contains(r'\#228B22')));
+      expect(encoded[2], isNot(contains(r'\#197')));
+      expect(encoded[3], contains(r'\#'));
+      expect(find.textContaining(r'\(\color{#FF5733}{A}\)'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps literal double dollars from spanning prose',
     (tester) async {
       await tester.pumpWidget(
@@ -2579,37 +2715,154 @@ void main() {}
     expect(find.text('dart'), findsOneWidget);
   });
 
-  testWidgets('MarkdownWithCodeHighlight toggles auto-collapsed code block', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _markdownHarness(
-        '''
+  testWidgets(
+    'MarkdownWithCodeHighlight keeps details tags literal in html code blocks',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('''
+```html
+<!DOCTYPE html>
+<html>
+<body>
+<details>
+  <summary>点击展开/折叠内容</summary>
+  <p>这里是可以折叠的内容。</p>
+</details>
+</body>
+</html>
+```
+'''),
+      );
+      await tester.pump();
+
+      expect(find.text('html'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(SelectableHighlightView),
+          matching: find.textContaining('<details>'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(SelectableHighlightView),
+          matching: find.textContaining('<summary>点击展开/折叠内容</summary>'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('点击展开/折叠内容'), findsNothing);
+      expect(find.byKey(const ValueKey('details-collapsed')), findsNothing);
+      expect(find.byKey(const ValueKey('details-expanded')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight toggles auto-collapsed code block from header',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          '''
 ```dart
 line1
 line2
 line3
 ```
 ''',
-        preferences: const {
-          'display_auto_collapse_code_block_v1': true,
-          'display_auto_collapse_code_block_lines_v1': 2,
-        },
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.pumpAndSettle();
+          preferences: const {
+            'display_auto_collapse_code_block_v1': true,
+            'display_auto_collapse_code_block_lines_v1': 2,
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
 
-    expect(find.text('Expand'), findsOneWidget);
-    expect(find.textContaining('line3'), findsNothing);
-    expect(find.textContaining('folded'), findsNothing);
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('code-block-collapse-icon-switcher')),
+        findsOneWidget,
+      );
+      expect(find.byIcon(Lucide.ChevronRight), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('dart')).dx,
+        lessThan(tester.getTopLeft(find.byIcon(Lucide.ChevronRight)).dx),
+      );
+      expect(find.textContaining('line3'), findsNothing);
+      expect(find.textContaining('folded'), findsNothing);
 
-    await tester.tap(find.text('Expand'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Collapse'), findsOneWidget);
-    expect(find.textContaining('line3'), findsOneWidget);
-  });
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
+      expect(find.byIcon(Lucide.ChevronRight), findsNothing);
+      expect(find.textContaining('line3'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight shows collapsed code tail fade when hidden lines exist',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(
+          '''
+```dart
+fade1
+fade2
+fade3
+```
+''',
+          preferences: const {
+            'display_auto_collapse_code_block_v1': true,
+            'display_auto_collapse_code_block_lines_v1': 2,
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('code-block-collapsed-tail-fade')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('fade3'), findsNothing);
+
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('code-block-collapsed-tail-fade')),
+        findsNothing,
+      );
+      expect(find.textContaining('fade3'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight omits collapsed code tail fade without hidden lines',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness('''
+```dart
+exact1
+exact2
+```
+'''),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Lucide.ChevronRight), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('code-block-collapsed-tail-fade')),
+        findsNothing,
+      );
+      expect(find.textContaining('exact2'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'MarkdownWithCodeHighlight shows full code after auto-collapse is disabled',
@@ -2638,7 +2891,8 @@ disable3
       await settings.setAutoCollapseCodeBlock(true);
       await tester.pumpAndSettle();
 
-      expect(find.text('Expand'), findsOneWidget);
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
       expect(find.textContaining('disable3'), findsNothing);
 
       await settings.setAutoCollapseCodeBlock(false);
@@ -2646,6 +2900,18 @@ disable3
 
       expect(find.text('Expand'), findsNothing);
       expect(find.text('Collapse'), findsNothing);
+      expect(find.textContaining('disable3'), findsOneWidget);
+
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Lucide.ChevronRight), findsOneWidget);
+      expect(find.textContaining('disable3'), findsNothing);
+
+      await tester.tap(find.text('dart'));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Lucide.ChevronRight), findsNothing);
       expect(find.textContaining('disable3'), findsOneWidget);
     },
   );
@@ -2673,10 +2939,11 @@ alpha3
     await tester.pumpAndSettle();
     await tester.pumpAndSettle();
 
-    expect(find.text('Expand'), findsOneWidget);
+    expect(find.text('Expand'), findsNothing);
+    expect(find.text('Collapse'), findsNothing);
     expect(find.textContaining('alpha3'), findsNothing);
 
-    await tester.tap(find.text('Expand'));
+    await tester.tap(find.text('dart'));
     await tester.pumpAndSettle();
 
     streamText.value = '''
@@ -2689,10 +2956,11 @@ alpha4
 ''';
     await tester.pumpAndSettle();
 
-    expect(find.text('Collapse'), findsOneWidget);
+    expect(find.text('Expand'), findsNothing);
+    expect(find.text('Collapse'), findsNothing);
     expect(find.textContaining('alpha4'), findsOneWidget);
 
-    await tester.tap(find.text('Collapse'));
+    await tester.tap(find.text('dart'));
     await tester.pumpAndSettle();
 
     streamText.value = '''
@@ -2706,7 +2974,8 @@ alpha5
 ''';
     await tester.pumpAndSettle();
 
-    expect(find.text('Expand'), findsOneWidget);
+    expect(find.text('Expand'), findsNothing);
+    expect(find.text('Collapse'), findsNothing);
     expect(find.textContaining('alpha5'), findsNothing);
   });
 
@@ -2734,7 +3003,7 @@ press3
       await tester.pumpAndSettle();
 
       final expandGesture = await tester.startGesture(
-        tester.getCenter(find.text('Expand')),
+        tester.getCenter(find.text('dart')),
       );
       streamText.value = '''
 ```dart
@@ -2748,11 +3017,12 @@ press4
       await expandGesture.up();
       await tester.pumpAndSettle();
 
-      expect(find.text('Collapse'), findsOneWidget);
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
       expect(find.textContaining('press4'), findsOneWidget);
 
       final collapseGesture = await tester.startGesture(
-        tester.getCenter(find.text('Collapse')),
+        tester.getCenter(find.text('dart')),
       );
       streamText.value = '''
 ```dart
@@ -2767,7 +3037,8 @@ press5
       await collapseGesture.up();
       await tester.pumpAndSettle();
 
-      expect(find.text('Expand'), findsOneWidget);
+      expect(find.text('Expand'), findsNothing);
+      expect(find.text('Collapse'), findsNothing);
       expect(find.textContaining('press5'), findsNothing);
     },
   );

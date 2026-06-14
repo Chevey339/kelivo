@@ -9,7 +9,6 @@ import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
-import '../../../core/services/api/builtin_tools.dart';
 import '../utils/model_display_helper.dart';
 import 'chat_input_bar.dart';
 import 'model_icon.dart';
@@ -65,6 +64,7 @@ class ChatInputSection extends StatelessWidget {
     this.onClearContext,
     this.onCompressContext,
     this.conversationId,
+    this.sendButtonTooltip,
     this.backgroundImageActive = false,
   });
 
@@ -106,6 +106,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onClearContext;
   final VoidCallback? onCompressContext;
   final String? conversationId;
+  final String? sendButtonTooltip;
   final bool backgroundImageActive;
 
   @override
@@ -123,9 +124,6 @@ class ChatInputSection extends StatelessWidget {
     // Enforce model capabilities: disable MCP selection if model doesn't support tools
     _enforceModelCapabilities(context, settings, ap, a, pk, mid);
 
-    // Compute whether built-in search is active
-    final builtinSearchActive = _isBuiltinSearchActive(settings, a, pk, mid);
-
     final isDesktop = _isDesktopPlatform(context);
     final hasWorldBooks =
         isTablet && context.watch<WorldBookProvider>().books.isNotEmpty;
@@ -133,10 +131,6 @@ class ChatInputSection extends StatelessWidget {
     return ChatInputBar(
       key: inputBarKey,
       onMore: onMore,
-      searchEnabled: settings.searchEnabled || builtinSearchActive,
-      onToggleSearch: (enabled) {
-        context.read<SettingsProvider>().setSearchEnabled(enabled);
-      },
       onSelectModel: onSelectModel,
       onLongPressSelectModel: onLongPressSelectModel,
       conversationId: conversationId,
@@ -172,6 +166,7 @@ class ChatInputSection extends StatelessWidget {
       onOpenSearch: onOpenSearch,
       onSend: onSend,
       loading: isLoading,
+      sendButtonTooltip: sendButtonTooltip,
       hasQueuedInput: hasQueuedInput,
       queuedPreviewText: queuedPreviewText,
       onCancelQueuedInput: onCancelQueuedInput,
@@ -213,6 +208,8 @@ class ChatInputSection extends StatelessWidget {
       onClearContext: isTablet ? onClearContext : null,
       onCompressContext: isTablet ? onCompressContext : null,
       backgroundImageActive: backgroundImageActive,
+      inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
+      inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
     );
   }
 
@@ -257,17 +254,6 @@ class ChatInputSection extends StatelessWidget {
         });
       }
     }
-  }
-
-  bool _isBuiltinSearchActive(
-    SettingsProvider settings,
-    Assistant? a,
-    String? pk,
-    String? mid,
-  ) {
-    final cfg = getActiveProviderConfig(settings, assistant: a);
-    if (cfg == null || mid == null) return false;
-    return BuiltInToolsHelper.isBuiltInSearchEnabled(cfg: cfg, modelId: mid);
   }
 
   bool _shouldShowMcpButton(

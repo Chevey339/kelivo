@@ -79,6 +79,7 @@ class OcrService {
       extraHeaders: null,
       extraBody: null,
       stream: false,
+      ocrActive: true,
     );
 
     String out = '';

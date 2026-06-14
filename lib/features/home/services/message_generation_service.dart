@@ -180,6 +180,7 @@ class MessageGenerationService {
     messageBuilderService.injectSearchPrompt(
       apiMessages,
       settings,
+      assistant,
       hasBuiltInSearch,
     );
     await messageBuilderService.injectInstructionPrompts(
@@ -227,6 +228,21 @@ class MessageGenerationService {
     required ChatInputData input,
     required Assistant? assistant,
   }) async {
+    return chatService.addMessage(
+      conversationId: conversationId,
+      role: 'user',
+      content: MessageGenerationService.buildPersistedUserMessageContent(
+        input,
+        assistant: assistant,
+      ),
+    );
+  }
+
+  /// Build the persisted content string for a user message.
+  static String buildPersistedUserMessageContent(
+    ChatInputData input, {
+    required Assistant? assistant,
+  }) {
     final content = input.text.trim();
     final imageMarkers = input.imagePaths.map((p) => '\n[image:$p]').join();
     final docMarkers = input.documents
@@ -240,13 +256,7 @@ class MessageGenerationService {
       target: AssistantRegexTransformTarget.persist,
     );
 
-    return chatService.addMessage(
-      conversationId: conversationId,
-      role: 'user',
-      content: processedUserText + imageMarkers + docMarkers,
-      requestAllowImagesApiRouting: input.allowImagesApiRouting,
-      requestExtraBody: input.extraBody,
-    );
+    return processedUserText + imageMarkers + docMarkers;
   }
 
   /// Create assistant message placeholder.
@@ -304,6 +314,10 @@ class MessageGenerationService {
       if (assistantBody != null) ...assistantBody,
       if (requestExtraBody != null) ...requestExtraBody,
     };
+    final bool ocrActive =
+        settings.ocrEnabled &&
+        settings.ocrModelProvider != null &&
+        settings.ocrModelId != null;
 
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
@@ -325,6 +339,7 @@ class MessageGenerationService {
       supportsReasoning: supportsReasoning,
       enableReasoning: enableReasoning,
       streamOutput: assistant?.streamOutput ?? true,
+      ocrActive: ocrActive,
       generateTitleOnFinish: generateTitleOnFinish,
     );
   }

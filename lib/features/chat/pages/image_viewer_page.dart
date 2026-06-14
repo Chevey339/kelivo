@@ -44,7 +44,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
   late final AnimationController _restoreCtrl;
   late final List<TransformationController> _zoomCtrls;
   late final List<_ImageDisplayTransform> _displayTransforms;
-  late final List<GlobalKey> _imageKeys;
+  late final List<GlobalKey> _imageFrameKeys;
   late final AnimationController _zoomCtrl;
   VoidCallback? _zoomTick;
   final Map<String, Size> _imageNaturalSizes = <String, Size>{};
@@ -103,7 +103,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       (_) => const _ImageDisplayTransform(),
       growable: false,
     );
-    _imageKeys = List<GlobalKey>.generate(
+    _imageFrameKeys = List<GlobalKey>.generate(
       widget.images.length,
       (_) => GlobalKey(),
       growable: false,
@@ -270,7 +270,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     }
   }
 
-  void _rememberImageNaturalSize(String src, Size size) {
+  void _rememberImageNaturalSize(String src, Size size, {bool notify = true}) {
     if (size.width <= 0 || size.height <= 0) return;
     final current = _imageNaturalSizes[src];
     if (current != null &&
@@ -279,7 +279,25 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       return;
     }
     _imageNaturalSizes[src] = size;
-    _markImageSizeChanged();
+    if (notify) {
+      _markImageSizeChanged();
+    }
+  }
+
+  Size? _readImageSizeFromBytes(Uint8List bytes) {
+    if (bytes.length >= 24 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47 &&
+        bytes[4] == 0x0D &&
+        bytes[5] == 0x0A &&
+        bytes[6] == 0x1A &&
+        bytes[7] == 0x0A) {
+      final data = ByteData.sublistView(bytes);
+      return Size(data.getUint32(16).toDouble(), data.getUint32(20).toDouble());
+    }
+    return null;
   }
 
   void _ensureImageNaturalSize(String src, ImageProvider provider) {
@@ -344,7 +362,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     }
 
     final naturalSize = _imageNaturalSizes[src];
-    final imageContext = _imageKeys[index].currentContext;
+    final imageContext = _imageFrameKeys[index].currentContext;
     final viewerContext = _viewerKey.currentContext;
     final imageBox = imageContext?.findRenderObject();
     final viewerBox = viewerContext?.findRenderObject();
@@ -354,14 +372,7 @@ class _ImageViewerPageState extends State<ImageViewerPage>
         viewerBox.hasSize) {
       final globalTopLeft = imageBox.localToGlobal(Offset.zero);
       final localTopLeft = viewerBox.globalToLocal(globalTopLeft);
-      if (naturalSize != null) {
-        return fitInto(
-          outerSize: imageBox.size,
-          outerTopLeft: localTopLeft,
-          sourceSize: naturalSize,
-        );
-      }
-      return centeredSquare(imageBox.size, localTopLeft);
+      return localTopLeft & imageBox.size;
     }
 
     final contentSize = Size(
@@ -378,6 +389,35 @@ class _ImageViewerPageState extends State<ImageViewerPage>
       outerTopLeft: contentRect.topLeft,
       sourceSize: naturalSize,
     );
+  }
+
+  Size _displaySizeFor({
+    required int index,
+    required String src,
+    required Size availableSize,
+  }) {
+    if (availableSize.width <= 0 || availableSize.height <= 0) {
+      return Size.zero;
+    }
+
+    final naturalSize = _imageNaturalSizes[src];
+    if (naturalSize == null) {
+      final side = math.min(availableSize.width, availableSize.height);
+      return Size.square(side);
+    }
+
+    final transform = _displayTransforms[index];
+    final fittedSource = transform.isOddQuarterTurn
+        ? Size(naturalSize.height, naturalSize.width)
+        : naturalSize;
+    return applyBoxFit(BoxFit.contain, fittedSource, availableSize).destination;
+  }
+
+  Size _imageBoxSizeFor({required int index, required Size displaySize}) {
+    if (_displayTransforms[index].isOddQuarterTurn) {
+      return Size(displaySize.height, displaySize.width);
+    }
+    return displaySize;
   }
 
   void _handleImageTap({
@@ -504,8 +544,12 @@ class _ImageViewerPageState extends State<ImageViewerPage>
         final base64Marker = 'base64,';
         final idx = src.indexOf(base64Marker);
         if (idx != -1) {
-          final b64 = src.substring(idx + base64Marker.length);
-          return MemoryImage(base64Decode(b64));
+          final bytes = base64Decode(src.substring(idx + base64Marker.length));
+          final size = _readImageSizeFromBytes(bytes);
+          if (size != null) {
+            _rememberImageNaturalSize(src, size, notify: false);
+          }
+          return MemoryImage(bytes);
         }
       } catch (_) {}
     }
@@ -1089,7 +1133,6 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     final provider = _providerFor(src);
     _ensureImageNaturalSize(src, provider);
     final image = Image(
-      key: _imageKeys[i],
       image: provider,
       fit: BoxFit.contain,
       gaplessPlayback: true,
@@ -1134,76 +1177,104 @@ class _ImageViewerPageState extends State<ImageViewerPage>
         final padding = compact
             ? const EdgeInsets.symmetric(vertical: 82)
             : const EdgeInsets.fromLTRB(92, 82, 92, 106);
+        final availableSize = Size(
+          math.max(0.0, pageSize.width - padding.horizontal),
+          math.max(0.0, pageSize.height - padding.vertical),
+        );
+        final displaySize = _displaySizeFor(
+          index: i,
+          src: src,
+          availableSize: availableSize,
+        );
+        final imageBoxSize = _imageBoxSizeFor(
+          index: i,
+          displaySize: displaySize,
+        );
 
         return Transform.translate(
           offset: Offset(0, translateY),
           child: Transform.scale(
             scale: pageScale,
-            child: Hero(
-              tag: 'img:$src',
-              child: AnimatedBuilder(
-                animation: _zoomCtrls[i],
-                builder: (context, _) {
-                  final scale = _zoomCtrls[i].value.getMaxScaleOnAxis();
-                  final canPan = scale > 1.01;
-                  return InteractiveViewer(
-                    key: i == _index ? _viewerKey : null,
-                    transformationController: _zoomCtrls[i],
-                    minScale: 1.0,
-                    maxScale: 5.0,
-                    panEnabled: canPan,
-                    scaleEnabled: true,
-                    clipBehavior: compact ? Clip.hardEdge : Clip.none,
-                    boundaryMargin: compact
-                        ? EdgeInsets.zero
-                        : canPan
-                        ? const EdgeInsets.all(80)
-                        : EdgeInsets.zero,
-                    child: SizedBox.expand(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.translucent,
-                        onTapDown: (details) =>
-                            _lastTapPos = details.localPosition,
-                        onTapCancel: () => _lastTapPos = null,
-                        onDoubleTapDown: (details) =>
-                            _lastDoubleTapPos = details.localPosition,
-                        onTap: () => _handleImageTap(
-                          index: i,
-                          src: src,
-                          pageSize: pageSize,
-                          padding: padding,
-                        ),
-                        onDoubleTap: () {
-                          final focal =
-                              _lastDoubleTapPos ?? pageSize.center(Offset.zero);
-                          _toggleZoomAt(_zoomCtrls[i], focal);
-                          _lastDoubleTapPos = null;
-                          if (!_chromeVisible) {
-                            setState(() => _chromeVisible = true);
-                          }
-                        },
-                        child: Padding(
-                          padding: padding,
-                          child: Semantics(
-                            image: true,
-                            label: l10n.imageViewerPageImageLabel(
-                              i + 1,
-                              widget.images.length,
-                            ),
-                            child: _AnimatedImageDisplayTransform(
-                              transformKey: ValueKey(
-                                'image-viewer-display-transform-$i',
+            child: AnimatedBuilder(
+              animation: _zoomCtrls[i],
+              builder: (context, _) {
+                final scale = _zoomCtrls[i].value.getMaxScaleOnAxis();
+                final canPan = scale > 1.01;
+                return InteractiveViewer(
+                  key: i == _index ? _viewerKey : null,
+                  transformationController: _zoomCtrls[i],
+                  minScale: 1.0,
+                  maxScale: 5.0,
+                  panEnabled: canPan,
+                  scaleEnabled: true,
+                  clipBehavior: compact ? Clip.hardEdge : Clip.none,
+                  boundaryMargin: compact
+                      ? EdgeInsets.zero
+                      : canPan
+                      ? const EdgeInsets.all(80)
+                      : EdgeInsets.zero,
+                  child: SizedBox.expand(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTapDown: (details) =>
+                          _lastTapPos = details.localPosition,
+                      onTapCancel: () => _lastTapPos = null,
+                      onDoubleTapDown: (details) =>
+                          _lastDoubleTapPos = details.localPosition,
+                      onTap: () => _handleImageTap(
+                        index: i,
+                        src: src,
+                        pageSize: pageSize,
+                        padding: padding,
+                      ),
+                      onDoubleTap: () {
+                        final focal =
+                            _lastDoubleTapPos ?? pageSize.center(Offset.zero);
+                        _toggleZoomAt(_zoomCtrls[i], focal);
+                        _lastDoubleTapPos = null;
+                        if (!_chromeVisible) {
+                          setState(() => _chromeVisible = true);
+                        }
+                      },
+                      child: Padding(
+                        padding: padding,
+                        child: Center(
+                          child: SizedBox(
+                            key: _imageFrameKeys[i],
+                            width: displaySize.width,
+                            height: displaySize.height,
+                            child: Hero(
+                              tag: 'img:$src',
+                              child: SizedBox.expand(
+                                child: Semantics(
+                                  image: true,
+                                  label: l10n.imageViewerPageImageLabel(
+                                    i + 1,
+                                    widget.images.length,
+                                  ),
+                                  child: Center(
+                                    child: _AnimatedImageDisplayTransform(
+                                      transformKey: ValueKey(
+                                        'image-viewer-display-transform-$i',
+                                      ),
+                                      transform: _displayTransforms[i],
+                                      child: SizedBox(
+                                        width: imageBoxSize.width,
+                                        height: imageBoxSize.height,
+                                        child: image,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
-                              transform: _displayTransforms[i],
-                              child: image,
                             ),
                           ),
                         ),
                       ),
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ),
         );

@@ -36,10 +36,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPageColorMode => '颜色模式';
 
   @override
-  String get settingsPageDisplay => '显示设置';
+  String get settingsPageDisplay => '偏好设置';
 
   @override
-  String get settingsPageDisplaySubtitle => '界面主题与字号等外观设置';
+  String get settingsPageDisplaySubtitle => '外观、行为与交互偏好';
 
   @override
   String get settingsPageAssistant => '助手';
@@ -1598,6 +1598,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageS3PathStyle => '路径风格（Path-style）';
 
   @override
+  String get backupPageUserAgent => 'User-Agent';
+
+  @override
+  String get backupPageUserAgentHint => '可选';
+
+  @override
   String get backupPageSave => '保存';
 
   @override
@@ -1743,6 +1749,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get messageEditPageHint => '输入消息内容…';
+
+  @override
+  String get userMessageEditSaveOnly => '仅保存';
+
+  @override
+  String get userMessageEditUnsupportedSnackbar => '该内容不支持编辑';
+
+  @override
+  String get userMessageEditOverwriteTitle => '提示';
+
+  @override
+  String get userMessageEditOverwriteContent => '修改将覆盖输入框已有内容，是否覆盖？';
 
   @override
   String get selectCopyPageTitle => '选择复制';
@@ -1892,6 +1910,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reasoningBudgetSheetXhigh => '极限推理';
 
   @override
+  String get reasoningBudgetSheetMax => '全力推理';
+
+  @override
   String get reasoningBudgetSheetTitle => '思维链强度';
 
   @override
@@ -2035,6 +2056,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatMessageWidgetWriteClipboard => '写入剪切板';
+
+  @override
+  String get chatMessageWidgetSpeakingTitle => '正在朗读:';
 
   @override
   String chatMessageWidgetSpeakText(String text) {
@@ -2653,6 +2677,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageOcrModelSubtitle => '用于对图片执行文字识别的模型';
+
+  @override
+  String get defaultModelPageOcrModelRequiresImageInput =>
+      '请选择标记为支持图片输入的模型用于 OCR';
 
   @override
   String get defaultModelPagePromptLabel => '提示词';
@@ -3836,6 +3864,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageChatBackgroundMaskTitle => '背景图片遮罩透明度';
 
   @override
+  String get displaySettingsPageChatInputBackgroundOpacityTitle => '输入框背景透明度';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => '主题设置';
 
   @override
@@ -4296,6 +4327,13 @@ class AppLocalizationsZh extends AppLocalizations {
       'Serper Google 搜索 API。响应快速，支持国家/地区、语言、时间和页码过滤。';
 
   @override
+  String get searchServiceNameQuerit => 'Querit';
+
+  @override
+  String get searchProviderQueritDescription =>
+      '面向 LLM 应用的 Querit 搜索 API。返回实时网页结果，并支持站点、时间、国家和语言过滤。';
+
+  @override
   String get searchServiceNameGrok => 'Grok';
 
   @override
@@ -4316,6 +4354,33 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchServicesDialogPageInvalid => '页码必须是正整数。';
+
+  @override
+  String get searchServicesDialogSitesIncludeOptional => '包含站点（可选）';
+
+  @override
+  String get searchServicesDialogSitesExcludeOptional => '排除站点（可选）';
+
+  @override
+  String get searchServicesDialogTimeRangeOptional => '时间范围（可选）';
+
+  @override
+  String get searchServicesDialogCountriesOptional => '国家（可选）';
+
+  @override
+  String get searchServicesDialogLanguagesOptional => '语言（可选）';
+
+  @override
+  String get searchServicesDialogSitesHint => 'example.com, docs.example.com';
+
+  @override
+  String get searchServicesDialogTimeRangeHint => 'd7';
+
+  @override
+  String get searchServicesDialogCountriesHint => 'united states, japan';
+
+  @override
+  String get searchServicesDialogLanguagesHint => 'english, japanese';
 
   @override
   String get generationInterrupted => '生成已中断';
@@ -5089,7 +5154,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String askUserCardQuestionCount(int count) {
-    return '询问 $count 个问题';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '询问 $count 个问题',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -5278,10 +5348,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get settingsPageColorMode => '颜色模式';
 
   @override
-  String get settingsPageDisplay => '显示设置';
+  String get settingsPageDisplay => '偏好设置';
 
   @override
-  String get settingsPageDisplaySubtitle => '界面主题与字号等外观设置';
+  String get settingsPageDisplaySubtitle => '外观、行为与交互偏好';
 
   @override
   String get settingsPageAssistant => '助手';
@@ -6840,6 +6910,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageS3PathStyle => '路径风格（Path-style）';
 
   @override
+  String get backupPageUserAgent => 'User-Agent';
+
+  @override
+  String get backupPageUserAgentHint => '可选';
+
+  @override
   String get backupPageSave => '保存';
 
   @override
@@ -6985,6 +7061,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get messageEditPageHint => '输入消息内容…';
+
+  @override
+  String get userMessageEditSaveOnly => '仅保存';
+
+  @override
+  String get userMessageEditUnsupportedSnackbar => '该内容不支持编辑';
+
+  @override
+  String get userMessageEditOverwriteTitle => '提示';
+
+  @override
+  String get userMessageEditOverwriteContent => '修改将覆盖输入框已有内容，是否覆盖？';
 
   @override
   String get selectCopyPageTitle => '选择复制';
@@ -7134,6 +7222,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get reasoningBudgetSheetXhigh => '极限推理';
 
   @override
+  String get reasoningBudgetSheetMax => '全力推理';
+
+  @override
   String get reasoningBudgetSheetTitle => '思维链强度';
 
   @override
@@ -7277,6 +7368,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetWriteClipboard => '写入剪切板';
+
+  @override
+  String get chatMessageWidgetSpeakingTitle => '正在朗读:';
 
   @override
   String chatMessageWidgetSpeakText(String text) {
@@ -7895,6 +7989,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageOcrModelSubtitle => '用于对图片执行文字识别的模型';
+
+  @override
+  String get defaultModelPageOcrModelRequiresImageInput =>
+      '请选择标记为支持图片输入的模型用于 OCR';
 
   @override
   String get defaultModelPagePromptLabel => '提示词';
@@ -9078,6 +9176,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageChatBackgroundMaskTitle => '背景图片遮罩透明度';
 
   @override
+  String get displaySettingsPageChatInputBackgroundOpacityTitle => '输入框背景透明度';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => '主题设置';
 
   @override
@@ -9538,6 +9639,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'Serper Google 搜索 API。响应快速，支持国家/地区、语言、时间和页码过滤。';
 
   @override
+  String get searchServiceNameQuerit => 'Querit';
+
+  @override
+  String get searchProviderQueritDescription =>
+      '面向 LLM 应用的 Querit 搜索 API。返回实时网页结果，并支持站点、时间、国家和语言过滤。';
+
+  @override
   String get searchServiceNameGrok => 'Grok';
 
   @override
@@ -9558,6 +9666,33 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchServicesDialogPageInvalid => '页码必须是正整数。';
+
+  @override
+  String get searchServicesDialogSitesIncludeOptional => '包含站点（可选）';
+
+  @override
+  String get searchServicesDialogSitesExcludeOptional => '排除站点（可选）';
+
+  @override
+  String get searchServicesDialogTimeRangeOptional => '时间范围（可选）';
+
+  @override
+  String get searchServicesDialogCountriesOptional => '国家（可选）';
+
+  @override
+  String get searchServicesDialogLanguagesOptional => '语言（可选）';
+
+  @override
+  String get searchServicesDialogSitesHint => 'example.com, docs.example.com';
+
+  @override
+  String get searchServicesDialogTimeRangeHint => 'd7';
+
+  @override
+  String get searchServicesDialogCountriesHint => 'united states, japan';
+
+  @override
+  String get searchServicesDialogLanguagesHint => 'english, japanese';
 
   @override
   String get generationInterrupted => '生成已中断';
@@ -10331,7 +10466,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String askUserCardQuestionCount(int count) {
-    return '询问 $count 个问题';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '询问 $count 个问题',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -10520,10 +10660,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get settingsPageColorMode => '顏色模式';
 
   @override
-  String get settingsPageDisplay => '顯示設定';
+  String get settingsPageDisplay => '偏好設定';
 
   @override
-  String get settingsPageDisplaySubtitle => '介面主題與字號等外觀設定';
+  String get settingsPageDisplaySubtitle => '外觀、行為與互動偏好';
 
   @override
   String get settingsPageAssistant => '助理';
@@ -12082,6 +12222,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageS3PathStyle => '路徑風格（Path-style）';
 
   @override
+  String get backupPageUserAgent => 'User-Agent';
+
+  @override
+  String get backupPageUserAgentHint => '可選';
+
+  @override
   String get backupPageSave => '儲存';
 
   @override
@@ -12226,6 +12372,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageEditPageHint => '輸入訊息內容…';
+
+  @override
+  String get userMessageEditSaveOnly => '僅儲存';
+
+  @override
+  String get userMessageEditUnsupportedSnackbar => '該內容不支援編輯';
+
+  @override
+  String get userMessageEditOverwriteTitle => '提示';
+
+  @override
+  String get userMessageEditOverwriteContent => '修改將覆蓋輸入框已有內容，是否覆蓋？';
 
   @override
   String get selectCopyPageTitle => '選擇複製';
@@ -12375,6 +12533,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get reasoningBudgetSheetXhigh => '極限推理';
 
   @override
+  String get reasoningBudgetSheetMax => '全力推理';
+
+  @override
   String get reasoningBudgetSheetTitle => '思維鏈強度';
 
   @override
@@ -12518,6 +12679,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatMessageWidgetWriteClipboard => '寫入剪貼簿';
+
+  @override
+  String get chatMessageWidgetSpeakingTitle => '正在朗讀:';
 
   @override
   String chatMessageWidgetSpeakText(String text) {
@@ -13136,6 +13300,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageOcrModelSubtitle => '用於對圖片執行文字辨識的模型';
+
+  @override
+  String get defaultModelPageOcrModelRequiresImageInput =>
+      '請選擇標記為支援圖片輸入的模型用於 OCR';
 
   @override
   String get defaultModelPagePromptLabel => '提示詞';
@@ -14318,6 +14486,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageChatBackgroundMaskTitle => '聊天背景遮罩透明度';
 
   @override
+  String get displaySettingsPageChatInputBackgroundOpacityTitle => '輸入框背景透明度';
+
+  @override
   String get displaySettingsPageThemeSettingsTitle => '主題設定';
 
   @override
@@ -14779,6 +14950,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       'Serper Google 搜尋 API。回應快速，支援國家/地區、語言、時間和頁碼過濾。';
 
   @override
+  String get searchServiceNameQuerit => 'Querit';
+
+  @override
+  String get searchProviderQueritDescription =>
+      '面向 LLM 應用的 Querit 搜尋 API。返回即時網頁結果，並支援站點、時間、國家和語言過濾。';
+
+  @override
   String get searchServiceNameGrok => 'Grok';
 
   @override
@@ -14799,6 +14977,33 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchServicesDialogPageInvalid => '頁碼必須是正整數。';
+
+  @override
+  String get searchServicesDialogSitesIncludeOptional => '包含站點（可選）';
+
+  @override
+  String get searchServicesDialogSitesExcludeOptional => '排除站點（可選）';
+
+  @override
+  String get searchServicesDialogTimeRangeOptional => '時間範圍（可選）';
+
+  @override
+  String get searchServicesDialogCountriesOptional => '國家（可選）';
+
+  @override
+  String get searchServicesDialogLanguagesOptional => '語言（可選）';
+
+  @override
+  String get searchServicesDialogSitesHint => 'example.com, docs.example.com';
+
+  @override
+  String get searchServicesDialogTimeRangeHint => 'd7';
+
+  @override
+  String get searchServicesDialogCountriesHint => 'united states, japan';
+
+  @override
+  String get searchServicesDialogLanguagesHint => 'english, japanese';
 
   @override
   String get generationInterrupted => '生成已中斷';
@@ -15573,7 +15778,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String askUserCardQuestionCount(int count) {
-    return '詢問 $count 個問題';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '詢問 $count 個問題',
+    );
+    return '$_temp0';
   }
 
   @override

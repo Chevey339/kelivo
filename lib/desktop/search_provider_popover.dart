@@ -309,7 +309,7 @@ class _SearchContent extends StatelessWidget {
       providerKey,
       cfg.copyWith(modelOverrides: overrides),
     );
-    await sp.setSearchEnabled(false);
+    await ap.setSearchEnabledForCurrentAssistant(false);
   }
 
   Future<void> _disableBuiltInSearch(
@@ -354,7 +354,7 @@ class _SearchContent extends StatelessWidget {
       0,
       services.isNotEmpty ? services.length - 1 : 0,
     );
-    final enabled = sp.searchEnabled;
+    final enabled = ap.currentSearchEnabled;
     final settingsNotifier = context.read<SettingsProvider>();
     final done = onDone;
     final supportsBuiltIn = _supportsBuiltInSearch(sp, ap);
@@ -379,7 +379,7 @@ class _SearchContent extends StatelessWidget {
         selected: false,
         onTap: () async {
           await _disableBuiltInSearch(sp, ap);
-          await settingsNotifier.setSearchEnabled(false);
+          await ap.setSearchEnabledForCurrentAssistant(false);
           done();
         },
       ),
@@ -436,7 +436,7 @@ class _SearchContent extends StatelessWidget {
             onTap: () async {
               await settingsNotifier.setSearchServiceSelected(i);
               await _disableBuiltInSearch(sp, ap);
-              await settingsNotifier.setSearchEnabled(true);
+              await ap.setSearchEnabledForCurrentAssistant(true);
               done();
             },
           ),

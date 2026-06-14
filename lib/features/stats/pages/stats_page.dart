@@ -139,7 +139,18 @@ class _StatsPageState extends State<StatsPage> {
 
     if (!widget.showAppBar) return body;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.statsPageTitle)),
+      appBar: AppBar(
+        leading: Tooltip(
+          message: l10n.settingsPageBackButton,
+          child: IosIconButton(
+            icon: Lucide.ArrowLeft,
+            minSize: 44,
+            size: 22,
+            onTap: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        title: Text(l10n.statsPageTitle),
+      ),
       body: body,
     );
   }

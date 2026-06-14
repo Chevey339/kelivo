@@ -1063,6 +1063,7 @@ class ChatActions {
         stream: ctx.streamOutput,
         requestId: conversationId,
         allowImagesApiRouting: ctx.allowImagesApiRouting,
+        ocrActive: ctx.ocrActive,
       );
 
       await _conversationStreams[conversationId]?.cancel();

@@ -373,6 +373,27 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                 },
                 onTap: () => _showChatBackgroundMaskSheet(context),
               ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.RectangleHorizontal,
+                label: l10n.displaySettingsPageChatInputBackgroundOpacityTitle,
+                detailBuilder: (ctx) {
+                  final brightness = Theme.of(ctx).brightness;
+                  final settings = ctx.watch<SettingsProvider>();
+                  final opacity = settings.chatInputBackgroundOpacityFor(
+                    brightness,
+                  );
+                  return Text(
+                    '${(opacity * 100).round()}%',
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                      fontSize: 13,
+                    ),
+                  );
+                },
+                onTap: () => _showChatInputBackgroundOpacitySheet(context),
+              ),
             ],
           ),
           // Inline cards replaced by sheet-triggering rows above.
@@ -1083,6 +1104,165 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
       },
     );
   }
+
+  Future<void> _showChatInputBackgroundOpacitySheet(
+    BuildContext context,
+  ) async {
+    final cs = Theme.of(context).colorScheme;
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      isScrollControlled: false,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+            child: Builder(
+              builder: (context) {
+                final theme = Theme.of(context);
+                final isDark = theme.brightness == Brightness.dark;
+                final l10n = AppLocalizations.of(context)!;
+                final settings = context.watch<SettingsProvider>();
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _chatInputOpacitySlider(
+                      context,
+                      label: l10n.settingsPageLightMode,
+                      brightness: Brightness.light,
+                      opacity: settings.chatInputBackgroundOpacityLight,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 18),
+                    _chatInputOpacitySlider(
+                      context,
+                      label: l10n.settingsPageDarkMode,
+                      brightness: Brightness.dark,
+                      opacity: settings.chatInputBackgroundOpacityDark,
+                      isDark: isDark,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _chatInputOpacitySlider(
+    BuildContext context, {
+    required String label,
+    required Brightness brightness,
+    required double opacity,
+    required bool isDark,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: cs.onSurface,
+            fontSize: 13,
+            fontWeight: AppFontWeights.semibold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text(
+              '0%',
+              style: TextStyle(
+                color: cs.onSurface.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SfSliderTheme(
+                data: SfSliderThemeData(
+                  activeTrackHeight: 8,
+                  inactiveTrackHeight: 8,
+                  overlayRadius: 14,
+                  activeTrackColor: cs.primary,
+                  inactiveTrackColor: cs.onSurface.withValues(
+                    alpha: isDark ? 0.25 : 0.20,
+                  ),
+                  tooltipBackgroundColor: cs.primary,
+                  tooltipTextStyle: TextStyle(
+                    color: cs.onPrimary,
+                    fontWeight: AppFontWeights.semibold,
+                  ),
+                  activeTickColor: cs.onSurface.withValues(
+                    alpha: isDark ? 0.45 : 0.35,
+                  ),
+                  inactiveTickColor: cs.onSurface.withValues(
+                    alpha: isDark ? 0.30 : 0.25,
+                  ),
+                  activeMinorTickColor: cs.onSurface.withValues(
+                    alpha: isDark ? 0.34 : 0.28,
+                  ),
+                  inactiveMinorTickColor: cs.onSurface.withValues(
+                    alpha: isDark ? 0.24 : 0.20,
+                  ),
+                ),
+                child: SfSlider(
+                  value: (opacity * 100).roundToDouble(),
+                  min: 0.0,
+                  max: 100.0001,
+                  stepSize: 5.0,
+                  showTicks: true,
+                  showLabels: true,
+                  interval: 25,
+                  minorTicksPerInterval: 1,
+                  enableTooltip: true,
+                  shouldAlwaysShowTooltip: false,
+                  tooltipShape: const SfPaddleTooltipShape(),
+                  labelFormatterCallback: (value, text) =>
+                      '${(value as double).round()}%',
+                  thumbIcon: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: cs.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: isDark
+                          ? []
+                          : [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                    ),
+                  ),
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setChatInputBackgroundOpacity(
+                        brightness,
+                        ((v as double) / 100.0).clamp(0.0, 1.0),
+                      ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${(opacity * 100).round()}%',
+              style: TextStyle(color: cs.onSurface, fontSize: 12),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 // --- iOS-style helpers ---
@@ -1493,6 +1673,51 @@ Widget _sheetDividerNoIcon(BuildContext context) {
     endIndent: 16,
     color: cs.outlineVariant.withValues(alpha: 0.18),
   );
+}
+
+Future<void> _showMobileMessageNavModeSheet(BuildContext context) async {
+  final cs = Theme.of(context).colorScheme;
+  final l10n = AppLocalizations.of(context)!;
+  final choice = await showModalBottomSheet<MobileMessageNavButtonsMode>(
+    context: context,
+    backgroundColor: cs.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _sheetOption(
+              ctx,
+              label: l10n.displaySettingsPageMessageNavButtonsModeAlways,
+              onTap: () =>
+                  Navigator.of(ctx).pop(MobileMessageNavButtonsMode.always),
+            ),
+            _sheetDividerNoIcon(ctx),
+            _sheetOption(
+              ctx,
+              label: l10n.displaySettingsPageMessageNavButtonsModeScroll,
+              onTap: () =>
+                  Navigator.of(ctx).pop(MobileMessageNavButtonsMode.scroll),
+            ),
+            _sheetDividerNoIcon(ctx),
+            _sheetOption(
+              ctx,
+              label: l10n.displaySettingsPageMessageNavButtonsModeNever,
+              onTap: () =>
+                  Navigator.of(ctx).pop(MobileMessageNavButtonsMode.never),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+  if (choice == null) return;
+  if (!context.mounted) return;
+  await context.read<SettingsProvider>().setMobileMessageNavButtonsMode(choice);
 }
 
 // --- Subpages ---
@@ -1950,14 +2175,20 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                     context.read<SettingsProvider>().setShowAppUpdates(v),
               ),
               _iosDivider(context),
-              _iosSwitchRow(
+              _iosNavRow(
                 context,
                 icon: Lucide.ChevronRight,
                 label: l10n.displaySettingsPageMessageNavButtonsTitle,
-                value: sp.showMessageNavButtons,
-                onChanged: (v) => context
-                    .read<SettingsProvider>()
-                    .setShowMessageNavButtons(v),
+                detailBuilder: (_) =>
+                    Text(switch (sp.mobileMessageNavButtonsMode) {
+                      MobileMessageNavButtonsMode.always =>
+                        l10n.displaySettingsPageMessageNavButtonsModeAlways,
+                      MobileMessageNavButtonsMode.scroll =>
+                        l10n.displaySettingsPageMessageNavButtonsModeScroll,
+                      MobileMessageNavButtonsMode.never =>
+                        l10n.displaySettingsPageMessageNavButtonsModeNever,
+                    }),
+                onTap: () => _showMobileMessageNavModeSheet(context),
               ),
               _iosDivider(context),
               _iosSwitchRow(

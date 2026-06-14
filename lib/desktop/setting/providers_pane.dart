@@ -939,6 +939,7 @@ class _DesktopProviderDetailPaneState
   final Map<String, String> _detectionErrorMessages = {};
   String? _currentDetectingModel;
   final Set<String> _pendingModels = {};
+  int _providerScopedStateEpoch = 0;
 
   // Connection test state for inline dialog
   // Keep local to this file to avoid cross-file coupling
@@ -953,6 +954,12 @@ class _DesktopProviderDetailPaneState
   final TextEditingController _apiPathCtrl = TextEditingController();
   final TextEditingController _balanceApiPathCtrl = TextEditingController();
   final TextEditingController _balanceResultPathCtrl = TextEditingController();
+  final TextEditingController _providerSettingsNameCtrl =
+      TextEditingController();
+  final TextEditingController _proxyHostCtrl = TextEditingController();
+  final TextEditingController _proxyPortCtrl = TextEditingController();
+  final TextEditingController _proxyUserCtrl = TextEditingController();
+  final TextEditingController _proxyPassCtrl = TextEditingController();
   bool _balanceLoading = false;
 
   void _syncCtrl(TextEditingController c, String newText) {
@@ -994,6 +1001,40 @@ class _DesktopProviderDetailPaneState
     );
   }
 
+  void _syncProviderSettingsControllersFromConfig(ProviderConfig cfg) {
+    _syncCtrl(_providerSettingsNameCtrl, cfg.name);
+    _syncCtrl(_proxyHostCtrl, cfg.proxyHost ?? '');
+    _syncCtrl(_proxyPortCtrl, cfg.proxyPort ?? '8080');
+    _syncCtrl(_proxyUserCtrl, cfg.proxyUsername ?? '');
+    _syncCtrl(_proxyPassCtrl, cfg.proxyPassword ?? '');
+  }
+
+  void _clearProviderScopedState({bool cancelRunningDetection = false}) {
+    if (cancelRunningDetection) {
+      _providerScopedStateEpoch += 1;
+      _isDetecting = false;
+    }
+    _selectedModels.clear();
+    _detectionResults.clear();
+    _detectionErrorMessages.clear();
+    _pendingModels.clear();
+    _currentDetectingModel = null;
+    _isSelectionMode = false;
+  }
+
+  @override
+  void didUpdateWidget(covariant _DesktopProviderDetailPane oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.providerKey == widget.providerKey) return;
+    _clearProviderScopedState(cancelRunningDetection: true);
+    final cfg = context.read<SettingsProvider>().getProviderConfig(
+      widget.providerKey,
+      defaultName: widget.displayName,
+    );
+    _syncControllersFromConfig(cfg);
+    _syncProviderSettingsControllersFromConfig(cfg);
+  }
+
   @override
   void dispose() {
     _filterCtrl.dispose();
@@ -1006,6 +1047,11 @@ class _DesktopProviderDetailPaneState
     _apiPathCtrl.dispose();
     _balanceApiPathCtrl.dispose();
     _balanceResultPathCtrl.dispose();
+    _providerSettingsNameCtrl.dispose();
+    _proxyHostCtrl.dispose();
+    _proxyPortCtrl.dispose();
+    _proxyUserCtrl.dispose();
+    _proxyPassCtrl.dispose();
     super.dispose();
   }
 
@@ -1127,6 +1173,9 @@ class _DesktopProviderDetailPaneState
                     ),
                     const SizedBox(width: 8),
                     _IconBtn(
+                      key: ValueKey(
+                        'desktop-provider-settings-${widget.providerKey}',
+                      ),
                       icon: lucide.Lucide.Settings,
                       onTap: () => _showProviderSettingsDialog(context),
                     ),
@@ -2214,27 +2263,16 @@ class _DesktopProviderDetailPaneState
     final cs = Theme.of(context).colorScheme;
     final sp = context.read<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
+    _syncProviderSettingsControllersFromConfig(
+      sp.getProviderConfig(widget.providerKey, defaultName: widget.displayName),
+    );
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
-        final cfg = sp.getProviderConfig(
-          widget.providerKey,
-          defaultName: widget.displayName,
-        );
         final GlobalKey avatarKey = GlobalKey();
-        final nameCtrl = TextEditingController(text: cfg.name);
-        final proxyHostCtrl = TextEditingController(text: cfg.proxyHost ?? '');
-        final proxyPortCtrl = TextEditingController(
-          text: cfg.proxyPort ?? '8080',
-        );
-        final proxyUserCtrl = TextEditingController(
-          text: cfg.proxyUsername ?? '',
-        );
-        final proxyPassCtrl = TextEditingController(
-          text: cfg.proxyPassword ?? '',
-        );
         return Dialog(
+          key: const ValueKey('desktop-provider-settings-dialog'),
           backgroundColor: cs.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -2266,10 +2304,6 @@ class _DesktopProviderDetailPaneState
                   }
                 }
 
-                syncCtrl(proxyHostCtrl, cfgNow.proxyHost ?? '');
-                syncCtrl(proxyPortCtrl, cfgNow.proxyPort ?? '8080');
-                syncCtrl(proxyUserCtrl, cfgNow.proxyUsername ?? '');
-                syncCtrl(proxyPassCtrl, cfgNow.proxyPassword ?? '');
                 final balanceDefaults = ProviderConfig.defaultsFor(
                   widget.providerKey,
                   displayName: widget.displayName,
@@ -2478,7 +2512,8 @@ class _DesktopProviderDetailPaneState
                               Focus(
                                 onFocusChange: (has) async {
                                   if (!has) {
-                                    final v = nameCtrl.text.trim();
+                                    final v = _providerSettingsNameCtrl.text
+                                        .trim();
                                     final old = spWatch.getProviderConfig(
                                       widget.providerKey,
                                       defaultName: widget.displayName,
@@ -2494,12 +2529,13 @@ class _DesktopProviderDetailPaneState
                                   }
                                 },
                                 child: TextField(
-                                  controller: nameCtrl,
+                                  controller: _providerSettingsNameCtrl,
                                   style: TextStyle(fontSize: 14),
                                   decoration: _inputDecoration(ctx),
                                   textInputAction: TextInputAction.done,
                                   onSubmitted: (_) async {
-                                    final v = nameCtrl.text.trim();
+                                    final v = _providerSettingsNameCtrl.text
+                                        .trim();
                                     final old = spWatch.getProviderConfig(
                                       widget.providerKey,
                                       defaultName: widget.displayName,
@@ -2514,7 +2550,8 @@ class _DesktopProviderDetailPaneState
                                     );
                                   },
                                   onEditingComplete: () async {
-                                    final v = nameCtrl.text.trim();
+                                    final v = _providerSettingsNameCtrl.text
+                                        .trim();
                                     final old = spWatch.getProviderConfig(
                                       widget.providerKey,
                                       defaultName: widget.displayName,
@@ -3161,7 +3198,8 @@ class _DesktopProviderDetailPaneState
                                       Focus(
                                         onFocusChange: (has) async {
                                           if (!has) {
-                                            final v = proxyHostCtrl.text.trim();
+                                            final v = _proxyHostCtrl.text
+                                                .trim();
                                             final old = spWatch
                                                 .getProviderConfig(
                                                   widget.providerKey,
@@ -3175,13 +3213,13 @@ class _DesktopProviderDetailPaneState
                                           }
                                         },
                                         child: TextField(
-                                          controller: proxyHostCtrl,
+                                          controller: _proxyHostCtrl,
                                           style: TextStyle(fontSize: 13),
                                           decoration: _proxyInputDecoration(
                                             ctx,
                                           ).copyWith(hintText: '127.0.0.1'),
                                           onChanged: (_) async {
-                                            if (proxyHostCtrl
+                                            if (_proxyHostCtrl
                                                 .value
                                                 .composing
                                                 .isValid) {
@@ -3196,7 +3234,7 @@ class _DesktopProviderDetailPaneState
                                             await spWatch.setProviderConfig(
                                               widget.providerKey,
                                               old.copyWith(
-                                                proxyHost: proxyHostCtrl.text
+                                                proxyHost: _proxyHostCtrl.text
                                                     .trim(),
                                               ),
                                             );
@@ -3210,7 +3248,8 @@ class _DesktopProviderDetailPaneState
                                       Focus(
                                         onFocusChange: (has) async {
                                           if (!has) {
-                                            final v = proxyPortCtrl.text.trim();
+                                            final v = _proxyPortCtrl.text
+                                                .trim();
                                             final old = spWatch
                                                 .getProviderConfig(
                                                   widget.providerKey,
@@ -3224,14 +3263,17 @@ class _DesktopProviderDetailPaneState
                                           }
                                         },
                                         child: TextField(
-                                          controller: proxyPortCtrl,
+                                          key: const ValueKey(
+                                            'desktop-provider-proxy-port-field',
+                                          ),
+                                          controller: _proxyPortCtrl,
                                           style: TextStyle(fontSize: 13),
                                           decoration: _proxyInputDecoration(
                                             ctx,
                                           ).copyWith(hintText: '8080'),
                                           keyboardType: TextInputType.number,
                                           onChanged: (_) async {
-                                            if (proxyPortCtrl
+                                            if (_proxyPortCtrl
                                                 .value
                                                 .composing
                                                 .isValid) {
@@ -3246,7 +3288,7 @@ class _DesktopProviderDetailPaneState
                                             await spWatch.setProviderConfig(
                                               widget.providerKey,
                                               old.copyWith(
-                                                proxyPort: proxyPortCtrl.text
+                                                proxyPort: _proxyPortCtrl.text
                                                     .trim(),
                                               ),
                                             );
@@ -3260,7 +3302,8 @@ class _DesktopProviderDetailPaneState
                                       Focus(
                                         onFocusChange: (has) async {
                                           if (!has) {
-                                            final v = proxyUserCtrl.text.trim();
+                                            final v = _proxyUserCtrl.text
+                                                .trim();
                                             final old = spWatch
                                                 .getProviderConfig(
                                                   widget.providerKey,
@@ -3274,13 +3317,13 @@ class _DesktopProviderDetailPaneState
                                           }
                                         },
                                         child: TextField(
-                                          controller: proxyUserCtrl,
+                                          controller: _proxyUserCtrl,
                                           style: TextStyle(fontSize: 13),
                                           decoration: _proxyInputDecoration(
                                             ctx,
                                           ),
                                           onChanged: (_) async {
-                                            if (proxyUserCtrl
+                                            if (_proxyUserCtrl
                                                 .value
                                                 .composing
                                                 .isValid) {
@@ -3295,7 +3338,7 @@ class _DesktopProviderDetailPaneState
                                             await spWatch.setProviderConfig(
                                               widget.providerKey,
                                               old.copyWith(
-                                                proxyUsername: proxyUserCtrl
+                                                proxyUsername: _proxyUserCtrl
                                                     .text
                                                     .trim(),
                                               ),
@@ -3310,7 +3353,8 @@ class _DesktopProviderDetailPaneState
                                       Focus(
                                         onFocusChange: (has) async {
                                           if (!has) {
-                                            final v = proxyPassCtrl.text.trim();
+                                            final v = _proxyPassCtrl.text
+                                                .trim();
                                             final old = spWatch
                                                 .getProviderConfig(
                                                   widget.providerKey,
@@ -3324,14 +3368,14 @@ class _DesktopProviderDetailPaneState
                                           }
                                         },
                                         child: TextField(
-                                          controller: proxyPassCtrl,
+                                          controller: _proxyPassCtrl,
                                           style: TextStyle(fontSize: 13),
                                           obscureText: true,
                                           decoration: _proxyInputDecoration(
                                             ctx,
                                           ),
                                           onChanged: (_) async {
-                                            if (proxyPassCtrl
+                                            if (_proxyPassCtrl
                                                 .value
                                                 .composing
                                                 .isValid) {
@@ -3346,7 +3390,7 @@ class _DesktopProviderDetailPaneState
                                             await spWatch.setProviderConfig(
                                               widget.providerKey,
                                               old.copyWith(
-                                                proxyPassword: proxyPassCtrl
+                                                proxyPassword: _proxyPassCtrl
                                                     .text
                                                     .trim(),
                                               ),
@@ -4650,6 +4694,7 @@ class _DesktopProviderDetailPaneState
     if (_selectedModels.isEmpty || _isDetecting) return;
 
     final modelsToTest = Set<String>.from(_selectedModels);
+    final detectionEpoch = _providerScopedStateEpoch;
 
     setState(() {
       _isDetecting = true;
@@ -4667,6 +4712,7 @@ class _DesktopProviderDetailPaneState
     );
 
     for (final modelId in modelsToTest) {
+      if (!mounted || detectionEpoch != _providerScopedStateEpoch) return;
       if (mounted) {
         setState(() {
           _currentDetectingModel = modelId;
@@ -4680,14 +4726,14 @@ class _DesktopProviderDetailPaneState
           modelId,
           useStream: _detectUseStream,
         );
-        if (mounted) {
+        if (mounted && detectionEpoch == _providerScopedStateEpoch) {
           setState(() {
             _detectionResults[modelId] = true;
             _detectionErrorMessages.remove(modelId);
           });
         }
       } catch (e) {
-        if (mounted) {
+        if (mounted && detectionEpoch == _providerScopedStateEpoch) {
           setState(() {
             _detectionResults[modelId] = false;
             _detectionErrorMessages[modelId] = e.toString();
@@ -4697,7 +4743,7 @@ class _DesktopProviderDetailPaneState
       await Future.delayed(const Duration(milliseconds: 500));
     }
 
-    if (mounted) {
+    if (mounted && detectionEpoch == _providerScopedStateEpoch) {
       setState(() {
         _isDetecting = false;
         _currentDetectingModel = null;

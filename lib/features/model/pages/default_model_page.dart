@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../widgets/model_select_sheet.dart';
 import '../widgets/ocr_prompt_sheet.dart';
+import '../utils/ocr_model_capability.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/brand_assets.dart';
@@ -173,6 +175,19 @@ class DefaultModelPage extends StatelessWidget {
             onPick: () async {
               final sel = await showModelSelector(context);
               if (sel != null) {
+                if (!modelSupportsOcrImageInput(
+                  settings,
+                  sel.providerKey,
+                  sel.modelId,
+                )) {
+                  if (!context.mounted) return;
+                  showAppSnackBar(
+                    context,
+                    message: l10n.defaultModelPageOcrModelRequiresImageInput,
+                    type: NotificationType.error,
+                  );
+                  return;
+                }
                 await settings.setOcrModel(sel.providerKey, sel.modelId);
               }
             },

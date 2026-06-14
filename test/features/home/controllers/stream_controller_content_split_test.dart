@@ -3,6 +3,8 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart'
+    show ToolUIPart;
 import 'package:Kelivo/features/home/controllers/stream_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,13 +18,16 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues(const {});
 
-  StreamController buildController({SettingsProvider? settings}) {
+  StreamController buildController({
+    SettingsProvider? settings,
+    String? currentConversationId,
+  }) {
     final settingsProvider = settings ?? SettingsProvider();
     return StreamController(
       chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () => settingsProvider,
-      getCurrentConversationId: () => null,
+      getCurrentConversationId: () => currentConversationId,
     );
   }
 
@@ -259,6 +264,233 @@ void main() {
       expect(controller.contentSplits[message.id]!.offsets, isEmpty);
       expect(controller.toolParts[message.id], hasLength(1));
       expect(controller.toolParts[message.id]!.single.loading, isTrue);
+    },
+  );
+
+  test(
+    'dedupeToolPartsList keeps completed no-id tool results with different content',
+    () {
+      final controller = buildController();
+
+      final parts = controller.dedupeToolPartsList(const [
+        ToolUIPart(
+          id: '',
+          toolName: 'builtin_search',
+          arguments: {},
+          content: '{"items":[{"title":"First"}]}',
+        ),
+        ToolUIPart(
+          id: '',
+          toolName: 'builtin_search',
+          arguments: {},
+          content: '{"items":[{"title":"Second"}]}',
+        ),
+      ]);
+
+      expect(parts, hasLength(2));
+      expect(parts.map((part) => part.content), [
+        '{"items":[{"title":"First"}]}',
+        '{"items":[{"title":"Second"}]}',
+      ]);
+    },
+  );
+
+  test(
+    'dedupeToolEvents keeps completed no-id tool results with different content',
+    () {
+      final controller = buildController();
+
+      final events = controller.dedupeToolEvents(const [
+        {
+          'id': '',
+          'name': 'builtin_search',
+          'arguments': <String, dynamic>{},
+          'content': '{"items":[{"title":"First"}]}',
+        },
+        {
+          'id': '',
+          'name': 'builtin_search',
+          'arguments': <String, dynamic>{},
+          'content': '{"items":[{"title":"Second"}]}',
+        },
+      ]);
+
+      expect(events, hasLength(2));
+      expect(events.map((event) => event['content']), [
+        '{"items":[{"title":"First"}]}',
+        '{"items":[{"title":"Second"}]}',
+      ]);
+    },
+  );
+
+  test(
+    'dedupeToolPartsList keeps latest completed result for the same non-empty id',
+    () {
+      final controller = buildController();
+
+      final parts = controller.dedupeToolPartsList(const [
+        ToolUIPart(
+          id: 'builtin_search',
+          toolName: 'builtin_search',
+          arguments: {},
+          content: '{"items":[{"title":"First"}]}',
+        ),
+        ToolUIPart(
+          id: 'builtin_search',
+          toolName: 'builtin_search',
+          arguments: {},
+          content: '{"items":[{"title":"First"},{"title":"Second"}]}',
+        ),
+      ]);
+
+      expect(parts, hasLength(1));
+      expect(
+        parts.single.content,
+        '{"items":[{"title":"First"},{"title":"Second"}]}',
+      );
+    },
+  );
+
+  test(
+    'dedupeToolEvents keeps latest completed result for the same non-empty id',
+    () {
+      final controller = buildController();
+
+      final events = controller.dedupeToolEvents(const [
+        {
+          'id': 'builtin_search',
+          'name': 'builtin_search',
+          'arguments': <String, dynamic>{},
+          'content': '{"items":[{"title":"First"}]}',
+        },
+        {
+          'id': 'builtin_search',
+          'name': 'builtin_search',
+          'arguments': <String, dynamic>{},
+          'content': '{"items":[{"title":"First"},{"title":"Second"}]}',
+        },
+      ]);
+
+      expect(events, hasLength(1));
+      expect(
+        events.single['content'],
+        '{"items":[{"title":"First"},{"title":"Second"}]}',
+      );
+    },
+  );
+
+  test(
+    'handleToolResultsChunk keeps latest completed result for the same non-empty id',
+    () async {
+      final settings = SettingsProvider();
+      final controller = buildController(
+        settings: settings,
+        currentConversationId: 'conversation-1',
+      );
+      final state = buildStreamingState(settings);
+
+      Future<void> upsertToolEventInDb(
+        String messageId, {
+        required String id,
+        required String name,
+        required Map<String, dynamic> arguments,
+        String? content,
+        Map<String, dynamic>? metadata,
+      }) async {}
+
+      await controller.handleToolResultsChunk(
+        ChatStreamChunk(
+          content: '',
+          isDone: false,
+          totalTokens: 0,
+          toolResults: [
+            ToolResultInfo(
+              id: 'builtin_search',
+              name: 'builtin_search',
+              arguments: const <String, dynamic>{},
+              content: '{"items":[{"title":"First"}]}',
+            ),
+          ],
+        ),
+        state,
+        upsertToolEventInDb: upsertToolEventInDb,
+      );
+
+      await controller.handleToolResultsChunk(
+        ChatStreamChunk(
+          content: '',
+          isDone: false,
+          totalTokens: 0,
+          toolResults: [
+            ToolResultInfo(
+              id: 'builtin_search',
+              name: 'builtin_search',
+              arguments: const <String, dynamic>{},
+              content: '{"items":[{"title":"First"},{"title":"Second"}]}',
+            ),
+          ],
+        ),
+        state,
+        upsertToolEventInDb: upsertToolEventInDb,
+      );
+
+      final parts = controller.toolParts[state.messageId]!;
+      expect(parts, hasLength(1));
+      expect(
+        parts.single.content,
+        '{"items":[{"title":"First"},{"title":"Second"}]}',
+      );
+    },
+  );
+
+  test(
+    'dedupeToolPartsList drops stale no-id placeholders when a completed result exists',
+    () {
+      final controller = buildController();
+
+      final parts = controller.dedupeToolPartsList(const [
+        ToolUIPart(
+          id: '',
+          toolName: 'builtin_search',
+          arguments: {},
+          loading: true,
+        ),
+        ToolUIPart(
+          id: '',
+          toolName: 'builtin_search',
+          arguments: {},
+          content: '{"items":[{"title":"Finished"}]}',
+        ),
+      ]);
+
+      expect(parts, hasLength(1));
+      expect(parts.single.loading, isFalse);
+      expect(parts.single.content, '{"items":[{"title":"Finished"}]}');
+    },
+  );
+
+  test(
+    'dedupeToolEvents drops stale no-id placeholders when a completed result exists',
+    () {
+      final controller = buildController();
+
+      final events = controller.dedupeToolEvents(const [
+        {
+          'id': '',
+          'name': 'builtin_search',
+          'arguments': <String, dynamic>{},
+          'content': null,
+        },
+        {
+          'id': '',
+          'name': 'builtin_search',
+          'arguments': <String, dynamic>{},
+          'content': '{"items":[{"title":"Finished"}]}',
+        },
+      ]);
+
+      expect(events, hasLength(1));
+      expect(events.single['content'], '{"items":[{"title":"Finished"}]}');
     },
   );
 

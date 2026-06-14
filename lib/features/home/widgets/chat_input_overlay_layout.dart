@@ -13,7 +13,7 @@ class ChatInputOverlayLayout extends StatelessWidget {
   });
 
   static const double _topOverlayTailHeight = 16;
-  static const double _bottomOverlayFadeHeight = 120;
+  static const double _bottomOverlayFadeHeight = 180;
 
   final double topInset;
   final Widget content;
@@ -78,18 +78,18 @@ class ChatInputOverlayLayout extends StatelessWidget {
                   height: _bottomOverlayFadeHeight,
                   child: _BottomOverlayFade(),
                 ),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: UnconstrainedBox(
-                  constrainedAxis: Axis.horizontal,
-                  alignment: Alignment.bottomCenter,
-                  child: bottomOverlay,
-                ),
-              ),
+              if (foreground != null) Positioned.fill(child: foreground!),
             ],
           ),
         ),
-        if (foreground != null) Positioned.fill(child: foreground!),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: UnconstrainedBox(
+            constrainedAxis: Axis.horizontal,
+            alignment: Alignment.bottomCenter,
+            child: bottomOverlay,
+          ),
+        ),
       ],
     );
   }

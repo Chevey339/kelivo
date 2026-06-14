@@ -50,6 +50,16 @@ class TranslationData {
   bool expanded = true; // default to expanded when translation is added
 }
 
+class UserMessageEditState {
+  const UserMessageEditState({
+    required this.messageId,
+    required this.previewText,
+  });
+
+  final String messageId;
+  final String previewText;
+}
+
 /// Controller that manages all state and service wiring for HomePage.
 ///
 /// This controller extracts the non-UI logic from _HomePageState to:
@@ -72,14 +82,27 @@ class HomePageController extends ChangeNotifier {
     required TextEditingController inputController,
     required ChatInputBarController mediaController,
     required ScrollController scrollController,
-  }) : _context = context,
-       _vsync = vsync,
-       _scaffoldKey = scaffoldKey,
-       _inputBarKey = inputBarKey,
-       _inputFocus = inputFocus,
-       _inputController = inputController,
-       _mediaController = mediaController,
-       _scrollController = scrollController {
+  }) : this._(
+         context,
+         vsync,
+         scaffoldKey,
+         inputBarKey,
+         inputFocus,
+         inputController,
+         mediaController,
+         scrollController,
+       );
+
+  HomePageController._(
+    this._context,
+    this._vsync,
+    this._scaffoldKey,
+    this._inputBarKey,
+    this._inputFocus,
+    this._inputController,
+    this._mediaController,
+    this._scrollController,
+  ) {
     _initialize();
   }
 
@@ -168,6 +191,8 @@ class HomePageController extends ChangeNotifier {
   // Input bar measurement
   double _inputBarHeight = 72;
 
+  UserMessageEditState? _userMessageEditState;
+
   // Animation tuning
   static const Duration _postSwitchScrollDelay = Duration(milliseconds: 220);
   static const double _sidebarMinWidth = 200;
@@ -205,6 +230,8 @@ class HomePageController extends ChangeNotifier {
   String get globalSearchQuery => _globalSearchQuery;
   String? get spotlightMessageId => _spotlightMessageId;
   int get spotlightToken => _spotlightToken;
+  UserMessageEditState? get userMessageEditState => _userMessageEditState;
+  bool get isUserMessageEditActive => _userMessageEditState != null;
 
   static double get sidebarMinWidth => _sidebarMinWidth;
   static double get sidebarMaxWidth => _sidebarMaxWidth;
@@ -311,7 +338,6 @@ class HomePageController extends ChangeNotifier {
     _fileUploadService = FileUploadService(
       getContext: () => _context,
       mediaController: _mediaController,
-      onScrollToBottom: () => _scrollToBottomSoon(),
     );
     _messageBuilderService = MessageBuilderService(
       chatService: _chatService,
@@ -597,6 +623,14 @@ class HomePageController extends ChangeNotifier {
         input.documents.isEmpty) {
       return ChatInputSubmissionResult.rejected;
     }
+    final editState = _userMessageEditState;
+    if (editState != null) {
+      final newMsg = await _saveEditedUserMessageVersion(input, editState);
+      if (newMsg == null) return ChatInputSubmissionResult.rejected;
+      _exitUserMessageEdit(clearDraft: false);
+      await regenerateAtMessage(newMsg);
+      return ChatInputSubmissionResult.sent;
+    }
     if (currentConversation == null) {
       await _createNewConversation();
     }
@@ -744,6 +778,7 @@ class HomePageController extends ChangeNotifier {
       await _viewModel.flushCurrentConversationProgress();
     } catch (_) {}
     if (currentConversation?.id == id) return;
+    _exitUserMessageEdit(clearDraft: true);
     if (!isDesktopPlatform) {
       try {
         await _convoFadeController.reverse();
@@ -779,6 +814,7 @@ class HomePageController extends ChangeNotifier {
     try {
       await _viewModel.flushCurrentConversationProgress();
     } catch (_) {}
+    _exitUserMessageEdit(clearDraft: true);
     if (!isDesktopPlatform) {
       try {
         await _convoFadeController.reverse();
@@ -799,6 +835,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> _createNewConversation() async {
+    _exitUserMessageEdit(clearDraft: true);
     _translations.clear();
     await _viewModel.createNewConversation();
     notifyListeners();
@@ -911,6 +948,11 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> editMessage(ChatMessage message) async {
+    if (message.role == 'user') {
+      await startUserMessageEdit(message);
+      return;
+    }
+
     final ctx = _context;
     if (!ctx.mounted) return;
     final isDesktop = isDesktopPlatform;
@@ -953,9 +995,154 @@ class HomePageController extends ChangeNotifier {
     if (!result.shouldSend) return;
     if (message.role == 'assistant') {
       await regenerateAtMessage(newMsg, assistantAsNewReply: true);
-    } else {
-      await regenerateAtMessage(newMsg);
     }
+  }
+
+  Future<void> startUserMessageEdit(ChatMessage message) async {
+    final ctx = _context;
+    if (!ctx.mounted) return;
+    if (message.role != 'user') {
+      final l10n = AppLocalizations.of(ctx)!;
+      showAppSnackBar(
+        ctx,
+        message: l10n.userMessageEditUnsupportedSnackbar,
+        type: NotificationType.warning,
+      );
+      return;
+    }
+
+    final hasDraft =
+        _inputController.text.trim().isNotEmpty ||
+        _mediaController.hasDraftMedia;
+    if (hasDraft) {
+      final overwrite = await _confirmOverwriteInputDraft(ctx);
+      if (overwrite != true) return;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      if (!ctx.mounted) return;
+    }
+
+    _enterUserMessageEdit(message);
+  }
+
+  void cancelUserMessageEdit() {
+    _exitUserMessageEdit(clearDraft: true);
+  }
+
+  void focusUserMessageEditInput() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_context.mounted) return;
+      _inputFocus.requestFocus();
+    });
+  }
+
+  Future<void> saveUserMessageEditOnly() async {
+    final editState = _userMessageEditState;
+    if (editState == null) return;
+    final input = _mediaController.snapshotInput(_inputController.text);
+    if (input.text.trim().isEmpty &&
+        input.imagePaths.isEmpty &&
+        input.documents.isEmpty) {
+      return;
+    }
+    final newMsg = await _saveEditedUserMessageVersion(input, editState);
+    if (newMsg == null) return;
+    _exitUserMessageEdit(clearDraft: true);
+  }
+
+  void _enterUserMessageEdit(ChatMessage message) {
+    final input = _messageBuilderService.parseInputFromRaw(
+      message.content,
+      includeMediaFilePathsAsImages: false,
+    );
+    final messageId = message.id;
+    _inputController.value = TextEditingValue(
+      text: input.text,
+      selection: TextSelection.collapsed(offset: input.text.length),
+      composing: TextRange.empty,
+    );
+    _mediaController.restoreInput(input);
+    _userMessageEditState = UserMessageEditState(
+      messageId: message.id,
+      previewText: input.text.isNotEmpty ? input.text : message.content.trim(),
+    );
+    notifyListeners();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_context.mounted) return;
+      if (_userMessageEditState?.messageId != messageId) return;
+      _inputFocus.requestFocus();
+    });
+  }
+
+  void _exitUserMessageEdit({required bool clearDraft}) {
+    if (_userMessageEditState == null) return;
+    _userMessageEditState = null;
+    if (clearDraft) {
+      _mediaController.clearDraft();
+    }
+    notifyListeners();
+    if (PlatformUtils.isMobileTarget) {
+      dismissKeyboard();
+    }
+  }
+
+  Future<ChatMessage?> _saveEditedUserMessageVersion(
+    ChatInputData input,
+    UserMessageEditState editState,
+  ) async {
+    final conversation = currentConversation;
+    if (conversation == null) return null;
+    final assistant = _context.read<AssistantProvider>().currentAssistant;
+    final content = MessageGenerationService.buildPersistedUserMessageContent(
+      input,
+      assistant: assistant,
+    );
+
+    await _chatService.clearConversationSuggestions(conversation.id);
+    _viewModel.updateCurrentConversation(
+      _chatService.getConversation(conversation.id),
+    );
+
+    final newMsg = await _chatService.appendMessageVersion(
+      messageId: editState.messageId,
+      content: content,
+    );
+    if (newMsg == null) return null;
+
+    if (_chatController.appendPersistedTailMessage(newMsg)) {
+      _viewModel.restoreMessageUiState();
+    }
+    final gid = newMsg.groupId ?? newMsg.id;
+    versionSelections[gid] = newMsg.version;
+    try {
+      await _chatService.setSelectedVersion(
+        conversation.id,
+        gid,
+        newMsg.version,
+      );
+    } catch (_) {}
+    notifyListeners();
+    return newMsg;
+  }
+
+  Future<bool?> _confirmOverwriteInputDraft(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.userMessageEditOverwriteTitle),
+        content: Text(l10n.userMessageEditOverwriteContent),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.homePageCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l10n.modelDetailSheetConfirmButton),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> translateMessage(ChatMessage message) async {
