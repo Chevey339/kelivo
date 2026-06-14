@@ -175,11 +175,19 @@ class MarkdownBlockScanner {
     return (buf.toString(), codeMap);
   }
 
-  /// The opening sequence must start at a line boundary.
-  /// Only backtick fences (3+) are supported; tilde fences are not.
+  /// The opening sequence must be at a line boundary (possibly with leading
+  /// whitespace). Only backtick fences (3+) are supported; tilde fences are not.
   static bool _isFenceStart(String text, int i) {
-    if (i > 0 && text[i - 1] != '\n') return false;
     if (text[i] != '`') return false;
+    // Walk back to start of line
+    var j = i;
+    while (j > 0 && text[j - 1] != '\n') {
+      j--;
+    }
+    // All characters between line start and i must be whitespace
+    for (var k = j; k < i; k++) {
+      if (text[k] != ' ' && text[k] != '\t') return false;
+    }
     var len = 0;
     while (i + len < text.length && text[i + len] == '`') {
       len++;
@@ -187,9 +195,13 @@ class MarkdownBlockScanner {
     return len >= 3;
   }
 
-  /// The candidate at [i] must start with the same [marker] and be at least
-  /// [minLen] characters long.
+  /// The candidate at [i] must start with the same [marker] (possibly with
+  /// leading whitespace) and be at least [minLen] characters long.
   static bool _closesFence(String text, int i, String marker, int minLen) {
+    // Skip leading whitespace (fences inside list items may be indented)
+    while (i < text.length && (text[i] == ' ' || text[i] == '\t')) {
+      i++;
+    }
     if (i >= text.length) return false;
     if (text[i] != marker) return false;
     var len = 0;
