@@ -251,7 +251,7 @@ bool _isExactHexColorArgument(String tex, int open, int hash, int close) {
       if (tex[j] != ' ' && tex[j] != ',') return false;
     }
   }
-  final hex = inner.substring(hash - open - 1);
+  final hex = inner.substring(hash - open);
   if (hex.length < 2) return false;
   if (hex.length > 8) return false;
   for (var j = 0; j < hex.length; j++) {
@@ -266,8 +266,26 @@ bool _isExactHexColorArgument(String tex, int open, int hash, int close) {
 }
 
 bool _isTexColorArgumentGroup(String tex, int open) {
-  if (open < 3) return false;
-  return tex.substring(open - 3, open) == 'lor';
+  if (open < 2) return false;
+  // Scan backwards to find the control word (backslash + letters)
+  var wordEnd = open - 1;
+  while (wordEnd >= 0 && _isAsciiLetter(tex.codeUnitAt(wordEnd))) {
+    wordEnd--;
+  }
+  if (wordEnd < 0 || tex.codeUnitAt(wordEnd) != 0x5C) return false;
+  final word = tex.substring(wordEnd, open);
+  return _isTexColorCommandArgument(word);
+}
+
+bool _isTexColorCommandArgument(String command) {
+  switch (command) {
+    case r'\color':
+    case r'\textcolor':
+    case r'\colorbox':
+    case r'\fcolorbox':
+      return true;
+  }
+  return false;
 }
 
 String _escapeLikelyLiteralMathBraces(String tex) {

@@ -12,7 +12,10 @@ import 'package:markdown/markdown.dart' as md;
 /// list so it wins for all `**...**` patterns.
 class CjkFriendlyBoldSyntax extends md.InlineSyntax {
   CjkFriendlyBoldSyntax()
-    : super(r'(?<!\*)\*\*(?!\*)(.+?)(?<!\*)\*\*(?!\*)', startCharacter: 0x2A);
+    : super(
+        r'(?<![\\*])\*\*(?!\*)(.+?)(?<![\\*])\*\*(?!\*)',
+        startCharacter: 0x2A,
+      );
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {
@@ -29,7 +32,7 @@ class CjkFriendlyBoldSyntax extends md.InlineSyntax {
 /// punctuation characters common in CJK text.
 class CjkFriendlyItalicSyntax extends md.InlineSyntax {
   CjkFriendlyItalicSyntax()
-    : super(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', startCharacter: 0x2A);
+    : super(r'(?<![\\*])\*(?!\*)(.+?)(?<![\\*])\*(?!\*)', startCharacter: 0x2A);
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {

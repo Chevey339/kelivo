@@ -442,7 +442,8 @@ class MarkdownBuilder implements md.NodeVisitor {
         if (builders.containsKey('table')) {
           // Custom table builder handles rendering; discard default table state.
           _tables.removeLast();
-        } else if (styleSheet.tableColumnWidth is FixedColumnWidth || styleSheet.tableColumnWidth is IntrinsicColumnWidth) {
+        } else if (styleSheet.tableColumnWidth is FixedColumnWidth ||
+            styleSheet.tableColumnWidth is IntrinsicColumnWidth) {
           child = _ScrollControllerBuilder(
             builder: (BuildContext context, ScrollController tableScrollController, Widget? child) {
               return Scrollbar(
@@ -463,11 +464,25 @@ class MarkdownBuilder implements md.NodeVisitor {
         }
       } else if (tag == 'blockquote') {
         _isInBlockquote = false;
-        child = DecoratedBox(
-          decoration: styleSheet.blockquoteDecoration!,
-          child: Padding(
-            padding: styleSheet.blockquotePadding!,
-            child: child,
+        child = Container(
+          key: const ValueKey('markdown-blockquote'),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 3,
+                child: DecoratedBox(
+                  key: const ValueKey('markdown-blockquote-line'),
+                  decoration: styleSheet.blockquoteDecoration!,
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: styleSheet.blockquotePadding!,
+                  child: child,
+                ),
+              ),
+            ],
           ),
         );
       } else if (tag == 'pre') {
@@ -477,7 +492,10 @@ class MarkdownBuilder implements md.NodeVisitor {
           child: child,
         );
       } else if (tag == 'hr') {
-        child = Container(decoration: styleSheet.horizontalRuleDecoration);
+        child = Container(
+          key: const ValueKey('markdown-soft-horizontal-rule'),
+          decoration: styleSheet.horizontalRuleDecoration,
+        );
       }
 
       _addBlockChild(child);
@@ -539,9 +557,7 @@ class MarkdownBuilder implements md.NodeVisitor {
         );
         _tables.single.rows.last.children.add(child);
       } else if (tag == 'a') {
-        if (!builders.containsKey('a')) {
-          _linkHandlers.removeLast();
-        }
+        _linkHandlers.removeLast();
       } else if (tag == 'sup') {
         final Widget c = current.children.last;
         TextSpan? textSpan;

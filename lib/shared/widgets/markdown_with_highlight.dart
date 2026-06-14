@@ -12,9 +12,9 @@ import 'markdown_plus_extensions/latex_element_builder.dart';
 import 'markdown_plus_extensions/cjk_friendly_syntax.dart';
 import 'markdown_plus_extensions/fenced_code_element_builder.dart';
 import 'markdown_plus_extensions/codespan_syntax.dart';
-import 'markdown_plus_extensions/citation_syntax.dart';
 import 'markdown_plus_extensions/details_block_syntax.dart';
 import 'markdown_plus_extensions/details_element_builder.dart';
+import 'markdown_plus_extensions/latex_friendly_escape_syntax.dart';
 import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
 import 'package:flutter/rendering.dart';
@@ -282,8 +282,10 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         enableDollarLatex: settings.enableDollarLatex,
         streaming: widget.streaming,
       );
-      // Convert citation links into custom syntax
-      final newBackendText = convertCitationLinks(preprocessed);
+      // Skip convertCitationLinks — let the native markdown parser
+      // handle [citation](index:id) as a link and intercept via
+      // the custom 'a' builder below.
+      final newBackendText = preprocessed;
       markdownWidget = fmp.MarkdownBody(
         key: ValueKey(
           '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${cs.onSurface.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}',
@@ -306,12 +308,12 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                 ),
               ),
               blockquoteDecoration: BoxDecoration(
-                border: BorderDirectional(
-                  start: BorderSide(
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.42),
-                    width: 3,
-                  ),
+                color: cs.onSurfaceVariant.withValues(
+                  alpha: Theme.of(context).brightness == Brightness.dark
+                      ? 0.48
+                      : 0.36,
                 ),
+                borderRadius: BorderRadius.circular(2),
               ),
               blockquotePadding: const EdgeInsets.only(
                 left: 13,
@@ -321,6 +323,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
               blockquote: TextStyle(
                 color: cs.onSurfaceVariant.withValues(alpha: 0.75),
               ),
+              strong: TextStyle(fontWeight: AppFontWeights.strong),
               blockSpacing: 6,
               tableHead: TextStyle(
                 fontWeight: FontWeight.w600,
@@ -338,65 +341,73 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                 horizontal: 10,
                 vertical: 9,
               ),
+              code: TextStyle(
+                fontFamily: codeFontFamily,
+                fontSize: 13,
+                height: 1.4,
+                backgroundColor: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white12
+                    : const Color(0xFFF1F3F5),
+              ),
             ),
         selectable: true,
-        extensionSet: md.ExtensionSet(
-          [
-            ...md.ExtensionSet.gitHubFlavored.blockSyntaxes,
-            DetailsBlockSyntax(),
-            if (settings.enableMathRendering) LatexBlockSyntax(),
-          ],
-          [
-            CjkFriendlyBoldSyntax(),
-            CjkFriendlyItalicSyntax(),
-            if (settings.enableMathRendering) LatexInlineSyntax(),
-            CodespanSyntax(),
-            CitationInlineSyntax(),
-            ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
-          ],
-        ),
+        extensionSet: _markdownExtensionSet(settings),
         imageBuilder: (uri, title, alt) {
           final url = uri.toString();
           final imgs = imageUrls.isNotEmpty ? imageUrls : <String>[url];
+          double? w;
+          double? h;
+          if (alt != null) {
+            final dimMatch = RegExp(r'^(\d+)x(\d+)$').firstMatch(alt);
+            if (dimMatch != null) {
+              w = double.tryParse(dimMatch[1]!);
+              h = double.tryParse(dimMatch[2]!);
+            }
+          }
           return _buildFlutterMarkdownPlusImage(
             ctx: context,
             url: url,
             imgs: imgs,
+            width: w,
+            height: h,
           );
         },
-        builders: {
-          'latex': LatexElementBuilder(),
-          'pre': FencedCodeElementBuilder(
-            streaming: widget.streaming,
-            codeWidgetBuilder: (ctx, lang, code, closed) {
-              final restoredCode = _unmaskHtmlTagStartsInsideFencedCode(code);
-              final langLower = lang.toLowerCase();
-              if (langLower == 'mermaid') {
-                return _MermaidBlock(
+        builders: () {
+          final mdBuilders = <String, fmp.MarkdownElementBuilder>{
+            'latex': LatexElementBuilder(),
+            'pre': FencedCodeElementBuilder(
+              streaming: widget.streaming,
+              codeWidgetBuilder: (ctx, lang, code, closed) {
+                final restoredCode = _unmaskHtmlTagStartsInsideFencedCode(code);
+                final langLower = lang.toLowerCase();
+                if (langLower == 'mermaid') {
+                  return _MermaidBlock(
+                    code: restoredCode,
+                    streaming: widget.streaming && !closed,
+                  );
+                } else if (langLower == 'plantuml') {
+                  return PlantUMLBlock(code: restoredCode);
+                }
+                return _CollapsibleCodeBlock(
+                  language: lang,
                   code: restoredCode,
-                  streaming: widget.streaming && !closed,
+                  streaming: widget.streaming,
+                  closed: closed,
                 );
-              } else if (langLower == 'plantuml') {
-                return PlantUMLBlock(code: restoredCode);
-              }
-              return _CollapsibleCodeBlock(
-                language: lang,
-                code: restoredCode,
-                streaming: widget.streaming,
-                closed: closed,
-              );
-            },
-          ),
-          'codespan': _buildCodespan(codeFontFamily: codeFontFamily),
-          'table': TableElementBuilder(
-            appFontFamily: appFontFamily.isEmpty ? null : appFontFamily,
-            streaming: widget.streaming,
-          ),
-          'citation': CitationElementBuilder(
-            onCitationTap: widget.onCitationTap,
-          ),
-          'details': DetailsElementBuilder(),
-        },
+              },
+            ),
+            'table': TableElementBuilder(
+              appFontFamily: appFontFamily.isEmpty ? null : appFontFamily,
+              streaming: widget.streaming,
+            ),
+            'a': _LinkBuilder(onCitationTap: widget.onCitationTap),
+          };
+          mdBuilders['details'] = DetailsElementBuilder(
+            extensionSet: _markdownExtensionSet(settings),
+            builders: mdBuilders,
+          );
+          return mdBuilders;
+        }(),
         onTapLink: (text, href, title) => _handleLinkTap(context, href ?? ''),
       );
       // ignore: dead_code
@@ -657,17 +668,12 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     return result;
   }
 
-  fmp.MarkdownElementBuilder _buildCodespan({String? codeFontFamily}) {
-    return _CodespanBuilder(
-      codeFontFamily: codeFontFamily ?? 'monospace',
-      codeDollarMask: _codeDollarMask,
-    );
-  }
-
   Widget _buildFlutterMarkdownPlusImage({
     required BuildContext ctx,
     required String url,
     required List<String> imgs,
+    double? width,
+    double? height,
   }) {
     final idx = imgs.indexOf(url);
     final initial = idx >= 0 ? idx : 0;
@@ -710,7 +716,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
               }
               return Image(
                 image: provider,
-                width: constraints.maxWidth,
+                width: width ?? constraints.maxWidth,
+                height: height,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stack) =>
                     const Icon(Icons.broken_image),
@@ -834,6 +841,25 @@ String? _normalizeLanguage(String? lang) {
   }
 }
 
+md.ExtensionSet _markdownExtensionSet(SettingsProvider settings) {
+  return md.ExtensionSet(
+    [
+      ...md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+      DetailsBlockSyntax(),
+      if (settings.enableMathRendering) LatexBlockSyntax(),
+    ],
+    [
+      LatexFriendlyEscapeSyntax(),
+      md.DecodeHtmlSyntax(),
+      CjkFriendlyBoldSyntax(),
+      CjkFriendlyItalicSyntax(),
+      if (settings.enableMathRendering) LatexInlineSyntax(),
+      CodespanSyntax(),
+      ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+    ],
+  );
+}
+
 String _preprocessNewBackend(
   String input, {
   required bool enableMath,
@@ -842,21 +868,8 @@ String _preprocessNewBackend(
 }) {
   var out = input.replaceAll('\r\n', '\n');
 
-  // Convert <details> blocks to custom markers (not CommonMark).
-  out = convertDetailsBlocks(out);
-
-  // Normalize citation metadata: [citation:1:id] → [citation](1:id).
-  out = _normalizeRawCitationMetadata(out);
-
-  // Normalize double-bracket LLM citations: [[1]](url) → [1](url).
-  out = out.replaceAllMapped(
-    RegExp(r'\[\[([^\]]+)\]\]\(([^\s)]+)\)'),
-    (m) => '[${m[1]}](${m[2]})',
-  );
-
-  // Mask code blocks so dollar signs inside code survive math conversion.
-  // First, move fenced code from list lines to the next line so list fences
-  // are recognized by the scanner.
+  // Mask code blocks first so <details> and citation metadata inside code
+  // are protected from preprocessing.
   final bulletFence = RegExp(
     r"^(\s*(?:[*+-]|\d+\.)\s+)```([^\s`]*)\s*$",
     multiLine: true,
@@ -868,6 +881,43 @@ String _preprocessNewBackend(
     blockScan.spans,
   );
   out = masked;
+
+  // Convert <details> blocks to custom markers (not CommonMark).
+  // Runs AFTER code masking so <details> inside code blocks are preserved.
+  out = convertDetailsBlocks(out);
+
+  // Convert inline HTML tags that the CommonMark parser doesn't handle
+  // natively: <br> → \n, <a href="url">text</a> → [text](url),
+  // <p>/</p> removed.
+  // Runs AFTER code masking so tags inside code blocks are protected.
+  out = out.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
+  out = out.replaceAllMapped(
+    RegExp(
+      r'<a\s+(?:[^>]*?\s)?href="([^"]*)"[^>]*>(.*?)</a>',
+      caseSensitive: false,
+      dotAll: true,
+    ),
+    (m) => '[${m[2]}](${m[1]})',
+  );
+  out = out.replaceAllMapped(
+    RegExp(
+      r"<a\s+(?:[^>]*?\s)?href='([^']*)'[^>]*>(.*?)</a>",
+      caseSensitive: false,
+      dotAll: true,
+    ),
+    (m) => "[${m[2]}](${m[1]})",
+  );
+  out = out.replaceAll(RegExp(r'</?p\s*>', caseSensitive: false), '');
+
+  // Normalize citation metadata: [citation:1:id] → [citation](1:id).
+  // Runs AFTER code masking so citations inside code blocks are protected.
+  out = _normalizeRawCitationMetadata(out);
+
+  // Normalize double-bracket LLM citations: [[1]](url) → [1](url).
+  out = out.replaceAllMapped(
+    RegExp(r'\[\[([^\]]+)\]\]\(([^\s)]+)\)'),
+    (m) => '[${m[1]}](${m[2]})',
+  );
 
   // Streaming stabilization (only active during streaming).
   if (streaming) {
@@ -886,7 +936,8 @@ String _preprocessNewBackend(
   // Protect | inside \(...\) on table rows (markdown TableSyntax splits on |).
   out = _protectTableRowMathPipes(out);
 
-  // Unmask code blocks.
+  // Unmask code blocks (must be last so masked code isn't
+  // affected by math or streaming processing).
   out = out.replaceAllMapped(RegExp(r'__CODE_MASK_\d+__'), (match) {
     final key = match.group(0)!;
     return codeMap[key] ?? key;
@@ -2239,49 +2290,6 @@ ImageProvider? _imageProviderFor(String src) {
   }
   // Missing local file or unsupported scheme
   return null;
-}
-
-class _CodespanBuilder extends fmp.MarkdownElementBuilder {
-  _CodespanBuilder({
-    required this.codeFontFamily,
-    required this.codeDollarMask,
-  });
-
-  final String codeFontFamily;
-  final String codeDollarMask;
-
-  @override
-  Widget visitElementAfterWithContext(
-    BuildContext context,
-    md.Element element,
-    TextStyle? preferredStyle,
-    TextStyle? parentStyle,
-  ) {
-    final inline = element.textContent;
-    String unmasked = inline.replaceAll(codeDollarMask, r'$');
-    String softened = _softBreakInline(unmasked);
-    final bool isDarkCtx = Theme.of(context).brightness == Brightness.dark;
-    final csCtx = Theme.of(context).colorScheme;
-    final bg = isDarkCtx ? Colors.white12 : const Color(0xFFF1F3F5);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: csCtx.outlineVariant.withValues(alpha: 0.22)),
-      ),
-      child: Text(
-        softened,
-        style: TextStyle(
-          fontFamily: codeFontFamily,
-          fontSize: 13,
-          height: 1.4,
-        ).copyWith(color: csCtx.onSurface),
-        softWrap: true,
-        overflow: TextOverflow.visible,
-      ),
-    );
-  }
 }
 
 class _CollapsibleCodeBlock extends StatefulWidget {
@@ -6047,8 +6055,11 @@ List<List<_ExtractedCell>>? _extractTableRows(md.Element table) {
   return rows.isEmpty ? null : rows;
 }
 
-class CitationElementBuilder extends fmp.MarkdownElementBuilder {
-  CitationElementBuilder({this.onCitationTap});
+/// Intercepts `a` tag to render citation capsules for citation links.
+/// For regular links, returns `null` so default children (already set up
+/// with link recognizers by the fork) are used as-is.
+class _LinkBuilder extends fmp.MarkdownElementBuilder {
+  _LinkBuilder({this.onCitationTap});
 
   final void Function(String id)? onCitationTap;
 
@@ -6062,20 +6073,16 @@ class CitationElementBuilder extends fmp.MarkdownElementBuilder {
     TextStyle? preferredStyle,
     TextStyle? parentStyle,
   ) {
-    if (element.tag != 'citation') return null;
-    final children = element.children;
-    final indexText =
-        children != null && children.isNotEmpty && children[0] is md.Text
-        ? (children[0] as md.Text).text
-        : '';
-    final id = children != null && children.length > 1 && children[1] is md.Text
-        ? (children[1] as md.Text).text
-        : '';
+    if (element.tag != 'a') return null;
+    final href = element.attributes['href'] ?? '';
+    final ref = _parseCitationRef(href);
+    if (ref == null) return null;
+
     final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () {
-        if (onCitationTap != null && id.isNotEmpty) {
-          onCitationTap!(id);
+        if (onCitationTap != null && ref.id.isNotEmpty) {
+          onCitationTap!(ref.id);
         }
       },
       child: Container(
@@ -6087,7 +6094,7 @@ class CitationElementBuilder extends fmp.MarkdownElementBuilder {
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
-          indexText,
+          ref.indexText,
           style: const TextStyle(fontSize: 12, height: 1.0),
         ),
       ),

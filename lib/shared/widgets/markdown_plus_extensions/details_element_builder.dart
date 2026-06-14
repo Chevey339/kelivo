@@ -6,6 +6,11 @@ import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 class DetailsElementBuilder extends fmp.MarkdownElementBuilder {
+  DetailsElementBuilder({this.extensionSet, this.builders = const {}});
+
+  final md.ExtensionSet? extensionSet;
+  final Map<String, fmp.MarkdownElementBuilder> builders;
+
   @override
   bool isBlockElement() => true;
 
@@ -51,6 +56,8 @@ class DetailsElementBuilder extends fmp.MarkdownElementBuilder {
       body: body,
       initiallyExpanded: initiallyExpanded,
       style: preferredStyle,
+      extensionSet: extensionSet,
+      builders: builders,
     );
   }
 }
@@ -61,12 +68,16 @@ class _DetailsWidget extends StatefulWidget {
     required this.body,
     required this.initiallyExpanded,
     this.style,
+    this.extensionSet,
+    this.builders = const {},
   });
 
   final String summary;
   final String body;
   final bool initiallyExpanded;
   final TextStyle? style;
+  final md.ExtensionSet? extensionSet;
+  final Map<String, fmp.MarkdownElementBuilder> builders;
 
   @override
   State<_DetailsWidget> createState() => _DetailsWidgetState();
@@ -173,6 +184,8 @@ class _DetailsWidgetState extends State<_DetailsWidget> {
                         styleSheet: fmp.MarkdownStyleSheet.fromTheme(
                           Theme.of(context),
                         ),
+                        extensionSet: widget.extensionSet,
+                        builders: widget.builders,
                         selectable: true,
                       ),
                     ),

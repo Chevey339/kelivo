@@ -95,12 +95,22 @@ class DetailsBlockSyntax extends md.BlockSyntax {
 
     String? summary;
     final bodyParts = <String>[];
+    var depth = 1;
 
     while (!parser.isDone) {
       final line = parser.current.content;
       if (line == _detailsCloseMarker) {
+        depth--;
         parser.advance();
-        break;
+        if (depth == 0) break;
+        bodyParts.add(line);
+        continue;
+      }
+      if (line.startsWith(_detailsOpenMarker)) {
+        depth++;
+        bodyParts.add(line);
+        parser.advance();
+        continue;
       }
       if (summary == null) {
         summary = line;
